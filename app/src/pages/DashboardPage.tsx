@@ -142,8 +142,10 @@ export default function DashboardPage() {
 
   const pendingInvoices = useMemo(
     () =>
-      invoices.filter((i) =>
-        ['Pending', 'Partial', 'Overdue'].includes(i.payment_status),
+      invoices.filter(
+        (i) =>
+          !['Cancelled', 'Draft'].includes(i.status) &&
+          ['Pending', 'Partial', 'Overdue'].includes(i.payment_status),
       ).length,
     [invoices],
   )
@@ -178,7 +180,7 @@ export default function DashboardPage() {
   }, [quotations])
 
   const recentQuotes = quotations.slice(0, 6)
-  const recentInvoices = invoices.slice(0, 6)
+  const recentInvoices = invoices.filter((i) => i.status !== 'Cancelled').slice(0, 6)
 
   const upcomingFollowUps = useMemo(() => {
     const today = startOfDay(new Date())

@@ -127,7 +127,11 @@ export const localAuth = {
     await initLocalDb()
     const { data } = await localDb.from('app_users').select('email').order('email')
     const rows = (data || []) as { email: string }[]
-    if (rows.length > 0) return rows.map((r) => r.email)
+    const emails = rows
+      .map((r) => String(r.email || '').trim().toLowerCase())
+      .filter(Boolean)
+    const unique = [...new Set(emails)].sort((a, b) => a.localeCompare(b))
+    if (unique.length > 0) return unique
     return DEFAULT_ADMINS.map((a) => a.email)
   },
 }

@@ -555,6 +555,7 @@ export const localDb = {
 
 export type MigrationDump = {
   version?: number
+  cleanVersion?: number
   exportedAt?: string
   counts?: Record<string, number>
   app_settings?: Row[]
@@ -611,7 +612,19 @@ export async function importMigrationDump(dump: MigrationDump): Promise<Record<s
   const counts: Record<string, number> = {}
 
   for (const store of LOCAL_STORES) {
-    const rows = (dump[store as keyof MigrationDump] as Row[] | undefined) || []
+    let rows = (dump[store as keyof MigrationDump] as Row[] | undefined) || []
+    // Dedupe users by email so login chips stay clean
+    if (store === 'app_users') {
+      const byEmail = new Map<string, Row>()
+      for (const row of rows) {
+        const email = String(row.email || '')
+          .trim()
+          .toLowerCase()
+        if (!email) continue
+        byEmail.set(email, { ...row, email, id: row.id || `user-${email}` })
+      }
+      rows = [...byEmail.values()]
+    }
     await clearStore(store)
     await putMany(store, rows)
     counts[store] = rows.length
@@ -625,7 +638,7 @@ export async function importMigrationDump(dump: MigrationDump): Promise<Record<s
   if (!counts.app_users) {
     await putMany(
       'app_users',
-      DEFAULT_ADMINS.map((u) => ({ ...u, id: crypto.randomUUID() })),
+      DEFAULT_ADMINS.map((u) => ({ ...u, id: `user-${u.email}` })),
     )
     counts.app_users = DEFAULT_ADMINS.length
   }
