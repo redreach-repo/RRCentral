@@ -80,7 +80,8 @@ function getApiHandler_(fnName) {
     getDocumentUrl: getDocumentUrl,
     getWhatsAppShare: getWhatsAppShare,
     previewNextReference: previewNextReference,
-    installDailyMaintenanceTrigger: installDailyMaintenanceTrigger
+    installDailyMaintenanceTrigger: installDailyMaintenanceTrigger,
+    exportMigrationDump: exportMigrationDump
   };
   return map[fnName] || null;
 }

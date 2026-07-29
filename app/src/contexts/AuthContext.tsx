@@ -11,6 +11,7 @@ import type { User } from '@supabase/supabase-js'
 import { authApi, isSupabaseConfigured } from '../lib/authApi'
 import { authMode } from '../lib/db'
 import { db } from '../lib/db'
+import { tryAutoImportSheetsDump } from '../lib/migrateFromSheets'
 import type { UserRole } from '../lib/types'
 
 interface AuthContextValue {
@@ -47,13 +48,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true
 
-    authApi.getSession().then(async ({ data: { session } }) => {
+    void (async () => {
+      try {
+        await tryAutoImportSheetsDump()
+      } catch {
+        // ignore — empty seed is fine
+      }
+
+      const { data: { session } } = await authApi.getSession()
       if (!mounted) return
       const currentUser = session?.user ?? null
       setUser(currentUser)
       setUserRole(await lookupUserRole(currentUser?.email))
       setLoading(false)
-    })
+    })()
 
     const {
       data: { subscription },

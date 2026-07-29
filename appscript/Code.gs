@@ -20,6 +20,10 @@ function doGet(e) {
     return serveExternalApiPage_(params);
   }
 
+  if (page === 'migrate' || page === 'migration') {
+    return serveMigrationExport_(params);
+  }
+
   var t = HtmlService.createTemplateFromFile('Index');
   t.bootstrap = JSON.stringify(getBootstrap());
   t.logoDataUri = (typeof LOGO_DATA_URI !== 'undefined') ? LOGO_DATA_URI : '';

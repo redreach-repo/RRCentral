@@ -1,11 +1,16 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
-import { db } from '../lib/db'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Pencil, Plus, Trash2, Upload } from 'lucide-react'
+import { db, authMode } from '../lib/db'
 import type { AppUser, UserRole } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
+import {
+  importSheetsDumpFromFile,
+  importSheetsDumpFromUrl,
+  resetSheetsImportFlag,
+} from '../lib/migrateFromSheets'
 import {
   buttonDangerStyle,
   buttonPrimaryStyle,
@@ -86,6 +91,8 @@ export default function SettingsPage() {
   })
   const [deleteUser, setDeleteUser] = useState<AppUser | null>(null)
   const [busy, setBusy] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setDraft({ ...settings })
@@ -103,6 +110,41 @@ export default function SettingsPage() {
   useEffect(() => {
     if (userRole === 'admin') void loadUsers()
   }, [userRole, loadUsers])
+
+  async function handleImportFile(file: File | null) {
+    if (!file) return
+    setImporting(true)
+    try {
+      const counts = await importSheetsDumpFromFile(file)
+      showToast(
+        `Imported Sheets data: ${counts.crm || 0} CRM, ${counts.quotations || 0} quotes, ${counts.invoices || 0} invoices`,
+        'success',
+      )
+      window.location.reload()
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Import failed', 'error')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  async function handleImportBundled() {
+    setImporting(true)
+    try {
+      resetSheetsImportFlag()
+      const url = `${import.meta.env.BASE_URL}migration-data.json`
+      const counts = await importSheetsDumpFromUrl(url)
+      showToast(
+        `Imported Sheets data: ${counts.crm || 0} CRM, ${counts.quotations || 0} quotes, ${counts.invoices || 0} invoices`,
+        'success',
+      )
+      window.location.reload()
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Bundled dump not found — export from Apps Script first', 'error')
+    } finally {
+      setImporting(false)
+    }
+  }
 
   if (userRole !== 'admin') {
     return (
@@ -233,6 +275,42 @@ export default function SettingsPage() {
       {renderSection('Bank details', 'Bank', BANK_KEYS)}
       {renderSection('Quote / Invoice settings', 'Quote settings', QUOTE_KEYS)}
       {renderSection('System', 'System', SYSTEM_KEYS)}
+
+      {authMode === 'local' && (
+        <div style={{ ...cardStyle, marginBottom: 20 }}>
+          <h2 style={sectionTitleStyle}>Import Google Sheets data</h2>
+          <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
+            Pull your existing CRM, quotes, invoices, and catalog from the Apps Script spreadsheet
+            into this browser. This replaces local data.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <button
+              type="button"
+              style={buttonPrimaryStyle}
+              disabled={importing}
+              onClick={() => void handleImportBundled()}
+            >
+              <Upload size={14} style={{ marginRight: 6 }} />
+              {importing ? 'Importing…' : 'Import bundled Sheets dump'}
+            </button>
+            <button
+              type="button"
+              style={buttonSecondaryStyle}
+              disabled={importing}
+              onClick={() => fileRef.current?.click()}
+            >
+              Upload migration JSON…
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/json,.json"
+              style={{ display: 'none' }}
+              onChange={(e) => void handleImportFile(e.target.files?.[0] || null)}
+            />
+          </div>
+        </div>
+      )}
 
       <div style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>

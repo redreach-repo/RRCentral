@@ -553,6 +553,87 @@ export const localDb = {
   },
 }
 
+export type MigrationDump = {
+  version?: number
+  exportedAt?: string
+  counts?: Record<string, number>
+  app_settings?: Row[]
+  app_users?: Row[]
+  clients?: Row[]
+  crm?: Row[]
+  follow_up_updates?: Row[]
+  quotations?: Row[]
+  invoices?: Row[]
+  line_items?: Row[]
+  products?: Row[]
+  quote_templates?: Row[]
+  income?: Row[]
+  expenses?: Row[]
+  payment_log?: Row[]
+  attachments?: Row[]
+  activity_log?: Row[]
+}
+
+async function clearStore(store: string): Promise<void> {
+  const database = await openDb()
+  const tx = database.transaction(store, 'readwrite')
+  tx.objectStore(store).clear()
+  await txDone(tx)
+}
+
+async function putMany(store: string, rows: Row[]): Promise<void> {
+  if (!rows.length) return
+  const database = await openDb()
+  const tx = database.transaction(store, 'readwrite')
+  const os = tx.objectStore(store)
+  for (const row of rows) {
+    const next = { ...row }
+    if (store !== 'app_settings' && !next.id) {
+      next.id = crypto.randomUUID()
+    }
+    if (store === 'quote_templates' && next.items_json != null && typeof next.items_json === 'string') {
+      try {
+        next.items_json = JSON.parse(next.items_json as string)
+      } catch {
+        next.items_json = []
+      }
+    }
+    os.put(next)
+  }
+  await txDone(tx)
+}
+
+/**
+ * Replace local IndexedDB contents with a Sheets migration dump.
+ */
+export async function importMigrationDump(dump: MigrationDump): Promise<Record<string, number>> {
+  await openDb()
+  const counts: Record<string, number> = {}
+
+  for (const store of LOCAL_STORES) {
+    const rows = (dump[store as keyof MigrationDump] as Row[] | undefined) || []
+    await clearStore(store)
+    await putMany(store, rows)
+    counts[store] = rows.length
+  }
+
+  // Keep defaults if dump had no settings/users
+  if (!counts.app_settings) {
+    await putMany('app_settings', DEFAULT_SETTINGS)
+    counts.app_settings = DEFAULT_SETTINGS.length
+  }
+  if (!counts.app_users) {
+    await putMany(
+      'app_users',
+      DEFAULT_ADMINS.map((u) => ({ ...u, id: crypto.randomUUID() })),
+    )
+    counts.app_users = DEFAULT_ADMINS.length
+  }
+
+  seeded = true
+  return counts
+}
+
 /** Ensure DB is open and seeded (useful before auth/user listing). */
 export async function initLocalDb(): Promise<void> {
   await ensureSeeded()
