@@ -1,5 +1,5 @@
 import { VAT_RATE } from './config'
-import { supabase } from './supabase'
+import { db } from './db'
 import type { LineItem } from './types'
 
 export interface DraftLineItem {
@@ -70,7 +70,7 @@ export async function loadLineItems(
   reference: string,
 ): Promise<LineItem[]> {
   if (!reference) return []
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('line_items')
     .select('*')
     .eq('doc_type', docType)
@@ -86,7 +86,7 @@ export async function saveLineItems(
   items: DraftLineItem[],
   vatRate = VAT_RATE,
 ): Promise<void> {
-  await supabase
+  await db
     .from('line_items')
     .delete()
     .eq('doc_type', docType)
@@ -114,7 +114,7 @@ export async function saveLineItems(
     }
   })
 
-  const { error } = await supabase.from('line_items').insert(rows)
+  const { error } = await db.from('line_items').insert(rows)
   if (error) throw error
 }
 
@@ -124,7 +124,7 @@ export async function deleteLineItems(
 ): Promise<void> {
   for (const ref of references) {
     if (!ref) continue
-    await supabase.from('line_items').delete().eq('doc_type', docType).eq('reference', ref)
+    await db.from('line_items').delete().eq('doc_type', docType).eq('reference', ref)
   }
 }
 

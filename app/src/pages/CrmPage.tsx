@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties, type For
 import { Link, useSearchParams } from 'react-router-dom'
 import { format, isBefore, isToday, parseISO, startOfDay } from 'date-fns'
 import { Plus, Pencil, Trash2, Search, X, ExternalLink, Loader2 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { db } from '../lib/db'
 import { NEXT_ACTIONS } from '../lib/config'
 import type { AppUser, CrmEntry } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -89,8 +89,8 @@ export default function CrmPage() {
     setError('')
     try {
       const [crmRes, usersRes] = await Promise.all([
-        supabase.from('crm').select('*').order('updated_at', { ascending: false }),
-        supabase.from('app_users').select('*').eq('active', true).order('name'),
+        db.from('crm').select('*').order('updated_at', { ascending: false }),
+        db.from('app_users').select('*').eq('active', true).order('name'),
       ])
       if (crmRes.error) throw crmRes.error
       if (usersRes.error) throw usersRes.error
@@ -158,7 +158,7 @@ export default function CrmPage() {
 
   async function upsertClient(payload: CrmForm) {
     if (!payload.company_name.trim()) return
-    const { data: existing } = await supabase
+    const { data: existing } = await db
       .from('clients')
       .select('id')
       .ilike('company_name', payload.company_name.trim())
@@ -174,9 +174,9 @@ export default function CrmPage() {
     }
 
     if (existing?.id) {
-      await supabase.from('clients').update(clientRow).eq('id', existing.id)
+      await db.from('clients').update(clientRow).eq('id', existing.id)
     } else {
-      await supabase.from('clients').insert(clientRow)
+      await db.from('clients').insert(clientRow)
     }
   }
 
@@ -206,10 +206,10 @@ export default function CrmPage() {
 
     try {
       if (editing) {
-        const { error: err } = await supabase.from('crm').update(payload).eq('id', editing.id)
+        const { error: err } = await db.from('crm').update(payload).eq('id', editing.id)
         if (err) throw err
       } else {
-        const { error: err } = await supabase.from('crm').insert({
+        const { error: err } = await db.from('crm').insert({
           ...payload,
           created_by: who,
         })
@@ -230,7 +230,7 @@ export default function CrmPage() {
     setSaving(true)
     setError('')
     try {
-      const { error: err } = await supabase.from('crm').delete().eq('id', deleteTarget.id)
+      const { error: err } = await db.from('crm').delete().eq('id', deleteTarget.id)
       if (err) throw err
       setDeleteTarget(null)
       await load()

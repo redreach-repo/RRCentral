@@ -8,15 +8,20 @@ import {
   type ReactNode,
 } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { supabase } from '../lib/supabase'
+import { authApi, isSupabaseConfigured } from '../lib/authApi'
+import { authMode } from '../lib/db'
+import { db } from '../lib/db'
 import type { UserRole } from '../lib/types'
 
 interface AuthContextValue {
   user: User | null
   userRole: UserRole
   signIn: () => Promise<void>
+  signInWithEmail: (email: string) => Promise<void>
   signOut: () => Promise<void>
   loading: boolean
+  authMode: 'supabase' | 'local'
+  isLocalMode: boolean
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -24,7 +29,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 async function lookupUserRole(email: string | undefined): Promise<UserRole> {
   if (!email) return 'sales'
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('app_users')
     .select('role')
     .eq('email', email)
@@ -42,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    authApi.getSession().then(async ({ data: { session } }) => {
       if (!mounted) return
       const currentUser = session?.user ?? null
       setUser(currentUser)
@@ -52,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = authApi.onAuthStateChange((_event, session) => {
       const currentUser = session?.user ?? null
       setUser(currentUser)
       void (async () => {
@@ -68,18 +73,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signIn = useCallback(async () => {
-    await supabase.auth.signInWithOAuth({ provider: 'google' })
+    if (!authApi.signInWithOAuth) {
+      throw new Error('Google sign-in is only available with Supabase')
+    }
+    await authApi.signInWithOAuth({ provider: 'google' })
+  }, [])
+
+  const signInWithEmail = useCallback(async (email: string) => {
+    if (!authApi.signInWithEmail) {
+      throw new Error('Email sign-in is only available in local mode')
+    }
+    const { error } = await authApi.signInWithEmail(email)
+    if (error) throw new Error(error.message)
   }, [])
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut()
+    await authApi.signOut()
     setUser(null)
     setUserRole('sales')
   }, [])
 
   const value = useMemo(
-    () => ({ user, userRole, signIn, signOut, loading }),
-    [user, userRole, signIn, signOut, loading],
+    () => ({
+      user,
+      userRole,
+      signIn,
+      signInWithEmail,
+      signOut,
+      loading,
+      authMode,
+      isLocalMode: !isSupabaseConfigured,
+    }),
+    [user, userRole, signIn, signInWithEmail, signOut, loading],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

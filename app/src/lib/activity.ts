@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { db } from './db'
 
 export async function logActivity(
   action: string,
@@ -7,7 +7,7 @@ export async function logActivity(
   details: string,
   userEmail: string,
 ): Promise<void> {
-  const { error } = await supabase.from('activity_log').insert({
+  const { error } = await db.from('activity_log').insert({
     action,
     entity,
     reference: reference || '',

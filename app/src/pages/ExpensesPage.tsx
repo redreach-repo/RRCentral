@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { Pencil, Plus, Trash2, Wallet } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { db } from '../lib/db'
 import { PAYMENT_METHODS } from '../lib/config'
 import type { Expense } from '../lib/types'
 import { useToast } from '../contexts/ToastContext'
@@ -76,7 +76,7 @@ export default function ExpensesPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('expenses')
         .select('*')
         .order('date', { ascending: false })
@@ -145,10 +145,10 @@ export default function ExpensesPage() {
         notes: form.notes.trim(),
       }
       if (editing) {
-        const { error } = await supabase.from('expenses').update(payload).eq('id', editing.id)
+        const { error } = await db.from('expenses').update(payload).eq('id', editing.id)
         if (error) throw error
       } else {
-        const { error } = await supabase.from('expenses').insert(payload)
+        const { error } = await db.from('expenses').insert(payload)
         if (error) throw error
       }
       showToast('Expense saved', 'success')
@@ -165,7 +165,7 @@ export default function ExpensesPage() {
     if (!deleteTarget) return
     setSaving(true)
     try {
-      const { error } = await supabase.from('expenses').delete().eq('id', deleteTarget.id)
+      const { error } = await db.from('expenses').delete().eq('id', deleteTarget.id)
       if (error) throw error
       showToast('Expense deleted', 'success')
       setDeleteTarget(null)

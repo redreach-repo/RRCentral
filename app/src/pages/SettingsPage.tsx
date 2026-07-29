@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { db } from '../lib/db'
 import type { AppUser, UserRole } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
@@ -92,7 +92,7 @@ export default function SettingsPage() {
   }, [settings])
 
   const loadUsers = useCallback(async () => {
-    const { data, error } = await supabase.from('app_users').select('*').order('name')
+    const { data, error } = await db.from('app_users').select('*').order('name')
     if (error) {
       showToast(error.message, 'error')
       return
@@ -192,10 +192,10 @@ export default function SettingsPage() {
         active: userForm.active,
       }
       if (editingUser) {
-        const { error } = await supabase.from('app_users').update(payload).eq('id', editingUser.id)
+        const { error } = await db.from('app_users').update(payload).eq('id', editingUser.id)
         if (error) throw error
       } else {
-        const { error } = await supabase.from('app_users').insert(payload)
+        const { error } = await db.from('app_users').insert(payload)
         if (error) throw error
       }
       showToast('User saved', 'success')
@@ -212,7 +212,7 @@ export default function SettingsPage() {
     if (!deleteUser) return
     setBusy(true)
     try {
-      const { error } = await supabase.from('app_users').delete().eq('id', deleteUser.id)
+      const { error } = await db.from('app_users').delete().eq('id', deleteUser.id)
       if (error) throw error
       showToast('User deleted', 'success')
       setDeleteUser(null)

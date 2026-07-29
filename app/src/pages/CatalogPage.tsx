@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Package, Pencil, Plus, Trash2 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { db } from '../lib/db'
 import { DIVISIONS, FABRIC_OPTIONS } from '../lib/config'
 import type { Product } from '../lib/types'
 import { useToast } from '../contexts/ToastContext'
@@ -66,7 +66,7 @@ export default function CatalogPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('products')
         .select('*')
         .order('name')
@@ -134,10 +134,10 @@ export default function CatalogPage() {
         updated_at: new Date().toISOString(),
       }
       if (editing) {
-        const { error } = await supabase.from('products').update(payload).eq('id', editing.id)
+        const { error } = await db.from('products').update(payload).eq('id', editing.id)
         if (error) throw error
       } else {
-        const { error } = await supabase.from('products').insert(payload)
+        const { error } = await db.from('products').insert(payload)
         if (error) throw error
       }
       showToast('Product saved', 'success')
@@ -151,7 +151,7 @@ export default function CatalogPage() {
   }
 
   async function toggleActive(p: Product) {
-    const { error } = await supabase
+    const { error } = await db
       .from('products')
       .update({ active: !p.active, updated_at: new Date().toISOString() })
       .eq('id', p.id)
@@ -166,7 +166,7 @@ export default function CatalogPage() {
     if (!deleteTarget) return
     setSaving(true)
     try {
-      const { error } = await supabase.from('products').delete().eq('id', deleteTarget.id)
+      const { error } = await db.from('products').delete().eq('id', deleteTarget.id)
       if (error) throw error
       showToast('Product deleted', 'success')
       setDeleteTarget(null)

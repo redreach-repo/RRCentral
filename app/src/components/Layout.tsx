@@ -32,7 +32,7 @@ const navItems = [
 ]
 
 export default function Layout() {
-  const { user, userRole, signOut } = useAuth()
+  const { user, userRole, signOut, isLocalMode } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const visibleNav = navItems.filter(
@@ -41,6 +41,11 @@ export default function Layout() {
 
   return (
     <div className={styles.shell}>
+      {isLocalMode && (
+        <div className={styles.localBanner} role="status">
+          Running in local mode — data stays in this browser
+        </div>
+      )}
       {sidebarOpen && (
         <button
           type="button"

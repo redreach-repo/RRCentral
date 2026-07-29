@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import { Copy, ExternalLink, Pencil, Plus, Trash2, Wallet } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { db } from '../lib/db'
 import {
   DELIVERY_TERMS,
   DIVISIONS,
@@ -102,15 +102,15 @@ async function syncIncome(inv: {
     payment_method: inv.payment_method || '',
     payment_status: inv.payment_status,
   }
-  const { data: existing } = await supabase
+  const { data: existing } = await db
     .from('income')
     .select('id')
     .eq('reference_number', inv.reference_number)
     .maybeSingle()
   if (existing?.id) {
-    await supabase.from('income').update(row).eq('id', existing.id)
+    await db.from('income').update(row).eq('id', existing.id)
   } else {
-    await supabase.from('income').insert(row)
+    await db.from('income').insert(row)
   }
 }
 
@@ -142,8 +142,8 @@ export default function InvoicesPage() {
     setLoading(true)
     try {
       const [iRes, cRes] = await Promise.all([
-        supabase.from('invoices').select('*').order('created_at', { ascending: false }),
-        supabase.from('clients').select('*').order('company_name'),
+        db.from('invoices').select('*').order('created_at', { ascending: false }),
+        db.from('clients').select('*').order('company_name'),
       ])
       if (iRes.error) throw iRes.error
       setInvoices((iRes.data || []) as Invoice[])
@@ -227,9 +227,9 @@ export default function InvoicesPage() {
     try {
       let reference = form.reference_number.trim()
       if (finalize && !reference) {
-        const { data: allRefs } = await supabase.from('invoices').select('reference_number')
+        const { data: allRefs } = await db.from('invoices').select('reference_number')
         const refs = ((allRefs || []) as { reference_number: string }[]).map((r) => r.reference_number)
-        const { data: quoteRefs } = await supabase.from('quotations').select('reference_number')
+        const { data: quoteRefs } = await db.from('quotations').select('reference_number')
         const qrefs = ((quoteRefs || []) as { reference_number: string }[]).map((r) => r.reference_number)
         reference = generateReference(divisionCode, [...refs, ...qrefs], invoicePrefix)
       }
@@ -265,10 +265,10 @@ export default function InvoicesPage() {
         if (editing.reference_number && editing.reference_number !== reference) {
           await deleteLineItems('Invoice', [editing.reference_number])
         }
-        const { error } = await supabase.from('invoices').update(payload).eq('id', editing.id)
+        const { error } = await db.from('invoices').update(payload).eq('id', editing.id)
         if (error) throw error
       } else {
-        const { error } = await supabase.from('invoices').insert({
+        const { error } = await db.from('invoices').insert({
           ...payload,
           created_by: who,
         })
@@ -304,7 +304,7 @@ export default function InvoicesPage() {
     setPayAmount('')
     setPayMethod(settings.paymentMethod || PAYMENT_METHODS[0])
     setPayNotes('')
-    const { data } = await supabase
+    const { data } = await db
       .from('payment_log')
       .select('*')
       .eq('invoice_ref', inv.reference_number)
@@ -329,7 +329,7 @@ export default function InvoicesPage() {
       const balanceAfter = Math.max(0, Math.round((Number(payTarget.amount) - newPaid) * 100) / 100)
       const payment_status = balanceAfter <= 0.009 ? 'Paid' : 'Partial'
 
-      const { error: pErr } = await supabase.from('payment_log').insert({
+      const { error: pErr } = await db.from('payment_log').insert({
         invoice_ref: payTarget.reference_number,
         client: payTarget.client,
         amount,
@@ -340,7 +340,7 @@ export default function InvoicesPage() {
       })
       if (pErr) throw pErr
 
-      const { error } = await supabase
+      const { error } = await db
         .from('invoices')
         .update({
           payment_status,
@@ -389,14 +389,14 @@ export default function InvoicesPage() {
     }
     setSaving(true)
     try {
-      const { data } = await supabase
+      const { data } = await db
         .from('payment_log')
         .select('*')
         .eq('invoice_ref', inv.reference_number)
       const paid = ((data || []) as PaymentLogEntry[]).reduce((s, p) => s + Number(p.amount || 0), 0)
       const balance = Math.max(0, Math.round((Number(inv.amount) - paid) * 100) / 100)
       if (balance > 0.009) {
-        await supabase.from('payment_log').insert({
+        await db.from('payment_log').insert({
           invoice_ref: inv.reference_number,
           client: inv.client,
           amount: balance,
@@ -406,7 +406,7 @@ export default function InvoicesPage() {
           balance_after: 0,
         })
       }
-      await supabase
+      await db
         .from('invoices')
         .update({ payment_status: 'Paid', updated_by: who, updated_at: new Date().toISOString() })
         .eq('id', inv.id)
@@ -440,7 +440,7 @@ export default function InvoicesPage() {
     try {
       const items = await loadLineItems('Invoice', inv.reference_number)
       const draftRef = `INV-DRAFT-${Date.now()}`
-      const { error } = await supabase.from('invoices').insert({
+      const { error } = await db.from('invoices').insert({
         client: inv.client,
         vertical: inv.vertical,
         reference_number: draftRef,
@@ -472,7 +472,7 @@ export default function InvoicesPage() {
     setSaving(true)
     try {
       await deleteLineItems('Invoice', [deleteTarget.reference_number])
-      const { error } = await supabase.from('invoices').delete().eq('id', deleteTarget.id)
+      const { error } = await db.from('invoices').delete().eq('id', deleteTarget.id)
       if (error) throw error
       await logActivity('delete_invoice', 'invoice', deleteTarget.reference_number, deleteTarget.client, who)
       showToast('Invoice deleted', 'success')

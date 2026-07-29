@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { differenceInCalendarDays, format, parseISO, startOfMonth, subMonths } from 'date-fns'
 import { Download } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { db } from '../lib/db'
 import { DIVISIONS } from '../lib/config'
 import type { Expense, IncomeEntry, Invoice, Quotation } from '../lib/types'
 import { useToast } from '../contexts/ToastContext'
@@ -44,10 +44,10 @@ export default function ReportsPage() {
     setLoading(true)
     try {
       const [q, i, inc, exp] = await Promise.all([
-        supabase.from('quotations').select('*'),
-        supabase.from('invoices').select('*'),
-        supabase.from('income').select('*'),
-        supabase.from('expenses').select('*'),
+        db.from('quotations').select('*'),
+        db.from('invoices').select('*'),
+        db.from('income').select('*'),
+        db.from('expenses').select('*'),
       ])
       if (q.error) throw q.error
       if (i.error) throw i.error

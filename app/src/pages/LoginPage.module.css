@@ -96,3 +96,85 @@
 .googleBtn:active {
   transform: translateY(0);
 }
+
+.googleBtn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.localForm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.localBanner {
+  margin: 0 0 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(232, 93, 4, 0.12);
+  border: 1px solid rgba(232, 93, 4, 0.28);
+  color: rgba(255, 220, 190, 0.95);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.fieldLabel {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.emailInput {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.28);
+  color: #f2f4f7;
+  font-size: 15px;
+  font-family: inherit;
+}
+
+.emailInput:focus {
+  outline: none;
+  border-color: rgba(232, 93, 4, 0.7);
+  box-shadow: 0 0 0 3px rgba(232, 93, 4, 0.18);
+}
+
+.seedList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 2px 0 4px;
+}
+
+.seedChip {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.75);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.seedChip:hover {
+  background: rgba(232, 93, 4, 0.18);
+  border-color: rgba(232, 93, 4, 0.35);
+  color: #fff;
+}
+
+.error {
+  margin: 0;
+  font-size: 13px;
+  color: #ff8a80;
+  text-align: center;
+}

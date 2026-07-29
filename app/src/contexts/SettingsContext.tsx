@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { supabase } from '../lib/supabase'
+import { db } from '../lib/db'
 import type { AppSetting } from '../lib/types'
 
 interface SettingsContextValue {
@@ -26,7 +26,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     let mounted = true
 
     async function loadSettings() {
-      const { data, error } = await supabase.from('app_settings').select('key, value')
+      const { data, error } = await db.from('app_settings').select('key, value')
 
       if (!mounted) return
 
@@ -49,7 +49,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const updateSetting = useCallback(async (key: string, value: string) => {
-    const { error } = await supabase
+    const { error } = await db
       .from('app_settings')
       .upsert({ key, value }, { onConflict: 'key' })
 

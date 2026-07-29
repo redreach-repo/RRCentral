@@ -8,7 +8,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import { addDays, format, isWithinInterval, parseISO, startOfDay } from 'date-fns'
-import { supabase } from '../lib/supabase'
+import { db } from '../lib/db'
 import { DIVISIONS } from '../lib/config'
 import type { CrmEntry, Expense, IncomeEntry, Invoice, Quotation } from '../lib/types'
 import StatusPill from '../components/StatusPill'
@@ -93,11 +93,11 @@ export default function DashboardPage() {
     setError(null)
     try {
       const [qRes, iRes, incRes, expRes, crmRes] = await Promise.all([
-        supabase.from('quotations').select('*').order('created_at', { ascending: false }),
-        supabase.from('invoices').select('*').order('created_at', { ascending: false }),
-        supabase.from('income').select('*'),
-        supabase.from('expenses').select('*'),
-        supabase.from('crm').select('*').order('follow_up_date', { ascending: true }),
+        db.from('quotations').select('*').order('created_at', { ascending: false }),
+        db.from('invoices').select('*').order('created_at', { ascending: false }),
+        db.from('income').select('*'),
+        db.from('expenses').select('*'),
+        db.from('crm').select('*').order('follow_up_date', { ascending: true }),
       ])
 
       if (qRes.error) throw qRes.error

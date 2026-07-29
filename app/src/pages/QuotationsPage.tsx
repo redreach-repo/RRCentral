@@ -11,7 +11,7 @@ import {
   RotateCcw,
   Trash2,
 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { db } from '../lib/db'
 import {
   DELIVERY_TERMS,
   DIVISIONS,
@@ -130,9 +130,9 @@ export default function QuotationsPage() {
     setLoading(true)
     try {
       const [qRes, cRes, pRes] = await Promise.all([
-        supabase.from('quotations').select('*').order('created_at', { ascending: false }),
-        supabase.from('clients').select('*').order('company_name'),
-        supabase.from('products').select('*').eq('active', true).order('name'),
+        db.from('quotations').select('*').order('created_at', { ascending: false }),
+        db.from('clients').select('*').order('company_name'),
+        db.from('products').select('*').eq('active', true).order('name'),
       ])
       if (qRes.error) throw qRes.error
       if (cRes.error) throw cRes.error
@@ -160,7 +160,7 @@ export default function QuotationsPage() {
     if (!templateId || loading) return
 
     void (async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('quote_templates')
         .select('*')
         .eq('id', templateId)
@@ -284,10 +284,10 @@ export default function QuotationsPage() {
       }
 
       if (editing) {
-        const { error } = await supabase.from('quotations').update(payload).eq('id', editing.id)
+        const { error } = await db.from('quotations').update(payload).eq('id', editing.id)
         if (error) throw error
       } else {
-        const { error } = await supabase.from('quotations').insert({
+        const { error } = await db.from('quotations').insert({
           ...payload,
           status: 'Draft',
           reference_number: '',
@@ -317,10 +317,10 @@ export default function QuotationsPage() {
     }
     setSaving(true)
     try {
-      const { data: allRefs } = await supabase.from('quotations').select('reference_number')
+      const { data: allRefs } = await db.from('quotations').select('reference_number')
       const refs = ((allRefs || []) as { reference_number: string }[]).map((r) => r.reference_number)
       const reference = generateReference(q.division_code || '01', refs, quotePrefix)
-      const { error } = await supabase
+      const { error } = await db
         .from('quotations')
         .update({
           reference_number: reference,
@@ -346,7 +346,7 @@ export default function QuotationsPage() {
     if (!q.reference_number) return
     setSaving(true)
     try {
-      const { data: inv } = await supabase
+      const { data: inv } = await db
         .from('invoices')
         .select('id')
         .eq('reference_number', q.reference_number)
@@ -355,7 +355,7 @@ export default function QuotationsPage() {
         showToast('Cannot undo — invoice exists for this reference', 'error')
         return
       }
-      const { error } = await supabase
+      const { error } = await db
         .from('quotations')
         .update({
           status: 'Draft',
@@ -389,9 +389,9 @@ export default function QuotationsPage() {
       const newQuoteId = makeQuoteId()
       const items = await loadLineItems('Quote', q.quote_id)
 
-      await supabase.from('quotations').update({ status: 'Superseded', updated_by: who }).eq('id', q.id)
+      await db.from('quotations').update({ status: 'Superseded', updated_by: who }).eq('id', q.id)
 
-      const { error } = await supabase.from('quotations').insert({
+      const { error } = await db.from('quotations').insert({
         client: q.client,
         vertical: q.vertical,
         division_code: q.division_code,
@@ -433,7 +433,7 @@ export default function QuotationsPage() {
     try {
       const items = await loadLineItems('Quote', q.quote_id)
       const newQuoteId = makeQuoteId()
-      const { error } = await supabase.from('quotations').insert({
+      const { error } = await db.from('quotations').insert({
         client: q.client,
         vertical: q.vertical,
         division_code: q.division_code,
@@ -469,7 +469,7 @@ export default function QuotationsPage() {
     setSaving(true)
     try {
       await deleteLineItems('Quote', [deleteTarget.quote_id])
-      const { error } = await supabase.from('quotations').delete().eq('id', deleteTarget.id)
+      const { error } = await db.from('quotations').delete().eq('id', deleteTarget.id)
       if (error) throw error
       await logActivity('delete_quote', 'quotation', deleteTarget.quote_id, deleteTarget.client, who)
       showToast('Quotation deleted', 'success')
@@ -486,7 +486,7 @@ export default function QuotationsPage() {
     if (!outcomeTarget) return
     setSaving(true)
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('quotations')
         .update({
           status: outcomeStatus,
@@ -521,7 +521,7 @@ export default function QuotationsPage() {
     setSaving(true)
     try {
       const q = convertTarget
-      const { data: existing } = await supabase
+      const { data: existing } = await db
         .from('invoices')
         .select('id')
         .eq('reference_number', q.reference_number)
@@ -545,7 +545,7 @@ export default function QuotationsPage() {
       }
       const amount = calcTotals(draftItems, vatRate).total
 
-      const { error } = await supabase.from('invoices').insert({
+      const { error } = await db.from('invoices').insert({
         client: q.client,
         vertical: q.vertical,
         reference_number: q.reference_number,
@@ -580,15 +580,15 @@ export default function QuotationsPage() {
         payment_method: settings.paymentMethod || '',
         payment_status: 'Pending',
       }
-      const { data: inc } = await supabase
+      const { data: inc } = await db
         .from('income')
         .select('id')
         .eq('reference_number', q.reference_number)
         .maybeSingle()
       if (inc?.id) {
-        await supabase.from('income').update(incomePayload).eq('id', inc.id)
+        await db.from('income').update(incomePayload).eq('id', inc.id)
       } else {
-        await supabase.from('income').insert(incomePayload)
+        await db.from('income').insert(incomePayload)
       }
 
       await logActivity('convert_invoice', 'invoice', q.reference_number, `${q.client} · ${pct}%`, who)

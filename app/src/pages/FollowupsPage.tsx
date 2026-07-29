@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { addDays, differenceInCalendarDays, format, parseISO, startOfDay } from 'date-fns'
 import { Bell, CalendarClock, MessageSquarePlus } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { db } from '../lib/db'
 import type { CrmEntry } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -45,7 +45,7 @@ export default function FollowupsPage() {
     setLoading(true)
     setError('')
     try {
-      const { data, error: err } = await supabase
+      const { data, error: err } = await db
         .from('crm')
         .select('*')
         .not('follow_up_date', 'is', null)
@@ -87,7 +87,7 @@ export default function FollowupsPage() {
     setBusyId(entry.id)
     try {
       const next = format(addDays(parseISO(entry.follow_up_date.slice(0, 10)), 7), 'yyyy-MM-dd')
-      const { error: err } = await supabase
+      const { error: err } = await db
         .from('crm')
         .update({
           follow_up_date: next,
@@ -109,7 +109,7 @@ export default function FollowupsPage() {
   async function clearFollowUp(entry: CrmEntry) {
     setBusyId(entry.id)
     try {
-      const { error: err } = await supabase
+      const { error: err } = await db
         .from('crm')
         .update({
           follow_up_date: null,
@@ -132,7 +132,7 @@ export default function FollowupsPage() {
     if (!updateTarget || !updateText.trim()) return
     setBusyId(updateTarget.id)
     try {
-      const { error: err } = await supabase.from('follow_up_updates').insert({
+      const { error: err } = await db.from('follow_up_updates').insert({
         crm_id: updateTarget.id,
         company: updateTarget.company_name,
         update_text: updateText.trim(),

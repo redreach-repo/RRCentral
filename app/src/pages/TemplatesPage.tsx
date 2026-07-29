@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FilePlus2, Pencil, Plus, Trash2 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { db } from '../lib/db'
 import { DIVISIONS } from '../lib/config'
 import type { QuoteTemplate } from '../lib/types'
 import { useToast } from '../contexts/ToastContext'
@@ -70,7 +70,7 @@ export default function TemplatesPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('quote_templates')
         .select('*')
         .order('name')
@@ -126,10 +126,10 @@ export default function TemplatesPage() {
         items_json,
       }
       if (editing) {
-        const { error } = await supabase.from('quote_templates').update(payload).eq('id', editing.id)
+        const { error } = await db.from('quote_templates').update(payload).eq('id', editing.id)
         if (error) throw error
       } else {
-        const { error } = await supabase.from('quote_templates').insert(payload)
+        const { error } = await db.from('quote_templates').insert(payload)
         if (error) throw error
       }
       showToast('Template saved', 'success')
@@ -146,7 +146,7 @@ export default function TemplatesPage() {
     if (!deleteTarget) return
     setSaving(true)
     try {
-      const { error } = await supabase.from('quote_templates').delete().eq('id', deleteTarget.id)
+      const { error } = await db.from('quote_templates').delete().eq('id', deleteTarget.id)
       if (error) throw error
       showToast('Template deleted', 'success')
       setDeleteTarget(null)

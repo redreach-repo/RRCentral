@@ -4,7 +4,7 @@ import { format } from 'date-fns'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
 import { ArrowLeft, Download, MessageCircle, Printer } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { db } from '../lib/db'
 import { DIVISIONS, VAT_RATE } from '../lib/config'
 import type { Client, Invoice, LineItem, Quotation } from '../lib/types'
 import { useSettings } from '../contexts/SettingsContext'
@@ -35,7 +35,7 @@ export default function DocumentPage() {
     setError('')
     try {
       if (docType === 'quote') {
-        const { data, error: err } = await supabase.from('quotations').select('*').eq('id', id).maybeSingle()
+        const { data, error: err } = await db.from('quotations').select('*').eq('id', id).maybeSingle()
         if (err) throw err
         if (!data) throw new Error('Quotation not found')
         const q = data as Quotation
@@ -44,7 +44,7 @@ export default function DocumentPage() {
         const lines = await loadLineItems('Quote', q.quote_id)
         setItems(lines)
         if (q.client) {
-          const { data: c } = await supabase
+          const { data: c } = await db
             .from('clients')
             .select('*')
             .ilike('company_name', q.client)
@@ -52,7 +52,7 @@ export default function DocumentPage() {
           setClient((c as Client) || null)
         }
       } else {
-        const { data, error: err } = await supabase.from('invoices').select('*').eq('id', id).maybeSingle()
+        const { data, error: err } = await db.from('invoices').select('*').eq('id', id).maybeSingle()
         if (err) throw err
         if (!data) throw new Error('Invoice not found')
         const inv = data as Invoice
@@ -61,7 +61,7 @@ export default function DocumentPage() {
         const lines = await loadLineItems('Invoice', inv.reference_number)
         setItems(lines)
         if (inv.client) {
-          const { data: c } = await supabase
+          const { data: c } = await db
             .from('clients')
             .select('*')
             .ilike('company_name', inv.client)
