@@ -6,3 +6,6 @@ source.xlsx
 *.log
 appscript/node_modules/
 appscript/.clasp.json
+app/dist/
+.env
+.env.local

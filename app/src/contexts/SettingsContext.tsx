@@ -1,0 +1,77 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react'
+import { supabase } from '../lib/supabase'
+import type { AppSetting } from '../lib/types'
+
+interface SettingsContextValue {
+  settings: Record<string, string>
+  updateSetting: (key: string, value: string) => Promise<void>
+  loading: boolean
+}
+
+const SettingsContext = createContext<SettingsContextValue | undefined>(undefined)
+
+export function SettingsProvider({ children }: { children: ReactNode }) {
+  const [settings, setSettings] = useState<Record<string, string>>({})
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let mounted = true
+
+    async function loadSettings() {
+      const { data, error } = await supabase.from('app_settings').select('key, value')
+
+      if (!mounted) return
+
+      if (!error && data) {
+        const map: Record<string, string> = {}
+        for (const row of data as AppSetting[]) {
+          map[row.key] = row.value
+        }
+        setSettings(map)
+      }
+
+      setLoading(false)
+    }
+
+    void loadSettings()
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const updateSetting = useCallback(async (key: string, value: string) => {
+    const { error } = await supabase
+      .from('app_settings')
+      .upsert({ key, value }, { onConflict: 'key' })
+
+    if (error) throw error
+
+    setSettings((prev) => ({ ...prev, [key]: value }))
+  }, [])
+
+  const value = useMemo(
+    () => ({ settings, updateSetting, loading }),
+    [settings, updateSetting, loading],
+  )
+
+  return (
+    <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>
+  )
+}
+
+export function useSettings() {
+  const context = useContext(SettingsContext)
+  if (!context) {
+    throw new Error('useSettings must be used within a SettingsProvider')
+  }
+  return context
+}
