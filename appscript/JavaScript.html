@@ -1,0 +1,1902 @@
+<script>
+(function () {
+  var state = {
+    view: 'dashboard',
+    bootstrap: window.__BOOTSTRAP__ || {},
+    cache: {},
+    query: '',
+    autosaveTimer: null,
+    autosaveInFlight: false,
+    autosaveQueued: false,
+    searchTimer: null,
+    clients: []
+  };
+
+  var titles = {
+    dashboard: ['Dashboard', 'Sales, CRM and cash at a glance'],
+    crm: ['CRM', 'Companies, contacts and follow-ups'],
+    followups: ['Follow-ups', 'Overdue and upcoming CRM reminders'],
+    quotes: ['Quotations', 'Create, track, duplicate and print'],
+    invoices: ['Invoices', 'Bill clients and track payments'],
+    catalog: ['Catalog', 'Price list · MOQ · fabric (GB/PV/TW)'],
+    templates: ['Templates', 'Reusable quote catalogs'],
+    reports: ['Reports', 'Win rate, aging and monthly P&L'],
+    expenses: ['Expenses', 'Vendor spend log'],
+    settings: ['Settings', 'Company profile, portal and roles']
+  };
+
+  function isAdmin() {
+    var u = state.bootstrap.user || {};
+    return u.role === 'admin' || u.openAccess;
+  }
+  function canMarkPaid() {
+    var u = state.bootstrap.user || {};
+    return u.canMarkPaid !== false;
+  }
+
+  function byline(createdBy, updatedBy) {
+    var c = String(createdBy || '').trim();
+    var u = String(updatedBy || '').trim();
+    if (!c && !u) return '';
+    if (c && u && c !== u) return '<div class="muted">Created by ' + esc(c) + ' · Updated by ' + esc(u) + '</div>';
+    return '<div class="muted">By ' + esc(u || c) + '</div>';
+  }
+
+  function signedInLabel() {
+    var u = state.bootstrap.user || {};
+    if (u.name) return u.name;
+    if (u.email) return u.email;
+    return '';
+  }
+
+  function $(sel, root) { return (root || document).querySelector(sel); }
+  function $all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+  function money(n) {
+    var cur = state.bootstrap.currency || 'AED';
+    return cur + ' ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function moq(root) {
+    var input = root ? root.querySelector('[name="moq"]') : null;
+    if (input && input.value !== '') return Number(input.value);
+    if (state.bootstrap.settings && state.bootstrap.settings.moqDefault != null) {
+      return Number(state.bootstrap.settings.moqDefault);
+    }
+    return Number((state.bootstrap.moqDefault != null) ? state.bootstrap.moqDefault : 50);
+  }
+
+  function badge(status) {
+    var s = String(status || '').toLowerCase();
+    var cls = 'badge';
+    if (s === 'paid' || s === 'awarded' || s === 'finalized') cls += ' ok';
+    else if (s === 'pending' || s === 'sent' || s === 'partial' || s === 'draft') cls += ' warn';
+    else if (s === 'not awarded' || s === 'overdue' || s === 'cancelled' || s === 'expired' || s === 'superseded') cls += ' bad';
+    else cls += ' info';
+    return '<span class="' + cls + '">' + esc(status || '—') + '</span>';
+  }
+
+  function toast(msg, isError) {
+    var el = $('#toast');
+    el.textContent = msg;
+    el.classList.toggle('error', !!isError);
+    el.classList.remove('hidden');
+    setTimeout(function () { el.classList.add('hidden'); }, 3200);
+  }
+
+  function flashSaved() {
+    var el = $('#autosave');
+    el.classList.remove('hidden');
+    setTimeout(function () { el.classList.add('hidden'); }, 1200);
+  }
+
+  function run(fnName, args) {
+    args = args || [];
+    if (window.RRApi && !(window.google && google.script && google.script.run)) {
+      return RRApi.call(fnName, args).catch(function (err) {
+        toast(err && err.message ? err.message : String(err), true);
+        throw err;
+      });
+    }
+    return new Promise(function (resolve, reject) {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(function (err) {
+          reject(err);
+          toast(err && err.message ? err.message : String(err), true);
+        })[fnName].apply(null, args);
+    });
+  }
+
+  function openModal(title, bodyHtml, footHtml) {
+    $('#modal-title').textContent = title;
+    $('#modal-body').innerHTML = bodyHtml;
+    $('#modal-foot').innerHTML = footHtml || '';
+    $('#modal').classList.remove('hidden');
+    $('#modal').setAttribute('aria-hidden', 'false');
+  }
+  function closeModal() {
+    $('#modal').classList.add('hidden');
+    $('#modal').setAttribute('aria-hidden', 'true');
+    if (state.autosaveTimer) clearTimeout(state.autosaveTimer);
+  }
+
+  function setView(view) {
+    state.view = view;
+    state.query = '';
+    $all('.nav-item').forEach(function (btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-view') === view);
+    });
+    var t = titles[view] || [view, ''];
+    $('#view-title').textContent = t[0];
+    $('#view-subtitle').textContent = t[1];
+    closeSidebar();
+    render();
+  }
+
+  function openSidebar() {
+    $('#sidebar').classList.add('open');
+    $('#sidebar-backdrop').classList.add('show');
+  }
+  function closeSidebar() {
+    $('#sidebar').classList.remove('open');
+    $('#sidebar-backdrop').classList.remove('show');
+  }
+  function toggleSidebar() {
+    if ($('#sidebar').classList.contains('open')) closeSidebar();
+    else openSidebar();
+  }
+
+  function field(label, name, value, type, opts) {
+    opts = opts || {};
+    if (type === 'select') {
+      var optsList = (opts.options || []).slice();
+      if (value) {
+        var hasValue = optsList.some(function (o) {
+          var val = typeof o === 'string' ? o : o.value;
+          return String(val) === String(value);
+        });
+        if (!hasValue) optsList.unshift(value);
+      }
+      var options = optsList.map(function (o) {
+        var val = typeof o === 'string' ? o : o.value;
+        var labelText = typeof o === 'string' ? o : o.label;
+        return '<option value="' + esc(val) + '"' + (String(val) === String(value || '') ? ' selected' : '') + '>' + esc(labelText) + '</option>';
+      }).join('');
+      return '<label class="field ' + (opts.full ? 'full' : '') + '">' + esc(label) +
+        '<select class="select" name="' + esc(name) + '"' + (opts.id ? ' id="' + esc(opts.id) + '"' : '') + '>' + options + '</select></label>';
+    }
+    if (type === 'textarea') {
+      return '<label class="field ' + (opts.full ? 'full' : '') + '">' + esc(label) +
+        '<textarea class="textarea" name="' + esc(name) + '"' +
+        (opts.placeholder ? ' placeholder="' + esc(opts.placeholder) + '"' : '') +
+        '>' + esc(value || '') + '</textarea></label>';
+    }
+    return '<label class="field ' + (opts.full ? 'full' : '') + '">' + esc(label) +
+      '<input class="input" type="' + esc(type || 'text') + '" name="' + esc(name) + '" value="' + esc(value || '') + '"' +
+      (opts.id ? ' id="' + esc(opts.id) + '"' : '') +
+      (opts.list ? ' list="' + esc(opts.list) + '"' : '') +
+      (opts.placeholder ? ' placeholder="' + esc(opts.placeholder) + '"' : '') + '></label>';
+  }
+
+  function formValues(root) {
+    var data = {};
+    if (!root) return data;
+    $all('input, select, textarea', root).forEach(function (el) {
+      if (!el.name) return;
+      data[el.name] = el.value;
+    });
+    return data;
+  }
+
+  function divisionOptions() {
+    return (state.bootstrap.divisions || []).map(function (v) {
+      return { value: v.code, label: v.code + ' — ' + v.brand + ' (' + v.name + ')' };
+    });
+  }
+
+  function clientDatalist() {
+    return '<datalist id="client-list">' +
+      state.clients.map(function (c) {
+        return '<option value="' + esc(c.companyName) + '"></option>';
+      }).join('') + '</datalist>';
+  }
+
+  function fillClientDetails(name, root) {
+    var c = state.clients.filter(function (x) {
+      return String(x.companyName).toLowerCase() === String(name || '').toLowerCase();
+    })[0];
+    if (!c) return;
+    var box = $('#client-preview', root);
+    if (!box) return;
+    box.innerHTML = '<div class="muted"><strong>' + esc(c.primaryContact || '—') + '</strong> · ' +
+      esc(c.email || '') + ' · ' + esc(c.mobile || c.office || '') + '</div>';
+  }
+
+  /* ---------- Dashboard ---------- */
+  function renderDashboard(data) {
+    var t = data.totals;
+    $('#topbar-actions').innerHTML =
+      '<button class="btn btn-primary" data-action="new-quote">New quote</button>' +
+      '<button class="btn btn-secondary" data-action="new-invoice">New invoice</button>';
+    var divHtml = (data.byDivision || []).map(function (d) {
+      return '<div class="stat"><div class="stat-label">' + esc(d.brand) + '</div><div class="stat-value">' +
+        d.quotes + '</div><div class="muted">' + money(d.amount) + '</div></div>';
+    }).join('');
+    $('#content').innerHTML =
+      '<div class="grid grid-4">' +
+        stat('This month in', money(t.monthIncome), 'pos') +
+        stat('This month out', money(t.monthExpense), '') +
+        stat('Month net', money(t.monthNet), t.monthNet < 0 ? 'neg' : 'pos') +
+        stat('Unpaid invoices', money(t.pendingInvoices), t.pendingInvoices ? 'neg' : '') +
+      '</div>' +
+      '<div class="grid grid-4" style="margin-top:12px">' +
+        stat('Open quotes', t.openQuotes, '') +
+        stat('Overdue follow-ups', t.overdueFollowUps || 0, t.overdueFollowUps ? 'neg' : '') +
+        stat('Quotations', t.quoteCount, '') +
+        stat('Invoices', t.invoiceCount, '') +
+      '</div>' +
+      '<h3 style="margin:18px 0 10px;font-size:14px">By division</h3>' +
+      '<div class="grid grid-3">' + divHtml + '</div>' +
+      '<div class="split" style="margin-top:12px">' +
+        panel('Open quotations', quoteCards(data.openQuotes || data.recentQuotes || [])) +
+        panel('Follow-ups (7 days)', followUpList(data.followUps) +
+          '<div style="margin-top:10px"><button class="btn btn-ghost" data-action="goto-followups">Open follow-ups</button></div>') +
+      '</div>' +
+      '<div style="margin-top:12px">' + panel('Unpaid invoices', invoiceCards(data.unpaidInvoices || data.recentInvoices || [])) + '</div>';
+  }
+
+  function stat(label, value, cls) {
+    return '<div class="stat"><div class="stat-label">' + esc(label) + '</div><div class="stat-value ' + cls + '">' + value + '</div></div>';
+  }
+  function panel(title, body) {
+    return '<div class="panel"><div class="panel-head"><h3>' + esc(title) + '</h3></div><div class="panel-body">' + body + '</div></div>';
+  }
+  function followUpList(items) {
+    if (!items || !items.length) return '<div class="empty">No upcoming follow-ups</div>';
+    return '<ul class="list-compact">' + items.map(function (c) {
+      return '<li><div><strong>' + esc(c.companyName) + '</strong><div class="muted">' + esc(c.notes || c.primaryContact || '') +
+        '</div></div><div>' + esc(c.followUpDate || '') + '</div></li>';
+    }).join('') + '</ul>';
+  }
+
+  function quoteCards(rows) {
+    if (!rows.length) return '<div class="empty">No quotations</div>';
+    return '<div class="table-wrap"><table class="data"><thead><tr><th>Ref</th><th>Client</th><th>Amount</th><th>Status</th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        var key = r.quoteId || r.reference;
+        return '<tr><td><button class="linkish" data-action="open-quote" data-ref="' + esc(key) + '">' + esc(r.reference || 'Draft') +
+          '</button></td><td>' + esc(r.client) + '</td><td>' + money(r.amount) + '</td><td>' + badge(r.status) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
+  function invoiceCards(rows) {
+    if (!rows.length) return '<div class="empty">No invoices</div>';
+    return '<div class="table-wrap"><table class="data"><thead><tr><th>Ref</th><th>Client</th><th>Amount</th><th>Payment</th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        return '<tr><td><button class="linkish" data-action="open-invoice" data-ref="' + esc(r.reference) + '">' + esc(r.reference) +
+          '</button></td><td>' + esc(r.client) + '</td><td>' + money(r.amount) + '</td><td>' + badge(r.paymentStatus || r.status) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
+  /* ---------- CRM / lists ---------- */
+  function renderCrm(rows) {
+    var q = state.query.toLowerCase();
+    var filtered = rows.filter(function (r) {
+      if (!q) return true;
+      return [r.companyName, r.primaryContact, r.email, r.mobile, r.notes, r.nextAction, r.owner].join(' ').toLowerCase().indexOf(q) >= 0;
+    });
+    $('#topbar-actions').innerHTML = '<button class="btn btn-primary" data-action="new-crm">New contact</button>';
+    $('#content').innerHTML =
+      '<div class="toolbar"><input class="search" id="filter" placeholder="Filter CRM…" value="' + esc(state.query) + '"></div>' +
+      '<div class="panel"><div class="panel-body">' +
+      (filtered.length ? '<div class="table-wrap"><table class="data"><thead><tr><th>Company</th><th>Next action</th><th>Owner</th><th>Follow-up</th><th>Entered by</th><th></th></tr></thead><tbody>' +
+        filtered.map(function (r) {
+          return '<tr><td><button class="linkish" data-action="client-timeline" data-company="' + esc(r.companyName) + '"><strong>' +
+            esc(r.companyName) + '</strong></button><div class="muted">' + esc(r.primaryContact || r.mobile || '') +
+            '</div></td><td>' + esc(r.nextAction || '—') + '</td><td>' + esc(r.owner || '—') + '</td><td>' +
+            esc(r.followUpDate || '—') + '</td><td>' + esc(r.updatedBy || r.createdBy || '—') +
+            (r.createdBy && r.updatedBy && r.createdBy !== r.updatedBy
+              ? '<div class="muted">created ' + esc(r.createdBy) + '</div>' : '') +
+            '</td><td class="actions">' +
+            '<button class="btn btn-ghost" data-action="client-timeline" data-company="' + esc(r.companyName) + '">Timeline</button>' +
+            (r.mobile || r.office
+              ? '<button class="btn btn-ghost" data-action="whatsapp-crm" data-row="' + r.row + '">WhatsApp</button>'
+              : '') +
+            '<button class="btn btn-ghost" data-action="edit-crm" data-row="' + r.row + '">Edit</button></td></tr>';
+        }).join('') + '</tbody></table></div>' : '<div class="empty">No CRM records</div>') +
+      '</div></div>';
+    $('#filter').oninput = function (e) { state.query = e.target.value; renderCrm(rows); };
+  }
+
+  function renderQuotes(rows) {
+    var draftCount = (rows || []).filter(function (q) {
+      return q.isDraft || !q.reference || String(q.status || '').toLowerCase() === 'draft';
+    }).length;
+    $('#topbar-actions').innerHTML =
+      '<button class="btn btn-secondary" data-action="from-template">From template</button>' +
+      '<button class="btn btn-danger" data-action="clear-draft-quotes">Clear drafts' +
+      (draftCount ? ' (' + draftCount + ')' : '') + '</button>' +
+      '<button class="btn btn-primary" data-action="new-quote">New quotation</button>';
+    var filtered = filterDocs(rows);
+    var banner = draftCount > 20
+      ? '<div class="panel" style="margin-bottom:12px;border-color:#f1c0c0;background:#fff5f5">' +
+        '<div class="panel-body" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">' +
+        '<div><strong>' + draftCount + ' draft quotations</strong>' +
+        '<div class="muted">Empty autosave drafts can be removed in one click. Finalized quotes are kept.</div></div>' +
+        '<button class="btn btn-danger" data-action="clear-draft-quotes">Clear all drafts</button></div></div>'
+      : '';
+    $('#content').innerHTML =
+      banner +
+      '<div class="toolbar"><input class="search" id="filter" placeholder="Filter quotations…" value="' + esc(state.query) + '"></div>' +
+      '<div class="panel"><div class="panel-body">' + quoteListFull(filtered) + '</div></div>';
+    $('#filter').oninput = function (e) { state.query = e.target.value; renderQuotes(rows); };
+  }
+
+  function quoteListFull(rows) {
+    if (!rows.length) return '<div class="empty">No quotations yet</div>';
+    return '<div class="table-wrap"><table class="data"><thead><tr><th>Reference</th><th>Client</th><th>Division</th><th>Amount</th><th>Status</th><th>Entered by</th><th></th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        var key = r.quoteId || r.reference;
+        var st = String(r.status || '').toLowerCase();
+        var actions = '<button class="btn btn-ghost" data-action="print-quote" data-ref="' + esc(key) + '">Print</button>' +
+          '<button class="btn btn-ghost" data-action="whatsapp-quote" data-ref="' + esc(key) + '">WhatsApp</button>' +
+          '<button class="btn btn-ghost" data-action="duplicate-quote" data-ref="' + esc(key) + '">Duplicate</button>';
+        if (r.isDraft || !r.reference) {
+          actions += '<button class="btn btn-ghost" data-action="finalize-quote" data-ref="' + esc(key) + '">Finalize</button>';
+        } else {
+          actions += '<button class="btn btn-ghost" data-action="revise-quote" data-ref="' + esc(key) + '">Revise</button>' +
+            '<button class="btn btn-ghost" data-action="convert-quote" data-ref="' + esc(key) + '">Invoice</button>' +
+            '<button class="btn btn-ghost" data-action="quote-outcome" data-ref="' + esc(key) + '" data-status="Awarded">Awarded</button>' +
+            '<button class="btn btn-ghost" data-action="quote-outcome" data-ref="' + esc(key) + '" data-status="Not awarded">Lost</button>';
+          if (st !== 'awarded' && st !== 'superseded') {
+            actions += '<button class="btn btn-ghost" data-action="undo-finalize" data-ref="' + esc(key) + '">Undo finalize</button>';
+          }
+        }
+        actions += '<button class="btn btn-danger" data-action="delete-quote" data-ref="' + esc(key) + '">Delete</button>';
+        return '<tr><td><button class="linkish" data-action="open-quote" data-ref="' + esc(key) + '">' + esc(r.reference || 'Draft') +
+          '</button>' + (r.outcomeReason ? '<div class="muted">' + esc(r.outcomeReason) + '</div>' : '') +
+          '</td><td>' + esc(r.client) + '</td><td>' + esc(r.divisionBrand || r.vertical || '') +
+          '</td><td>' + money(r.amount) + '</td><td>' + badge(r.status) + '</td><td>' +
+          esc(r.updatedBy || r.createdBy || '—') +
+          (r.createdBy && r.updatedBy && r.createdBy !== r.updatedBy
+            ? '<div class="muted">created ' + esc(r.createdBy) + '</div>' : '') +
+          '</td><td class="actions">' + actions + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
+  function renderInvoices(rows) {
+    $('#topbar-actions').innerHTML = '<button class="btn btn-primary" data-action="new-invoice">New invoice</button>';
+    var filtered = filterDocs(rows);
+    $('#content').innerHTML =
+      '<div class="toolbar"><input class="search" id="filter" placeholder="Filter invoices…" value="' + esc(state.query) + '"></div>' +
+      '<div class="panel"><div class="panel-body">' + invoiceListFull(filtered) + '</div></div>';
+    $('#filter').oninput = function (e) { state.query = e.target.value; renderInvoices(rows); };
+  }
+
+  function invoiceListFull(rows) {
+    if (!rows.length) return '<div class="empty">No invoices yet</div>';
+    return '<div class="table-wrap"><table class="data"><thead><tr><th>Reference</th><th>Client</th><th>Amount</th><th>Paid / Due</th><th>Payment</th><th>Entered by</th><th></th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        return '<tr><td><button class="linkish" data-action="open-invoice" data-ref="' + esc(r.reference) + '">' + esc(r.reference) +
+          '</button></td><td><button class="linkish" data-action="client-timeline" data-company="' + esc(r.client) + '">' +
+          esc(r.client) + '</button></td><td>' + money(r.amount) + '</td><td><div>' + money(r.amountPaid || 0) +
+          '</div><div class="muted">due ' + money(r.balanceDue != null ? r.balanceDue : r.amount) + '</div></td><td>' +
+          badge(r.paymentStatus || r.status) + '</td><td>' + esc(r.updatedBy || r.createdBy || '—') +
+          (r.createdBy && r.updatedBy && r.createdBy !== r.updatedBy
+            ? '<div class="muted">created ' + esc(r.createdBy) + '</div>' : '') +
+          '</td><td class="actions">' +
+          '<button class="btn btn-ghost" data-action="print-invoice" data-ref="' + esc(r.reference) + '">Print</button>' +
+          '<button class="btn btn-ghost" data-action="whatsapp-invoice" data-ref="' + esc(r.reference) + '">WhatsApp</button>' +
+          '<button class="btn btn-ghost" data-action="duplicate-invoice" data-ref="' + esc(r.reference) + '">Duplicate</button>' +
+          '<button class="btn btn-primary" data-action="record-payment" data-ref="' + esc(r.reference) + '">Payment</button>' +
+          (canMarkPaid()
+            ? '<button class="btn btn-ghost" data-action="mark-paid" data-ref="' + esc(r.reference) + '">Mark paid</button>'
+            : '') +
+          '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
+  function filterDocs(rows) {
+    var q = state.query.toLowerCase();
+    if (!q) return rows;
+    return rows.filter(function (r) {
+      return [r.reference, r.quoteId, r.client, r.description, r.vertical, r.divisionBrand, r.status, r.paymentStatus]
+        .join(' ').toLowerCase().indexOf(q) >= 0;
+    });
+  }
+
+  function renderTemplates(rows) {
+    $('#topbar-actions').innerHTML = '';
+    $('#content').innerHTML = '<div class="panel"><div class="panel-body">' +
+      (rows.length ? '<div class="table-wrap"><table class="data"><thead><tr><th>Name</th><th>Division</th><th>Lines</th><th>Description</th><th></th></tr></thead><tbody>' +
+        rows.map(function (t) {
+          return '<tr><td><strong>' + esc(t.name) + '</strong></td><td>' + esc(t.divisionCode) + '</td><td>' +
+            (t.items || []).length + '</td><td>' + esc(t.description || '') + '</td><td class="actions">' +
+            '<button class="btn btn-primary" data-action="use-template" data-id="' + esc(t.id) + '">Use</button>' +
+            '<button class="btn btn-danger" data-action="delete-template" data-id="' + esc(t.id) + '">Delete</button></td></tr>';
+        }).join('') + '</tbody></table></div>'
+        : '<div class="empty">No templates yet. Open a quote and tap “Save as template”.</div>') +
+      '</div></div>';
+  }
+
+  function renderFollowups(data) {
+    $('#topbar-actions').innerHTML = '';
+    state.cache.followups = data;
+    function formatWhen(v) {
+      if (!v) return '';
+      var s = String(v);
+      return s.length > 16 ? s.slice(0, 16).replace('T', ' ') : s;
+    }
+    function block(title, rows, empty) {
+      if (!rows.length) return panel(title, '<div class="empty">' + empty + '</div>');
+      return panel(title, '<div class="table-wrap"><table class="data"><thead><tr><th>Company</th><th>Next / Owner</th><th>Latest update</th><th>Due</th><th></th></tr></thead><tbody>' +
+        rows.map(function (r) {
+          return '<tr><td><button class="linkish" data-action="client-timeline" data-company="' + esc(r.companyName) + '"><strong>' +
+            esc(r.companyName) + '</strong></button><div class="muted">' +
+            esc(r.primaryContact || r.mobile || '') +
+            (r.quoteRef ? ' · ' + esc(r.quoteRef) : '') + '</div></td><td><div>' + esc(r.nextAction || '—') +
+            '</div><div class="muted">' + esc(r.owner || 'Unassigned') + '</div></td><td>' +
+            (r.latestUpdate
+              ? '<div>' + esc(r.latestUpdate) + '</div><div class="muted">' +
+                esc(formatWhen(r.latestUpdateAt)) + (r.latestUpdateBy ? ' · ' + esc(r.latestUpdateBy.split('@')[0]) : '') + '</div>'
+              : '<span class="muted">No team update yet</span>') +
+            '</td><td>' +
+            (r.overdue ? '<span class="badge bad">' + esc(r.followUpDate) + '</span>' : esc(r.followUpDate)) +
+            '</td><td class="actions">' +
+            '<button class="btn btn-primary" data-action="post-followup-update" data-row="' + r.row +
+            '" data-company="' + esc(r.companyName) + '">Update</button>' +
+            (r.hasPhone || r.mobile
+              ? '<button class="btn btn-ghost" data-action="whatsapp-crm" data-row="' + r.row + '">WhatsApp</button>'
+              : '') +
+            '<button class="btn btn-ghost" data-action="edit-crm" data-row="' + r.row + '">Edit</button>' +
+            '<button class="btn btn-ghost" data-action="snooze-followup" data-row="' + r.row + '">+7 days</button>' +
+            '<button class="btn btn-ghost" data-action="clear-followup" data-row="' + r.row + '">Done</button></td></tr>';
+        }).join('') + '</tbody></table></div>');
+    }
+    var dig = data.digest || {};
+    var companies = data.companyOptions || [];
+    var companyOpts = [{ value: '', label: 'General / team-wide' }].concat(companies.map(function (c) {
+      return { value: String(c.row), label: c.companyName };
+    }));
+    var feed = (data.updates || []).slice(0, 25);
+    var feedHtml = feed.length
+      ? '<ul class="list-compact update-feed">' + feed.map(function (u) {
+          return '<li><div><strong>' + esc(u.company || 'Team') + '</strong>' +
+            '<div class="update-text">' + esc(u.update) + '</div>' +
+            '<div class="muted">' + esc(formatWhen(u.timestamp)) +
+            (u.user ? ' · ' + esc(String(u.user).split('@')[0]) : '') + '</div></div></li>';
+        }).join('') + '</ul>'
+      : '<div class="empty">No updates yet — post the first one so the team is in sync.</div>';
+
+    $('#content').innerHTML =
+      '<div class="grid grid-4">' +
+        stat('Overdue', dig.overdueCount || 0, dig.overdueCount ? 'neg' : '') +
+        stat('Upcoming (14d)', dig.upcomingCount || 0, '') +
+        stat('Team updates', dig.updateCount || 0, '') +
+        stat('From quotes', dig.quoteFollowUps || 0, '') +
+      '</div>' +
+      '<p class="muted" style="margin:10px 0 0">Finalized quotations auto-create follow-ups (default +' +
+        esc((state.bootstrap.settings && state.bootstrap.settings.followUpDaysAfterQuote) || 3) +
+        ' days) and sync to Google Calendar when enabled.</p>' +
+      '<div class="panel" style="margin-top:12px">' +
+        '<div class="panel-head"><h3>Team status board</h3></div>' +
+        '<div class="panel-body" style="padding:16px">' +
+          '<form id="followup-update-form" class="form-grid">' +
+            field('Company (optional)', 'crmRow', '', 'select', { options: companyOpts, full: true }) +
+            field('Current update', 'update', '', 'textarea', {
+              full: true,
+              placeholder: 'e.g. Called Ahmed — waiting on PO confirmation by Thursday'
+            }) +
+          '</form>' +
+          '<div class="modal-foot" style="padding:12px 0 0;border:0">' +
+            '<button class="btn btn-primary" data-action="submit-followup-update">Post update</button>' +
+          '</div>' +
+          '<h4 style="margin:18px 0 8px;font-size:13px">Recent updates</h4>' +
+          feedHtml +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-top:12px">' + block('Overdue', data.overdue || [], 'No overdue follow-ups') + '</div>' +
+      '<div style="margin-top:12px">' + block('Upcoming', data.upcoming || [], 'No upcoming follow-ups') + '</div>';
+  }
+
+  function renderCatalog(rows) {
+    $('#topbar-actions').innerHTML = '<button class="btn btn-primary" data-action="new-catalog">Add item</button>';
+    $('#content').innerHTML =
+      '<div class="toolbar"><input class="search" id="filter" placeholder="Filter catalog…" value="' + esc(state.query) + '"></div>' +
+      '<div class="panel"><div class="panel-body">' +
+      (rows.length ? '<div class="table-wrap"><table class="data"><thead><tr><th>SKU</th><th>Name</th><th>Div</th><th>Price</th><th>MOQ</th><th>Fabric</th><th></th></tr></thead><tbody>' +
+        rows.filter(function (r) {
+          if (!state.query) return true;
+          return [r.sku, r.name, r.fabric, r.notes].join(' ').toLowerCase().indexOf(state.query.toLowerCase()) >= 0;
+        }).map(function (r) {
+          return '<tr><td>' + esc(r.sku) + '</td><td><strong>' + esc(r.name) + '</strong>' +
+            (r.active ? '' : ' <span class="badge bad">off</span>') +
+            '</td><td>' + esc(r.divisionCode) + '</td><td>' + money(r.unitPrice) + '</td><td>' +
+            esc(r.moq === '' ? '—' : r.moq) + '</td><td>' + esc(r.fabric || '—') +
+            '</td><td class="actions"><button class="btn btn-ghost" data-action="edit-catalog" data-sku="' + esc(r.sku) +
+            '">Edit</button><button class="btn btn-danger" data-action="delete-catalog" data-sku="' + esc(r.sku) +
+            '">Delete</button></td></tr>';
+        }).join('') + '</tbody></table></div>' : '<div class="empty">No catalog items yet. Add uniforms, fabrics (GB/PV/TW), and MOQs here.</div>') +
+      '</div></div>';
+    var filter = $('#filter');
+    if (filter) filter.oninput = function (e) { state.query = e.target.value; renderCatalog(rows); };
+  }
+
+  function renderReports(data) {
+    $('#topbar-actions').innerHTML =
+      '<button class="btn btn-secondary" data-action="export-report" data-kind="winrate">Export win rate</button>' +
+      '<button class="btn btn-secondary" data-action="export-report" data-kind="aging">Export aging</button>' +
+      '<button class="btn btn-secondary" data-action="export-report" data-kind="pnl">Export P&L</button>';
+    var win = (data.winRate || []).map(function (d) {
+      return '<tr><td>' + esc(d.brand) + '</td><td>' + d.quotes + '</td><td>' + d.awarded + '</td><td>' +
+        d.notAwarded + '</td><td>' + (d.winRate == null ? '—' : d.winRate + '%') + '</td><td>' +
+        money(d.awardedAmount) + '</td></tr>';
+    }).join('');
+    var aging = data.aging || {};
+    var monthly = (data.monthly || []).map(function (m) {
+      return '<tr><td>' + esc(m.month) + '</td><td>' + money(m.income) + '</td><td>' + money(m.expense) +
+        '</td><td class="' + (m.net < 0 ? 'neg' : 'pos') + '">' + money(m.net) + '</td></tr>';
+    }).join('');
+    $('#content').innerHTML =
+      '<div class="grid grid-4">' +
+        stat('Current', money(aging.current || 0), '') +
+        stat('1–30 days', money(aging.d30 || 0), '') +
+        stat('31–60 / 61–90', money((aging.d60 || 0) + (aging.d90 || 0)), '') +
+        stat('90+ days', money(aging.over90 || 0), aging.over90 ? 'neg' : '') +
+      '</div>' +
+      '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Win rate by division</h3></div><div class="panel-body">' +
+      '<div class="table-wrap"><table class="data"><thead><tr><th>Division</th><th>Quotes</th><th>Won</th><th>Lost</th><th>Win %</th><th>Won amount</th></tr></thead><tbody>' +
+      (win || '<tr><td colspan="6" class="empty">No data</td></tr>') + '</tbody></table></div></div></div>' +
+      '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Unpaid aging</h3></div><div class="panel-body">' +
+      ((aging.items || []).length
+        ? '<div class="table-wrap"><table class="data"><thead><tr><th>Ref</th><th>Client</th><th>Amount</th><th>Age</th><th>Status</th></tr></thead><tbody>' +
+          aging.items.slice(0, 20).map(function (r) {
+            return '<tr><td>' + esc(r.reference) + '</td><td>' + esc(r.client) + '</td><td>' + money(r.amount) +
+              '</td><td>' + r.ageDays + 'd</td><td>' + badge(r.paymentStatus) + '</td></tr>';
+          }).join('') + '</tbody></table></div>'
+        : '<div class="empty">No unpaid invoices</div>') +
+      '</div></div>' +
+      '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Monthly P&L</h3></div><div class="panel-body">' +
+      '<div class="table-wrap"><table class="data"><thead><tr><th>Month</th><th>Income</th><th>Expense</th><th>Net</th></tr></thead><tbody>' +
+      (monthly || '<tr><td colspan="4" class="empty">No data</td></tr>') + '</tbody></table></div></div></div>';
+  }
+
+  function openCatalogEditor(item) {
+    item = item || {};
+    openModal(item.sku ? 'Edit catalog item' : 'New catalog item',
+      '<form id="cat-form" class="form-grid">' +
+        field('SKU', 'sku', item.sku || '', 'text', { placeholder: 'Auto if blank' }) +
+        field('Name', 'name', item.name || '', 'text', { full: true }) +
+        field('Division', 'divisionCode', item.divisionCode || '01', 'select', { options: divisionOptions() }) +
+        field('Unit price', 'unitPrice', item.unitPrice || '', 'number') +
+        field('MOQ', 'moq', item.moq === '' || item.moq == null ? '' : item.moq, 'number') +
+        field('Fabric', 'fabric', item.fabric || '', 'select', {
+          options: (state.bootstrap.fabricOptions || ['', 'GB', 'PV', 'TW']).map(function (f) {
+            return { value: f, label: f || '— none —' };
+          })
+        }) +
+        field('Unit', 'unit', item.unit || 'pcs') +
+        field('Notes', 'notes', item.notes || '', 'textarea', { full: true }) +
+      '</form>',
+      '<button class="btn btn-secondary" data-close="1">Cancel</button><button class="btn btn-primary" id="save-cat">Save</button>'
+    );
+    $('#save-cat').onclick = function () {
+      run('saveCatalogItem', [formValues($('#cat-form'))]).then(function () {
+        closeModal(); toast('Catalog item saved'); render();
+      });
+    };
+  }
+
+  function renderExpenses(rows) {
+    $('#topbar-actions').innerHTML = '<button class="btn btn-primary" data-action="new-expense">Add expense</button>';
+    $('#content').innerHTML = '<div class="panel"><div class="panel-body">' +
+      (rows.length ? '<div class="table-wrap"><table class="data"><thead><tr><th>Date</th><th>Vendor</th><th>Category</th><th>Amount</th></tr></thead><tbody>' +
+        rows.map(function (r) {
+          return '<tr><td>' + esc(r.date) + '</td><td>' + esc(r.vendor) + '</td><td>' + esc(r.category) + '</td><td>' + money(r.amount) + '</td></tr>';
+        }).join('') + '</tbody></table></div>' : '<div class="empty">No expenses</div>') + '</div></div>';
+  }
+
+  function renderSettings(settings) {
+    $('#topbar-actions').innerHTML = '';
+    var role = state.bootstrap.user || {};
+    var portal = state.bootstrap.portal || {};
+    var usersHtml = '<div class="muted" style="padding:8px 0">Loading users…</div>';
+    var locked = !isAdmin();
+    $('#content').innerHTML =
+      '<div class="panel" style="margin-bottom:12px"><div class="panel-body" id="identity-box">' +
+        '<div class="muted">Loading account…</div></div></div>' +
+      (locked
+        ? '<div class="panel"><div class="panel-body"><div class="empty">Settings are admin-only. You are signed in as ' +
+          esc(role.email || 'guest') + ' (' + esc(role.role || 'sales') + '). Ask the app owner to add your <strong>Gmail</strong> as admin.</div></div></div>'
+        : '') +
+      '<div class="panel"><div class="panel-body" style="padding:16px"><form id="settings-form" class="form-grid"' +
+      (locked ? ' style="pointer-events:none;opacity:0.55"' : '') + '>' +
+        field('Company name', 'companyName', settings.companyName) +
+        field('Brand', 'brand', settings.brand) +
+        field('Address', 'address', settings.address, 'textarea', { full: true }) +
+        field('Company email (on quotes — Zoho is fine)', 'email', settings.email, 'email') +
+        field('Website', 'website', settings.website) +
+        field('Account name', 'accountName', settings.accountName) +
+        field('Bank name', 'bankName', settings.bankName) +
+        field('Bank account', 'bankAccount', settings.bankAccount) +
+        field('IBAN', 'iban', settings.iban) +
+        field('Payment terms', 'paymentTerms', settings.paymentTerms, 'select', {
+          full: true,
+          options: state.bootstrap.paymentTermsOptions || []
+        }) +
+        field('Delivery terms', 'deliveryTerms', settings.deliveryTerms, 'select', {
+          full: true,
+          options: state.bootstrap.deliveryTermsOptions || []
+        }) +
+        field('MOQ (pcs per item)', 'moqDefault', settings.moqDefault != null ? settings.moqDefault : 50, 'number') +
+        field('MOQ terms', 'moqTerms', settings.moqTerms, 'textarea', { full: true }) +
+        field('Quote validity (days)', 'quoteValidityDays', settings.quoteValidityDays, 'number') +
+        field('Follow-up days after quote', 'followUpDaysAfterQuote', settings.followUpDaysAfterQuote != null ? settings.followUpDaysAfterQuote : 3, 'number') +
+        field('WhatsApp country code', 'whatsappCountryCode', settings.whatsappCountryCode || '971', 'text', { placeholder: '971' }) +
+        field('Google Calendar sync', 'calendarSync', settings.calendarSync || 'yes', 'select', {
+          options: [
+            { value: 'yes', label: 'On — invite Owner’s Google Calendar' },
+            { value: 'no', label: 'Off' }
+          ]
+        }) +
+        field('Shared calendar ID', 'calendarId', settings.calendarId || 'primary', 'text', {
+          full: true,
+          placeholder: 'primary (app owner’s Google Calendar)'
+        }) +
+        '<div class="full" id="calendar-status-box" style="margin:4px 0 8px;padding:12px;border:1px solid #e5e7eb;border-radius:8px;background:#fafafa">' +
+          '<div class="muted">Checking Google Calendar…</div></div>' +
+        field('Portal URL', 'portalBaseUrl', settings.portalBaseUrl || portal.baseUrl || 'https://crm.redreach.ae', 'text', { full: true }) +
+        field('PDF language default', 'bilingualDefault', settings.bilingualDefault || 'en', 'select', {
+          options: [
+            { value: 'en', label: 'English' },
+            { value: 'ar', label: 'Arabic' },
+            { value: 'both', label: 'English + Arabic' }
+          ]
+        }) +
+        field('Admin Google emails (Gmail)', 'adminEmails', settings.adminEmails || '', 'text', {
+          full: true,
+          placeholder: 'you@gmail.com, partner@gmail.com'
+        }) +
+        '<div class="full muted">Use personal <strong>Gmail / Google</strong> addresses here — not Zoho. Zoho (info@redreach.ae) is only the company email printed on documents.</div>' +
+      '</form></div>' +
+      (locked ? '' : '<div class="modal-foot">' +
+        '<button class="btn btn-ghost" data-action="copy-portal">Copy portal setup</button>' +
+        '<button class="btn btn-ghost" data-action="install-trigger">Install daily digest</button>' +
+        '<button class="btn btn-secondary" data-action="authorize-calendar">Connect Google Calendar</button>' +
+        '<button class="btn btn-ghost" data-action="sync-calendar">Sync follow-ups → Calendar</button>' +
+        '<button class="btn btn-primary" data-action="save-settings">Save settings</button></div>') +
+      '</div>' +
+      (locked ? '' :
+        '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Users & roles</h3></div>' +
+        '<div class="panel-body"><p class="muted" style="margin:0 0 10px">Add each teammate’s <strong>Gmail</strong> (Google account) and a display name. They sign into this app with that Gmail — Zoho mail is not used for login.</p>' +
+        '<div id="users-box">' + usersHtml + '</div></div>' +
+        '<div class="modal-foot"><button class="btn btn-primary" data-action="add-user">Add user</button></div></div>');
+
+    run('getIdentityInfo').then(function (id) {
+      var box = $('#identity-box');
+      if (!box) return;
+      box.innerHTML =
+        '<div><strong>Signed in (Google):</strong> ' + esc(id.signedInEmail || 'not detected') +
+        (id.signedInName ? (' · ' + esc(id.signedInName)) : '') +
+        ' · <strong>Role:</strong> ' + esc(id.role || '—') +
+        (id.isAppOwner ? ' · app owner' : '') + '</div>' +
+        '<div class="muted" style="margin-top:6px"><strong>App owner Google account:</strong> ' +
+        esc(id.appOwnerEmail || '—') +
+        ' · <strong>Company email on quotes:</strong> ' + esc(id.companyEmail || '—') + '</div>' +
+        '<div class="muted" style="margin-top:8px">' + esc(id.note || '') + '</div>';
+    }).catch(function () {
+      var box = $('#identity-box');
+      if (box) box.innerHTML = '<div class="muted">Could not load account info.</div>';
+    });
+
+    if (!locked) {
+      run('getCalendarStatus').then(function (st) {
+        var box = $('#calendar-status-box');
+        if (!box) return;
+        var connectBtn =
+          '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">' +
+          '<button class="btn btn-secondary" data-action="authorize-calendar">Connect Google Calendar</button>' +
+          (st.connectUrl
+            ? '<a class="btn btn-primary" href="' + esc(st.connectUrl) + '" target="_blank" rel="noopener">Open connect page</a>'
+            : '') +
+          '</div>';
+        if (st.ok) {
+          box.style.borderColor = '#bbf7d0';
+          box.style.background = '#f0fdf4';
+          box.innerHTML = '<strong>Calendar connected</strong><div class="muted" style="margin-top:4px">' +
+            esc(st.message || '') +
+            (st.calendarName ? (' · ' + esc(st.calendarName)) : '') + '</div>';
+        } else {
+          box.style.borderColor = '#fecaca';
+          box.style.background = '#fef2f2';
+          box.innerHTML = '<strong>Calendar not connected</strong><div class="muted" style="margin-top:4px">' +
+            esc(st.message || st.error || 'Permission needed') +
+            '</div><div class="muted" style="margin-top:6px">Sign into Chrome as <strong>alfredsv@gmail.com</strong> or <strong>redreachdxb@gmail.com</strong> (app owner), then open the connect page and click <strong>Allow</strong>.</div>' +
+            connectBtn;
+        }
+      }).catch(function (err) {
+        var box = $('#calendar-status-box');
+        if (!box) return;
+        box.style.borderColor = '#fecaca';
+        box.style.background = '#fef2f2';
+        box.innerHTML = '<strong>Calendar not connected</strong><div class="muted" style="margin-top:4px">' +
+          esc((err && err.message) || 'Permission needed') +
+          '</div><div style="margin-top:8px"><button class="btn btn-secondary" data-action="authorize-calendar">Connect Google Calendar</button></div>';
+      });
+      // Don't leave "Checking…" forever if the call stalls
+      setTimeout(function () {
+        var box = $('#calendar-status-box');
+        if (!box) return;
+        if (/Checking Google Calendar/i.test(box.textContent || '')) {
+          box.style.borderColor = '#fde68a';
+          box.style.background = '#fffbeb';
+          box.innerHTML = '<strong>Calendar check timed out</strong><div class="muted" style="margin-top:4px">' +
+            'Click Connect Google Calendar (must use the app-owner Gmail).</div>' +
+            '<div style="margin-top:8px"><button class="btn btn-secondary" data-action="authorize-calendar">Connect Google Calendar</button></div>';
+        }
+      }, 8000);
+      run('listUsers').then(function (users) {
+        var box = $('#users-box');
+        if (!box) return;
+        if (!users.length) {
+          box.innerHTML = '<div class="empty">No users listed — everyone is treated as admin until you add roles. Add Gmail addresses only.</div>';
+          return;
+        }
+        box.innerHTML = '<div class="table-wrap"><table class="data"><thead><tr><th>Google email</th><th>Role</th><th>Name</th><th></th></tr></thead><tbody>' +
+          users.map(function (u) {
+            return '<tr><td>' + esc(u.email) + '</td><td>' + esc(u.role) + '</td><td>' + esc(u.name || '') +
+              '</td><td><button class="btn btn-danger" data-action="delete-user" data-email="' + esc(u.email) +
+              '">Remove</button></td></tr>';
+          }).join('') + '</tbody></table></div>';
+      });
+      run('getPortalInfo').then(function (info) {
+        state.cache.portal = info;
+      });
+    }
+  }
+
+  /* ---------- Editors ---------- */
+  function itemsEditorHtml(items, moqValue) {
+    items = items && items.length ? items : [{ description: '', qty: 1, unitPrice: '' }];
+    return '<div class="full"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">' +
+      '<strong>Line items</strong>' +
+      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
+      '<label class="field" style="margin:0;grid-template-columns:auto auto;align-items:center;gap:8px">MOQ (pcs)' +
+      '<input class="input" style="width:88px;min-height:36px" name="moq" type="number" min="0" step="1" value="' + esc(moqValue == null || moqValue === '' ? 50 : moqValue) + '"></label>' +
+      '<button type="button" class="btn btn-ghost" id="pick-catalog">From catalog</button>' +
+      '<button type="button" class="btn btn-ghost" id="add-line">Add line</button></div></div>' +
+      '<div class="table-wrap"><table class="data items-table"><thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th></th></tr></thead>' +
+      '<tbody id="lines">' + items.map(function (it, i) {
+        return '<tr><td><input class="input desc" name="desc_' + i + '" value="' + esc(it.description || '') + '"></td>' +
+          '<td><input class="input qty" name="qty_' + i + '" type="number" min="0" step="1" value="' + esc(it.qty == null ? 1 : it.qty) + '"></td>' +
+          '<td><input class="input price" name="price_' + i + '" type="number" min="0" step="0.01" value="' + esc(it.unitPrice == null ? '' : it.unitPrice) + '"></td>' +
+          '<td><button type="button" class="btn btn-ghost rm-line">×</button></td></tr>';
+      }).join('') + '</tbody></table></div><div id="catalog-picker" class="hidden" style="margin-top:10px"></div><div id="moq-box"></div><div class="totals" id="item-totals"></div></div>';
+  }
+
+  function readItems(root) {
+    return $all('#lines tr', root).map(function (tr) {
+      var desc = tr.querySelector('.desc') || $all('input', tr)[0];
+      var qty = tr.querySelector('.qty');
+      var price = tr.querySelector('.price');
+      return {
+        description: desc ? desc.value : '',
+        qty: Number(qty ? qty.value : 0),
+        unitPrice: Number(price ? price.value : 0)
+      };
+    }).filter(function (it) { return it.description || it.unitPrice; });
+  }
+
+  function bindItemsEditor(root) {
+    function recalc() {
+      var rate = Number((state.bootstrap.settings && state.bootstrap.settings.vatRate) || 0.05);
+      var items = readItems(root);
+      var sub = items.reduce(function (s, it) { return s + (Number(it.qty) * Number(it.unitPrice || 0)); }, 0);
+      var vat = sub * rate;
+      $('#item-totals', root).innerHTML =
+        '<div><span>Subtotal</span><span>' + money(sub) + '</span></div>' +
+        '<div><span>VAT (' + (rate * 100).toFixed(0) + '%)</span><span>' + money(vat) + '</span></div>' +
+        '<div class="grand"><span>Total</span><span>' + money(sub + vat) + '</span></div>';
+      var threshold = moq(root);
+      var low = items.filter(function (it) { return it.qty > 0 && it.qty < threshold; });
+      var box = $('#moq-box', root);
+      if (box) {
+        box.innerHTML = low.length
+          ? '<div class="moq-warn">MOQ reminder: ' + low.length + ' line(s) below ' + threshold + ' pcs. Unit prices may change.</div>'
+          : '';
+      }
+    }
+    $('#add-line', root).onclick = function () {
+      var tbody = $('#lines', root);
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td><input class="input desc"></td><td><input class="input qty" type="number" min="0" step="1" value="1"></td>' +
+        '<td><input class="input price" type="number" min="0" step="0.01"></td>' +
+        '<td><button type="button" class="btn btn-ghost rm-line">×</button></td>';
+      tbody.appendChild(tr);
+      recalc();
+    };
+    var pickBtn = $('#pick-catalog', root);
+    if (pickBtn) {
+      pickBtn.onclick = function () {
+        var picker = $('#catalog-picker', root);
+        if (!picker) return;
+        if (!picker.classList.contains('hidden') && picker.innerHTML) {
+          picker.classList.add('hidden');
+          picker.innerHTML = '';
+          return;
+        }
+        var div = (root.querySelector('[name="divisionCode"]') || {}).value || '';
+        run('listCatalog', [div || '']).then(function (items) {
+          items = (items || []).filter(function (c) { return c.active !== false; });
+          if (!items.length) { toast('Catalog is empty — add items under Catalog first', true); return; }
+          picker.classList.remove('hidden');
+          picker.innerHTML = '<div class="panel" style="margin:0"><div class="panel-head"><h3>Catalog</h3></div><div class="panel-body">' +
+            '<div class="table-wrap"><table class="data"><thead><tr><th>SKU</th><th>Name</th><th>Price</th><th>MOQ</th><th>Fabric</th><th></th></tr></thead><tbody>' +
+            items.map(function (c) {
+              return '<tr><td>' + esc(c.sku) + '</td><td>' + esc(c.name) + '</td><td>' + money(c.unitPrice) +
+                '</td><td>' + esc(c.moq === '' ? '—' : c.moq) + '</td><td>' + esc(c.fabric || '—') +
+                '</td><td><button type="button" class="btn btn-primary pick-sku" data-sku="' + esc(c.sku) + '">Add</button></td></tr>';
+            }).join('') + '</tbody></table></div></div></div>';
+          picker.onclick = function (ev) {
+            var btn = ev.target.closest('.pick-sku');
+            if (!btn) return;
+            var item = items.filter(function (c) { return c.sku === btn.getAttribute('data-sku'); })[0];
+            if (!item) return;
+            var fabric = item.fabric ? (' [' + item.fabric + ']') : '';
+            var tbody = $('#lines', root);
+            var tr = document.createElement('tr');
+            tr.innerHTML = '<td><input class="input desc" value="' + esc((item.name || item.sku) + fabric) +
+              '"></td><td><input class="input qty" type="number" min="0" step="1" value="' +
+              esc(item.moq || 1) + '"></td><td><input class="input price" type="number" min="0" step="0.01" value="' +
+              esc(item.unitPrice) + '"></td><td><button type="button" class="btn btn-ghost rm-line">×</button></td>';
+            tbody.appendChild(tr);
+            toast('Added ' + (item.name || item.sku));
+            recalc();
+          };
+        });
+      };
+    }
+    root.addEventListener('click', function (e) {
+      if (e.target.classList.contains('rm-line')) {
+        var tr = e.target.closest('tr');
+        if (tr && $('#lines', root).children.length > 1) tr.remove();
+        recalc();
+      }
+    });
+    root.addEventListener('input', function (e) { if (e.target.matches('input')) recalc(); });
+    recalc();
+  }
+
+  function scheduleAutosave(buildPayload) {
+    if (state.autosaveTimer) clearTimeout(state.autosaveTimer);
+    state.autosaveTimer = setTimeout(function () {
+      if (state.autosaveInFlight) {
+        // Queue one more pass after the in-flight save finishes (avoids duplicate drafts)
+        state.autosaveQueued = true;
+        return;
+      }
+      var payload = buildPayload();
+      var items = (payload.items || []).filter(function (it) {
+        return String(it.description || '').trim() || Number(it.unitPrice) > 0;
+      });
+      if (!String(payload.client || '').trim() && !items.length && !String(payload.description || '').trim()) return;
+      // Never create a brand-new row without a client (prevents empty RR Threads spam)
+      if (!payload.quoteId && !payload.row && !String(payload.client || '').trim()) return;
+      state.autosaveInFlight = true;
+      state.autosaveQueued = false;
+      run('saveQuote', [payload]).then(function (saved) {
+        var idInput = document.querySelector('#doc-form [name="quoteId"]');
+        if (idInput && saved.quote && saved.quote.quoteId) idInput.value = saved.quote.quoteId;
+        var rowInput = document.querySelector('#doc-form [name="row"]');
+        if (rowInput && saved.quote && saved.quote.row) rowInput.value = saved.quote.row;
+        flashSaved();
+      }).catch(function () { /* toast already shown */ }).then(function () {
+        state.autosaveInFlight = false;
+        if (state.autosaveQueued) scheduleAutosave(buildPayload);
+      });
+    }, 1200);
+  }
+
+  function openDocEditor(kind, data, opts) {
+    opts = opts || {};
+    var isInvoice = kind === 'invoice';
+    var doc = data ? (isInvoice ? data.invoice : data.quote) : {};
+    var items = data ? data.items : (opts.items || []);
+    var today = new Date().toISOString().slice(0, 10);
+    var isDraft = !isInvoice && (!doc.reference || String(doc.status || '').toLowerCase() === 'draft');
+    var divisionValue = doc.divisionCode || opts.divisionCode || '01';
+    if (!doc.divisionCode && doc.vertical) {
+      var match = (state.bootstrap.divisions || []).filter(function (d) {
+        return d.brand === doc.vertical || d.name === doc.vertical || (d.aliases || []).indexOf(doc.vertical) >= 0;
+      })[0];
+      if (match) divisionValue = match.code;
+    }
+    var defaultTerms = (state.bootstrap.settings && (state.bootstrap.settings.defaultPaymentTerms || state.bootstrap.settings.paymentTerms)) ||
+      'Immediate upon delivery';
+    var paymentTermsValue = doc.paymentTerms || opts.paymentTerms || defaultTerms;
+    var defaultDelivery = (state.bootstrap.settings && (state.bootstrap.settings.defaultDeliveryTerms || state.bootstrap.settings.deliveryTerms)) ||
+      '2 weeks once the advance payment is done';
+    var deliveryTermsValue = doc.deliveryTerms || opts.deliveryTerms || defaultDelivery;
+    var defaultMoq = (state.bootstrap.settings && state.bootstrap.settings.moqDefault != null)
+      ? state.bootstrap.settings.moqDefault
+      : (state.bootstrap.moqDefault != null ? state.bootstrap.moqDefault : 50);
+    var moqValue = (doc.moq !== '' && doc.moq != null) ? doc.moq : (opts.moq != null ? opts.moq : defaultMoq);
+
+    openModal(doc.quoteId || doc.reference ? ('Edit ' + kind) : ('New ' + kind),
+      clientDatalist() +
+      '<form id="doc-form" class="form-grid">' +
+        field('Client', 'client', doc.client || opts.client || '', 'text', { full: true, list: 'client-list', id: 'client-input', placeholder: 'Start typing a CRM company…' }) +
+        '<div class="full" id="client-preview"></div>' +
+        field('RED REACH division', 'divisionCode', divisionValue, 'select', { options: divisionOptions(), full: true }) +
+        (!isInvoice
+          ? '<div class="full"><label class="field">Reference<input class="input" value="' + esc(doc.reference || 'Assigned on finalize') + '" disabled></label></div>'
+          : field('Reference', 'reference', doc.reference || '', 'text')) +
+        field('Date', 'date', (doc.date && String(doc.date).slice(0, 10)) || today, 'date') +
+        field('Payment terms', 'paymentTerms', paymentTermsValue, 'select', {
+          full: true,
+          options: state.bootstrap.paymentTermsOptions || []
+        }) +
+        field('Delivery', 'deliveryTerms', deliveryTermsValue, 'select', {
+          full: true,
+          options: state.bootstrap.deliveryTermsOptions || []
+        }) +
+        (isInvoice
+          ? field('Payment status', 'paymentStatus', doc.paymentStatus || 'Pending', 'select', { options: state.bootstrap.paymentStatuses || [] }) +
+            field('Status', 'status', doc.status || 'Awarded', 'select', { options: state.bootstrap.invoiceStatuses || [] })
+          : '<input type="hidden" name="status" value="' + esc(isDraft ? 'Draft' : (doc.status || 'Finalized')) + '">') +
+        field('Summary', 'description', doc.description || opts.description || '', 'textarea', { full: true }) +
+        itemsEditorHtml(items, moqValue) +
+        field('Remarks', 'notes', doc.notes || opts.notes || '', 'textarea', { full: true }) +
+        ((doc.createdBy || doc.updatedBy)
+          ? '<div class="full muted" style="margin-top:4px">' +
+            (doc.createdBy ? 'Created by <strong>' + esc(doc.createdBy) + '</strong>' : '') +
+            (doc.createdBy && doc.updatedBy ? ' · ' : '') +
+            (doc.updatedBy ? 'Last saved by <strong>' + esc(doc.updatedBy) + '</strong>' : '') +
+            '</div>'
+          : '') +
+        '<input type="hidden" name="row" value="' + esc(doc.row || '') + '">' +
+        '<input type="hidden" name="quoteId" value="' + esc(doc.quoteId || '') + '">' +
+      '</form>',
+      '<button class="btn btn-secondary" data-close="1">Cancel</button>' +
+      (!isInvoice ? '<button class="btn btn-ghost" id="save-template-btn">Save as template</button>' : '') +
+      ((doc.quoteId || doc.reference) ? '<button class="btn btn-ghost" id="print-doc">Print / PDF</button>' : '') +
+      ((doc.quoteId || doc.reference) ? '<button class="btn btn-ghost" id="wa-doc">WhatsApp</button>' : '') +
+      (!isInvoice && isDraft && (doc.quoteId || doc.row) ? '<button class="btn btn-ghost" id="finalize-doc">Finalize</button>' : '') +
+      (!isInvoice && !isDraft && doc.reference && String(doc.status || '').toLowerCase() !== 'awarded'
+        ? '<button class="btn btn-ghost" id="undo-finalize-doc">Undo finalize</button>' : '') +
+      ((doc.quoteId || doc.row) && !isInvoice ? '<button class="btn btn-danger" id="delete-doc">Delete</button>' : '') +
+      '<button class="btn btn-primary" id="save-doc">' + (!isInvoice && isDraft ? 'Save draft' : 'Save') + '</button>'
+    );
+
+    var root = $('#modal-body');
+    var entityRef = doc.quoteId || doc.reference || '';
+    if (entityRef) {
+      var attachBox = document.createElement('div');
+      attachBox.className = 'full';
+      attachBox.id = 'attach-box';
+      attachBox.innerHTML = '<div style="margin-top:12px"><strong>Attachments</strong> ' +
+        '<label class="btn btn-ghost" style="display:inline-flex;margin-left:8px">Upload' +
+        '<input type="file" id="attach-file" style="display:none"></label>' +
+        '<div id="attach-list" class="muted" style="margin-top:8px">Loading…</div></div>';
+      var form = $('#doc-form', root);
+      if (form) form.appendChild(attachBox);
+      function refreshAttachments() {
+        run('listAttachments', [isInvoice ? 'invoice' : 'quote', entityRef]).then(function (files) {
+          var list = $('#attach-list', root);
+          if (!list) return;
+          if (!files.length) { list.innerHTML = 'No attachments yet'; return; }
+          list.innerHTML = files.map(function (f) {
+            return '<div style="display:flex;gap:8px;align-items:center;margin:4px 0">' +
+              '<a href="' + esc(f.url) + '" target="_blank" rel="noopener">' + esc(f.fileName) + '</a>' +
+              '<button type="button" class="btn btn-ghost del-att" data-id="' + esc(f.id) + '">×</button></div>';
+          }).join('');
+        });
+      }
+      refreshAttachments();
+      var fileInput = $('#attach-file', root);
+      if (fileInput) {
+        fileInput.onchange = function () {
+          var file = fileInput.files && fileInput.files[0];
+          if (!file) return;
+          var reader = new FileReader();
+          reader.onload = function () {
+            var base64 = String(reader.result || '');
+            run('uploadAttachment', [{
+              entityType: isInvoice ? 'invoice' : 'quote',
+              entityRef: entityRef,
+              fileName: file.name,
+              mimeType: file.type || 'application/octet-stream',
+              base64: base64
+            }]).then(function () { toast('Uploaded'); refreshAttachments(); });
+          };
+          reader.readAsDataURL(file);
+        };
+      }
+      root.addEventListener('click', function (ev) {
+        var del = ev.target.closest('.del-att');
+        if (!del) return;
+        if (!confirm('Remove attachment?')) return;
+        run('deleteAttachment', [del.getAttribute('data-id')]).then(function () {
+          toast('Removed'); refreshAttachments();
+        });
+      });
+    }
+    if (isInvoice && data && data.paymentSummary) {
+      var payBox = document.createElement('div');
+      payBox.className = 'full';
+      var ps = data.paymentSummary;
+      var pays = data.payments || [];
+      payBox.innerHTML = '<div style="margin-top:12px"><strong>Payments</strong> · Paid ' + money(ps.paid || 0) +
+        ' · Balance ' + money(ps.balance || 0) +
+        ' <button type="button" class="btn btn-ghost" id="add-payment-btn" style="margin-left:8px">Record payment</button></div>' +
+        (pays.length
+          ? '<div class="table-wrap" style="margin-top:8px"><table class="data"><thead><tr><th>When</th><th>Amount</th><th>Method</th><th>Notes</th></tr></thead><tbody>' +
+            pays.map(function (p) {
+              return '<tr><td>' + esc(String(p.timestamp).slice(0, 16).replace('T', ' ')) + '</td><td>' +
+                money(p.amount) + '</td><td>' + esc(p.method) + '</td><td>' + esc(p.notes || '') + '</td></tr>';
+            }).join('') + '</tbody></table></div>'
+          : '<div class="muted" style="margin-top:6px">No payments yet</div>');
+      var docForm = $('#doc-form', root);
+      if (docForm) docForm.appendChild(payBox);
+      var addPay = $('#add-payment-btn', root);
+      if (addPay) addPay.onclick = function () {
+        closeModal();
+        openRecordPayment(doc.reference);
+      };
+    }
+    bindItemsEditor(root);
+    fillClientDetails(doc.client || opts.client || '', root);
+    var clientInput = $('#client-input', root);
+    if (clientInput) {
+      clientInput.addEventListener('change', function () { fillClientDetails(clientInput.value, root); });
+      clientInput.addEventListener('blur', function () { fillClientDetails(clientInput.value, root); });
+    }
+
+    function buildPayload() {
+      var payload = formValues($('#doc-form'));
+      payload.items = readItems(root);
+      payload.vertical = payload.divisionCode;
+      if (payload.row) payload.row = Number(payload.row); else delete payload.row;
+      if (!payload.quoteId) delete payload.quoteId;
+      return payload;
+    }
+
+    if (!isInvoice) {
+      root.addEventListener('input', function () { scheduleAutosave(buildPayload); });
+      root.addEventListener('change', function () { scheduleAutosave(buildPayload); });
+    }
+
+    if (isInvoice && !doc.reference) {
+      var vertSelect = root.querySelector('[name="divisionCode"]');
+      var refInput = root.querySelector('[name="reference"]');
+      function refreshRef() {
+        run('previewNextReference', [vertSelect.value, 'invoice']).then(function (ref) { if (refInput) refInput.value = ref; });
+      }
+      if (vertSelect) { vertSelect.addEventListener('change', refreshRef); refreshRef(); }
+    }
+
+    $('#save-doc').onclick = function () {
+      var payload = buildPayload();
+      var fn = isInvoice ? 'saveInvoice' : 'saveQuote';
+      run(fn, [payload]).then(function (saved) {
+        closeModal();
+        toast(isInvoice ? 'Invoice saved' : 'Quotation saved');
+        state.view = isInvoice ? 'invoices' : 'quotes';
+        render();
+        var key = isInvoice ? saved.invoice.reference : (saved.quote.quoteId || saved.quote.reference);
+        if (key) openDoc(kind, key);
+      });
+    };
+
+    var printBtn = $('#print-doc');
+    if (printBtn) printBtn.onclick = function () { printDoc(kind, doc.quoteId || doc.reference); };
+
+    var waDoc = $('#wa-doc');
+    if (waDoc) waDoc.onclick = function () { openWhatsApp(kind, doc.quoteId || doc.reference); };
+
+    var finalizeBtn = $('#finalize-doc');
+    if (finalizeBtn) {
+      finalizeBtn.onclick = function () {
+        run('saveQuote', [buildPayload()]).then(function (saved) {
+          return run('finalizeQuote', [saved.quote.quoteId]);
+        }).then(function (finalized) {
+          closeModal();
+          toast('Finalized as ' + finalized.quote.reference + ' · follow-up scheduled');
+          state.view = 'quotes';
+          render();
+          openDoc('quote', finalized.quote.quoteId);
+        });
+      };
+    }
+
+    var undoBtn = $('#undo-finalize-doc');
+    if (undoBtn) {
+      undoBtn.onclick = function () {
+        if (!confirm('Return this quote to draft and clear the reference number?')) return;
+        run('undoFinalizeQuote', [doc.quoteId || doc.reference]).then(function (saved) {
+          closeModal();
+          toast('Returned to draft');
+          state.view = 'quotes';
+          render();
+          openDoc('quote', saved.quote.quoteId);
+        });
+      };
+    }
+
+    var deleteBtn = $('#delete-doc');
+    if (deleteBtn) {
+      deleteBtn.onclick = function () {
+        var label = doc.reference || doc.quoteId || 'this draft';
+        if (!confirm('Delete quotation ' + label + '? This cannot be undone.')) return;
+        run('deleteQuote', [doc.quoteId || doc.reference, false]).then(function () {
+          closeModal();
+          toast('Quotation deleted');
+          state.view = 'quotes';
+          render();
+        });
+      };
+    }
+
+    var tplBtn = $('#save-template-btn');
+    if (tplBtn) {
+      tplBtn.onclick = function () {
+        var payload = buildPayload();
+        var name = prompt('Template name', payload.description || (payload.client + ' catalog') || 'Uniform catalog');
+        if (!name) return;
+        run('saveTemplate', [{
+          name: name,
+          divisionCode: payload.divisionCode,
+          description: payload.description,
+          items: payload.items
+        }]).then(function () { toast('Template saved'); });
+      };
+    }
+  }
+
+  function openCrmEditor(record) {
+    record = record || {};
+    var actionOpts = (state.bootstrap.nextActionOptions || []).map(function (a) {
+      return { value: a, label: a };
+    });
+    actionOpts.unshift({ value: '', label: '— select —' });
+    var ownerOpts = (state.bootstrap.teamOwners || []).map(function (o) {
+      if (typeof o === 'string') return { value: o, label: o };
+      return { value: o.value || o.email || o.label, label: o.label || o.name || o.email || o.value };
+    });
+    if (record.owner) {
+      var hasOwner = ownerOpts.some(function (o) { return String(o.value) === String(record.owner); });
+      if (!hasOwner) ownerOpts.unshift({ value: record.owner, label: record.owner });
+    }
+    ownerOpts.unshift({ value: '', label: '— unassigned —' });
+    // Default new contacts to the signed-in user so Calendar invite has a target
+    var defaultOwner = record.owner || '';
+    if (!record.row) {
+      var me = (state.bootstrap.user && (state.bootstrap.user.email || state.bootstrap.user.name)) || '';
+      if (me && !defaultOwner) defaultOwner = me;
+    }
+    openModal(record.row ? 'Edit contact' : 'New contact',
+      '<form id="crm-form" class="form-grid">' +
+        field('Company name', 'companyName', record.companyName, 'text', { full: true }) +
+        field('Primary contact', 'primaryContact', record.primaryContact) +
+        field('Email', 'email', record.email, 'email') +
+        field('Mobile', 'mobile', record.mobile) +
+        field('Office', 'office', record.office) +
+        field('Follow-up date', 'followUpDate', record.followUpDate, 'date') +
+        field('Next action', 'nextAction', record.nextAction || '', 'select', { options: actionOpts }) +
+        field('Owner (Google Calendar invite)', 'owner', defaultOwner, 'select', {
+          options: ownerOpts,
+          full: true
+        }) +
+        '<div class="full muted" style="margin-top:-6px">Owner must be an App User email so the follow-up lands on their Google Calendar.</div>' +
+        field('Notes', 'notes', record.notes, 'textarea', { full: true }) +
+        ((record.createdBy || record.updatedBy)
+          ? '<div class="full muted">Created by <strong>' + esc(record.createdBy || '—') +
+            '</strong> · Last saved by <strong>' + esc(record.updatedBy || record.createdBy || '—') + '</strong></div>'
+          : '') +
+        '<input type="hidden" name="row" value="' + esc(record.row || '') + '">' +
+        '<input type="hidden" name="slNo" value="' + esc(record.slNo || '') + '">' +
+      '</form>',
+      '<button class="btn btn-secondary" data-close="1">Cancel</button>' +
+      (record.companyName ? '<button class="btn btn-ghost" id="crm-timeline">Timeline</button>' : '') +
+      (record.row ? '<button class="btn btn-danger" id="delete-crm">Delete</button>' : '') +
+      '<button class="btn btn-primary" id="save-crm">Save</button>'
+    );
+    $('#save-crm').onclick = function () {
+      var payload = formValues($('#crm-form'));
+      if (payload.row) payload.row = Number(payload.row); else delete payload.row;
+      run('saveCrm', [payload]).then(function (res) {
+        closeModal();
+        if (res && res.calendar && res.calendar.ok === false) {
+          toast(res.calendar.message || 'Saved, but Calendar sync failed', true);
+        } else if (res && res.calendar && res.calendar.ok) {
+          var g = (res.calendar.guests || []).join(', ');
+          toast(g ? ('Saved · calendar invite → ' + g) : (res.calendar.warning || 'Saved · follow-up on calendar'));
+        } else {
+          toast('Contact saved');
+        }
+        render();
+      });
+    };
+    var del = $('#delete-crm');
+    if (del) del.onclick = function () {
+      if (!confirm('Delete this contact?')) return;
+      run('deleteCrm', [Number(record.row)]).then(function () { closeModal(); toast('Deleted'); render(); });
+    };
+    var tl = $('#crm-timeline');
+    if (tl) tl.onclick = function () {
+      closeModal();
+      openClientTimeline(record.companyName);
+    };
+  }
+
+  function openRecordPayment(ref) {
+    run('getInvoice', [ref]).then(function (data) {
+      var inv = data.invoice;
+      var sum = data.paymentSummary || {};
+      var balance = sum.balance != null ? sum.balance : inv.amount;
+      openModal('Record payment — ' + inv.reference,
+        '<div class="muted" style="margin-bottom:12px">Invoice ' + money(inv.amount) +
+          ' · Paid ' + money(sum.paid || 0) + ' · Balance ' + money(balance) + '</div>' +
+        '<form id="pay-form" class="form-grid">' +
+          field('Amount', 'amount', balance > 0 ? balance : '', 'number', { full: true }) +
+          field('Method', 'method', 'Bank Transfer', 'select', {
+            options: state.bootstrap.paymentMethods || []
+          }) +
+          field('Notes', 'notes', '', 'textarea', { full: true, placeholder: 'e.g. 50% advance via Mashreq' }) +
+        '</form>' +
+        ((data.payments || []).length
+          ? '<h4 style="margin:16px 0 8px;font-size:13px">Payment history</h4><div class="table-wrap"><table class="data"><thead><tr><th>When</th><th>Amount</th><th>Method</th><th>Notes</th></tr></thead><tbody>' +
+            data.payments.map(function (p) {
+              return '<tr><td>' + esc(String(p.timestamp).slice(0, 16).replace('T', ' ')) + '</td><td>' +
+                money(p.amount) + '</td><td>' + esc(p.method) + '</td><td>' + esc(p.notes || '') + '</td></tr>';
+            }).join('') + '</tbody></table></div>'
+          : '<div class="empty" style="margin-top:12px">No payments recorded yet</div>'),
+        '<button class="btn btn-secondary" data-close="1">Cancel</button>' +
+        '<button class="btn btn-primary" id="save-payment">Save payment</button>'
+      );
+      $('#save-payment').onclick = function () {
+        var vals = formValues($('#pay-form'));
+        if (!(Number(vals.amount) > 0)) { toast('Enter a payment amount', true); return; }
+        run('recordPayment', [{
+          reference: ref,
+          amount: Number(vals.amount),
+          method: vals.method,
+          notes: vals.notes
+        }]).then(function () {
+          closeModal();
+          toast('Payment recorded');
+          state.view = 'invoices';
+          render();
+        });
+      };
+    });
+  }
+
+  function openClientTimeline(companyName) {
+    if (!companyName) return;
+    state.cache.timelineCompany = companyName;
+    $('#content').innerHTML = '<div class="loading">Loading timeline…</div>';
+    run('getClientTimeline', [companyName]).then(function (data) {
+      state.view = 'timeline';
+      $all('.nav-item').forEach(function (btn) { btn.classList.remove('active'); });
+      $('#view-title').textContent = data.companyName;
+      $('#view-subtitle').textContent = 'Client activity timeline';
+      var crm = data.crm || {};
+      var t = data.totals || {};
+      function formatWhen(v) {
+        if (!v) return '';
+        return String(v).slice(0, 16).replace('T', ' ');
+      }
+      var typeBadge = {
+        quote: 'info', invoice: 'warn', payment: 'ok', update: 'info',
+        crm: 'info', note: 'warn', activity: ''
+      };
+      $('#topbar-actions').innerHTML =
+        '<button class="btn btn-secondary" data-action="goto-crm">Back to CRM</button>' +
+        (crm.row ? '<button class="btn btn-ghost" data-action="edit-crm" data-row="' + crm.row + '">Edit contact</button>' : '') +
+        '<button class="btn btn-primary" data-action="new-quote" data-company="' + esc(data.companyName) + '">New quote</button>';
+      $('#content').innerHTML =
+        '<div class="grid grid-4">' +
+          stat('Quotes', t.quotes || 0, '') +
+          stat('Invoices', t.invoices || 0, '') +
+          stat('Payments', t.payments || 0, '') +
+          stat('Updates', t.updates || 0, '') +
+        '</div>' +
+        '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Overview</h3></div><div class="panel-body">' +
+          '<div class="muted">' + esc(crm.primaryContact || (data.client && data.client.primaryContact) || '—') +
+          ' · ' + esc(crm.mobile || crm.email || '') + '</div>' +
+          '<div style="margin-top:8px"><strong>Next:</strong> ' + esc(crm.nextAction || '—') +
+          ' · <strong>Owner:</strong> ' + esc(crm.owner || '—') +
+          ' · <strong>Follow-up:</strong> ' + esc(crm.followUpDate || '—') + '</div>' +
+        '</div></div>' +
+        '<div class="panel" style="margin-top:12px"><div class="panel-head"><h3>Timeline</h3></div><div class="panel-body">' +
+        ((data.events || []).length
+          ? '<ul class="timeline">' + data.events.map(function (e) {
+              var cls = typeBadge[e.type] || '';
+              var click = '';
+              if (e.type === 'quote' && e.ref) click = ' data-action="open-quote" data-ref="' + esc(e.ref) + '"';
+              if (e.type === 'invoice' && e.ref) click = ' data-action="open-invoice" data-ref="' + esc(e.ref) + '"';
+              if (e.type === 'payment' && e.ref) click = ' data-action="record-payment" data-ref="' + esc(e.ref) + '"';
+              return '<li class="timeline-item"' + click + ' style="cursor:' + (click ? 'pointer' : 'default') + '">' +
+                '<div class="timeline-meta"><span class="badge ' + cls + '">' + esc(e.type) + '</span> ' +
+                '<span class="muted">' + esc(formatWhen(e.when)) + '</span></div>' +
+                '<div class="timeline-title">' + esc(e.title) + '</div>' +
+                (e.detail ? '<div class="muted timeline-detail">' + esc(e.detail) + '</div>' : '') +
+                (e.meta && e.meta.amount != null ? '<div class="muted">' + money(e.meta.amount) +
+                  (e.meta.balanceDue != null ? ' · due ' + money(e.meta.balanceDue) : '') + '</div>' : '') +
+                '</li>';
+            }).join('') + '</ul>'
+          : '<div class="empty">No activity yet for this client</div>') +
+        '</div></div>';
+    });
+  }
+
+  function openExpenseEditor() {
+    var today = new Date().toISOString().slice(0, 10);
+    openModal('Add expense',
+      '<form id="exp-form" class="form-grid">' +
+        field('Date', 'date', today, 'date') +
+        field('Vendor', 'vendor', '') +
+        field('Category', 'category', '') +
+        field('Amount', 'amount', '', 'number') +
+        field('Payment method', 'paymentMethod', 'Cash', 'select', { options: state.bootstrap.paymentMethods || [] }) +
+        field('Notes', 'notes', '', 'textarea', { full: true }) +
+      '</form>',
+      '<button class="btn btn-secondary" data-close="1">Cancel</button><button class="btn btn-primary" id="save-exp">Save</button>'
+    );
+    $('#save-exp').onclick = function () {
+      run('saveExpense', [formValues($('#exp-form'))]).then(function () { closeModal(); toast('Expense added'); render(); });
+    };
+  }
+
+  function openDoc(kind, ref) {
+    var fn = kind === 'invoice' ? 'getInvoice' : 'getQuote';
+    Promise.all([run(fn, [ref]), run('listClients')]).then(function (res) {
+      state.clients = res[1] || [];
+      openDocEditor(kind, res[0]);
+    });
+  }
+
+  function openWhatsApp(kind, ref) {
+    toast('Preparing WhatsApp…');
+    // Open synchronously so the browser allows the popup (async google.script.run blocks window.open)
+    var popup = null;
+    try {
+      popup = window.open('about:blank', '_blank');
+      if (popup) {
+        try {
+          popup.document.write('<p style="font-family:sans-serif;padding:24px">Opening WhatsApp…</p>');
+        } catch (e0) { /* cross-origin / opaque */ }
+      }
+    } catch (e1) {
+      popup = null;
+    }
+
+    run('getWhatsAppShare', [kind, ref]).then(function (share) {
+      if (!share || !share.url) {
+        if (popup) try { popup.close(); } catch (e2) {}
+        toast('Could not build WhatsApp link', true);
+        return;
+      }
+      if (!share.hasPhone) {
+        toast('No mobile on CRM — WhatsApp will open without a number');
+      }
+      if (popup && !popup.closed) {
+        try {
+          popup.location.href = share.url;
+          return;
+        } catch (e3) {
+          try { popup.close(); } catch (e4) {}
+        }
+      }
+      showWhatsAppFallback(share);
+    }).catch(function () {
+      if (popup) try { popup.close(); } catch (e5) {}
+    });
+  }
+
+  function showWhatsAppFallback(share) {
+    // Prefer a second layered prompt so we don't wipe an open quote/invoice editor
+    var existingTitle = ($('#modal-title') && !$('#modal').classList.contains('hidden'))
+      ? $('#modal-title').textContent
+      : '';
+    var editingDoc = existingTitle && /quote|invoice/i.test(existingTitle);
+    if (editingDoc) {
+      var go = confirm(
+        (share.hasPhone ? ('WhatsApp ' + share.phone + '?\n\n') : 'Open WhatsApp without a saved mobile?\n\n') +
+        'OK opens WhatsApp. Cancel stays on this form.'
+      );
+      if (go) window.open(share.url, '_blank');
+      return;
+    }
+    openModal('Open WhatsApp',
+      '<p class="muted" style="margin:0 0 12px">Your browser blocked the popup. Tap the button below.</p>' +
+      (share.hasPhone
+        ? '<p>To: <strong>' + esc(share.phone) + '</strong></p>'
+        : '<p class="muted">No mobile on file — you will pick the chat in WhatsApp.</p>') +
+      '<p style="margin:16px 0"><a class="btn btn-primary" id="wa-open-link" href="' + esc(share.url) +
+      '" target="_blank" rel="noopener">Open WhatsApp</a></p>' +
+      '<label class="field full">Message<textarea class="textarea" id="wa-msg" readonly>' +
+      esc(share.text || '') + '</textarea></label>',
+      '<button class="btn btn-secondary" data-close="1">Close</button>' +
+      '<button class="btn btn-ghost" id="wa-copy-msg">Copy message</button>'
+    );
+    var copyBtn = $('#wa-copy-msg');
+    if (copyBtn) {
+      copyBtn.onclick = function () {
+        var text = share.text || '';
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () { toast('Message copied'); });
+        } else {
+          var el = $('#wa-msg');
+          if (el) { el.focus(); el.select(); try { document.execCommand('copy'); toast('Message copied'); } catch (e) {} }
+        }
+      };
+    }
+  }
+
+  function printDoc(kind, ref) {
+    var lang = (state.bootstrap.settings && state.bootstrap.settings.bilingualDefault) ||
+      (state.bootstrap.portal && state.bootstrap.portal.bilingualDefault) || 'en';
+    toast('Opening document…');
+    var popup = null;
+    try { popup = window.open('about:blank', '_blank'); } catch (e) { popup = null; }
+    run('getDocumentUrl', [kind, ref, lang]).then(function (url) {
+      if (!url || url.charAt(0) === '?') {
+        url = window.location.href.split('?')[0] + (url || ('?page=doc&type=' + encodeURIComponent(kind) + '&ref=' + encodeURIComponent(ref) + '&lang=' + encodeURIComponent(lang)));
+      }
+      if (popup && !popup.closed) {
+        try { popup.location.href = url; return; } catch (e2) { try { popup.close(); } catch (e3) {} }
+      }
+      openModal('Open document',
+        '<p class="muted">Popup was blocked. Tap below to open.</p>' +
+        '<p style="margin-top:12px"><a class="btn btn-primary" href="' + esc(url) + '" target="_blank" rel="noopener">Open print / PDF</a></p>',
+        '<button class="btn btn-secondary" data-close="1">Close</button>'
+      );
+    }).catch(function () {
+      if (popup) try { popup.close(); } catch (e4) {}
+    });
+  }
+
+  function renderSearchResults(data, q) {
+    var box = $('#search-results');
+    if (!q) { box.classList.add('hidden'); return; }
+    var html = '';
+    function section(title, rows, action, labelFn) {
+      if (!rows || !rows.length) return;
+      html += '<div class="group">' + esc(title) + '</div>';
+      rows.forEach(function (r) {
+        html += '<button type="button" data-action="' + action + '" data-ref="' + esc(r.ref) + '" data-row="' + esc(r.row || '') + '">' + labelFn(r) + '</button>';
+      });
+    }
+    section('CRM', (data.clients || []).map(function (c) {
+      return { ref: c.companyName, row: c.row, label: c.companyName, sub: c.primaryContact };
+    }), 'client-timeline', function (r) { return '<strong>' + esc(r.label) + '</strong><div class="muted">' + esc(r.sub || '') + ' · timeline</div>'; });
+    section('Quotes', (data.quotes || []).map(function (q) {
+      return { ref: q.quoteId || q.reference, label: q.reference || 'Draft', sub: q.client };
+    }), 'open-quote', function (r) { return '<strong>' + esc(r.label) + '</strong><div class="muted">' + esc(r.sub || '') + '</div>'; });
+    section('Invoices', (data.invoices || []).map(function (q) {
+      return { ref: q.reference, label: q.reference, sub: q.client };
+    }), 'open-invoice', function (r) { return '<strong>' + esc(r.label) + '</strong><div class="muted">' + esc(r.sub || '') + '</div>'; });
+    box.innerHTML = html || '<div class="empty">No matches</div>';
+    box.classList.remove('hidden');
+  }
+
+  function render() {
+    $('#content').innerHTML = '<div class="loading">Loading…</div>';
+    if (state.view === 'dashboard') run('getDashboard').then(renderDashboard);
+    else if (state.view === 'crm') run('listCrm').then(function (rows) { state.cache.crm = rows; renderCrm(rows); });
+    else if (state.view === 'followups') run('getFollowUps').then(renderFollowups);
+    else if (state.view === 'quotes') run('listQuotes').then(function (rows) { state.cache.quotes = rows; renderQuotes(rows); });
+    else if (state.view === 'invoices') run('listInvoices').then(function (rows) { state.cache.invoices = rows; renderInvoices(rows); });
+    else if (state.view === 'catalog') run('listCatalog').then(function (rows) { state.cache.catalog = rows; renderCatalog(rows); });
+    else if (state.view === 'templates') run('listTemplates').then(renderTemplates);
+    else if (state.view === 'reports') run('getReports').then(renderReports);
+    else if (state.view === 'expenses') run('listExpenses').then(renderExpenses);
+    else if (state.view === 'settings') run('getSettings').then(function (s) { state.bootstrap.settings = s; renderSettings(s); });
+    else if (state.view === 'timeline') {
+      var company = state.cache.timelineCompany || '';
+      if (company) openClientTimeline(company);
+      else setView('crm');
+    }
+  }
+
+  function onClick(e) {
+    if (e.target.closest('[data-close]')) { closeModal(); return; }
+    if (e.target.closest('#menu-toggle')) { toggleSidebar(); return; }
+    if (e.target.closest('#sidebar-backdrop')) { closeSidebar(); return; }
+
+    var nav = e.target.closest('.nav-item[data-view]');
+    if (nav) {
+      setView(nav.getAttribute('data-view'));
+      return;
+    }
+
+    var actionEl = e.target.closest('[data-action]');
+    if (!actionEl) return;
+    var action = actionEl.getAttribute('data-action');
+    var ref = actionEl.getAttribute('data-ref');
+    var row = actionEl.getAttribute('data-row');
+    var id = actionEl.getAttribute('data-id');
+
+    if (action === 'new-crm') openCrmEditor();
+    if (action === 'edit-crm') {
+      $('#search-results').classList.add('hidden');
+      var rec = (state.cache.crm || []).filter(function (r) { return String(r.row) === String(row); })[0];
+      if (rec) openCrmEditor(rec);
+      else run('listCrm').then(function (rows) {
+        state.cache.crm = rows;
+        openCrmEditor(rows.filter(function (r) { return String(r.row) === String(row); })[0]);
+      });
+    }
+    if (action === 'new-quote') {
+      var prefillClient = actionEl.getAttribute('data-company') || '';
+      run('listClients').then(function (clients) {
+        state.clients = clients;
+        openDocEditor('quote', null, prefillClient ? { client: prefillClient } : null);
+      });
+    }
+    if (action === 'client-timeline') {
+      openClientTimeline(actionEl.getAttribute('data-company') || ref || '');
+    }
+    if (action === 'goto-crm') setView('crm');
+    if (action === 'record-payment') {
+      openRecordPayment(ref);
+    }
+    if (action === 'new-invoice') {
+      run('listClients').then(function (clients) { state.clients = clients; openDocEditor('invoice', null); });
+    }
+    if (action === 'from-template') setView('templates');
+    if (action === 'use-template') {
+      var client = prompt('Client name for this quote (optional)', '');
+      run('createQuoteFromTemplate', [id, client || '']).then(function (saved) {
+        toast('Quote created from template');
+        state.view = 'quotes';
+        render();
+        openDoc('quote', saved.quote.quoteId);
+      });
+    }
+    if (action === 'delete-template') {
+      if (!confirm('Delete this template?')) return;
+      run('deleteTemplate', [id]).then(function () { toast('Template deleted'); render(); });
+    }
+    if (action === 'open-quote') { $('#search-results').classList.add('hidden'); openDoc('quote', ref); }
+    if (action === 'open-invoice') { $('#search-results').classList.add('hidden'); openDoc('invoice', ref); }
+    if (action === 'print-quote') printDoc('quote', ref);
+    if (action === 'print-invoice') printDoc('invoice', ref);
+    if (action === 'whatsapp-quote') openWhatsApp('quote', ref);
+    if (action === 'whatsapp-invoice') openWhatsApp('invoice', ref);
+    if (action === 'whatsapp-crm') openWhatsApp('crm', row);
+    if (action === 'authorize-calendar') {
+      toast('Opening Google Calendar connect…');
+      run('authorizeGoogleCalendar').then(function (r) {
+        if (r && r.ok) {
+          toast(r.message || 'Calendar connected');
+          if (state.view === 'settings') render();
+          return;
+        }
+        var url = (r && (r.connectUrl || r.authUrl)) || '';
+        openModal('Connect Google Calendar',
+          '<p>Google must show an <strong>Allow</strong> screen — that only works in a separate tab.</p>' +
+          '<ol style="margin:12px 0 0 18px;line-height:1.65">' +
+          '<li>Sign into this browser as <strong>alfredsv@gmail.com</strong> or <strong>redreachdxb@gmail.com</strong>.</li>' +
+          '<li>Click <strong>Open connect page</strong>.</li>' +
+          '<li>Press <strong>Allow</strong> / <strong>Continue</strong> for Calendar.</li>' +
+          '<li>Come back here and click Sync follow-ups → Calendar.</li>' +
+          '</ol>' +
+          (r && r.message ? '<p class="muted" style="margin-top:12px">' + esc(r.message) + '</p>' : '') +
+          (r && r.error ? '<p class="muted">' + esc(r.error) + '</p>' : ''),
+          '<button class="btn btn-secondary" data-close="1">Close</button>' +
+          (url
+            ? '<a class="btn btn-primary" href="' + esc(url) + '" target="_blank" rel="noopener">Open connect page</a>'
+            : '<button class="btn btn-primary" data-action="authorize-calendar">Try again</button>')
+        );
+        if (url) {
+          try { window.open(url, '_blank'); } catch (e) {}
+        }
+      }).catch(function (err) {
+        run('getCalendarStatus').then(function (st) {
+          var url = (st && (st.connectUrl || st.authUrl)) || '';
+          openModal('Connect Google Calendar',
+            '<p>Authorization failed from the button (common with Apps Script web apps).</p>' +
+            '<p class="muted">' + esc((err && err.message) || '') + '</p>' +
+            '<p>Open the connect page instead and click <strong>Allow</strong>.</p>',
+            '<button class="btn btn-secondary" data-close="1">Close</button>' +
+            (url ? '<a class="btn btn-primary" href="' + esc(url) + '" target="_blank" rel="noopener">Open connect page</a>' : '')
+          );
+          if (url) try { window.open(url, '_blank'); } catch (e2) {}
+        });
+      });
+    }
+    if (action === 'sync-calendar') {
+      toast('Syncing follow-ups to Calendar…');
+      run('syncAllFollowUpsToCalendar').then(function (r) {
+        var msg = 'Calendar synced: ' + (r.synced || 0) + ' events';
+        if (r.invited) msg += ' · ' + r.invited + ' owner invite(s)';
+        if (r.warnings && r.warnings.length) msg += ' · ' + r.warnings.length + ' without owner email';
+        if (r.errors && r.errors.length) msg += ' · ' + r.errors.length + ' errors';
+        toast(msg, !!(r.errors && r.errors.length));
+        if (state.view === 'settings') render();
+      });
+    }
+    if (action === 'duplicate-quote') {
+      run('duplicateQuote', [ref]).then(function (saved) {
+        toast('Duplicated as draft');
+        render();
+        openDoc('quote', saved.quote.quoteId);
+      });
+    }
+    if (action === 'delete-quote') {
+      if (!ref) return;
+      if (!confirm('Delete this quotation? This cannot be undone.')) return;
+      run('deleteQuote', [ref, false]).then(function (res) {
+        toast('Deleted ' + (res.deleted || 'quotation'));
+        closeModal();
+        state.view = 'quotes';
+        render();
+      });
+    }
+    if (action === 'clear-draft-quotes') {
+      var count = (state.cache.quotes || []).filter(function (q) {
+        return q.isDraft || !q.reference || String(q.status || '').toLowerCase() === 'draft';
+      }).length;
+      if (!count) { toast('No draft quotations to clear'); return; }
+      if (!confirm('Delete all ' + count + ' draft quotation(s)? Finalized quotes are kept. This cannot be undone.')) return;
+      toast('Clearing ' + count + ' drafts… this may take a moment');
+      run('clearAllDraftQuotes').then(function (res) {
+        toast('Deleted ' + (res.deletedCount || 0) + ' draft(s)' +
+          (res.errors && res.errors.length ? ' · ' + res.errors.length + ' failed' : ''));
+        state.view = 'quotes';
+        render();
+      });
+    }
+    if (action === 'duplicate-invoice') {
+      run('duplicateInvoice', [ref]).then(function (saved) {
+        toast('Invoice duplicated');
+        render();
+        openDoc('invoice', saved.invoice.reference);
+      });
+    }
+    if (action === 'finalize-quote') {
+      if (!confirm('Finalize and assign reference number? A follow-up will be created automatically.')) return;
+      run('finalizeQuote', [ref]).then(function (saved) {
+        toast('Finalized as ' + saved.quote.reference + ' · follow-up scheduled');
+        render();
+      });
+    }
+    if (action === 'revise-quote') {
+      if (!confirm('Create a revision?')) return;
+      run('reviseQuote', [ref]).then(function (saved) { toast('Created ' + saved.quote.reference); render(); openDoc('quote', saved.quote.quoteId); });
+    }
+    if (action === 'convert-quote') {
+      openConvertDialog(ref);
+    }
+    if (action === 'quote-outcome') {
+      var status = actionEl.getAttribute('data-status') || 'Awarded';
+      var reason = prompt(status + ' — reason (optional)', '') || '';
+      run('setQuoteOutcome', [ref, status, reason]).then(function () {
+        toast('Marked ' + status); render();
+      });
+    }
+    if (action === 'undo-finalize') {
+      if (!confirm('Return to draft and clear reference?')) return;
+      run('undoFinalizeQuote', [ref]).then(function () { toast('Returned to draft'); render(); });
+    }
+    if (action === 'goto-followups') setView('followups');
+    if (action === 'snooze-followup') {
+      run('snoozeFollowUp', [Number(row), 7]).then(function () { toast('Snoozed +7 days'); render(); });
+    }
+    if (action === 'clear-followup') {
+      run('clearFollowUp', [Number(row)]).then(function () { toast('Follow-up cleared'); render(); });
+    }
+    if (action === 'submit-followup-update') {
+      var form = $('#followup-update-form');
+      if (!form) return;
+      var vals = formValues(form);
+      var text = String(vals.update || '').trim();
+      if (!text) { toast('Type an update first', true); return; }
+      var crmRow = vals.crmRow ? Number(vals.crmRow) : '';
+      var company = '';
+      if (crmRow && state.cache.followups && state.cache.followups.companyOptions) {
+        var match = state.cache.followups.companyOptions.filter(function (c) {
+          return String(c.row) === String(crmRow);
+        })[0];
+        if (match) company = match.companyName;
+      }
+      run('addFollowUpUpdate', [{
+        update: text,
+        crmRow: crmRow || '',
+        company: company
+      }]).then(function (data) {
+        toast('Update posted');
+        renderFollowups(data);
+      });
+    }
+    if (action === 'post-followup-update') {
+      var companyName = actionEl.getAttribute('data-company') || '';
+      openModal('Update — ' + (companyName || 'Follow-up'),
+        '<form id="row-update-form" class="form-grid">' +
+          field('Current update', 'update', '', 'textarea', {
+            full: true,
+            placeholder: 'What happened? Next step? Anything the team should know…'
+          }) +
+          '<input type="hidden" name="crmRow" value="' + esc(row || '') + '">' +
+          '<input type="hidden" name="company" value="' + esc(companyName) + '">' +
+        '</form>',
+        '<button class="btn btn-secondary" data-close="1">Cancel</button>' +
+        '<button class="btn btn-primary" id="save-row-update">Post update</button>'
+      );
+      $('#save-row-update').onclick = function () {
+        var vals = formValues($('#row-update-form'));
+        if (!String(vals.update || '').trim()) { toast('Type an update first', true); return; }
+        run('addFollowUpUpdate', [{
+          update: vals.update,
+          crmRow: vals.crmRow ? Number(vals.crmRow) : '',
+          company: vals.company || ''
+        }]).then(function (data) {
+          closeModal();
+          toast('Update posted');
+          state.view = 'followups';
+          renderFollowups(data);
+        });
+      };
+    }
+    if (action === 'new-catalog') openCatalogEditor();
+    if (action === 'edit-catalog') {
+      var cat = (state.cache.catalog || []).filter(function (c) { return c.sku === actionEl.getAttribute('data-sku'); })[0];
+      openCatalogEditor(cat || { sku: actionEl.getAttribute('data-sku') });
+    }
+    if (action === 'delete-catalog') {
+      if (!confirm('Delete catalog item?')) return;
+      run('deleteCatalogItem', [actionEl.getAttribute('data-sku')]).then(function () { toast('Deleted'); render(); });
+    }
+    if (action === 'export-report') {
+      var kind = actionEl.getAttribute('data-kind') || 'pnl';
+      run('exportReportCsv', [kind]).then(function (csv) {
+        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'redreach-' + kind + '.csv';
+        a.click();
+        toast('Exported ' + kind);
+      });
+    }
+    if (action === 'copy-portal') {
+      run('getPortalInfo').then(function (info) {
+        var text = 'Portal URL: ' + (info.portalBaseUrl || '') +
+          '\nRedirect target (Apps Script): ' + (info.scriptUrl || '(open the live web app once to resolve)') +
+          '\n\n' + (info.note || '');
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () { toast('Portal setup copied'); });
+        } else {
+          prompt('Copy portal setup', text);
+        }
+      });
+    }
+    if (action === 'install-trigger') {
+      run('installDailyMaintenanceTrigger').then(function (r) { toast(r.message || 'Trigger installed'); });
+    }
+    if (action === 'add-user') {
+      var email = prompt('Teammate’s Gmail / Google email (NOT Zoho)\ne.g. name@gmail.com');
+      if (!email) return;
+      email = String(email).trim().toLowerCase();
+      if (email.indexOf('@') < 0) { toast('Enter a full Google email', true); return; }
+      if (/redreach\.ae$/i.test(email.split('@')[1] || '') && !/@gmail\.com$/i.test(email)) {
+        if (!confirm('This looks like a company domain. Login needs a Google account.\n\nIf this address is on Zoho (not Google Workspace), calendar/login will not work. Continue anyway?')) return;
+      }
+      var name = prompt('Display name (shown as “entered by”)', email.split('@')[0]) || '';
+      var role = prompt('Role: admin or sales', 'sales') || 'sales';
+      run('saveUser', [{ email: email, role: role, name: name }]).then(function () {
+        toast('User saved — ' + (name || email)); render();
+      });
+    }
+    if (action === 'delete-user') {
+      if (!confirm('Remove this user?')) return;
+      run('deleteUser', [actionEl.getAttribute('data-email')]).then(function () {
+        toast('User removed'); render();
+      });
+    }
+    if (action === 'mark-paid') {
+      if (!ref) { toast('Missing invoice reference', true); return; }
+      if (!confirm('Mark ' + ref + ' as fully paid?')) return;
+      toast('Marking paid…');
+      run('markInvoicePaid', [ref, 'Bank Transfer']).then(function (data) {
+        var ps = (data && data.invoice && data.invoice.paymentStatus) ||
+          (data && data.paymentSummary && data.paymentSummary.status) || 'Paid';
+        toast('Marked ' + ref + ' as ' + ps);
+        state.view = 'invoices';
+        render();
+      });
+    }
+    if (action === 'new-expense') openExpenseEditor();
+    if (action === 'save-settings') {
+      var payload = formValues($('#settings-form'));
+      payload.quoteValidityDays = Number(payload.quoteValidityDays);
+      if (payload.moqDefault != null && payload.moqDefault !== '') payload.moqDefault = Number(payload.moqDefault);
+      if (payload.followUpDaysAfterQuote != null && payload.followUpDaysAfterQuote !== '') {
+        payload.followUpDaysAfterQuote = Number(payload.followUpDaysAfterQuote);
+      }
+      run('saveSettings', [payload]).then(function (s) {
+        state.bootstrap.settings = s;
+        state.bootstrap.moqDefault = s.moqDefault;
+        state.bootstrap.portal = state.bootstrap.portal || {};
+        state.bootstrap.portal.baseUrl = s.portalBaseUrl;
+        toast('Settings saved');
+        var who = signedInLabel();
+        $('#sidebar-company').innerHTML =
+          '<div>' + esc(s.companyName || '') + '</div>' +
+          (who ? '<div class="muted" style="margin-top:6px;font-size:12px">Signed in as ' + esc(who) + '</div>' : '');
+      });
+    }
+  }
+
+  function openConvertDialog(ref) {
+    openModal('Convert quote → invoice',
+      '<form id="convert-form" class="form-grid">' +
+        '<div class="full muted">Keeps payment terms, delivery, and remarks from the quotation.</div>' +
+        field('Invoice type', 'mode', 'full', 'select', {
+          full: true,
+          options: [
+            { value: 'full', label: 'Full invoice (same reference)' },
+            { value: 'deposit', label: 'Deposit invoice (%)' },
+            { value: 'newref', label: 'Full invoice with new reference' }
+          ]
+        }) +
+        field('Deposit %', 'depositPercent', '50', 'number') +
+      '</form>',
+      '<button class="btn btn-secondary" data-close="1">Cancel</button>' +
+      '<button class="btn btn-primary" id="do-convert">Create invoice</button>'
+    );
+    $('#do-convert').onclick = function () {
+      var vals = formValues($('#convert-form'));
+      var opts = {};
+      if (vals.mode === 'deposit') {
+        opts.depositPercent = Number(vals.depositPercent || 50);
+        opts.newReference = true;
+      } else if (vals.mode === 'newref') {
+        opts.newReference = true;
+      }
+      run('convertQuoteToInvoice', [ref, opts]).then(function (saved) {
+        closeModal();
+        toast('Invoice ' + saved.invoice.reference + ' created');
+        state.view = 'invoices';
+        render();
+        openDoc('invoice', saved.invoice.reference);
+      });
+    };
+  }
+
+  document.addEventListener('click', onClick);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+  document.addEventListener('submit', function (e) {
+    // Prevent Enter from reloading the Apps Script page inside editors/settings
+    if (e.target && e.target.closest && e.target.closest('form')) {
+      e.preventDefault();
+    }
+  });
+
+  var searchInput = $('#global-search');
+  searchInput.addEventListener('input', function () {
+    var q = searchInput.value.trim();
+    if (state.searchTimer) clearTimeout(state.searchTimer);
+    if (!q) { $('#search-results').classList.add('hidden'); return; }
+    state.searchTimer = setTimeout(function () {
+      run('globalSearch', [q]).then(function (data) { renderSearchResults(data, q); });
+    }, 280);
+  });
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.global-search-wrap')) $('#search-results').classList.add('hidden');
+  });
+
+  var settings = state.bootstrap.settings || {};
+  var who = signedInLabel();
+  $('#sidebar-company').innerHTML =
+    '<div>' + esc(settings.companyName || 'Red Reach Middle East FZE') + '</div>' +
+    (who ? '<div class="muted" style="margin-top:6px;font-size:12px">Signed in as ' + esc(who) + '</div>' : '');
+  run('listClients').then(function (c) { state.clients = c || []; });
+  setView('dashboard');
+})();
+</script>

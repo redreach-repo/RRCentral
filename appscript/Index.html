@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#121417">
+    <title>RED REACH Central</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+    <?!= include('Stylesheet'); ?>
+  </head>
+  <body>
+    <div id="app">
+      <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+      <aside class="sidebar" id="sidebar">
+        <div class="brand">
+          <? if (logoDataUri) { ?>
+            <img class="brand-logo" src="<?!= logoDataUri ?>" alt="RED REACH">
+          <? } else { ?>
+            <div class="brand-mark">RR</div>
+            <div>
+              <div class="brand-name">RED REACH</div>
+              <div class="brand-sub">Central</div>
+            </div>
+          <? } ?>
+        </div>
+        <nav class="nav desktop-nav">
+          <button class="nav-item active" data-view="dashboard">Dashboard</button>
+          <button class="nav-item" data-view="crm">CRM</button>
+          <button class="nav-item" data-view="followups">Follow-ups</button>
+          <button class="nav-item" data-view="quotes">Quotations</button>
+          <button class="nav-item" data-view="invoices">Invoices</button>
+          <button class="nav-item" data-view="catalog">Catalog</button>
+          <button class="nav-item" data-view="templates">Templates</button>
+          <button class="nav-item" data-view="reports">Reports</button>
+          <button class="nav-item" data-view="expenses">Expenses</button>
+          <button class="nav-item" data-view="settings">Settings</button>
+        </nav>
+        <div class="sidebar-foot" id="sidebar-company"></div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div class="topbar-left">
+            <button class="icon-btn menu-btn" id="menu-toggle" aria-label="Menu">☰</button>
+            <div>
+              <h1 id="view-title">Dashboard</h1>
+              <p id="view-subtitle" class="muted">Overview of sales and accounts</p>
+            </div>
+          </div>
+          <div class="topbar-actions" id="topbar-actions"></div>
+        </header>
+
+        <div class="global-search-wrap">
+          <input class="search global-search" id="global-search" placeholder="Search clients, quotes, invoices…" autocomplete="off">
+          <div id="search-results" class="search-results hidden"></div>
+        </div>
+
+        <div id="content" class="content">
+          <div class="loading">Loading…</div>
+        </div>
+      </main>
+    </div>
+
+    <div id="modal" class="modal hidden" aria-hidden="true">
+      <div class="modal-backdrop" data-close="1"></div>
+      <div class="modal-card" role="dialog">
+        <div class="modal-head">
+          <h2 id="modal-title">Dialog</h2>
+          <button class="icon-btn" data-close="1" aria-label="Close">×</button>
+        </div>
+        <div id="modal-body" class="modal-body"></div>
+        <div id="modal-foot" class="modal-foot"></div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+    <div id="autosave" class="autosave hidden">Saved</div>
+
+    <script>
+      window.__BOOTSTRAP__ = <?!= bootstrap ?>;
+    </script>
+    <?!= include('JavaScript'); ?>
+  </body>
+</html>

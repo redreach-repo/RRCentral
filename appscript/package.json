@@ -1,0 +1,16 @@
+{
+  "name": "appscript",
+  "version": "1.0.0",
+  "description": "Google Apps Script web app that turns the **RR Central** spreadsheet into a CRM, quotation generator, and invoice generator for **Red Reach Middle East FZE**.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@google/clasp": "^3.3.0"
+  }
+}

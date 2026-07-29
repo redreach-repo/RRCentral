@@ -1,0 +1,8 @@
+node_modules/
+.clasp.json
+.source.xlsx
+source.xlsx
+.DS_Store
+*.log
+appscript/node_modules/
+appscript/.clasp.json

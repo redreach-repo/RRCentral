@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <title><?!= title ?> <?!= doc.reference || doc.quoteId || '' ?></title>
+    <style>
+      :root {
+        --ink: #111;
+        --muted: #555;
+        --line: #e2e2e2;
+        --accent: #e85d04;
+        --accent-deep: #c1121f;
+        --bg: #fff;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: #f0f0f0;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      .toolbar {
+        position: sticky; top: 0; z-index: 2;
+        display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;
+        padding: 12px 16px; background: #111;
+      }
+      .toolbar button, .toolbar a {
+        appearance: none; border: 0; border-radius: 999px; padding: 10px 14px;
+        font: inherit; font-weight: 600; cursor: pointer; background: #fff; color: #111;
+        text-decoration: none; display: inline-flex; align-items: center;
+      }
+      .toolbar button.wa { background: #25D366; color: #fff; }
+      .division-pill {
+        display: inline-block; margin-top: 8px; padding: 6px 10px; border-radius: 999px;
+        background: linear-gradient(90deg, #c1121f, #e85d04); color: #fff;
+        font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
+      }
+      .frame {
+        width: min(900px, calc(100% - 24px));
+        margin: 20px auto 40px;
+        background: var(--bg);
+        box-shadow: 0 18px 40px rgba(0,0,0,0.12);
+        border-left: 10px solid var(--accent);
+        border-right: 10px solid var(--accent);
+      }
+      /* Temporary offscreen clone used only for PDF capture */
+      #pdf-capture-root {
+        position: fixed;
+        left: -10000px;
+        top: 0;
+        width: 800px;
+        background: #fff;
+        z-index: -1;
+        pointer-events: none;
+      }
+      #pdf-capture-root .frame {
+        width: 800px !important;
+        max-width: 800px !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+      }
+      .sheet { padding: 36px 40px 24px; }
+      .top {
+        display: flex; justify-content: space-between; gap: 24px; align-items: flex-start;
+        padding-bottom: 18px; border-bottom: 2px solid var(--accent);
+      }
+      .logo { max-height: 72px; max-width: 280px; display: block; }
+      .company { margin-top: 10px; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+      .doc-meta { text-align: right; min-width: 220px; }
+      .doc-meta .label {
+        font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
+        color: var(--accent-deep); font-weight: 700;
+      }
+      .doc-meta h1 {
+        margin: 6px 0 12px; font-size: 22px; letter-spacing: -0.02em; word-break: break-word;
+      }
+      .meta-grid { display: grid; gap: 4px; font-size: 13px; }
+      .meta-grid span { color: var(--muted); }
+      .parties {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+        margin: 24px 0 16px;
+      }
+      .parties h3 {
+        margin: 0 0 8px; font-size: 11px; letter-spacing: 0.12em;
+        text-transform: uppercase; color: var(--muted);
+      }
+      .parties p { margin: 0; line-height: 1.5; font-size: 14px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13.5px; }
+      th, td { padding: 10px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+      th {
+        font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+        color: var(--muted); border-bottom: 2px solid #222;
+      }
+      td.num, th.num { text-align: right; }
+      .totals { width: 280px; margin: 18px 0 0 auto; font-size: 14px; }
+      .totals div { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; }
+      .totals .grand {
+        margin-top: 6px; padding-top: 10px; border-top: 2px solid #222;
+        font-weight: 800; font-size: 16px;
+      }
+      .pay-box, .terms-box, .notes-box {
+        margin-top: 28px; font-size: 12.5px; line-height: 1.55; color: #333;
+      }
+      .pay-box h3, .terms-box h3, .notes-box h3 {
+        margin: 0 0 8px; font-size: 13px; color: var(--accent-deep);
+      }
+      .notes-box p { margin: 0; white-space: pre-wrap; }
+      .closing { margin-top: 18px; font-size: 13px; }
+      .sign-row {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 40px;
+        margin: 42px 0 18px; font-size: 13px; font-weight: 700;
+      }
+      .sign-row div {
+        border-top: 1px solid #bbb; padding-top: 10px; margin-top: 48px;
+      }
+      .footer-bar {
+        background: linear-gradient(90deg, #c1121f 0%, #e85d04 55%, #f48c06 100%);
+        color: #fff; text-align: center; font-size: 12.5px; font-weight: 600;
+        padding: 12px 16px; letter-spacing: 0.02em;
+      }
+      .draft-banner {
+        background: #fff3cd; color: #7a5b00; padding: 8px 12px; border-radius: 8px;
+        margin-bottom: 14px; font-size: 13px; font-weight: 600;
+      }
+      @media print {
+        body { background: #fff !important; }
+        .toolbar, #pdf-capture-root { display: none !important; }
+        .frame {
+          margin: 0 !important;
+          width: 100% !important;
+          max-width: none !important;
+          box-shadow: none !important;
+        }
+      }
+      .toolbar button:disabled { opacity: 0.6; cursor: wait; }
+      .toolbar .hint {
+        flex: 1; color: rgba(255,255,255,0.72); font-size: 12px; align-self: center;
+        min-width: 140px;
+      }
+      body.rtl .sheet, body.rtl .doc-meta, body.rtl .parties, body.rtl table, body.rtl .totals {
+        direction: rtl; text-align: right;
+      }
+      body.rtl .doc-meta { text-align: left; }
+      body.rtl td.num, body.rtl th.num { text-align: left; }
+      body.rtl .totals { margin-left: 0; margin-right: auto; }
+      .attach-list { margin: 16px 0 0; padding-left: 18px; font-size: 12.5px; }
+      .attach-list a { color: var(--accent-deep); }
+      @media (max-width: 720px) {
+        .sheet { padding: 20px 16px; }
+        .top, .parties, .sign-row { grid-template-columns: 1fr; display: grid; }
+        .doc-meta { text-align: left; }
+        .totals { width: 100%; }
+        table { font-size: 12px; }
+        .toolbar .hint { display: none; }
+      }
+    </style>
+  </head>
+  <body class="<?= lang === 'ar' ? 'rtl' : '' ?>">
+    <div class="toolbar">
+      <span class="hint" id="share-hint">Save as PDF downloads the file. WhatsApp can attach it on phone; otherwise it shares the document link.</span>
+      <select id="lang-select" style="border:0;border-radius:999px;padding:8px 12px;font:inherit;font-weight:600">
+        <option value="en" <?= lang === 'en' ? 'selected' : '' ?>>EN</option>
+        <option value="ar" <?= lang === 'ar' ? 'selected' : '' ?>>AR</option>
+        <option value="both" <?= lang === 'both' ? 'selected' : '' ?>>EN+AR</option>
+      </select>
+      <button type="button" id="btn-save-pdf">Save as PDF</button>
+      <button type="button" id="btn-print" onclick="window.print()">Print</button>
+      <button type="button" class="wa" id="wa-share"
+         data-text="<?= title ?> <?= doc.reference || 'DRAFT' ?> · <?= divisionLabel ?>">WhatsApp</button>
+    </div>
+    <div class="frame" id="doc-frame">
+      <div class="sheet">
+        <? if (docType === 'quote' && (!doc.reference || doc.status === 'Draft')) { ?>
+          <div class="draft-banner"><?= L.draftBanner ?></div>
+        <? } ?>
+
+        <div class="top">
+          <div>
+            <? if (logoSrc) { ?>
+              <img class="logo" src="<?!= logoSrc ?>" alt="RED REACH">
+            <? } else { ?>
+              <div style="font-size:22px;font-weight:800;color:#c1121f">RED REACH</div>
+            <? } ?>
+            <div class="company">
+              <div><strong><?= settings.companyName ?></strong></div>
+              <div><?= settings.address ?></div>
+              <? if (settings.email) { ?><div><?= settings.email ?></div><? } ?>
+              <? if (settings.website) { ?><div><?= settings.website ?></div><? } ?>
+              <? if (settings.trn) { ?><div>TRN: <?= settings.trn ?></div><? } ?>
+            </div>
+          </div>
+          <div class="doc-meta">
+            <div class="label"><?= L.title ?></div>
+            <h1><?= doc.reference || 'DRAFT' ?></h1>
+            <div class="division-pill"><?= divisionLabel ?> · <?= divisionName ?> (<?= divisionCode ?>)</div>
+            <div class="meta-grid" style="margin-top:10px">
+              <div><span><?= L.date ?>:</span> <?= issueDate ?></div>
+              <? if (docType === 'quote' && validUntil) { ?>
+                <div><span><?= L.validUntil ?>:</span> <?= validUntil ?></div>
+              <? } ?>
+              <? if (doc.revision) { ?>
+                <div><span><?= L.revision ?>:</span> <?= doc.revision ?></div>
+              <? } ?>
+              <div><span><?= L.status ?>:</span> <?= doc.status ?><? if (docType === 'invoice' && doc.paymentStatus) { ?> · <?= doc.paymentStatus ?><? } ?></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="parties">
+          <div>
+            <h3><?= L.billTo ?></h3>
+            <p>
+              <strong><?= (client && client.companyName) || doc.client ?></strong><br>
+              <? if (client && client.primaryContact) { ?><?= client.primaryContact ?><br><? } ?>
+              <? if (client && client.email) { ?><?= client.email ?><br><? } ?>
+              <? if (client && client.mobile) { ?><?= client.mobile ?><br><? } ?>
+              <? if (client && client.address) { ?><?= client.address ?><br><? } ?>
+              <? if (client && client.trn) { ?>TRN: <?= client.trn ?><? } ?>
+            </p>
+          </div>
+          <div>
+            <h3><?= L.summary ?></h3>
+            <p><?= doc.description || '—' ?></p>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th><?= L.description ?></th>
+              <th class="num"><?= L.qty ?></th>
+              <th class="num"><?= L.unit ?></th>
+              <th class="num"><?= L.amount ?></th>
+            </tr>
+          </thead>
+          <tbody>
+            <? for (var i = 0; i < items.length; i++) {
+              var it = items[i]; ?>
+              <tr>
+                <td><?= i + 1 ?></td>
+                <td><?= it.description ?></td>
+                <td class="num"><?= it.qty ?></td>
+                <td class="num"><?= currency ?> <?= Number(it.unitPrice || 0).toFixed(2) ?></td>
+                <td class="num"><?= currency ?> <?= Number(it.amount || (it.qty * it.unitPrice) || 0).toFixed(2) ?></td>
+              </tr>
+            <? } ?>
+          </tbody>
+        </table>
+
+        <div class="totals">
+          <div><span><?= L.subtotal ?></span><span><?= currency ?> <?= Number(summary.subtotal || 0).toFixed(2) ?></span></div>
+          <div><span><?= L.vat ?> (<?= (Number(summary.vatRate || 0) * 100).toFixed(0) ?>%)</span><span><?= currency ?> <?= Number(summary.vat || 0).toFixed(2) ?></span></div>
+          <div class="grand"><span><?= L.total ?></span><span><?= currency ?> <?= Number(summary.total || doc.amount || 0).toFixed(2) ?></span></div>
+        </div>
+
+        <div class="pay-box">
+          <h3><?= L.paymentDetails ?></h3>
+          <div><strong><?= L.paymentTerms ?>:</strong> <?= doc.paymentTerms || settings.paymentTerms || 'Immediate upon delivery' ?></div>
+          <div><strong><?= L.delivery ?>:</strong> <?= doc.deliveryTerms || settings.deliveryTerms || '2 weeks once the advance payment is done' ?></div>
+          <div><strong><?= L.method ?>:</strong> <?= settings.paymentMethod || 'Cheque or Bank Transfer' ?></div>
+          <div><strong>Account Name:</strong> <?= settings.accountName || settings.companyName ?></div>
+          <div><strong>Bank Name:</strong> <?= settings.bankName ?></div>
+          <div><strong>a/c:</strong> <?= settings.bankAccount ?></div>
+          <div><strong>IBAN:</strong> <?= settings.iban ?></div>
+        </div>
+
+        <div class="terms-box">
+          <div class="closing"><?= settings.quoteClosing || 'Thanking you and looking forward to your valued order' ?></div>
+          <? if (docType === 'quote') { ?>
+            <p style="font-style:italic;margin:10px 0 0"><?= settings.quoteTerms ?></p>
+            <p style="font-style:italic;margin:6px 0 0">Delivery: <?= doc.deliveryTerms || settings.deliveryTerms ?></p>
+            <p style="font-weight:700;margin:8px 0 0">
+              <? if (doc.moq) { ?>MOQ: <?= doc.moq ?> pcs per item. <? } ?>
+              <?= settings.moqTerms ?>
+            </p>
+          <? } ?>
+        </div>
+
+        <div class="notes-box">
+          <h3><?= L.remarks ?></h3>
+          <p><?= doc.notes ? doc.notes : '—' ?></p>
+        </div>
+
+        <? if (attachments && attachments.length) { ?>
+          <div class="notes-box">
+            <h3><?= L.attachments ?></h3>
+            <ul class="attach-list">
+              <? for (var ai = 0; ai < attachments.length; ai++) { ?>
+                <li><a href="<?= attachments[ai].url ?>" target="_blank" rel="noopener"><?= attachments[ai].fileName ?></a></li>
+              <? } ?>
+            </ul>
+          </div>
+        <? } ?>
+
+        <div class="sign-row">
+          <div><?= L.preparedBy || 'Prepared By' ?></div>
+          <div><?= L.approvedBy ?></div>
+        </div>
+      </div>
+      <div class="footer-bar">
+        <?= settings.address || 'P.O. Box 6641, Dubai, UAE' ?>
+        &nbsp;|&nbsp;
+        <?= settings.email || 'info@redreach.ae' ?>
+        &nbsp;|&nbsp;
+        <?= settings.website || 'www.redreach.ae' ?>
+      </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script>
+      (function () {
+        var fileName = <?= JSON.stringify(String((doc.reference || doc.quoteId || 'REDREACH-document')).replace(/[\\/:*?"<>|]/g, '-') + '.pdf') ?>;
+        var shareText = (document.getElementById('wa-share').getAttribute('data-text') || 'RED REACH document') +
+          '\n' + window.location.href;
+        var frame = document.getElementById('doc-frame');
+        var hint = document.getElementById('share-hint');
+        var CAPTURE_WIDTH = 800;
+
+        function setBusy(busy, msg) {
+          ['btn-save-pdf', 'wa-share', 'btn-print'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.disabled = !!busy;
+          });
+          if (hint && msg) hint.textContent = msg;
+        }
+
+        function getJsPdf() {
+          if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
+          if (window.jsPDF) return window.jsPDF;
+          throw new Error('jsPDF missing');
+        }
+
+        function buildCaptureClone() {
+          var old = document.getElementById('pdf-capture-root');
+          if (old) old.remove();
+          var root = document.createElement('div');
+          root.id = 'pdf-capture-root';
+          var clone = frame.cloneNode(true);
+          clone.id = 'pdf-capture-frame';
+          clone.style.width = CAPTURE_WIDTH + 'px';
+          clone.style.maxWidth = CAPTURE_WIDTH + 'px';
+          clone.style.margin = '0';
+          clone.style.boxShadow = 'none';
+          root.appendChild(clone);
+          document.body.appendChild(root);
+          return { root: root, clone: clone };
+        }
+
+        function canvasToPdfBlob(canvas) {
+          var JsPDF = getJsPdf();
+          var pdf = new JsPDF({ orientation: 'p', unit: 'mm', format: 'a4', compress: true });
+          var pageW = pdf.internal.pageSize.getWidth();
+          var pageH = pdf.internal.pageSize.getHeight();
+          var margin = 8;
+          var usableW = pageW - margin * 2;
+          var usableH = pageH - margin * 2;
+          var imgW = usableW;
+          var imgH = (canvas.height * imgW) / canvas.width;
+          var imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+          // Slice the tall image across A4 pages (no blank first page, full width)
+          var y = 0;
+          var page = 0;
+          while (y < imgH - 0.5) {
+            if (page > 0) pdf.addPage();
+            pdf.addImage(imgData, 'JPEG', margin, margin - y, imgW, imgH);
+            y += usableH;
+            page += 1;
+            if (page > 30) break;
+          }
+          return pdf.output('blob');
+        }
+
+        function renderPdfBlob() {
+          if (typeof html2canvas !== 'function') {
+            return Promise.reject(new Error('html2canvas missing'));
+          }
+          window.scrollTo(0, 0);
+          var parts = buildCaptureClone();
+          return html2canvas(parts.clone, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#ffffff',
+            logging: false,
+            width: CAPTURE_WIDTH,
+            windowWidth: CAPTURE_WIDTH,
+            scrollX: 0,
+            scrollY: 0
+          }).then(function (canvas) {
+            parts.root.remove();
+            return canvasToPdfBlob(canvas);
+          }, function (err) {
+            parts.root.remove();
+            throw err;
+          });
+        }
+
+        function downloadBlob(blob) {
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(function () { URL.revokeObjectURL(url); }, 2500);
+        }
+
+        document.getElementById('btn-save-pdf').onclick = function () {
+          setBusy(true, 'Creating full-width PDF…');
+          renderPdfBlob().then(function (blob) {
+            downloadBlob(blob);
+            setBusy(false, 'PDF downloaded.');
+          }).catch(function (err) {
+            console.error(err);
+            setBusy(false, 'Opening print dialog — choose “Save as PDF”.');
+            window.print();
+          });
+        };
+
+        document.getElementById('wa-share').onclick = function (e) {
+          e.preventDefault();
+          setBusy(true, 'Preparing WhatsApp…');
+          renderPdfBlob().then(function (blob) {
+            var file = new File([blob], fileName, { type: 'application/pdf' });
+            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+              return navigator.share({
+                files: [file],
+                title: fileName,
+                text: shareText
+              }).then(function () {
+                setBusy(false, 'Shared via WhatsApp / share sheet.');
+              });
+            }
+            downloadBlob(blob);
+            window.open('https://wa.me/?text=' + encodeURIComponent(shareText + '\n\n(PDF downloaded — attach the file in WhatsApp)'), '_blank');
+            setBusy(false, 'PDF downloaded. Attach that file in WhatsApp.');
+          }).catch(function () {
+            window.open('https://wa.me/?text=' + encodeURIComponent(shareText), '_blank');
+            setBusy(false, 'Opened WhatsApp with document link.');
+          });
+        };
+
+        var langSelect = document.getElementById('lang-select');
+        if (langSelect) {
+          langSelect.onchange = function () {
+            var url = new URL(window.location.href);
+            url.searchParams.set('lang', langSelect.value);
+            window.location.href = url.toString();
+          };
+        }
+      })();
+    </script>
+  </body>
+</html>
