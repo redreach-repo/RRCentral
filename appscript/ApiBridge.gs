@@ -131,11 +131,12 @@ function serveExternalApiPage_(params) {
     .replace(/</g, '\\u003c')
     .replace(/>/g, '\\u003e')
     .replace(/<\/script/gi, '<\\/script');
-  var targetOrigin = origin && origin !== '*' ? JSON.stringify(String(origin)) : '"*"';
   var html =
     '<!DOCTYPE html><html><head><meta charset="utf-8"><title>API</title></head><body>' +
-    '<script>(function(){var p=' + json + ';try{parent.postMessage(p,' + targetOrigin + ');}catch(e){try{parent.postMessage(p,"*");}catch(e2){}}})();</script>' +
-    '</body></html>';
+    '<script>(function(){var p=' + json + ';' +
+    'function send(w){try{w.postMessage(p,"*");}catch(e){}}' +
+    'send(parent);send(top);if(window.frames){try{send(window.parent);}catch(e2){}}' +
+    '})();</script></body></html>';
   return HtmlService.createHtmlOutput(html)
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }

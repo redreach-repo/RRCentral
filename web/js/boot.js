@@ -8,7 +8,14 @@
   var err = document.getElementById('login-err');
 
   function showErr(msg) {
-    err.textContent = msg || '';
+    err.innerHTML = msg || '';
+  }
+
+  function classicLink() {
+    var url = (window.RR_CONFIG && RR_CONFIG.scriptUrl) || '';
+    return url
+      ? ' <a href="' + url + '" target="_blank" rel="noopener">Open classic Google app</a>'
+      : '';
   }
 
   select.addEventListener('change', function () {
@@ -43,7 +50,10 @@
     app.classList.remove('hidden');
     var s = document.createElement('script');
     s.src = 'js/app.js';
-    s.onerror = function () { showErr('Failed to load app.js'); gate.classList.remove('hidden'); };
+    s.onerror = function () {
+      gate.classList.remove('hidden');
+      showErr('Failed to load app.js.' + classicLink());
+    };
     document.body.appendChild(s);
   }
 
@@ -51,7 +61,7 @@
     showErr('');
     var email = emailFromForm();
     if (!email || email.indexOf('@') < 0) {
-      showErr('Enter a valid Google email (Gmail).');
+      showErr('Enter a valid email.');
       return;
     }
     localStorage.setItem('rr_user_email', email);
@@ -66,7 +76,10 @@
       .catch(function (e) {
         btn.disabled = false;
         btn.textContent = 'Continue';
-        showErr((e && e.message) || 'Could not reach Apps Script API. Check web/config.js scriptUrl + apiToken.');
+        showErr(
+          ((e && e.message) || 'Could not reach Apps Script.') +
+          classicLink()
+        );
       });
   });
 })();

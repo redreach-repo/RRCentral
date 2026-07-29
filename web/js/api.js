@@ -1,20 +1,7 @@
 /* global RR_CONFIG */
 (function (global) {
   var pending = {};
-  var frameName = 'rr-api-frame';
   var seq = 0;
-
-  function ensureFrame() {
-    var existing = document.getElementsByName(frameName)[0];
-    if (existing) return existing;
-    var iframe = document.createElement('iframe');
-    iframe.name = frameName;
-    iframe.id = frameName;
-    iframe.title = 'API';
-    iframe.style.cssText = 'position:absolute;width:0;height:0;border:0;left:-9999px;top:0';
-    document.body.appendChild(iframe);
-    return iframe;
-  }
 
   function scriptUrl() {
     var cfg = global.RR_CONFIG || {};
@@ -27,59 +14,58 @@
     return new Promise(function (resolve, reject) {
       var cfg = global.RR_CONFIG || {};
       var reqId = 'r' + Date.now() + '_' + (++seq);
+      var timeoutMs = cfg.timeoutMs || 25000;
       var timer = setTimeout(function () {
-        if (!pending[reqId]) return;
+        cleanup();
+        reject(new Error(
+          'Timed out talking to Google Apps Script. Open the classic app once to authorize, ' +
+          'or check that the web app is deployed as “Anyone” (anonymous).'
+        ));
+      }, timeoutMs);
+
+      function cleanup() {
+        clearTimeout(timer);
+        window.removeEventListener('message', onMessage);
+        try { if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe); } catch (e) {}
         delete pending[reqId];
-        reject(new Error('API timeout calling ' + fnName));
-      }, cfg.timeoutMs || 120000);
-
-      pending[reqId] = {
-        resolve: function (v) { clearTimeout(timer); resolve(v); },
-        reject: function (e) { clearTimeout(timer); reject(e); }
-      };
-
-      ensureFrame();
-      var form = document.createElement('form');
-      form.method = 'POST';
-      form.action = scriptUrl() + '?page=api';
-      form.target = frameName;
-      form.style.display = 'none';
-
-      function field(name, value) {
-        var input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = name;
-        input.value = value == null ? '' : String(value);
-        form.appendChild(input);
       }
 
-      field('page', 'api');
-      field('fn', fnName);
-      field('args', JSON.stringify(args));
-      field('reqId', reqId);
-      field('token', cfg.apiToken || '');
-      field('userEmail', cfg.userEmail || localStorage.getItem('rr_user_email') || '');
-      field('origin', location.origin);
+      function onMessage(ev) {
+        var data = ev.data;
+        if (!data || data.reqId !== reqId) return;
+        var originOk =
+          !ev.origin ||
+          /script\.google\.com$/.test(ev.origin) ||
+          /googleusercontent\.com$/.test(ev.origin) ||
+          ev.origin === location.origin;
+        if (!originOk) return;
+        cleanup();
+        if (data.ok === false) reject(new Error(data.error || 'API error'));
+        else resolve(data.result);
+      }
 
-      document.body.appendChild(form);
-      form.submit();
-      setTimeout(function () {
-        try { form.remove(); } catch (e) {}
-      }, 0);
+      pending[reqId] = true;
+      window.addEventListener('message', onMessage);
+
+      // Prefer GET in a dedicated iframe (more reliable than form POST for Apps Script)
+      var iframe = document.createElement('iframe');
+      iframe.title = 'API';
+      iframe.style.cssText = 'position:absolute;width:0;height:0;border:0;left:-9999px;top:0';
+      var q =
+        '?page=api' +
+        '&fn=' + encodeURIComponent(fnName) +
+        '&args=' + encodeURIComponent(JSON.stringify(args)) +
+        '&reqId=' + encodeURIComponent(reqId) +
+        '&token=' + encodeURIComponent(cfg.apiToken || '') +
+        '&userEmail=' + encodeURIComponent(cfg.userEmail || localStorage.getItem('rr_user_email') || '') +
+        '&origin=' + encodeURIComponent(location.origin);
+      iframe.src = scriptUrl() + q;
+      document.body.appendChild(iframe);
     });
   }
 
-  window.addEventListener('message', function (ev) {
-    var data = ev.data;
-    if (!data || !data.reqId || !pending[data.reqId]) return;
-    // Accept messages from Google Apps Script origins
-    var okOrigin = !ev.origin || /script\.google\.com$/.test(ev.origin) || /googleusercontent\.com$/.test(ev.origin);
-    if (!okOrigin && ev.origin !== location.origin) return;
-    var p = pending[data.reqId];
-    delete pending[data.reqId];
-    if (data.ok === false) p.reject(new Error(data.error || 'API error'));
-    else p.resolve(data.result);
-  });
-
-  global.RRApi = { call: call };
+  global.RRApi = {
+    call: call,
+    scriptUrl: scriptUrl
+  };
 })(window);

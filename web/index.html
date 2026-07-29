@@ -3,129 +3,69 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#121417">
     <title>RED REACH Central</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app.css">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-      #login-gate {
-        position: fixed; inset: 0; z-index: 9999;
-        display: flex; align-items: center; justify-content: center;
-        background: linear-gradient(160deg, #121417 0%, #2a2f36 50%, #1a1d22 100%);
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100vh; display: grid; place-items: center;
+        font-family: "DM Sans", system-ui, sans-serif;
+        background: linear-gradient(160deg, #121417 0%, #2a2f36 55%, #1a1d22 100%);
         color: #fff; padding: 24px;
       }
-      #login-gate.hidden { display: none; }
-      .login-card {
-        width: min(420px, 100%);
+      .card {
+        width: min(440px, 100%);
         background: rgba(255,255,255,0.06);
         border: 1px solid rgba(255,255,255,0.12);
         border-radius: 16px; padding: 28px 24px;
-        backdrop-filter: blur(8px);
       }
-      .login-card h1 { margin: 0 0 8px; font-size: 22px; font-weight: 600; }
-      .login-card p { margin: 0 0 18px; color: rgba(255,255,255,0.7); line-height: 1.45; font-size: 14px; }
-      .login-card label { display: block; font-size: 12px; color: rgba(255,255,255,0.55); margin-bottom: 6px; }
-      .login-card input, .login-card select {
-        width: 100%; box-sizing: border-box; margin-bottom: 14px;
-        border-radius: 10px; border: 1px solid rgba(255,255,255,0.18);
-        background: rgba(0,0,0,0.25); color: #fff; padding: 12px 14px; font: inherit;
-      }
-      .login-card button {
-        width: 100%; border: 0; border-radius: 10px; padding: 12px 14px;
+      h1 { margin: 0 0 8px; font-size: 22px; font-weight: 700; }
+      p { margin: 0 0 16px; color: rgba(255,255,255,0.72); line-height: 1.5; font-size: 14px; }
+      .btn {
+        display: block; width: 100%; text-align: center; text-decoration: none;
+        border: 0; border-radius: 10px; padding: 13px 14px; margin-top: 10px;
         background: #e85d04; color: #fff; font: inherit; font-weight: 600; cursor: pointer;
       }
-      .login-card .err { color: #fecaca; font-size: 13px; margin-top: 10px; min-height: 1.2em; }
-      #app.hidden { display: none; }
+      .btn.secondary { background: transparent; border: 1px solid rgba(255,255,255,0.22); }
+      .muted { font-size: 12px; color: rgba(255,255,255,0.55); margin-top: 14px; }
+      code { font-size: 12px; word-break: break-all; }
     </style>
+    <script src="config.js"></script>
   </head>
   <body>
-    <div id="login-gate">
-      <div class="login-card">
-        <h1>RED REACH Central</h1>
-        <p>Sign in with your <strong>Gmail / Google</strong> account email. Zoho addresses are only for company contact on quotes.</p>
-        <label for="login-email">Google email</label>
-        <select id="login-email">
-          <option value="alfred@redreach.ae">alfred@redreach.ae (admin)</option>
-          <option value="jacob@redreach.ae">jacob@redreach.ae (admin)</option>
-          <option value="alfredsv@gmail.com">alfredsv@gmail.com (admin)</option>
-          <option value="redreachdxb@gmail.com">redreachdxb@gmail.com (admin)</option>
-          <option value="__other__">Other Google email…</option>
-        </select>
-        <input id="login-email-other" type="email" placeholder="name@gmail.com" class="hidden" style="display:none">
-        <button type="button" id="login-btn">Continue</button>
-        <div class="err" id="login-err"></div>
-      </div>
+    <div class="card">
+      <h1>RED REACH Central</h1>
+      <p>
+        The app runs on Google Apps Script (Sheets + Calendar).
+        GitHub hosts this launcher page.
+      </p>
+      <a class="btn" id="open-app" href="#">Open RED REACH Central</a>
+      <a class="btn secondary" id="open-calendar" href="#" target="_blank" rel="noopener">Connect Google Calendar</a>
+      <p class="muted">
+        Sign in with your Google account when prompted
+        (<code id="url-hint"></code>
+      </p>
     </div>
-
-    <div id="app" class="hidden">
-      <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
-      <aside class="sidebar" id="sidebar">
-        <div class="brand">
-          <img class="brand-logo" src="logo.png" alt="RED REACH" onerror="this.style.display='none'">
-          <div>
-            <div class="brand-name">RED REACH</div>
-            <div class="brand-sub">Central</div>
-          </div>
-        </div>
-        <nav class="nav desktop-nav">
-          <button class="nav-item active" data-view="dashboard">Dashboard</button>
-          <button class="nav-item" data-view="crm">CRM</button>
-          <button class="nav-item" data-view="followups">Follow-ups</button>
-          <button class="nav-item" data-view="quotes">Quotations</button>
-          <button class="nav-item" data-view="invoices">Invoices</button>
-          <button class="nav-item" data-view="catalog">Catalog</button>
-          <button class="nav-item" data-view="templates">Templates</button>
-          <button class="nav-item" data-view="reports">Reports</button>
-          <button class="nav-item" data-view="expenses">Expenses</button>
-          <button class="nav-item" data-view="settings">Settings</button>
-        </nav>
-        <div class="sidebar-foot" id="sidebar-company"></div>
-      </aside>
-
-      <main class="main">
-        <header class="topbar">
-          <div class="topbar-left">
-            <button class="icon-btn menu-btn" id="menu-toggle" aria-label="Menu">☰</button>
-            <div>
-              <h1 id="view-title">Dashboard</h1>
-              <p id="view-subtitle" class="muted">Overview of sales and accounts</p>
-            </div>
-          </div>
-          <div class="topbar-actions" id="topbar-actions"></div>
-        </header>
-
-        <div class="global-search-wrap">
-          <input class="search global-search" id="global-search" placeholder="Search clients, quotes, invoices…" autocomplete="off">
-          <div id="search-results" class="search-results hidden"></div>
-        </div>
-
-        <div id="content" class="content">
-          <div class="loading">Loading…</div>
-        </div>
-      </main>
-    </div>
-
-    <div id="modal" class="modal hidden" aria-hidden="true">
-      <div class="modal-backdrop" data-close="1"></div>
-      <div class="modal-card" role="dialog">
-        <div class="modal-head">
-          <h2 id="modal-title">Dialog</h2>
-          <button class="icon-btn" data-close="1" aria-label="Close">×</button>
-        </div>
-        <div id="modal-body" class="modal-body"></div>
-        <div id="modal-foot" class="modal-foot"></div>
-      </div>
-    </div>
-
-    <div id="toast" class="toast hidden"></div>
-    <div id="autosave" class="autosave hidden">Saved</div>
-
-    <script src="config.js"></script>
-    <script src="js/api.js"></script>
-    <script src="js/boot.js"></script>
+    <script>
+      (function () {
+        var cfg = window.RR_CONFIG || {};
+        var base = String(cfg.scriptUrl || '').replace(/\/$/, '');
+        if (!base) {
+          document.getElementById('open-app').textContent = 'Missing scriptUrl in config.js';
+          return;
+        }
+        document.getElementById('open-app').href = base;
+        document.getElementById('open-calendar').href = base + '?page=calendar-connect';
+        document.getElementById('url-hint').textContent = '';
+        // Auto-open after a short beat so the GitHub URL still “hosts” entry
+        var params = new URLSearchParams(location.search);
+        if (params.get('auto') !== '0') {
+          setTimeout(function () { location.replace(base); }, 600);
+        }
+      })();
+    </script>
   </body>
 </html>
