@@ -38,6 +38,11 @@
   backdrop-filter: blur(16px);
 }
 
+.logo {
+  margin: 0 auto 18px;
+  max-width: 260px;
+}
+
 .mark {
   width: 56px;
   height: 56px;

@@ -16,6 +16,7 @@ import {
   LogOut,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import BrandLogo from './BrandLogo'
 import styles from './Layout.module.css'
 
 const navItems = [
@@ -57,11 +58,7 @@ export default function Layout() {
 
       <aside className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
         <div className={styles.brand}>
-          <div className={styles.brandMark}>RR</div>
-          <div>
-            <div className={styles.brandName}>RED REACH</div>
-            <div className={styles.brandSub}>Central</div>
-          </div>
+          <BrandLogo height={44} className={styles.brandLogo} />
           <button
             type="button"
             className={styles.closeBtn}

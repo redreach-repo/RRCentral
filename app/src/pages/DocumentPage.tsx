@@ -12,6 +12,7 @@ import { useToast } from '../contexts/ToastContext'
 import { formatAED } from '../lib/money'
 import { loadLineItems } from '../lib/lineItems'
 import { buildWhatsAppUrl } from '../lib/whatsapp'
+import { resolveLogoUrl } from '../lib/brand'
 
 type DocType = 'quote' | 'invoice'
 
@@ -246,13 +247,11 @@ export default function DocumentPage() {
               }}
             >
               <div>
-                {settings.logoUrl ? (
-                  <img src={settings.logoUrl} alt="Logo" style={{ maxHeight: 72, maxWidth: 280 }} />
-                ) : (
-                  <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '0.04em', color: '#c1121f' }}>
-                    {settings.brand || 'RED REACH'}
-                  </div>
-                )}
+                <img
+                  src={resolveLogoUrl(settings.logoUrl)}
+                  alt={settings.brand || 'RED REACH'}
+                  style={{ maxHeight: 72, maxWidth: 280, objectFit: 'contain' }}
+                />
                 <div style={{ marginTop: 10, color: '#555', fontSize: 12.5, lineHeight: 1.5 }}>
                   <div style={{ fontWeight: 700, color: '#111' }}>
                     {settings.companyName || 'Red Reach Middle East FZE'}

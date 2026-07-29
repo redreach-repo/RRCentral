@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { authApi } from '../lib/authApi'
+import BrandLogo from '../components/BrandLogo'
 import styles from './LoginPage.module.css'
 
 export default function LoginPage() {
@@ -45,7 +46,7 @@ export default function LoginPage() {
     <div className={styles.page}>
       <div className={styles.glow} aria-hidden />
       <div className={styles.card}>
-        <div className={styles.mark}>RR</div>
+        <BrandLogo height={52} className={styles.logo} />
         <h1 className={styles.title}>RED REACH Central</h1>
         <p className={styles.subtitle}>
           Multi-division CRM &amp; quoting for Red Reach Middle East FZE
