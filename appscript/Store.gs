@@ -204,7 +204,9 @@ function ensureKnownAdmins_() {
     ensureHeaderRow_(userSheet, USER_HEADERS);
     var names = {
       'alfredsv@gmail.com': 'Alfred',
-      'redreachdxb@gmail.com': 'RED REACH DXB'
+      'redreachdxb@gmail.com': 'RED REACH DXB',
+      'alfred@redreach.ae': 'Alfred',
+      'jacob@redreach.ae': 'Jacob'
     };
     // Read users directly — do NOT call listUsers() (it would re-enter ensureAppSheets_)
     var existing = sheetToObjects_(userSheet).map(function (r) {
@@ -267,7 +269,7 @@ function ensureSettingsDefaults_() {
     logoUrl: '',
     portalBaseUrl: CONFIG.PORTAL_DEFAULT || 'https://crm.redreach.ae',
     bilingualDefault: 'en',
-    adminEmails: 'alfredsv@gmail.com, redreachdxb@gmail.com',
+    adminEmails: 'alfredsv@gmail.com, redreachdxb@gmail.com, alfred@redreach.ae, jacob@redreach.ae',
     apiToken: CONFIG.API_TOKEN || 'rr-central-2026-change-me',
     whatsappCountryCode: '971',
     followUpDaysAfterQuote: '3',

@@ -53,7 +53,9 @@ var CONFIG = {
    */
   ADMIN_EMAILS: [
     'alfredsv@gmail.com',
-    'redreachdxb@gmail.com'
+    'redreachdxb@gmail.com',
+    'alfred@redreach.ae',
+    'jacob@redreach.ae'
   ],
   /** Shared secret for GitHub Pages → Apps Script API (override in App Settings key apiToken) */
   API_TOKEN: 'rr-central-2026-change-me',
