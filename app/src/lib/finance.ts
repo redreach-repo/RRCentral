@@ -3,18 +3,6 @@ import type { Expense, IncomeEntry, Invoice } from './types'
 
 const LOST_STATUSES = new Set(['not awarded', 'not_awarded', 'lost', 'cancelled', 'canceled'])
 
-/** True when an income row should count as real revenue (invoiced & paid / awarded). */
-export function isRecognizedIncome(row: IncomeEntry): boolean {
-  const status = String(row.status || '').trim().toLowerCase()
-  const pay = String(row.payment_status || '').trim().toLowerCase()
-  if (LOST_STATUSES.has(status)) return false
-  if (pay === 'pending' || pay === 'unpaid') return false
-  // Historical sheet rows often only set payment_status=Paid
-  if (pay === 'paid' || pay === 'partial') return true
-  if (status === 'awarded' && pay !== 'pending') return true
-  return false
-}
-
 export function isCancelledInvoice(inv: Pick<Invoice, 'status'> | { status?: string }): boolean {
   return String(inv.status || '').trim().toLowerCase() === 'cancelled'
 }
@@ -28,6 +16,57 @@ export function effectiveInvoicePaymentStatus(
 ): string {
   if (isCancelledInvoice(inv)) return 'Pending'
   return String(inv.payment_status || 'Pending')
+}
+
+/** True when an income row should count as real revenue (invoiced & paid / awarded). */
+export function isRecognizedIncome(row: IncomeEntry): boolean {
+  const status = String(row.status || '').trim().toLowerCase()
+  const pay = String(row.payment_status || '').trim().toLowerCase()
+  if (LOST_STATUSES.has(status)) return false
+  if (pay === 'pending' || pay === 'unpaid') return false
+  // Historical sheet rows often only set payment_status=Paid
+  if (pay === 'paid' || pay === 'partial') return true
+  if (status === 'awarded' && pay !== 'pending') return true
+  return false
+}
+
+/**
+ * Dashboard/report income: never count rows tied to a cancelled invoice, and only
+ * count invoice-linked rows when that invoice is actually Paid/Partial.
+ * Historical sheet income (no matching invoice) still uses isRecognizedIncome,
+ * unless the invoice ref was deleted.
+ */
+export function countsTowardIncome(
+  row: IncomeEntry,
+  invoices: Array<Pick<Invoice, 'reference_number' | 'status' | 'payment_status'>>,
+  deletedInvoiceRefs?: Set<string> | string[],
+): boolean {
+  if (!isRecognizedIncome(row)) return false
+  const ref = String(row.reference_number || '').trim()
+  if (!ref) return true
+
+  const deleted =
+    deletedInvoiceRefs instanceof Set
+      ? deletedInvoiceRefs
+      : new Set((deletedInvoiceRefs || []).map((r) => String(r || '').trim()).filter(Boolean))
+  if (deleted.has(ref)) return false
+
+  const inv = invoices.find((i) => String(i.reference_number || '').trim() === ref)
+  if (!inv) return true
+  if (isCancelledInvoice(inv)) return false
+  const pay = effectiveInvoicePaymentStatus(inv).toLowerCase()
+  return pay === 'paid' || pay === 'partial'
+}
+
+export function sumRecognizedIncome(
+  rows: IncomeEntry[],
+  invoices?: Array<Pick<Invoice, 'reference_number' | 'status' | 'payment_status'>>,
+  deletedInvoiceRefs?: Set<string> | string[],
+): number {
+  const filtered = invoices
+    ? rows.filter((r) => countsTowardIncome(r, invoices, deletedInvoiceRefs))
+    : rows.filter(isRecognizedIncome)
+  return filtered.reduce((s, r) => s + Number(r.total_amount || 0), 0)
 }
 
 /** Active (non-cancelled) invoices that are still collectible. */
@@ -48,10 +87,6 @@ export function monthKey(dateStr: string | null | undefined): string | null {
 export function isInMonth(dateStr: string | null | undefined, month = startOfMonth(new Date())): boolean {
   const key = monthKey(dateStr)
   return key === format(month, 'yyyy-MM')
-}
-
-export function sumRecognizedIncome(rows: IncomeEntry[]): number {
-  return rows.filter(isRecognizedIncome).reduce((s, r) => s + Number(r.total_amount || 0), 0)
 }
 
 export function sumExpenses(rows: Expense[]): number {

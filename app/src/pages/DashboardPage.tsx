@@ -14,14 +14,14 @@ import { db } from '../lib/db'
 import { DIVISIONS, PIPELINE_STAGES } from '../lib/config'
 import type { CrmEntry, Expense, IncomeEntry, Invoice, Quotation } from '../lib/types'
 import {
+  countsTowardIncome,
   isInMonth,
   isOpenInvoice,
-  isRecognizedIncome,
   sortByDateDesc,
   sumExpenses,
   sumRecognizedIncome,
 } from '../lib/finance'
-import { reconcileInvoiceFinance } from '../lib/invoiceFinance'
+import { loadDeletedInvoiceRefs, reconcileInvoiceFinance } from '../lib/invoiceFinance'
 import { displayDocumentReference } from '../lib/documents'
 import { hydrateContacts, primaryContact } from '../lib/contacts'
 import StatusPill from '../components/StatusPill'
@@ -117,12 +117,14 @@ export default function DashboardPage() {
   const [income, setIncome] = useState<IncomeEntry[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [crm, setCrm] = useState<CrmEntry[]>([])
+  const [deletedInvoiceRefs, setDeletedInvoiceRefs] = useState<string[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       await reconcileInvoiceFinance()
+      const deleted = await loadDeletedInvoiceRefs()
       const [qRes, iRes, incRes, expRes, crmRes] = await Promise.all([
         db.from('quotations').select('*'),
         db.from('invoices').select('*'),
@@ -142,6 +144,7 @@ export default function DashboardPage() {
       setIncome((incRes.data as IncomeEntry[]) ?? [])
       setExpenses((expRes.data as Expense[]) ?? [])
       setCrm((crmRes.data as CrmEntry[]) ?? [])
+      setDeletedInvoiceRefs([...deleted])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load dashboard')
     } finally {
@@ -156,7 +159,10 @@ export default function DashboardPage() {
   const thisMonth = startOfMonth(new Date())
   const monthLabel = format(thisMonth, 'MMM yyyy')
 
-  const recognizedIncome = useMemo(() => income.filter(isRecognizedIncome), [income])
+  const recognizedIncome = useMemo(
+    () => income.filter((r) => countsTowardIncome(r, invoices, deletedInvoiceRefs)),
+    [income, invoices, deletedInvoiceRefs],
+  )
 
   const monthIncome = useMemo(
     () =>
@@ -175,7 +181,10 @@ export default function DashboardPage() {
   )
 
   const monthNet = monthIncome - monthExpenses
-  const ytdIncome = useMemo(() => sumRecognizedIncome(income), [income])
+  const ytdIncome = useMemo(
+    () => sumRecognizedIncome(income, invoices, deletedInvoiceRefs),
+    [income, invoices, deletedInvoiceRefs],
+  )
   const ytdExpenses = useMemo(() => sumExpenses(expenses), [expenses])
 
   const openQuotes = useMemo(

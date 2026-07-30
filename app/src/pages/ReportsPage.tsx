@@ -20,16 +20,16 @@ import { formatAED } from '../lib/money'
 import { BASE_CURRENCY, formatMoneyAmount } from '../lib/currency'
 import { buildCurrencyReport, cashReceivedByCurrency } from '../lib/currencyReports'
 import {
+  countsTowardIncome,
   currentVatQuarter,
   expenseVatParts,
   incomeVatParts,
   isOpenInvoice,
-  isRecognizedIncome,
   monthKey,
   quarterMonths,
   type VatQuarter,
 } from '../lib/finance'
-import { reconcileInvoiceFinance } from '../lib/invoiceFinance'
+import { loadDeletedInvoiceRefs, reconcileInvoiceFinance } from '../lib/invoiceFinance'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -71,6 +71,7 @@ export default function ReportsPage() {
   const [payments, setPayments] = useState<CustomerPayment[]>([])
   const [refunds, setRefunds] = useState<CustomerRefund[]>([])
   const [suppliers, setSuppliers] = useState<SupplierCommitment[]>([])
+  const [deletedInvoiceRefs, setDeletedInvoiceRefs] = useState<string[]>([])
 
   const nowQ = currentVatQuarter()
   const [vatYear, setVatYear] = useState(nowQ.year)
@@ -80,6 +81,7 @@ export default function ReportsPage() {
     setLoading(true)
     try {
       await reconcileInvoiceFinance()
+      const deleted = await loadDeletedInvoiceRefs()
       const [q, i, inc, exp, c, pay, ref, sup] = await Promise.all([
         db.from('quotations').select('*'),
         db.from('invoices').select('*'),
@@ -106,6 +108,7 @@ export default function ReportsPage() {
       setPayments((pay.data || []) as CustomerPayment[])
       setRefunds((ref.data || []) as CustomerRefund[])
       setSuppliers((sup.data || []) as SupplierCommitment[])
+      setDeletedInvoiceRefs([...deleted])
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Failed to load reports', 'error')
     } finally {
@@ -117,7 +120,10 @@ export default function ReportsPage() {
     void load()
   }, [load])
 
-  const recognizedIncome = useMemo(() => income.filter(isRecognizedIncome), [income])
+  const recognizedIncome = useMemo(
+    () => income.filter((r) => countsTowardIncome(r, invoices, deletedInvoiceRefs)),
+    [income, invoices, deletedInvoiceRefs],
+  )
 
   const fxReport = useMemo(
     () =>

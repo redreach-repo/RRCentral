@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  countsTowardIncome,
   effectiveInvoicePaymentStatus,
   expenseVatParts,
   incomeVatParts,
@@ -49,6 +50,27 @@ describe('finance', () => {
     expect(
       effectiveInvoicePaymentStatus({ status: 'Awarded', payment_status: 'Paid' } as Invoice),
     ).toBe('Paid')
+  })
+
+  it('excludes cancelled and deleted invoice income from dashboard totals', () => {
+    const row = {
+      reference_number: 'RR-01-26001',
+      status: 'Paid',
+      payment_status: 'Paid',
+      total_amount: 2845.5,
+    } as IncomeEntry
+    expect(
+      countsTowardIncome(row, [
+        { reference_number: 'RR-01-26001', status: 'Cancelled', payment_status: 'Paid' },
+      ]),
+    ).toBe(false)
+    expect(countsTowardIncome(row, [], ['RR-01-26001'])).toBe(false)
+    expect(
+      countsTowardIncome(
+        { ...row, reference_number: '26107' } as IncomeEntry,
+        [{ reference_number: '26107', status: 'Awarded', payment_status: 'Paid' }],
+      ),
+    ).toBe(true)
   })
 
   it('monthKey and quarterMonths', () => {
