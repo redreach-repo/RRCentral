@@ -50,17 +50,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     void (async () => {
       try {
-        await tryAutoImportSheetsDump()
+        await Promise.race([
+          tryAutoImportSheetsDump(),
+          new Promise<void>((resolve) => setTimeout(resolve, 8000)),
+        ])
       } catch {
         // ignore — empty seed is fine
       }
 
-      const { data: { session } } = await authApi.getSession()
-      if (!mounted) return
-      const currentUser = session?.user ?? null
-      setUser(currentUser)
-      setUserRole(await lookupUserRole(currentUser?.email))
-      setLoading(false)
+      try {
+        const {
+          data: { session },
+        } = await authApi.getSession()
+        if (!mounted) return
+        const currentUser = session?.user ?? null
+        setUser(currentUser)
+        setUserRole(await lookupUserRole(currentUser?.email))
+      } catch {
+        if (!mounted) return
+        setUser(null)
+        setUserRole('sales')
+      } finally {
+        if (mounted) setLoading(false)
+      }
     })()
 
     const {
@@ -69,8 +81,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const currentUser = session?.user ?? null
       setUser(currentUser)
       void (async () => {
-        setUserRole(await lookupUserRole(currentUser?.email))
-        setLoading(false)
+        try {
+          setUserRole(await lookupUserRole(currentUser?.email))
+        } finally {
+          setLoading(false)
+        }
       })()
     })
 
