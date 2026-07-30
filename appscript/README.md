@@ -4,6 +4,14 @@ Mobile-first Apps Script CRM + quotations + invoices for **Red Reach Middle East
 
 **Live web app:** use your `/exec` deployment URL (currently `@13`).
 
+## Look & behaviour
+
+Aligned with the React GitHub Pages CRM:
+
+- Dark charcoal UI (`#121417`) + orange accent (`#e85d04`) + DM Sans
+- Dashboard income only counts **paid / partial** invoices (cancelled and unpaid excluded)
+- Cancelling an invoice clears payments/income; deleting an invoice removes line items, payments, and income
+
 ## What’s included
 
 - Responsive UI for iPhone, iPad, Android, Mac, Windows

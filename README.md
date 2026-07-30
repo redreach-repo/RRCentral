@@ -10,7 +10,7 @@ CRM + quotations + invoices for **Red Reach Middle East FZE**.
 | Legacy UI | [`web/`](./web/) | Static Pages launcher for Apps Script |
 | Legacy backend | [`appscript/`](./appscript/) | Google Apps Script + Sheets |
 
-Prefer the React app in `app/` for new work.
+For **team sharing**, use the **Apps Script** web app (shared Google Sheet). The React app in `app/` is local-browser unless Supabase is connected.
 
 ## React app quick start
 

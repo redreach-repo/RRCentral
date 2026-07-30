@@ -715,6 +715,11 @@ function saveInvoice(payload) {
     '';
   var dateVal = parseDate_(payload.date) || new Date();
   var amount = payload.items && payload.items.length ? summary.total : toNumber_(payload.amount);
+  var status = payload.status || 'Awarded';
+  var paymentStatus = payload.paymentStatus || 'Pending';
+  if (String(status).toLowerCase() === 'cancelled') {
+    paymentStatus = 'Pending';
+  }
 
   var rowIndex = payload.row ? Number(payload.row) : findRowByReference_(sheet, 4, reference);
   var who = currentUserLabel_();
@@ -733,8 +738,8 @@ function saveInvoice(payload) {
     dateVal,
     description,
     amount,
-    payload.status || 'Awarded',
-    payload.paymentStatus || 'Pending',
+    status,
+    paymentStatus,
     payload.paymentTerms || getSettings().defaultPaymentTerms || getSettings().paymentTerms,
     payload.moq != null && payload.moq !== '' ? toNumber_(payload.moq) : getSettings().moqDefault,
     payload.notes || '',
@@ -753,12 +758,16 @@ function saveInvoice(payload) {
     saveLineItems_('Invoice', reference, payload.items, getSettings().vatRate);
   }
 
-  try {
-    syncIncomeFromInvoice_(reference);
-  } catch (e) {
-    // Income sync is best-effort; invoice itself is already saved
+  if (String(status).toLowerCase() === 'cancelled') {
+    deleteFinanceForInvoiceRef_(reference);
+  } else {
+    try {
+      syncIncomeFromInvoice_(reference);
+    } catch (e) {
+      // Income sync is best-effort; invoice itself is already saved
+    }
   }
-  logActivity_('save_invoice', 'invoice', reference, (payload.client || '') + ' · ' + who);
+  logActivity_('save_invoice', 'invoice', reference, (payload.client || '') + ' · ' + status + ' · ' + who);
   return getInvoice(reference);
 }
 
@@ -884,6 +893,9 @@ function recordPayment(payload) {
 
   var data = getInvoice(reference);
   var inv = data.invoice;
+  if (String(inv.status || '').toLowerCase() === 'cancelled') {
+    throw new Error('Cancelled invoices cannot take payments');
+  }
 
   var current = getInvoicePaymentSummary_(reference, inv.amount);
   var newPaid = Math.round((current.paid + amount) * 100) / 100;
@@ -931,6 +943,9 @@ function markInvoicePaid(reference, paymentMethod) {
   if (!role.canMarkPaid) throw new Error('Only admins can mark invoices as fully paid');
   ensureAppSheets_();
   var data = getInvoice(reference);
+  if (String(data.invoice.status || '').toLowerCase() === 'cancelled') {
+    throw new Error('Cancelled invoices cannot be marked paid');
+  }
   var summary = getInvoicePaymentSummary_(reference, data.invoice.amount);
   if (summary.balance > 0.009) {
     return recordPayment({
@@ -962,6 +977,10 @@ function updateInvoicePayment(reference, paymentStatus, paymentMethod) {
 function syncIncomeFromInvoice_(reference, paymentMethod) {
   var data = getInvoice(reference);
   var inv = data.invoice;
+  if (String(inv.status || '').toLowerCase() === 'cancelled') {
+    deleteFinanceForInvoiceRef_(reference);
+    return;
+  }
   var incomeSheet = getSheet_(CONFIG.SHEETS.INCOME, true, INCOME_HEADERS);
   if (!incomeSheet) return;
   var last = incomeSheet.getLastRow();
@@ -997,6 +1016,49 @@ function syncIncomeFromInvoice_(reference, paymentMethod) {
   } else {
     appendRows_(incomeSheet, [values]);
   }
+}
+
+/** Remove income + payment log rows for an invoice reference (React parity). */
+function deleteFinanceForInvoiceRef_(reference) {
+  var ref = String(reference || '').trim();
+  if (!ref) return;
+
+  var incomeSheet = getSheet_(CONFIG.SHEETS.INCOME, true, INCOME_HEADERS);
+  if (incomeSheet && incomeSheet.getLastRow() >= 2) {
+    var incomeRefs = incomeSheet.getRange(2, 4, incomeSheet.getLastRow(), 4).getValues();
+    for (var i = incomeRefs.length - 1; i >= 0; i--) {
+      if (String(incomeRefs[i][0]) === ref) {
+        incomeSheet.deleteRow(i + 2);
+      }
+    }
+  }
+
+  var paySheet = getSheet_(CONFIG.SHEETS.PAYMENTS, true, PAYMENT_HEADERS);
+  if (paySheet && paySheet.getLastRow() >= 2) {
+    var payRefs = paySheet.getRange(2, 2, paySheet.getLastRow(), 2).getValues();
+    for (var j = payRefs.length - 1; j >= 0; j--) {
+      if (String(payRefs[j][0]) === ref) {
+        paySheet.deleteRow(j + 2);
+      }
+    }
+  }
+}
+
+function deleteInvoice(reference) {
+  ensureAppSheets_();
+  var ref = String(reference || '').trim();
+  if (!ref) throw new Error('Invoice reference is required');
+  var invSheet = getSheet_(CONFIG.SHEETS.INVOICES, true, INVOICE_HEADERS);
+  var row = findRowByReference_(invSheet, 4, ref);
+  if (row < 0) throw new Error('Invoice not found: ' + ref);
+  var client = '';
+  try { client = String(invSheet.getRange(row, 2).getValue() || ''); } catch (e) {}
+
+  clearLineItems_('Invoice', ref);
+  deleteFinanceForInvoiceRef_(ref);
+  invSheet.deleteRow(row);
+  logActivity_('delete_invoice', 'invoice', ref, client);
+  return { ok: true, reference: ref };
 }
 
 function findClient_(name) {

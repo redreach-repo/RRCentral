@@ -87,6 +87,40 @@ function listTeamOwners_() {
   return owners;
 }
 
+function isCancelledInvoice_(inv) {
+  return String(inv && inv.status || '').trim().toLowerCase() === 'cancelled';
+}
+
+function isOpenInvoice_(inv) {
+  if (isCancelledInvoice_(inv)) return false;
+  if (String(inv.status || '').toLowerCase() === 'draft') return false;
+  var pay = String(inv.paymentStatus || '').toLowerCase();
+  return pay === 'pending' || pay === 'partial' || pay === 'overdue';
+}
+
+/** Match React finance.ts — do not count cancelled / unpaid / deleted-invoice income. */
+function isRecognizedIncome_(row, invoicesByRef) {
+  var status = String(row.status || '').trim().toLowerCase();
+  var pay = String(row.paymentStatus || '').trim().toLowerCase();
+  if (status === 'not awarded' || status === 'not_awarded' || status === 'lost' ||
+      status === 'cancelled' || status === 'canceled') {
+    return false;
+  }
+  if (pay === 'pending' || pay === 'unpaid') return false;
+
+  var ref = String(row.reference || '').trim();
+  if (ref && invoicesByRef && invoicesByRef[ref]) {
+    var inv = invoicesByRef[ref];
+    if (isCancelledInvoice_(inv)) return false;
+    var invPay = String(inv.paymentStatus || '').toLowerCase();
+    if (invPay !== 'paid' && invPay !== 'partial') return false;
+  }
+
+  if (pay === 'paid' || pay === 'partial') return true;
+  if (status === 'awarded' && pay !== 'pending') return true;
+  return false;
+}
+
 function getDashboard() {
   ensureAppSheets_();
   var income = listIncome_();
@@ -98,14 +132,22 @@ function getDashboard() {
   today.setHours(0, 0, 0, 0);
   var monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
-  var totalIncome = income.reduce(function (s, r) { return s + toNumber_(r.totalAmount || r.billAmount); }, 0);
+  var invoicesByRef = {};
+  invoices.forEach(function (inv) {
+    if (inv.reference) invoicesByRef[String(inv.reference)] = inv;
+  });
+
+  var recognized = income.filter(function (r) {
+    return isRecognizedIncome_(r, invoicesByRef);
+  });
+
+  var totalIncome = recognized.reduce(function (s, r) {
+    return s + toNumber_(r.totalAmount || r.billAmount);
+  }, 0);
   var totalExpense = expenses.reduce(function (s, r) { return s + toNumber_(r.amount); }, 0);
 
-  var unpaid = invoices.filter(function (i) {
-    var ps = String(i.paymentStatus || '').toLowerCase();
-    return ps !== 'paid';
-  });
-  var pendingInvoicesAmt = unpaid.reduce(function (s, i) { return s + toNumber_(i.amount); }, 0);
+  var openInvoices = invoices.filter(isOpenInvoice_);
+  var pendingInvoicesAmt = openInvoices.reduce(function (s, i) { return s + toNumber_(i.amount); }, 0);
 
   var openQuotes = quotes.filter(function (q) {
     var st = String(q.status || '').toLowerCase();
@@ -114,15 +156,42 @@ function getDashboard() {
 
   var byDivision = {};
   CONFIG.DIVISIONS.forEach(function (d) {
-    byDivision[d.code] = { code: d.code, brand: d.brand, quotes: 0, amount: 0 };
+    byDivision[d.code] = {
+      code: d.code,
+      brand: d.brand,
+      quotes: 0,
+      amount: 0,
+      openCount: 0,
+      openAmount: 0,
+      awardedCount: 0,
+      awardedAmount: 0
+    };
   });
   quotes.forEach(function (q) {
     var code = q.divisionCode || getDivision_(q.vertical).code;
     if (!byDivision[code]) {
-      byDivision[code] = { code: code, brand: q.divisionBrand || q.vertical, quotes: 0, amount: 0 };
+      byDivision[code] = {
+        code: code,
+        brand: q.divisionBrand || q.vertical,
+        quotes: 0,
+        amount: 0,
+        openCount: 0,
+        openAmount: 0,
+        awardedCount: 0,
+        awardedAmount: 0
+      };
     }
     byDivision[code].quotes += 1;
     byDivision[code].amount += toNumber_(q.amount);
+    var st = String(q.status || '').toLowerCase();
+    if (st === 'draft' || st === 'finalized' || st === 'sent' || st === 'pending') {
+      byDivision[code].openCount += 1;
+      byDivision[code].openAmount += toNumber_(q.amount);
+    }
+    if (st === 'awarded') {
+      byDivision[code].awardedCount += 1;
+      byDivision[code].awardedAmount += toNumber_(q.amount);
+    }
   });
 
   var followUps = crm.filter(function (c) {
@@ -142,7 +211,12 @@ function getDashboard() {
     return d.getTime() < today.getTime();
   }).length;
 
-  var monthIncome = income.filter(function (r) {
+  var openCrm = crm.filter(function (c) {
+    var stage = String(c.pipelineStage || c.stage || 'Lead');
+    return stage !== 'Won' && stage !== 'Lost';
+  }).length;
+
+  var monthIncome = recognized.filter(function (r) {
     var d = parseDate_(r.date);
     return d && d >= monthStart;
   }).reduce(function (s, r) { return s + toNumber_(r.totalAmount || r.billAmount); }, 0);
@@ -152,14 +226,19 @@ function getDashboard() {
     return d && d >= monthStart;
   }).reduce(function (s, r) { return s + toNumber_(r.amount); }, 0);
 
+  var recentInvoices = invoices.filter(function (i) {
+    return !isCancelledInvoice_(i);
+  }).slice(0, 6);
+
   return {
     totals: {
       income: totalIncome,
       expense: totalExpense,
       net: totalIncome - totalExpense,
       pendingInvoices: pendingInvoicesAmt,
-      unpaidCount: unpaid.length,
+      unpaidCount: openInvoices.length,
       crmCount: crm.length,
+      openCrm: openCrm,
       quoteCount: quotes.length,
       invoiceCount: invoices.length,
       openQuotes: openQuotes.length,
@@ -169,13 +248,14 @@ function getDashboard() {
       monthIncome: monthIncome,
       monthExpense: monthExpense,
       monthNet: monthIncome - monthExpense,
-      overdueFollowUps: overdueFollowUps
+      overdueFollowUps: overdueFollowUps,
+      monthLabel: Utilities.formatDate(monthStart, Session.getScriptTimeZone(), 'MMM yyyy')
     },
     byDivision: Object.keys(byDivision).map(function (k) { return byDivision[k]; }),
     recentQuotes: quotes.slice(0, 6),
-    recentInvoices: invoices.slice(0, 6),
+    recentInvoices: recentInvoices,
     openQuotes: openQuotes.slice(0, 8),
-    unpaidInvoices: unpaid.slice(0, 8),
+    unpaidInvoices: openInvoices.slice(0, 8),
     followUps: followUps,
     settings: getSettings(),
     user: getUserRole()

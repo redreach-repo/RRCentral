@@ -49,6 +49,7 @@ function getApiHandler_(fnName) {
     getInvoice: getInvoice,
     saveInvoice: saveInvoice,
     duplicateInvoice: duplicateInvoice,
+    deleteInvoice: deleteInvoice,
     convertQuoteToInvoice: convertQuoteToInvoice,
     recordPayment: recordPayment,
     markInvoicePaid: markInvoicePaid,

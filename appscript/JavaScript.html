@@ -13,11 +13,11 @@
   };
 
   var titles = {
-    dashboard: ['Dashboard', 'Sales, CRM and cash at a glance'],
+    dashboard: ['Dashboard', 'This month — income only counts paid invoices, not lost quotes'],
     crm: ['CRM', 'Companies, contacts and follow-ups'],
     followups: ['Follow-ups', 'Overdue and upcoming CRM reminders'],
     quotes: ['Quotations', 'Create, track, duplicate and print'],
-    invoices: ['Invoices', 'Bill clients and track payments'],
+    invoices: ['Invoices', 'Billing and payment tracking'],
     catalog: ['Catalog', 'Price list · MOQ · fabric (GB/PV/TW)'],
     templates: ['Templates', 'Reusable quote catalogs'],
     reports: ['Reports', 'Win rate, aging and monthly P&L'],
@@ -53,11 +53,18 @@
   function $all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
   function money(n) {
     var cur = state.bootstrap.currency || 'AED';
-    return cur + ' ' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return cur + ' ' + Number(n || 0).toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
   function esc(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function isCancelledInvoice(inv) {
+    return String(inv && inv.status || '').toLowerCase() === 'cancelled';
+  }
+  function effectivePaymentStatus(inv) {
+    if (isCancelledInvoice(inv)) return 'Pending';
+    return inv.paymentStatus || 'Pending';
   }
   function moq(root) {
     var input = root ? root.querySelector('[name="moq"]') : null;
@@ -71,10 +78,14 @@
   function badge(status) {
     var s = String(status || '').toLowerCase();
     var cls = 'badge';
-    if (s === 'paid' || s === 'awarded' || s === 'finalized') cls += ' ok';
-    else if (s === 'pending' || s === 'sent' || s === 'partial' || s === 'draft') cls += ' warn';
-    else if (s === 'not awarded' || s === 'overdue' || s === 'cancelled' || s === 'expired' || s === 'superseded') cls += ' bad';
-    else cls += ' info';
+    if (s === 'paid' || s === 'awarded') cls += ' ok';
+    else if (s === 'finalized') cls += ' info';
+    else if (s === 'sent' || s === 'pending') cls += ' warn';
+    else if (s === 'partial' || s === 'expired') cls += ' warn';
+    else if (s === 'draft' || s === 'cancelled' || s === 'canceled') cls += ' neutral';
+    else if (s === 'not awarded' || s === 'overdue') cls += ' bad';
+    else if (s === 'superseded') cls += ' info';
+    else cls += ' neutral';
     return '<span class="' + cls + '">' + esc(status || '—') + '</span>';
   }
 
@@ -218,38 +229,44 @@
   /* ---------- Dashboard ---------- */
   function renderDashboard(data) {
     var t = data.totals;
+    var monthLabel = t.monthLabel || '';
     $('#topbar-actions').innerHTML =
       '<button class="btn btn-primary" data-action="new-quote">New quote</button>' +
       '<button class="btn btn-secondary" data-action="new-invoice">New invoice</button>';
     var divHtml = (data.byDivision || []).map(function (d) {
-      return '<div class="stat"><div class="stat-label">' + esc(d.brand) + '</div><div class="stat-value">' +
-        d.quotes + '</div><div class="muted">' + money(d.amount) + '</div></div>';
+      return '<div class="stat"><div class="stat-label">' + esc(d.brand) + '</div>' +
+        '<div class="stat-value">' + (d.openCount != null ? d.openCount : d.quotes) + '</div>' +
+        '<div class="stat-hint">Open ' + money(d.openAmount != null ? d.openAmount : d.amount) +
+        (d.awardedCount ? ' · Awarded ' + d.awardedCount + ' (' + money(d.awardedAmount || 0) + ')' : '') +
+        '</div></div>';
     }).join('');
     $('#content').innerHTML =
       '<div class="grid grid-4">' +
-        stat('This month in', money(t.monthIncome), 'pos') +
-        stat('This month out', money(t.monthExpense), '') +
-        stat('Month net', money(t.monthNet), t.monthNet < 0 ? 'neg' : 'pos') +
-        stat('Unpaid invoices', money(t.pendingInvoices), t.pendingInvoices ? 'neg' : '') +
+        stat('Income · ' + monthLabel, money(t.monthIncome), 'pos', 'YTD paid ' + money(t.income)) +
+        stat('Expenses · ' + monthLabel, money(t.monthExpense), '', 'YTD ' + money(t.expense)) +
+        stat('Net · ' + monthLabel, money(t.monthNet), t.monthNet < 0 ? 'neg' : 'pos', '') +
+        stat('Open quotes', t.openQuotes, '', 'Draft / Finalized / Sent') +
       '</div>' +
-      '<div class="grid grid-4" style="margin-top:12px">' +
-        stat('Open quotes', t.openQuotes, '') +
-        stat('Overdue follow-ups', t.overdueFollowUps || 0, t.overdueFollowUps ? 'neg' : '') +
-        stat('Quotations', t.quoteCount, '') +
-        stat('Invoices', t.invoiceCount, '') +
+      '<div class="grid grid-4" style="margin-top:14px">' +
+        stat('Open CRM deals', t.openCrm != null ? t.openCrm : t.crmCount, '', 'Not Won / Lost') +
+        stat('Pending invoices', t.unpaidCount || 0, t.unpaidCount ? 'neg' : '', money(t.pendingInvoices || 0) + ' open') +
+        stat('Overdue follow-ups', t.overdueFollowUps || 0, t.overdueFollowUps ? 'neg' : '', '') +
+        stat('Awarded quotes', t.awardedQuotes || 0, '', 'Not income until paid') +
       '</div>' +
-      '<h3 style="margin:18px 0 10px;font-size:14px">By division</h3>' +
+      '<h3 style="margin:18px 0 10px;font-size:15px">By division</h3>' +
       '<div class="grid grid-3">' + divHtml + '</div>' +
       '<div class="split" style="margin-top:12px">' +
-        panel('Open quotations', quoteCards(data.openQuotes || data.recentQuotes || [])) +
+        panel('Recent quotations', quoteCards(data.recentQuotes || data.openQuotes || [])) +
         panel('Follow-ups (7 days)', followUpList(data.followUps) +
-          '<div style="margin-top:10px"><button class="btn btn-ghost" data-action="goto-followups">Open follow-ups</button></div>') +
+          '<div style="padding:12px"><button class="btn btn-ghost" data-action="goto-followups">Open follow-ups</button></div>') +
       '</div>' +
-      '<div style="margin-top:12px">' + panel('Unpaid invoices', invoiceCards(data.unpaidInvoices || data.recentInvoices || [])) + '</div>';
+      '<div style="margin-top:12px">' + panel('Pending invoices', invoiceCards(data.unpaidInvoices || [])) + '</div>' +
+      '<div style="margin-top:12px">' + panel('Recent invoices', invoiceCards(data.recentInvoices || [])) + '</div>';
   }
 
-  function stat(label, value, cls) {
-    return '<div class="stat"><div class="stat-label">' + esc(label) + '</div><div class="stat-value ' + cls + '">' + value + '</div></div>';
+  function stat(label, value, cls, hint) {
+    return '<div class="stat"><div class="stat-label">' + esc(label) + '</div><div class="stat-value ' + cls + '">' + value +
+      '</div>' + (hint ? '<div class="stat-hint">' + esc(hint) + '</div>' : '') + '</div>';
   }
   function panel(title, body) {
     return '<div class="panel"><div class="panel-head"><h3>' + esc(title) + '</h3></div><div class="panel-body">' + body + '</div></div>';
@@ -274,10 +291,11 @@
 
   function invoiceCards(rows) {
     if (!rows.length) return '<div class="empty">No invoices</div>';
-    return '<div class="table-wrap"><table class="data"><thead><tr><th>Ref</th><th>Client</th><th>Amount</th><th>Payment</th></tr></thead><tbody>' +
+    return '<div class="table-wrap"><table class="data"><thead><tr><th>Ref</th><th>Client</th><th>Amount</th><th>Status</th><th>Payment</th></tr></thead><tbody>' +
       rows.map(function (r) {
         return '<tr><td><button class="linkish" data-action="open-invoice" data-ref="' + esc(r.reference) + '">' + esc(r.reference) +
-          '</button></td><td>' + esc(r.client) + '</td><td>' + money(r.amount) + '</td><td>' + badge(r.paymentStatus || r.status) + '</td></tr>';
+          '</button></td><td>' + esc(r.client) + '</td><td>' + money(r.amount) + '</td><td>' + badge(r.status) +
+          '</td><td>' + badge(effectivePaymentStatus(r)) + '</td></tr>';
       }).join('') + '</tbody></table></div>';
   }
 
@@ -322,8 +340,8 @@
       '<button class="btn btn-primary" data-action="new-quote">New quotation</button>';
     var filtered = filterDocs(rows);
     var banner = draftCount > 20
-      ? '<div class="panel" style="margin-bottom:12px;border-color:#f1c0c0;background:#fff5f5">' +
-        '<div class="panel-body" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">' +
+      ? '<div class="panel" style="margin-bottom:12px;border-color:rgba(239,68,68,0.35);background:rgba(239,68,68,0.1)">' +
+        '<div class="panel-body has-pad" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">' +
         '<div><strong>' + draftCount + ' draft quotations</strong>' +
         '<div class="muted">Empty autosave drafts can be removed in one click. Finalized quotes are kept.</div></div>' +
         '<button class="btn btn-danger" data-action="clear-draft-quotes">Clear all drafts</button></div></div>'
@@ -378,24 +396,30 @@
 
   function invoiceListFull(rows) {
     if (!rows.length) return '<div class="empty">No invoices yet</div>';
-    return '<div class="table-wrap"><table class="data"><thead><tr><th>Reference</th><th>Client</th><th>Amount</th><th>Paid / Due</th><th>Payment</th><th>Entered by</th><th></th></tr></thead><tbody>' +
+    return '<div class="table-wrap"><table class="data"><thead><tr><th>Reference</th><th>Client</th><th>Amount</th><th>Status</th><th>Paid / Due</th><th>Payment</th><th>Entered by</th><th></th></tr></thead><tbody>' +
       rows.map(function (r) {
+        var cancelled = isCancelledInvoice(r);
+        var payStatus = effectivePaymentStatus(r);
+        var paid = String(payStatus).toLowerCase() === 'paid';
+        var actions = '<button class="btn btn-ghost" data-action="print-invoice" data-ref="' + esc(r.reference) + '">Print</button>' +
+          '<button class="btn btn-ghost" data-action="whatsapp-invoice" data-ref="' + esc(r.reference) + '">WhatsApp</button>' +
+          '<button class="btn btn-ghost" data-action="duplicate-invoice" data-ref="' + esc(r.reference) + '">Duplicate</button>';
+        if (!cancelled && !paid) {
+          actions += '<button class="btn btn-primary" data-action="record-payment" data-ref="' + esc(r.reference) + '">Pay</button>';
+          if (canMarkPaid()) {
+            actions += '<button class="btn btn-ghost" data-action="mark-paid" data-ref="' + esc(r.reference) + '">Mark paid</button>';
+          }
+        }
+        actions += '<button class="btn btn-danger" data-action="delete-invoice" data-ref="' + esc(r.reference) + '">Delete</button>';
         return '<tr><td><button class="linkish" data-action="open-invoice" data-ref="' + esc(r.reference) + '">' + esc(r.reference) +
           '</button></td><td><button class="linkish" data-action="client-timeline" data-company="' + esc(r.client) + '">' +
-          esc(r.client) + '</button></td><td>' + money(r.amount) + '</td><td><div>' + money(r.amountPaid || 0) +
+          esc(r.client) + '</button></td><td>' + money(r.amount) + '</td><td>' + badge(r.status) +
+          '</td><td><div>' + money(r.amountPaid || 0) +
           '</div><div class="muted">due ' + money(r.balanceDue != null ? r.balanceDue : r.amount) + '</div></td><td>' +
-          badge(r.paymentStatus || r.status) + '</td><td>' + esc(r.updatedBy || r.createdBy || '—') +
+          badge(payStatus) + '</td><td>' + esc(r.updatedBy || r.createdBy || '—') +
           (r.createdBy && r.updatedBy && r.createdBy !== r.updatedBy
             ? '<div class="muted">created ' + esc(r.createdBy) + '</div>' : '') +
-          '</td><td class="actions">' +
-          '<button class="btn btn-ghost" data-action="print-invoice" data-ref="' + esc(r.reference) + '">Print</button>' +
-          '<button class="btn btn-ghost" data-action="whatsapp-invoice" data-ref="' + esc(r.reference) + '">WhatsApp</button>' +
-          '<button class="btn btn-ghost" data-action="duplicate-invoice" data-ref="' + esc(r.reference) + '">Duplicate</button>' +
-          '<button class="btn btn-primary" data-action="record-payment" data-ref="' + esc(r.reference) + '">Payment</button>' +
-          (canMarkPaid()
-            ? '<button class="btn btn-ghost" data-action="mark-paid" data-ref="' + esc(r.reference) + '">Mark paid</button>'
-            : '') +
-          '</td></tr>';
+          '</td><td class="actions">' + actions + '</td></tr>';
       }).join('') + '</tbody></table></div>';
   }
 
@@ -1807,6 +1831,15 @@
         var ps = (data && data.invoice && data.invoice.paymentStatus) ||
           (data && data.paymentSummary && data.paymentSummary.status) || 'Paid';
         toast('Marked ' + ref + ' as ' + ps);
+        state.view = 'invoices';
+        render();
+      });
+    }
+    if (action === 'delete-invoice') {
+      if (!ref) { toast('Missing invoice reference', true); return; }
+      if (!confirm('Delete invoice ' + ref + ' and its payments / income?')) return;
+      run('deleteInvoice', [ref]).then(function () {
+        toast('Invoice deleted');
         state.view = 'invoices';
         render();
       });
