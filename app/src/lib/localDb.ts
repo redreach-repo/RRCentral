@@ -6,7 +6,7 @@
 import { ALL_SEED_PRODUCTS } from './seedCatalog'
 
 export const DB_NAME = 'rrcentral_local'
-const DB_VERSION = 2
+const DB_VERSION = 4
 
 export const LOCAL_STORES = [
   'app_settings',
@@ -25,6 +25,14 @@ export const LOCAL_STORES = [
   'attachments',
   'activity_log',
   'inventory_movements',
+  'customer_payments',
+  'customer_refunds',
+  'supplier_commitments',
+  'fx_rates',
+  'wanders_deals',
+  'wanders_passengers',
+  'tour_packages',
+  'wanders_terms_acceptances',
 ] as const
 
 export type LocalStoreName = (typeof LOCAL_STORES)[number]
@@ -79,6 +87,28 @@ const DEFAULT_SETTINGS: { key: string; value: string }[] = [
   { key: 'zohoMailAccountId', value: '' },
   { key: 'zohoCalendarEnabled', value: 'no' },
   { key: 'zohoMailEnabled', value: 'no' },
+  { key: 'wandersLegalEntityName', value: 'TBC' },
+  { key: 'wandersTradingName', value: 'RR Wanders' },
+  { key: 'wandersRegisteredCountry', value: 'TBC' },
+  { key: 'wandersRegisteredState', value: 'TBC' },
+  { key: 'wandersRegistrationNumber', value: 'TBC' },
+  { key: 'wandersRegisteredAddress', value: 'TBC' },
+  { key: 'wandersTaxRegistration', value: 'TBC' },
+  { key: 'wandersTaxRules', value: 'TBC — do not assume UAE VAT 5%' },
+  { key: 'wandersGoverningLaw', value: 'TBC' },
+  { key: 'wandersDisputeJurisdiction', value: 'TBC' },
+  { key: 'wandersComplaintsContact', value: 'TBC' },
+  { key: 'wandersPaymentAccountNames', value: 'TBC' },
+  { key: 'wandersBaseCurrency', value: 'TBC' },
+  { key: 'wandersAccountingRevenueRule', value: 'TBC' },
+  { key: 'wandersDepositPercent', value: '50' },
+  { key: 'wandersHoldBusinessDays', value: '3' },
+  { key: 'wandersBalanceDaysBefore', value: '30-45' },
+  { key: 'wandersTermsVersion', value: 'WAN-TERMS-2026-07-DRAFT' },
+  { key: 'wandersPackageCodePrefix', value: 'WAN' },
+  { key: 'wandersQuoteLanguage', value: 'en' },
+  { key: 'wandersApplyVat', value: 'no' },
+  { key: 'wandersVatRate', value: 'TBC' },
   {
     key: 'emailQuoteSubject',
     value: '{{title}} {{ref}} — {{company}}',
@@ -374,6 +404,15 @@ function withDefaults(table: string, row: Row): Row {
         'expenses',
         'payment_log',
         'activity_log',
+        'inventory_movements',
+        'customer_payments',
+        'customer_refunds',
+        'supplier_commitments',
+        'fx_rates',
+        'wanders_deals',
+        'wanders_passengers',
+        'tour_packages',
+        'wanders_terms_acceptances',
       ].includes(table)
     ) {
       next.created_at = now
@@ -405,6 +444,67 @@ function withDefaults(table: string, row: Row): Row {
     if (next.reference == null) next.reference = ''
     if (next.user_email == null) next.user_email = ''
     if (next.created_at == null) next.created_at = now
+  }
+
+  if (table === 'quotations') {
+    if (next.currency == null) next.currency = 'AED'
+    if (next.quotation_currency == null) next.quotation_currency = next.currency || 'AED'
+    if (next.payment_currency == null) next.payment_currency = next.quotation_currency
+    if (next.supplier_currency == null) next.supplier_currency = 'AED'
+    if (next.booking_currency == null) next.booking_currency = 'AED'
+    if (next.fx_rate == null) next.fx_rate = 1
+    if (next.base_amount == null) {
+      next.base_amount = Number(next.amount || 0) * Number(next.fx_rate || 1)
+    }
+    if (next.conversion_fee_estimate == null) next.conversion_fee_estimate = 0
+    if (next.bank_fee_estimate == null) next.bank_fee_estimate = 0
+    if (next.charges_borne_by == null) next.charges_borne_by = 'Customer'
+    if (next.accept_other_payment_currency == null) next.accept_other_payment_currency = true
+    if (next.fx_rate_approved_by == null) next.fx_rate_approved_by = ''
+    if (next.net_amount_required == null) next.net_amount_required = ''
+    if (next.payment_instructions == null) next.payment_instructions = ''
+    if (next.supplier_cost_base == null) next.supplier_cost_base = 0
+    if (next.estimated_gross_profit_base == null) next.estimated_gross_profit_base = 0
+  }
+
+  if (table === 'customer_payments') {
+    if (next.currency == null) next.currency = 'AED'
+    if (next.fx_rate == null) next.fx_rate = 1
+    if (next.processing_fee == null) next.processing_fee = 0
+    if (next.conversion_fee == null) next.conversion_fee = 0
+    if (next.status == null) next.status = 'Pending'
+    if (next.payment_type == null) next.payment_type = 'Deposit'
+    if (next.created_at == null) next.created_at = now
+    if (next.updated_at == null) next.updated_at = now
+  }
+
+  if (table === 'customer_refunds' && next.created_at == null) next.created_at = now
+  if (table === 'supplier_commitments' && next.created_at == null) next.created_at = now
+  if (table === 'fx_rates' && next.created_at == null) next.created_at = now
+
+  if (table === 'wanders_deals') {
+    if (next.division_code == null) next.division_code = '02'
+    if (next.sales_stage == null) next.sales_stage = 'New enquiry'
+    if (next.booking_status == null) next.booking_status = 'Deposit pending'
+    if (next.booking_currency == null) next.booking_currency = 'TBC'
+    if (next.quote_currency == null) next.quote_currency = 'TBC'
+    if (next.budget_currency == null) next.budget_currency = 'TBC'
+    if (next.deposit_percent == null) next.deposit_percent = 50
+    if (next.terms_accepted == null) next.terms_accepted = false
+    if (next.updated_at == null) next.updated_at = now
+  }
+
+  if (table === 'wanders_passengers') {
+    if (next.is_lead == null) next.is_lead = false
+    if (next.passenger_class == null) next.passenger_class = 'Adult'
+    if (next.updated_at == null) next.updated_at = now
+  }
+
+  if (table === 'tour_packages') {
+    if (next.active == null) next.active = true
+    if (next.default_currency == null) next.default_currency = 'TBC'
+    if (next.guide_price == null) next.guide_price = 0
+    if (next.updated_at == null) next.updated_at = now
   }
 
   return next
@@ -651,6 +751,14 @@ export type MigrationDump = {
   attachments?: Row[]
   activity_log?: Row[]
   inventory_movements?: Row[]
+  customer_payments?: Row[]
+  customer_refunds?: Row[]
+  supplier_commitments?: Row[]
+  fx_rates?: Row[]
+  wanders_deals?: Row[]
+  wanders_passengers?: Row[]
+  tour_packages?: Row[]
+  wanders_terms_acceptances?: Row[]
 }
 
 async function clearStore(store: string): Promise<void> {

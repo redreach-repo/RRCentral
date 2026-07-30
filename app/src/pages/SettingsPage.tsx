@@ -80,6 +80,30 @@ const SYSTEM_KEYS = [
   { key: 'followUpDaysAfterQuote', label: 'Follow-up days after quote' },
 ] as const
 
+const WANDERS_KEYS = [
+  { key: 'wandersTradingName', label: 'Trading / brand name' },
+  { key: 'wandersLegalEntityName', label: 'Registered legal entity (TBC)' },
+  { key: 'wandersRegisteredCountry', label: 'Registered country (TBC)' },
+  { key: 'wandersRegisteredState', label: 'Registered state/province (TBC)' },
+  { key: 'wandersRegistrationNumber', label: 'Registration / licence no. (TBC)' },
+  { key: 'wandersRegisteredAddress', label: 'Registered address (TBC)' },
+  { key: 'wandersTaxRegistration', label: 'Tax registration (TBC)' },
+  { key: 'wandersTaxRules', label: 'Tax rules (TBC — do not assume UAE VAT)' },
+  { key: 'wandersGoverningLaw', label: 'Governing law (TBC)' },
+  { key: 'wandersDisputeJurisdiction', label: 'Courts / dispute jurisdiction (TBC)' },
+  { key: 'wandersComplaintsContact', label: 'Complaints contact (TBC)' },
+  { key: 'wandersPaymentAccountNames', label: 'Official payment-account names (TBC)' },
+  { key: 'wandersBaseCurrency', label: 'Base / reporting currency (TBC)' },
+  { key: 'wandersAccountingRevenueRule', label: 'Accounting revenue rule (TBC)' },
+  { key: 'wandersDepositPercent', label: 'Default deposit %' },
+  { key: 'wandersHoldBusinessDays', label: 'Default hold (business days)' },
+  { key: 'wandersBalanceDaysBefore', label: 'Balance due (days before departure)' },
+  { key: 'wandersTermsVersion', label: 'Current terms version' },
+  { key: 'wandersPackageCodePrefix', label: 'Package code prefix' },
+  { key: 'wandersApplyVat', label: 'Apply VAT on Wanders quotes (yes/no)' },
+  { key: 'wandersVatRate', label: 'Wanders VAT rate (TBC)' },
+] as const
+
 const MESSAGE_KEYS = [
   { key: 'emailQuoteSubject', label: 'Quote email subject' },
   { key: 'emailQuoteBody', label: 'Quote email body' },
@@ -508,6 +532,11 @@ export default function SettingsPage() {
       {renderSection('Company info', 'Company', COMPANY_KEYS)}
       {renderSection('Bank details', 'Bank', BANK_KEYS)}
       {renderSection('Quote / Invoice settings', 'Quote settings', QUOTE_KEYS)}
+      {renderSection(
+        'RR Wanders (TBC legal / tax / currency — not for live customer docs until confirmed)',
+        'Wanders',
+        WANDERS_KEYS,
+      )}
       {renderSection('System', 'System', SYSTEM_KEYS)}
 
       <div style={{ ...cardStyle, marginBottom: 20 }}>

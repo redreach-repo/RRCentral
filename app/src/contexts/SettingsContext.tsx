@@ -13,6 +13,7 @@ import type { AppSetting } from '../lib/types'
 interface SettingsContextValue {
   settings: Record<string, string>
   updateSetting: (key: string, value: string) => Promise<void>
+  refresh: () => Promise<void>
   loading: boolean
 }
 
@@ -22,23 +23,23 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
 
+  const refresh = useCallback(async () => {
+    const { data, error } = await db.from('app_settings').select('key, value')
+    if (!error && data) {
+      const map: Record<string, string> = {}
+      for (const row of data as AppSetting[]) {
+        map[row.key] = row.value
+      }
+      setSettings(map)
+    }
+  }, [])
+
   useEffect(() => {
     let mounted = true
 
     async function loadSettings() {
-      const { data, error } = await db.from('app_settings').select('key, value')
-
-      if (!mounted) return
-
-      if (!error && data) {
-        const map: Record<string, string> = {}
-        for (const row of data as AppSetting[]) {
-          map[row.key] = row.value
-        }
-        setSettings(map)
-      }
-
-      setLoading(false)
+      await refresh()
+      if (mounted) setLoading(false)
     }
 
     void loadSettings()
@@ -46,7 +47,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false
     }
-  }, [])
+  }, [refresh])
 
   const updateSetting = useCallback(async (key: string, value: string) => {
     const { error } = await db
@@ -59,8 +60,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ settings, updateSetting, loading }),
-    [settings, updateSetting, loading],
+    () => ({ settings, updateSetting, refresh, loading }),
+    [settings, updateSetting, refresh, loading],
   )
 
   return (

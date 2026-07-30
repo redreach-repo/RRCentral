@@ -50,6 +50,13 @@ import {
 import { sortByDateDesc } from '../lib/finance'
 import { isQuotePastValidity, quoteValidUntil } from '../lib/documents'
 import {
+  BASE_CURRENCY,
+  CURRENCY_LABELS,
+  SUPPORTED_CURRENCIES,
+  toBaseAmount,
+} from '../lib/currency'
+import { approveFxRate, quotationCurrencyDefaults } from '../lib/customerPayments'
+import {
   buttonDangerStyle,
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -67,6 +74,7 @@ import {
   tdStyle,
   thStyle,
   toolbarStyle,
+  formGridStyle,
 } from '../lib/uiStyles'
 
 type StatusTab = 'All' | 'Draft' | 'Finalized' | 'Sent' | 'Awarded'
@@ -81,6 +89,20 @@ interface QuoteForm {
   notes: string
   date: string
   items: DraftLineItem[]
+  quotation_currency: string
+  payment_currency: string
+  supplier_currency: string
+  booking_currency: string
+  fx_rate: number
+  fx_rate_date: string
+  rate_valid_until: string
+  charges_borne_by: string
+  accept_other_payment_currency: boolean
+  net_amount_required: string
+  payment_instructions: string
+  conversion_fee_estimate: number
+  bank_fee_estimate: number
+  supplier_cost_base: number
 }
 
 const emptyForm = (defaults?: Partial<QuoteForm>): QuoteForm => ({
@@ -93,6 +115,20 @@ const emptyForm = (defaults?: Partial<QuoteForm>): QuoteForm => ({
   notes: '',
   date: format(new Date(), 'yyyy-MM-dd'),
   items: [newDraftLine()],
+  quotation_currency: BASE_CURRENCY,
+  payment_currency: BASE_CURRENCY,
+  supplier_currency: BASE_CURRENCY,
+  booking_currency: BASE_CURRENCY,
+  fx_rate: 1,
+  fx_rate_date: format(new Date(), 'yyyy-MM-dd'),
+  rate_valid_until: '',
+  charges_borne_by: 'Customer',
+  accept_other_payment_currency: true,
+  net_amount_required: '',
+  payment_instructions: '',
+  conversion_fee_estimate: 0,
+  bank_fee_estimate: 0,
+  supplier_cost_base: 0,
   ...defaults,
 })
 
@@ -221,14 +257,24 @@ export default function QuotationsPage() {
   useEffect(() => {
     const wantNew = searchParams.get('new') === '1'
     const client = searchParams.get('client')
+    const division = searchParams.get('division')
     if (!wantNew || loading) return
     setEditing(null)
     setForm(
       emptyForm({
         client: client || '',
+        division_code: division === '02' ? '02' : '01',
         payment_terms: settings.paymentTerms || PAYMENT_TERMS[0],
         delivery_terms: settings.deliveryTerms || DELIVERY_TERMS[0],
-        moq: settings.moqDefault || '50',
+        moq: division === '02' ? '' : settings.moqDefault || '50',
+        ...(division === '02'
+          ? {
+              quotation_currency: settings.wandersBaseCurrency || 'TBC',
+              payment_currency: settings.wandersBaseCurrency || 'TBC',
+              booking_currency: settings.wandersBaseCurrency || 'TBC',
+              supplier_currency: settings.wandersBaseCurrency || 'TBC',
+            }
+          : {}),
       }),
     )
     setEditorOpen(true)
@@ -330,6 +376,20 @@ export default function QuotationsPage() {
         notes: q.notes || '',
         date: q.date ? q.date.slice(0, 10) : format(new Date(), 'yyyy-MM-dd'),
         items: toDraftItems(items),
+        quotation_currency: q.quotation_currency || q.currency || BASE_CURRENCY,
+        payment_currency: q.payment_currency || q.quotation_currency || BASE_CURRENCY,
+        supplier_currency: q.supplier_currency || BASE_CURRENCY,
+        booking_currency: q.booking_currency || BASE_CURRENCY,
+        fx_rate: Number(q.fx_rate) || 1,
+        fx_rate_date: q.fx_rate_date ? q.fx_rate_date.slice(0, 10) : format(new Date(), 'yyyy-MM-dd'),
+        rate_valid_until: q.rate_valid_until ? q.rate_valid_until.slice(0, 10) : '',
+        charges_borne_by: q.charges_borne_by || 'Customer',
+        accept_other_payment_currency: q.accept_other_payment_currency !== false,
+        net_amount_required: q.net_amount_required || '',
+        payment_instructions: q.payment_instructions || '',
+        conversion_fee_estimate: Number(q.conversion_fee_estimate) || 0,
+        bank_fee_estimate: Number(q.bank_fee_estimate) || 0,
+        supplier_cost_base: Number(q.supplier_cost_base) || 0,
       })
       setEditorOpen(true)
     } catch (e) {
@@ -354,6 +414,29 @@ export default function QuotationsPage() {
       const amount = totals.total
       const vertical = divisionBrand(form.division_code)
       const quoteId = editing?.quote_id || makeQuoteId()
+      const fxRate = Number(form.fx_rate) || 1
+      const baseAmount = toBaseAmount(amount, fxRate)
+      const currencyFields = {
+        currency: form.quotation_currency,
+        quotation_currency: form.quotation_currency,
+        payment_currency: form.payment_currency,
+        supplier_currency: form.supplier_currency,
+        booking_currency: form.booking_currency,
+        fx_rate: fxRate,
+        fx_rate_date: form.fx_rate_date || null,
+        fx_rate_approved_by: who,
+        fx_rate_approved_at: new Date().toISOString(),
+        base_amount: baseAmount,
+        conversion_fee_estimate: Number(form.conversion_fee_estimate) || 0,
+        bank_fee_estimate: Number(form.bank_fee_estimate) || 0,
+        charges_borne_by: form.charges_borne_by,
+        net_amount_required: form.net_amount_required,
+        accept_other_payment_currency: form.accept_other_payment_currency,
+        rate_valid_until: form.rate_valid_until || null,
+        payment_instructions: form.payment_instructions,
+        supplier_cost_base: Number(form.supplier_cost_base) || 0,
+        estimated_gross_profit_base: baseAmount - (Number(form.supplier_cost_base) || 0),
+      }
       const payload = {
         client: form.client.trim(),
         vertical,
@@ -368,6 +451,17 @@ export default function QuotationsPage() {
         quote_id: quoteId,
         updated_by: who,
         updated_at: new Date().toISOString(),
+        ...currencyFields,
+      }
+
+      if (form.quotation_currency !== BASE_CURRENCY || fxRate !== 1) {
+        await approveFxRate({
+          from: form.quotation_currency,
+          rate: fxRate,
+          rateDate: form.fx_rate_date,
+          approvedBy: who,
+          notes: `Quote draft ${quoteId}`,
+        })
       }
 
       if (editing) {
@@ -376,6 +470,8 @@ export default function QuotationsPage() {
       } else {
         const { error } = await db.from('quotations').insert({
           ...payload,
+          ...quotationCurrencyDefaults(),
+          ...currencyFields,
           status: 'Draft',
           reference_number: '',
           base_reference: '',
@@ -1186,9 +1282,207 @@ export default function QuotationsPage() {
             fontSize: 14,
           }}
         >
-          <div>Subtotal: <strong>{formatAED(totals.subtotal)}</strong></div>
-          <div>VAT ({(vatRate * 100).toFixed(0)}%): <strong>{formatAED(totals.vat)}</strong></div>
-          <div>Total: <strong style={{ color: colors.accent }}>{formatAED(totals.total)}</strong></div>
+          <div>
+            Subtotal:{' '}
+            <strong>
+              {form.quotation_currency} {totals.subtotal.toLocaleString('en-AE', { minimumFractionDigits: 2 })}
+            </strong>
+          </div>
+          <div>
+            VAT ({(vatRate * 100).toFixed(0)}%):{' '}
+            <strong>
+              {form.quotation_currency} {totals.vat.toLocaleString('en-AE', { minimumFractionDigits: 2 })}
+            </strong>
+          </div>
+          <div>
+            Total:{' '}
+            <strong style={{ color: colors.accent }}>
+              {form.quotation_currency} {totals.total.toLocaleString('en-AE', { minimumFractionDigits: 2 })}
+            </strong>
+          </div>
+          <div style={{ color: colors.muted2 }}>
+            ≈ AED {toBaseAmount(totals.total, form.fx_rate).toLocaleString('en-AE', { minimumFractionDigits: 2 })}
+          </div>
+        </div>
+
+        <div
+          style={{
+            marginTop: 18,
+            padding: 14,
+            border: `1px solid ${colors.border}`,
+            borderRadius: 10,
+            background: form.division_code === '02' ? 'rgba(96,165,250,0.06)' : 'transparent',
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 10, fontSize: 14 }}>
+            Currencies & payment instructions
+            {form.division_code === '02' ? ' · RR Wanders' : ''}
+          </div>
+          <div style={formGridStyle}>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Quotation currency</label>
+              <select
+                style={selectStyle}
+                value={form.quotation_currency}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    quotation_currency: e.target.value,
+                    payment_currency: f.payment_currency || e.target.value,
+                    fx_rate: e.target.value === BASE_CURRENCY ? 1 : f.fx_rate,
+                  }))
+                }
+              >
+                {SUPPORTED_CURRENCIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c} — {CURRENCY_LABELS[c]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Customer payment currency</label>
+              <select
+                style={selectStyle}
+                value={form.payment_currency}
+                onChange={(e) => setForm((f) => ({ ...f, payment_currency: e.target.value }))}
+              >
+                {SUPPORTED_CURRENCIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Supplier currency</label>
+              <select
+                style={selectStyle}
+                value={form.supplier_currency}
+                onChange={(e) => setForm((f) => ({ ...f, supplier_currency: e.target.value }))}
+              >
+                {SUPPORTED_CURRENCIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Booking / reporting currency</label>
+              <select
+                style={selectStyle}
+                value={form.booking_currency}
+                onChange={(e) => setForm((f) => ({ ...f, booking_currency: e.target.value }))}
+              >
+                {SUPPORTED_CURRENCIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>FX rate (1 quote unit → AED)</label>
+              <input
+                type="number"
+                step="0.0001"
+                style={inputStyle}
+                value={form.fx_rate}
+                onChange={(e) => setForm((f) => ({ ...f, fx_rate: Number(e.target.value) }))}
+              />
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Rate date</label>
+              <input
+                type="date"
+                style={inputStyle}
+                value={form.fx_rate_date}
+                onChange={(e) => setForm((f) => ({ ...f, fx_rate_date: e.target.value }))}
+              />
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Rate valid until</label>
+              <input
+                type="date"
+                style={inputStyle}
+                value={form.rate_valid_until}
+                onChange={(e) => setForm((f) => ({ ...f, rate_valid_until: e.target.value }))}
+              />
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Bank / FX charges borne by</label>
+              <select
+                style={selectStyle}
+                value={form.charges_borne_by}
+                onChange={(e) => setForm((f) => ({ ...f, charges_borne_by: e.target.value }))}
+              >
+                <option value="Customer">Customer</option>
+                <option value="RR Wanders">RR Wanders</option>
+                <option value="Shared">Shared</option>
+              </select>
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Conversion fee estimate</label>
+              <input
+                type="number"
+                style={inputStyle}
+                value={form.conversion_fee_estimate}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, conversion_fee_estimate: Number(e.target.value) }))
+                }
+              />
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Bank fee estimate</label>
+              <input
+                type="number"
+                style={inputStyle}
+                value={form.bank_fee_estimate}
+                onChange={(e) => setForm((f) => ({ ...f, bank_fee_estimate: Number(e.target.value) }))}
+              />
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Supplier cost (AED)</label>
+              <input
+                type="number"
+                style={inputStyle}
+                value={form.supplier_cost_base}
+                onChange={(e) => setForm((f) => ({ ...f, supplier_cost_base: Number(e.target.value) }))}
+              />
+            </div>
+            <div style={{ ...fieldStyle, display: 'flex', alignItems: 'center', gap: 8, paddingTop: 22 }}>
+              <input
+                type="checkbox"
+                checked={form.accept_other_payment_currency}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, accept_other_payment_currency: e.target.checked }))
+                }
+                id="accept-other-ccy"
+              />
+              <label htmlFor="accept-other-ccy" style={{ fontSize: 13 }}>
+                Accept other payment currencies
+              </label>
+            </div>
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Net amount that must be received</label>
+            <input
+              style={inputStyle}
+              value={form.net_amount_required}
+              onChange={(e) => setForm((f) => ({ ...f, net_amount_required: e.target.value }))}
+              placeholder="e.g. USD 2,500 net of all bank charges"
+            />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Payment instructions (selected currency)</label>
+            <textarea
+              style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }}
+              value={form.payment_instructions}
+              onChange={(e) => setForm((f) => ({ ...f, payment_instructions: e.target.value }))}
+              placeholder="Bank name, IBAN, SWIFT, beneficiary…"
+            />
+          </div>
         </div>
 
         <div style={fieldStyle}>

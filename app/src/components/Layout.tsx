@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
   LayoutDashboard,
+  Banknote,
   Users,
   CalendarClock,
   FileText,
   Receipt,
   Package,
   Boxes,
+  Plane,
   LayoutTemplate,
   BarChart3,
   Wallet,
@@ -23,11 +25,13 @@ import styles from './Layout.module.css'
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/crm', label: 'CRM', icon: Users },
+  { to: '/wanders', label: 'Wanders', icon: Plane },
   { to: '/follow-ups', label: 'Follow-ups', icon: CalendarClock },
   { to: '/quotations', label: 'Quotations', icon: FileText },
   { to: '/invoices', label: 'Invoices', icon: Receipt },
   { to: '/catalog', label: 'Catalog', icon: Package },
   { to: '/inventory', label: 'Inventory', icon: Boxes },
+  { to: '/payments', label: 'Payments', icon: Banknote },
   { to: '/templates', label: 'Templates', icon: LayoutTemplate },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/expenses', label: 'Expenses', icon: Wallet },
