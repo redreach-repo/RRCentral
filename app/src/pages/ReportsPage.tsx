@@ -3,11 +3,22 @@ import { differenceInCalendarDays, format, parseISO, startOfMonth, subMonths } f
 import { Download } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS, PIPELINE_STAGES, VAT_RATE } from '../lib/config'
-import type { CrmEntry, Expense, IncomeEntry, Invoice, Quotation } from '../lib/types'
+import type {
+  CrmEntry,
+  CustomerPayment,
+  CustomerRefund,
+  Expense,
+  IncomeEntry,
+  Invoice,
+  Quotation,
+  SupplierCommitment,
+} from '../lib/types'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import { formatAED } from '../lib/money'
+import { BASE_CURRENCY, formatMoneyAmount } from '../lib/currency'
+import { buildCurrencyReport, cashReceivedByCurrency } from '../lib/currencyReports'
 import {
   currentVatQuarter,
   expenseVatParts,
@@ -37,7 +48,7 @@ import {
   thStyle,
 } from '../lib/uiStyles'
 
-type Tab = 'winrate' | 'aging' | 'pnl' | 'vat' | 'funnel'
+type Tab = 'winrate' | 'aging' | 'pnl' | 'vat' | 'funnel' | 'fx'
 
 const tabStyle = (active: boolean): CSSProperties => ({
   ...buttonSecondaryStyle,
@@ -56,6 +67,9 @@ export default function ReportsPage() {
   const [income, setIncome] = useState<IncomeEntry[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [crm, setCrm] = useState<CrmEntry[]>([])
+  const [payments, setPayments] = useState<CustomerPayment[]>([])
+  const [refunds, setRefunds] = useState<CustomerRefund[]>([])
+  const [suppliers, setSuppliers] = useState<SupplierCommitment[]>([])
 
   const nowQ = currentVatQuarter()
   const [vatYear, setVatYear] = useState(nowQ.year)
@@ -64,23 +78,32 @@ export default function ReportsPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [q, i, inc, exp, c] = await Promise.all([
+      const [q, i, inc, exp, c, pay, ref, sup] = await Promise.all([
         db.from('quotations').select('*'),
         db.from('invoices').select('*'),
         db.from('income').select('*'),
         db.from('expenses').select('*'),
         db.from('crm').select('*'),
+        db.from('customer_payments').select('*'),
+        db.from('customer_refunds').select('*'),
+        db.from('supplier_commitments').select('*'),
       ])
       if (q.error) throw q.error
       if (i.error) throw i.error
       if (inc.error) throw inc.error
       if (exp.error) throw exp.error
       if (c.error) throw c.error
+      if (pay.error) throw pay.error
+      if (ref.error) throw ref.error
+      if (sup.error) throw sup.error
       setQuotes((q.data || []) as Quotation[])
       setInvoices((i.data || []) as Invoice[])
       setIncome((inc.data || []) as IncomeEntry[])
       setExpenses((exp.data || []) as Expense[])
       setCrm((c.data || []) as CrmEntry[])
+      setPayments((pay.data || []) as CustomerPayment[])
+      setRefunds((ref.data || []) as CustomerRefund[])
+      setSuppliers((sup.data || []) as SupplierCommitment[])
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Failed to load reports', 'error')
     } finally {
@@ -93,6 +116,18 @@ export default function ReportsPage() {
   }, [load])
 
   const recognizedIncome = useMemo(() => income.filter(isRecognizedIncome), [income])
+
+  const fxReport = useMemo(
+    () =>
+      buildCurrencyReport({
+        quotes,
+        payments,
+        refunds,
+        suppliers,
+      }),
+    [quotes, payments, refunds, suppliers],
+  )
+  const cashByCurrency = useMemo(() => cashReceivedByCurrency(payments), [payments])
 
   const winRate = useMemo(() => {
     return DIVISIONS.map((d) => {
@@ -271,7 +306,43 @@ export default function ReportsPage() {
   const maxPnl = Math.max(1, ...monthlyPnl.map((m) => Math.max(m.income, m.expenses)))
 
   function exportCsv() {
-    if (tab === 'funnel') {
+    if (tab === 'fx') {
+      const lines = [
+        'MULTI-CURRENCY REPORT',
+        `Bookings,${fxReport.bookingCount}`,
+        '',
+        'CUSTOMER REVENUE BY ORIGINAL CURRENCY (invoiced)',
+        'Currency,Amount',
+        ...Object.entries(fxReport.revenueByCurrency).map(([c, a]) => `${escapeCsv(c)},${a}`),
+        '',
+        `Customer revenue converted to ${BASE_CURRENCY},${fxReport.revenueBase}`,
+        '',
+        'CASH RECEIVED BY PAYMENT CURRENCY',
+        'Currency,Amount',
+        ...Object.entries(cashByCurrency).map(([c, a]) => `${escapeCsv(c)},${a}`),
+        '',
+        'OUTSTANDING BALANCES BY CURRENCY',
+        'Currency,Amount',
+        ...Object.entries(fxReport.outstandingByCurrency).map(([c, a]) => `${escapeCsv(c)},${a}`),
+        `Outstanding ${BASE_CURRENCY} equiv.,${fxReport.outstandingBase}`,
+        '',
+        'SUPPLIER PAYABLES BY CURRENCY',
+        'Currency,Amount',
+        ...Object.entries(fxReport.supplierPayablesByCurrency).map(([c, a]) => `${escapeCsv(c)},${a}`),
+        `Supplier payables ${BASE_CURRENCY},${fxReport.supplierPayablesBase}`,
+        '',
+        `Currency-conversion fees (raw),${fxReport.conversionFees}`,
+        `Currency-conversion fees ${BASE_CURRENCY},${fxReport.conversionFeesBase}`,
+        `Exchange-rate gains and losses ${BASE_CURRENCY},${fxReport.fxGainLossBase}`,
+        '',
+        'GROSS PROFIT BY BOOKING CURRENCY (est. in AED keyed by quote currency)',
+        'Quote currency,Est GP AED',
+        ...Object.entries(fxReport.estimatedGpByBookingCurrency).map(([c, a]) => `${escapeCsv(c)},${a}`),
+        `Estimated GP ${BASE_CURRENCY},${fxReport.estimatedGpBase}`,
+        `Actual GP ${BASE_CURRENCY},${fxReport.actualGpBase}`,
+      ]
+      downloadCsv('multi-currency-report.csv', lines.join('\n'))
+    } else if (tab === 'funnel') {
       const header = ['Stage', 'Count']
       const rows = crmFunnel.stages.map((r) => [r.stage, r.count].map(escapeCsv).join(','))
       const reasonHeader = ['Outcome reason', 'Count']
@@ -365,7 +436,7 @@ export default function ReportsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
         <div>
           <h1 style={pageTitleStyle}>Reports</h1>
-          <p style={pageSubtitleStyle}>VAT, sales, aging, and P&L — income excludes not-awarded quotes</p>
+          <p style={pageSubtitleStyle}>VAT, sales, aging, multi-currency, and P&L — income excludes not-awarded quotes</p>
         </div>
         <button type="button" style={buttonPrimaryStyle} onClick={exportCsv} disabled={loading}>
           <Download size={16} /> Export CSV
@@ -375,6 +446,9 @@ export default function ReportsPage() {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
         <button type="button" style={tabStyle(tab === 'vat')} onClick={() => setTab('vat')}>
           VAT report
+        </button>
+        <button type="button" style={tabStyle(tab === 'fx')} onClick={() => setTab('fx')}>
+          Multi-currency
         </button>
         <button type="button" style={tabStyle(tab === 'funnel')} onClick={() => setTab('funnel')}>
           CRM funnel
@@ -392,6 +466,57 @@ export default function ReportsPage() {
 
       {loading ? (
         <div style={{ ...cardStyle, color: colors.muted }}>Loading reports…</div>
+      ) : tab === 'fx' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <p style={{ margin: 0, fontSize: 12, color: colors.muted }}>
+            Amounts stay in their original currencies — never cross-added. Base currency is {BASE_CURRENCY}.
+          </p>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+              gap: 10,
+            }}
+          >
+            <FxKpi
+              label={`Revenue (${BASE_CURRENCY})`}
+              value={formatMoneyAmount(fxReport.revenueBase, BASE_CURRENCY)}
+            />
+            <FxKpi
+              label={`Outstanding (${BASE_CURRENCY})`}
+              value={formatMoneyAmount(fxReport.outstandingBase, BASE_CURRENCY)}
+            />
+            <FxKpi
+              label={`Supplier payables (${BASE_CURRENCY})`}
+              value={formatMoneyAmount(fxReport.supplierPayablesBase, BASE_CURRENCY)}
+            />
+            <FxKpi
+              label={`FX gain / loss (${BASE_CURRENCY})`}
+              value={formatMoneyAmount(fxReport.fxGainLossBase, BASE_CURRENCY)}
+            />
+            <FxKpi
+              label={`Conversion fees (${BASE_CURRENCY})`}
+              value={formatMoneyAmount(fxReport.conversionFeesBase, BASE_CURRENCY)}
+            />
+            <FxKpi
+              label={`Est. GP (${BASE_CURRENCY})`}
+              value={formatMoneyAmount(fxReport.estimatedGpBase, BASE_CURRENCY)}
+            />
+            <FxKpi
+              label={`Actual GP (${BASE_CURRENCY})`}
+              value={formatMoneyAmount(fxReport.actualGpBase, BASE_CURRENCY)}
+            />
+          </div>
+          <CurrencyTable title="Customer revenue by original currency (invoiced)" rows={fxReport.revenueByCurrency} />
+          <CurrencyTable title="Cash received by payment currency" rows={cashByCurrency} />
+          <CurrencyTable title="Outstanding balances by currency" rows={fxReport.outstandingByCurrency} />
+          <CurrencyTable title="Supplier payables by currency" rows={fxReport.supplierPayablesByCurrency} />
+          <CurrencyTable
+            title={`Gross profit (est. ${BASE_CURRENCY}) keyed by booking/quote currency`}
+            rows={fxReport.estimatedGpByBookingCurrency}
+            asBase
+          />
+        </div>
       ) : tab === 'funnel' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={cardStyle}>
@@ -699,6 +824,58 @@ function Bar({ label, value, max, color }: { label: string; value: number; max: 
         <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 999 }} />
       </div>
       <span style={{ fontSize: 12, textAlign: 'right' }}>{formatAED(value)}</span>
+    </div>
+  )
+}
+
+function FxKpi({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ ...cardStyle, padding: 12 }}>
+      <div style={{ fontSize: 11, color: colors.muted, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontWeight: 700, fontSize: 15 }}>{value}</div>
+    </div>
+  )
+}
+
+function CurrencyTable({
+  title,
+  rows,
+  asBase,
+}: {
+  title: string
+  rows: Record<string, number>
+  asBase?: boolean
+}) {
+  const entries = Object.entries(rows)
+  return (
+    <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${colors.border}`, fontWeight: 700 }}>
+        {title}
+      </div>
+      {entries.length === 0 ? (
+        <div style={{ padding: 16, color: colors.muted, fontSize: 13 }}>No rows yet.</div>
+      ) : (
+        <div style={tableWrapStyle}>
+          <table style={tableStyle}>
+            <thead>
+              <tr>
+                <th style={thStyle}>Currency</th>
+                <th style={thStyle}>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map(([c, a]) => (
+                <tr key={c}>
+                  <td style={tdStyle}>{c}</td>
+                  <td style={tdStyle}>
+                    {asBase ? formatMoneyAmount(a, BASE_CURRENCY) : formatMoneyAmount(a, c)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }

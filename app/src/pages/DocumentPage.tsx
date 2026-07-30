@@ -8,6 +8,7 @@ import type { Client, CrmContact, CrmEntry, Invoice, LineItem, Quotation } from 
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatAED } from '../lib/money'
+import { BASE_CURRENCY, formatMoneyAmount } from '../lib/currency'
 import { loadLineItems } from '../lib/lineItems'
 import { buildWhatsAppUrl } from '../lib/whatsapp'
 import { resolveLogoUrl } from '../lib/brand'
@@ -158,6 +159,12 @@ export default function DocumentPage() {
         : null)
 
   const vatRate = Number(settings.vatRate || VAT_RATE) || VAT_RATE
+  const docCurrency = (
+    (quote && (quote.quotation_currency || quote.currency)) ||
+    BASE_CURRENCY
+  ).toUpperCase()
+  const money = (n: number) =>
+    docType === 'quote' ? formatMoneyAmount(n, docCurrency) : formatAED(n)
   const summary = useMemo(() => {
     if (items.length) {
       const subtotal = items.reduce((s, i) => s + Number(i.amount || 0), 0)
@@ -215,7 +222,7 @@ export default function DocumentPage() {
       contactGreeting: p?.name || client?.primary_contact ? ` ${p?.name || client?.primary_contact}` : '',
       titleLower: title.toLowerCase(),
       ref: displayRef,
-      amount: formatAED(summary.total),
+      amount: money(summary.total),
       company,
       client: doc?.client || '',
       contact: p?.name || client?.primary_contact || 'team',
@@ -256,7 +263,7 @@ export default function DocumentPage() {
     company: settings.companyName || 'Red Reach Middle East FZE',
     client: doc?.client || '',
     contact: primaryContact(emailContacts)?.name || client?.primary_contact || 'team',
-    amount: formatAED(summary.total),
+    amount: money(summary.total),
     validUntil: validUntil ? format(new Date(validUntil), 'dd MMM yyyy') : '',
     validUntilLine: validUntil && docType === 'quote' ? `\nValid until: ${format(new Date(validUntil), 'dd MMM yyyy')}` : '',
   }
@@ -559,11 +566,11 @@ export default function DocumentPage() {
             <div style={{ width: 280, margin: '18px 0 0 auto', fontSize: 14 }}>
               <div style={totalRow}>
                 <span>Subtotal</span>
-                <span>{formatAED(summary.subtotal)}</span>
+                <span>{money(summary.subtotal)}</span>
               </div>
               <div style={totalRow}>
                 <span>VAT ({(vatRate * 100).toFixed(0)}%)</span>
-                <span>{formatAED(summary.vat)}</span>
+                <span>{money(summary.vat)}</span>
               </div>
               <div
                 style={{
@@ -575,8 +582,8 @@ export default function DocumentPage() {
                   fontSize: 16,
                 }}
               >
-                <span>Total</span>
-                <span>{formatAED(summary.total)}</span>
+                <span>Total ({docType === 'quote' ? docCurrency : 'AED'})</span>
+                <span>{money(summary.total)}</span>
               </div>
             </div>
 
@@ -585,6 +592,48 @@ export default function DocumentPage() {
               <div>Payment terms: {doc.payment_terms || settings.paymentTerms || '—'}</div>
               <div>Delivery: {doc.delivery_terms || settings.deliveryTerms || '—'}</div>
               {'moq' in doc && <div>MOQ: {doc.moq || settings.moqDefault || '—'}</div>}
+              {docType === 'quote' && quote && (
+                <div style={{ marginTop: 10 }}>
+                  <strong>Quotation currency:</strong> {docCurrency}
+                  <br />
+                  <strong>Other payment currencies accepted:</strong>{' '}
+                  {quote.accept_other_payment_currency === false ? 'No' : 'Yes'}
+                  {quote.payment_currency && quote.payment_currency !== docCurrency
+                    ? ` (preferred: ${quote.payment_currency})`
+                    : ''}
+                  <br />
+                  {quote.fx_rate && quote.fx_rate !== 1 ? (
+                    <>
+                      <strong>Exchange rate used:</strong> 1 {docCurrency} = {quote.fx_rate}{' '}
+                      {quote.booking_currency || BASE_CURRENCY}
+                      {quote.fx_rate_date ? ` (as of ${quote.fx_rate_date})` : ''}
+                      <br />
+                    </>
+                  ) : null}
+                  {quote.rate_valid_until ? (
+                    <>
+                      <strong>Rate valid until:</strong> {quote.rate_valid_until}
+                      <br />
+                    </>
+                  ) : null}
+                  <strong>Bank / conversion charges borne by:</strong>{' '}
+                  {quote.charges_borne_by || 'Customer'}
+                  <br />
+                  {quote.net_amount_required ? (
+                    <>
+                      <strong>Net amount required by RR Wanders:</strong> {quote.net_amount_required}
+                      <br />
+                    </>
+                  ) : null}
+                  {quote.payment_instructions ? (
+                    <div style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>
+                      <strong>Payment instructions ({quote.payment_currency || docCurrency}):</strong>
+                      <br />
+                      {quote.payment_instructions}
+                    </div>
+                  ) : null}
+                </div>
+              )}
               {settings.accountName && (
                 <div style={{ marginTop: 10 }}>
                   <strong>Bank:</strong> {settings.bankName} · {settings.accountName}

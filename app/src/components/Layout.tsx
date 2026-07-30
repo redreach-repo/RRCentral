@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
   LayoutDashboard,
+  Banknote,
   Users,
   CalendarClock,
   FileText,
@@ -28,6 +29,7 @@ const navItems = [
   { to: '/invoices', label: 'Invoices', icon: Receipt },
   { to: '/catalog', label: 'Catalog', icon: Package },
   { to: '/inventory', label: 'Inventory', icon: Boxes },
+  { to: '/payments', label: 'Payments', icon: Banknote },
   { to: '/templates', label: 'Templates', icon: LayoutTemplate },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/expenses', label: 'Expenses', icon: Wallet },

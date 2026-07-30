@@ -147,10 +147,125 @@ create table quotations (
   delivery_terms text not null default '',
   outcome_reason text not null default '',
   valid_until date,
+  currency text not null default 'AED',
+  quotation_currency text not null default 'AED',
+  payment_currency text not null default 'AED',
+  supplier_currency text not null default 'AED',
+  booking_currency text not null default 'AED',
+  fx_rate numeric(18,8) not null default 1,
+  fx_rate_date date,
+  fx_rate_approved_by text not null default '',
+  fx_rate_approved_at timestamptz,
+  base_amount numeric(14,2) not null default 0,
+  conversion_fee_estimate numeric(12,2) not null default 0,
+  bank_fee_estimate numeric(12,2) not null default 0,
+  charges_borne_by text not null default 'Customer',
+  net_amount_required text not null default '',
+  accept_other_payment_currency boolean not null default true,
+  rate_valid_until date,
+  payment_instructions text not null default '',
+  supplier_cost_base numeric(14,2) not null default 0,
+  estimated_gross_profit_base numeric(14,2) not null default 0,
   created_by text not null default '',
   updated_by text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
+);
+
+------------------------------------------------------------
+-- CUSTOMER PAYMENTS (multi-currency — original FC amount immutable)
+------------------------------------------------------------
+create table customer_payments (
+  id uuid primary key default uuid_generate_v4(),
+  booking_id uuid,
+  quote_ref text not null default '',
+  invoice_ref text not null default '',
+  client text not null default '',
+  payment_date date,
+  amount_received numeric(14,2) not null default 0,
+  currency text not null default 'AED',
+  fx_rate numeric(18,8) not null default 1,
+  fx_rate_date date,
+  fx_rate_approved_by text not null default '',
+  base_amount numeric(14,2) not null default 0,
+  payment_method text not null default '',
+  bank_provider text not null default '',
+  processing_fee numeric(12,2) not null default 0,
+  conversion_fee numeric(12,2) not null default 0,
+  net_amount numeric(14,2) not null default 0,
+  payment_type text not null default 'Deposit',
+  transaction_ref text not null default '',
+  proof_url text not null default '',
+  status text not null default 'Pending',
+  notes text not null default '',
+  created_by text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+------------------------------------------------------------
+-- CUSTOMER REFUNDS
+------------------------------------------------------------
+create table customer_refunds (
+  id uuid primary key default uuid_generate_v4(),
+  payment_id uuid,
+  booking_id uuid,
+  quote_ref text not null default '',
+  client text not null default '',
+  refund_date date,
+  original_currency text not null default 'AED',
+  original_amount_received numeric(14,2) not null default 0,
+  refund_currency text not null default 'AED',
+  amount_refunded numeric(14,2) not null default 0,
+  fx_rate numeric(18,8) not null default 1,
+  fx_rate_date date,
+  conversion_fee numeric(12,2) not null default 0,
+  bank_fee numeric(12,2) not null default 0,
+  base_amount numeric(14,2) not null default 0,
+  fx_gain_loss numeric(14,2) not null default 0,
+  reason text not null default '',
+  approved_by text not null default '',
+  approved_at timestamptz,
+  status text not null default 'Refunded',
+  notes text not null default '',
+  created_by text not null default '',
+  created_at timestamptz not null default now()
+);
+
+------------------------------------------------------------
+-- SUPPLIER COMMITMENTS (original currency preserved)
+------------------------------------------------------------
+create table supplier_commitments (
+  id uuid primary key default uuid_generate_v4(),
+  booking_id uuid,
+  quote_ref text not null default '',
+  supplier_name text not null default '',
+  description text not null default '',
+  amount numeric(14,2) not null default 0,
+  currency text not null default 'AED',
+  fx_rate numeric(18,8) not null default 1,
+  fx_rate_date date,
+  base_amount numeric(14,2) not null default 0,
+  status text not null default 'Open',
+  due_date date,
+  notes text not null default '',
+  created_at timestamptz not null default now()
+);
+
+------------------------------------------------------------
+-- FX RATE APPROVAL LOG (historical rates never auto-change)
+------------------------------------------------------------
+create table fx_rates (
+  id uuid primary key default uuid_generate_v4(),
+  from_currency text not null default 'AED',
+  to_currency text not null default 'AED',
+  rate numeric(18,8) not null default 1,
+  rate_date date not null,
+  source text not null default 'manual',
+  approved_by text not null default '',
+  approved_at timestamptz not null default now(),
+  notes text not null default '',
+  created_at timestamptz not null default now()
 );
 
 ------------------------------------------------------------
@@ -338,6 +453,10 @@ create index idx_activity_log_entity on activity_log(entity, reference);
 create index idx_attachments_entity on attachments(entity_type, entity_ref);
 create index idx_income_date on income(date);
 create index idx_expenses_date on expenses(date);
+create index idx_customer_payments_booking on customer_payments(booking_id);
+create index idx_customer_refunds_booking on customer_refunds(booking_id);
+create index idx_supplier_commitments_booking on supplier_commitments(booking_id);
+create index idx_fx_rates_pair_date on fx_rates(from_currency, to_currency, rate_date);
 
 ------------------------------------------------------------
 -- ROW LEVEL SECURITY (all tables readable/writable by authenticated users)
@@ -358,6 +477,10 @@ alter table payment_log enable row level security;
 alter table attachments enable row level security;
 alter table activity_log enable row level security;
 alter table inventory_movements enable row level security;
+alter table customer_payments enable row level security;
+alter table customer_refunds enable row level security;
+alter table supplier_commitments enable row level security;
+alter table fx_rates enable row level security;
 
 -- Allow all authenticated users to read/write all tables
 -- (app-level role checks handle admin vs sales permissions)
@@ -377,6 +500,10 @@ create policy "Authenticated users full access" on payment_log for all using (au
 create policy "Authenticated users full access" on attachments for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "Authenticated users full access" on activity_log for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "Authenticated users full access" on inventory_movements for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Authenticated users full access" on customer_payments for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Authenticated users full access" on customer_refunds for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Authenticated users full access" on supplier_commitments for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Authenticated users full access" on fx_rates for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 ------------------------------------------------------------
 -- Optional upgrades for existing databases (run once if upgrading)
@@ -410,3 +537,22 @@ create policy "Authenticated users full access" on inventory_movements for all u
 --   user_email text not null default '',
 --   created_at timestamptz not null default now()
 -- );
+-- alter table quotations add column if not exists currency text not null default 'AED';
+-- alter table quotations add column if not exists quotation_currency text not null default 'AED';
+-- alter table quotations add column if not exists payment_currency text not null default 'AED';
+-- alter table quotations add column if not exists supplier_currency text not null default 'AED';
+-- alter table quotations add column if not exists booking_currency text not null default 'AED';
+-- alter table quotations add column if not exists fx_rate numeric(18,8) not null default 1;
+-- alter table quotations add column if not exists fx_rate_date date;
+-- alter table quotations add column if not exists fx_rate_approved_by text not null default '';
+-- alter table quotations add column if not exists fx_rate_approved_at timestamptz;
+-- alter table quotations add column if not exists base_amount numeric(14,2) not null default 0;
+-- alter table quotations add column if not exists conversion_fee_estimate numeric(12,2) not null default 0;
+-- alter table quotations add column if not exists bank_fee_estimate numeric(12,2) not null default 0;
+-- alter table quotations add column if not exists charges_borne_by text not null default 'Customer';
+-- alter table quotations add column if not exists net_amount_required text not null default '';
+-- alter table quotations add column if not exists accept_other_payment_currency boolean not null default true;
+-- alter table quotations add column if not exists rate_valid_until date;
+-- alter table quotations add column if not exists payment_instructions text not null default '';
+-- alter table quotations add column if not exists supplier_cost_base numeric(14,2) not null default 0;
+-- alter table quotations add column if not exists estimated_gross_profit_base numeric(14,2) not null default 0;

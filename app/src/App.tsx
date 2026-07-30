@@ -12,6 +12,7 @@ import QuotationsPage from './pages/QuotationsPage'
 import InvoicesPage from './pages/InvoicesPage'
 import CatalogPage from './pages/CatalogPage'
 import InventoryPage from './pages/InventoryPage'
+import PaymentsPage from './pages/PaymentsPage'
 import TemplatesPage from './pages/TemplatesPage'
 import ReportsPage from './pages/ReportsPage'
 import ExpensesPage from './pages/ExpensesPage'
@@ -48,6 +49,7 @@ export default function App() {
               <Route path="invoices" element={<InvoicesPage />} />
               <Route path="catalog" element={<CatalogPage />} />
               <Route path="inventory" element={<InventoryPage />} />
+              <Route path="payments" element={<PaymentsPage />} />
               <Route path="templates" element={<TemplatesPage />} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="expenses" element={<ExpensesPage />} />

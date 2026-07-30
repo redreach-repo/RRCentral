@@ -83,10 +83,131 @@ export interface Quotation {
   outcome_reason: string
   /** yyyy-MM-dd — set on finalize from quoteValidityDays */
   valid_until: string | null
+  /** Document / booking currency (usually same as quotation_currency). */
+  currency: string
+  /** Currency shown on the approved quotation. */
+  quotation_currency: string
+  /** Preferred customer payment currency (may differ). */
+  payment_currency: string
+  /** Supplier settlement currency. */
+  supplier_currency: string
+  /** Reporting / booking currency (often AED). */
+  booking_currency: string
+  /** 1 quotation_currency = fx_rate × base (AED). Locked when approved. */
+  fx_rate: number
+  fx_rate_date: string | null
+  fx_rate_approved_by: string
+  fx_rate_approved_at: string | null
+  /** Base-currency (AED) equivalent of amount at fx_rate. */
+  base_amount: number
+  /** Estimated bank/conversion fees in quotation currency. */
+  conversion_fee_estimate: number
+  bank_fee_estimate: number
+  /** Who bears bank/FX charges: Customer | RR Wanders | Shared */
+  charges_borne_by: string
+  /** Net amount RR Wanders must receive (quotation currency). */
+  net_amount_required: string
+  /** Whether alternate payment currencies are accepted. */
+  accept_other_payment_currency: boolean
+  /** Rate validity deadline yyyy-MM-dd. */
+  rate_valid_until: string | null
+  payment_instructions: string
+  /** Optional supplier cost in base for GP. */
+  supplier_cost_base: number
+  estimated_gross_profit_base: number
   created_by: string
   updated_by: string
   created_at: string
   updated_at: string
+}
+
+/** Customer payment against a booking/quote/invoice — original FC amount is immutable. */
+export interface CustomerPayment {
+  id: string
+  /** Link to quotation.id or booking key. */
+  booking_id: string
+  quote_ref: string
+  invoice_ref: string
+  client: string
+  payment_date: string | null
+  amount_received: number
+  /** Original currency received — never overwritten after save. */
+  currency: string
+  fx_rate: number
+  fx_rate_date: string | null
+  fx_rate_approved_by: string
+  /** Base (AED) equivalent of net received. */
+  base_amount: number
+  payment_method: string
+  bank_provider: string
+  processing_fee: number
+  conversion_fee: number
+  net_amount: number
+  payment_type: string
+  transaction_ref: string
+  proof_url: string
+  status: string
+  notes: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CustomerRefund {
+  id: string
+  payment_id: string
+  booking_id: string
+  quote_ref: string
+  client: string
+  refund_date: string | null
+  original_currency: string
+  original_amount_received: number
+  refund_currency: string
+  amount_refunded: number
+  fx_rate: number
+  fx_rate_date: string | null
+  conversion_fee: number
+  bank_fee: number
+  base_amount: number
+  fx_gain_loss: number
+  reason: string
+  approved_by: string
+  approved_at: string | null
+  status: string
+  notes: string
+  created_by: string
+  created_at: string
+}
+
+export interface SupplierCommitment {
+  id: string
+  booking_id: string
+  quote_ref: string
+  supplier_name: string
+  description: string
+  amount: number
+  currency: string
+  fx_rate: number
+  fx_rate_date: string | null
+  base_amount: number
+  status: string
+  due_date: string | null
+  notes: string
+  created_at: string
+}
+
+/** Approved/manual FX rate log — historical rates never auto-change. */
+export interface FxRateEntry {
+  id: string
+  from_currency: string
+  to_currency: string
+  rate: number
+  rate_date: string
+  source: string
+  approved_by: string
+  approved_at: string
+  notes: string
+  created_at: string
 }
 
 export interface Invoice {
