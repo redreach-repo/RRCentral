@@ -498,11 +498,28 @@ export default function SettingsPage() {
               />
             </div>
 
-            <h3 style={{ margin: '8px 0 10px', fontSize: 14 }}>Connect Supabase (shared cloud)</h3>
-            <p style={{ color: colors.muted2, fontSize: 12, margin: '0 0 10px', lineHeight: 1.45 }}>
-              Create a Supabase project, run <code>app/supabase-schema.sql</code>, enable Google OAuth,
-              then paste the project URL and anon key here. No redeploy needed.
-            </p>
+            <h3 style={{ margin: '8px 0 10px', fontSize: 14 }}>Connect Supabase (share with colleagues)</h3>
+            <ol style={{ color: colors.muted2, fontSize: 12, margin: '0 0 12px', paddingLeft: 18, lineHeight: 1.55 }}>
+              <li>
+                In Supabase: open your project → <strong style={{ color: colors.text }}>SQL Editor</strong> → paste
+                and run <code>app/supabase-schema.sql</code> from this repo.
+              </li>
+              <li>
+                In Supabase: <strong style={{ color: colors.text }}>Authentication → Providers → Google</strong> →
+                enable. Add redirect URL{' '}
+                <code>https://redreach-repo.github.io/RRCentral/</code>
+              </li>
+              <li>
+                In Supabase: <strong style={{ color: colors.text }}>Project Settings → API</strong> → copy Project
+                URL and anon public key into the fields below.
+              </li>
+              <li>
+                Click <strong style={{ color: colors.text }}>Connect &amp; reload</strong>. The orange “local mode”
+                banner should disappear. Colleagues use the same URL + key (or add them as GitHub Actions secrets
+                <code> VITE_SUPABASE_URL</code> / <code>VITE_SUPABASE_ANON_KEY</code> so everyone gets cloud
+                automatically).
+              </li>
+            </ol>
             <div style={{ display: 'grid', gap: 10, marginBottom: 12 }}>
               <div>
                 <label style={labelStyle}>Supabase URL</label>

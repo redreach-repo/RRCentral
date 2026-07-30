@@ -55,7 +55,8 @@ export default function LoginPage() {
         {isLocalMode ? (
           <form className={styles.localForm} onSubmit={(e) => void handleLocalContinue(e)}>
             <p className={styles.localBanner}>
-              Running in local mode — data is stored in this browser (IndexedDB), not the cloud
+              Local mode (this browser only). To share with colleagues: sign in → Settings → Data &amp; storage →
+              Connect Supabase.
             </p>
             <label className={styles.fieldLabel} htmlFor="local-email">
               Email
