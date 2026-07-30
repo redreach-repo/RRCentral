@@ -38,6 +38,8 @@ export async function syncSeedCatalog(
           unit: seed.unit,
           active: seed.active,
           notes: seed.notes,
+          reorder_level: seed.reorder_level,
+          track_sizes: seed.track_sizes,
           updated_at: now,
         })
         .eq('id', found.id)

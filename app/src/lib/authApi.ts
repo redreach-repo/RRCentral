@@ -1,5 +1,5 @@
 import type { Session, User } from '@supabase/supabase-js'
-import { isSupabaseConfigured, supabase } from './supabase'
+import { getSupabaseClient, isSupabaseConfigured } from './supabaseConfig'
 import { initLocalDb, localDb, DEFAULT_ADMINS } from './localDb'
 
 const LOCAL_SESSION_KEY = 'rrcentral_local_session'
@@ -60,10 +60,6 @@ function notifyLocal(event: string, session: Session | null) {
   }
 }
 
-/**
- * Local-mode auth: passwordless email picker for demos / GitHub Pages.
- * Seeds sales users on first sign-in if the email is not already in app_users.
- */
 export const localAuth = {
   async signInWithEmail(email: string) {
     const normalized = email.trim().toLowerCase()
@@ -102,7 +98,6 @@ export const localAuth = {
 
   onAuthStateChange(callback: AuthChangeCallback) {
     localListeners.add(callback)
-    // Fire current session asynchronously, matching Supabase timing
     queueMicrotask(() => {
       callback('INITIAL_SESSION', readLocalSession())
     })
@@ -150,19 +145,33 @@ export type AuthApi = {
   listSeedEmails?: () => Promise<string[]>
 }
 
-export const authApi: AuthApi = isSupabaseConfigured
-  ? {
-      getSession: () => supabase.auth.getSession(),
-      onAuthStateChange: (cb) => supabase.auth.onAuthStateChange(cb),
-      signOut: () => supabase.auth.signOut(),
-      signInWithOAuth: (opts) => supabase.auth.signInWithOAuth(opts),
-    }
-  : {
-      getSession: () => localAuth.getSession(),
-      onAuthStateChange: (cb) => localAuth.onAuthStateChange(cb),
-      signOut: () => localAuth.signOut(),
-      signInWithEmail: (email) => localAuth.signInWithEmail(email),
-      listSeedEmails: () => localAuth.listSeedEmails(),
-    }
+function supabaseAuthApi(): AuthApi {
+  const supabase = getSupabaseClient()
+  return {
+    getSession: () => supabase.auth.getSession(),
+    onAuthStateChange: (cb) => supabase.auth.onAuthStateChange(cb),
+    signOut: () => supabase.auth.signOut(),
+    signInWithOAuth: (opts) => supabase.auth.signInWithOAuth(opts),
+  }
+}
+
+function localAuthApi(): AuthApi {
+  return {
+    getSession: () => localAuth.getSession(),
+    onAuthStateChange: (cb) => localAuth.onAuthStateChange(cb),
+    signOut: () => localAuth.signOut(),
+    signInWithEmail: (email) => localAuth.signInWithEmail(email),
+    listSeedEmails: () => localAuth.listSeedEmails(),
+  }
+}
+
+/** Resolves to Supabase or local auth based on current config. */
+export const authApi: AuthApi = new Proxy({} as AuthApi, {
+  get(_t, prop) {
+    const api = isSupabaseConfigured() ? supabaseAuthApi() : localAuthApi()
+    const value = api[prop as keyof AuthApi]
+    return typeof value === 'function' ? value.bind(api) : value
+  },
+})
 
 export { isSupabaseConfigured }

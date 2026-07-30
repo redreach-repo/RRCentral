@@ -11,6 +11,7 @@ import FollowupsPage from './pages/FollowupsPage'
 import QuotationsPage from './pages/QuotationsPage'
 import InvoicesPage from './pages/InvoicesPage'
 import CatalogPage from './pages/CatalogPage'
+import InventoryPage from './pages/InventoryPage'
 import TemplatesPage from './pages/TemplatesPage'
 import ReportsPage from './pages/ReportsPage'
 import ExpensesPage from './pages/ExpensesPage'
@@ -46,6 +47,7 @@ export default function App() {
               <Route path="quotations" element={<QuotationsPage />} />
               <Route path="invoices" element={<InvoicesPage />} />
               <Route path="catalog" element={<CatalogPage />} />
+              <Route path="inventory" element={<InventoryPage />} />
               <Route path="templates" element={<TemplatesPage />} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="expenses" element={<ExpensesPage />} />

@@ -122,6 +122,10 @@ export interface LineItem {
   vat_amount: number
   line_total: number
   remarks: string
+  /** Optional catalogue SKU for inventory linkage. */
+  sku?: string
+  /** Optional size breakdown JSON, e.g. { S: 2, M: 4 }. */
+  sizes_json?: string | Record<string, number> | null
   created_at: string
 }
 
@@ -136,7 +140,28 @@ export interface Product {
   unit: string
   active: boolean
   notes: string
+  /** Units physically on hand. */
+  stock_on_hand: number
+  /** Units reserved against awarded quotes. */
+  stock_reserved: number
+  /** Alert when available stock falls to this level. */
+  reorder_level: number
+  /** When true, quotes can break qty into size runs. */
+  track_sizes: boolean
+  /** Optional per-size on-hand counts. */
+  size_stock?: Record<string, number> | null
   updated_at: string
+}
+
+export interface InventoryMovement {
+  id: string
+  sku: string
+  qty_delta: number
+  reserved_delta: number
+  reason: string
+  reference: string
+  user_email: string
+  created_at: string
 }
 
 export interface QuoteTemplate {

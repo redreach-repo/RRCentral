@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, Fragment } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import {
@@ -27,16 +27,10 @@ import Modal from '../components/Modal'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
 import { logActivity } from '../lib/activity'
-import { syncCrmFromQuote } from '../lib/crmSync'
-import { formatAED } from '../lib/money'
-import {
-  generateReference,
-  formatRevisionReference,
-  parseBaseReference,
-} from '../lib/referenceNumber'
 import {
   calcTotals,
   deleteLineItems,
+  effectiveQty,
   loadLineItems,
   makeQuoteId,
   newDraftLine,
@@ -44,6 +38,15 @@ import {
   toDraftItems,
   type DraftLineItem,
 } from '../lib/lineItems'
+import { STANDARD_SIZES, emptySizeBreakdown, sumSizes } from '../lib/sizes'
+import { commitStockForInvoice, releaseStockForQuote, reserveStockForQuote } from '../lib/inventory'
+import { syncCrmFromQuote } from '../lib/crmSync'
+import { formatAED } from '../lib/money'
+import {
+  generateReference,
+  formatRevisionReference,
+  parseBaseReference,
+} from '../lib/referenceNumber'
 import { sortByDateDesc } from '../lib/finance'
 import { isQuotePastValidity, quoteValidUntil } from '../lib/documents'
 import {
@@ -248,12 +251,19 @@ export default function QuotationsPage() {
       const items =
         itemsRaw.length > 0
           ? itemsRaw.map((row: unknown) => {
-              const r = row as { description?: string; qty?: number; unit_price?: number; remarks?: string }
+              const r = row as {
+                description?: string
+                qty?: number
+                unit_price?: number
+                remarks?: string
+                sku?: string
+              }
               return newDraftLine({
                 description: r.description || '',
                 qty: Number(r.qty) || 1,
                 unit_price: Number(r.unit_price) || 0,
                 remarks: r.remarks || '',
+                sku: r.sku || '',
               })
             })
           : [newDraftLine()]
@@ -605,6 +615,26 @@ export default function QuotationsPage() {
         outcomeReason,
         userEmail: who,
       })
+
+      // Inventory: reserve on Awarded, release when lost / not awarded / expired
+      try {
+        const lines = await loadLineItems(
+          'Quote',
+          outcomeTarget.quote_id || outcomeTarget.reference_number,
+        )
+        const ref = outcomeTarget.reference_number || outcomeTarget.quote_id
+        if (outcomeStatus === 'Awarded') {
+          await reserveStockForQuote({ lines, quoteRef: ref, userEmail: who })
+        } else if (['Not awarded', 'Expired'].includes(outcomeStatus)) {
+          if (outcomeTarget.status === 'Awarded') {
+            await releaseStockForQuote({ lines, quoteRef: ref, userEmail: who })
+          }
+        }
+      } catch (invErr) {
+        console.error(invErr)
+        showToast('Outcome saved, but inventory update failed', 'error')
+      }
+
       showToast('Outcome updated', 'success')
       setOutcomeTarget(null)
       await load()
@@ -666,6 +696,17 @@ export default function QuotationsPage() {
       if (error) throw error
 
       await saveLineItems('Invoice', q.reference_number, draftItems, vatRate)
+
+      try {
+        await commitStockForInvoice({
+          lines: items,
+          invoiceRef: q.reference_number,
+          userEmail: who,
+        })
+      } catch (invErr) {
+        console.error(invErr)
+        showToast('Invoice created, but inventory commit failed', 'error')
+      }
 
       // Sync income (no unique constraint on reference_number — select then insert/update)
       const sub = calcTotals(draftItems, vatRate)
@@ -1000,6 +1041,8 @@ export default function QuotationsPage() {
                           .join(' — '),
                         qty: p.moq || 1,
                         unit_price: Number(p.unit_price) || 0,
+                        sku: p.sku || '',
+                        sizes: p.track_sizes ? emptySizeBreakdown() : null,
                       }),
                     ],
                   }))
@@ -1039,50 +1082,95 @@ export default function QuotationsPage() {
             </thead>
             <tbody>
               {form.items.map((it) => {
-                const amount = (Number(it.qty) || 0) * (Number(it.unit_price) || 0)
+                const qty = effectiveQty(it)
+                const amount = qty * (Number(it.unit_price) || 0)
                 const vat = amount * vatRate
                 const lineTotal = amount + vat
                 return (
-                  <tr key={it.key}>
-                    <td style={tdStyle}>
-                      <input
-                        style={inputStyle}
-                        value={it.description}
-                        onChange={(e) => updateItem(it.key, { description: e.target.value })}
-                      />
-                    </td>
-                    <td style={{ ...tdStyle, width: 90 }}>
-                      <input
-                        type="number"
-                        style={inputStyle}
-                        value={it.qty}
-                        onChange={(e) => updateItem(it.key, { qty: Number(e.target.value) })}
-                      />
-                    </td>
-                    <td style={{ ...tdStyle, width: 120 }}>
-                      <input
-                        type="number"
-                        style={inputStyle}
-                        value={it.unit_price}
-                        onChange={(e) => updateItem(it.key, { unit_price: Number(e.target.value) })}
-                      />
-                    </td>
-                    <td style={tdStyle}>{formatAED(amount)}</td>
-                    <td style={tdStyle}>{formatAED(vat)}</td>
-                    <td style={tdStyle}>{formatAED(lineTotal)}</td>
-                    <td style={tdStyle}>
-                      <button
-                        type="button"
-                        style={buttonDangerStyle}
-                        disabled={form.items.length <= 1}
-                        onClick={() =>
-                          setForm((f) => ({ ...f, items: f.items.filter((x) => x.key !== it.key) }))
-                        }
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
-                  </tr>
+                  <Fragment key={it.key}>
+                    <tr>
+                      <td style={tdStyle}>
+                        <input
+                          style={inputStyle}
+                          value={it.description}
+                          onChange={(e) => updateItem(it.key, { description: e.target.value })}
+                        />
+                        <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                          <button
+                            type="button"
+                            style={{ ...buttonSecondaryStyle, padding: '2px 8px', fontSize: 11 }}
+                            onClick={() =>
+                              updateItem(it.key, {
+                                sizes: it.sizes ? null : emptySizeBreakdown(),
+                                qty: it.sizes ? sumSizes(it.sizes) || 1 : it.qty,
+                              })
+                            }
+                          >
+                            {it.sizes ? 'Clear sizes' : 'Size run'}
+                          </button>
+                          {it.sku ? (
+                            <span style={{ fontSize: 11, color: colors.muted2 }}>SKU {it.sku}</span>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td style={{ ...tdStyle, width: 90 }}>
+                        <input
+                          type="number"
+                          style={inputStyle}
+                          value={qty}
+                          disabled={!!it.sizes}
+                          onChange={(e) => updateItem(it.key, { qty: Number(e.target.value) })}
+                        />
+                      </td>
+                      <td style={{ ...tdStyle, width: 120 }}>
+                        <input
+                          type="number"
+                          style={inputStyle}
+                          value={it.unit_price}
+                          onChange={(e) => updateItem(it.key, { unit_price: Number(e.target.value) })}
+                        />
+                      </td>
+                      <td style={tdStyle}>{formatAED(amount)}</td>
+                      <td style={tdStyle}>{formatAED(vat)}</td>
+                      <td style={tdStyle}>{formatAED(lineTotal)}</td>
+                      <td style={tdStyle}>
+                        <button
+                          type="button"
+                          style={buttonDangerStyle}
+                          disabled={form.items.length <= 1}
+                          onClick={() =>
+                            setForm((f) => ({ ...f, items: f.items.filter((x) => x.key !== it.key) }))
+                          }
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                    {it.sizes ? (
+                      <tr>
+                        <td style={tdStyle} colSpan={7}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                            {STANDARD_SIZES.map((s) => (
+                              <label key={s} style={{ fontSize: 11, color: colors.muted }}>
+                                {s}
+                                <input
+                                  type="number"
+                                  min={0}
+                                  style={{ ...inputStyle, width: 64, marginTop: 4, display: 'block' }}
+                                  value={Number(it.sizes?.[s] || 0)}
+                                  onChange={(e) => {
+                                    const next = { ...(it.sizes || {}) }
+                                    next[s] = Number(e.target.value) || 0
+                                    updateItem(it.key, { sizes: next, qty: sumSizes(next) })
+                                  }}
+                                />
+                              </label>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
                 )
               })}
             </tbody>

@@ -19,6 +19,10 @@ export type SeedProduct = {
   unit: string
   active: boolean
   notes: string
+  stock_on_hand: number
+  stock_reserved: number
+  reorder_level: number
+  track_sizes: boolean
 }
 
 const DIV = '01'
@@ -39,6 +43,10 @@ function cat(
     unit: opts.unit ?? 'pcs',
     active: opts.active ?? true,
     notes: opts.notes ?? 'Colour, sizing and branding confirmed per quote.',
+    stock_on_hand: opts.stock_on_hand ?? 0,
+    stock_reserved: opts.stock_reserved ?? 0,
+    reorder_level: opts.reorder_level ?? 20,
+    track_sizes: opts.track_sizes ?? false,
   }
 }
 
@@ -117,91 +125,109 @@ export const QUOTED_SELLABLE_PRODUCTS: SeedProduct[] = [
   cat('COR-003-OX-GB', 'Oxford shirt with logo & trousers', {
     fabric: 'GB',
     unit_price: 125,
+    track_sizes: true,
     notes: 'Shirt + trousers set · Gabardine. Logo embroidery. Was quoted as Oxford shirt & pants/trousers (GB).',
   }),
   cat('COR-003-OX-PV', 'Oxford shirt with logo & trousers', {
     fabric: 'PV',
     unit_price: 120,
+    track_sizes: true,
     notes: 'Shirt + trousers set · Poly Viscose. Logo embroidery.',
   }),
   cat('COR-003-OX-TW', 'Oxford shirt with logo & trousers', {
     fabric: 'TW',
     unit_price: 115,
+    track_sizes: true,
     notes: 'Shirt + trousers set · Twill. Logo embroidery.',
   }),
   cat('COR-003-CC-GB', 'Chinese collar shirt with logo & trousers', {
     fabric: 'GB',
     unit_price: 120,
+    track_sizes: true,
     notes: 'Shirt + trousers set · Gabardine. Logo embroidery.',
   }),
   cat('COR-003-CC-PV', 'Chinese collar shirt with logo & trousers', {
     fabric: 'PV',
     unit_price: 115,
+    track_sizes: true,
     notes: 'Shirt + trousers set · Poly Viscose. Logo embroidery.',
   }),
   cat('COR-003-CC-TW', 'Chinese collar shirt with logo & trousers', {
     fabric: 'TW',
     unit_price: 110,
+    track_sizes: true,
     notes: 'Shirt + trousers set · Twill. Logo embroidery.',
   }),
   cat('COR-004-GB', 'Corporate blazer with logo', {
     fabric: 'GB',
     unit_price: 400,
+    track_sizes: true,
     notes: 'Blazer with logo · Gabardine.',
   }),
   cat('COR-004-PV', 'Corporate blazer with logo', {
     fabric: 'PV',
     unit_price: 375,
+    track_sizes: true,
     notes: 'Blazer with logo · Poly Viscose.',
   }),
   cat('COR-004-TW', 'Corporate blazer with logo', {
     fabric: 'TW',
     unit_price: 350,
+    track_sizes: true,
     notes: 'Blazer with logo · Twill.',
   }),
   cat('COR-002-DF-TW', 'Dry-fit polo with logo & trousers', {
     fabric: 'TW',
     unit_price: 115,
+    track_sizes: true,
     notes: 'Dry-fit polo t-shirt + trousers · Twill. Logo embroidery.',
   }),
   cat('COR-002-MS-TW', 'Mesh polo with logo & trousers', {
     fabric: 'TW',
     unit_price: 105,
+    track_sizes: true,
     notes: 'Mesh polo t-shirt + trousers · Twill. Logo embroidery.',
   }),
   cat('COR-001-DF-FS', 'Dry-fit full-sleeve round-neck t-shirt with logo', {
     fabric: '',
     unit_price: 125,
+    track_sizes: true,
     notes: 'Performance knit tee · full sleeve · logo.',
   }),
   cat('IND-006-DF-CR', 'Dry-fit full-sleeve tee with reflector & cargo pants', {
     fabric: 'TW',
     unit_price: 130,
+    track_sizes: true,
     notes: 'Dry-fit full-sleeve round-neck tee with reflector + cargo pants (TW).',
   }),
   cat('HOS-004-CH-GB', 'Chef coat with 2 flags & logo + trousers', {
     fabric: 'GB',
     unit_price: 165,
+    track_sizes: true,
     notes: 'Chef coat (2 flags + logo) + trousers · Gabardine.',
   }),
   cat('HOS-004-CH-PV', 'Chef coat with 2 flags & logo + trousers', {
     fabric: 'PV',
     unit_price: 160,
+    track_sizes: true,
     notes: 'Chef coat (2 flags + logo) + trousers · Poly Viscose.',
   }),
   cat('HOS-004-CH-TW', 'Chef coat with 2 flags & logo + trousers', {
     fabric: 'TW',
     unit_price: 155,
+    track_sizes: true,
     notes: 'Chef coat (2 flags + logo) + trousers · Twill.',
   }),
   cat('HOS-004-AH', 'Half apron with logo', {
     fabric: 'TW',
     unit_price: 25,
+    track_sizes: false,
     notes: 'Half apron · logo embroidery/print.',
   }),
   cat('HOS-004-AF', 'Full apron with logo', {
     fabric: 'TW',
     unit_price: 35,
+    track_sizes: false,
     notes: 'Full apron · logo embroidery/print.',
   }),
 ]

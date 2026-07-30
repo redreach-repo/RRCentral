@@ -125,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       loading,
       authMode,
-      isLocalMode: !isSupabaseConfigured,
+      isLocalMode: !isSupabaseConfigured(),
     }),
     [user, userRole, signIn, signInWithEmail, signOut, loading],
   )

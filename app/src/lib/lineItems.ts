@@ -1,5 +1,6 @@
 import { VAT_RATE } from './config'
 import { db } from './db'
+import { formatSizes, parseSizesJson, sumSizes, type SizeBreakdown } from './sizes'
 import type { LineItem } from './types'
 
 export interface DraftLineItem {
@@ -8,6 +9,8 @@ export interface DraftLineItem {
   qty: number
   unit_price: number
   remarks?: string
+  sku?: string
+  sizes?: SizeBreakdown | null
 }
 
 export function newDraftLine(partial?: Partial<DraftLineItem>): DraftLineItem {
@@ -17,6 +20,8 @@ export function newDraftLine(partial?: Partial<DraftLineItem>): DraftLineItem {
     qty: 1,
     unit_price: 0,
     remarks: '',
+    sku: '',
+    sizes: null,
     ...partial,
   }
 }
@@ -32,7 +37,8 @@ export function calcTotals(items: DraftLineItem[], vatRate = VAT_RATE) {
   let subtotal = 0
   let vat = 0
   for (const item of items) {
-    const c = calcLine(item.qty, item.unit_price, vatRate)
+    const qty = item.sizes ? sumSizes(item.sizes) : Number(item.qty) || 0
+    const c = calcLine(qty, item.unit_price, vatRate)
     subtotal += c.amount
     vat += c.vat_amount
   }
@@ -54,15 +60,25 @@ export function formatMoney(n: number, currency = 'AED'): string {
   })}`
 }
 
+export function effectiveQty(item: DraftLineItem): number {
+  if (item.sizes) return sumSizes(item.sizes)
+  return Number(item.qty) || 0
+}
+
 export function toDraftItems(rows: LineItem[]): DraftLineItem[] {
   if (!rows.length) return [newDraftLine()]
-  return rows.map((r) => ({
-    key: r.id || crypto.randomUUID(),
-    description: r.description || '',
-    qty: Number(r.qty) || 0,
-    unit_price: Number(r.unit_price) || 0,
-    remarks: r.remarks || '',
-  }))
+  return rows.map((r) => {
+    const sizes = parseSizesJson(r.sizes_json)
+    return {
+      key: r.id || crypto.randomUUID(),
+      description: r.description || '',
+      qty: sizes ? sumSizes(sizes) : Number(r.qty) || 0,
+      unit_price: Number(r.unit_price) || 0,
+      remarks: r.remarks || '',
+      sku: r.sku || '',
+      sizes,
+    }
+  })
 }
 
 export async function loadLineItems(
@@ -93,24 +109,31 @@ export async function saveLineItems(
     .eq('reference', reference)
 
   const filtered = items.filter(
-    (i) => i.description.trim() || Number(i.qty) || Number(i.unit_price),
+    (i) => i.description.trim() || Number(i.qty) || Number(i.unit_price) || (i.sizes && sumSizes(i.sizes)),
   )
   if (!filtered.length) return
 
   const rows = filtered.map((item, idx) => {
-    const c = calcLine(item.qty, item.unit_price, vatRate)
+    const qty = item.sizes ? sumSizes(item.sizes) : Number(item.qty) || 0
+    const c = calcLine(qty, item.unit_price, vatRate)
+    const sizeLabel = item.sizes ? formatSizes(item.sizes) : ''
+    const remarks = [item.remarks || '', sizeLabel ? `Sizes ${sizeLabel}` : '']
+      .filter(Boolean)
+      .join(' · ')
     return {
       doc_type: docType,
       reference,
       line_no: idx + 1,
       description: item.description.trim(),
-      qty: Number(item.qty) || 0,
+      qty,
       unit_price: Number(item.unit_price) || 0,
       vat_rate: c.vat_rate,
       amount: c.amount,
       vat_amount: c.vat_amount,
       line_total: c.line_total,
-      remarks: item.remarks || '',
+      remarks,
+      sku: item.sku || '',
+      sizes_json: item.sizes || null,
     }
   })
 

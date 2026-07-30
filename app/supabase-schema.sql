@@ -192,6 +192,8 @@ create table line_items (
   vat_amount numeric(12,2) not null default 0,
   line_total numeric(12,2) not null default 0,
   remarks text not null default '',
+  sku text not null default '',
+  sizes_json jsonb,
   created_at timestamptz not null default now()
 );
 
@@ -209,7 +211,26 @@ create table products (
   unit text not null default 'pcs',
   active boolean not null default true,
   notes text not null default '',
+  stock_on_hand numeric(12,2) not null default 0,
+  stock_reserved numeric(12,2) not null default 0,
+  reorder_level numeric(12,2) not null default 20,
+  track_sizes boolean not null default false,
+  size_stock jsonb not null default '{}'::jsonb,
   updated_at timestamptz not null default now()
+);
+
+------------------------------------------------------------
+-- INVENTORY MOVEMENTS
+------------------------------------------------------------
+create table inventory_movements (
+  id uuid primary key default uuid_generate_v4(),
+  sku text not null default '',
+  qty_delta numeric(12,2) not null default 0,
+  reserved_delta numeric(12,2) not null default 0,
+  reason text not null default '',
+  reference text not null default '',
+  user_email text not null default '',
+  created_at timestamptz not null default now()
 );
 
 ------------------------------------------------------------
@@ -336,6 +357,7 @@ alter table expenses enable row level security;
 alter table payment_log enable row level security;
 alter table attachments enable row level security;
 alter table activity_log enable row level security;
+alter table inventory_movements enable row level security;
 
 -- Allow all authenticated users to read/write all tables
 -- (app-level role checks handle admin vs sales permissions)
@@ -354,6 +376,7 @@ create policy "Authenticated users full access" on expenses for all using (auth.
 create policy "Authenticated users full access" on payment_log for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "Authenticated users full access" on attachments for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "Authenticated users full access" on activity_log for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Authenticated users full access" on inventory_movements for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 ------------------------------------------------------------
 -- Optional upgrades for existing databases (run once if upgrading)
@@ -370,3 +393,20 @@ create policy "Authenticated users full access" on activity_log for all using (a
 -- alter table clients add column if not exists company_owner text not null default '';
 -- alter table clients add column if not exists website text not null default '';
 -- alter table quotations add column if not exists valid_until date;
+-- alter table products add column if not exists stock_on_hand numeric(12,2) not null default 0;
+-- alter table products add column if not exists stock_reserved numeric(12,2) not null default 0;
+-- alter table products add column if not exists reorder_level numeric(12,2) not null default 20;
+-- alter table products add column if not exists track_sizes boolean not null default false;
+-- alter table products add column if not exists size_stock jsonb not null default '{}'::jsonb;
+-- alter table line_items add column if not exists sku text not null default '';
+-- alter table line_items add column if not exists sizes_json jsonb;
+-- create table if not exists inventory_movements (
+--   id uuid primary key default uuid_generate_v4(),
+--   sku text not null default '',
+--   qty_delta numeric(12,2) not null default 0,
+--   reserved_delta numeric(12,2) not null default 0,
+--   reason text not null default '',
+--   reference text not null default '',
+--   user_email text not null default '',
+--   created_at timestamptz not null default now()
+-- );

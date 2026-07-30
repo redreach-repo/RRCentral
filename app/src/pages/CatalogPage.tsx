@@ -41,6 +41,9 @@ type ProductForm = {
   unit: string
   active: boolean
   notes: string
+  stock_on_hand: number
+  reorder_level: number
+  track_sizes: boolean
 }
 
 const emptyForm = (): ProductForm => ({
@@ -53,6 +56,9 @@ const emptyForm = (): ProductForm => ({
   unit: 'pcs',
   active: true,
   notes: '',
+  stock_on_hand: 0,
+  reorder_level: 20,
+  track_sizes: false,
 })
 
 export default function CatalogPage() {
@@ -121,6 +127,9 @@ export default function CatalogPage() {
       unit: p.unit || 'pcs',
       active: !!p.active,
       notes: p.notes || '',
+      stock_on_hand: Number(p.stock_on_hand) || 0,
+      reorder_level: Number(p.reorder_level) || 20,
+      track_sizes: !!p.track_sizes,
     })
     setOpen(true)
   }
@@ -425,6 +434,24 @@ export default function CatalogPage() {
             <label style={labelStyle}>Unit</label>
             <input style={inputStyle} value={form.unit} onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))} />
           </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Stock on hand</label>
+            <input
+              type="number"
+              style={inputStyle}
+              value={form.stock_on_hand}
+              onChange={(e) => setForm((f) => ({ ...f, stock_on_hand: Number(e.target.value) }))}
+            />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Reorder level</label>
+            <input
+              type="number"
+              style={inputStyle}
+              value={form.reorder_level}
+              onChange={(e) => setForm((f) => ({ ...f, reorder_level: Number(e.target.value) }))}
+            />
+          </div>
           <div style={{ ...fieldStyle, display: 'flex', alignItems: 'center', gap: 8, paddingTop: 22 }}>
             <input
               type="checkbox"
@@ -433,6 +460,15 @@ export default function CatalogPage() {
               id="prod-active"
             />
             <label htmlFor="prod-active" style={{ fontSize: 13 }}>Active</label>
+          </div>
+          <div style={{ ...fieldStyle, display: 'flex', alignItems: 'center', gap: 8, paddingTop: 22 }}>
+            <input
+              type="checkbox"
+              checked={form.track_sizes}
+              onChange={(e) => setForm((f) => ({ ...f, track_sizes: e.target.checked }))}
+              id="prod-sizes"
+            />
+            <label htmlFor="prod-sizes" style={{ fontSize: 13 }}>Track size runs</label>
           </div>
         </div>
         <div style={fieldStyle}>

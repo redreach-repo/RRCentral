@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FilePlus2, Pencil, Plus, Trash2 } from 'lucide-react'
+import { FilePlus2, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS } from '../lib/config'
 import type { QuoteTemplate } from '../lib/types'
@@ -8,6 +8,7 @@ import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
 import { newDraftLine, type DraftLineItem } from '../lib/lineItems'
+import { syncSeedTemplates } from '../lib/syncTemplates'
 import { formatAED } from '../lib/money'
 import {
   buttonDangerStyle,
@@ -47,12 +48,19 @@ const emptyForm = (): TemplateForm => ({
 function parseItems(json: unknown): DraftLineItem[] {
   if (!Array.isArray(json) || json.length === 0) return [newDraftLine()]
   return json.map((row) => {
-    const r = row as { description?: string; qty?: number; unit_price?: number; remarks?: string }
+    const r = row as {
+      description?: string
+      qty?: number
+      unit_price?: number
+      remarks?: string
+      sku?: string
+    }
     return newDraftLine({
       description: r.description || '',
       qty: Number(r.qty) || 1,
       unit_price: Number(r.unit_price) || 0,
       remarks: r.remarks || '',
+      sku: r.sku || '',
     })
   })
 }
@@ -66,6 +74,7 @@ export default function TemplatesPage() {
   const [editing, setEditing] = useState<QuoteTemplate | null>(null)
   const [form, setForm] = useState<TemplateForm>(emptyForm())
   const [saving, setSaving] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<QuoteTemplate | null>(null)
 
   const load = useCallback(async () => {
@@ -119,6 +128,7 @@ export default function TemplatesPage() {
           qty: Number(i.qty) || 0,
           unit_price: Number(i.unit_price) || 0,
           remarks: i.remarks || '',
+          sku: i.sku || '',
         }))
       const payload = {
         name: form.name.trim(),
@@ -159,6 +169,19 @@ export default function TemplatesPage() {
     }
   }
 
+  async function syncSkuTemplates() {
+    setSyncing(true)
+    try {
+      const r = await syncSeedTemplates()
+      showToast(`Templates synced · ${r.inserted} new · ${r.updated} updated`, 'success')
+      await load()
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Template sync failed', 'error')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   const brand = (code: string) => DIVISIONS.find((d) => d.code === code)?.brand || code
 
   return (
@@ -168,9 +191,19 @@ export default function TemplatesPage() {
           <h1 style={pageTitleStyle}>Templates</h1>
           <p style={pageSubtitleStyle}>Reusable quotation line-item sets</p>
         </div>
-        <button type="button" style={buttonPrimaryStyle} onClick={openCreate}>
-          <Plus size={16} /> New template
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={syncing}
+            onClick={() => void syncSkuTemplates()}
+          >
+            <RefreshCw size={16} /> {syncing ? 'Syncing…' : 'Load SKU templates'}
+          </button>
+          <button type="button" style={buttonPrimaryStyle} onClick={openCreate}>
+            <Plus size={16} /> New template
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -179,9 +212,9 @@ export default function TemplatesPage() {
         <EmptyState
           icon={<FilePlus2 size={22} />}
           title="No templates"
-          subtitle="Save common quote line items as templates."
-          actionLabel="New template"
-          onAction={openCreate}
+          subtitle="Load Corporate / Hospitality SKU templates, or create your own."
+          actionLabel="Load SKU templates"
+          onAction={() => void syncSkuTemplates()}
         />
       ) : (
         <div style={{ display: 'grid', gap: 12 }}>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Download, HardDrive, Pencil, Plus, Trash2, Upload, Plug } from 'lucide-react'
-import { db, authMode } from '../lib/db'
+import { db, currentAuthMode } from '../lib/db'
 import type { AppUser, UserRole } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
@@ -13,6 +13,11 @@ import {
 } from '../lib/migrateFromSheets'
 import { clearLocalData, DB_NAME, exportLocalDump } from '../lib/localDb'
 import { testZohoConnection } from '../lib/zoho'
+import {
+  clearSupabaseRuntimeConfig,
+  getSupabaseRuntimeConfig,
+  saveSupabaseRuntimeConfig,
+} from '../lib/supabaseConfig'
 import {
   buttonDangerStyle,
   buttonPrimaryStyle,
@@ -123,10 +128,36 @@ export default function SettingsPage() {
   const [testingZoho, setTestingZoho] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const backupRef = useRef<HTMLInputElement>(null)
+  const runtimeCfg = getSupabaseRuntimeConfig()
+  const [supabaseUrl, setSupabaseUrl] = useState(runtimeCfg.source === 'runtime' ? runtimeCfg.url : '')
+  const [supabaseKey, setSupabaseKey] = useState(
+    runtimeCfg.source === 'runtime' ? runtimeCfg.anonKey : '',
+  )
+  const mode = currentAuthMode()
 
   useEffect(() => {
     setDraft({ ...settings })
   }, [settings])
+
+  function connectSupabase() {
+    if (!supabaseUrl.trim() || !supabaseKey.trim()) {
+      showToast('Enter Supabase URL and anon key', 'error')
+      return
+    }
+    if (!supabaseUrl.includes('supabase.co') && !supabaseUrl.startsWith('http')) {
+      showToast('URL looks invalid', 'error')
+      return
+    }
+    saveSupabaseRuntimeConfig(supabaseUrl, supabaseKey)
+    showToast('Cloud credentials saved — reloading…', 'success')
+    window.setTimeout(() => window.location.reload(), 600)
+  }
+
+  function disconnectSupabase() {
+    clearSupabaseRuntimeConfig()
+    showToast('Disconnected from Supabase — reloading…', 'success')
+    window.setTimeout(() => window.location.reload(), 600)
+  }
 
   const loadUsers = useCallback(async () => {
     const { data, error } = await db.from('app_users').select('*').order('name')
@@ -377,7 +408,7 @@ export default function SettingsPage() {
         <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
           <HardDrive size={18} /> Data &amp; storage
         </h2>
-        {isLocalMode || authMode === 'local' ? (
+        {isLocalMode || mode === 'local' ? (
           <>
             <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.55 }}>
               Mode: <strong style={{ color: colors.text }}>Local (this browser only)</strong>
@@ -424,18 +455,53 @@ export default function SettingsPage() {
                 onChange={(e) => void handleRestoreBackup(e.target.files?.[0] || null)}
               />
             </div>
-            <p style={{ color: colors.muted2, fontSize: 12, margin: 0, lineHeight: 1.45 }}>
-              For multi-device / shared team access, configure Supabase (
-              <code>VITE_SUPABASE_URL</code> + <code>VITE_SUPABASE_ANON_KEY</code>) and redeploy.
+
+            <h3 style={{ margin: '8px 0 10px', fontSize: 14 }}>Connect Supabase (shared cloud)</h3>
+            <p style={{ color: colors.muted2, fontSize: 12, margin: '0 0 10px', lineHeight: 1.45 }}>
+              Create a Supabase project, run <code>app/supabase-schema.sql</code>, enable Google OAuth,
+              then paste the project URL and anon key here. No redeploy needed.
             </p>
+            <div style={{ display: 'grid', gap: 10, marginBottom: 12 }}>
+              <div>
+                <label style={labelStyle}>Supabase URL</label>
+                <input
+                  style={inputStyle}
+                  value={supabaseUrl}
+                  onChange={(e) => setSupabaseUrl(e.target.value)}
+                  placeholder="https://xxxx.supabase.co"
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Anon key</label>
+                <input
+                  style={inputStyle}
+                  value={supabaseKey}
+                  onChange={(e) => setSupabaseKey(e.target.value)}
+                  placeholder="eyJhbGciOi…"
+                />
+              </div>
+            </div>
+            <button type="button" style={buttonPrimaryStyle} onClick={connectSupabase}>
+              <Plug size={14} /> Connect &amp; reload
+            </button>
           </>
         ) : (
-          <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.55 }}>
-            Mode: <strong style={{ color: colors.text }}>Supabase cloud</strong>
-            <br />
-            Business data is stored in your Supabase Postgres project. Auth uses Google OAuth via
-            Supabase.
-          </p>
+          <>
+            <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.55 }}>
+              Mode: <strong style={{ color: colors.text }}>Supabase cloud</strong>
+              <br />
+              Source:{' '}
+              {runtimeCfg.source === 'env' ? 'build environment variables' : 'Settings credentials'}
+              <br />
+              Business data is stored in your Supabase Postgres project. Auth uses Google OAuth via
+              Supabase.
+            </p>
+            {runtimeCfg.source === 'runtime' ? (
+              <button type="button" style={buttonSecondaryStyle} onClick={disconnectSupabase}>
+                Disconnect cloud (back to local)
+              </button>
+            ) : null}
+          </>
         )}
       </div>
 
@@ -562,7 +628,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {authMode === 'local' && (
+      {currentAuthMode() === 'local' && (
         <div style={{ ...cardStyle, marginBottom: 20 }}>
           <h2 style={sectionTitleStyle}>Import Google Sheets data</h2>
           <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
