@@ -9,6 +9,7 @@ import {
   Receipt,
   Package,
   Boxes,
+  Plane,
   LayoutTemplate,
   BarChart3,
   Wallet,
@@ -24,6 +25,7 @@ import styles from './Layout.module.css'
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/crm', label: 'CRM', icon: Users },
+  { to: '/wanders', label: 'Wanders', icon: Plane },
   { to: '/follow-ups', label: 'Follow-ups', icon: CalendarClock },
   { to: '/quotations', label: 'Quotations', icon: FileText },
   { to: '/invoices', label: 'Invoices', icon: Receipt },

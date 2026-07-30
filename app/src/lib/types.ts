@@ -369,3 +369,157 @@ export interface AppSetting {
   key: string
   value: string
 }
+
+/** RR Wanders travel deal — separate from Threads CRM pipeline. */
+export interface WandersDeal {
+  id: string
+  /** Optional link to shared company CRM record. */
+  crm_id: string
+  client_name: string
+  lead_contact: string
+  email: string
+  mobile: string
+  customer_type: string
+  lead_source: string
+  source_market: string
+  country_of_residence: string
+  nationality: string
+  departure_country: string
+  departure_airport: string
+  destination_country: string
+  destination_regions: string
+  multiple_destinations: boolean
+  departure_date: string | null
+  return_date: string | null
+  nights: number
+  flexible_dates: boolean
+  adults: number
+  children: number
+  child_ages: string
+  infants: number
+  room_requirements: string
+  hotel_category: string
+  meal_plan: string
+  budget_amount: number
+  budget_currency: string
+  purpose_of_travel: string
+  flights_required: string
+  flight_state: string
+  visa_assistance_required: boolean
+  visa_status: string
+  transfers_required: boolean
+  activities_interests: string
+  special_occasion: string
+  accessibility_requirements: string
+  medical_dietary: string
+  preferred_channel: string
+  campaign_source: string
+  package_code: string
+  product_type: string
+  sales_stage: string
+  booking_status: string
+  sales_owner: string
+  operations_owner: string
+  next_action: string
+  follow_up_date: string | null
+  deal_status: string
+  lost_reason: string
+  quote_ref: string
+  quote_id: string
+  quote_value: number
+  quote_currency: string
+  estimated_cost: number
+  estimated_profit: number
+  estimated_margin_pct: number
+  deposit_percent: number
+  deposit_amount: number
+  deposit_deadline: string | null
+  deposit_status: string
+  balance_amount: number
+  balance_deadline: string | null
+  balance_status: string
+  hold_business_days: number
+  terms_version: string
+  terms_text: string
+  terms_accepted: boolean
+  terms_accepted_at: string | null
+  terms_accepted_by: string
+  acceptance_method: string
+  insurance_recommended: boolean
+  insurance_declined: boolean
+  special_requirements_declared: boolean
+  passenger_details_checked: boolean
+  gifts_included: boolean
+  photography_included: boolean
+  marketing_photo_consent: boolean
+  notes: string
+  /** Base/reporting currency for this deal — may be TBC. */
+  booking_currency: string
+  division_code: string
+  created_by: string
+  updated_by: string
+  created_at: string
+  updated_at: string
+}
+
+/** Sensitive passenger record — access-controlled; never public/marketing. */
+export interface WandersPassenger {
+  id: string
+  deal_id: string
+  title: string
+  full_passport_name: string
+  is_lead: boolean
+  passport_number: string
+  nationality: string
+  date_of_birth: string | null
+  gender: string
+  passport_issue_date: string | null
+  passport_expiry_date: string | null
+  passport_issuing_country: string
+  country_of_residence: string
+  residency_status: string
+  visa_status: string
+  mobile: string
+  email: string
+  emergency_contact: string
+  dietary_requirements: string
+  medical_accessibility_notes: string
+  passenger_class: string
+  created_at: string
+  updated_at: string
+  updated_by: string
+}
+
+/** Internal tour package catalogue (not public website products). */
+export interface TourPackage {
+  id: string
+  code: string
+  name: string
+  destination: string
+  product_type: string
+  nights: number
+  days: number
+  summary: string
+  inclusions: string
+  exclusions: string
+  default_currency: string
+  guide_price: number
+  active: boolean
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
+/** Immutable accepted quote/terms snapshot. */
+export interface WandersTermsAcceptance {
+  id: string
+  deal_id: string
+  quote_ref: string
+  terms_version: string
+  terms_text: string
+  accepted_at: string
+  accepted_by: string
+  acceptance_method: string
+  created_by: string
+  created_at: string
+}

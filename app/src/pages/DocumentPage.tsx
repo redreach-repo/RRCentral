@@ -9,6 +9,8 @@ import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatAED } from '../lib/money'
 import { BASE_CURRENCY, formatMoneyAmount } from '../lib/currency'
+import { isWandersDivision } from '../lib/wandersConfig'
+import { buildWandersTermsText } from '../lib/wandersTerms'
 import { loadLineItems } from '../lib/lineItems'
 import { buildWhatsAppUrl } from '../lib/whatsapp'
 import { resolveLogoUrl } from '../lib/brand'
@@ -159,23 +161,58 @@ export default function DocumentPage() {
         : null)
 
   const vatRate = Number(settings.vatRate || VAT_RATE) || VAT_RATE
+  const isWandersQuote = docType === 'quote' && isWandersDivision(quote?.division_code)
+  const wandersVatEnabled = (settings.wandersApplyVat || 'no').toLowerCase() === 'yes'
+  const effectiveVatRate =
+    isWandersQuote && !wandersVatEnabled
+      ? 0
+      : isWandersQuote && settings.wandersVatRate && settings.wandersVatRate !== 'TBC'
+        ? Number(settings.wandersVatRate) || 0
+        : vatRate
   const docCurrency = (
     (quote && (quote.quotation_currency || quote.currency)) ||
     BASE_CURRENCY
   ).toUpperCase()
-  const money = (n: number) =>
-    docType === 'quote' ? formatMoneyAmount(n, docCurrency) : formatAED(n)
+  const money = (n: number) => {
+    if (docType !== 'quote') return formatAED(n)
+    if (docCurrency === 'TBC') {
+      return `TBC ${n.toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    }
+    return formatMoneyAmount(n, docCurrency)
+  }
+  const wandersLegalReady =
+    Boolean(settings.wandersLegalEntityName) &&
+    settings.wandersLegalEntityName !== 'TBC' &&
+    settings.wandersGoverningLaw &&
+    settings.wandersGoverningLaw !== 'TBC'
+  const wandersTermsBlock =
+    isWandersQuote && quote
+      ? buildWandersTermsText({
+          includeFlightsClause: true,
+          depositPercent: Number(settings.wandersDepositPercent) || 50,
+          holdBusinessDays: Number(settings.wandersHoldBusinessDays) || 3,
+          balanceDaysBefore: settings.wandersBalanceDaysBefore || '30-45',
+          version: settings.wandersTermsVersion,
+          governingLaw: settings.wandersGoverningLaw || 'TBC',
+          disputeJurisdiction: settings.wandersDisputeJurisdiction || 'TBC',
+        })
+      : ''
   const summary = useMemo(() => {
     if (items.length) {
+      if (isWandersQuote && !wandersVatEnabled) {
+        const subtotal = items.reduce((s, i) => s + Number(i.amount || 0), 0)
+        return { subtotal, vat: 0, total: subtotal }
+      }
       const subtotal = items.reduce((s, i) => s + Number(i.amount || 0), 0)
       const vat = items.reduce((s, i) => s + Number(i.vat_amount || 0), 0)
       const total = items.reduce((s, i) => s + Number(i.line_total || 0), 0)
       return { subtotal, vat, total }
     }
     const total = Number(doc?.amount || 0)
-    const subtotal = total / (1 + vatRate)
+    if (effectiveVatRate <= 0) return { subtotal: total, vat: 0, total }
+    const subtotal = total / (1 + effectiveVatRate)
     return { subtotal, vat: total - subtotal, total }
-  }, [items, doc, vatRate])
+  }, [items, doc, effectiveVatRate, isWandersQuote, wandersVatEnabled])
 
   async function downloadPdf() {
     if (!sheetRef.current) return
@@ -569,7 +606,7 @@ export default function DocumentPage() {
                 <span>{money(summary.subtotal)}</span>
               </div>
               <div style={totalRow}>
-                <span>VAT ({(vatRate * 100).toFixed(0)}%)</span>
+                <span>VAT ({(effectiveVatRate * 100).toFixed(0)}%)</span>
                 <span>{money(summary.vat)}</span>
               </div>
               <div
@@ -643,16 +680,37 @@ export default function DocumentPage() {
               )}
             </div>
 
-            {(doc.notes || settings.quoteTerms) && (
+            {isWandersQuote && (
+              <div style={{ marginTop: 18, fontSize: 12.5, lineHeight: 1.55, color: '#333' }}>
+                {wandersLegalReady ? (
+                  <div style={{ marginBottom: 10 }}>
+                    <strong>Contracting entity:</strong> {settings.wandersLegalEntityName}
+                    <br />
+                    {settings.wandersRegisteredAddress}
+                  </div>
+                ) : (
+                  <div style={{ marginBottom: 10, fontStyle: 'italic', color: '#666' }}>
+                    Contracting legal-entity details will appear here once confirmed (currently TBC —
+                    not published as UAE or any assumed jurisdiction).
+                  </div>
+                )}
+              </div>
+            )}
+
+            {(doc.notes || (!isWandersQuote && settings.quoteTerms) || (isWandersQuote && wandersTermsBlock)) && (
               <div style={{ marginTop: 22, fontSize: 12.5, lineHeight: 1.55, color: '#333' }}>
-                <h3 style={{ margin: '0 0 8px', fontSize: 13, color: '#c1121f' }}>Notes / terms</h3>
+                <h3 style={{ margin: '0 0 8px', fontSize: 13, color: '#c1121f' }}>
+                  {isWandersQuote ? 'RR Wanders terms' : 'Notes / terms'}
+                </h3>
                 <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                  {doc.notes || settings.quoteTerms}
+                  {isWandersQuote
+                    ? [doc.notes, wandersTermsBlock].filter(Boolean).join('\n\n')
+                    : doc.notes || settings.quoteTerms}
                 </p>
               </div>
             )}
 
-            {docType === 'quote' && settings.quoteClosing && (
+            {docType === 'quote' && !isWandersQuote && settings.quoteClosing && (
               <p style={{ marginTop: 18, fontSize: 13 }}>{settings.quoteClosing}</p>
             )}
 

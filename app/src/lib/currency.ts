@@ -1,4 +1,7 @@
-/** Multi-currency helpers for RR Wanders. Never sum different currencies together. */
+/** Multi-currency helpers. Threads default display currency remains AED.
+ * RR Wanders base/reporting currency is configurable (settings.wandersBaseCurrency)
+ * and may be TBC until the owner confirms — do not invent a jurisdiction currency.
+ */
 
 export const BASE_CURRENCY = 'AED'
 

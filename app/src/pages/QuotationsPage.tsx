@@ -257,14 +257,24 @@ export default function QuotationsPage() {
   useEffect(() => {
     const wantNew = searchParams.get('new') === '1'
     const client = searchParams.get('client')
+    const division = searchParams.get('division')
     if (!wantNew || loading) return
     setEditing(null)
     setForm(
       emptyForm({
         client: client || '',
+        division_code: division === '02' ? '02' : '01',
         payment_terms: settings.paymentTerms || PAYMENT_TERMS[0],
         delivery_terms: settings.deliveryTerms || DELIVERY_TERMS[0],
-        moq: settings.moqDefault || '50',
+        moq: division === '02' ? '' : settings.moqDefault || '50',
+        ...(division === '02'
+          ? {
+              quotation_currency: settings.wandersBaseCurrency || 'TBC',
+              payment_currency: settings.wandersBaseCurrency || 'TBC',
+              booking_currency: settings.wandersBaseCurrency || 'TBC',
+              supplier_currency: settings.wandersBaseCurrency || 'TBC',
+            }
+          : {}),
       }),
     )
     setEditorOpen(true)
