@@ -1,22 +1,23 @@
 {
   "version": 1,
-  "exportedAt": "2026-07-29T18:46:11.476Z",
+  "exportedAt": "2026-07-30T17:19:39.000Z",
   "source": "google-sheets",
   "counts": {
     "crm": 17,
     "clients": 16,
     "quotations": 7,
-    "invoices": 3,
-    "line_items": 37,
+    "invoices": 4,
+    "line_items": 42,
     "products": 0,
     "quote_templates": 0,
-    "income": 12,
+    "income": 13,
     "expenses": 68,
-    "payment_log": 2,
+    "payment_log": 3,
     "follow_up_updates": 0,
     "app_users": 5,
-    "activity_log": 13,
-    "app_settings": 36
+    "activity_log": 14,
+    "app_settings": 36,
+    "attachments": 1
   },
   "app_settings": [
     {
@@ -29,7 +30,7 @@
     },
     {
       "key": "tagline",
-      "value": "Multi-division commerce · UAE"
+      "value": "Multi-division commerce \u00b7 UAE"
     },
     {
       "key": "address",
@@ -274,9 +275,9 @@
       "email": "",
       "mobile": "",
       "office": "",
-      "address": "",
+      "address": "Ras Al Khor, Dubai, UAE",
       "trn": "",
-      "notes": "Auto follow-up for quotation RR-01-26001 (AED 2845.50)",
+      "notes": "Paid invoice 26107 (AED 373.80, Cash, 30-03-2026). Quotation/invoice RR-01-26001 cancelled (not awarded / wrong tagging).",
       "created_at": "2026-07-29T18:45:50.155Z"
     },
     {
@@ -696,7 +697,7 @@
       "email_phone": "",
       "mobile_number": "",
       "office_number": "",
-      "notes": "Auto follow-up for quotation RR-01-26001 (AED 2845.50)",
+      "notes": "Paid invoice 26107 (AED 373.80, Cash, 30-03-2026). Quote RR-01-26001 Not awarded; invoice RR-01-26001 Cancelled.",
       "follow_up_date": null,
       "next_action": "",
       "owner": "alfredsv@gmail.com",
@@ -705,7 +706,7 @@
       "created_by": "alfredsv@gmail.com",
       "updated_by": "alfredsv@gmail.com",
       "created_at": "2026-07-29T18:45:44.037Z",
-      "updated_at": "2026-07-29T18:45:44.037Z"
+      "updated_at": "2026-07-30T17:19:39.000Z"
     }
   ],
   "follow_up_updates": [],
@@ -885,12 +886,12 @@
       "payment_status": "Pending",
       "payment_terms": "",
       "moq": "",
-      "notes": "Cancelled: linked quote was Not awarded; was wrongly tagged to Thalassery.",
+      "notes": "Cancelled: customer paid invoice 26107 (AED 373.80, Cash, 30-03-2026), not this invoice. Also linked quote was Not awarded; was wrongly tagged to Thalassery.",
       "delivery_terms": "",
       "created_by": "",
-      "updated_by": "",
+      "updated_by": "alfredsv@gmail.com",
       "created_at": "2026-07-29T18:45:56.754Z",
-      "updated_at": "2026-07-29T18:45:56.754Z"
+      "updated_at": "2026-07-30T17:19:39.000Z"
     },
     {
       "id": "invoice-3",
@@ -929,6 +930,25 @@
       "updated_by": "",
       "created_at": "2026-07-29T18:45:56.754Z",
       "updated_at": "2026-07-29T18:45:56.754Z"
+    },
+    {
+      "id": "invoice-ello-26107",
+      "client": "Ello Pets Hotel & Day Care",
+      "vertical": "RR Threads",
+      "reference_number": "26107",
+      "date": "2026-03-30",
+      "description": "Uniforms \u2014 Corporate Chino, Polo, Round Neck, Cargo Pants, Corporate Trousers",
+      "amount": 373.8,
+      "status": "Awarded",
+      "payment_status": "Paid",
+      "payment_terms": "Immediate upon delivery",
+      "moq": "",
+      "notes": "Cash payment received on invoice date 30-03-2026. Source PDF: 26107 Ello Pets Hotel & Day Care.",
+      "delivery_terms": "Ex-stock subject to Prior Sale",
+      "created_by": "alfredsv@gmail.com",
+      "updated_by": "alfredsv@gmail.com",
+      "created_at": "2026-03-30T00:00:00.000Z",
+      "updated_at": "2026-07-30T17:19:39.000Z"
     }
   ],
   "line_items": [
@@ -1486,6 +1506,81 @@
       "line_total": 136.5,
       "remarks": "",
       "created_at": "2026-07-29T18:45:57.162Z"
+    },
+    {
+      "id": "line-inv-26107-1",
+      "doc_type": "Invoice",
+      "reference": "26107",
+      "line_no": 1,
+      "description": "Corporate Chino - 65/35",
+      "qty": 1,
+      "unit_price": 53.0,
+      "vat_rate": 0.05,
+      "amount": 53.0,
+      "vat_amount": 2.65,
+      "line_total": 55.65,
+      "remarks": "",
+      "created_at": "2026-03-30T00:00:00.000Z"
+    },
+    {
+      "id": "line-inv-26107-2",
+      "doc_type": "Invoice",
+      "reference": "26107",
+      "line_no": 2,
+      "description": "Corporate Polo - 65/35",
+      "qty": 1,
+      "unit_price": 53.0,
+      "vat_rate": 0.05,
+      "amount": 53.0,
+      "vat_amount": 2.65,
+      "line_total": 55.65,
+      "remarks": "",
+      "created_at": "2026-03-30T00:00:00.000Z"
+    },
+    {
+      "id": "line-inv-26107-3",
+      "doc_type": "Invoice",
+      "reference": "26107",
+      "line_no": 3,
+      "description": "Corporate Round Neck - 100% cotton",
+      "qty": 2,
+      "unit_price": 42.0,
+      "vat_rate": 0.05,
+      "amount": 84.0,
+      "vat_amount": 4.2,
+      "line_total": 88.2,
+      "remarks": "",
+      "created_at": "2026-03-30T00:00:00.000Z"
+    },
+    {
+      "id": "line-inv-26107-4",
+      "doc_type": "Invoice",
+      "reference": "26107",
+      "line_no": 4,
+      "description": "Cargo Pants",
+      "qty": 1,
+      "unit_price": 89.0,
+      "vat_rate": 0.05,
+      "amount": 89.0,
+      "vat_amount": 4.45,
+      "line_total": 93.45,
+      "remarks": "",
+      "created_at": "2026-03-30T00:00:00.000Z"
+    },
+    {
+      "id": "line-inv-26107-5",
+      "doc_type": "Invoice",
+      "reference": "26107",
+      "line_no": 5,
+      "description": "Corporate Trousers - Regular Fit",
+      "qty": 1,
+      "unit_price": 77.0,
+      "vat_rate": 0.05,
+      "amount": 77.0,
+      "vat_amount": 3.85,
+      "line_total": 80.85,
+      "remarks": "",
+      "created_at": "2026-03-30T00:00:00.000Z"
     }
   ],
   "products": [],
@@ -1657,6 +1752,20 @@
       "total_amount": 5000,
       "status": "",
       "payment_method": "",
+      "payment_status": "Paid"
+    },
+    {
+      "id": "income-ello-26107",
+      "client_source": "Ello Pets Hotel & Day Care",
+      "category": "Uniforms",
+      "reference_number": "26107",
+      "date": "2026-03-30",
+      "description": "Staff uniforms (sample/order)",
+      "bill_amount": 356.0,
+      "vat": 17.8,
+      "total_amount": 373.8,
+      "status": "Awarded",
+      "payment_method": "Cash",
       "payment_status": "Paid"
     }
   ],
@@ -2432,9 +2541,31 @@
       "user_email": "alfredsv@gmail.com",
       "balance_after": 0,
       "created_at": "2026-07-24T00:00:00.000Z"
+    },
+    {
+      "id": "pay-ello-26107",
+      "invoice_ref": "26107",
+      "client": "Ello Pets Hotel & Day Care",
+      "amount": 373.8,
+      "method": "Cash",
+      "notes": "Cash paid on invoice date (corrected: paid 26107, not RR-01-26001)",
+      "user_email": "alfredsv@gmail.com",
+      "balance_after": 0,
+      "created_at": "2026-03-30T00:00:00.000Z"
     }
   ],
-  "attachments": [],
+  "attachments": [
+    {
+      "id": "att-ello-26107",
+      "entity_type": "invoice",
+      "entity_ref": "26107",
+      "file_name": "26107_Ello_Pets_Hotel_Day_Care.pdf",
+      "storage_path": "invoices/26107_Ello_Pets_Hotel_Day_Care.pdf",
+      "url": "invoices/26107_Ello_Pets_Hotel_Day_Care.pdf",
+      "uploaded_by": "alfredsv@gmail.com",
+      "uploaded_at": "2026-07-30T17:19:39.000Z"
+    }
+  ],
   "activity_log": [
     {
       "id": "act-52",
@@ -2459,7 +2590,7 @@
       "action": "record_payment",
       "entity": "invoice",
       "reference": "RR-04-26102",
-      "details": "2441.25 · Paid · balance 0",
+      "details": "2441.25 \u00b7 Paid \u00b7 balance 0",
       "user_email": "alfredsv@gmail.com",
       "created_at": "2026-07-24T00:00:00.000Z"
     },
@@ -2468,7 +2599,7 @@
       "action": "record_payment",
       "entity": "invoice",
       "reference": "RR-03-26101",
-      "details": "2845.5 · Paid · balance 0",
+      "details": "2845.5 \u00b7 Paid \u00b7 balance 0",
       "user_email": "alfredsv@gmail.com",
       "created_at": "2026-07-24T00:00:00.000Z"
     },
@@ -2552,8 +2683,17 @@
       "details": "Not awarded",
       "user_email": "alfredsv@gmail.com",
       "created_at": "2026-07-25T00:00:00.000Z"
+    },
+    {
+      "id": "act-ello-26107-paid",
+      "action": "correct_invoice_payment",
+      "entity": "invoice",
+      "reference": "26107",
+      "details": "Marked Paid (Cash, 30-03-2026). Cancelled RR-01-26001 \u2014 customer paid 26107, not RR-01-26001.",
+      "user_email": "alfredsv@gmail.com",
+      "created_at": "2026-07-30T17:19:39.000Z"
     }
   ],
-  "cleanVersion": 3,
-  "cleanedAt": "2026-07-29T19:00:00.000Z"
+  "cleanVersion": 4,
+  "cleanedAt": "2026-07-30T17:19:39.000Z"
 }
