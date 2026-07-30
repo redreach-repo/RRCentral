@@ -56,6 +56,9 @@ import {
   toBaseAmount,
 } from '../lib/currency'
 import { approveFxRate, quotationCurrencyDefaults } from '../lib/customerPayments'
+import { getDivisionQuoteFormat } from '../lib/divisionQuoteFormats'
+import { ensureDivisionCataloguesSeeded } from '../lib/syncDivisionCatalogues'
+import { CONNECT_PARTNER } from '../lib/seedDivisionCatalogues'
 import {
   buttonDangerStyle,
   buttonPrimaryStyle,
@@ -167,10 +170,16 @@ export default function QuotationsPage() {
   const vatRate = Number(settings.vatRate || VAT_RATE) || VAT_RATE
   const quotePrefix = settings.quotePrefix || 'RR'
   const who = user?.email || ''
+  const activeFormat = getDivisionQuoteFormat(form.division_code, settings)
+  const divisionProducts = useMemo(
+    () => products.filter((p) => (p.division_code || '01') === form.division_code),
+    [products, form.division_code],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
+      await ensureDivisionCataloguesSeeded().catch(() => undefined)
       const [qRes, cRes, pRes] = await Promise.all([
         db.from('quotations').select('*').order('created_at', { ascending: false }),
         db.from('clients').select('*').order('company_name'),
@@ -178,6 +187,8 @@ export default function QuotationsPage() {
       ])
       if (qRes.error) throw qRes.error
       if (cRes.error) throw cRes.error
+      if (pRes.error) throw pRes.error
+      setProducts((pRes.data || []) as Product[])
 
       const validityDays = Number(settings.quoteValidityDays || 14) || 14
       let rows = sortByDateDesc((qRes.data || []) as Quotation[])
@@ -237,7 +248,6 @@ export default function QuotationsPage() {
 
       setQuotes(rows)
       setClients((cRes.data || []) as Client[])
-      if (!pRes.error) setProducts((pRes.data || []) as Product[])
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Failed to load quotations', 'error')
     } finally {
@@ -1054,7 +1064,20 @@ export default function QuotationsPage() {
             <select
               style={selectStyle}
               value={form.division_code}
-              onChange={(e) => setForm((f) => ({ ...f, division_code: e.target.value }))}
+              onChange={(e) => {
+                const code = e.target.value
+                const fmt = getDivisionQuoteFormat(code, settings)
+                setForm((f) => ({
+                  ...f,
+                  division_code: code,
+                  payment_terms: fmt.defaultPaymentTerms || f.payment_terms,
+                  description: f.description || fmt.defaultDescriptionHint,
+                  moq: fmt.showMoq ? f.moq || settings.moqDefault || '50' : '',
+                  delivery_terms: fmt.showDelivery
+                    ? f.delivery_terms || settings.deliveryTerms || ''
+                    : '',
+                }))
+              }}
             >
               {DIVISIONS.map((d) => (
                 <option key={d.code} value={d.code}>
@@ -1062,6 +1085,13 @@ export default function QuotationsPage() {
                 </option>
               ))}
             </select>
+            <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted }}>
+              Format: <strong>{activeFormat.formatLabel}</strong>
+              {activeFormat.showPartnerFulfillment
+                ? ` · Partner: ${activeFormat.partnerName || CONNECT_PARTNER.name}`
+                : ''}
+              . Catalogue and PDF layout switch with the division; amounts stay editable per customer.
+            </p>
           </div>
           <div style={fieldStyle}>
             <label style={labelStyle}>Date</label>
@@ -1120,12 +1150,12 @@ export default function QuotationsPage() {
         <div style={{ marginTop: 8, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <strong style={{ fontSize: 14 }}>Line items</strong>
           <div style={{ display: 'flex', gap: 8 }}>
-            {products.length > 0 && (
+            {divisionProducts.length > 0 && (
               <select
                 style={{ ...selectStyle, minWidth: 180 }}
                 defaultValue=""
                 onChange={(e) => {
-                  const p = products.find((x) => x.id === e.target.value)
+                  const p = divisionProducts.find((x) => x.id === e.target.value)
                   if (!p) return
                   setForm((f) => ({
                     ...f,
@@ -1145,8 +1175,8 @@ export default function QuotationsPage() {
                   e.target.value = ''
                 }}
               >
-                <option value="">Add from catalog…</option>
-                {products.map((p) => (
+                <option value="">Add from {activeFormat.brand} catalog…</option>
+                {divisionProducts.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.sku ? `${p.sku} — ` : ''}{p.name}
                   </option>
@@ -1311,12 +1341,21 @@ export default function QuotationsPage() {
             padding: 14,
             border: `1px solid ${colors.border}`,
             borderRadius: 10,
-            background: form.division_code === '02' ? 'rgba(96,165,250,0.06)' : 'transparent',
+            background:
+              form.division_code === '02'
+                ? 'rgba(96,165,250,0.06)'
+                : form.division_code === '03'
+                  ? 'rgba(52,211,153,0.06)'
+                  : form.division_code === '04'
+                    ? 'rgba(251,191,36,0.06)'
+                    : form.division_code === '06'
+                      ? 'rgba(167,139,250,0.06)'
+                      : 'transparent',
           }}
         >
           <div style={{ fontWeight: 700, marginBottom: 10, fontSize: 14 }}>
             Currencies & payment instructions
-            {form.division_code === '02' ? ' · RR Wanders' : ''}
+            {form.division_code !== '01' ? ` · ${activeFormat.brand}` : ''}
           </div>
           <div style={formGridStyle}>
             <div style={fieldStyle}>

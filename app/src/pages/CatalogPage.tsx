@@ -4,6 +4,7 @@ import { db } from '../lib/db'
 import { DIVISIONS, FABRIC_OPTIONS } from '../lib/config'
 import { BRAND_CATALOGUES, catalogueUrl } from '../lib/catalogues'
 import { syncSeedCatalog } from '../lib/syncCatalog'
+import { ensureDivisionCataloguesSeeded } from '../lib/syncDivisionCatalogues'
 import type { Product } from '../lib/types'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
@@ -208,6 +209,22 @@ export default function CatalogPage() {
     }
   }
 
+  async function syncDivisionServices() {
+    setSyncing(true)
+    try {
+      const r = await ensureDivisionCataloguesSeeded()
+      showToast(
+        `Service catalogues · Marketing +${r.marketing}, Connect +${r.connect}, Trading +${r.trading}`,
+        'success',
+      )
+      await load()
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Service catalog sync failed', 'error')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   const brand = (code: string) => DIVISIONS.find((d) => d.code === code)?.brand || code
 
   const visibleCatalogues = useMemo(() => {
@@ -231,6 +248,15 @@ export default function CatalogPage() {
             title="Load / refresh RR Threads catalogue SKUs"
           >
             <RefreshCw size={16} /> {syncing ? 'Syncing…' : 'Sync catalogue SKUs'}
+          </button>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={syncing}
+            onClick={() => void syncDivisionServices()}
+            title="Load Marketing, Connect (Konekt+) and Trading service rows"
+          >
+            <RefreshCw size={16} /> Load Marketing / Connect / Trading
           </button>
           <button type="button" style={buttonPrimaryStyle} onClick={openCreate}>
             <Plus size={16} /> Add product

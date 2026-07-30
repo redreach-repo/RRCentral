@@ -11,6 +11,12 @@ import { formatAED } from '../lib/money'
 import { BASE_CURRENCY, formatMoneyAmount } from '../lib/currency'
 import { isWandersDivision } from '../lib/wandersConfig'
 import { buildWandersTermsText } from '../lib/wandersTerms'
+import {
+  columnLabel,
+  getDivisionQuoteFormat,
+  type QuoteColumnId,
+} from '../lib/divisionQuoteFormats'
+import { CONNECT_PARTNER } from '../lib/seedDivisionCatalogues'
 import { loadLineItems } from '../lib/lineItems'
 import { buildWhatsAppUrl } from '../lib/whatsapp'
 import { resolveLogoUrl } from '../lib/brand'
@@ -141,7 +147,14 @@ export default function DocumentPage() {
     fallbackId: quote?.quote_id,
     status: doc?.status,
   })
-  const title = docType === 'quote' ? 'QUOTATION' : 'INVOICE'
+  const title =
+    docType === 'quote'
+      ? getDivisionQuoteFormat(quote?.division_code, settings).documentTitle
+      : 'INVOICE'
+  const quoteFormat = getDivisionQuoteFormat(
+    docType === 'quote' ? quote?.division_code : '01',
+    settings,
+  )
   const isDraft =
     displayRef === 'DRAFT' ||
     (quote ? !quote.reference_number || quote.status === 'Draft' : invoice?.status === 'Draft')
@@ -440,7 +453,7 @@ export default function DocumentPage() {
                       fontWeight: 700,
                     }}
                   >
-                    {division}
+                    {quoteFormat.introEyebrow || division}
                   </span>
                 ) : null}
               </div>
@@ -504,7 +517,7 @@ export default function DocumentPage() {
                     color: '#555',
                   }}
                 >
-                  Bill to
+                  {quoteFormat.sectionHeadings.billTo}
                 </h3>
                 <p style={{ margin: 0, lineHeight: 1.5, fontSize: 14 }}>
                   <strong>{doc.client}</strong>
@@ -550,29 +563,56 @@ export default function DocumentPage() {
                     color: '#555',
                   }}
                 >
-                  Description
+                  {quoteFormat.sectionHeadings.scope}
                 </h3>
                 <p style={{ margin: 0, lineHeight: 1.5, fontSize: 14 }}>{doc.description || '—'}</p>
+                {docType === 'quote' && quoteFormat.showPartnerFulfillment ? (
+                  <p style={{ margin: '10px 0 0', fontSize: 12.5, color: '#444', lineHeight: 1.45 }}>
+                    <strong>Fulfilment partner:</strong> {quoteFormat.partnerName || CONNECT_PARTNER.name}{' '}
+                    ({CONNECT_PARTNER.location}). {CONNECT_PARTNER.billingNote}
+                  </p>
+                ) : null}
+                {docType === 'quote' && quoteFormat.showTripSummary && quote ? (
+                  <p style={{ margin: '10px 0 0', fontSize: 12.5, color: '#444', lineHeight: 1.45 }}>
+                    Travel proposal format — passenger counts, dates and inclusions as listed below.
+                    Flights and visa assistance only when stated.
+                  </p>
+                ) : null}
               </div>
             </div>
+
+            <h3
+              style={{
+                margin: '18px 0 8px',
+                fontSize: 11,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                color: '#555',
+              }}
+            >
+              {quoteFormat.sectionHeadings.lines}
+            </h3>
 
             <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8, fontSize: 13.5 }}>
               <thead>
                 <tr>
-                  {['#', 'Description', 'Qty', 'Unit price', 'Amount', 'VAT', 'Total'].map((h) => (
+                  {quoteFormat.columns.map((h) => (
                     <th
                       key={h}
                       style={{
                         padding: '10px 8px',
                         borderBottom: '2px solid #222',
-                        textAlign: h === '#' || h === 'Description' ? 'left' : 'right',
+                        textAlign:
+                          h === 'line' || h === 'sku' || h === 'description' || h === 'sizes'
+                            ? 'left'
+                            : 'right',
                         fontSize: 11,
                         textTransform: 'uppercase',
                         letterSpacing: '0.08em',
                         color: '#555',
                       }}
                     >
-                      {h}
+                      {columnLabel(h)}
                     </th>
                   ))}
                 </tr>
@@ -580,20 +620,33 @@ export default function DocumentPage() {
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ padding: 12, color: '#555' }}>
+                    <td
+                      colSpan={quoteFormat.columns.length}
+                      style={{ padding: 12, color: '#555' }}
+                    >
                       No line items
                     </td>
                   </tr>
                 ) : (
                   items.map((it) => (
                     <tr key={it.id}>
-                      <td style={cell}>{it.line_no}</td>
-                      <td style={cell}>{it.description}</td>
-                      <td style={{ ...cell, textAlign: 'right' }}>{it.qty}</td>
-                      <td style={{ ...cell, textAlign: 'right' }}>{Number(it.unit_price).toFixed(2)}</td>
-                      <td style={{ ...cell, textAlign: 'right' }}>{Number(it.amount).toFixed(2)}</td>
-                      <td style={{ ...cell, textAlign: 'right' }}>{Number(it.vat_amount).toFixed(2)}</td>
-                      <td style={{ ...cell, textAlign: 'right' }}>{Number(it.line_total).toFixed(2)}</td>
+                      {quoteFormat.columns.map((col) => (
+                        <td
+                          key={col}
+                          style={{
+                            ...cell,
+                            textAlign:
+                              col === 'line' ||
+                              col === 'sku' ||
+                              col === 'description' ||
+                              col === 'sizes'
+                                ? 'left'
+                                : 'right',
+                          }}
+                        >
+                          {renderLineCell(col, it, quoteFormat.showInventorySku)}
+                        </td>
+                      ))}
                     </tr>
                   ))
                 )}
@@ -625,11 +678,25 @@ export default function DocumentPage() {
             </div>
 
             <div style={{ marginTop: 28, fontSize: 12.5, lineHeight: 1.55, color: '#333' }}>
-              <h3 style={{ margin: '0 0 8px', fontSize: 13, color: '#c1121f' }}>Payment & delivery</h3>
-              <div>Payment terms: {doc.payment_terms || settings.paymentTerms || '—'}</div>
-              <div>Delivery: {doc.delivery_terms || settings.deliveryTerms || '—'}</div>
-              {'moq' in doc && <div>MOQ: {doc.moq || settings.moqDefault || '—'}</div>}
-              {docType === 'quote' && quote && (
+              <h3 style={{ margin: '0 0 8px', fontSize: 13, color: '#c1121f' }}>
+                {quoteFormat.sectionHeadings.commercial}
+              </h3>
+              <div>
+                Payment terms:{' '}
+                {doc.payment_terms || quoteFormat.defaultPaymentTerms || settings.paymentTerms || '—'}
+              </div>
+              {quoteFormat.showDelivery ? (
+                <div>Delivery: {doc.delivery_terms || settings.deliveryTerms || '—'}</div>
+              ) : null}
+              {quoteFormat.showMoq && 'moq' in doc ? (
+                <div>MOQ: {doc.moq || settings.moqDefault || '—'}</div>
+              ) : null}
+              {docType === 'quote' && quoteFormat.showHoursBilling ? (
+                <div style={{ marginTop: 8 }}>
+                  Hours and rates are as listed. Unused hours policy is editable per client engagement.
+                </div>
+              ) : null}
+              {docType === 'quote' && quote ? (
                 <div style={{ marginTop: 10 }}>
                   <strong>Quotation currency:</strong> {docCurrency}
                   <br />
@@ -658,7 +725,7 @@ export default function DocumentPage() {
                   <br />
                   {quote.net_amount_required ? (
                     <>
-                      <strong>Net amount required by RR Wanders:</strong> {quote.net_amount_required}
+                      <strong>Net amount required:</strong> {quote.net_amount_required}
                       <br />
                     </>
                   ) : null}
@@ -670,7 +737,7 @@ export default function DocumentPage() {
                     </div>
                   ) : null}
                 </div>
-              )}
+              ) : null}
               {settings.accountName && (
                 <div style={{ marginTop: 10 }}>
                   <strong>Bank:</strong> {settings.bankName} · {settings.accountName}
@@ -697,22 +764,31 @@ export default function DocumentPage() {
               </div>
             )}
 
-            {(doc.notes || (!isWandersQuote && settings.quoteTerms) || (isWandersQuote && wandersTermsBlock)) && (
+            {(doc.notes ||
+              quoteFormat.defaultScopeNotes ||
+              (!isWandersQuote && settings.quoteTerms) ||
+              (isWandersQuote && wandersTermsBlock)) && (
               <div style={{ marginTop: 22, fontSize: 12.5, lineHeight: 1.55, color: '#333' }}>
                 <h3 style={{ margin: '0 0 8px', fontSize: 13, color: '#c1121f' }}>
-                  {isWandersQuote ? 'RR Wanders terms' : 'Notes / terms'}
+                  {quoteFormat.sectionHeadings.terms}
                 </h3>
                 <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
                   {isWandersQuote
                     ? [doc.notes, wandersTermsBlock].filter(Boolean).join('\n\n')
-                    : doc.notes || settings.quoteTerms}
+                    : [doc.notes, quoteFormat.defaultScopeNotes || settings.quoteTerms]
+                        .filter(Boolean)
+                        .join('\n\n')}
                 </p>
               </div>
             )}
 
-            {docType === 'quote' && !isWandersQuote && settings.quoteClosing && (
-              <p style={{ marginTop: 18, fontSize: 13 }}>{settings.quoteClosing}</p>
-            )}
+            {docType === 'quote' ? (
+              <p style={{ marginTop: 18, fontSize: 13 }}>
+                {isWandersQuote
+                  ? null
+                  : quoteFormat.closingNote || settings.quoteClosing || null}
+              </p>
+            ) : null}
 
             <div
               style={{
@@ -787,6 +863,50 @@ const totalRow: CSSProperties = {
   justifyContent: 'space-between',
   gap: 16,
   padding: '6px 0',
+}
+
+function formatSizes(raw: LineItem['sizes_json']): string {
+  if (!raw) return '—'
+  try {
+    const obj = typeof raw === 'string' ? (JSON.parse(raw) as Record<string, number>) : raw
+    const parts = Object.entries(obj || {})
+      .filter(([, n]) => Number(n) > 0)
+      .map(([k, n]) => `${k}:${n}`)
+    return parts.length ? parts.join(' ') : '—'
+  } catch {
+    return '—'
+  }
+}
+
+function renderLineCell(col: QuoteColumnId, it: LineItem, showSku: boolean): ReactNode {
+  switch (col) {
+    case 'line':
+      return it.line_no
+    case 'sku':
+      return showSku ? it.sku || '—' : '—'
+    case 'description':
+      return it.description
+    case 'sizes':
+      return formatSizes(it.sizes_json)
+    case 'qty':
+    case 'hours':
+      return it.qty
+    case 'unit':
+      return '—'
+    case 'unit_price':
+    case 'rate':
+      return Number(it.unit_price).toFixed(2)
+    case 'amount':
+      return Number(it.amount).toFixed(2)
+    case 'vat':
+      return Number(it.vat_amount).toFixed(2)
+    case 'total':
+      return Number(it.line_total).toFixed(2)
+    case 'period':
+      return '—'
+    default:
+      return '—'
+  }
 }
 
 function ToolbarBtn({

@@ -266,7 +266,6 @@ export async function deletePassenger(id: string): Promise<void> {
 }
 
 export async function ensureTourPackagesSeeded(): Promise<TourPackage[]> {
-  const { ensureTourOpsSeeded } = await import('./wandersTourOps')
   const { packages } = await ensureTourOpsSeeded()
   return packages
 }
