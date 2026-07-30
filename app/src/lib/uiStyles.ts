@@ -13,9 +13,31 @@ export const colors = {
 }
 
 export const pageStyle: CSSProperties = {
-  padding: '24px',
+  padding: 0,
   color: colors.text,
   minHeight: '100%',
+  width: '100%',
+  maxWidth: '100%',
+  overflowX: 'hidden',
+}
+
+export const formGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))',
+  gap: 12,
+}
+
+export const dualPanelGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))',
+  gap: 16,
+}
+
+export const kpiGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))',
+  gap: 14,
+  marginBottom: 24,
 }
 
 export const cardStyle: CSSProperties = {
@@ -104,6 +126,8 @@ export const fieldStyle: CSSProperties = {
 export const tableWrapStyle: CSSProperties = {
   overflowX: 'auto',
   width: '100%',
+  WebkitOverflowScrolling: 'touch',
+  maxWidth: '100%',
 }
 
 export const tableStyle: CSSProperties = {
@@ -153,6 +177,18 @@ export function formatMoney(amount: number, currency = 'AED'): string {
 
 export function downloadCsv(filename: string, csv: string) {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+export function downloadJson(filename: string, data: unknown) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], {
+    type: 'application/json;charset=utf-8',
+  })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url

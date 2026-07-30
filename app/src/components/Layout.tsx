@@ -44,7 +44,7 @@ export default function Layout() {
     <div className={styles.shell}>
       {isLocalMode && (
         <div className={styles.localBanner} role="status">
-          Running in local mode — data stays in this browser
+          Running in local mode — data is stored in this browser (IndexedDB), not the cloud
         </div>
       )}
       {sidebarOpen && (
@@ -106,9 +106,9 @@ export default function Layout() {
 
           <div className={styles.topbarRight}>
             <span className={styles.userEmail}>{user?.email}</span>
-            <button type="button" className={styles.signOutBtn} onClick={() => void signOut()}>
+            <button type="button" className={styles.signOutBtn} onClick={() => void signOut()} aria-label="Sign out">
               <LogOut size={16} />
-              <span>Sign out</span>
+              <span className={styles.signOutLabel}>Sign out</span>
             </button>
           </div>
         </header>

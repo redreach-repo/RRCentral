@@ -103,7 +103,7 @@ export default function Modal({ open, title, onClose, children, width = 520 }: M
         }
       `}</style>
       <div
-        style={{ ...cardStyle, maxWidth: width }}
+        style={{ ...cardStyle, maxWidth: typeof width === 'number' ? `min(${width}px, 100%)` : width }}
         role="dialog"
         aria-modal="true"
         aria-label={title}

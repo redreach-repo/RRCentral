@@ -38,6 +38,37 @@
   backdrop-filter: blur(16px);
 }
 
+@media (max-width: 640px) {
+  .page {
+    padding: 16px;
+    padding-top: max(16px, env(safe-area-inset-top));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+
+  .card {
+    padding: 28px 18px;
+    border-radius: 14px;
+  }
+
+  .title {
+    font-size: 20px;
+  }
+
+  .subtitle {
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+
+  .logo {
+    max-width: 200px;
+  }
+
+  .seedChip {
+    font-size: 10px;
+    padding: 6px 8px;
+  }
+}
+
 .logo {
   margin: 0 auto 18px;
   max-width: 260px;

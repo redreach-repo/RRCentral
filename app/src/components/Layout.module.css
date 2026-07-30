@@ -26,6 +26,15 @@
   padding-top: 34px;
 }
 
+.shell:has(.localBanner) .topbar {
+  top: 34px;
+}
+
+.shell:has(.localBanner) .sidebar {
+  top: 34px;
+  height: calc(100% - 34px);
+}
+
 .overlay {
   display: none;
   position: fixed;
@@ -192,6 +201,14 @@
   font-weight: 600;
   letter-spacing: 0.02em;
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.signOutLabel {
+  display: inline;
 }
 
 .topbarRight {
@@ -233,9 +250,13 @@
 .content {
   flex: 1;
   padding: 28px 24px;
+  padding-left: max(24px, env(safe-area-inset-left));
+  padding-right: max(24px, env(safe-area-inset-right));
+  padding-bottom: max(28px, env(safe-area-inset-bottom));
 }
 
-@media (max-width: 900px) {
+/* Tablet + phone: drawer navigation */
+@media (max-width: 1024px) {
   .overlay {
     display: block;
   }
@@ -243,8 +264,15 @@
   .sidebar {
     position: fixed;
     inset: 0 auto 0 0;
+    width: min(280px, 86vw);
     transform: translateX(-100%);
     transition: transform 0.22s ease;
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.45);
+  }
+
+  .shell:has(.localBanner) .sidebar {
+    top: 34px;
+    height: calc(100% - 34px);
   }
 
   .sidebarOpen {
@@ -263,7 +291,54 @@
     display: none;
   }
 
+  .topbar {
+    padding: 0 16px;
+    height: 56px;
+  }
+
   .content {
     padding: 20px 16px;
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+}
+
+/* Phone */
+@media (max-width: 640px) {
+  .localBanner {
+    font-size: 11px;
+    padding: 7px 10px;
+    line-height: 1.35;
+  }
+
+  .shell:has(.localBanner) {
+    padding-top: 40px;
+  }
+
+  .shell:has(.localBanner) .topbar,
+  .shell:has(.localBanner) .sidebar {
+    top: 40px;
+  }
+
+  .shell:has(.localBanner) .sidebar {
+    height: calc(100% - 40px);
+  }
+
+  .title {
+    font-size: 14px;
+  }
+
+  .signOutLabel {
+    display: none;
+  }
+
+  .signOutBtn {
+    padding: 8px;
+  }
+
+  .content {
+    padding: 14px 12px;
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
   }
 }

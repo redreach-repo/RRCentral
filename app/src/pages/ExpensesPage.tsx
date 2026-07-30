@@ -26,6 +26,7 @@ import {
   tdStyle,
   thStyle,
   toolbarStyle,
+  formGridStyle,
 } from '../lib/uiStyles'
 
 const CATEGORIES = [
@@ -257,7 +258,7 @@ export default function ExpensesPage() {
       )}
 
       <Modal open={open} title={editing ? 'Edit expense' : 'Add expense'} onClose={() => setOpen(false)} width={520}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={formGridStyle}>
           <div style={fieldStyle}>
             <label style={labelStyle}>Date</label>
             <input type="date" style={inputStyle} value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />

@@ -24,7 +24,9 @@ import EmptyState from '../components/EmptyState'
 import {
   cardStyle,
   colors,
+  dualPanelGridStyle,
   formatMoney,
+  kpiGridStyle,
   pageStyle,
   pageSubtitleStyle,
   pageTitleStyle,
@@ -245,14 +247,7 @@ export default function DashboardPage() {
         This month ({monthLabel}) — income only counts paid / awarded invoices, not lost quotes
       </p>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          gap: 14,
-          marginBottom: 24,
-        }}
-      >
+      <div style={kpiGridStyle}>
         <KpiCard
           label={`Income · ${monthLabel}`}
           value={formatMoney(monthIncome)}
@@ -328,14 +323,7 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-          gap: 16,
-          marginBottom: 24,
-        }}
-      >
+      <div style={{ ...dualPanelGridStyle, marginBottom: 24 }}>
         <div style={cardStyle}>
           <h2 style={sectionTitleStyle}>Recent Quotes</h2>
           {recentQuotes.length === 0 ? (

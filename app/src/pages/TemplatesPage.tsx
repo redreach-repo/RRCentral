@@ -27,6 +27,7 @@ import {
   tdStyle,
   thStyle,
   toolbarStyle,
+  formGridStyle,
 } from '../lib/uiStyles'
 
 type TemplateForm = {
@@ -221,7 +222,7 @@ export default function TemplatesPage() {
       )}
 
       <Modal open={open} title={editing ? 'Edit template' : 'New template'} onClose={() => setOpen(false)} width={720}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={formGridStyle}>
           <div style={fieldStyle}>
             <label style={labelStyle}>Name *</label>
             <input style={inputStyle} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />

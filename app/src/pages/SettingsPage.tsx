@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Pencil, Plus, Trash2, Upload } from 'lucide-react'
+import { Download, HardDrive, Pencil, Plus, Trash2, Upload } from 'lucide-react'
 import { db, authMode } from '../lib/db'
 import type { AppUser, UserRole } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -11,12 +11,14 @@ import {
   importSheetsDumpFromUrl,
   resetSheetsImportFlag,
 } from '../lib/migrateFromSheets'
+import { clearLocalData, DB_NAME, exportLocalDump } from '../lib/localDb'
 import {
   buttonDangerStyle,
   buttonPrimaryStyle,
   buttonSecondaryStyle,
   cardStyle,
   colors,
+  downloadJson,
   fieldStyle,
   inputStyle,
   labelStyle,
@@ -75,7 +77,7 @@ const SYSTEM_KEYS = [
 type UserForm = { email: string; name: string; role: UserRole; active: boolean }
 
 export default function SettingsPage() {
-  const { userRole } = useAuth()
+  const { userRole, isLocalMode } = useAuth()
   const { settings, updateSetting, loading: settingsLoading } = useSettings()
   const { showToast } = useToast()
   const [draft, setDraft] = useState<Record<string, string>>({})
@@ -92,7 +94,9 @@ export default function SettingsPage() {
   const [deleteUser, setDeleteUser] = useState<AppUser | null>(null)
   const [busy, setBusy] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [backingUp, setBackingUp] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const backupRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setDraft({ ...settings })
@@ -143,6 +147,59 @@ export default function SettingsPage() {
       showToast(e instanceof Error ? e.message : 'Bundled dump not found — export from Apps Script first', 'error')
     } finally {
       setImporting(false)
+    }
+  }
+
+  async function handleBackupDownload() {
+    setBackingUp(true)
+    try {
+      const dump = await exportLocalDump()
+      const stamp = new Date().toISOString().slice(0, 10)
+      downloadJson(`rrcentral-backup-${stamp}.json`, dump)
+      showToast('Backup downloaded', 'success')
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Backup failed', 'error')
+    } finally {
+      setBackingUp(false)
+    }
+  }
+
+  async function handleRestoreBackup(file: File | null) {
+    if (!file) return
+    if (!window.confirm('Restore this backup? It replaces all CRM data in this browser.')) return
+    setImporting(true)
+    try {
+      const counts = await importSheetsDumpFromFile(file)
+      showToast(
+        `Restored backup: ${counts.crm || 0} CRM, ${counts.quotations || 0} quotes, ${counts.invoices || 0} invoices`,
+        'success',
+      )
+      window.location.reload()
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Restore failed', 'error')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  async function handleClearLocal() {
+    if (
+      !window.confirm(
+        'Clear all local CRM data in this browser? Download a backup first. This cannot be undone.',
+      )
+    ) {
+      return
+    }
+    setBusy(true)
+    try {
+      resetSheetsImportFlag()
+      await clearLocalData()
+      showToast('Local data cleared — defaults restored', 'success')
+      window.location.reload()
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Clear failed', 'error')
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -269,7 +326,73 @@ export default function SettingsPage() {
   return (
     <div style={pageStyle}>
       <h1 style={pageTitleStyle}>Settings</h1>
-      <p style={pageSubtitleStyle}>Company details, defaults, and user access</p>
+      <p style={pageSubtitleStyle}>Company details, data storage, and user access</p>
+
+      <div style={{ ...cardStyle, marginBottom: 20 }}>
+        <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <HardDrive size={18} /> Data &amp; storage
+        </h2>
+        {isLocalMode || authMode === 'local' ? (
+          <>
+            <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.55 }}>
+              Mode: <strong style={{ color: colors.text }}>Local (this browser only)</strong>
+              <br />
+              Database: IndexedDB <code style={{ color: '#ff9f4a' }}>{DB_NAME}</code>
+              <br />
+              CRM, quotes, invoices, expenses, and settings stay on this device. They are{' '}
+              <strong style={{ color: colors.text }}>not</strong> synced to the cloud. Clearing browser
+              site data deletes everything — download a backup regularly.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+              <button
+                type="button"
+                style={buttonPrimaryStyle}
+                disabled={backingUp}
+                onClick={() => void handleBackupDownload()}
+              >
+                <Download size={14} />
+                {backingUp ? 'Preparing…' : 'Download backup JSON'}
+              </button>
+              <button
+                type="button"
+                style={buttonSecondaryStyle}
+                disabled={importing}
+                onClick={() => backupRef.current?.click()}
+              >
+                <Upload size={14} />
+                Restore backup…
+              </button>
+              <button
+                type="button"
+                style={buttonDangerStyle}
+                disabled={busy}
+                onClick={() => void handleClearLocal()}
+              >
+                <Trash2 size={14} />
+                Clear local data
+              </button>
+              <input
+                ref={backupRef}
+                type="file"
+                accept="application/json,.json"
+                style={{ display: 'none' }}
+                onChange={(e) => void handleRestoreBackup(e.target.files?.[0] || null)}
+              />
+            </div>
+            <p style={{ color: colors.muted2, fontSize: 12, margin: 0, lineHeight: 1.45 }}>
+              For multi-device / shared team access, configure Supabase (
+              <code>VITE_SUPABASE_URL</code> + <code>VITE_SUPABASE_ANON_KEY</code>) and redeploy.
+            </p>
+          </>
+        ) : (
+          <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.55 }}>
+            Mode: <strong style={{ color: colors.text }}>Supabase cloud</strong>
+            <br />
+            Business data is stored in your Supabase Postgres project. Auth uses Google OAuth via
+            Supabase.
+          </p>
+        )}
+      </div>
 
       {renderSection('Company info', 'Company', COMPANY_KEYS)}
       {renderSection('Bank details', 'Bank', BANK_KEYS)}
@@ -281,7 +404,7 @@ export default function SettingsPage() {
           <h2 style={sectionTitleStyle}>Import Google Sheets data</h2>
           <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
             Pull your existing CRM, quotes, invoices, and catalog from the Apps Script spreadsheet
-            into this browser. This replaces local data.
+            into this browser. This replaces local data — download a backup first.
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             <button

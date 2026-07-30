@@ -25,6 +25,7 @@ import {
   tdStyle,
   thStyle,
   toolbarStyle,
+  formGridStyle,
 } from '../lib/uiStyles'
 
 type ProductForm = {
@@ -273,7 +274,7 @@ export default function CatalogPage() {
       )}
 
       <Modal open={open} title={editing ? 'Edit product' : 'Add product'} onClose={() => setOpen(false)} width={520}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={formGridStyle}>
           <div style={fieldStyle}>
             <label style={labelStyle}>SKU</label>
             <input style={inputStyle} value={form.sku} onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))} />

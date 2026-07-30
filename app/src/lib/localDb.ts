@@ -3,7 +3,7 @@
  * Used when VITE_SUPABASE_URL is missing or a placeholder (e.g. GitHub Pages demos).
  */
 
-const DB_NAME = 'rrcentral_local'
+export const DB_NAME = 'rrcentral_local'
 const DB_VERSION = 1
 
 export const LOCAL_STORES = [
@@ -602,6 +602,33 @@ async function putMany(store: string, rows: Row[]): Promise<void> {
     os.put(next)
   }
   await txDone(tx)
+}
+
+/** Export every IndexedDB store as a portable JSON dump (backup / restore). */
+export async function exportLocalDump(): Promise<MigrationDump> {
+  await openDb()
+  const counts: Record<string, number> = {}
+  const dump: MigrationDump = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    counts,
+  }
+  for (const store of LOCAL_STORES) {
+    const rows = await getAll(store)
+    dump[store] = rows
+    counts[store] = rows.length
+  }
+  return dump
+}
+
+/** Wipe all local stores and re-seed defaults (settings + admin users). */
+export async function clearLocalData(): Promise<void> {
+  await openDb()
+  for (const store of LOCAL_STORES) {
+    await clearStore(store)
+  }
+  seeded = false
+  await ensureSeeded()
 }
 
 /**

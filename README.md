@@ -14,10 +14,9 @@ Prefer the React app in `app/` for new work.
 
 ## React app quick start
 
-1. Create a Supabase project and run [`app/supabase-schema.sql`](./app/supabase-schema.sql).
-2. Enable **Google** auth in Supabase.
-3. Copy `app/.env.example` → `app/.env` and set `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`.
-4. Local:
+**Today on GitHub Pages the app runs in local mode:** CRM data is stored in **this browser’s IndexedDB** (`rrcentral_local`), not in the cloud. Use **Settings → Data & storage** to download backups.
+
+### Local (no Supabase)
 
 ```bash
 cd app
@@ -25,9 +24,14 @@ npm install
 npm run dev
 ```
 
-5. Deploy: push to `main` (workflow builds `app/` and publishes to GitHub Pages). Add the same Vite env vars as GitHub Actions secrets (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`).
+### Cloud (Supabase) — optional for multi-device sync
 
-Full setup notes: [`app/README.md`](./app/README.md).
+1. Create a Supabase project and run [`app/supabase-schema.sql`](./app/supabase-schema.sql).
+2. Enable **Google** auth in Supabase.
+3. Copy `app/.env.example` → `app/.env` and set real `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`.
+4. Deploy: push to `main`. Add the same Vite env vars as GitHub Actions secrets.
+
+Full notes: [`app/README.md`](./app/README.md).
 
 ## Legacy Apps Script API
 

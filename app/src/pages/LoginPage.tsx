@@ -55,7 +55,7 @@ export default function LoginPage() {
         {isLocalMode ? (
           <form className={styles.localForm} onSubmit={(e) => void handleLocalContinue(e)}>
             <p className={styles.localBanner}>
-              Running in local mode — data stays in this browser
+              Running in local mode — data is stored in this browser (IndexedDB), not the cloud
             </p>
             <label className={styles.fieldLabel} htmlFor="local-email">
               Email
