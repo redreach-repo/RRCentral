@@ -73,6 +73,24 @@ const QUOTE_KEYS = [
   { key: 'invoicePrefix', label: 'Invoice prefix' },
 ] as const
 
+/** Editable per-division PDF title/closing — change anytime per customer standards. */
+const DIVISION_FORMAT_KEYS = [
+  { key: 'quoteFormat_01_documentTitle', label: 'Threads PDF title' },
+  { key: 'quoteFormat_01_closingNote', label: 'Threads closing' },
+  { key: 'quoteFormat_02_documentTitle', label: 'Wanders PDF title' },
+  { key: 'quoteFormat_02_closingNote', label: 'Wanders closing' },
+  { key: 'quoteFormat_03_documentTitle', label: 'Marketing PDF title' },
+  { key: 'quoteFormat_03_scopeNotes', label: 'Marketing scope notes' },
+  { key: 'quoteFormat_03_closingNote', label: 'Marketing closing' },
+  { key: 'quoteFormat_04_documentTitle', label: 'Connect PDF title' },
+  { key: 'quoteFormat_04_partnerName', label: 'Connect fulfilment partner' },
+  { key: 'quoteFormat_04_scopeNotes', label: 'Connect scope notes' },
+  { key: 'quoteFormat_04_closingNote', label: 'Connect closing' },
+  { key: 'quoteFormat_06_documentTitle', label: 'Trading PDF title' },
+  { key: 'quoteFormat_06_scopeNotes', label: 'Trading scope notes' },
+  { key: 'quoteFormat_06_closingNote', label: 'Trading closing' },
+] as const
+
 const SYSTEM_KEYS = [
   { key: 'logoUrl', label: 'Logo URL' },
   { key: 'portalBaseUrl', label: 'Portal base URL' },
@@ -532,6 +550,11 @@ export default function SettingsPage() {
       {renderSection('Company info', 'Company', COMPANY_KEYS)}
       {renderSection('Bank details', 'Bank', BANK_KEYS)}
       {renderSection('Quote / Invoice settings', 'Quote settings', QUOTE_KEYS)}
+      {renderSection(
+        'Division quotation formats (editable titles, closings, Connect partner name)',
+        'Division formats',
+        DIVISION_FORMAT_KEYS,
+      )}
       {renderSection(
         'RR Wanders (TBC legal / tax / currency — not for live customer docs until confirmed)',
         'Wanders',

@@ -6,7 +6,7 @@
 import { ALL_SEED_PRODUCTS } from './seedCatalog'
 
 export const DB_NAME = 'rrcentral_local'
-const DB_VERSION = 4
+const DB_VERSION = 5
 
 export const LOCAL_STORES = [
   'app_settings',
@@ -33,6 +33,11 @@ export const LOCAL_STORES = [
   'wanders_passengers',
   'tour_packages',
   'wanders_terms_acceptances',
+  'wanders_partners',
+  'package_cost_components',
+  'package_selling_prices',
+  'scheduled_departures',
+  'customer_bookings',
 ] as const
 
 export type LocalStoreName = (typeof LOCAL_STORES)[number]
@@ -413,6 +418,11 @@ function withDefaults(table: string, row: Row): Row {
         'wanders_passengers',
         'tour_packages',
         'wanders_terms_acceptances',
+        'wanders_partners',
+        'package_cost_components',
+        'package_selling_prices',
+        'scheduled_departures',
+        'customer_bookings',
       ].includes(table)
     ) {
       next.created_at = now
@@ -504,6 +514,57 @@ function withDefaults(table: string, row: Row): Row {
     if (next.active == null) next.active = true
     if (next.default_currency == null) next.default_currency = 'TBC'
     if (next.guide_price == null) next.guide_price = 0
+    if (next.min_group_size == null) next.min_group_size = 10
+    if (next.meal_tiers == null) next.meal_tiers = 'Breakfast only|Full board'
+    if (next.costing_method == null) next.costing_method = 'Add component costs'
+    if (next.supplier_currency == null) next.supplier_currency = 'TBC'
+    if (next.customer_selling_currency == null) next.customer_selling_currency = 'TBC'
+    if (next.status == null) next.status = 'Product development'
+    if (next.destination_country == null) next.destination_country = ''
+    if (next.advertising_market == null) next.advertising_market = 'TBC'
+    if (next.travel_period == null) next.travel_period = 'TBC'
+    if (next.smaller_group_policy == null) {
+      next.smaller_group_policy = 'Private arrangement at a higher price'
+    }
+    if (next.primary_supplier_id == null) next.primary_supplier_id = ''
+    if (next.primary_coordinator_id == null) next.primary_coordinator_id = ''
+    if (next.updated_at == null) next.updated_at = now
+  }
+
+  if (table === 'wanders_partners') {
+    if (next.active == null) next.active = true
+    if (next.status == null) next.status = 'Active'
+    if (next.updated_at == null) next.updated_at = now
+  }
+
+  if (table === 'package_cost_components') {
+    if (next.amount == null) next.amount = 0
+    if (next.per_person == null) next.per_person = true
+    if (next.sort_order == null) next.sort_order = 0
+    if (next.updated_at == null) next.updated_at = now
+  }
+
+  if (table === 'package_selling_prices') {
+    if (next.selling_amount == null) next.selling_amount = 0
+    if (next.cost_amount == null) next.cost_amount = 0
+    if (next.fx_rate_to_selling == null) next.fx_rate_to_selling = 0
+    if (next.margin_amount == null) next.margin_amount = 0
+    if (next.margin_pct == null) next.margin_pct = 0
+    if (next.updated_at == null) next.updated_at = now
+  }
+
+  if (table === 'scheduled_departures') {
+    if (next.capacity == null) next.capacity = 0
+    if (next.booked_pax == null) next.booked_pax = 0
+    if (next.min_group_size == null) next.min_group_size = 10
+    if (next.min_group_met == null) next.min_group_met = false
+    if (next.status == null) next.status = 'Open'
+    if (next.updated_at == null) next.updated_at = now
+  }
+
+  if (table === 'customer_bookings') {
+    if (next.pax_count == null) next.pax_count = 1
+    if (next.status == null) next.status = 'Enquiry linked'
     if (next.updated_at == null) next.updated_at = now
   }
 
@@ -759,6 +820,11 @@ export type MigrationDump = {
   wanders_passengers?: Row[]
   tour_packages?: Row[]
   wanders_terms_acceptances?: Row[]
+  wanders_partners?: Row[]
+  package_cost_components?: Row[]
+  package_selling_prices?: Row[]
+  scheduled_departures?: Row[]
+  customer_bookings?: Row[]
 }
 
 async function clearStore(store: string): Promise<void> {

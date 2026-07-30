@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import { Plane, Plus, Shield } from 'lucide-react'
+import WandersTourOpsPanel from './WandersTourOpsPanel'
 import {
   WANDERS_BOOKING_STATUSES,
   WANDERS_COMM_CHANNELS,
@@ -60,11 +61,13 @@ import {
 import { buildWhatsAppUrl } from '../lib/whatsapp'
 
 type Tab = 'trip' | 'passengers' | 'commercial' | 'terms' | 'packages'
+type Mode = 'leads' | 'tourops'
 
 export default function WandersPage() {
   const { user, userRole } = useAuth()
   const { settings, refresh } = useSettings()
   const { showToast } = useToast()
+  const [mode, setMode] = useState<Mode>('leads')
   const [deals, setDeals] = useState<WandersDeal[]>([])
   const [packages, setPackages] = useState<TourPackage[]>([])
   const [selectedId, setSelectedId] = useState('')
@@ -268,16 +271,45 @@ export default function WandersPage() {
         <div>
           <h1 style={pageTitleStyle}>RR Wanders CRM</h1>
           <p style={pageSubtitleStyle}>
-            Travel deals, packages, passengers and deposits — separate from RR Threads. Base currency:{' '}
-            <strong>{baseCurrency}</strong>
+            Travel deals, packages, partners, departures and bookings — separate from RR Threads. Base
+            currency: <strong>{baseCurrency}</strong>
             {baseCurrency === 'TBC' ? ' (confirm in Settings before production)' : ''}.
           </p>
         </div>
-        <button type="button" style={buttonPrimaryStyle} onClick={newDeal}>
-          <Plus size={16} /> New enquiry
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            style={{
+              ...buttonSecondaryStyle,
+              background: mode === 'leads' ? colors.accent : 'rgba(255,255,255,0.06)',
+              borderColor: mode === 'leads' ? colors.accent : colors.border,
+            }}
+            onClick={() => setMode('leads')}
+          >
+            Customer leads
+          </button>
+          <button
+            type="button"
+            style={{
+              ...buttonSecondaryStyle,
+              background: mode === 'tourops' ? colors.accent : 'rgba(255,255,255,0.06)',
+              borderColor: mode === 'tourops' ? colors.accent : colors.border,
+            }}
+            onClick={() => setMode('tourops')}
+          >
+            Tour products & ops
+          </button>
+          {mode === 'leads' ? (
+            <button type="button" style={buttonPrimaryStyle} onClick={newDeal}>
+              <Plus size={16} /> New enquiry
+            </button>
+          ) : null}
+        </div>
       </div>
 
+      {mode === 'tourops' ? (
+        <WandersTourOpsPanel deals={deals} />
+      ) : (
       <div
         style={{
           display: 'grid',
@@ -1059,6 +1091,7 @@ export default function WandersPage() {
           )}
         </div>
       </div>
+      )}
 
       <Modal open={paxOpen} title="Passenger (private)" onClose={() => setPaxOpen(false)} width={640}>
         {paxForm ? (

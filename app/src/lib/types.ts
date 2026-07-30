@@ -490,21 +490,150 @@ export interface WandersPassenger {
   updated_by: string
 }
 
-/** Internal tour package catalogue (not public website products). */
+/** Internal tour package catalogue (not public website products; not Zoho Lead text). */
 export interface TourPackage {
   id: string
   code: string
   name: string
   destination: string
+  destination_country: string
+  advertising_market: string
+  travel_period: string
   product_type: string
   nights: number
   days: number
   summary: string
   inclusions: string
   exclusions: string
+  min_group_size: number
+  smaller_group_policy: string
+  meal_tiers: string
+  costing_method: string
+  supplier_currency: string
+  customer_selling_currency: string
+  status: string
+  primary_supplier_id: string
+  primary_coordinator_id: string
   default_currency: string
   guide_price: number
   active: boolean
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
+/** Supplier or coordinator partner — separate from customer leads. */
+export interface WandersPartner {
+  id: string
+  name: string
+  partner_type: string
+  country: string
+  destination: string
+  status: string
+  role_summary: string
+  responsibilities: string
+  communication_route: string
+  next_involvement: string
+  booking_stage_responsibility: string
+  contact_name: string
+  contact_email: string
+  contact_phone: string
+  currency: string
+  notes: string
+  active: boolean
+  created_at: string
+  updated_at: string
+}
+
+/** Cost line on a package — summed when costing_method is Add component costs. */
+export interface PackageCostComponent {
+  id: string
+  package_id: string
+  category: string
+  description: string
+  meal_tier: string
+  supplier_id: string
+  amount: number
+  currency: string
+  per_person: boolean
+  notes: string
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+/** Planned selling price / margin snapshot (INR may be TBC until finalized). */
+export interface PackageSellingPrice {
+  id: string
+  package_id: string
+  meal_tier: string
+  label: string
+  selling_amount: number
+  selling_currency: string
+  cost_amount: number
+  cost_currency: string
+  fx_rate_to_selling: number
+  margin_amount: number
+  margin_pct: number
+  status: string
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
+/** Individual scheduled departure for a package. */
+export interface ScheduledDeparture {
+  id: string
+  package_id: string
+  label: string
+  departure_date: string | null
+  return_date: string | null
+  capacity: number
+  booked_pax: number
+  min_group_size: number
+  min_group_met: boolean
+  booking_deadline: string | null
+  supplier_confirmation_status: string
+  status: string
+  total_customer_payments: number
+  payments_currency: string
+  total_costs: number
+  costs_currency: string
+  revenue: number
+  revenue_currency: string
+  profit: number
+  profit_currency: string
+  supplier_id: string
+  coordinator_id: string
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Customer booking against a package/departure.
+ * Links leads/deals to product ops — never stores package details only in lead notes.
+ */
+export interface CustomerBooking {
+  id: string
+  deal_id: string
+  package_id: string
+  departure_id: string
+  supplier_id: string
+  coordinator_id: string
+  client_name: string
+  lead_contact: string
+  pax_count: number
+  meal_tier: string
+  selling_amount: number
+  selling_currency: string
+  cost_amount: number
+  cost_currency: string
+  margin_amount: number
+  margin_pct: number
+  deposit_status: string
+  payment_status: string
+  status: string
   notes: string
   created_at: string
   updated_at: string
