@@ -904,6 +904,13 @@ export async function importMigrationDump(dump: MigrationDump): Promise<Record<s
       }
       rows = [...byEmail.values()]
     }
+    // Cancelled invoices must not stay Paid (stale marks from wrong invoice corrections)
+    if (store === 'invoices') {
+      rows = rows.map((row) => {
+        if (String(row.status || '').trim().toLowerCase() !== 'cancelled') return row
+        return { ...row, payment_status: 'Pending' }
+      })
+    }
     await clearStore(store)
     await putMany(store, rows)
     counts[store] = rows.length

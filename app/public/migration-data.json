@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exportedAt": "2026-07-30T17:19:39.000Z",
+  "exportedAt": "2026-07-30T17:26:52.000Z",
   "source": "google-sheets",
   "counts": {
     "crm": 17,
@@ -886,12 +886,12 @@
       "payment_status": "Pending",
       "payment_terms": "",
       "moq": "",
-      "notes": "Cancelled: customer paid invoice 26107 (AED 373.80, Cash, 30-03-2026), not this invoice. Also linked quote was Not awarded; was wrongly tagged to Thalassery.",
+      "notes": "Cancelled \u2014 not paid. Customer paid invoice 26107 (AED 373.80, Cash, 30-03-2026), not this invoice. Linked quote was Not awarded; was wrongly tagged to Thalassery.",
       "delivery_terms": "",
       "created_by": "",
       "updated_by": "alfredsv@gmail.com",
       "created_at": "2026-07-29T18:45:56.754Z",
-      "updated_at": "2026-07-30T17:19:39.000Z"
+      "updated_at": "2026-07-30T17:26:52.000Z"
     },
     {
       "id": "invoice-3",
@@ -2694,6 +2694,6 @@
       "created_at": "2026-07-30T17:19:39.000Z"
     }
   ],
-  "cleanVersion": 4,
-  "cleanedAt": "2026-07-30T17:19:39.000Z"
+  "cleanVersion": 5,
+  "cleanedAt": "2026-07-30T17:26:52.000Z"
 }

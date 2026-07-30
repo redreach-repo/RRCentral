@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  effectiveInvoicePaymentStatus,
   expenseVatParts,
   incomeVatParts,
   isOpenInvoice,
@@ -39,6 +40,15 @@ describe('finance', () => {
     expect(isOpenInvoice({ status: 'Sent', payment_status: 'Pending' } as Invoice)).toBe(true)
     expect(isOpenInvoice({ status: 'Cancelled', payment_status: 'Pending' } as Invoice)).toBe(false)
     expect(isOpenInvoice({ status: 'Draft', payment_status: 'Pending' } as Invoice)).toBe(false)
+  })
+
+  it('clears payment on cancelled invoices', () => {
+    expect(
+      effectiveInvoicePaymentStatus({ status: 'Cancelled', payment_status: 'Paid' } as Invoice),
+    ).toBe('Pending')
+    expect(
+      effectiveInvoicePaymentStatus({ status: 'Awarded', payment_status: 'Paid' } as Invoice),
+    ).toBe('Paid')
   })
 
   it('monthKey and quarterMonths', () => {

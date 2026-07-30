@@ -30,7 +30,11 @@ import {
   toDraftItems,
   type DraftLineItem,
 } from '../lib/lineItems'
-import { sortByDateDesc } from '../lib/finance'
+import {
+  effectiveInvoicePaymentStatus,
+  isCancelledInvoice,
+  sortByDateDesc,
+} from '../lib/finance'
 import {
   buttonDangerStyle,
   buttonPrimaryStyle,
@@ -147,14 +151,59 @@ export default function InvoicesPage() {
         db.from('clients').select('*').order('company_name'),
       ])
       if (iRes.error) throw iRes.error
-      setInvoices(sortByDateDesc((iRes.data || []) as Invoice[]))
+      const raw = (iRes.data || []) as Invoice[]
+      // Repair stale Paid marks on cancelled invoices (e.g. wrong Ello payment applied then cancelled)
+      const stalePaid = raw.filter(
+        (inv) => isCancelledInvoice(inv) && String(inv.payment_status || '').toLowerCase() === 'paid',
+      )
+      for (const inv of stalePaid) {
+        await db
+          .from('invoices')
+          .update({
+            payment_status: 'Pending',
+            updated_at: new Date().toISOString(),
+            updated_by: who || inv.updated_by || '',
+          })
+          .eq('id', inv.id)
+        const { data: pays } = await db
+          .from('payment_log')
+          .select('id')
+          .eq('invoice_ref', inv.reference_number)
+        for (const p of (pays || []) as { id: string }[]) {
+          await db.from('payment_log').delete().eq('id', p.id)
+        }
+        await syncIncome(
+          {
+            client: inv.client,
+            vertical: inv.vertical,
+            reference_number: inv.reference_number,
+            date: inv.date,
+            description: inv.description,
+            payment_status: 'Pending',
+            payment_method: '',
+          },
+          {
+            subtotal: Number(inv.amount) / (1 + vatRate),
+            vat: Number(inv.amount) - Number(inv.amount) / (1 + vatRate),
+            total: Number(inv.amount),
+          },
+        )
+      }
+      const invoicesFixed = stalePaid.length
+        ? raw.map((inv) =>
+            isCancelledInvoice(inv) && String(inv.payment_status || '').toLowerCase() === 'paid'
+              ? { ...inv, payment_status: 'Pending' }
+              : inv,
+          )
+        : raw
+      setInvoices(sortByDateDesc(invoicesFixed))
       setClients((cRes.data || []) as Client[])
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Failed to load invoices', 'error')
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [showToast, who, vatRate])
 
   useEffect(() => {
     void load()
@@ -242,7 +291,10 @@ export default function InvoicesPage() {
       const vertical =
         DIVISIONS.find((d) => d.code === divisionCode)?.brand || form.vertical
       const status = finalize ? (form.status === 'Draft' ? 'Sent' : form.status) : form.status
-      const payment_status = editing?.payment_status || 'Pending'
+      // Cancelled invoices are not paid — clear any mistaken Paid mark
+      const payment_status = isCancelledInvoice({ status })
+        ? 'Pending'
+        : editing?.payment_status || 'Pending'
 
       const payload = {
         client: form.client.trim(),
@@ -276,6 +328,16 @@ export default function InvoicesPage() {
         if (error) throw error
       }
 
+      if (isCancelledInvoice({ status })) {
+        const { data: pays } = await db
+          .from('payment_log')
+          .select('id')
+          .eq('invoice_ref', reference)
+        for (const p of (pays || []) as { id: string }[]) {
+          await db.from('payment_log').delete().eq('id', p.id)
+        }
+      }
+
       await saveLineItems('Invoice', reference, form.items, vatRate)
       await syncIncome(
         {
@@ -285,7 +347,7 @@ export default function InvoicesPage() {
           date: payload.date,
           description: payload.description,
           payment_status,
-          payment_method: settings.paymentMethod || '',
+          payment_method: isCancelledInvoice({ status }) ? '' : settings.paymentMethod || '',
         },
         totals,
       )
@@ -301,6 +363,10 @@ export default function InvoicesPage() {
   }
 
   async function openPayment(inv: Invoice) {
+    if (isCancelledInvoice(inv)) {
+      showToast('Cancelled invoices cannot take payments', 'error')
+      return
+    }
     setPayTarget(inv)
     setPayAmount('')
     setPayMethod(settings.paymentMethod || PAYMENT_METHODS[0])
@@ -318,6 +384,10 @@ export default function InvoicesPage() {
 
   async function recordPayment() {
     if (!payTarget) return
+    if (isCancelledInvoice(payTarget)) {
+      showToast('Cancelled invoices cannot take payments', 'error')
+      return
+    }
     const amount = Number(payAmount)
     if (!(amount > 0)) {
       showToast('Enter a valid payment amount', 'error')
@@ -386,6 +456,10 @@ export default function InvoicesPage() {
   async function markPaid(inv: Invoice) {
     if (userRole !== 'admin') {
       showToast('Only admins can mark invoices as paid', 'error')
+      return
+    }
+    if (isCancelledInvoice(inv)) {
+      showToast('Cancelled invoices cannot be marked paid', 'error')
       return
     }
     setSaving(true)
@@ -545,7 +619,7 @@ export default function InvoicesPage() {
                       <StatusPill status={inv.status} />
                     </td>
                     <td style={tdStyle}>
-                      <StatusPill status={inv.payment_status} />
+                      <StatusPill status={effectiveInvoicePaymentStatus(inv)} />
                     </td>
                     <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -558,12 +632,15 @@ export default function InvoicesPage() {
                         >
                           <ExternalLink size={14} />
                         </Link>
-                        {inv.payment_status !== 'Paid' && (
+                        {!isCancelledInvoice(inv) &&
+                          effectiveInvoicePaymentStatus(inv) !== 'Paid' && (
                           <button type="button" style={buttonPrimaryStyle} onClick={() => void openPayment(inv)}>
                             Pay
                           </button>
                         )}
-                        {userRole === 'admin' && inv.payment_status !== 'Paid' && (
+                        {userRole === 'admin' &&
+                          !isCancelledInvoice(inv) &&
+                          effectiveInvoicePaymentStatus(inv) !== 'Paid' && (
                           <button type="button" style={buttonSecondaryStyle} disabled={saving} onClick={() => void markPaid(inv)}>
                             Mark paid
                           </button>

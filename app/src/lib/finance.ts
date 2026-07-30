@@ -15,9 +15,24 @@ export function isRecognizedIncome(row: IncomeEntry): boolean {
   return false
 }
 
+export function isCancelledInvoice(inv: Pick<Invoice, 'status'> | { status?: string }): boolean {
+  return String(inv.status || '').trim().toLowerCase() === 'cancelled'
+}
+
+/**
+ * Cancelled invoices are never collectible/paid — clear stale "Paid" badges
+ * left behind when status was set to Cancelled after a mistaken payment mark.
+ */
+export function effectiveInvoicePaymentStatus(
+  inv: Pick<Invoice, 'status' | 'payment_status'> | { status?: string; payment_status?: string },
+): string {
+  if (isCancelledInvoice(inv)) return 'Pending'
+  return String(inv.payment_status || 'Pending')
+}
+
 /** Active (non-cancelled) invoices that are still collectible. */
 export function isOpenInvoice(inv: Invoice): boolean {
-  if (String(inv.status || '').toLowerCase() === 'cancelled') return false
+  if (isCancelledInvoice(inv)) return false
   if (String(inv.status || '').toLowerCase() === 'draft') return false
   const pay = String(inv.payment_status || '').toLowerCase()
   return ['pending', 'partial', 'overdue'].includes(pay)
