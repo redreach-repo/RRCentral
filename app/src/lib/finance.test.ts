@@ -29,8 +29,8 @@ describe('finance', () => {
     ).toBe(false)
     expect(
       isRecognizedIncome({
-        status: '',
-        payment_status: 'Pending',
+        status: 'Cancelled',
+        payment_status: 'Paid',
         total_amount: 100,
       } as IncomeEntry),
     ).toBe(false)

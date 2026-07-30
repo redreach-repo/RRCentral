@@ -29,6 +29,7 @@ import {
   quarterMonths,
   type VatQuarter,
 } from '../lib/finance'
+import { reconcileInvoiceFinance } from '../lib/invoiceFinance'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -78,6 +79,7 @@ export default function ReportsPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
+      await reconcileInvoiceFinance()
       const [q, i, inc, exp, c, pay, ref, sup] = await Promise.all([
         db.from('quotations').select('*'),
         db.from('invoices').select('*'),

@@ -35,6 +35,7 @@ import {
   isCancelledInvoice,
   sortByDateDesc,
 } from '../lib/finance'
+import { deleteFinanceForInvoiceRef, reconcileInvoiceFinance } from '../lib/invoiceFinance'
 import {
   buttonDangerStyle,
   buttonPrimaryStyle,
@@ -92,8 +93,11 @@ async function syncIncome(inv: {
   description: string
   payment_status: string
   payment_method?: string
+  invoice_status?: string
 }, totals: { subtotal: number; vat: number; total: number }) {
   if (!inv.reference_number) return
+  const cancelled = isCancelledInvoice({ status: inv.invoice_status || '' })
+  const payment_status = cancelled ? 'Pending' : inv.payment_status
   const row = {
     client_source: inv.client,
     category: inv.vertical,
@@ -103,9 +107,9 @@ async function syncIncome(inv: {
     bill_amount: totals.subtotal,
     vat: totals.vat,
     total_amount: totals.total,
-    status: inv.payment_status === 'Paid' ? 'Paid' : 'Open',
-    payment_method: inv.payment_method || '',
-    payment_status: inv.payment_status,
+    status: cancelled ? 'Cancelled' : payment_status === 'Paid' ? 'Paid' : 'Open',
+    payment_method: cancelled ? '' : inv.payment_method || '',
+    payment_status,
   }
   const { data: existing } = await db
     .from('income')
@@ -114,7 +118,7 @@ async function syncIncome(inv: {
     .maybeSingle()
   if (existing?.id) {
     await db.from('income').update(row).eq('id', existing.id)
-  } else {
+  } else if (!cancelled) {
     await db.from('income').insert(row)
   }
 }
@@ -146,6 +150,7 @@ export default function InvoicesPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
+      await reconcileInvoiceFinance()
       const [iRes, cRes] = await Promise.all([
         db.from('invoices').select('*').order('created_at', { ascending: false }),
         db.from('clients').select('*').order('company_name'),
@@ -165,29 +170,7 @@ export default function InvoicesPage() {
             updated_by: who || inv.updated_by || '',
           })
           .eq('id', inv.id)
-        const { data: pays } = await db
-          .from('payment_log')
-          .select('id')
-          .eq('invoice_ref', inv.reference_number)
-        for (const p of (pays || []) as { id: string }[]) {
-          await db.from('payment_log').delete().eq('id', p.id)
-        }
-        await syncIncome(
-          {
-            client: inv.client,
-            vertical: inv.vertical,
-            reference_number: inv.reference_number,
-            date: inv.date,
-            description: inv.description,
-            payment_status: 'Pending',
-            payment_method: '',
-          },
-          {
-            subtotal: Number(inv.amount) / (1 + vatRate),
-            vat: Number(inv.amount) - Number(inv.amount) / (1 + vatRate),
-            total: Number(inv.amount),
-          },
-        )
+        await deleteFinanceForInvoiceRef(inv.reference_number)
       }
       const invoicesFixed = stalePaid.length
         ? raw.map((inv) =>
@@ -203,7 +186,7 @@ export default function InvoicesPage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast, who, vatRate])
+  }, [showToast, who])
 
   useEffect(() => {
     void load()
@@ -329,13 +312,7 @@ export default function InvoicesPage() {
       }
 
       if (isCancelledInvoice({ status })) {
-        const { data: pays } = await db
-          .from('payment_log')
-          .select('id')
-          .eq('invoice_ref', reference)
-        for (const p of (pays || []) as { id: string }[]) {
-          await db.from('payment_log').delete().eq('id', p.id)
-        }
+        await deleteFinanceForInvoiceRef(reference)
       }
 
       await saveLineItems('Invoice', reference, form.items, vatRate)
@@ -348,6 +325,7 @@ export default function InvoicesPage() {
           description: payload.description,
           payment_status,
           payment_method: isCancelledInvoice({ status }) ? '' : settings.paymentMethod || '',
+          invoice_status: status,
         },
         totals,
       )
@@ -432,6 +410,7 @@ export default function InvoicesPage() {
           description: payTarget.description,
           payment_status,
           payment_method: payMethod,
+          invoice_status: payTarget.status,
         },
         { subtotal: t.subtotal || payTarget.amount / (1 + vatRate), vat: t.vat, total: t.total || payTarget.amount },
       )
@@ -497,6 +476,7 @@ export default function InvoicesPage() {
           description: inv.description,
           payment_status: 'Paid',
           payment_method: settings.paymentMethod || '',
+          invoice_status: inv.status,
         },
         { subtotal: t.subtotal || inv.amount / (1 + vatRate), vat: t.vat, total: t.total || inv.amount },
       )
@@ -546,10 +526,12 @@ export default function InvoicesPage() {
     if (!deleteTarget) return
     setSaving(true)
     try {
-      await deleteLineItems('Invoice', [deleteTarget.reference_number])
+      const ref = deleteTarget.reference_number
+      await deleteLineItems('Invoice', [ref])
+      await deleteFinanceForInvoiceRef(ref)
       const { error } = await db.from('invoices').delete().eq('id', deleteTarget.id)
       if (error) throw error
-      await logActivity('delete_invoice', 'invoice', deleteTarget.reference_number, deleteTarget.client, who)
+      await logActivity('delete_invoice', 'invoice', ref, deleteTarget.client, who)
       showToast('Invoice deleted', 'success')
       setDeleteTarget(null)
       await load()
@@ -884,7 +866,8 @@ export default function InvoicesPage() {
 
       <Modal open={!!deleteTarget} title="Delete invoice?" onClose={() => setDeleteTarget(null)} width={420}>
         <p style={{ color: colors.muted, fontSize: 14 }}>
-          Delete <strong style={{ color: colors.text }}>{deleteTarget?.reference_number}</strong> and its line items?
+          Delete <strong style={{ color: colors.text }}>{deleteTarget?.reference_number}</strong>, its line items,
+          linked payments, and income?
         </p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setDeleteTarget(null)}>Cancel</button>

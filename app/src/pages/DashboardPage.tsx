@@ -21,6 +21,7 @@ import {
   sumExpenses,
   sumRecognizedIncome,
 } from '../lib/finance'
+import { reconcileInvoiceFinance } from '../lib/invoiceFinance'
 import { displayDocumentReference } from '../lib/documents'
 import { hydrateContacts, primaryContact } from '../lib/contacts'
 import StatusPill from '../components/StatusPill'
@@ -121,6 +122,7 @@ export default function DashboardPage() {
     setLoading(true)
     setError(null)
     try {
+      await reconcileInvoiceFinance()
       const [qRes, iRes, incRes, expRes, crmRes] = await Promise.all([
         db.from('quotations').select('*'),
         db.from('invoices').select('*'),
