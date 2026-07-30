@@ -2,19 +2,33 @@
 
 CRM + quotations + invoices for **Red Reach Middle East FZE**.
 
+## How the team should use it
+
+**Use GitHub Pages + Supabase** (shared cloud database). Open:
+
+https://redreach-repo.github.io/RRCentral/
+
+1. Create a project at [supabase.com](https://supabase.com)
+2. SQL Editor → run [`app/supabase-schema.sql`](./app/supabase-schema.sql)
+3. Auth → Providers → **Google** → enable  
+   Redirect URL: `https://redreach-repo.github.io/RRCentral/`
+4. Project Settings → API → copy **URL** + **anon key**
+5. In the CRM: **Settings → Data & storage → Connect Supabase** → paste → Connect & reload  
+   *(Or add GitHub Actions secrets `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` and redeploy so everyone is cloud by default.)*
+
+Until Supabase is connected, the orange banner means **local mode** (data stays in that browser only).
+
 ## Apps
 
 | App | Path | Stack |
 |-----|------|--------|
-| **React app (current)** | [`app/`](./app/) | Vite + React + Supabase → GitHub Pages |
+| **React app (team)** | [`app/`](./app/) | Vite + React → GitHub Pages + optional Supabase |
 | Legacy UI | [`web/`](./web/) | Static Pages launcher for Apps Script |
 | Legacy backend | [`appscript/`](./appscript/) | Google Apps Script + Sheets |
 
-For **team sharing**, use the **Apps Script** web app (shared Google Sheet). The React app in `app/` is local-browser unless Supabase is connected.
-
 ## React app quick start
 
-**Today on GitHub Pages the app runs in local mode:** CRM data is stored in **this browser’s IndexedDB** (`rrcentral_local`), not in the cloud. Use **Settings → Data & storage** to download backups.
+**Today on GitHub Pages the app runs in local mode until Supabase is connected:** CRM data is stored in **this browser’s IndexedDB** (`rrcentral_local`). Use **Settings → Data & storage** to connect Supabase or download backups.
 
 ### Local (no Supabase)
 
@@ -24,14 +38,9 @@ npm install
 npm run dev
 ```
 
-### Cloud (Supabase) — optional for multi-device sync
+### Cloud (Supabase) — team sharing
 
-1. Create a Supabase project and run [`app/supabase-schema.sql`](./app/supabase-schema.sql).
-2. Enable **Google** auth in Supabase.
-3. Copy `app/.env.example` → `app/.env` and set real `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`.
-4. Deploy: push to `main`. Add the same Vite env vars as GitHub Actions secrets.
-
-Full notes: [`app/README.md`](./app/README.md).
+Follow the steps at the top of this README. Full notes: [`app/README.md`](./app/README.md).
 
 ## Legacy Apps Script API
 
