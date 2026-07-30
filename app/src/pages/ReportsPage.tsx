@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'r
 import { differenceInCalendarDays, format, parseISO, startOfMonth, subMonths } from 'date-fns'
 import { Download } from 'lucide-react'
 import { db } from '../lib/db'
-import { DIVISIONS, VAT_RATE } from '../lib/config'
-import type { Expense, IncomeEntry, Invoice, Quotation } from '../lib/types'
+import { DIVISIONS, PIPELINE_STAGES, VAT_RATE } from '../lib/config'
+import type { CrmEntry, Expense, IncomeEntry, Invoice, Quotation } from '../lib/types'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
@@ -37,7 +37,7 @@ import {
   thStyle,
 } from '../lib/uiStyles'
 
-type Tab = 'winrate' | 'aging' | 'pnl' | 'vat'
+type Tab = 'winrate' | 'aging' | 'pnl' | 'vat' | 'funnel'
 
 const tabStyle = (active: boolean): CSSProperties => ({
   ...buttonSecondaryStyle,
@@ -55,6 +55,7 @@ export default function ReportsPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [income, setIncome] = useState<IncomeEntry[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
+  const [crm, setCrm] = useState<CrmEntry[]>([])
 
   const nowQ = currentVatQuarter()
   const [vatYear, setVatYear] = useState(nowQ.year)
@@ -63,20 +64,23 @@ export default function ReportsPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [q, i, inc, exp] = await Promise.all([
+      const [q, i, inc, exp, c] = await Promise.all([
         db.from('quotations').select('*'),
         db.from('invoices').select('*'),
         db.from('income').select('*'),
         db.from('expenses').select('*'),
+        db.from('crm').select('*'),
       ])
       if (q.error) throw q.error
       if (i.error) throw i.error
       if (inc.error) throw inc.error
       if (exp.error) throw exp.error
+      if (c.error) throw c.error
       setQuotes((q.data || []) as Quotation[])
       setInvoices((i.data || []) as Invoice[])
       setIncome((inc.data || []) as IncomeEntry[])
       setExpenses((exp.data || []) as Expense[])
+      setCrm((c.data || []) as CrmEntry[])
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Failed to load reports', 'error')
     } finally {
@@ -102,6 +106,40 @@ export default function ReportsPage() {
       return { ...d, total, awarded, notAwarded, expired, winPct }
     })
   }, [quotes])
+
+  const crmFunnel = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const s of PIPELINE_STAGES) counts[s] = 0
+    const reasons: Record<string, number> = {}
+    let won = 0
+    let lost = 0
+    for (const c of crm) {
+      const s = c.pipeline_stage || 'Lead'
+      counts[s] = (counts[s] || 0) + 1
+      if (s === 'Won') {
+        won += 1
+        const r = (c.outcome_reason || 'Unspecified').trim() || 'Unspecified'
+        reasons[r] = (reasons[r] || 0) + 1
+      } else if (s === 'Lost') {
+        lost += 1
+        const r = (c.outcome_reason || 'Unspecified').trim() || 'Unspecified'
+        reasons[r] = (reasons[r] || 0) + 1
+      }
+    }
+    const decided = won + lost
+    const winPct = decided > 0 ? Math.round((won / decided) * 1000) / 10 : 0
+    const reasonRows = Object.entries(reasons)
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count)
+    return {
+      stages: PIPELINE_STAGES.map((s) => ({ stage: s, count: counts[s] || 0 })),
+      won,
+      lost,
+      winPct,
+      reasonRows,
+      total: crm.length,
+    }
+  }, [crm])
 
   const aging = useMemo(() => {
     const buckets = [
@@ -233,7 +271,30 @@ export default function ReportsPage() {
   const maxPnl = Math.max(1, ...monthlyPnl.map((m) => Math.max(m.income, m.expenses)))
 
   function exportCsv() {
-    if (tab === 'winrate') {
+    if (tab === 'funnel') {
+      const header = ['Stage', 'Count']
+      const rows = crmFunnel.stages.map((r) => [r.stage, r.count].map(escapeCsv).join(','))
+      const reasonHeader = ['Outcome reason', 'Count']
+      const reasonRows = crmFunnel.reasonRows.map((r) =>
+        [r.reason, r.count].map(escapeCsv).join(','),
+      )
+      downloadCsv(
+        'crm-funnel.csv',
+        [
+          'PIPELINE',
+          header.join(','),
+          ...rows,
+          '',
+          `Won,${crmFunnel.won}`,
+          `Lost,${crmFunnel.lost}`,
+          `Win %,${crmFunnel.winPct}`,
+          '',
+          'OUTCOME REASONS',
+          reasonHeader.join(','),
+          ...reasonRows,
+        ].join('\n'),
+      )
+    } else if (tab === 'winrate') {
       const header = ['Division', 'Brand', 'Total', 'Awarded', 'Not awarded', 'Expired', 'Win %']
       const rows = winRate.map((r) =>
         [r.code, r.brand, r.total, r.awarded, r.notAwarded, r.expired, r.winPct]
@@ -315,6 +376,9 @@ export default function ReportsPage() {
         <button type="button" style={tabStyle(tab === 'vat')} onClick={() => setTab('vat')}>
           VAT report
         </button>
+        <button type="button" style={tabStyle(tab === 'funnel')} onClick={() => setTab('funnel')}>
+          CRM funnel
+        </button>
         <button type="button" style={tabStyle(tab === 'winrate')} onClick={() => setTab('winrate')}>
           Win rate by division
         </button>
@@ -328,6 +392,67 @@ export default function ReportsPage() {
 
       {loading ? (
         <div style={{ ...cardStyle, color: colors.muted }}>Loading reports…</div>
+      ) : tab === 'funnel' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={cardStyle}>
+            <p style={{ margin: '0 0 12px', fontSize: 13, color: colors.muted }}>
+              {crmFunnel.total} companies · Won {crmFunnel.won} · Lost {crmFunnel.lost} · Win rate{' '}
+              {crmFunnel.winPct}% (of decided)
+            </p>
+            <div style={tableWrapStyle}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Stage</th>
+                    <th style={thStyle}>Count</th>
+                    <th style={thStyle}>Share</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {crmFunnel.stages.map((r) => (
+                    <tr key={r.stage}>
+                      <td style={tdStyle}>{r.stage}</td>
+                      <td style={tdStyle}>{r.count}</td>
+                      <td style={tdStyle}>
+                        {crmFunnel.total > 0
+                          ? `${Math.round((r.count / crmFunnel.total) * 1000) / 10}%`
+                          : '0%'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div style={cardStyle}>
+            <h2 style={{ margin: '0 0 12px', fontSize: 16 }}>Won / Lost reasons</h2>
+            {crmFunnel.reasonRows.length === 0 ? (
+              <EmptyState
+                title="No outcomes yet"
+                subtitle="Set Won/Lost on CRM companies or sync from quote outcomes."
+              />
+            ) : (
+              <div style={tableWrapStyle}>
+                <table style={tableStyle}>
+                  <thead>
+                    <tr>
+                      <th style={thStyle}>Reason</th>
+                      <th style={thStyle}>Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {crmFunnel.reasonRows.map((r) => (
+                      <tr key={r.reason}>
+                        <td style={tdStyle}>{r.reason}</td>
+                        <td style={tdStyle}>{r.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
       ) : tab === 'vat' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ ...cardStyle, display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'end' }}>

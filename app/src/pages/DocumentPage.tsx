@@ -21,6 +21,7 @@ import { hydrateContacts, primaryContact } from '../lib/contacts'
 import { isZohoMailEnabled } from '../lib/zoho'
 import EmailComposeModal from '../components/EmailComposeModal'
 import { logActivity } from '../lib/activity'
+import { syncCrmFromQuote } from '../lib/crmSync'
 import {
   applyMessageTemplate,
   DEFAULT_EMAIL_QUOTE_BODY,
@@ -240,6 +241,11 @@ export default function DocumentPage() {
     if (!err) {
       setQuote({ ...quote, status: 'Sent' })
       await logActivity('email_quote', 'quotation', displayRef, quote.client, '')
+      await syncCrmFromQuote({
+        client: quote.client,
+        quoteRef: quote.reference_number,
+        quoteStatus: 'Sent',
+      })
     }
   }
 

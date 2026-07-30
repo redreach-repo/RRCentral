@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { addDays, differenceInCalendarDays, format, parseISO, startOfDay } from 'date-fns'
 import { Bell, CalendarClock, Mail, MessageSquarePlus, MessageCircle } from 'lucide-react'
 import { db } from '../lib/db'
+import { NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
 import type { CrmEntry } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
@@ -56,6 +57,10 @@ export default function FollowupsPage() {
   const [error, setError] = useState('')
   const [updateTarget, setUpdateTarget] = useState<CrmEntry | null>(null)
   const [updateText, setUpdateText] = useState('')
+  const [updateFollowDate, setUpdateFollowDate] = useState('')
+  const [updateStage, setUpdateStage] = useState('')
+  const [updateNextAction, setUpdateNextAction] = useState('')
+  const [updateClearDate, setUpdateClearDate] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [emailTarget, setEmailTarget] = useState<CrmEntry | null>(null)
 
@@ -137,7 +142,7 @@ export default function FollowupsPage() {
 
       const { error: err } = await db.from('crm').update(patch).eq('id', entry.id)
       if (err) throw err
-      await logActivity('snooze_followup', 'crm', entry.company_name, `Snoozed to ${next}`, user?.email || '')
+      await logActivity('snooze_followup', 'crm', entry.company_name, `Snoozed to ${next}`, user?.email || '', entry.id)
       showToast('Follow-up snoozed +7 days', 'success')
       await load()
     } catch (e) {
@@ -173,7 +178,7 @@ export default function FollowupsPage() {
         })
         .eq('id', entry.id)
       if (err) throw err
-      await logActivity('clear_followup', 'crm', entry.company_name, 'Cleared follow-up date', user?.email || '')
+      await logActivity('clear_followup', 'crm', entry.company_name, 'Cleared follow-up date', user?.email || '', entry.id)
       showToast('Follow-up cleared', 'success')
       await load()
     } catch (e) {
@@ -194,16 +199,73 @@ export default function FollowupsPage() {
         user_email: user?.email || '',
       })
       if (err) throw err
+
+      const patch: Record<string, unknown> = {
+        updated_by: user?.email || '',
+        updated_at: new Date().toISOString(),
+      }
+      if (updateStage) patch.pipeline_stage = updateStage
+      if (updateNextAction) patch.next_action = updateNextAction
+
+      let nextDate: string | null | undefined
+      if (updateClearDate) {
+        nextDate = null
+        patch.follow_up_date = null
+      } else if (updateFollowDate) {
+        nextDate = updateFollowDate
+        patch.follow_up_date = updateFollowDate
+      }
+
+      if (isZohoCalendarEnabled(settings) && nextDate !== undefined) {
+        try {
+          const contacts = hydrateContacts(updateTarget)
+          const p = primaryContact(contacts)
+          if (nextDate) {
+            const eventId = await syncFollowUpToZohoCalendar(settings, {
+              company: updateTarget.company_name,
+              nextAction: (patch.next_action as string) || updateTarget.next_action,
+              owner: updateTarget.owner,
+              contactName: p?.name,
+              contactEmail: p?.email,
+              followUpDate: nextDate,
+              existingEventId: updateTarget.calendar_event_id || undefined,
+            })
+            if (eventId) patch.calendar_event_id = eventId
+          } else if (updateTarget.calendar_event_id) {
+            await deleteZohoCalendarEvent(settings, updateTarget.calendar_event_id)
+            patch.calendar_event_id = ''
+          }
+        } catch (calErr) {
+          showToast(
+            calErr instanceof Error
+              ? `Saved locally; Zoho Calendar: ${calErr.message}`
+              : 'Saved locally; calendar sync failed',
+            'error',
+          )
+        }
+      }
+
+      if (Object.keys(patch).length > 2) {
+        const { error: crmErr } = await db.from('crm').update(patch).eq('id', updateTarget.id)
+        if (crmErr) throw crmErr
+      }
+
       await logActivity(
         'followup_update',
         'crm',
         updateTarget.company_name,
         updateText.trim().slice(0, 120),
         user?.email || '',
+        updateTarget.id,
       )
-      showToast('Update added', 'success')
+      showToast('Update saved', 'success')
       setUpdateTarget(null)
       setUpdateText('')
+      setUpdateFollowDate('')
+      setUpdateStage('')
+      setUpdateNextAction('')
+      setUpdateClearDate(false)
+      await load()
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Failed to save update', 'error')
     } finally {
@@ -306,6 +368,10 @@ export default function FollowupsPage() {
             onClick={() => {
               setUpdateTarget(entry)
               setUpdateText('')
+              setUpdateFollowDate(entry.follow_up_date ? entry.follow_up_date.slice(0, 10) : '')
+              setUpdateStage(entry.pipeline_stage || 'Lead')
+              setUpdateNextAction(entry.next_action || '')
+              setUpdateClearDate(false)
             }}
           >
             <MessageSquarePlus size={14} /> Add Update
@@ -359,15 +425,83 @@ export default function FollowupsPage() {
         open={!!updateTarget}
         title={`Update — ${updateTarget?.company_name || ''}`}
         onClose={() => setUpdateTarget(null)}
-        width={480}
+        width={520}
       >
         <label style={labelStyle}>What happened?</label>
         <textarea
-          style={{ ...inputStyle, minHeight: 110, resize: 'vertical', marginBottom: 16 }}
+          style={{ ...inputStyle, minHeight: 90, resize: 'vertical', marginBottom: 12 }}
           value={updateText}
           onChange={(e) => setUpdateText(e.target.value)}
           placeholder="Called client, sent samples, awaiting reply…"
         />
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+            gap: 10,
+            marginBottom: 12,
+          }}
+        >
+          <div>
+            <label style={labelStyle}>Pipeline stage</label>
+            <select
+              style={inputStyle}
+              value={updateStage}
+              onChange={(e) => setUpdateStage(e.target.value)}
+            >
+              {PIPELINE_STAGES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Next action</label>
+            <select
+              style={inputStyle}
+              value={updateNextAction}
+              onChange={(e) => setUpdateNextAction(e.target.value)}
+            >
+              <option value="">—</option>
+              {NEXT_ACTIONS.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Follow-up date</label>
+            <input
+              type="date"
+              style={inputStyle}
+              value={updateClearDate ? '' : updateFollowDate}
+              disabled={updateClearDate}
+              onChange={(e) => {
+                setUpdateClearDate(false)
+                setUpdateFollowDate(e.target.value)
+              }}
+            />
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                marginTop: 8,
+                fontSize: 12,
+                color: colors.muted,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={updateClearDate}
+                onChange={(e) => setUpdateClearDate(e.target.checked)}
+              />
+              Clear follow-up date
+            </label>
+          </div>
+        </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setUpdateTarget(null)}>
             Cancel
@@ -382,7 +516,7 @@ export default function FollowupsPage() {
           </button>
         </div>
         <p style={{ margin: '12px 0 0', fontSize: 12, color: colors.muted2 }}>
-          Saves to follow_up_updates. Use Clear if the follow-up is done.
+          Saves a note and optionally updates stage, next action, and follow-up date.
         </p>
       </Modal>
 

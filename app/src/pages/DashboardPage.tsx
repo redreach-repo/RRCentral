@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
   FileText,
   Receipt,
   TrendingDown,
   TrendingUp,
+  Users,
   Wallet,
 } from 'lucide-react'
 import { addDays, format, isWithinInterval, parseISO, startOfDay, startOfMonth } from 'date-fns'
 import { db } from '../lib/db'
-import { DIVISIONS } from '../lib/config'
+import { DIVISIONS, PIPELINE_STAGES } from '../lib/config'
 import type { CrmEntry, Expense, IncomeEntry, Invoice, Quotation } from '../lib/types'
 import {
   isInMonth,
@@ -20,6 +22,7 @@ import {
   sumRecognizedIncome,
 } from '../lib/finance'
 import { displayDocumentReference } from '../lib/documents'
+import { hydrateContacts, primaryContact } from '../lib/contacts'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
 import {
@@ -44,10 +47,11 @@ interface KpiCardProps {
   icon: ReactNode
   accent?: string
   hint?: string
+  to?: string
 }
 
-function KpiCard({ label, value, icon, accent = colors.accent, hint }: KpiCardProps) {
-  return (
+function KpiCard({ label, value, icon, accent = colors.accent, hint, to }: KpiCardProps) {
+  const inner = (
     <div
       style={{
         ...cardStyle,
@@ -56,6 +60,9 @@ function KpiCard({ label, value, icon, accent = colors.accent, hint }: KpiCardPr
         alignItems: 'flex-start',
         minWidth: 0,
         background: `linear-gradient(135deg, ${accent}18 0%, ${colors.card} 55%)`,
+        textDecoration: 'none',
+        color: 'inherit',
+        cursor: to ? 'pointer' : undefined,
       }}
     >
       <div
@@ -91,6 +98,13 @@ function KpiCard({ label, value, icon, accent = colors.accent, hint }: KpiCardPr
         ) : null}
       </div>
     </div>
+  )
+  return to ? (
+    <Link to={to} style={{ textDecoration: 'none', color: 'inherit', minWidth: 0 }}>
+      {inner}
+    </Link>
+  ) : (
+    inner
   )
 }
 
@@ -187,6 +201,43 @@ export default function DashboardPage() {
     }).length
   }, [crm])
 
+  const pipelineCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const s of PIPELINE_STAGES) counts[s] = 0
+    for (const c of crm) {
+      const s = c.pipeline_stage || 'Lead'
+      counts[s] = (counts[s] || 0) + 1
+    }
+    return counts
+  }, [crm])
+
+  const openPipeline = useMemo(
+    () =>
+      crm.filter((c) => !['Won', 'Lost'].includes(c.pipeline_stage || 'Lead')).length,
+    [crm],
+  )
+
+  const ownerWorkload = useMemo(() => {
+    const today = startOfDay(new Date())
+    const map = new Map<string, { open: number; overdue: number }>()
+    for (const c of crm) {
+      const owner = c.owner || 'Unassigned'
+      const cur = map.get(owner) || { open: 0, overdue: 0 }
+      if (!['Won', 'Lost'].includes(c.pipeline_stage || 'Lead')) cur.open += 1
+      if (c.follow_up_date) {
+        try {
+          if (parseISO(c.follow_up_date) < today) cur.overdue += 1
+        } catch {
+          /* ignore */
+        }
+      }
+      map.set(owner, cur)
+    }
+    return Array.from(map.entries())
+      .map(([owner, v]) => ({ owner, ...v }))
+      .sort((a, b) => b.open - a.open || b.overdue - a.overdue || a.owner.localeCompare(b.owner))
+  }, [crm])
+
   /** Pipeline = open quotes only. Awarded = won revenue potential (not income until paid). */
   const divisionBreakdown = useMemo(() => {
     return DIVISIONS.map((d) => {
@@ -277,6 +328,14 @@ export default function DashboardPage() {
           hint="Draft / Finalized / Sent"
         />
         <KpiCard
+          label="Open CRM deals"
+          value={String(openPipeline)}
+          icon={<Users size={18} />}
+          accent="#a78bfa"
+          hint="Not Won / Lost"
+          to="/crm"
+        />
+        <KpiCard
           label="Pending Invoices"
           value={String(pendingInvoices)}
           icon={<Receipt size={18} />}
@@ -287,7 +346,32 @@ export default function DashboardPage() {
           value={String(overdueFollowUps)}
           icon={<AlertTriangle size={18} />}
           accent="#fb923c"
+          to="/follow-ups"
         />
+      </div>
+
+      <div style={{ ...cardStyle, marginBottom: 24 }}>
+        <h2 style={sectionTitleStyle}>CRM pipeline</h2>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {PIPELINE_STAGES.map((s) => (
+            <Link
+              key={s}
+              to={`/crm?stage=${encodeURIComponent(s)}`}
+              style={{
+                textDecoration: 'none',
+                color: colors.text,
+                border: `1px solid ${colors.border}`,
+                borderRadius: 10,
+                padding: '10px 14px',
+                minWidth: 88,
+                background: 'rgba(255,255,255,0.03)',
+              }}
+            >
+              <div style={{ fontSize: 11, color: colors.muted, marginBottom: 4 }}>{s}</div>
+              <div style={{ fontSize: 20, fontWeight: 700 }}>{pipelineCounts[s] || 0}</div>
+            </Link>
+          ))}
+        </div>
       </div>
 
       <div style={{ ...cardStyle, marginBottom: 24 }}>
@@ -404,46 +488,106 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div style={cardStyle}>
-        <h2 style={sectionTitleStyle}>Upcoming Follow-ups (7 days)</h2>
-        {upcomingFollowUps.length === 0 ? (
-          <EmptyState
-            icon={<AlertTriangle size={22} />}
-            title="No upcoming follow-ups"
-            subtitle="CRM follow-ups due in the next 7 days will show here."
-          />
-        ) : (
-          <div style={tableWrapStyle}>
-            <table style={tableStyle}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>Date</th>
-                  <th style={thStyle}>Company</th>
-                  <th style={thStyle}>Contact</th>
-                  <th style={thStyle}>Action</th>
-                  <th style={thStyle}>Owner</th>
-                  <th style={thStyle}>Quote</th>
-                </tr>
-              </thead>
-              <tbody>
-                {upcomingFollowUps.map((c) => (
-                  <tr key={c.id}>
-                    <td style={tdStyle}>
-                      {c.follow_up_date
-                        ? format(parseISO(c.follow_up_date), 'dd MMM yyyy')
-                        : '—'}
-                    </td>
-                    <td style={tdStyle}>{c.company_name}</td>
-                    <td style={tdStyle}>{c.primary_contact || '—'}</td>
-                    <td style={tdStyle}>{c.next_action || '—'}</td>
-                    <td style={tdStyle}>{c.owner || '—'}</td>
-                    <td style={tdStyle}>{c.quote_ref || '—'}</td>
+      <div style={{ ...dualPanelGridStyle, marginBottom: 24 }}>
+        <div style={cardStyle}>
+          <h2 style={sectionTitleStyle}>Sales owner workload</h2>
+          {ownerWorkload.length === 0 ? (
+            <EmptyState title="No CRM owners yet" subtitle="Assign sales owners on CRM companies." />
+          ) : (
+            <div style={tableWrapStyle}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Owner</th>
+                    <th style={thStyle}>Open deals</th>
+                    <th style={thStyle}>Overdue</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody>
+                  {ownerWorkload.map((r) => (
+                    <tr key={r.owner}>
+                      <td style={tdStyle}>
+                        <Link
+                          to={`/crm?owner=${encodeURIComponent(r.owner)}`}
+                          style={{ color: colors.accent, textDecoration: 'none' }}
+                        >
+                          {r.owner}
+                        </Link>
+                      </td>
+                      <td style={tdStyle}>{r.open}</td>
+                      <td style={{ ...tdStyle, color: r.overdue ? colors.danger : colors.muted }}>
+                        {r.overdue}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div style={cardStyle}>
+          <h2 style={sectionTitleStyle}>Upcoming Follow-ups (7 days)</h2>
+          {upcomingFollowUps.length === 0 ? (
+            <EmptyState
+              icon={<AlertTriangle size={22} />}
+              title="No upcoming follow-ups"
+              subtitle="CRM follow-ups due in the next 7 days will show here."
+            />
+          ) : (
+            <div style={tableWrapStyle}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Date</th>
+                    <th style={thStyle}>Company</th>
+                    <th style={thStyle}>Contact</th>
+                    <th style={thStyle}>Action</th>
+                    <th style={thStyle}>Owner</th>
+                    <th style={thStyle}>Quote</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {upcomingFollowUps.map((c) => {
+                    const p = primaryContact(hydrateContacts(c))
+                    return (
+                      <tr key={c.id}>
+                        <td style={tdStyle}>
+                          {c.follow_up_date
+                            ? format(parseISO(c.follow_up_date), 'dd MMM yyyy')
+                            : '—'}
+                        </td>
+                        <td style={tdStyle}>
+                          <Link
+                            to={`/crm?edit=${c.id}`}
+                            style={{ color: colors.accent, textDecoration: 'none' }}
+                          >
+                            {c.company_name}
+                          </Link>
+                        </td>
+                        <td style={tdStyle}>{p?.name || c.primary_contact || '—'}</td>
+                        <td style={tdStyle}>{c.next_action || '—'}</td>
+                        <td style={tdStyle}>{c.owner || '—'}</td>
+                        <td style={tdStyle}>
+                          {c.quote_ref ? (
+                            <Link
+                              to={`/quotations?ref=${encodeURIComponent(c.quote_ref)}`}
+                              style={{ color: colors.accent, textDecoration: 'none' }}
+                            >
+                              {c.quote_ref}
+                            </Link>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

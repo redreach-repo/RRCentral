@@ -27,6 +27,7 @@ import Modal from '../components/Modal'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
 import { logActivity } from '../lib/activity'
+import { syncCrmFromQuote } from '../lib/crmSync'
 import { formatAED } from '../lib/money'
 import {
   generateReference,
@@ -184,6 +185,15 @@ export default function QuotationsPage() {
               }
             : q,
         )
+        await Promise.all(
+          toExpire.map((q) =>
+            syncCrmFromQuote({
+              client: q.client,
+              quoteRef: q.reference_number,
+              quoteStatus: 'Expired',
+            }),
+          ),
+        )
       }
 
       setQuotes(rows)
@@ -204,6 +214,23 @@ export default function QuotationsPage() {
     const ref = searchParams.get('ref')
     if (ref) setSearch(ref)
   }, [searchParams])
+
+  useEffect(() => {
+    const wantNew = searchParams.get('new') === '1'
+    const client = searchParams.get('client')
+    if (!wantNew || loading) return
+    setEditing(null)
+    setForm(
+      emptyForm({
+        client: client || '',
+        payment_terms: settings.paymentTerms || PAYMENT_TERMS[0],
+        delivery_terms: settings.deliveryTerms || DELIVERY_TERMS[0],
+        moq: settings.moqDefault || '50',
+      }),
+    )
+    setEditorOpen(true)
+    setSearchParams({}, { replace: true })
+  }, [searchParams, loading, setSearchParams, settings])
 
   useEffect(() => {
     const templateId = searchParams.get('template')
@@ -386,6 +413,12 @@ export default function QuotationsPage() {
         .eq('id', q.id)
       if (error) throw error
       await logActivity('finalize_quote', 'quotation', reference, q.client, who)
+      await syncCrmFromQuote({
+        client: q.client,
+        quoteRef: reference,
+        quoteStatus: 'Finalized',
+        userEmail: who,
+      })
       showToast(`Finalized as ${reference}`, 'success')
       await load()
     } catch (e) {
@@ -475,6 +508,12 @@ export default function QuotationsPage() {
         vatRate,
       )
       await logActivity('revise_quote', 'quotation', newRef, `Rev ${nextRev} of ${base}`, who)
+      await syncCrmFromQuote({
+        client: q.client,
+        quoteRef: newRef,
+        quoteStatus: 'Finalized',
+        userEmail: who,
+      })
       showToast(`Created revision ${newRef}`, 'success')
       await load()
     } catch (e) {
@@ -559,6 +598,13 @@ export default function QuotationsPage() {
         `${outcomeStatus}: ${outcomeReason}`,
         who,
       )
+      await syncCrmFromQuote({
+        client: outcomeTarget.client,
+        quoteRef: outcomeTarget.reference_number,
+        quoteStatus: outcomeStatus,
+        outcomeReason,
+        userEmail: who,
+      })
       showToast('Outcome updated', 'success')
       setOutcomeTarget(null)
       await load()

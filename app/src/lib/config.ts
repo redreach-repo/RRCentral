@@ -44,6 +44,16 @@ export const PIPELINE_STAGES = [
   'Lost',
 ] as const
 
+export const CRM_OUTCOME_REASONS = [
+  'Price',
+  'Competitor won',
+  'Timing / budget',
+  'Scope mismatch',
+  'No response',
+  'Relationship',
+  'Other',
+] as const
+
 export const PAYMENT_TERMS = [
   'Immediate upon delivery',
   '50% Advance, 50% on delivery',

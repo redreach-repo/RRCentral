@@ -104,6 +104,7 @@ create table crm (
   trn text not null default '',
   pipeline_stage text not null default 'Lead',
   quote_ref text not null default '',
+  outcome_reason text not null default '',
   calendar_event_id text not null default '',
   contacts jsonb not null default '[]'::jsonb,
   created_by text not null default '',
@@ -295,6 +296,7 @@ create table activity_log (
   reference text not null default '',
   details text not null default '',
   user_email text not null default '',
+  crm_id uuid references crm(id) on delete set null,
   created_at timestamptz not null default now()
 );
 
@@ -363,6 +365,8 @@ create policy "Authenticated users full access" on activity_log for all using (a
 -- alter table crm add column if not exists website text not null default '';
 -- alter table crm add column if not exists trn text not null default '';
 -- alter table crm add column if not exists pipeline_stage text not null default 'Lead';
+-- alter table crm add column if not exists outcome_reason text not null default '';
+-- alter table activity_log add column if not exists crm_id uuid references crm(id) on delete set null;
 -- alter table clients add column if not exists company_owner text not null default '';
 -- alter table clients add column if not exists website text not null default '';
 -- alter table quotations add column if not exists valid_until date;

@@ -44,6 +44,8 @@ export interface CrmEntry {
   /** Sales pipeline stage: Lead → … → Won/Lost */
   pipeline_stage: string
   quote_ref: string
+  /** Why the deal was Won or Lost (company-level). */
+  outcome_reason: string
   calendar_event_id: string
   contacts?: CrmContact[]
   created_by: string
@@ -203,6 +205,8 @@ export interface ActivityLogEntry {
   reference: string
   details: string
   user_email: string
+  /** Optional link back to a CRM company for timeline filtering. */
+  crm_id?: string | null
   created_at: string
 }
 

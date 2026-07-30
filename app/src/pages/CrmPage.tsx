@@ -12,9 +12,10 @@ import {
   Mail,
   UserPlus,
   MessageCircle,
+  FileText,
 } from 'lucide-react'
 import { db } from '../lib/db'
-import { NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
+import { CRM_OUTCOME_REASONS, NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
 import type { ActivityLogEntry, AppUser, CrmContact, CrmEntry } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
@@ -83,7 +84,10 @@ type CrmForm = {
   owner: string
   pipeline_stage: string
   quote_ref: string
+  outcome_reason: string
 }
+
+type FollowFilter = 'All' | 'Overdue' | 'Today' | 'Upcoming' | 'None'
 
 const emptyForm = (): CrmForm => ({
   company_name: '',
@@ -98,7 +102,28 @@ const emptyForm = (): CrmForm => ({
   owner: '',
   pipeline_stage: 'Lead',
   quote_ref: '',
+  outcome_reason: '',
 })
+
+const chip = (active: boolean): CSSProperties => ({
+  ...btnGhost,
+  fontSize: 12,
+  padding: '6px 10px',
+  borderRadius: 8,
+  border: `1px solid ${active ? colors.accent : colors.border}`,
+  background: active ? `${colors.accent}22` : 'transparent',
+  color: active ? colors.text : colors.muted,
+  fontWeight: active ? 700 : 500,
+})
+
+const compactSelect: CSSProperties = {
+  ...input,
+  padding: '4px 8px',
+  fontSize: 12,
+  minWidth: 0,
+  width: '100%',
+  maxWidth: 140,
+}
 
 function followUpColor(dateStr: string | null): string {
   if (!dateStr) return colors.muted2
@@ -123,13 +148,17 @@ export default function CrmPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
+  const [stageFilter, setStageFilter] = useState<string>('All')
+  const [ownerFilter, setOwnerFilter] = useState<string>('All')
+  const [followFilter, setFollowFilter] = useState<FollowFilter>('All')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<CrmEntry | null>(null)
-  const [form, setForm] = useState<CrmForm>(emptyForm)
+  const [form, setForm] = useState<CrmForm>(() => emptyForm())
   const [deleteTarget, setDeleteTarget] = useState<CrmEntry | null>(null)
   const [emailTarget, setEmailTarget] = useState<CrmEntry | null>(null)
   const [activity, setActivity] = useState<ActivityLogEntry[]>([])
   const [activityLoading, setActivityLoading] = useState(false)
+  const [quickBusyId, setQuickBusyId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -149,6 +178,7 @@ export default function CrmPage() {
           address: row.address || '',
           website: row.website || '',
           trn: row.trn || '',
+          outcome_reason: row.outcome_reason || '',
         })),
       )
       setOwners((usersRes.data || []) as AppUser[])
@@ -179,23 +209,29 @@ export default function CrmPage() {
       owner: entry.owner || '',
       pipeline_stage: entry.pipeline_stage || 'Lead',
       quote_ref: entry.quote_ref || '',
+      outcome_reason: entry.outcome_reason || '',
     })
     setModalOpen(true)
     setActivityLoading(true)
     void (async () => {
       try {
         const company = entry.company_name
-        const [actRes, fuRes, quoteRes] = await Promise.all([
-          db.from('activity_log').select('*').order('created_at', { ascending: false }).limit(80),
+        const [actRes, actByCrmRes, fuRes, quoteRes] = await Promise.all([
+          db.from('activity_log').select('*').order('created_at', { ascending: false }).limit(120),
+          db.from('activity_log').select('*').eq('crm_id', entry.id).order('created_at', { ascending: false }).limit(40),
           db.from('follow_up_updates').select('*').eq('crm_id', entry.id).order('created_at', { ascending: false }),
           db.from('quotations').select('*').ilike('client', company).order('created_at', { ascending: false }).limit(10),
         ])
-        const logs = ((actRes.data || []) as ActivityLogEntry[]).filter(
+        const byCrm = (actByCrmRes.data || []) as ActivityLogEntry[]
+        const byCrmIds = new Set(byCrm.map((a) => a.id))
+        const legacy = ((actRes.data || []) as ActivityLogEntry[]).filter(
           (a) =>
-            a.reference === company ||
-            a.details?.includes(company) ||
-            (a.entity === 'crm' && a.reference === company),
+            !byCrmIds.has(a.id) &&
+            (a.reference === company ||
+              a.details?.includes(company) ||
+              (a.entity === 'crm' && a.reference === company)),
         )
+        const logs = [...byCrm, ...legacy]
         const updates = ((fuRes.data || []) as { update_text?: string; user_email?: string; created_at?: string }[]).map(
           (u, i) =>
             ({
@@ -238,6 +274,15 @@ export default function CrmPage() {
 
   useEffect(() => {
     const editId = searchParams.get('edit')
+    const stage = searchParams.get('stage')
+    const follow = searchParams.get('follow')
+    const owner = searchParams.get('owner')
+    if (stage) setStageFilter(stage)
+    if (follow === 'Overdue' || follow === 'Today' || follow === 'Upcoming' || follow === 'None') {
+      setFollowFilter(follow)
+    }
+    if (owner === 'Unassigned' || owner === '') setOwnerFilter('Unassigned')
+    else if (owner) setOwnerFilter(owner)
     if (!editId || loading || !entries.length) return
     const found = entries.find((e) => e.id === editId)
     if (found) {
@@ -246,14 +291,50 @@ export default function CrmPage() {
     }
   }, [searchParams, entries, loading, openEdit, setSearchParams])
 
+  const ownerOptions = useMemo(() => {
+    const names = new Set<string>()
+    for (const o of owners) {
+      const n = o.name || o.email
+      if (n) names.add(n)
+    }
+    for (const e of entries) {
+      if (e.owner) names.add(e.owner)
+    }
+    return Array.from(names).sort((a, b) => a.localeCompare(b))
+  }, [owners, entries])
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return entries
+    const today = startOfDay(new Date())
     return entries.filter((e) => {
+      if (stageFilter !== 'All' && (e.pipeline_stage || 'Lead') !== stageFilter) return false
+      if (ownerFilter === 'Unassigned') {
+        if (e.owner) return false
+      } else if (ownerFilter !== 'All' && (e.owner || '') !== ownerFilter) {
+        return false
+      }
+      if (followFilter !== 'All') {
+        if (followFilter === 'None') {
+          if (e.follow_up_date) return false
+        } else if (!e.follow_up_date) {
+          return false
+        } else {
+          try {
+            const d = startOfDay(parseISO(e.follow_up_date.slice(0, 10)))
+            if (followFilter === 'Overdue' && !(isBefore(d, today) && !isToday(d))) return false
+            if (followFilter === 'Today' && !isToday(d)) return false
+            if (followFilter === 'Upcoming' && !(d > today)) return false
+          } catch {
+            return false
+          }
+        }
+      }
+      if (!q) return true
       if (e.company_name.toLowerCase().includes(q)) return true
       if ((e.company_owner || '').toLowerCase().includes(q)) return true
       if ((e.address || '').toLowerCase().includes(q)) return true
       if ((e.trn || '').toLowerCase().includes(q)) return true
+      if ((e.quote_ref || '').toLowerCase().includes(q)) return true
       return hydrateContacts(e).some(
         (c) =>
           c.name.toLowerCase().includes(q) ||
@@ -261,7 +342,76 @@ export default function CrmPage() {
           c.phone.toLowerCase().includes(q),
       )
     })
-  }, [entries, search])
+  }, [entries, search, stageFilter, ownerFilter, followFilter])
+
+  const stageCounts = useMemo(() => {
+    const counts: Record<string, number> = { All: entries.length }
+    for (const s of PIPELINE_STAGES) counts[s] = 0
+    for (const e of entries) {
+      const s = e.pipeline_stage || 'Lead'
+      counts[s] = (counts[s] || 0) + 1
+    }
+    return counts
+  }, [entries])
+
+  async function quickPatch(
+    entry: CrmEntry,
+    patch: Partial<Pick<CrmEntry, 'pipeline_stage' | 'follow_up_date' | 'next_action' | 'outcome_reason'>>,
+  ) {
+    setQuickBusyId(entry.id)
+    setError('')
+    try {
+      const nextFollow = patch.follow_up_date !== undefined ? patch.follow_up_date : entry.follow_up_date
+      const payload: Record<string, unknown> = {
+        ...patch,
+        updated_by: user?.email || '',
+        updated_at: new Date().toISOString(),
+      }
+      if (isZohoCalendarEnabled(settings) && patch.follow_up_date !== undefined) {
+        try {
+          const contacts = hydrateContacts(entry)
+          const p = primaryContact(contacts)
+          if (nextFollow) {
+            const eventId = await syncFollowUpToZohoCalendar(settings, {
+              company: entry.company_name,
+              nextAction: patch.next_action ?? entry.next_action,
+              owner: entry.owner,
+              contactName: p?.name,
+              contactEmail: p?.email,
+              followUpDate: String(nextFollow).slice(0, 10),
+              existingEventId: entry.calendar_event_id || undefined,
+            })
+            if (eventId) payload.calendar_event_id = eventId
+          } else if (entry.calendar_event_id) {
+            await deleteZohoCalendarEvent(settings, entry.calendar_event_id)
+            payload.calendar_event_id = ''
+          }
+        } catch (calErr) {
+          showToast(
+            calErr instanceof Error ? `Updated locally; Zoho: ${calErr.message}` : 'Updated; calendar sync failed',
+            'error',
+          )
+        }
+      }
+      const { error: err } = await db.from('crm').update(payload).eq('id', entry.id)
+      if (err) throw err
+      await logActivity(
+        'quick_update_crm',
+        'crm',
+        entry.company_name,
+        Object.entries(patch)
+          .map(([k, v]) => `${k}=${v ?? '—'}`)
+          .join(' · '),
+        user?.email || '',
+        entry.id,
+      )
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Quick update failed')
+    } finally {
+      setQuickBusyId(null)
+    }
+  }
 
   function openCreate() {
     setEditing(null)
@@ -358,6 +508,7 @@ export default function CrmPage() {
       owner: form.owner,
       pipeline_stage: form.pipeline_stage || 'Lead',
       quote_ref: form.quote_ref.trim(),
+      outcome_reason: form.outcome_reason.trim(),
       updated_by: who,
       updated_at: new Date().toISOString(),
     }
@@ -387,6 +538,7 @@ export default function CrmPage() {
         form.company_name.trim(),
         `${form.pipeline_stage || 'Lead'} · ${form.next_action || 'no action'}`,
         who,
+        savedId,
       )
 
       // Best-effort Zoho Calendar sync
@@ -488,6 +640,44 @@ export default function CrmPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <select
+          style={{ ...input, maxWidth: 180 }}
+          value={ownerFilter}
+          onChange={(e) => setOwnerFilter(e.target.value)}
+          title="Sales owner"
+        >
+          <option value="All">All owners</option>
+          <option value="Unassigned">Unassigned</option>
+          {ownerOptions.map((o) => (
+            <option key={o} value={o}>
+              {o}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+        <button type="button" style={chip(stageFilter === 'All')} onClick={() => setStageFilter('All')}>
+          All ({stageCounts.All || 0})
+        </button>
+        {PIPELINE_STAGES.map((s) => (
+          <button
+            key={s}
+            type="button"
+            style={chip(stageFilter === s)}
+            onClick={() => setStageFilter(s)}
+          >
+            {s} ({stageCounts[s] || 0})
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {(['All', 'Overdue', 'Today', 'Upcoming', 'None'] as FollowFilter[]).map((f) => (
+          <button key={f} type="button" style={chip(followFilter === f)} onClick={() => setFollowFilter(f)}>
+            {f === 'All' ? 'Any follow-up' : f}
+          </button>
+        ))}
       </div>
 
       {loading ? (
@@ -503,7 +693,9 @@ export default function CrmPage() {
             border: `1px solid ${colors.border}`,
           }}
         >
-          {search ? 'No companies match your search.' : 'No CRM entries yet. Add your first company.'}
+          {search || stageFilter !== 'All' || ownerFilter !== 'All' || followFilter !== 'All'
+            ? 'No companies match your filters.'
+            : 'No CRM entries yet. Add your first company.'}
         </div>
       ) : (
         <div style={tableWrap}>
@@ -527,6 +719,7 @@ export default function CrmPage() {
                 const contacts = hydrateContacts(row)
                 const display = contactDisplay(contacts)
                 const p = primaryContact(contacts)
+                const busy = quickBusyId === row.id
                 return (
                   <tr key={row.id}>
                     <td style={td}>
@@ -562,14 +755,47 @@ export default function CrmPage() {
                       ) : null}
                     </td>
                     <td style={td}>{row.company_owner || '—'}</td>
-                    <td style={td}>{row.pipeline_stage || 'Lead'}</td>
+                    <td style={td}>
+                      <select
+                        style={compactSelect}
+                        disabled={busy}
+                        value={row.pipeline_stage || 'Lead'}
+                        onChange={(e) => void quickPatch(row, { pipeline_stage: e.target.value })}
+                      >
+                        {PIPELINE_STAGES.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
                     <td style={td}>{p?.phone || row.mobile_number || row.office_number || '—'}</td>
                     <td style={{ ...td, color: followUpColor(row.follow_up_date), fontWeight: 600 }}>
-                      {row.follow_up_date
-                        ? format(parseISO(row.follow_up_date.slice(0, 10)), 'dd MMM yyyy')
-                        : '—'}
+                      <input
+                        type="date"
+                        style={{ ...compactSelect, maxWidth: 150, color: 'inherit', fontWeight: 600 }}
+                        disabled={busy}
+                        value={row.follow_up_date ? row.follow_up_date.slice(0, 10) : ''}
+                        onChange={(e) =>
+                          void quickPatch(row, { follow_up_date: e.target.value || null })
+                        }
+                      />
                     </td>
-                    <td style={td}>{row.next_action || '—'}</td>
+                    <td style={td}>
+                      <select
+                        style={compactSelect}
+                        disabled={busy}
+                        value={row.next_action || ''}
+                        onChange={(e) => void quickPatch(row, { next_action: e.target.value })}
+                      >
+                        <option value="">—</option>
+                        {NEXT_ACTIONS.map((a) => (
+                          <option key={a} value={a}>
+                            {a}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
                     <td style={td}>{row.owner || '—'}</td>
                     <td style={td}>
                       {row.quote_ref ? (
@@ -590,6 +816,13 @@ export default function CrmPage() {
                       )}
                     </td>
                     <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                      <Link
+                        to={`/quotations?client=${encodeURIComponent(row.company_name)}&new=1`}
+                        style={{ ...btnGhost, display: 'inline-flex', textDecoration: 'none' }}
+                        title="Create quote"
+                      >
+                        <FileText size={14} />
+                      </Link>
                       <button
                         type="button"
                         style={btnGhost}
@@ -758,7 +991,52 @@ export default function CrmPage() {
                       placeholder="RR-01-26001"
                     />
                   </Field>
+                  {(form.pipeline_stage === 'Won' || form.pipeline_stage === 'Lost') && (
+                    <Field label={`${form.pipeline_stage} reason`}>
+                      <select
+                        style={input}
+                        value={form.outcome_reason}
+                        onChange={(e) => setForm((f) => ({ ...f, outcome_reason: e.target.value }))}
+                      >
+                        <option value="">—</option>
+                        {CRM_OUTCOME_REASONS.map((r) => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
+                        {form.outcome_reason &&
+                          !CRM_OUTCOME_REASONS.includes(
+                            form.outcome_reason as (typeof CRM_OUTCOME_REASONS)[number],
+                          ) && (
+                            <option value={form.outcome_reason}>{form.outcome_reason}</option>
+                          )}
+                      </select>
+                      <input
+                        style={{ ...input, marginTop: 8 }}
+                        placeholder="Or type a custom reason"
+                        value={
+                          CRM_OUTCOME_REASONS.includes(
+                            form.outcome_reason as (typeof CRM_OUTCOME_REASONS)[number],
+                          )
+                            ? ''
+                            : form.outcome_reason
+                        }
+                        onChange={(e) => setForm((f) => ({ ...f, outcome_reason: e.target.value }))}
+                      />
+                    </Field>
+                  )}
                 </div>
+
+                {editing ? (
+                  <div style={{ marginBottom: 12 }}>
+                    <Link
+                      to={`/quotations?client=${encodeURIComponent(form.company_name || editing.company_name)}&new=1`}
+                      style={{ ...btnPrimary, display: 'inline-flex', textDecoration: 'none', fontSize: 13 }}
+                    >
+                      <FileText size={14} /> Create quote for this company
+                    </Link>
+                  </div>
+                ) : null}
 
                 <div style={{ marginTop: 8, marginBottom: 8 }}>
                   <div
