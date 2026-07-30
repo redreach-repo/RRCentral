@@ -75,6 +75,15 @@ const SYSTEM_KEYS = [
   { key: 'followUpDaysAfterQuote', label: 'Follow-up days after quote' },
 ] as const
 
+const MESSAGE_KEYS = [
+  { key: 'emailQuoteSubject', label: 'Quote email subject' },
+  { key: 'emailQuoteBody', label: 'Quote email body' },
+  { key: 'emailCrmSubject', label: 'CRM email subject' },
+  { key: 'emailCrmBody', label: 'CRM email body' },
+  { key: 'whatsappQuoteMessage', label: 'Quote WhatsApp message' },
+  { key: 'whatsappCrmMessage', label: 'CRM WhatsApp message' },
+] as const
+
 const ZOHO_KEYS = [
   { key: 'zohoClientId', label: 'Client ID' },
   { key: 'zohoClientSecret', label: 'Client Secret' },
@@ -432,6 +441,45 @@ export default function SettingsPage() {
       {renderSection('Bank details', 'Bank', BANK_KEYS)}
       {renderSection('Quote / Invoice settings', 'Quote settings', QUOTE_KEYS)}
       {renderSection('System', 'System', SYSTEM_KEYS)}
+
+      <div style={{ ...cardStyle, marginBottom: 20 }}>
+        <h2 style={sectionTitleStyle}>Message templates</h2>
+        <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
+          Tokens: <code>{'{{ref}}'}</code>, <code>{'{{client}}'}</code>, <code>{'{{contact}}'}</code>,{' '}
+          <code>{'{{amount}}'}</code>, <code>{'{{company}}'}</code>, <code>{'{{title}}'}</code>,{' '}
+          <code>{'{{validUntil}}'}</code>, <code>{'{{contactGreeting}}'}</code>
+        </p>
+        <div style={{ display: 'grid', gap: 12, marginBottom: 12 }}>
+          {MESSAGE_KEYS.map(({ key, label }) => (
+            <div key={key} style={fieldStyle}>
+              <label style={labelStyle}>{label}</label>
+              {key.toLowerCase().includes('body') || key.toLowerCase().includes('message') ? (
+                <textarea
+                  style={{ ...inputStyle, minHeight: 90, resize: 'vertical' }}
+                  value={draft[key] ?? ''}
+                  onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
+                />
+              ) : (
+                <input
+                  style={inputStyle}
+                  value={draft[key] ?? ''}
+                  onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            style={buttonPrimaryStyle}
+            disabled={savingSection === 'Messages' || settingsLoading}
+            onClick={() => void saveSection(MESSAGE_KEYS, 'Messages')}
+          >
+            {savingSection === 'Messages' ? 'Saving…' : 'Save templates'}
+          </button>
+        </div>
+      </div>
 
       <div style={{ ...cardStyle, marginBottom: 20 }}>
         <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>

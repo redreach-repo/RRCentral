@@ -76,6 +76,33 @@ const DEFAULT_SETTINGS: { key: string; value: string }[] = [
   { key: 'zohoMailAccountId', value: '' },
   { key: 'zohoCalendarEnabled', value: 'no' },
   { key: 'zohoMailEnabled', value: 'no' },
+  {
+    key: 'emailQuoteSubject',
+    value: '{{title}} {{ref}} — {{company}}',
+  },
+  {
+    key: 'emailQuoteBody',
+    value:
+      'Dear {{contact}},\n\nPlease find attached our {{titleLower}} {{ref}}.\n\nAmount: {{amount}}{{validUntilLine}}\n\nThe PDF has been downloaded to your device — please attach it to this email if it is not already included.\n\nBest regards,\n{{company}}',
+  },
+  {
+    key: 'emailCrmSubject',
+    value: 'Follow-up — {{client}}',
+  },
+  {
+    key: 'emailCrmBody',
+    value: 'Dear {{contact}},\n\nI hope you are well.\n\nBest regards,\n{{company}}',
+  },
+  {
+    key: 'whatsappQuoteMessage',
+    value:
+      'Hello{{contactGreeting}},\n\nPlease find our {{titleLower}} {{ref}}.\nAmount: {{amount}}\n\nThank you,\n{{company}}',
+  },
+  {
+    key: 'whatsappCrmMessage',
+    value:
+      'Hello{{contactGreeting}},\n\nFollowing up regarding {{client}}.\n\nBest regards,\n{{company}}',
+  },
 ]
 
 const DEFAULT_ADMINS: {

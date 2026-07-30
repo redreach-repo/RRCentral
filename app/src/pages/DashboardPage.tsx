@@ -19,6 +19,7 @@ import {
   sumExpenses,
   sumRecognizedIncome,
 } from '../lib/finance'
+import { displayDocumentReference } from '../lib/documents'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
 import {
@@ -346,7 +347,13 @@ export default function DashboardPage() {
                       <td style={tdStyle}>
                         {q.date ? format(parseISO(q.date.slice(0, 10)), 'dd MMM yyyy') : '—'}
                       </td>
-                      <td style={tdStyle}>{q.reference_number || q.quote_id || '—'}</td>
+                      <td style={tdStyle}>
+                        {displayDocumentReference({
+                          referenceNumber: q.reference_number,
+                          fallbackId: q.quote_id,
+                          status: q.status,
+                        })}
+                      </td>
                       <td style={tdStyle}>{q.client || '—'}</td>
                       <td style={tdStyle}>{formatMoney(q.amount)}</td>
                       <td style={tdStyle}>

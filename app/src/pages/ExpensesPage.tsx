@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { Pencil, Plus, Trash2, Wallet } from 'lucide-react'
+import { Paperclip, Pencil, Plus, Trash2, Wallet } from 'lucide-react'
 import { db } from '../lib/db'
 import { PAYMENT_METHODS } from '../lib/config'
-import type { Expense } from '../lib/types'
+import type { Attachment, Expense } from '../lib/types'
+import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
 import { formatAED } from '../lib/money'
+import { logActivity } from '../lib/activity'
 import {
   buttonDangerStyle,
   buttonPrimaryStyle,
@@ -63,6 +65,7 @@ const emptyForm = (): ExpenseForm => ({
 })
 
 export default function ExpensesPage() {
+  const { user } = useAuth()
   const { showToast } = useToast()
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(true)
@@ -73,6 +76,8 @@ export default function ExpensesPage() {
   const [form, setForm] = useState<ExpenseForm>(emptyForm())
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Expense | null>(null)
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [pendingFiles, setPendingFiles] = useState<{ name: string; dataUrl: string }[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -96,7 +101,7 @@ export default function ExpensesPage() {
 
   const filtered = useMemo(() => {
     return expenses.filter((e) => {
-      if (!e.date) return !from && !to
+      if (!e.date) return true
       const d = e.date.slice(0, 10)
       if (from && d < from) return false
       if (to && d > to) return false
@@ -109,9 +114,21 @@ export default function ExpensesPage() {
     [filtered],
   )
 
+  async function loadAttachments(expenseId: string) {
+    const { data } = await db
+      .from('attachments')
+      .select('*')
+      .eq('entity_type', 'expense')
+      .eq('entity_ref', expenseId)
+      .order('uploaded_at', { ascending: false })
+    setAttachments((data || []) as Attachment[])
+  }
+
   function openCreate() {
     setEditing(null)
     setForm(emptyForm())
+    setAttachments([])
+    setPendingFiles([])
     setOpen(true)
   }
 
@@ -126,7 +143,43 @@ export default function ExpensesPage() {
       references_text: e.references_text || '',
       notes: e.notes || '',
     })
+    setPendingFiles([])
     setOpen(true)
+    void loadAttachments(e.id)
+  }
+
+  async function readFileAsDataUrl(file: File): Promise<{ name: string; dataUrl: string }> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve({ name: file.name, dataUrl: String(reader.result || '') })
+      reader.onerror = () => reject(reader.error || new Error('Read failed'))
+      reader.readAsDataURL(file)
+    })
+  }
+
+  async function onPickFiles(files: FileList | null) {
+    if (!files?.length) return
+    try {
+      const rows = await Promise.all([...files].map((f) => readFileAsDataUrl(f)))
+      setPendingFiles((prev) => [...prev, ...rows])
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not read file', 'error')
+    }
+  }
+
+  async function saveAttachmentsFor(expenseId: string) {
+    const who = user?.email || ''
+    for (const file of pendingFiles) {
+      await db.from('attachments').insert({
+        entity_type: 'expense',
+        entity_ref: expenseId,
+        file_name: file.name,
+        storage_path: '',
+        url: file.dataUrl,
+        uploaded_by: who,
+        uploaded_at: new Date().toISOString(),
+      })
+    }
   }
 
   async function save() {
@@ -145,13 +198,27 @@ export default function ExpensesPage() {
         references_text: form.references_text.trim(),
         notes: form.notes.trim(),
       }
+      let expenseId = editing?.id || ''
       if (editing) {
         const { error } = await db.from('expenses').update(payload).eq('id', editing.id)
         if (error) throw error
+        expenseId = editing.id
       } else {
-        const { error } = await db.from('expenses').insert(payload)
+        const newId = crypto.randomUUID()
+        const { error } = await db.from('expenses').insert({ ...payload, id: newId })
         if (error) throw error
+        expenseId = newId
       }
+      if (pendingFiles.length && expenseId) {
+        await saveAttachmentsFor(expenseId)
+      }
+      await logActivity(
+        editing ? 'update_expense' : 'save_expense',
+        'expense',
+        payload.vendor,
+        `${payload.category} · ${formatAED(payload.amount)}`,
+        user?.email || '',
+      )
       showToast('Expense saved', 'success')
       setOpen(false)
       await load()
@@ -166,8 +233,17 @@ export default function ExpensesPage() {
     if (!deleteTarget) return
     setSaving(true)
     try {
+      const { data: atts } = await db
+        .from('attachments')
+        .select('id')
+        .eq('entity_type', 'expense')
+        .eq('entity_ref', deleteTarget.id)
+      for (const a of (atts || []) as { id: string }[]) {
+        await db.from('attachments').delete().eq('id', a.id)
+      }
       const { error } = await db.from('expenses').delete().eq('id', deleteTarget.id)
       if (error) throw error
+      await logActivity('delete_expense', 'expense', deleteTarget.vendor, '', user?.email || '')
       showToast('Expense deleted', 'success')
       setDeleteTarget(null)
       await load()
@@ -178,12 +254,17 @@ export default function ExpensesPage() {
     }
   }
 
+  async function removeAttachment(id: string) {
+    await db.from('attachments').delete().eq('id', id)
+    if (editing) await loadAttachments(editing.id)
+  }
+
   return (
     <div style={pageStyle}>
       <div style={toolbarStyle}>
         <div>
           <h1 style={pageTitleStyle}>Expenses</h1>
-          <p style={pageSubtitleStyle}>Vendors, categories, and spend</p>
+          <p style={pageSubtitleStyle}>Vendors, categories, receipts, and spend</p>
         </div>
         <button type="button" style={buttonPrimaryStyle} onClick={openCreate}>
           <Plus size={16} /> Add expense
@@ -257,7 +338,7 @@ export default function ExpensesPage() {
         </div>
       )}
 
-      <Modal open={open} title={editing ? 'Edit expense' : 'Add expense'} onClose={() => setOpen(false)} width={520}>
+      <Modal open={open} title={editing ? 'Edit expense' : 'Add expense'} onClose={() => setOpen(false)} width={560}>
         <div style={formGridStyle}>
           <div style={fieldStyle}>
             <label style={labelStyle}>Date</label>
@@ -296,6 +377,39 @@ export default function ExpensesPage() {
           <label style={labelStyle}>Notes</label>
           <textarea style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
         </div>
+        <div style={fieldStyle}>
+          <label style={labelStyle}>
+            <Paperclip size={12} style={{ marginRight: 4 }} />
+            Receipts / attachments
+          </label>
+          <input
+            type="file"
+            accept="image/*,.pdf"
+            multiple
+            onChange={(e) => void onPickFiles(e.target.files)}
+          />
+          {pendingFiles.length > 0 ? (
+            <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 12, color: colors.muted }}>
+              {pendingFiles.map((f) => (
+                <li key={f.name + f.dataUrl.slice(0, 24)}>{f.name} (pending save)</li>
+              ))}
+            </ul>
+          ) : null}
+          {attachments.length > 0 ? (
+            <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13 }}>
+              {attachments.map((a) => (
+                <li key={a.id} style={{ marginBottom: 4 }}>
+                  <a href={a.url} target="_blank" rel="noreferrer" style={{ color: colors.accent }}>
+                    {a.file_name || 'Attachment'}
+                  </a>{' '}
+                  <button type="button" style={buttonGhostTiny} onClick={() => void removeAttachment(a.id)}>
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setOpen(false)}>Cancel</button>
           <button type="button" style={buttonPrimaryStyle} disabled={saving} onClick={() => void save()}>Save</button>
@@ -313,4 +427,10 @@ export default function ExpensesPage() {
       </Modal>
     </div>
   )
+}
+
+const buttonGhostTiny = {
+  ...buttonSecondaryStyle,
+  padding: '2px 8px',
+  fontSize: 11,
 }

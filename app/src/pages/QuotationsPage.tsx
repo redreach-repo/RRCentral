@@ -142,6 +142,20 @@ export default function QuotationsPage() {
       const validityDays = Number(settings.quoteValidityDays || 14) || 14
       let rows = sortByDateDesc((qRes.data || []) as Quotation[])
 
+      // Backfill valid_until on finalized quotes that never got one
+      const needValidUntil = rows.filter(
+        (q) =>
+          q.reference_number &&
+          !q.valid_until &&
+          ['Finalized', 'Sent', 'Awarded', 'Expired'].includes(q.status),
+      )
+      for (const q of needValidUntil) {
+        const until = quoteValidUntil(q.date, validityDays)
+        if (!until) continue
+        await db.from('quotations').update({ valid_until: until }).eq('id', q.id)
+        q.valid_until = until
+      }
+
       // Auto-mark past-validity open quotes as Expired
       const toExpire = rows.filter((q) => {
         if (!['Finalized', 'Sent'].includes(q.status)) return false
@@ -335,7 +349,7 @@ export default function QuotationsPage() {
       }
 
       await saveLineItems('Quote', quoteId, form.items, vatRate)
-      await logActivity('save_quote', 'quotation', quoteId, `${payload.client} · Draft`, who)
+      await logActivity('save_quote', 'quotation', 'DRAFT', `${payload.client} · Draft`, who)
       showToast('Draft saved', 'success')
       setEditorOpen(false)
       await load()
@@ -430,6 +444,8 @@ export default function QuotationsPage() {
 
       await db.from('quotations').update({ status: 'Superseded', updated_by: who }).eq('id', q.id)
 
+      const newDate = format(new Date(), 'yyyy-MM-dd')
+      const validityDays = Number(settings.quoteValidityDays || 14) || 14
       const { error } = await db.from('quotations').insert({
         client: q.client,
         vertical: q.vertical,
@@ -439,13 +455,14 @@ export default function QuotationsPage() {
         delivery_terms: q.delivery_terms,
         moq: q.moq,
         notes: q.notes,
-        date: format(new Date(), 'yyyy-MM-dd'),
+        date: newDate,
         amount: q.amount,
         status: 'Finalized',
         reference_number: newRef,
         base_reference: base,
         revision: nextRev,
         quote_id: newQuoteId,
+        valid_until: quoteValidUntil(newDate, validityDays),
         created_by: who,
         updated_by: who,
       })
@@ -493,7 +510,7 @@ export default function QuotationsPage() {
       })
       if (error) throw error
       await saveLineItems('Quote', newQuoteId, toDraftItems(items), vatRate)
-      await logActivity('duplicate_quote', 'quotation', newQuoteId, q.client, who)
+      await logActivity('duplicate_quote', 'quotation', 'DRAFT', q.client, who)
       showToast('Duplicated as new Draft', 'success')
       await load()
     } catch (e) {

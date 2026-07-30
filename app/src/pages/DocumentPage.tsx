@@ -4,7 +4,7 @@ import { format } from 'date-fns'
 import { ArrowLeft, Download, Mail, MessageCircle, Printer } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS, VAT_RATE } from '../lib/config'
-import type { Client, CrmContact, Invoice, LineItem, Quotation } from '../lib/types'
+import type { Client, CrmContact, CrmEntry, Invoice, LineItem, Quotation } from '../lib/types'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatAED } from '../lib/money'
@@ -17,10 +17,16 @@ import {
   elementToPdfBlob,
   quoteValidUntil,
 } from '../lib/documents'
-import { hydrateContacts } from '../lib/contacts'
+import { hydrateContacts, primaryContact } from '../lib/contacts'
 import { isZohoMailEnabled } from '../lib/zoho'
 import EmailComposeModal from '../components/EmailComposeModal'
-import type { CrmEntry } from '../lib/types'
+import { logActivity } from '../lib/activity'
+import {
+  applyMessageTemplate,
+  DEFAULT_EMAIL_QUOTE_BODY,
+  DEFAULT_EMAIL_QUOTE_SUBJECT,
+  DEFAULT_WHATSAPP_QUOTE,
+} from '../lib/templates'
 
 type DocType = 'quote' | 'invoice'
 
@@ -201,11 +207,52 @@ export default function DocumentPage() {
   }
 
   function shareWhatsApp() {
-    const phone = client?.mobile || ''
+    const p = primaryContact(emailContacts)
+    const phone = p?.phone || client?.mobile || ''
     const company = settings.companyName || 'Red Reach Middle East FZE'
-    const text = `Hello${client?.primary_contact ? ` ${client.primary_contact}` : ''},\n\nPlease find our ${title.toLowerCase()} ${displayRef}.\nAmount: ${formatAED(summary.total)}\n\nThank you,\n${company}`
+    const text = applyMessageTemplate(settings.whatsappQuoteMessage || DEFAULT_WHATSAPP_QUOTE, {
+      contactGreeting: p?.name || client?.primary_contact ? ` ${p?.name || client?.primary_contact}` : '',
+      titleLower: title.toLowerCase(),
+      ref: displayRef,
+      amount: formatAED(summary.total),
+      company,
+      client: doc?.client || '',
+      contact: p?.name || client?.primary_contact || 'team',
+      validUntil: validUntil ? format(new Date(validUntil), 'dd MMM yyyy') : '',
+    })
     const url = buildWhatsAppUrl(phone, text, settings.whatsappCountryCode || '971')
     window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  async function markQuoteSent() {
+    if (docType !== 'quote' || !quote) return
+    if (!['Finalized', 'Draft'].includes(quote.status)) return
+    if (quote.status === 'Sent') return
+    // Only promote Finalized → Sent (Draft stays draft until finalized)
+    if (quote.status !== 'Finalized') return
+    const { error: err } = await db
+      .from('quotations')
+      .update({
+        status: 'Sent',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', quote.id)
+    if (!err) {
+      setQuote({ ...quote, status: 'Sent' })
+      await logActivity('email_quote', 'quotation', displayRef, quote.client, '')
+    }
+  }
+
+  const emailVars = {
+    title,
+    titleLower: title.toLowerCase(),
+    ref: displayRef,
+    company: settings.companyName || 'Red Reach Middle East FZE',
+    client: doc?.client || '',
+    contact: primaryContact(emailContacts)?.name || client?.primary_contact || 'team',
+    amount: formatAED(summary.total),
+    validUntil: validUntil ? format(new Date(validUntil), 'dd MMM yyyy') : '',
+    validUntilLine: validUntil && docType === 'quote' ? `\nValid until: ${format(new Date(validUntil), 'dd MMM yyyy')}` : '',
   }
 
   if (loading) {
@@ -593,10 +640,17 @@ export default function DocumentPage() {
         open={emailOpen}
         companyName={doc.client || ''}
         contacts={emailContacts}
-        defaultSubject={`${title} ${displayRef} — ${settings.companyName || 'Red Reach'}`}
-        defaultBody={`Dear ${emailContacts[0]?.name || 'team'},\n\nPlease find attached our ${title.toLowerCase()} ${displayRef}.\n\nAmount: ${formatAED(summary.total)}${validUntil && docType === 'quote' ? `\nValid until: ${format(new Date(validUntil), 'dd MMM yyyy')}` : ''}\n\nThe PDF has been downloaded to your device — please attach it to this email if it is not already included.\n\nBest regards,\n${settings.companyName || 'Red Reach Middle East FZE'}`}
+        defaultSubject={applyMessageTemplate(
+          settings.emailQuoteSubject || DEFAULT_EMAIL_QUOTE_SUBJECT,
+          emailVars,
+        )}
+        defaultBody={applyMessageTemplate(
+          settings.emailQuoteBody || DEFAULT_EMAIL_QUOTE_BODY,
+          emailVars,
+        )}
         zohoEnabled={isZohoMailEnabled(settings)}
         onClose={() => setEmailOpen(false)}
+        onSent={() => void markQuoteSent()}
       />
 
       <style>{`

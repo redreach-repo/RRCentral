@@ -11,6 +11,7 @@ import {
   Loader2,
   Mail,
   UserPlus,
+  MessageCircle,
 } from 'lucide-react'
 import { db } from '../lib/db'
 import { NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
@@ -19,6 +20,14 @@ import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { logActivity } from '../lib/activity'
+import { buildWhatsAppUrl } from '../lib/whatsapp'
+import { displayDocumentReference } from '../lib/documents'
+import {
+  applyMessageTemplate,
+  DEFAULT_EMAIL_CRM_BODY,
+  DEFAULT_EMAIL_CRM_SUBJECT,
+  DEFAULT_WHATSAPP_CRM,
+} from '../lib/templates'
 import {
   CONTACT_ROLES,
   contactDisplay,
@@ -132,7 +141,16 @@ export default function CrmPage() {
       ])
       if (crmRes.error) throw crmRes.error
       if (usersRes.error) throw usersRes.error
-      setEntries((crmRes.data || []) as CrmEntry[])
+      setEntries(
+        ((crmRes.data || []) as CrmEntry[]).map((row) => ({
+          ...row,
+          pipeline_stage: row.pipeline_stage || 'Lead',
+          company_owner: row.company_owner || '',
+          address: row.address || '',
+          website: row.website || '',
+          trn: row.trn || '',
+        })),
+      )
       setOwners((usersRes.data || []) as AppUser[])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load CRM')
@@ -196,7 +214,11 @@ export default function CrmPage() {
               id: `q-${i}`,
               action: 'quotation',
               entity: 'quotation',
-              reference: q.reference_number || q.quote_id || '',
+              reference: displayDocumentReference({
+                referenceNumber: q.reference_number,
+                fallbackId: q.quote_id,
+                status: q.status,
+              }),
               details: `${q.status || ''} · AED ${Number(q.amount || 0).toFixed(2)}`,
               user_email: '',
               created_at: q.created_at || '',
@@ -576,6 +598,35 @@ export default function CrmPage() {
                       >
                         <Mail size={14} />
                       </button>
+                      <button
+                        type="button"
+                        style={btnGhost}
+                        title="WhatsApp"
+                        onClick={() => {
+                          const p = primaryContact(hydrateContacts(row))
+                          const phone = p?.phone || row.mobile_number || ''
+                          if (!phone) {
+                            showToast('No phone number on this company', 'error')
+                            return
+                          }
+                          const text = applyMessageTemplate(
+                            settings.whatsappCrmMessage || DEFAULT_WHATSAPP_CRM,
+                            {
+                              contactGreeting: p?.name ? ` ${p.name}` : '',
+                              contact: p?.name || 'team',
+                              client: row.company_name,
+                              company: settings.companyName || 'Red Reach Middle East FZE',
+                            },
+                          )
+                          window.open(
+                            buildWhatsAppUrl(phone, text, settings.whatsappCountryCode || '971'),
+                            '_blank',
+                            'noopener,noreferrer',
+                          )
+                        }}
+                      >
+                        <MessageCircle size={14} />
+                      </button>
                       <button type="button" style={btnGhost} onClick={() => openEdit(row)} title="Edit">
                         <Pencil size={14} />
                       </button>
@@ -901,13 +952,16 @@ export default function CrmPage() {
         open={!!emailTarget}
         companyName={emailTarget?.company_name || ''}
         contacts={emailTarget ? hydrateContacts(emailTarget) : []}
-        defaultSubject={
-          emailTarget?.quote_ref
-            ? `Regarding ${emailTarget.quote_ref}`
-            : emailTarget
-              ? `Follow-up — ${emailTarget.company_name}`
-              : ''
-        }
+        defaultSubject={applyMessageTemplate(settings.emailCrmSubject || DEFAULT_EMAIL_CRM_SUBJECT, {
+          client: emailTarget?.company_name || '',
+          company: settings.companyName || 'Red Reach Middle East FZE',
+          contact: emailTarget ? primaryContact(hydrateContacts(emailTarget))?.name || 'team' : 'team',
+        })}
+        defaultBody={applyMessageTemplate(settings.emailCrmBody || DEFAULT_EMAIL_CRM_BODY, {
+          client: emailTarget?.company_name || '',
+          company: settings.companyName || 'Red Reach Middle East FZE',
+          contact: emailTarget ? primaryContact(hydrateContacts(emailTarget))?.name || 'team' : 'team',
+        })}
         zohoEnabled={isZohoMailEnabled(settings)}
         onClose={() => setEmailTarget(null)}
       />

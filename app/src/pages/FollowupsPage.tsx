@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { addDays, differenceInCalendarDays, format, parseISO, startOfDay } from 'date-fns'
-import { Bell, CalendarClock, Mail, MessageSquarePlus } from 'lucide-react'
+import { Bell, CalendarClock, Mail, MessageSquarePlus, MessageCircle } from 'lucide-react'
 import { db } from '../lib/db'
 import type { CrmEntry } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -11,6 +11,13 @@ import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
 import EmailComposeModal from '../components/EmailComposeModal'
 import { hydrateContacts, primaryContact } from '../lib/contacts'
+import { buildWhatsAppUrl } from '../lib/whatsapp'
+import {
+  applyMessageTemplate,
+  DEFAULT_EMAIL_CRM_BODY,
+  DEFAULT_EMAIL_CRM_SUBJECT,
+  DEFAULT_WHATSAPP_CRM,
+} from '../lib/templates'
 import {
   deleteZohoCalendarEvent,
   isZohoCalendarEnabled,
@@ -271,6 +278,32 @@ export default function FollowupsPage() {
             style={buttonSecondaryStyle}
             disabled={busy}
             onClick={() => {
+              const p = primaryContact(contacts)
+              const phone = p?.phone || entry.mobile_number || ''
+              if (!phone) {
+                showToast('No phone number on this company', 'error')
+                return
+              }
+              const text = applyMessageTemplate(settings.whatsappCrmMessage || DEFAULT_WHATSAPP_CRM, {
+                contactGreeting: p?.name ? ` ${p.name}` : '',
+                contact: p?.name || 'team',
+                client: entry.company_name,
+                company: settings.companyName || 'Red Reach Middle East FZE',
+              })
+              window.open(
+                buildWhatsAppUrl(phone, text, settings.whatsappCountryCode || '971'),
+                '_blank',
+                'noopener,noreferrer',
+              )
+            }}
+          >
+            <MessageCircle size={14} /> WhatsApp
+          </button>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={busy}
+            onClick={() => {
               setUpdateTarget(entry)
               setUpdateText('')
             }}
@@ -357,13 +390,16 @@ export default function FollowupsPage() {
         open={!!emailTarget}
         companyName={emailTarget?.company_name || ''}
         contacts={emailTarget ? hydrateContacts(emailTarget) : []}
-        defaultSubject={
-          emailTarget?.quote_ref
-            ? `Regarding ${emailTarget.quote_ref}`
-            : emailTarget
-              ? `Follow-up — ${emailTarget.company_name}`
-              : ''
-        }
+        defaultSubject={applyMessageTemplate(settings.emailCrmSubject || DEFAULT_EMAIL_CRM_SUBJECT, {
+          client: emailTarget?.company_name || '',
+          company: settings.companyName || 'Red Reach Middle East FZE',
+          contact: emailTarget ? primaryContact(hydrateContacts(emailTarget))?.name || 'team' : 'team',
+        })}
+        defaultBody={applyMessageTemplate(settings.emailCrmBody || DEFAULT_EMAIL_CRM_BODY, {
+          client: emailTarget?.company_name || '',
+          company: settings.companyName || 'Red Reach Middle East FZE',
+          contact: emailTarget ? primaryContact(hydrateContacts(emailTarget))?.name || 'team' : 'team',
+        })}
         zohoEnabled={isZohoMailEnabled(settings)}
         onClose={() => setEmailTarget(null)}
       />

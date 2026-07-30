@@ -23,6 +23,8 @@ type Props = {
   defaultBody?: string
   zohoEnabled: boolean
   onClose: () => void
+  /** Called after a successful send (Zoho) or mailto open. */
+  onSent?: () => void | Promise<void>
 }
 
 export default function EmailComposeModal({
@@ -33,6 +35,7 @@ export default function EmailComposeModal({
   defaultBody = '',
   zohoEnabled,
   onClose,
+  onSent,
 }: Props) {
   const { settings } = useSettings()
   const { showToast } = useToast()
@@ -67,10 +70,12 @@ export default function EmailComposeModal({
           body: body.trim(),
         })
         showToast('Email sent via Zoho Mail', 'success')
+        await onSent?.()
         onClose()
       } else {
         openMailto(to.trim(), subject.trim(), body.trim())
         showToast('Opened mail client (Zoho Mail not enabled)', 'success')
+        await onSent?.()
         onClose()
       }
     } catch (e) {
