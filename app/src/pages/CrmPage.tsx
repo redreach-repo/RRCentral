@@ -63,6 +63,10 @@ import {
 type CrmForm = {
   company_name: string
   contacts: CrmContact[]
+  company_owner: string
+  address: string
+  website: string
+  trn: string
   notes: string
   follow_up_date: string
   next_action: string
@@ -73,6 +77,10 @@ type CrmForm = {
 const emptyForm = (): CrmForm => ({
   company_name: '',
   contacts: [newContact({ role: 'Primary' })],
+  company_owner: '',
+  address: '',
+  website: '',
+  trn: '',
   notes: '',
   follow_up_date: '',
   next_action: '',
@@ -138,6 +146,10 @@ export default function CrmPage() {
     setForm({
       company_name: entry.company_name || '',
       contacts: contacts.length ? contacts : [newContact({ role: 'Primary' })],
+      company_owner: entry.company_owner || '',
+      address: entry.address || '',
+      website: entry.website || '',
+      trn: entry.trn || '',
       notes: entry.notes || '',
       follow_up_date: entry.follow_up_date ? entry.follow_up_date.slice(0, 10) : '',
       next_action: entry.next_action || '',
@@ -162,6 +174,9 @@ export default function CrmPage() {
     if (!q) return entries
     return entries.filter((e) => {
       if (e.company_name.toLowerCase().includes(q)) return true
+      if ((e.company_owner || '').toLowerCase().includes(q)) return true
+      if ((e.address || '').toLowerCase().includes(q)) return true
+      if ((e.trn || '').toLowerCase().includes(q)) return true
       return hydrateContacts(e).some(
         (c) =>
           c.name.toLowerCase().includes(q) ||
@@ -206,22 +221,26 @@ export default function CrmPage() {
     })
   }
 
-  async function upsertClient(company: string, contacts: CrmContact[], notes: string) {
-    if (!company.trim()) return
+  async function upsertClient(formData: CrmForm, contacts: CrmContact[]) {
+    if (!formData.company_name.trim()) return
     const flat = flatFieldsFromContacts(contacts)
     const { data: existing } = await db
       .from('clients')
       .select('id')
-      .ilike('company_name', company.trim())
+      .ilike('company_name', formData.company_name.trim())
       .maybeSingle()
 
     const clientRow = {
-      company_name: company.trim(),
+      company_name: formData.company_name.trim(),
       primary_contact: flat.primary_contact,
       email: flat.email_phone,
       mobile: flat.mobile_number,
       office: flat.office_number,
-      notes,
+      address: formData.address.trim(),
+      trn: formData.trn.trim(),
+      website: formData.website.trim(),
+      company_owner: formData.company_owner.trim(),
+      notes: formData.notes.trim(),
       contacts: normalizeContacts(contacts),
     }
 
@@ -250,6 +269,10 @@ export default function CrmPage() {
       company_name: form.company_name.trim(),
       ...flat,
       contacts,
+      company_owner: form.company_owner.trim(),
+      address: form.address.trim(),
+      website: form.website.trim(),
+      trn: form.trn.trim(),
       notes: form.notes.trim(),
       follow_up_date: followUpDate,
       next_action: form.next_action,
@@ -277,7 +300,7 @@ export default function CrmPage() {
         savedId = newId
       }
 
-      await upsertClient(form.company_name, contacts, form.notes.trim())
+      await upsertClient(form, contacts)
 
       // Best-effort Zoho Calendar sync
       if (isZohoCalendarEnabled(settings)) {
@@ -350,7 +373,7 @@ export default function CrmPage() {
       <div style={pageHeader}>
         <div>
           <h2 style={pageTitle}>CRM / Sales Visits</h2>
-          <p style={pageSub}>Companies, multiple contacts, follow-ups, and Zoho sync</p>
+          <p style={pageSub}>Companies, contacts, company owner, and sales assignment</p>
         </div>
         <button type="button" style={btnPrimary} onClick={openCreate}>
           <Plus size={16} /> Add company
@@ -402,10 +425,11 @@ export default function CrmPage() {
               <tr>
                 <th style={th}>Company</th>
                 <th style={th}>Contacts</th>
+                <th style={th}>Company owner</th>
                 <th style={th}>Phone</th>
                 <th style={th}>Follow-up</th>
                 <th style={th}>Next action</th>
-                <th style={th}>Owner</th>
+                <th style={th}>Sales owner</th>
                 <th style={th}>Quote</th>
                 <th style={th}></th>
               </tr>
@@ -449,6 +473,7 @@ export default function CrmPage() {
                         </span>
                       ) : null}
                     </td>
+                    <td style={td}>{row.company_owner || '—'}</td>
                     <td style={td}>{p?.phone || row.mobile_number || row.office_number || '—'}</td>
                     <td style={{ ...td, color: followUpColor(row.follow_up_date), fontWeight: 600 }}>
                       {row.follow_up_date
@@ -524,6 +549,36 @@ export default function CrmPage() {
                       onChange={(e) => setForm((f) => ({ ...f, company_name: e.target.value }))}
                     />
                   </Field>
+                  <Field label="Company owner">
+                    <input
+                      style={input}
+                      value={form.company_owner}
+                      onChange={(e) => setForm((f) => ({ ...f, company_owner: e.target.value }))}
+                      placeholder="Proprietor / business owner name"
+                    />
+                  </Field>
+                  <Field label="Address">
+                    <input
+                      style={input}
+                      value={form.address}
+                      onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                    />
+                  </Field>
+                  <Field label="Website">
+                    <input
+                      style={input}
+                      value={form.website}
+                      onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
+                      placeholder="www.example.com"
+                    />
+                  </Field>
+                  <Field label="TRN">
+                    <input
+                      style={input}
+                      value={form.trn}
+                      onChange={(e) => setForm((f) => ({ ...f, trn: e.target.value }))}
+                    />
+                  </Field>
                   <Field label="Follow-up date">
                     <input
                       type="date"
@@ -546,7 +601,7 @@ export default function CrmPage() {
                       ))}
                     </select>
                   </Field>
-                  <Field label="Owner">
+                  <Field label="Sales owner (Red Reach)">
                     <select
                       style={input}
                       value={form.owner}

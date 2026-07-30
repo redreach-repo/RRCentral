@@ -77,6 +77,8 @@ create table clients (
   office text not null default '',
   address text not null default '',
   trn text not null default '',
+  website text not null default '',
+  company_owner text not null default '',
   notes text not null default '',
   contacts jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now()
@@ -96,6 +98,10 @@ create table crm (
   follow_up_date date,
   next_action text not null default '',
   owner text not null default '',
+  company_owner text not null default '',
+  address text not null default '',
+  website text not null default '',
+  trn text not null default '',
   quote_ref text not null default '',
   calendar_event_id text not null default '',
   contacts jsonb not null default '[]'::jsonb,
@@ -350,3 +356,9 @@ create policy "Authenticated users full access" on activity_log for all using (a
 ------------------------------------------------------------
 -- alter table crm add column if not exists contacts jsonb not null default '[]'::jsonb;
 -- alter table clients add column if not exists contacts jsonb not null default '[]'::jsonb;
+-- alter table crm add column if not exists company_owner text not null default '';
+-- alter table crm add column if not exists address text not null default '';
+-- alter table crm add column if not exists website text not null default '';
+-- alter table crm add column if not exists trn text not null default '';
+-- alter table clients add column if not exists company_owner text not null default '';
+-- alter table clients add column if not exists website text not null default '';

@@ -17,6 +17,8 @@ export interface Client {
   office: string
   address: string
   trn: string
+  website?: string
+  company_owner?: string
   notes: string
   contacts?: CrmContact[]
   created_at: string
@@ -32,7 +34,13 @@ export interface CrmEntry {
   notes: string
   follow_up_date: string | null
   next_action: string
+  /** Red Reach salesperson assigned to this account (not the client's business owner). */
   owner: string
+  /** Name of the client's business owner / proprietor. */
+  company_owner: string
+  address: string
+  website: string
+  trn: string
   quote_ref: string
   calendar_event_id: string
   contacts?: CrmContact[]

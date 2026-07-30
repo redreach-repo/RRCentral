@@ -234,7 +234,10 @@ export default function FollowupsPage() {
               {entry.company_name}
             </Link>
             <div style={{ fontSize: 13, color: colors.muted, marginTop: 4 }}>
-              {contactLabel} · {entry.next_action || 'No action'} · {entry.owner || 'Unassigned'}
+              {contactLabel} · {entry.next_action || 'No action'}
+              {entry.company_owner ? ` · Owner: ${entry.company_owner}` : ''}
+              {' · '}
+              {entry.owner ? `Sales: ${entry.owner}` : 'Unassigned'}
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
