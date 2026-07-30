@@ -82,6 +82,8 @@ const MESSAGE_KEYS = [
   { key: 'emailCrmBody', label: 'CRM email body' },
   { key: 'whatsappQuoteMessage', label: 'Quote WhatsApp message' },
   { key: 'whatsappCrmMessage', label: 'CRM WhatsApp message' },
+  { key: 'whatsappFollowUpQuoteMessage', label: 'Follow-up WhatsApp (quotation)' },
+  { key: 'whatsappFollowUpInvoiceMessage', label: 'Follow-up WhatsApp (invoice)' },
 ] as const
 
 const ZOHO_KEYS = [

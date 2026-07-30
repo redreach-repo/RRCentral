@@ -20,6 +20,12 @@ import {
   DEFAULT_WHATSAPP_CRM,
 } from '../lib/templates'
 import {
+  buildFollowUpWhatsAppMessage,
+  DEFAULT_WHATSAPP_FOLLOWUP_INVOICE,
+  DEFAULT_WHATSAPP_FOLLOWUP_QUOTE,
+  loadFollowUpDocument,
+} from '../lib/followUpMessage'
+import {
   deleteZohoCalendarEvent,
   isZohoCalendarEnabled,
   isZohoMailEnabled,
@@ -63,6 +69,44 @@ export default function FollowupsPage() {
   const [updateClearDate, setUpdateClearDate] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [emailTarget, setEmailTarget] = useState<CrmEntry | null>(null)
+
+  async function openFollowUpWhatsApp(entry: CrmEntry) {
+    const contacts = hydrateContacts(entry)
+    const p = primaryContact(contacts)
+    const phone = p?.phone || entry.mobile_number || ''
+    if (!phone) {
+      showToast('No phone number on this company', 'error')
+      return
+    }
+    setBusyId(entry.id)
+    try {
+      const doc = await loadFollowUpDocument(entry)
+      const text = buildFollowUpWhatsAppMessage({
+        entry,
+        contactName: p?.name,
+        companyName: settings.companyName || 'Red Reach Middle East FZE',
+        doc,
+        quoteTemplate: settings.whatsappFollowUpQuoteMessage || DEFAULT_WHATSAPP_FOLLOWUP_QUOTE,
+        invoiceTemplate: settings.whatsappFollowUpInvoiceMessage || DEFAULT_WHATSAPP_FOLLOWUP_INVOICE,
+        genericTemplate: settings.whatsappCrmMessage || DEFAULT_WHATSAPP_CRM,
+      })
+      window.open(
+        buildWhatsAppUrl(phone, text, settings.whatsappCountryCode || '971'),
+        '_blank',
+        'noopener,noreferrer',
+      )
+      if (doc) {
+        showToast(
+          `WhatsApp ready · ${doc.kind === 'quote' ? 'Quotation' : 'Invoice'} ${doc.ref}`,
+          'success',
+        )
+      }
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not prepare WhatsApp message', 'error')
+    } finally {
+      setBusyId(null)
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -339,25 +383,7 @@ export default function FollowupsPage() {
             type="button"
             style={buttonSecondaryStyle}
             disabled={busy}
-            onClick={() => {
-              const p = primaryContact(contacts)
-              const phone = p?.phone || entry.mobile_number || ''
-              if (!phone) {
-                showToast('No phone number on this company', 'error')
-                return
-              }
-              const text = applyMessageTemplate(settings.whatsappCrmMessage || DEFAULT_WHATSAPP_CRM, {
-                contactGreeting: p?.name ? ` ${p.name}` : '',
-                contact: p?.name || 'team',
-                client: entry.company_name,
-                company: settings.companyName || 'Red Reach Middle East FZE',
-              })
-              window.open(
-                buildWhatsAppUrl(phone, text, settings.whatsappCountryCode || '971'),
-                '_blank',
-                'noopener,noreferrer',
-              )
-            }}
+            onClick={() => void openFollowUpWhatsApp(entry)}
           >
             <MessageCircle size={14} /> WhatsApp
           </button>

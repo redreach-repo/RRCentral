@@ -30,6 +30,12 @@ import {
   DEFAULT_WHATSAPP_CRM,
 } from '../lib/templates'
 import {
+  buildFollowUpWhatsAppMessage,
+  DEFAULT_WHATSAPP_FOLLOWUP_INVOICE,
+  DEFAULT_WHATSAPP_FOLLOWUP_QUOTE,
+  loadFollowUpDocument,
+} from '../lib/followUpMessage'
+import {
   CONTACT_ROLES,
   contactDisplay,
   flatFieldsFromContacts,
@@ -834,28 +840,52 @@ export default function CrmPage() {
                       <button
                         type="button"
                         style={btnGhost}
-                        title="WhatsApp"
+                        title="WhatsApp follow-up"
+                        disabled={quickBusyId === row.id}
                         onClick={() => {
-                          const p = primaryContact(hydrateContacts(row))
-                          const phone = p?.phone || row.mobile_number || ''
-                          if (!phone) {
-                            showToast('No phone number on this company', 'error')
-                            return
-                          }
-                          const text = applyMessageTemplate(
-                            settings.whatsappCrmMessage || DEFAULT_WHATSAPP_CRM,
-                            {
-                              contactGreeting: p?.name ? ` ${p.name}` : '',
-                              contact: p?.name || 'team',
-                              client: row.company_name,
-                              company: settings.companyName || 'Red Reach Middle East FZE',
-                            },
-                          )
-                          window.open(
-                            buildWhatsAppUrl(phone, text, settings.whatsappCountryCode || '971'),
-                            '_blank',
-                            'noopener,noreferrer',
-                          )
+                          void (async () => {
+                            const p = primaryContact(hydrateContacts(row))
+                            const phone = p?.phone || row.mobile_number || ''
+                            if (!phone) {
+                              showToast('No phone number on this company', 'error')
+                              return
+                            }
+                            setQuickBusyId(row.id)
+                            try {
+                              const doc = await loadFollowUpDocument(row)
+                              const text = buildFollowUpWhatsAppMessage({
+                                entry: row,
+                                contactName: p?.name,
+                                companyName: settings.companyName || 'Red Reach Middle East FZE',
+                                doc,
+                                quoteTemplate:
+                                  settings.whatsappFollowUpQuoteMessage ||
+                                  DEFAULT_WHATSAPP_FOLLOWUP_QUOTE,
+                                invoiceTemplate:
+                                  settings.whatsappFollowUpInvoiceMessage ||
+                                  DEFAULT_WHATSAPP_FOLLOWUP_INVOICE,
+                                genericTemplate: settings.whatsappCrmMessage || DEFAULT_WHATSAPP_CRM,
+                              })
+                              window.open(
+                                buildWhatsAppUrl(phone, text, settings.whatsappCountryCode || '971'),
+                                '_blank',
+                                'noopener,noreferrer',
+                              )
+                              if (doc) {
+                                showToast(
+                                  `WhatsApp ready · ${doc.kind === 'quote' ? 'Quotation' : 'Invoice'} ${doc.ref}`,
+                                  'success',
+                                )
+                              }
+                            } catch (e) {
+                              showToast(
+                                e instanceof Error ? e.message : 'Could not prepare WhatsApp message',
+                                'error',
+                              )
+                            } finally {
+                              setQuickBusyId(null)
+                            }
+                          })()
                         }}
                       >
                         <MessageCircle size={14} />

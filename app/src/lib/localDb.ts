@@ -101,7 +101,17 @@ const DEFAULT_SETTINGS: { key: string; value: string }[] = [
   {
     key: 'whatsappCrmMessage',
     value:
-      'Hello{{contactGreeting}},\n\nFollowing up regarding {{client}}.\n\nBest regards,\n{{company}}',
+      'Hello{{contactGreeting}},\n\nFollowing up regarding {{client}}. Kindly update us on the status at your earliest convenience.\n\nBest regards,\n{{company}}',
+  },
+  {
+    key: 'whatsappFollowUpQuoteMessage',
+    value:
+      'Hello{{contactGreeting}},\n\nFollowing up on our quotation {{ref}} dated {{date}} for {{client}} ({{amount}}){{validUntilLine}}.\n\nKindly update us on the status at your earliest convenience.\n\nBest regards,\n{{company}}',
+  },
+  {
+    key: 'whatsappFollowUpInvoiceMessage',
+    value:
+      'Hello{{contactGreeting}},\n\nFollowing up on our invoice {{ref}} dated {{date}} for {{client}} ({{amount}}). Current payment status: {{paymentStatus}}.\n\nKindly update us on the payment status at your earliest convenience.\n\nBest regards,\n{{company}}',
   },
 ]
 

@@ -28,7 +28,7 @@ export const DEFAULT_WHATSAPP_QUOTE =
   'Hello{{contactGreeting}},\n\nPlease find our {{titleLower}} {{ref}}.\nAmount: {{amount}}\n\nThank you,\n{{company}}'
 
 export const DEFAULT_WHATSAPP_CRM =
-  'Hello{{contactGreeting}},\n\nFollowing up regarding {{client}}.\n\nBest regards,\n{{company}}'
+  'Hello{{contactGreeting}},\n\nFollowing up regarding {{client}}. Kindly update us on the status at your earliest convenience.\n\nBest regards,\n{{company}}'
 
 export const DEFAULT_EMAIL_CRM_SUBJECT = 'Follow-up — {{client}}'
 
