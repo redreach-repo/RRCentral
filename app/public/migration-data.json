@@ -10,7 +10,7 @@
     "line_items": 37,
     "products": 0,
     "quote_templates": 0,
-    "income": 13,
+    "income": 12,
     "expenses": 68,
     "payment_log": 2,
     "follow_up_updates": 0,
@@ -1492,20 +1492,6 @@
   "quote_templates": [],
   "income": [
     {
-      "id": "income-1",
-      "client_source": "Ello Pets Hotel & Day Care",
-      "category": "Uniforms",
-      "reference_number": "26107",
-      "date": "2026-03-30",
-      "description": "Corporate Uniforms Sample",
-      "bill_amount": 356,
-      "vat": 17.8,
-      "total_amount": 373.8,
-      "status": "Not Awarded",
-      "payment_method": "Cash",
-      "payment_status": "Paid"
-    },
-    {
       "id": "income-2",
       "client_source": "Multi Commerce FZC",
       "category": "Uniforms",
@@ -2568,6 +2554,6 @@
       "created_at": "2026-07-25T00:00:00.000Z"
     }
   ],
-  "cleanVersion": 2,
+  "cleanVersion": 3,
   "cleanedAt": "2026-07-29T19:00:00.000Z"
 }

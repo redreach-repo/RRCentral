@@ -2,11 +2,22 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'r
 import { differenceInCalendarDays, format, parseISO, startOfMonth, subMonths } from 'date-fns'
 import { Download } from 'lucide-react'
 import { db } from '../lib/db'
-import { DIVISIONS } from '../lib/config'
+import { DIVISIONS, VAT_RATE } from '../lib/config'
 import type { Expense, IncomeEntry, Invoice, Quotation } from '../lib/types'
+import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import { formatAED } from '../lib/money'
+import {
+  currentVatQuarter,
+  expenseVatParts,
+  incomeVatParts,
+  isOpenInvoice,
+  isRecognizedIncome,
+  monthKey,
+  quarterMonths,
+  type VatQuarter,
+} from '../lib/finance'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -14,16 +25,19 @@ import {
   colors,
   downloadCsv,
   escapeCsv,
+  inputStyle,
+  labelStyle,
   pageStyle,
   pageSubtitleStyle,
   pageTitleStyle,
+  selectStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
 } from '../lib/uiStyles'
 
-type Tab = 'winrate' | 'aging' | 'pnl'
+type Tab = 'winrate' | 'aging' | 'pnl' | 'vat'
 
 const tabStyle = (active: boolean): CSSProperties => ({
   ...buttonSecondaryStyle,
@@ -33,12 +47,18 @@ const tabStyle = (active: boolean): CSSProperties => ({
 
 export default function ReportsPage() {
   const { showToast } = useToast()
-  const [tab, setTab] = useState<Tab>('winrate')
+  const { settings } = useSettings()
+  const vatRate = Number(settings.vatRate || VAT_RATE) || VAT_RATE
+  const [tab, setTab] = useState<Tab>('vat')
   const [loading, setLoading] = useState(true)
   const [quotes, setQuotes] = useState<Quotation[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [income, setIncome] = useState<IncomeEntry[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
+
+  const nowQ = currentVatQuarter()
+  const [vatYear, setVatYear] = useState(nowQ.year)
+  const [vatQuarter, setVatQuarter] = useState<VatQuarter>(nowQ.quarter)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -68,6 +88,8 @@ export default function ReportsPage() {
     void load()
   }, [load])
 
+  const recognizedIncome = useMemo(() => income.filter(isRecognizedIncome), [income])
+
   const winRate = useMemo(() => {
     return DIVISIONS.map((d) => {
       const rows = quotes.filter((q) => (q.division_code || '01') === d.code)
@@ -91,7 +113,7 @@ export default function ReportsPage() {
     ]
     const today = new Date()
     for (const inv of invoices) {
-      if (['Paid', 'Cancelled'].includes(inv.payment_status) || inv.status === 'Cancelled') continue
+      if (!isOpenInvoice(inv)) continue
       const dateStr = inv.date
       if (!dateStr) continue
       const age = differenceInCalendarDays(today, parseISO(dateStr.slice(0, 10)))
@@ -115,21 +137,98 @@ export default function ReportsPage() {
       const key = format(m, 'yyyy-MM')
       months.push({ key, label: format(m, 'MMM yyyy'), income: 0, expenses: 0, net: 0 })
     }
-    for (const row of income) {
-      if (!row.date) continue
-      const key = row.date.slice(0, 7)
+    for (const row of recognizedIncome) {
+      const key = monthKey(row.date)
+      if (!key) continue
       const m = months.find((x) => x.key === key)
       if (m) m.income += Number(row.total_amount) || 0
     }
     for (const row of expenses) {
-      if (!row.date) continue
-      const key = row.date.slice(0, 7)
+      const key = monthKey(row.date)
+      if (!key) continue
       const m = months.find((x) => x.key === key)
       if (m) m.expenses += Number(row.amount) || 0
     }
     for (const m of months) m.net = m.income - m.expenses
     return months
-  }, [income, expenses])
+  }, [recognizedIncome, expenses])
+
+  const vatMonths = useMemo(() => quarterMonths(vatYear, vatQuarter), [vatYear, vatQuarter])
+
+  const vatReport = useMemo(() => {
+    const monthSet = new Set(vatMonths)
+    const incomeRows = recognizedIncome
+      .filter((r) => {
+        const k = monthKey(r.date)
+        return k != null && monthSet.has(k)
+      })
+      .map((r) => {
+        const parts = incomeVatParts(r, vatRate)
+        return {
+          id: r.id,
+          date: r.date,
+          month: monthKey(r.date) || '',
+          client: r.client_source,
+          reference: r.reference_number,
+          description: r.description || r.category,
+          ...parts,
+        }
+      })
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+
+    const expenseRows = expenses
+      .filter((r) => {
+        const k = monthKey(r.date)
+        return k != null && monthSet.has(k)
+      })
+      .map((r) => {
+        const parts = expenseVatParts(r, vatRate)
+        return {
+          id: r.id,
+          date: r.date,
+          month: monthKey(r.date) || '',
+          vendor: r.vendor,
+          category: r.category,
+          reference: r.references_text,
+          notes: r.notes,
+          ...parts,
+        }
+      })
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+
+    const byMonth = vatMonths.map((key) => {
+      const inc = incomeRows.filter((r) => r.month === key)
+      const exp = expenseRows.filter((r) => r.month === key)
+      const outputVat = inc.reduce((s, r) => s + r.vat, 0)
+      const inputVat = exp.reduce((s, r) => s + r.vat, 0)
+      const supplies = inc.reduce((s, r) => s + r.exclusive, 0)
+      const purchases = exp.reduce((s, r) => s + r.exclusive, 0)
+      return {
+        key,
+        label: format(parseISO(`${key}-01`), 'MMM yyyy'),
+        supplies,
+        outputVat,
+        purchases,
+        inputVat,
+        netVat: outputVat - inputVat,
+        incomeCount: inc.length,
+        expenseCount: exp.length,
+      }
+    })
+
+    const totals = byMonth.reduce(
+      (acc, m) => ({
+        supplies: acc.supplies + m.supplies,
+        outputVat: acc.outputVat + m.outputVat,
+        purchases: acc.purchases + m.purchases,
+        inputVat: acc.inputVat + m.inputVat,
+        netVat: acc.netVat + m.netVat,
+      }),
+      { supplies: 0, outputVat: 0, purchases: 0, inputVat: 0, netVat: 0 },
+    )
+
+    return { incomeRows, expenseRows, byMonth, totals }
+  }, [recognizedIncome, expenses, vatMonths, vatRate])
 
   const maxPnl = Math.max(1, ...monthlyPnl.map((m) => Math.max(m.income, m.expenses)))
 
@@ -146,22 +245,66 @@ export default function ReportsPage() {
       const header = ['Bucket', 'Count', 'Amount']
       const rows = aging.map((r) => [r.key, r.count, r.amount].map(escapeCsv).join(','))
       downloadCsv('invoice-aging.csv', [header.join(','), ...rows].join('\n'))
-    } else {
-      const header = ['Month', 'Income', 'Expenses', 'Net']
+    } else if (tab === 'pnl') {
+      const header = ['Month', 'Income (paid)', 'Expenses', 'Net']
       const rows = monthlyPnl.map((r) =>
         [r.label, r.income, r.expenses, r.net].map(escapeCsv).join(','),
       )
       downloadCsv('monthly-pnl.csv', [header.join(','), ...rows].join('\n'))
+    } else {
+      const qLabel = `Q${vatQuarter}-${vatYear}`
+      const summaryHeader = ['Month', 'Taxable supplies', 'Output VAT', 'Purchases (ex VAT)', 'Input VAT', 'Net VAT']
+      const summaryRows = [
+        ...vatReport.byMonth.map((m) =>
+          [m.label, m.supplies, m.outputVat, m.purchases, m.inputVat, m.netVat].map(escapeCsv).join(','),
+        ),
+        ['TOTAL', vatReport.totals.supplies, vatReport.totals.outputVat, vatReport.totals.purchases, vatReport.totals.inputVat, vatReport.totals.netVat]
+          .map(escapeCsv)
+          .join(','),
+      ]
+      const incomeHeader = ['Date', 'Client', 'Reference', 'Description', 'Exclusive', 'VAT', 'Inclusive']
+      const incomeRows = vatReport.incomeRows.map((r) =>
+        [r.date, r.client, r.reference, r.description, r.exclusive, r.vat, r.inclusive]
+          .map(escapeCsv)
+          .join(','),
+      )
+      const expenseHeader = ['Date', 'Vendor', 'Category', 'Reference', 'Exclusive', 'VAT', 'Inclusive']
+      const expenseRows = vatReport.expenseRows.map((r) =>
+        [r.date, r.vendor, r.category, r.reference, r.exclusive, r.vat, r.inclusive]
+          .map(escapeCsv)
+          .join(','),
+      )
+      const body = [
+        `VAT Report ${qLabel}`,
+        '',
+        'SUMMARY',
+        summaryHeader.join(','),
+        ...summaryRows,
+        '',
+        'INCOME (Output VAT)',
+        incomeHeader.join(','),
+        ...incomeRows,
+        '',
+        'EXPENSES (Input VAT — amounts treated as VAT-inclusive)',
+        expenseHeader.join(','),
+        ...expenseRows,
+      ].join('\n')
+      downloadCsv(`vat-report-${qLabel}.csv`, body)
     }
     showToast('CSV downloaded', 'success')
   }
+
+  const yearOptions = useMemo(() => {
+    const y = new Date().getFullYear()
+    return [y, y - 1, y - 2]
+  }, [])
 
   return (
     <div style={pageStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
         <div>
           <h1 style={pageTitleStyle}>Reports</h1>
-          <p style={pageSubtitleStyle}>Sales, aging, and P&L</p>
+          <p style={pageSubtitleStyle}>VAT, sales, aging, and P&L — income excludes not-awarded quotes</p>
         </div>
         <button type="button" style={buttonPrimaryStyle} onClick={exportCsv} disabled={loading}>
           <Download size={16} /> Export CSV
@@ -169,6 +312,9 @@ export default function ReportsPage() {
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+        <button type="button" style={tabStyle(tab === 'vat')} onClick={() => setTab('vat')}>
+          VAT report
+        </button>
         <button type="button" style={tabStyle(tab === 'winrate')} onClick={() => setTab('winrate')}>
           Win rate by division
         </button>
@@ -182,6 +328,160 @@ export default function ReportsPage() {
 
       {loading ? (
         <div style={{ ...cardStyle, color: colors.muted }}>Loading reports…</div>
+      ) : tab === 'vat' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ ...cardStyle, display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'end' }}>
+            <div>
+              <label style={labelStyle}>Year</label>
+              <select
+                style={selectStyle}
+                value={vatYear}
+                onChange={(e) => setVatYear(Number(e.target.value))}
+              >
+                {yearOptions.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Quarter</label>
+              <select
+                style={{ ...selectStyle, ...inputStyle }}
+                value={vatQuarter}
+                onChange={(e) => setVatQuarter(Number(e.target.value) as VatQuarter)}
+              >
+                <option value={1}>Q1 (Jan–Mar)</option>
+                <option value={2}>Q2 (Apr–Jun)</option>
+                <option value={3}>Q3 (Jul–Sep)</option>
+                <option value={4}>Q4 (Oct–Dec)</option>
+              </select>
+            </div>
+            <div style={{ fontSize: 13, color: colors.muted, paddingBottom: 8 }}>
+              VAT rate {(vatRate * 100).toFixed(0)}% · Not-awarded quotes excluded from income
+            </div>
+          </div>
+
+          <div style={cardStyle}>
+            <h2 style={{ margin: '0 0 12px', fontSize: 16 }}>Quarter summary</h2>
+            <div style={tableWrapStyle}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Month</th>
+                    <th style={thStyle}>Taxable supplies</th>
+                    <th style={thStyle}>Output VAT</th>
+                    <th style={thStyle}>Purchases (ex VAT)</th>
+                    <th style={thStyle}>Input VAT</th>
+                    <th style={thStyle}>Net VAT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {vatReport.byMonth.map((m) => (
+                    <tr key={m.key}>
+                      <td style={tdStyle}>{m.label}</td>
+                      <td style={tdStyle}>{formatAED(m.supplies)}</td>
+                      <td style={tdStyle}>{formatAED(m.outputVat)}</td>
+                      <td style={tdStyle}>{formatAED(m.purchases)}</td>
+                      <td style={tdStyle}>{formatAED(m.inputVat)}</td>
+                      <td style={{
+                        ...tdStyle,
+                        fontWeight: 700,
+                        color: m.netVat >= 0 ? colors.success : colors.danger,
+                      }}>
+                        {formatAED(m.netVat)}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td style={{ ...tdStyle, fontWeight: 700 }}>TOTAL Q{vatQuarter}</td>
+                    <td style={{ ...tdStyle, fontWeight: 700 }}>{formatAED(vatReport.totals.supplies)}</td>
+                    <td style={{ ...tdStyle, fontWeight: 700 }}>{formatAED(vatReport.totals.outputVat)}</td>
+                    <td style={{ ...tdStyle, fontWeight: 700 }}>{formatAED(vatReport.totals.purchases)}</td>
+                    <td style={{ ...tdStyle, fontWeight: 700 }}>{formatAED(vatReport.totals.inputVat)}</td>
+                    <td style={{
+                      ...tdStyle,
+                      fontWeight: 700,
+                      color: vatReport.totals.netVat >= 0 ? colors.success : colors.danger,
+                    }}>
+                      {formatAED(vatReport.totals.netVat)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div style={cardStyle}>
+            <h2 style={{ margin: '0 0 12px', fontSize: 16 }}>Income / Output VAT</h2>
+            {vatReport.incomeRows.length === 0 ? (
+              <EmptyState title="No paid income this quarter" subtitle="Only paid / awarded income is included." />
+            ) : (
+              <div style={tableWrapStyle}>
+                <table style={tableStyle}>
+                  <thead>
+                    <tr>
+                      <th style={thStyle}>Date</th>
+                      <th style={thStyle}>Client</th>
+                      <th style={thStyle}>Reference</th>
+                      <th style={thStyle}>Exclusive</th>
+                      <th style={thStyle}>VAT</th>
+                      <th style={thStyle}>Inclusive</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {vatReport.incomeRows.map((r) => (
+                      <tr key={r.id}>
+                        <td style={tdStyle}>{r.date || '—'}</td>
+                        <td style={tdStyle}>{r.client || '—'}</td>
+                        <td style={tdStyle}>{r.reference || '—'}</td>
+                        <td style={tdStyle}>{formatAED(r.exclusive)}</td>
+                        <td style={tdStyle}>{formatAED(r.vat)}</td>
+                        <td style={tdStyle}>{formatAED(r.inclusive)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div style={cardStyle}>
+            <h2 style={{ margin: '0 0 12px', fontSize: 16 }}>Expenses / Input VAT</h2>
+            <p style={{ margin: '0 0 12px', fontSize: 12, color: colors.muted }}>
+              Expense amounts are treated as VAT-inclusive and split at {(vatRate * 100).toFixed(0)}%.
+            </p>
+            {vatReport.expenseRows.length === 0 ? (
+              <EmptyState title="No expenses this quarter" subtitle="Add expenses to calculate input VAT." />
+            ) : (
+              <div style={tableWrapStyle}>
+                <table style={tableStyle}>
+                  <thead>
+                    <tr>
+                      <th style={thStyle}>Date</th>
+                      <th style={thStyle}>Vendor</th>
+                      <th style={thStyle}>Category</th>
+                      <th style={thStyle}>Exclusive</th>
+                      <th style={thStyle}>VAT</th>
+                      <th style={thStyle}>Inclusive</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {vatReport.expenseRows.map((r) => (
+                      <tr key={r.id}>
+                        <td style={tdStyle}>{r.date || '—'}</td>
+                        <td style={tdStyle}>{r.vendor || '—'}</td>
+                        <td style={tdStyle}>{r.category || '—'}</td>
+                        <td style={tdStyle}>{formatAED(r.exclusive)}</td>
+                        <td style={tdStyle}>{formatAED(r.vat)}</td>
+                        <td style={tdStyle}>{formatAED(r.inclusive)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
       ) : tab === 'winrate' ? (
         <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
           <div style={tableWrapStyle}>
@@ -240,6 +540,9 @@ export default function ReportsPage() {
         </div>
       ) : (
         <div style={cardStyle}>
+          <p style={{ margin: '0 0 14px', fontSize: 12, color: colors.muted }}>
+            Income includes paid / awarded entries only — not awarded quotes are excluded.
+          </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {monthlyPnl.map((m) => (
               <div key={m.key}>

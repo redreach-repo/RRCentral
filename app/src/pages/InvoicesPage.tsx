@@ -30,6 +30,7 @@ import {
   toDraftItems,
   type DraftLineItem,
 } from '../lib/lineItems'
+import { sortByDateDesc } from '../lib/finance'
 import {
   buttonDangerStyle,
   buttonPrimaryStyle,
@@ -146,7 +147,7 @@ export default function InvoicesPage() {
         db.from('clients').select('*').order('company_name'),
       ])
       if (iRes.error) throw iRes.error
-      setInvoices((iRes.data || []) as Invoice[])
+      setInvoices(sortByDateDesc((iRes.data || []) as Invoice[]))
       setClients((cRes.data || []) as Client[])
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Failed to load invoices', 'error')

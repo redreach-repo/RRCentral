@@ -43,6 +43,7 @@ import {
   toDraftItems,
   type DraftLineItem,
 } from '../lib/lineItems'
+import { sortByDateDesc } from '../lib/finance'
 import {
   buttonDangerStyle,
   buttonPrimaryStyle,
@@ -136,7 +137,7 @@ export default function QuotationsPage() {
       ])
       if (qRes.error) throw qRes.error
       if (cRes.error) throw cRes.error
-      setQuotes((qRes.data || []) as Quotation[])
+      setQuotes(sortByDateDesc((qRes.data || []) as Quotation[]))
       setClients((cRes.data || []) as Client[])
       if (!pRes.error) setProducts((pRes.data || []) as Product[])
     } catch (e) {
