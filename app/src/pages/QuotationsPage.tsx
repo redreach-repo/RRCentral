@@ -44,6 +44,7 @@ import {
   type DraftLineItem,
 } from '../lib/lineItems'
 import { sortByDateDesc } from '../lib/finance'
+import { isQuotePastValidity, quoteValidUntil } from '../lib/documents'
 import {
   buttonDangerStyle,
   buttonPrimaryStyle,
@@ -137,7 +138,41 @@ export default function QuotationsPage() {
       ])
       if (qRes.error) throw qRes.error
       if (cRes.error) throw cRes.error
-      setQuotes(sortByDateDesc((qRes.data || []) as Quotation[]))
+
+      const validityDays = Number(settings.quoteValidityDays || 14) || 14
+      let rows = sortByDateDesc((qRes.data || []) as Quotation[])
+
+      // Auto-mark past-validity open quotes as Expired
+      const toExpire = rows.filter((q) => {
+        if (!['Finalized', 'Sent'].includes(q.status)) return false
+        const until = q.valid_until || quoteValidUntil(q.date, validityDays)
+        return until ? isQuotePastValidity(until) : false
+      })
+      if (toExpire.length) {
+        await Promise.all(
+          toExpire.map((q) =>
+            db
+              .from('quotations')
+              .update({
+                status: 'Expired',
+                valid_until: q.valid_until || quoteValidUntil(q.date, validityDays),
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', q.id),
+          ),
+        )
+        rows = rows.map((q) =>
+          toExpire.some((e) => e.id === q.id)
+            ? {
+                ...q,
+                status: 'Expired',
+                valid_until: q.valid_until || quoteValidUntil(q.date, validityDays),
+              }
+            : q,
+        )
+      }
+
+      setQuotes(rows)
       setClients((cRes.data || []) as Client[])
       if (!pRes.error) setProducts((pRes.data || []) as Product[])
     } catch (e) {
@@ -145,7 +180,7 @@ export default function QuotationsPage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [showToast, settings.quoteValidityDays])
 
   useEffect(() => {
     void load()
@@ -321,6 +356,8 @@ export default function QuotationsPage() {
       const { data: allRefs } = await db.from('quotations').select('reference_number')
       const refs = ((allRefs || []) as { reference_number: string }[]).map((r) => r.reference_number)
       const reference = generateReference(q.division_code || '01', refs, quotePrefix)
+      const validityDays = Number(settings.quoteValidityDays || 14) || 14
+      const validUntil = quoteValidUntil(q.date || format(new Date(), 'yyyy-MM-dd'), validityDays)
       const { error } = await db
         .from('quotations')
         .update({
@@ -328,6 +365,7 @@ export default function QuotationsPage() {
           base_reference: reference,
           status: 'Finalized',
           revision: q.revision || 0,
+          valid_until: validUntil,
           updated_by: who,
           updated_at: new Date().toISOString(),
         })
@@ -663,9 +701,13 @@ export default function QuotationsPage() {
                   <tr key={q.id}>
                     <td style={tdStyle}>
                       <div style={{ fontWeight: 600 }}>
-                        {q.reference_number || <span style={{ color: colors.muted2 }}>Draft</span>}
+                        {q.reference_number || <span style={{ color: colors.muted2 }}>DRAFT</span>}
                       </div>
-                      <div style={{ fontSize: 11, color: colors.muted2 }}>{q.quote_id}</div>
+                      {q.valid_until && q.reference_number ? (
+                        <div style={{ fontSize: 11, color: colors.muted2 }}>
+                          Valid until {format(new Date(q.valid_until), 'dd MMM yyyy')}
+                        </div>
+                      ) : null}
                     </td>
                     <td style={tdStyle}>{q.client || '—'}</td>
                     <td style={tdStyle}>{q.vertical || divisionBrand(q.division_code)}</td>
@@ -685,9 +727,9 @@ export default function QuotationsPage() {
                           <Link
                             to={`/document/quote/${q.id}`}
                             style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}
-                            title="View PDF"
+                            title="View / email PDF"
                           >
-                            <ExternalLink size={14} /> View PDF
+                            <ExternalLink size={14} /> PDF / Email
                           </Link>
                         )}
                         {q.status === 'Draft' && (

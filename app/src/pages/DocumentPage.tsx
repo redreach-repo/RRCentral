@@ -1,18 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import html2canvas from 'html2canvas'
-import { jsPDF } from 'jspdf'
-import { ArrowLeft, Download, MessageCircle, Printer } from 'lucide-react'
+import { ArrowLeft, Download, Mail, MessageCircle, Printer } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS, VAT_RATE } from '../lib/config'
-import type { Client, Invoice, LineItem, Quotation } from '../lib/types'
+import type { Client, CrmContact, Invoice, LineItem, Quotation } from '../lib/types'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatAED } from '../lib/money'
 import { loadLineItems } from '../lib/lineItems'
 import { buildWhatsAppUrl } from '../lib/whatsapp'
 import { resolveLogoUrl } from '../lib/brand'
+import {
+  displayDocumentReference,
+  downloadBlob,
+  elementToPdfBlob,
+  quoteValidUntil,
+} from '../lib/documents'
+import { hydrateContacts } from '../lib/contacts'
+import { isZohoMailEnabled } from '../lib/zoho'
+import EmailComposeModal from '../components/EmailComposeModal'
+import type { CrmEntry } from '../lib/types'
 
 type DocType = 'quote' | 'invoice'
 
@@ -29,7 +37,9 @@ export default function DocumentPage() {
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [items, setItems] = useState<LineItem[]>([])
   const [client, setClient] = useState<Client | null>(null)
+  const [emailContacts, setEmailContacts] = useState<CrmContact[]>([])
   const [pdfBusy, setPdfBusy] = useState(false)
+  const [emailOpen, setEmailOpen] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -51,6 +61,23 @@ export default function DocumentPage() {
             .ilike('company_name', q.client)
             .maybeSingle()
           setClient((c as Client) || null)
+          const { data: crm } = await db
+            .from('crm')
+            .select('*')
+            .ilike('company_name', q.client)
+            .maybeSingle()
+          const fromCrm = crm ? hydrateContacts(crm as CrmEntry) : []
+          if (fromCrm.length) setEmailContacts(fromCrm)
+          else if (c) {
+            setEmailContacts(
+              hydrateContacts({
+                primary_contact: (c as Client).primary_contact,
+                email_phone: (c as Client).email,
+                mobile_number: (c as Client).mobile,
+                contacts: (c as Client).contacts,
+              }),
+            )
+          } else setEmailContacts([])
         }
       } else {
         const { data, error: err } = await db.from('invoices').select('*').eq('id', id).maybeSingle()
@@ -68,6 +95,23 @@ export default function DocumentPage() {
             .ilike('company_name', inv.client)
             .maybeSingle()
           setClient((c as Client) || null)
+          const { data: crm } = await db
+            .from('crm')
+            .select('*')
+            .ilike('company_name', inv.client)
+            .maybeSingle()
+          const fromCrm = crm ? hydrateContacts(crm as CrmEntry) : []
+          if (fromCrm.length) setEmailContacts(fromCrm)
+          else if (c) {
+            setEmailContacts(
+              hydrateContacts({
+                primary_contact: (c as Client).primary_contact,
+                email_phone: (c as Client).email,
+                mobile_number: (c as Client).mobile,
+                contacts: (c as Client).contacts,
+              }),
+            )
+          } else setEmailContacts([])
         }
       }
     } catch (e) {
@@ -82,15 +126,29 @@ export default function DocumentPage() {
   }, [load])
 
   const doc = quote || invoice
-  const reference =
-    (quote?.reference_number || quote?.quote_id) || invoice?.reference_number || ''
+  const displayRef = displayDocumentReference({
+    referenceNumber: quote?.reference_number || invoice?.reference_number,
+    fallbackId: quote?.quote_id,
+    status: doc?.status,
+  })
   const title = docType === 'quote' ? 'QUOTATION' : 'INVOICE'
-  const isDraft = quote ? !quote.reference_number || quote.status === 'Draft' : invoice?.status === 'Draft'
+  const isDraft =
+    displayRef === 'DRAFT' ||
+    (quote ? !quote.reference_number || quote.status === 'Draft' : invoice?.status === 'Draft')
   const division =
     DIVISIONS.find((d) => d.code === quote?.division_code)?.brand ||
     quote?.vertical ||
     invoice?.vertical ||
     ''
+
+  const validityDays = Number(settings.quoteValidityDays || 14) || 14
+  const validUntil =
+    quote?.valid_until ||
+    (quote?.date && quote.status !== 'Draft'
+      ? quoteValidUntil(quote.date, validityDays)
+      : quote?.date
+        ? quoteValidUntil(quote.date, validityDays)
+        : null)
 
   const vatRate = Number(settings.vatRate || VAT_RATE) || VAT_RATE
   const summary = useMemo(() => {
@@ -109,29 +167,10 @@ export default function DocumentPage() {
     if (!sheetRef.current) return
     setPdfBusy(true)
     try {
-      const canvas = await html2canvas(sheetRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
+      const { blob, filename } = await elementToPdfBlob(sheetRef.current, {
+        filenameHint: `${title.toLowerCase()}-${displayRef}`,
       })
-      const img = canvas.toDataURL('image/jpeg', 0.95)
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-      const pageWidth = pdf.internal.pageSize.getWidth()
-      const pageHeight = pdf.internal.pageSize.getHeight()
-      const imgWidth = pageWidth
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
-      let heightLeft = imgHeight
-      let position = 0
-      pdf.addImage(img, 'JPEG', 0, position, imgWidth, imgHeight)
-      heightLeft -= pageHeight
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight
-        pdf.addPage()
-        pdf.addImage(img, 'JPEG', 0, position, imgWidth, imgHeight)
-        heightLeft -= pageHeight
-      }
-      const filename = `${title.toLowerCase()}-${reference || id}.pdf`.replace(/\s+/g, '-')
-      pdf.save(filename)
+      downloadBlob(blob, filename)
       showToast('PDF downloaded', 'success')
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'PDF failed', 'error')
@@ -140,10 +179,31 @@ export default function DocumentPage() {
     }
   }
 
+  async function prepareEmail() {
+    if (!sheetRef.current) {
+      setEmailOpen(true)
+      return
+    }
+    setPdfBusy(true)
+    try {
+      const { blob, filename } = await elementToPdfBlob(sheetRef.current, {
+        filenameHint: `${title.toLowerCase()}-${displayRef}`,
+      })
+      downloadBlob(blob, filename)
+      showToast('PDF downloaded — attach it to the email if needed', 'success')
+      setEmailOpen(true)
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'PDF failed', 'error')
+      setEmailOpen(true)
+    } finally {
+      setPdfBusy(false)
+    }
+  }
+
   function shareWhatsApp() {
     const phone = client?.mobile || ''
     const company = settings.companyName || 'Red Reach Middle East FZE'
-    const text = `Hello${client?.primary_contact ? ` ${client.primary_contact}` : ''},\n\nPlease find our ${title.toLowerCase()} ${reference}.\nAmount: ${formatAED(summary.total)}\n\nThank you,\n${company}`
+    const text = `Hello${client?.primary_contact ? ` ${client.primary_contact}` : ''},\n\nPlease find our ${title.toLowerCase()} ${displayRef}.\nAmount: ${formatAED(summary.total)}\n\nThank you,\n${company}`
     const url = buildWhatsAppUrl(phone, text, settings.whatsappCountryCode || '971')
     window.open(url, '_blank', 'noopener,noreferrer')
   }
@@ -199,6 +259,9 @@ export default function DocumentPage() {
         </ToolbarBtn>
         <ToolbarBtn onClick={() => void downloadPdf()} disabled={pdfBusy}>
           <Download size={14} /> {pdfBusy ? 'Preparing…' : 'Download PDF'}
+        </ToolbarBtn>
+        <ToolbarBtn onClick={() => void prepareEmail()} disabled={pdfBusy}>
+          <Mail size={14} /> Email PDF
         </ToolbarBtn>
         <ToolbarBtn onClick={shareWhatsApp} accent>
           <MessageCircle size={14} /> WhatsApp
@@ -297,13 +360,19 @@ export default function DocumentPage() {
                   {title}
                 </div>
                 <h1 style={{ margin: '6px 0 12px', fontSize: 22, wordBreak: 'break-word' }}>
-                  {reference || '—'}
+                  {displayRef}
                 </h1>
                 <div style={{ display: 'grid', gap: 4, fontSize: 13 }}>
                   <div>
                     <span style={{ color: '#555' }}>Date: </span>
                     {doc.date ? format(new Date(doc.date), 'dd MMM yyyy') : '—'}
                   </div>
+                  {docType === 'quote' && validUntil ? (
+                    <div>
+                      <span style={{ color: '#555' }}>Valid until: </span>
+                      {format(new Date(validUntil), 'dd MMM yyyy')}
+                    </div>
+                  ) : null}
                   {'payment_status' in doc && (
                     <div>
                       <span style={{ color: '#555' }}>Payment: </span>
@@ -519,6 +588,16 @@ export default function DocumentPage() {
           </div>
         </div>
       </div>
+
+      <EmailComposeModal
+        open={emailOpen}
+        companyName={doc.client || ''}
+        contacts={emailContacts}
+        defaultSubject={`${title} ${displayRef} — ${settings.companyName || 'Red Reach'}`}
+        defaultBody={`Dear ${emailContacts[0]?.name || 'team'},\n\nPlease find attached our ${title.toLowerCase()} ${displayRef}.\n\nAmount: ${formatAED(summary.total)}${validUntil && docType === 'quote' ? `\nValid until: ${format(new Date(validUntil), 'dd MMM yyyy')}` : ''}\n\nThe PDF has been downloaded to your device — please attach it to this email if it is not already included.\n\nBest regards,\n${settings.companyName || 'Red Reach Middle East FZE'}`}
+        zohoEnabled={isZohoMailEnabled(settings)}
+        onClose={() => setEmailOpen(false)}
+      />
 
       <style>{`
         @media print {

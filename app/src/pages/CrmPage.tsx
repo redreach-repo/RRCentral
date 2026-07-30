@@ -13,11 +13,12 @@ import {
   UserPlus,
 } from 'lucide-react'
 import { db } from '../lib/db'
-import { NEXT_ACTIONS } from '../lib/config'
-import type { AppUser, CrmContact, CrmEntry } from '../lib/types'
+import { NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
+import type { ActivityLogEntry, AppUser, CrmContact, CrmEntry } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
+import { logActivity } from '../lib/activity'
 import {
   CONTACT_ROLES,
   contactDisplay,
@@ -71,6 +72,7 @@ type CrmForm = {
   follow_up_date: string
   next_action: string
   owner: string
+  pipeline_stage: string
   quote_ref: string
 }
 
@@ -85,6 +87,7 @@ const emptyForm = (): CrmForm => ({
   follow_up_date: '',
   next_action: '',
   owner: '',
+  pipeline_stage: 'Lead',
   quote_ref: '',
 })
 
@@ -116,6 +119,8 @@ export default function CrmPage() {
   const [form, setForm] = useState<CrmForm>(emptyForm)
   const [deleteTarget, setDeleteTarget] = useState<CrmEntry | null>(null)
   const [emailTarget, setEmailTarget] = useState<CrmEntry | null>(null)
+  const [activity, setActivity] = useState<ActivityLogEntry[]>([])
+  const [activityLoading, setActivityLoading] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -154,9 +159,59 @@ export default function CrmPage() {
       follow_up_date: entry.follow_up_date ? entry.follow_up_date.slice(0, 10) : '',
       next_action: entry.next_action || '',
       owner: entry.owner || '',
+      pipeline_stage: entry.pipeline_stage || 'Lead',
       quote_ref: entry.quote_ref || '',
     })
     setModalOpen(true)
+    setActivityLoading(true)
+    void (async () => {
+      try {
+        const company = entry.company_name
+        const [actRes, fuRes, quoteRes] = await Promise.all([
+          db.from('activity_log').select('*').order('created_at', { ascending: false }).limit(80),
+          db.from('follow_up_updates').select('*').eq('crm_id', entry.id).order('created_at', { ascending: false }),
+          db.from('quotations').select('*').ilike('client', company).order('created_at', { ascending: false }).limit(10),
+        ])
+        const logs = ((actRes.data || []) as ActivityLogEntry[]).filter(
+          (a) =>
+            a.reference === company ||
+            a.details?.includes(company) ||
+            (a.entity === 'crm' && a.reference === company),
+        )
+        const updates = ((fuRes.data || []) as { update_text?: string; user_email?: string; created_at?: string }[]).map(
+          (u, i) =>
+            ({
+              id: `fu-${i}`,
+              action: 'followup_note',
+              entity: 'crm',
+              reference: company,
+              details: u.update_text || '',
+              user_email: u.user_email || '',
+              created_at: u.created_at || '',
+            }) satisfies ActivityLogEntry,
+        )
+        const quotes = ((quoteRes.data || []) as { reference_number?: string; quote_id?: string; status?: string; amount?: number; created_at?: string }[]).map(
+          (q, i) =>
+            ({
+              id: `q-${i}`,
+              action: 'quotation',
+              entity: 'quotation',
+              reference: q.reference_number || q.quote_id || '',
+              details: `${q.status || ''} · AED ${Number(q.amount || 0).toFixed(2)}`,
+              user_email: '',
+              created_at: q.created_at || '',
+            }) satisfies ActivityLogEntry,
+        )
+        const merged = [...logs, ...updates, ...quotes].sort((a, b) =>
+          String(b.created_at).localeCompare(String(a.created_at)),
+        )
+        setActivity(merged.slice(0, 40))
+      } catch {
+        setActivity([])
+      } finally {
+        setActivityLoading(false)
+      }
+    })()
   }, [])
 
   useEffect(() => {
@@ -191,6 +246,7 @@ export default function CrmPage() {
     const defaultOwner =
       owners.find((o) => o.email === user?.email)?.name || user?.email || ''
     setForm({ ...emptyForm(), owner: defaultOwner })
+    setActivity([])
     setModalOpen(true)
   }
 
@@ -198,6 +254,7 @@ export default function CrmPage() {
     setModalOpen(false)
     setEditing(null)
     setForm(emptyForm())
+    setActivity([])
   }
 
   function updateContact(id: string, patch: Partial<CrmContact>) {
@@ -277,6 +334,7 @@ export default function CrmPage() {
       follow_up_date: followUpDate,
       next_action: form.next_action,
       owner: form.owner,
+      pipeline_stage: form.pipeline_stage || 'Lead',
       quote_ref: form.quote_ref.trim(),
       updated_by: who,
       updated_at: new Date().toISOString(),
@@ -301,6 +359,13 @@ export default function CrmPage() {
       }
 
       await upsertClient(form, contacts)
+      await logActivity(
+        editing ? 'update_crm' : 'create_crm',
+        'crm',
+        form.company_name.trim(),
+        `${form.pipeline_stage || 'Lead'} · ${form.next_action || 'no action'}`,
+        who,
+      )
 
       // Best-effort Zoho Calendar sync
       if (isZohoCalendarEnabled(settings)) {
@@ -426,6 +491,7 @@ export default function CrmPage() {
                 <th style={th}>Company</th>
                 <th style={th}>Contacts</th>
                 <th style={th}>Company owner</th>
+                <th style={th}>Stage</th>
                 <th style={th}>Phone</th>
                 <th style={th}>Follow-up</th>
                 <th style={th}>Next action</th>
@@ -474,6 +540,7 @@ export default function CrmPage() {
                       ) : null}
                     </td>
                     <td style={td}>{row.company_owner || '—'}</td>
+                    <td style={td}>{row.pipeline_stage || 'Lead'}</td>
                     <td style={td}>{p?.phone || row.mobile_number || row.office_number || '—'}</td>
                     <td style={{ ...td, color: followUpColor(row.follow_up_date), fontWeight: 600 }}>
                       {row.follow_up_date
@@ -619,6 +686,19 @@ export default function CrmPage() {
                         )}
                     </select>
                   </Field>
+                  <Field label="Pipeline stage">
+                    <select
+                      style={input}
+                      value={form.pipeline_stage}
+                      onChange={(e) => setForm((f) => ({ ...f, pipeline_stage: e.target.value }))}
+                    >
+                      {PIPELINE_STAGES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
                   <Field label="Quote ref">
                     <input
                       style={input}
@@ -730,6 +810,55 @@ export default function CrmPage() {
                     onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                   />
                 </Field>
+
+                {editing ? (
+                  <div style={{ marginTop: 16 }}>
+                    <label style={{ ...label, marginBottom: 8 }}>Activity timeline</label>
+                    {activityLoading ? (
+                      <p style={{ color: colors.muted, fontSize: 13 }}>Loading activity…</p>
+                    ) : activity.length === 0 ? (
+                      <p style={{ color: colors.muted2, fontSize: 13 }}>
+                        No activity yet. Saves, follow-ups, and quotes for this company will appear here.
+                      </p>
+                    ) : (
+                      <div
+                        style={{
+                          maxHeight: 220,
+                          overflowY: 'auto',
+                          border: `1px solid ${colors.border}`,
+                          borderRadius: 10,
+                          padding: 10,
+                          display: 'grid',
+                          gap: 8,
+                        }}
+                      >
+                        {activity.map((a) => (
+                          <div
+                            key={a.id}
+                            style={{
+                              fontSize: 12,
+                              borderBottom: `1px solid ${colors.border}`,
+                              paddingBottom: 8,
+                            }}
+                          >
+                            <div style={{ color: colors.muted2 }}>
+                              {a.created_at
+                                ? format(parseISO(String(a.created_at).slice(0, 19)), 'dd MMM yyyy HH:mm')
+                                : '—'}
+                              {a.user_email ? ` · ${a.user_email}` : ''}
+                              {` · ${a.action}`}
+                            </div>
+                            <div style={{ color: colors.text, marginTop: 2 }}>
+                              {a.reference ? <strong>{a.reference}</strong> : null}
+                              {a.reference && a.details ? ' — ' : ''}
+                              {a.details}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
               </div>
               <div style={modalFooter}>
                 <button type="button" style={btn} onClick={closeModal} disabled={saving}>

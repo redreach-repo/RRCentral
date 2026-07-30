@@ -102,6 +102,7 @@ create table crm (
   address text not null default '',
   website text not null default '',
   trn text not null default '',
+  pipeline_stage text not null default 'Lead',
   quote_ref text not null default '',
   calendar_event_id text not null default '',
   contacts jsonb not null default '[]'::jsonb,
@@ -144,6 +145,7 @@ create table quotations (
   notes text not null default '',
   delivery_terms text not null default '',
   outcome_reason text not null default '',
+  valid_until date,
   created_by text not null default '',
   updated_by text not null default '',
   created_at timestamptz not null default now(),
@@ -360,5 +362,7 @@ create policy "Authenticated users full access" on activity_log for all using (a
 -- alter table crm add column if not exists address text not null default '';
 -- alter table crm add column if not exists website text not null default '';
 -- alter table crm add column if not exists trn text not null default '';
+-- alter table crm add column if not exists pipeline_stage text not null default 'Lead';
 -- alter table clients add column if not exists company_owner text not null default '';
 -- alter table clients add column if not exists website text not null default '';
+-- alter table quotations add column if not exists valid_until date;

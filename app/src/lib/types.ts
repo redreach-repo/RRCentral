@@ -41,6 +41,8 @@ export interface CrmEntry {
   address: string
   website: string
   trn: string
+  /** Sales pipeline stage: Lead → … → Won/Lost */
+  pipeline_stage: string
   quote_ref: string
   calendar_event_id: string
   contacts?: CrmContact[]
@@ -77,6 +79,8 @@ export interface Quotation {
   notes: string
   delivery_terms: string
   outcome_reason: string
+  /** yyyy-MM-dd — set on finalize from quoteValidityDays */
+  valid_until: string | null
   created_by: string
   updated_by: string
   created_at: string

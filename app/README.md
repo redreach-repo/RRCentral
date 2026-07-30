@@ -41,7 +41,19 @@ Open http://localhost:5173/RRCentral/ — pick a seeded admin email. Sheets data
 
 ## Features
 
-Dashboard (monthly income/expense), CRM with **multiple contacts**, Follow-ups, Quotations, Invoices, Catalog, Templates, VAT report + P&amp;L, Expenses, Settings, PDF export, WhatsApp share, **Zoho Calendar / Mail**.
+Dashboard (monthly income/expense), CRM with **multiple contacts**, **pipeline stages**, and **activity timeline**, Follow-ups, Quotations (validity + auto-expire), Invoices, Catalog, Templates, VAT report + P&amp;L, Expenses, Settings, professional PDF (drafts show **DRAFT** not internal IDs), Email PDF, WhatsApp share, **Zoho Calendar / Mail**.
+
+## Shared cloud backend (Supabase)
+
+Local IndexedDB is fine for a single browser. For the whole team:
+
+1. Create a project at https://supabase.com
+2. SQL Editor → run [`supabase-schema.sql`](./supabase-schema.sql)
+3. Auth → enable **Google**, add redirect URLs for local + GitHub Pages
+4. Copy Project URL + anon key into `app/.env` (and GitHub Actions secrets `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`)
+5. Redeploy — the app switches from local mode to shared Postgres automatically
+
+Until those secrets are set, GitHub Pages keeps running in local mode.
 
 ## Zoho Calendar & Mail
 

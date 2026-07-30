@@ -34,6 +34,16 @@ export const NEXT_ACTIONS = [
   'Other',
 ] as const
 
+/** CRM sales pipeline stages (company-level). */
+export const PIPELINE_STAGES = [
+  'Lead',
+  'Contacted',
+  'Quoted',
+  'Negotiation',
+  'Won',
+  'Lost',
+] as const
+
 export const PAYMENT_TERMS = [
   'Immediate upon delivery',
   '50% Advance, 50% on delivery',
