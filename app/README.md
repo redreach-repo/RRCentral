@@ -41,7 +41,23 @@ Open http://localhost:5173/RRCentral/ — pick a seeded admin email. Sheets data
 
 ## Features
 
-Dashboard (monthly income/expense), CRM, Follow-ups, Quotations, Invoices, Catalog, Templates, VAT report + P&amp;L, Expenses, Settings, PDF export, WhatsApp share.
+Dashboard (monthly income/expense), CRM with **multiple contacts**, Follow-ups, Quotations, Invoices, Catalog, Templates, VAT report + P&amp;L, Expenses, Settings, PDF export, WhatsApp share, **Zoho Calendar / Mail**.
+
+## Zoho Calendar & Mail
+
+CRM follow-ups can sync to Zoho Calendar; Email actions can send via Zoho Mail.
+
+1. Open [Zoho API Console](https://api-console.zoho.com/) → create a **Self Client**.
+2. Generate a refresh token with scopes:
+   - `ZohoCalendar.event.ALL`
+   - `ZohoMail.messages.CREATE`
+   - `ZohoMail.accounts.READ`
+3. In the app: **Settings → Zoho Calendar & Mail** — paste Client ID, Client Secret, Refresh Token.
+4. Set **Calendar sync** / **Mail send** to `yes`.
+5. Use regional domains if needed (`accounts.zoho.eu`, `calendar.zoho.eu`, `mail.zoho.eu`, etc.).
+6. Click **Test connection**, then save a CRM follow-up date or use Email on a CRM row.
+
+Tokens are stored in local settings (browser IndexedDB in local mode). Browser CORS must allow Zoho API calls from your Pages origin; if a call is blocked, use a backend proxy later.
 
 ## Roles
 

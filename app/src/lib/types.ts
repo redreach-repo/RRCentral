@@ -1,5 +1,13 @@
 export type UserRole = 'admin' | 'sales'
 
+export interface CrmContact {
+  id: string
+  name: string
+  email: string
+  phone: string
+  role: string
+}
+
 export interface Client {
   id: string
   company_name: string
@@ -10,6 +18,7 @@ export interface Client {
   address: string
   trn: string
   notes: string
+  contacts?: CrmContact[]
   created_at: string
 }
 
@@ -26,6 +35,7 @@ export interface CrmEntry {
   owner: string
   quote_ref: string
   calendar_event_id: string
+  contacts?: CrmContact[]
   created_by: string
   updated_by: string
   created_at: string

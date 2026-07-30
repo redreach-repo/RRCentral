@@ -1,11 +1,39 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { format, isBefore, isToday, parseISO, startOfDay } from 'date-fns'
-import { Plus, Pencil, Trash2, Search, X, ExternalLink, Loader2 } from 'lucide-react'
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Search,
+  X,
+  ExternalLink,
+  Loader2,
+  Mail,
+  UserPlus,
+} from 'lucide-react'
 import { db } from '../lib/db'
 import { NEXT_ACTIONS } from '../lib/config'
-import type { AppUser, CrmEntry } from '../lib/types'
+import type { AppUser, CrmContact, CrmEntry } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
+import { useSettings } from '../contexts/SettingsContext'
+import { useToast } from '../contexts/ToastContext'
+import {
+  CONTACT_ROLES,
+  contactDisplay,
+  flatFieldsFromContacts,
+  hydrateContacts,
+  newContact,
+  normalizeContacts,
+  primaryContact,
+} from '../lib/contacts'
+import {
+  deleteZohoCalendarEvent,
+  isZohoCalendarEnabled,
+  isZohoMailEnabled,
+  syncFollowUpToZohoCalendar,
+} from '../lib/zoho'
+import EmailComposeModal from '../components/EmailComposeModal'
 import {
   page,
   pageHeader,
@@ -34,10 +62,7 @@ import {
 
 type CrmForm = {
   company_name: string
-  primary_contact: string
-  email_phone: string
-  mobile_number: string
-  office_number: string
+  contacts: CrmContact[]
   notes: string
   follow_up_date: string
   next_action: string
@@ -47,10 +72,7 @@ type CrmForm = {
 
 const emptyForm = (): CrmForm => ({
   company_name: '',
-  primary_contact: '',
-  email_phone: '',
-  mobile_number: '',
-  office_number: '',
+  contacts: [newContact({ role: 'Primary' })],
   notes: '',
   follow_up_date: '',
   next_action: '',
@@ -72,6 +94,8 @@ function followUpColor(dateStr: string | null): string {
 
 export default function CrmPage() {
   const { user } = useAuth()
+  const { settings } = useSettings()
+  const { showToast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const [entries, setEntries] = useState<CrmEntry[]>([])
   const [owners, setOwners] = useState<AppUser[]>([])
@@ -83,6 +107,7 @@ export default function CrmPage() {
   const [editing, setEditing] = useState<CrmEntry | null>(null)
   const [form, setForm] = useState<CrmForm>(emptyForm)
   const [deleteTarget, setDeleteTarget] = useState<CrmEntry | null>(null)
+  const [emailTarget, setEmailTarget] = useState<CrmEntry | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -109,12 +134,10 @@ export default function CrmPage() {
 
   const openEdit = useCallback((entry: CrmEntry) => {
     setEditing(entry)
+    const contacts = hydrateContacts(entry)
     setForm({
       company_name: entry.company_name || '',
-      primary_contact: entry.primary_contact || '',
-      email_phone: entry.email_phone || '',
-      mobile_number: entry.mobile_number || '',
-      office_number: entry.office_number || '',
+      contacts: contacts.length ? contacts : [newContact({ role: 'Primary' })],
       notes: entry.notes || '',
       follow_up_date: entry.follow_up_date ? entry.follow_up_date.slice(0, 10) : '',
       next_action: entry.next_action || '',
@@ -137,15 +160,21 @@ export default function CrmPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return entries
-    return entries.filter((e) => e.company_name.toLowerCase().includes(q))
+    return entries.filter((e) => {
+      if (e.company_name.toLowerCase().includes(q)) return true
+      return hydrateContacts(e).some(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          c.email.toLowerCase().includes(q) ||
+          c.phone.toLowerCase().includes(q),
+      )
+    })
   }, [entries, search])
 
   function openCreate() {
     setEditing(null)
     const defaultOwner =
-      owners.find((o) => o.email === user?.email)?.name ||
-      user?.email ||
-      ''
+      owners.find((o) => o.email === user?.email)?.name || user?.email || ''
     setForm({ ...emptyForm(), owner: defaultOwner })
     setModalOpen(true)
   }
@@ -156,21 +185,44 @@ export default function CrmPage() {
     setForm(emptyForm())
   }
 
-  async function upsertClient(payload: CrmForm) {
-    if (!payload.company_name.trim()) return
+  function updateContact(id: string, patch: Partial<CrmContact>) {
+    setForm((f) => ({
+      ...f,
+      contacts: f.contacts.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+    }))
+  }
+
+  function addContact() {
+    setForm((f) => ({
+      ...f,
+      contacts: [...f.contacts, newContact({ role: f.contacts.length ? 'Other' : 'Primary' })],
+    }))
+  }
+
+  function removeContact(id: string) {
+    setForm((f) => {
+      const next = f.contacts.filter((c) => c.id !== id)
+      return { ...f, contacts: next.length ? next : [newContact({ role: 'Primary' })] }
+    })
+  }
+
+  async function upsertClient(company: string, contacts: CrmContact[], notes: string) {
+    if (!company.trim()) return
+    const flat = flatFieldsFromContacts(contacts)
     const { data: existing } = await db
       .from('clients')
       .select('id')
-      .ilike('company_name', payload.company_name.trim())
+      .ilike('company_name', company.trim())
       .maybeSingle()
 
     const clientRow = {
-      company_name: payload.company_name.trim(),
-      primary_contact: payload.primary_contact,
-      email: payload.email_phone,
-      mobile: payload.mobile_number,
-      office: payload.office_number,
-      notes: payload.notes,
+      company_name: company.trim(),
+      primary_contact: flat.primary_contact,
+      email: flat.email_phone,
+      mobile: flat.mobile_number,
+      office: flat.office_number,
+      notes,
+      contacts: normalizeContacts(contacts),
     }
 
     if (existing?.id) {
@@ -189,14 +241,17 @@ export default function CrmPage() {
     setSaving(true)
     setError('')
     const who = user?.email || ''
-    const payload = {
+    const contacts = normalizeContacts(form.contacts)
+    const flat = flatFieldsFromContacts(contacts)
+    const followUpDate = form.follow_up_date || null
+    const prevEventId = editing?.calendar_event_id || ''
+
+    const payload: Record<string, unknown> = {
       company_name: form.company_name.trim(),
-      primary_contact: form.primary_contact.trim(),
-      email_phone: form.email_phone.trim(),
-      mobile_number: form.mobile_number.trim(),
-      office_number: form.office_number.trim(),
+      ...flat,
+      contacts,
       notes: form.notes.trim(),
-      follow_up_date: form.follow_up_date || null,
+      follow_up_date: followUpDate,
       next_action: form.next_action,
       owner: form.owner,
       quote_ref: form.quote_ref.trim(),
@@ -205,17 +260,59 @@ export default function CrmPage() {
     }
 
     try {
+      let savedId = editing?.id || ''
       if (editing) {
         const { error: err } = await db.from('crm').update(payload).eq('id', editing.id)
         if (err) throw err
+        savedId = editing.id
       } else {
+        const newId = crypto.randomUUID()
         const { error: err } = await db.from('crm').insert({
           ...payload,
+          id: newId,
           created_by: who,
+          calendar_event_id: '',
         })
         if (err) throw err
+        savedId = newId
       }
-      await upsertClient(form)
+
+      await upsertClient(form.company_name, contacts, form.notes.trim())
+
+      // Best-effort Zoho Calendar sync
+      if (isZohoCalendarEnabled(settings)) {
+        try {
+          const p = primaryContact(contacts)
+          if (followUpDate) {
+            const eventId = await syncFollowUpToZohoCalendar(settings, {
+              company: form.company_name.trim(),
+              nextAction: form.next_action,
+              owner: form.owner,
+              contactName: p?.name,
+              contactEmail: p?.email,
+              followUpDate,
+              existingEventId: prevEventId || undefined,
+            })
+            if (savedId && eventId && eventId !== prevEventId) {
+              await db
+                .from('crm')
+                .update({ calendar_event_id: eventId })
+                .eq('id', savedId)
+            }
+          } else if (prevEventId) {
+            await deleteZohoCalendarEvent(settings, prevEventId)
+            if (savedId) {
+              await db.from('crm').update({ calendar_event_id: '' }).eq('id', savedId)
+            }
+          }
+        } catch (calErr) {
+          showToast(
+            calErr instanceof Error ? `Saved, but Zoho Calendar: ${calErr.message}` : 'Saved, but calendar sync failed',
+            'error',
+          )
+        }
+      }
+
       closeModal()
       await load()
     } catch (err) {
@@ -230,6 +327,13 @@ export default function CrmPage() {
     setSaving(true)
     setError('')
     try {
+      if (isZohoCalendarEnabled(settings) && deleteTarget.calendar_event_id) {
+        try {
+          await deleteZohoCalendarEvent(settings, deleteTarget.calendar_event_id)
+        } catch {
+          /* ignore calendar delete errors on CRM delete */
+        }
+      }
       const { error: err } = await db.from('crm').delete().eq('id', deleteTarget.id)
       if (err) throw err
       setDeleteTarget(null)
@@ -246,10 +350,10 @@ export default function CrmPage() {
       <div style={pageHeader}>
         <div>
           <h2 style={pageTitle}>CRM / Sales Visits</h2>
-          <p style={pageSub}>Contacts, follow-ups, and ownership</p>
+          <p style={pageSub}>Companies, multiple contacts, follow-ups, and Zoho sync</p>
         </div>
         <button type="button" style={btnPrimary} onClick={openCreate}>
-          <Plus size={16} /> Add contact
+          <Plus size={16} /> Add company
         </button>
       </div>
 
@@ -269,7 +373,7 @@ export default function CrmPage() {
           />
           <input
             style={{ ...input, paddingLeft: 36 }}
-            placeholder="Search by company…"
+            placeholder="Search company or contact…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -281,8 +385,15 @@ export default function CrmPage() {
           <Loader2 size={22} style={{ animation: 'spin 1s linear infinite' }} /> Loading…
         </div>
       ) : filtered.length === 0 ? (
-        <div style={{ ...emptyState, ...{ background: colors.card, borderRadius: 12, border: `1px solid ${colors.border}` } }}>
-          {search ? 'No companies match your search.' : 'No CRM entries yet. Add your first contact.'}
+        <div
+          style={{
+            ...emptyState,
+            background: colors.card,
+            borderRadius: 12,
+            border: `1px solid ${colors.border}`,
+          }}
+        >
+          {search ? 'No companies match your search.' : 'No CRM entries yet. Add your first company.'}
         </div>
       ) : (
         <div style={tableWrap}>
@@ -290,7 +401,7 @@ export default function CrmPage() {
             <thead>
               <tr>
                 <th style={th}>Company</th>
-                <th style={th}>Contact</th>
+                <th style={th}>Contacts</th>
                 <th style={th}>Phone</th>
                 <th style={th}>Follow-up</th>
                 <th style={th}>Next action</th>
@@ -300,61 +411,94 @@ export default function CrmPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((row) => (
-                <tr key={row.id}>
-                  <td style={td}>
-                    <button
-                      type="button"
-                      onClick={() => openEdit(row)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: colors.text,
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        padding: 0,
-                        textAlign: 'left',
-                      }}
-                    >
-                      {row.company_name}
-                    </button>
-                  </td>
-                  <td style={td}>{row.primary_contact || '—'}</td>
-                  <td style={td}>{row.mobile_number || row.office_number || row.email_phone || '—'}</td>
-                  <td style={{ ...td, color: followUpColor(row.follow_up_date), fontWeight: 600 }}>
-                    {row.follow_up_date
-                      ? format(parseISO(row.follow_up_date.slice(0, 10)), 'dd MMM yyyy')
-                      : '—'}
-                  </td>
-                  <td style={td}>{row.next_action || '—'}</td>
-                  <td style={td}>{row.owner || '—'}</td>
-                  <td style={td}>
-                    {row.quote_ref ? (
-                      <Link
-                        to={`/quotations?ref=${encodeURIComponent(row.quote_ref)}`}
-                        style={{ color: colors.accent, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              {filtered.map((row) => {
+                const contacts = hydrateContacts(row)
+                const display = contactDisplay(contacts)
+                const p = primaryContact(contacts)
+                return (
+                  <tr key={row.id}>
+                    <td style={td}>
+                      <button
+                        type="button"
+                        onClick={() => openEdit(row)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: colors.text,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          padding: 0,
+                          textAlign: 'left',
+                        }}
                       >
-                        {row.quote_ref} <ExternalLink size={12} />
-                      </Link>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td style={{ ...td, whiteSpace: 'nowrap' }}>
-                    <button type="button" style={btnGhost} onClick={() => openEdit(row)} title="Edit">
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      style={btnGhost}
-                      onClick={() => setDeleteTarget(row)}
-                      title="Delete"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                        {row.company_name}
+                      </button>
+                    </td>
+                    <td style={td}>
+                      {display.label}
+                      {display.extra > 0 ? (
+                        <span
+                          style={{
+                            marginLeft: 6,
+                            fontSize: 11,
+                            color: colors.accent,
+                            fontWeight: 600,
+                          }}
+                        >
+                          +{display.extra}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td style={td}>{p?.phone || row.mobile_number || row.office_number || '—'}</td>
+                    <td style={{ ...td, color: followUpColor(row.follow_up_date), fontWeight: 600 }}>
+                      {row.follow_up_date
+                        ? format(parseISO(row.follow_up_date.slice(0, 10)), 'dd MMM yyyy')
+                        : '—'}
+                    </td>
+                    <td style={td}>{row.next_action || '—'}</td>
+                    <td style={td}>{row.owner || '—'}</td>
+                    <td style={td}>
+                      {row.quote_ref ? (
+                        <Link
+                          to={`/quotations?ref=${encodeURIComponent(row.quote_ref)}`}
+                          style={{
+                            color: colors.accent,
+                            textDecoration: 'none',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                        >
+                          {row.quote_ref} <ExternalLink size={12} />
+                        </Link>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                      <button
+                        type="button"
+                        style={btnGhost}
+                        onClick={() => setEmailTarget(row)}
+                        title="Email"
+                      >
+                        <Mail size={14} />
+                      </button>
+                      <button type="button" style={btnGhost} onClick={() => openEdit(row)} title="Edit">
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        style={btnGhost}
+                        onClick={() => setDeleteTarget(row)}
+                        title="Delete"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -362,9 +506,9 @@ export default function CrmPage() {
 
       {modalOpen && (
         <div style={overlay} onClick={closeModal}>
-          <div style={modal} onClick={(e) => e.stopPropagation()}>
+          <div style={{ ...modal, maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
             <div style={modalHeader}>
-              <h3 style={{ margin: 0, fontSize: 16 }}>{editing ? 'Edit contact' : 'Add contact'}</h3>
+              <h3 style={{ margin: 0, fontSize: 16 }}>{editing ? 'Edit company' : 'Add company'}</h3>
               <button type="button" style={btnGhost} onClick={closeModal}>
                 <X size={18} />
               </button>
@@ -378,34 +522,6 @@ export default function CrmPage() {
                       required
                       value={form.company_name}
                       onChange={(e) => setForm((f) => ({ ...f, company_name: e.target.value }))}
-                    />
-                  </Field>
-                  <Field label="Primary contact">
-                    <input
-                      style={input}
-                      value={form.primary_contact}
-                      onChange={(e) => setForm((f) => ({ ...f, primary_contact: e.target.value }))}
-                    />
-                  </Field>
-                  <Field label="Email / phone">
-                    <input
-                      style={input}
-                      value={form.email_phone}
-                      onChange={(e) => setForm((f) => ({ ...f, email_phone: e.target.value }))}
-                    />
-                  </Field>
-                  <Field label="Mobile">
-                    <input
-                      style={input}
-                      value={form.mobile_number}
-                      onChange={(e) => setForm((f) => ({ ...f, mobile_number: e.target.value }))}
-                    />
-                  </Field>
-                  <Field label="Office">
-                    <input
-                      style={input}
-                      value={form.office_number}
-                      onChange={(e) => setForm((f) => ({ ...f, office_number: e.target.value }))}
                     />
                   </Field>
                   <Field label="Follow-up date">
@@ -457,6 +573,101 @@ export default function CrmPage() {
                     />
                   </Field>
                 </div>
+
+                <div style={{ marginTop: 8, marginBottom: 8 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: 10,
+                    }}
+                  >
+                    <label style={{ ...label, margin: 0 }}>Contacts</label>
+                    <button type="button" style={btnGhost} onClick={addContact}>
+                      <UserPlus size={14} /> Add contact
+                    </button>
+                  </div>
+                  <div style={{ display: 'grid', gap: 10 }}>
+                    {form.contacts.map((c, idx) => (
+                      <div
+                        key={c.id}
+                        style={{
+                          border: `1px solid ${colors.border}`,
+                          borderRadius: 10,
+                          padding: 12,
+                          background: 'rgba(0,0,0,0.2)',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            marginBottom: 8,
+                            fontSize: 12,
+                            color: colors.muted2,
+                          }}
+                        >
+                          <span>Contact {idx + 1}</span>
+                          {form.contacts.length > 1 ? (
+                            <button type="button" style={btnGhost} onClick={() => removeContact(c.id)}>
+                              <Trash2 size={14} />
+                            </button>
+                          ) : null}
+                        </div>
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))',
+                            gap: 10,
+                          }}
+                        >
+                          <Field label="Name">
+                            <input
+                              style={input}
+                              value={c.name}
+                              onChange={(e) => updateContact(c.id, { name: e.target.value })}
+                            />
+                          </Field>
+                          <Field label="Email">
+                            <input
+                              style={input}
+                              type="email"
+                              value={c.email}
+                              onChange={(e) => updateContact(c.id, { email: e.target.value })}
+                            />
+                          </Field>
+                          <Field label="Phone">
+                            <input
+                              style={input}
+                              value={c.phone}
+                              onChange={(e) => updateContact(c.id, { phone: e.target.value })}
+                            />
+                          </Field>
+                          <Field label="Role">
+                            <select
+                              style={input}
+                              value={c.role}
+                              onChange={(e) => updateContact(c.id, { role: e.target.value })}
+                            >
+                              {CONTACT_ROLES.map((r) => (
+                                <option key={r} value={r}>
+                                  {r}
+                                </option>
+                              ))}
+                            </select>
+                          </Field>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {isZohoCalendarEnabled(settings) ? (
+                    <p style={{ margin: '8px 0 0', fontSize: 12, color: colors.muted2 }}>
+                      Follow-up date syncs to Zoho Calendar when enabled in Settings.
+                    </p>
+                  ) : null}
+                </div>
+
                 <Field label="Notes">
                   <textarea
                     style={{ ...input, minHeight: 80, resize: 'vertical' }}
@@ -482,7 +693,7 @@ export default function CrmPage() {
         <div style={overlay} onClick={() => setDeleteTarget(null)}>
           <div style={{ ...modal, maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
             <div style={modalHeader}>
-              <h3 style={{ margin: 0, fontSize: 16 }}>Delete contact?</h3>
+              <h3 style={{ margin: 0, fontSize: 16 }}>Delete company?</h3>
             </div>
             <div style={modalBody}>
               <p style={{ margin: 0, color: colors.muted, fontSize: 14 }}>
@@ -501,6 +712,21 @@ export default function CrmPage() {
           </div>
         </div>
       )}
+
+      <EmailComposeModal
+        open={!!emailTarget}
+        companyName={emailTarget?.company_name || ''}
+        contacts={emailTarget ? hydrateContacts(emailTarget) : []}
+        defaultSubject={
+          emailTarget?.quote_ref
+            ? `Regarding ${emailTarget.quote_ref}`
+            : emailTarget
+              ? `Follow-up — ${emailTarget.company_name}`
+              : ''
+        }
+        zohoEnabled={isZohoMailEnabled(settings)}
+        onClose={() => setEmailTarget(null)}
+      />
     </div>
   )
 }

@@ -78,6 +78,7 @@ create table clients (
   address text not null default '',
   trn text not null default '',
   notes text not null default '',
+  contacts jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now()
 );
 
@@ -97,6 +98,7 @@ create table crm (
   owner text not null default '',
   quote_ref text not null default '',
   calendar_event_id text not null default '',
+  contacts jsonb not null default '[]'::jsonb,
   created_by text not null default '',
   updated_by text not null default '',
   created_at timestamptz not null default now(),
@@ -342,3 +344,9 @@ create policy "Authenticated users full access" on expenses for all using (auth.
 create policy "Authenticated users full access" on payment_log for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "Authenticated users full access" on attachments for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "Authenticated users full access" on activity_log for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
+------------------------------------------------------------
+-- Optional upgrades for existing databases (run once if upgrading)
+------------------------------------------------------------
+-- alter table crm add column if not exists contacts jsonb not null default '[]'::jsonb;
+-- alter table clients add column if not exists contacts jsonb not null default '[]'::jsonb;

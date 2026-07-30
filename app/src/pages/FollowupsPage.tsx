@@ -1,13 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { addDays, differenceInCalendarDays, format, parseISO, startOfDay } from 'date-fns'
-import { Bell, CalendarClock, MessageSquarePlus } from 'lucide-react'
+import { Bell, CalendarClock, Mail, MessageSquarePlus } from 'lucide-react'
 import { db } from '../lib/db'
 import type { CrmEntry } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
+import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
+import EmailComposeModal from '../components/EmailComposeModal'
+import { hydrateContacts, primaryContact } from '../lib/contacts'
+import {
+  deleteZohoCalendarEvent,
+  isZohoCalendarEnabled,
+  isZohoMailEnabled,
+  syncFollowUpToZohoCalendar,
+} from '../lib/zoho'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -33,6 +42,7 @@ function daysLabel(dateStr: string, today: Date): string {
 
 export default function FollowupsPage() {
   const { user } = useAuth()
+  const { settings } = useSettings()
   const { showToast } = useToast()
   const [entries, setEntries] = useState<CrmEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -40,6 +50,7 @@ export default function FollowupsPage() {
   const [updateTarget, setUpdateTarget] = useState<CrmEntry | null>(null)
   const [updateText, setUpdateText] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [emailTarget, setEmailTarget] = useState<CrmEntry | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -87,14 +98,37 @@ export default function FollowupsPage() {
     setBusyId(entry.id)
     try {
       const next = format(addDays(parseISO(entry.follow_up_date.slice(0, 10)), 7), 'yyyy-MM-dd')
-      const { error: err } = await db
-        .from('crm')
-        .update({
-          follow_up_date: next,
-          updated_by: user?.email || '',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', entry.id)
+      const patch: Record<string, unknown> = {
+        follow_up_date: next,
+        updated_by: user?.email || '',
+        updated_at: new Date().toISOString(),
+      }
+
+      if (isZohoCalendarEnabled(settings)) {
+        try {
+          const contacts = hydrateContacts(entry)
+          const p = primaryContact(contacts)
+          const eventId = await syncFollowUpToZohoCalendar(settings, {
+            company: entry.company_name,
+            nextAction: entry.next_action,
+            owner: entry.owner,
+            contactName: p?.name,
+            contactEmail: p?.email,
+            followUpDate: next,
+            existingEventId: entry.calendar_event_id || undefined,
+          })
+          if (eventId) patch.calendar_event_id = eventId
+        } catch (calErr) {
+          showToast(
+            calErr instanceof Error
+              ? `Snoozed locally; Zoho Calendar: ${calErr.message}`
+              : 'Snoozed locally; calendar sync failed',
+            'error',
+          )
+        }
+      }
+
+      const { error: err } = await db.from('crm').update(patch).eq('id', entry.id)
       if (err) throw err
       await logActivity('snooze_followup', 'crm', entry.company_name, `Snoozed to ${next}`, user?.email || '')
       showToast('Follow-up snoozed +7 days', 'success')
@@ -109,10 +143,24 @@ export default function FollowupsPage() {
   async function clearFollowUp(entry: CrmEntry) {
     setBusyId(entry.id)
     try {
+      if (isZohoCalendarEnabled(settings) && entry.calendar_event_id) {
+        try {
+          await deleteZohoCalendarEvent(settings, entry.calendar_event_id)
+        } catch (calErr) {
+          showToast(
+            calErr instanceof Error
+              ? `Cleared locally; Zoho Calendar: ${calErr.message}`
+              : 'Cleared locally; calendar delete failed',
+            'error',
+          )
+        }
+      }
+
       const { error: err } = await db
         .from('crm')
         .update({
           follow_up_date: null,
+          calendar_event_id: '',
           updated_by: user?.email || '',
           updated_at: new Date().toISOString(),
         })
@@ -159,6 +207,13 @@ export default function FollowupsPage() {
   function renderCard(entry: CrmEntry, tone: 'overdue' | 'upcoming') {
     const accent = tone === 'overdue' ? colors.danger : colors.success
     const busy = busyId === entry.id
+    const contacts = hydrateContacts(entry)
+    const p = primaryContact(contacts)
+    const contactLabel =
+      contacts.length > 1
+        ? `${p?.name || '—'} +${contacts.length - 1}`
+        : p?.name || entry.primary_contact || '—'
+
     return (
       <div
         key={entry.id}
@@ -179,7 +234,7 @@ export default function FollowupsPage() {
               {entry.company_name}
             </Link>
             <div style={{ fontSize: 13, color: colors.muted, marginTop: 4 }}>
-              {entry.primary_contact || '—'} · {entry.next_action || 'No action'} · {entry.owner || 'Unassigned'}
+              {contactLabel} · {entry.next_action || 'No action'} · {entry.owner || 'Unassigned'}
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -204,6 +259,14 @@ export default function FollowupsPage() {
             type="button"
             style={buttonSecondaryStyle}
             disabled={busy}
+            onClick={() => setEmailTarget(entry)}
+          >
+            <Mail size={14} /> Email
+          </button>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={busy}
             onClick={() => {
               setUpdateTarget(entry)
               setUpdateText('')
@@ -219,7 +282,10 @@ export default function FollowupsPage() {
   return (
     <div style={pageStyle}>
       <h1 style={pageTitleStyle}>Follow-ups</h1>
-      <p style={pageSubtitleStyle}>Overdue and upcoming CRM actions</p>
+      <p style={pageSubtitleStyle}>
+        Overdue and upcoming CRM actions
+        {isZohoCalendarEnabled(settings) ? ' · Zoho Calendar sync on' : ''}
+      </p>
 
       {error ? (
         <div style={{ ...cardStyle, color: colors.danger, marginBottom: 16 }}>{error}</div>
@@ -283,6 +349,21 @@ export default function FollowupsPage() {
           Saves to follow_up_updates. Use Clear if the follow-up is done.
         </p>
       </Modal>
+
+      <EmailComposeModal
+        open={!!emailTarget}
+        companyName={emailTarget?.company_name || ''}
+        contacts={emailTarget ? hydrateContacts(emailTarget) : []}
+        defaultSubject={
+          emailTarget?.quote_ref
+            ? `Regarding ${emailTarget.quote_ref}`
+            : emailTarget
+              ? `Follow-up — ${emailTarget.company_name}`
+              : ''
+        }
+        zohoEnabled={isZohoMailEnabled(settings)}
+        onClose={() => setEmailTarget(null)}
+      />
     </div>
   )
 }

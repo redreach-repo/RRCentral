@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Download, HardDrive, Pencil, Plus, Trash2, Upload } from 'lucide-react'
+import { Download, HardDrive, Pencil, Plus, Trash2, Upload, Plug } from 'lucide-react'
 import { db, authMode } from '../lib/db'
 import type { AppUser, UserRole } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -12,6 +12,7 @@ import {
   resetSheetsImportFlag,
 } from '../lib/migrateFromSheets'
 import { clearLocalData, DB_NAME, exportLocalDump } from '../lib/localDb'
+import { testZohoConnection } from '../lib/zoho'
 import {
   buttonDangerStyle,
   buttonPrimaryStyle,
@@ -74,6 +75,19 @@ const SYSTEM_KEYS = [
   { key: 'followUpDaysAfterQuote', label: 'Follow-up days after quote' },
 ] as const
 
+const ZOHO_KEYS = [
+  { key: 'zohoClientId', label: 'Client ID' },
+  { key: 'zohoClientSecret', label: 'Client Secret' },
+  { key: 'zohoRefreshToken', label: 'Refresh Token' },
+  { key: 'zohoAccountsDomain', label: 'Accounts domain' },
+  { key: 'zohoCalendarDomain', label: 'Calendar domain' },
+  { key: 'zohoMailDomain', label: 'Mail domain' },
+  { key: 'zohoCalendarUid', label: 'Calendar UID (optional)' },
+  { key: 'zohoMailAccountId', label: 'Mail account ID (optional)' },
+  { key: 'zohoCalendarEnabled', label: 'Calendar sync (yes/no)' },
+  { key: 'zohoMailEnabled', label: 'Mail send (yes/no)' },
+] as const
+
 type UserForm = { email: string; name: string; role: UserRole; active: boolean }
 
 export default function SettingsPage() {
@@ -95,6 +109,7 @@ export default function SettingsPage() {
   const [busy, setBusy] = useState(false)
   const [importing, setImporting] = useState(false)
   const [backingUp, setBackingUp] = useState(false)
+  const [testingZoho, setTestingZoho] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const backupRef = useRef<HTMLInputElement>(null)
 
@@ -323,6 +338,25 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleTestZoho() {
+    setTestingZoho(true)
+    try {
+      // Persist draft Zoho keys first so test uses latest values
+      for (const { key } of ZOHO_KEYS) {
+        const value = draft[key] ?? settings[key] ?? ''
+        if ((settings[key] ?? '') !== value) {
+          await updateSetting(key, value)
+        }
+      }
+      const result = await testZohoConnection({ ...settings, ...draft })
+      showToast(result, 'success')
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Zoho test failed', 'error')
+    } finally {
+      setTestingZoho(false)
+    }
+  }
+
   return (
     <div style={pageStyle}>
       <h1 style={pageTitleStyle}>Settings</h1>
@@ -398,6 +432,85 @@ export default function SettingsPage() {
       {renderSection('Bank details', 'Bank', BANK_KEYS)}
       {renderSection('Quote / Invoice settings', 'Quote settings', QUOTE_KEYS)}
       {renderSection('System', 'System', SYSTEM_KEYS)}
+
+      <div style={{ ...cardStyle, marginBottom: 20 }}>
+        <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Plug size={18} /> Zoho Calendar &amp; Mail
+        </h2>
+        <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.55 }}>
+          Connect Zoho so CRM follow-ups sync to Calendar and Email sends via Zoho Mail.
+          Create a Self Client in the{' '}
+          <a
+            href="https://api-console.zoho.com/"
+            target="_blank"
+            rel="noreferrer"
+            style={{ color: colors.accent }}
+          >
+            Zoho API Console
+          </a>
+          , generate a refresh token with scopes{' '}
+          <code style={{ color: '#ff9f4a' }}>ZohoCalendar.event.ALL</code> and{' '}
+          <code style={{ color: '#ff9f4a' }}>ZohoMail.messages.CREATE</code>
+          (plus <code style={{ color: '#ff9f4a' }}>ZohoMail.accounts.READ</code>), then paste
+          credentials below. Set Calendar sync / Mail send to <strong>yes</strong> to enable.
+          Use regional domains if your org is on .eu / .in (e.g.{' '}
+          <code>https://accounts.zoho.eu</code>).
+        </p>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: 12,
+            marginBottom: 14,
+          }}
+        >
+          {ZOHO_KEYS.map(({ key, label }) => (
+            <div key={key} style={fieldStyle}>
+              <label style={labelStyle}>{label}</label>
+              <input
+                style={inputStyle}
+                type={
+                  key.toLowerCase().includes('secret') || key.toLowerCase().includes('token')
+                    ? 'password'
+                    : 'text'
+                }
+                value={draft[key] ?? ''}
+                placeholder={
+                  key === 'zohoAccountsDomain'
+                    ? 'https://accounts.zoho.com'
+                    : key === 'zohoCalendarDomain'
+                      ? 'https://calendar.zoho.com'
+                      : key === 'zohoMailDomain'
+                        ? 'https://mail.zoho.com'
+                        : key.includes('Enabled')
+                          ? 'yes / no'
+                          : ''
+                }
+                onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
+              />
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <button
+            type="button"
+            style={buttonPrimaryStyle}
+            disabled={savingSection === 'Zoho' || settingsLoading}
+            onClick={() => void saveSection(ZOHO_KEYS, 'Zoho')}
+          >
+            {savingSection === 'Zoho' ? 'Saving…' : 'Save Zoho settings'}
+          </button>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={testingZoho}
+            onClick={() => void handleTestZoho()}
+          >
+            <Plug size={14} />
+            {testingZoho ? 'Testing…' : 'Test connection'}
+          </button>
+        </div>
+      </div>
 
       {authMode === 'local' && (
         <div style={{ ...cardStyle, marginBottom: 20 }}>

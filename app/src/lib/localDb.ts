@@ -66,6 +66,16 @@ const DEFAULT_SETTINGS: { key: string; value: string }[] = [
   { key: 'followUpDaysAfterQuote', value: '3' },
   { key: 'calendarSync', value: 'yes' },
   { key: 'calendarId', value: 'primary' },
+  { key: 'zohoClientId', value: '' },
+  { key: 'zohoClientSecret', value: '' },
+  { key: 'zohoRefreshToken', value: '' },
+  { key: 'zohoAccountsDomain', value: 'https://accounts.zoho.com' },
+  { key: 'zohoCalendarDomain', value: 'https://calendar.zoho.com' },
+  { key: 'zohoMailDomain', value: 'https://mail.zoho.com' },
+  { key: 'zohoCalendarUid', value: '' },
+  { key: 'zohoMailAccountId', value: '' },
+  { key: 'zohoCalendarEnabled', value: 'no' },
+  { key: 'zohoMailEnabled', value: 'no' },
 ]
 
 const DEFAULT_ADMINS: {
