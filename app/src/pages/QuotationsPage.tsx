@@ -995,14 +995,9 @@ export default function QuotationsPage() {
                     items: [
                       ...f.items,
                       newDraftLine({
-                        description: [
-                          p.sku ? `${p.sku}` : '',
-                          p.name,
-                          p.fabric ? `(${p.fabric})` : '',
-                        ]
+                        description: [p.sku, `${p.name}${p.fabric ? ` (${p.fabric})` : ''}`]
                           .filter(Boolean)
-                          .join(' — ')
-                          .replace(' — (', ' ('),
+                          .join(' — '),
                         qty: p.moq || 1,
                         unit_price: Number(p.unit_price) || 0,
                       }),
