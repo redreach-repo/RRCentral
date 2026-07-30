@@ -3,6 +3,8 @@
  * Used when VITE_SUPABASE_URL is missing or a placeholder (e.g. GitHub Pages demos).
  */
 
+import { ALL_SEED_PRODUCTS } from './seedCatalog'
+
 export const DB_NAME = 'rrcentral_local'
 const DB_VERSION = 1
 
@@ -263,6 +265,17 @@ async function ensureSeeded(): Promise<void> {
     const store = tx.objectStore('app_users')
     for (const admin of DEFAULT_ADMINS) {
       store.put({ id: crypto.randomUUID(), ...admin })
+    }
+    await txDone(tx)
+  }
+
+  const productsCount = await reqToPromise(txStore(database, 'products', 'readonly').count())
+  if (productsCount === 0) {
+    const tx = database.transaction('products', 'readwrite')
+    const store = tx.objectStore('products')
+    const now = new Date().toISOString()
+    for (const p of ALL_SEED_PRODUCTS) {
+      store.put({ id: crypto.randomUUID(), ...p, updated_at: now })
     }
     await txDone(tx)
   }

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, ExternalLink, FileText, Package, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Download, ExternalLink, FileText, Package, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS, FABRIC_OPTIONS } from '../lib/config'
 import { BRAND_CATALOGUES, catalogueUrl } from '../lib/catalogues'
+import { syncSeedCatalog } from '../lib/syncCatalog'
 import type { Product } from '../lib/types'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
@@ -64,6 +65,7 @@ export default function CatalogPage() {
   const [editing, setEditing] = useState<Product | null>(null)
   const [form, setForm] = useState<ProductForm>(emptyForm())
   const [saving, setSaving] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
 
   const load = useCallback(async () => {
@@ -181,6 +183,22 @@ export default function CatalogPage() {
     }
   }
 
+  async function syncCatalogueSkus() {
+    setSyncing(true)
+    try {
+      const result = await syncSeedCatalog()
+      showToast(
+        `Catalogue SKUs synced · ${result.inserted} new · ${result.updated} updated`,
+        'success',
+      )
+      await load()
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'SKU sync failed', 'error')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   const brand = (code: string) => DIVISIONS.find((d) => d.code === code)?.brand || code
 
   const visibleCatalogues = useMemo(() => {
@@ -195,9 +213,20 @@ export default function CatalogPage() {
           <h1 style={pageTitleStyle}>Catalog</h1>
           <p style={pageSubtitleStyle}>Brand catalogues and products across divisions</p>
         </div>
-        <button type="button" style={buttonPrimaryStyle} onClick={openCreate}>
-          <Plus size={16} /> Add product
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={syncing}
+            onClick={() => void syncCatalogueSkus()}
+            title="Load / refresh RR Threads catalogue SKUs"
+          >
+            <RefreshCw size={16} /> {syncing ? 'Syncing…' : 'Sync catalogue SKUs'}
+          </button>
+          <button type="button" style={buttonPrimaryStyle} onClick={openCreate}>
+            <Plus size={16} /> Add product
+          </button>
+        </div>
       </div>
 
       {visibleCatalogues.length > 0 ? (
@@ -301,6 +330,10 @@ export default function CatalogPage() {
         />
       ) : (
         <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+          <p style={{ margin: '0 0 12px', fontSize: 12, color: colors.muted }}>
+            SKU scheme matches the Premium Catalogue (COR-001…) plus sellable fabric variants from
+            quotes (e.g. COR-003-OX-GB). Use <strong>Sync catalogue SKUs</strong> to load or refresh.
+          </p>
           <div style={tableWrapStyle}>
             <table style={tableStyle}>
               <thead>
