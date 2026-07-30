@@ -388,16 +388,28 @@ create table wanders_passengers (
 );
 
 create table tour_packages (
-  id uuid primary key default uuid_generate_v4(),
+  id text primary key,
   code text not null default '',
   name text not null default '',
   destination text not null default '',
+  destination_country text not null default '',
+  advertising_market text not null default 'TBC',
+  travel_period text not null default 'TBC',
   product_type text not null default '',
   nights integer not null default 0,
   days integer not null default 0,
   summary text not null default '',
   inclusions text not null default '',
   exclusions text not null default '',
+  min_group_size integer not null default 10,
+  smaller_group_policy text not null default 'Private arrangement at a higher price',
+  meal_tiers text not null default 'Breakfast only|Full board',
+  costing_method text not null default 'Add component costs',
+  supplier_currency text not null default 'TBC',
+  customer_selling_currency text not null default 'TBC',
+  status text not null default 'Product development',
+  primary_supplier_id text not null default '',
+  primary_coordinator_id text not null default '',
   default_currency text not null default 'TBC',
   guide_price numeric(14,2) not null default 0,
   active boolean not null default true,
@@ -417,6 +429,115 @@ create table wanders_terms_acceptances (
   acceptance_method text not null default '',
   created_by text not null default '',
   created_at timestamptz not null default now()
+);
+
+create table wanders_partners (
+  id text primary key,
+  name text not null default '',
+  partner_type text not null default '',
+  country text not null default '',
+  destination text not null default '',
+  status text not null default 'Active',
+  role_summary text not null default '',
+  responsibilities text not null default '',
+  communication_route text not null default '',
+  next_involvement text not null default '',
+  booking_stage_responsibility text not null default '',
+  contact_name text not null default '',
+  contact_email text not null default '',
+  contact_phone text not null default '',
+  currency text not null default 'TBC',
+  notes text not null default '',
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table package_cost_components (
+  id text primary key,
+  package_id text not null default '',
+  category text not null default '',
+  description text not null default '',
+  meal_tier text not null default '',
+  supplier_id text not null default '',
+  amount numeric(14,2) not null default 0,
+  currency text not null default 'PHP',
+  per_person boolean not null default true,
+  notes text not null default '',
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table package_selling_prices (
+  id text primary key,
+  package_id text not null default '',
+  meal_tier text not null default '',
+  label text not null default '',
+  selling_amount numeric(14,2) not null default 0,
+  selling_currency text not null default 'INR',
+  cost_amount numeric(14,2) not null default 0,
+  cost_currency text not null default 'PHP',
+  fx_rate_to_selling numeric(18,8) not null default 0,
+  margin_amount numeric(14,2) not null default 0,
+  margin_pct numeric(8,2) not null default 0,
+  status text not null default 'Pending finalization',
+  notes text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table scheduled_departures (
+  id text primary key,
+  package_id text not null default '',
+  label text not null default '',
+  departure_date date,
+  return_date date,
+  capacity integer not null default 0,
+  booked_pax integer not null default 0,
+  min_group_size integer not null default 10,
+  min_group_met boolean not null default false,
+  booking_deadline date,
+  supplier_confirmation_status text not null default 'Not requested',
+  status text not null default 'Open',
+  total_customer_payments numeric(14,2) not null default 0,
+  payments_currency text not null default 'INR',
+  total_costs numeric(14,2) not null default 0,
+  costs_currency text not null default 'PHP',
+  revenue numeric(14,2) not null default 0,
+  revenue_currency text not null default 'INR',
+  profit numeric(14,2) not null default 0,
+  profit_currency text not null default 'INR',
+  supplier_id text not null default '',
+  coordinator_id text not null default '',
+  notes text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table customer_bookings (
+  id text primary key,
+  deal_id text not null default '',
+  package_id text not null default '',
+  departure_id text not null default '',
+  supplier_id text not null default '',
+  coordinator_id text not null default '',
+  client_name text not null default '',
+  lead_contact text not null default '',
+  pax_count integer not null default 1,
+  meal_tier text not null default '',
+  selling_amount numeric(14,2) not null default 0,
+  selling_currency text not null default 'INR',
+  cost_amount numeric(14,2) not null default 0,
+  cost_currency text not null default 'PHP',
+  margin_amount numeric(14,2) not null default 0,
+  margin_pct numeric(8,2) not null default 0,
+  deposit_status text not null default 'Expected',
+  payment_status text not null default 'Expected',
+  status text not null default 'Enquiry linked',
+  notes text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 ------------------------------------------------------------
@@ -639,6 +760,11 @@ alter table wanders_deals enable row level security;
 alter table wanders_passengers enable row level security;
 alter table tour_packages enable row level security;
 alter table wanders_terms_acceptances enable row level security;
+alter table wanders_partners enable row level security;
+alter table package_cost_components enable row level security;
+alter table package_selling_prices enable row level security;
+alter table scheduled_departures enable row level security;
+alter table customer_bookings enable row level security;
 
 -- Allow all authenticated users to read/write all tables
 -- (app-level role checks handle admin vs sales permissions)
@@ -666,6 +792,11 @@ create policy "Authenticated users full access" on wanders_deals for all using (
 create policy "Authenticated users full access" on wanders_passengers for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "Authenticated users full access" on tour_packages for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "Authenticated users full access" on wanders_terms_acceptances for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Authenticated users full access" on wanders_partners for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Authenticated users full access" on package_cost_components for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Authenticated users full access" on package_selling_prices for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Authenticated users full access" on scheduled_departures for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Authenticated users full access" on customer_bookings for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 ------------------------------------------------------------
 -- Optional upgrades for existing databases (run once if upgrading)

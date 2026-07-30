@@ -8,7 +8,7 @@ import {
   WANDERS_TERMS_VERSION,
 } from './wandersConfig'
 import { buildWandersTermsText } from './wandersTerms'
-import { buildDefaultTourPackages } from './seedWandersPackages'
+import { ensureTourOpsSeeded } from './wandersTourOps'
 import type { TourPackage, WandersDeal, WandersPassenger, WandersTermsAcceptance } from './types'
 import { logActivity } from './activity'
 
@@ -266,16 +266,9 @@ export async function deletePassenger(id: string): Promise<void> {
 }
 
 export async function ensureTourPackagesSeeded(): Promise<TourPackage[]> {
-  const { data, error } = await db.from('tour_packages').select('*')
-  if (error) throw error
-  const rows = (data || []) as TourPackage[]
-  if (rows.length) return rows
-  const seeded = buildDefaultTourPackages()
-  for (const p of seeded) {
-    const { error: err } = await db.from('tour_packages').insert(p)
-    if (err) throw err
-  }
-  return seeded
+  const { ensureTourOpsSeeded } = await import('./wandersTourOps')
+  const { packages } = await ensureTourOpsSeeded()
+  return packages
 }
 
 export async function ensureWandersSettings(): Promise<void> {
