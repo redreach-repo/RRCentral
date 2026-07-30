@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Package, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Download, ExternalLink, FileText, Package, Pencil, Plus, Trash2 } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS, FABRIC_OPTIONS } from '../lib/config'
+import { BRAND_CATALOGUES, catalogueUrl } from '../lib/catalogues'
 import type { Product } from '../lib/types'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
@@ -26,6 +27,7 @@ import {
   thStyle,
   toolbarStyle,
   formGridStyle,
+  sectionTitleStyle,
 } from '../lib/uiStyles'
 
 type ProductForm = {
@@ -181,17 +183,94 @@ export default function CatalogPage() {
 
   const brand = (code: string) => DIVISIONS.find((d) => d.code === code)?.brand || code
 
+  const visibleCatalogues = useMemo(() => {
+    if (divisionFilter === 'all') return BRAND_CATALOGUES
+    return BRAND_CATALOGUES.filter((c) => c.divisionCode === divisionFilter)
+  }, [divisionFilter])
+
   return (
     <div style={pageStyle}>
       <div style={toolbarStyle}>
         <div>
           <h1 style={pageTitleStyle}>Catalog</h1>
-          <p style={pageSubtitleStyle}>Products across divisions</p>
+          <p style={pageSubtitleStyle}>Brand catalogues and products across divisions</p>
         </div>
         <button type="button" style={buttonPrimaryStyle} onClick={openCreate}>
           <Plus size={16} /> Add product
         </button>
       </div>
+
+      {visibleCatalogues.length > 0 ? (
+        <div style={{ marginBottom: 24 }}>
+          <h2 style={sectionTitleStyle}>Brand catalogues</h2>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))',
+              gap: 12,
+            }}
+          >
+            {visibleCatalogues.map((c) => {
+              const href = catalogueUrl(c.fileName)
+              return (
+                <div
+                  key={c.id}
+                  style={{
+                    ...cardStyle,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 10,
+                        background: 'rgba(96,165,250,0.15)',
+                        color: '#60a5fa',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <FileText size={20} />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 15 }}>{c.title}</div>
+                      <div style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>
+                        {c.brand} · {c.pages} pages · PDF
+                      </div>
+                      <p style={{ margin: '8px 0 0', fontSize: 13, color: colors.muted2 }}>
+                        {c.description}
+                      </p>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ ...buttonPrimaryStyle, textDecoration: 'none' }}
+                    >
+                      <ExternalLink size={14} /> View PDF
+                    </a>
+                    <a
+                      href={href}
+                      download={c.fileName}
+                      style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}
+                    >
+                      <Download size={14} /> Download
+                    </a>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
         <select style={selectStyle} value={divisionFilter} onChange={(e) => setDivisionFilter(e.target.value)}>
@@ -207,6 +286,8 @@ export default function CatalogPage() {
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
+
+      <h2 style={sectionTitleStyle}>Products</h2>
 
       {loading ? (
         <div style={{ ...cardStyle, color: colors.muted }}>Loading catalog…</div>
