@@ -18,3 +18,14 @@ export const DESTINATION_PHOTOS = [
   { file: 'wander-city.jpg', caption: 'Lakeside cities' },
   { file: 'wander-himalaya.jpg', caption: 'Himalayas' },
 ] as const
+
+export const DESTINATION_FILM = DESTINATION_PHOTOS.map((shot) => shot.file)
+
+export const THREAD_LOOKBOOK = [
+  'threads-1.jpg',
+  'threads-2.jpg',
+  'threads-3.jpg',
+  'threads-4.jpg',
+  'threads-5.jpg',
+  'vertical-threads.jpg',
+] as const
