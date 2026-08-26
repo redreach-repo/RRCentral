@@ -23,8 +23,9 @@ import SiteLayout from './site/components/SiteLayout'
 import HomePage from './site/pages/HomePage'
 import AboutPage from './site/pages/AboutPage'
 import ContactPage from './site/pages/ContactPage'
-import VerticalPage from './site/pages/VerticalPage'
+import VerticalPage, { VerticalAliasRedirect } from './site/pages/VerticalPage'
 import VerticalsIndexPage from './site/pages/VerticalsIndexPage'
+import { PLAYBOOKS } from './site/data/playbooks'
 
 export default function App() {
   return (
@@ -37,7 +38,10 @@ export default function App() {
               <Route path="about" element={<AboutPage />} />
               <Route path="contact" element={<ContactPage />} />
               <Route path="verticals" element={<VerticalsIndexPage />} />
-              <Route path="verticals/:slug" element={<VerticalPage />} />
+              <Route path="verticals/:slug" element={<VerticalAliasRedirect />} />
+              {Object.values(PLAYBOOKS).map((playbook) => (
+                <Route key={playbook.path} path={playbook.path.slice(1)} element={<VerticalPage />} />
+              ))}
             </Route>
             <Route path="/login" element={<LoginPage />} />
             <Route

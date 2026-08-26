@@ -6,6 +6,7 @@ import CursorGlow from './CursorGlow'
 import SiteWordmark from './SiteWordmark'
 import { siteAsset } from '../assets'
 import { SITE, VERTICALS } from '../data/verticals'
+import { playbookByPath, verticalPath } from '../data/playbooks'
 import '../site.css'
 
 export default function SiteLayout() {
@@ -15,6 +16,7 @@ export default function SiteLayout() {
   const [scrolled, setScrolled] = useState(false)
   const [progress, setProgress] = useState(0)
   const centralTo = user ? '/app' : '/login'
+  const companyActive = Boolean(playbookByPath(location.pathname))
 
   useEffect(() => {
     const onScroll = () => {
@@ -49,7 +51,19 @@ export default function SiteLayout() {
               Home
             </NavLink>
             <NavLink to="/about">About us</NavLink>
-            <NavLink to="/verticals">Services</NavLink>
+            <div className="site-nav-drop">
+              <NavLink to="/verticals" className={({ isActive }) => (isActive || companyActive ? 'active' : undefined)}>
+                Companies
+              </NavLink>
+              <div className="site-nav-drop-panel">
+                {VERTICALS.map((v) => (
+                  <NavLink key={v.slug} to={verticalPath(v.slug)}>
+                    {v.brand}
+                    <span>{v.category}</span>
+                  </NavLink>
+                ))}
+              </div>
+            </div>
             <NavLink to="/contact">Contact us</NavLink>
             <Link to="/contact" className="site-nav-cta">
               Get in Touch
@@ -68,8 +82,14 @@ export default function SiteLayout() {
           </button>
         </header>
         <div className={`site-mobile-panel ${open ? 'open' : ''}`}>
+          <Link to="/" onClick={() => setOpen(false)}>
+            Home
+          </Link>
+          <Link to="/verticals" onClick={() => setOpen(false)}>
+            All companies
+          </Link>
           {VERTICALS.map((v) => (
-            <Link key={v.slug} to={`/verticals/${v.slug}`} onClick={() => setOpen(false)}>
+            <Link key={v.slug} to={verticalPath(v.slug)} onClick={() => setOpen(false)}>
               {v.brand}
             </Link>
           ))}
@@ -97,10 +117,10 @@ export default function SiteLayout() {
                 <img className="site-footer-map" src={siteAsset('world-map.png')} alt="Red Reach, Dubai" />
               </div>
               <div>
-                <h4>Verticals</h4>
+                <h4>Companies</h4>
                 {VERTICALS.map((v) => (
                   <div key={v.slug}>
-                    <Link to={`/verticals/${v.slug}`}>{v.brand}</Link>
+                    <Link to={verticalPath(v.slug)}>{v.brand}</Link>
                   </div>
                 ))}
               </div>

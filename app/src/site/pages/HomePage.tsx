@@ -18,6 +18,7 @@ import {
   siteAsset,
 } from '../assets'
 import { FEATURED_VERTICALS, SITE, VERTICALS } from '../data/verticals'
+import { verticalPath } from '../data/playbooks'
 
 export default function HomePage() {
   const years = new Date().getFullYear() - SITE.founded
@@ -125,15 +126,14 @@ export default function HomePage() {
             </h2>
           </div>
           <p className="site-muted" style={{ maxWidth: 360 }}>
-            Specialised services in marketing, care, virtual assistance, travel, uniforms, trading, and
-            upskilling.
+            Specialised companies — click any card to open that vertical’s own page.
           </p>
         </div>
         <div className="site-protocol">
           {VERTICALS.map((v, i) => (
             <Reveal key={v.slug} delay={i * 70}>
               <Tilt>
-                <Link to={`/verticals/${v.slug}`} className="site-offering">
+                <Link to={verticalPath(v.slug)} className="site-offering">
                   <img src={siteAsset(v.image)} alt={v.brand} />
                   <div className="site-offering-copy">
                     <div className="site-card-icon">
@@ -142,7 +142,7 @@ export default function HomePage() {
                     <h3>{v.brand}</h3>
                     <p>{v.summary}</p>
                     <span>
-                      Know more <ArrowUpRight size={14} />
+                      Open this company <ArrowUpRight size={14} />
                     </span>
                   </div>
                 </Link>
@@ -169,7 +169,7 @@ export default function HomePage() {
                   ))}
                 </ul>
                 <div className="site-actions" style={{ marginTop: 24 }}>
-                  <Link className="site-btn site-btn-primary" to={`/verticals/${v.slug}`}>
+                  <Link className="site-btn site-btn-primary" to={verticalPath(v.slug)}>
                     View {v.brand}
                   </Link>
                 </div>
@@ -187,7 +187,7 @@ export default function HomePage() {
               Journeys worth <em>the photograph</em>
             </h2>
           </div>
-          <Link className="site-btn site-btn-ghost" to="/verticals/wanders">
+          <Link className="site-btn site-btn-ghost" to={verticalPath('wanders')}>
             Explore travel
           </Link>
         </div>
@@ -264,7 +264,7 @@ export default function HomePage() {
               Uniforms that <em>carry the brand</em>
             </h2>
           </div>
-          <Link className="site-btn site-btn-ghost" to="/verticals/threads">
+          <Link className="site-btn site-btn-ghost" to={verticalPath('threads')}>
             View lookbook
           </Link>
         </div>

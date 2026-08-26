@@ -1,121 +1,80 @@
-import { useState } from 'react'
-import { Link, Navigate, useParams } from 'react-router-dom'
-import ContactForm from '../components/ContactForm'
+import { useEffect, useState } from 'react'
+import { Navigate, useLocation, useParams } from 'react-router-dom'
 import Lightbox from '../components/Lightbox'
-import { siteAsset } from '../assets'
-import { verticalBySlug } from '../data/verticals'
+import { THREAD_LOOKBOOK } from '../assets'
+import { PLAYBOOKS, playbookByPath, verticalPath } from '../data/playbooks'
+import { verticalBySlug, type VerticalSlug } from '../data/verticals'
+import {
+  AgencyLayout,
+  ApparelLayout,
+  LearnLayout,
+  MedicalLayout,
+  TradeLayout,
+  TravelLayout,
+  VaLayout,
+} from './verticalLayouts'
+
+function VerticalAliasRedirect() {
+  const { slug } = useParams()
+  const next = verticalPath(slug)
+  if (!slug || next === `/verticals/${slug}` || next === '/verticals') return <Navigate to="/" replace />
+  return <Navigate to={next} replace />
+}
+
+export { VerticalAliasRedirect }
 
 export default function VerticalPage() {
-  const { slug } = useParams()
+  const { slug: paramSlug } = useParams()
+  const { pathname } = useLocation()
+  const matched = playbookByPath(pathname)
+  const slug = (matched?.slug ?? paramSlug) as VerticalSlug | undefined
   const vertical = verticalBySlug(slug)
+  const playbook = slug ? PLAYBOOKS[slug] : undefined
   const [shot, setShot] = useState<number | null>(null)
-  if (!vertical) return <Navigate to="/" replace />
+
+  useEffect(() => {
+    setShot(null)
+  }, [slug])
+
+  useEffect(() => {
+    if (!vertical) return
+    const previous = document.title
+    document.title = `${vertical.brand} | Red Reach`
+    return () => {
+      document.title = previous
+    }
+  }, [vertical])
+
+  if (!vertical || !playbook || !slug) return <Navigate to="/" replace />
+
+  const lightboxFiles =
+    playbook.layout === 'apparel'
+      ? [...THREAD_LOOKBOOK]
+      : playbook.layout === 'travel'
+        ? playbook.collection.map((item) => item.image).filter((file): file is string => Boolean(file))
+        : (vertical.gallery ?? [])
+
+  const Layout =
+    playbook.layout === 'agency'
+      ? AgencyLayout
+      : playbook.layout === 'medical'
+        ? MedicalLayout
+        : playbook.layout === 'va'
+          ? VaLayout
+          : playbook.layout === 'travel'
+            ? TravelLayout
+            : playbook.layout === 'apparel'
+              ? ApparelLayout
+              : playbook.layout === 'trade'
+                ? TradeLayout
+                : LearnLayout
 
   return (
-    <>
-      <section className="site-page-hero">
-        <div className="site-hero-media">
-          <img src={siteAsset(vertical.image)} alt={vertical.brand} />
-        </div>
-        <div className="site-hero-copy">
-          <div className="site-kicker">{vertical.eyebrow}</div>
-          <h1 className="site-display">
-            {vertical.heroLine}
-            <br />
-            <em>{vertical.heroAccent}</em>
-          </h1>
-          <p className="site-lede">{vertical.description}</p>
-          <div className="site-actions">
-            <Link className="site-btn site-btn-primary" to="/contact">
-              Start a project
-            </Link>
-            <a className="site-btn site-btn-gold" href="https://wa.me/971507008977" target="_blank" rel="noreferrer">
-              WhatsApp
-            </a>
-          </div>
-        </div>
-      </section>
-
-      <section className="site-section">
-        <div className="site-feature">
-          <div className="site-feature-copy">
-            <span className="site-chip">{vertical.category}</span>
-            <h3>{vertical.tagline}</h3>
-            <ul className="site-bullets">
-              {vertical.bullets.map((b) => (
-                <li key={b}>{b}</li>
-              ))}
-            </ul>
-          </div>
-          <div className="site-highlights" style={{ gridTemplateColumns: '1fr', padding: 18 }}>
-            {vertical.highlights.map((h) => (
-              <article key={h.title} className="site-card" style={{ minHeight: 0 }}>
-                <div className="site-card-body">
-                  <h3>{h.title}</h3>
-                  <p>{h.body}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {vertical.gallery && vertical.gallery.length > 0 && (
-        <section className="site-section" style={{ paddingTop: 0 }}>
-          <div className="site-kicker">In the field</div>
-          <h2 className="site-h2" style={{ marginBottom: 28 }}>
-            Pictures from <em>{vertical.brand}</em>
-          </h2>
-          <div className="site-gallery">
-            {vertical.gallery.map((file, i) => (
-              <figure key={file}>
-                <button type="button" onClick={() => setShot(i)} aria-label="Open photograph">
-                  <img src={siteAsset(file)} alt="" />
-                </button>
-              </figure>
-            ))}
-          </div>
-        </section>
+    <div className={`site-vertical site-vertical--${playbook.layout}`}>
+      <Layout vertical={vertical} playbook={playbook} onOpenShot={setShot} />
+      {shot !== null && lightboxFiles.length > 0 && (
+        <Lightbox files={lightboxFiles} index={shot} onIndex={setShot} onClose={() => setShot(null)} />
       )}
-
-      {vertical.process && (
-        <section className="site-section" style={{ paddingTop: 0 }}>
-          <div className="site-kicker">How we work</div>
-          <h2 className="site-h2" style={{ marginBottom: 28 }}>
-            Process with <em>owners</em>
-          </h2>
-          <div className="site-principles">
-            {vertical.process.map((step) => (
-              <article key={step.step} className="site-principle">
-                <strong>{step.step}</strong>
-                <h3>{step.title}</h3>
-                <p className="site-muted">{step.body}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="site-section" style={{ paddingTop: 0 }}>
-        <div className="site-cta">
-          <div>
-            <div className="site-kicker">Next</div>
-            <h2 className="site-h2">
-              Ready when
-              <br />
-              <em>you are</em>
-            </h2>
-            <p className="site-lede">
-              Share the brief for {vertical.brand}. It is filed in Central so the team can follow up with a
-              quotation path.
-            </p>
-          </div>
-          <ContactForm compact defaultVertical={vertical.slug} />
-        </div>
-      </section>
-      {shot !== null && vertical.gallery && (
-        <Lightbox files={vertical.gallery} index={shot} onIndex={setShot} onClose={() => setShot(null)} />
-      )}
-    </>
+    </div>
   )
 }
