@@ -19,6 +19,15 @@ describe('vertical playbooks', () => {
     expect(playbookByPath('/travel/')?.slug).toBe('wanders')
     expect(playbookByPath('/RRCentral/uniforms')?.slug).toBe('threads')
     expect(playbookByPath('/missing')).toBeUndefined()
+    expect(VERTICALS.map((v) => v.brand)).toEqual([
+      'RR Marketing',
+      'RR Care',
+      'RR Connect',
+      'RR Wanders',
+      'RR Threads',
+      'RR Trading',
+      'RR Upskilling',
+    ])
   })
 
   it('keeps category playbooks distinct', () => {

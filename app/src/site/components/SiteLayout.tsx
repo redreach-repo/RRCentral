@@ -42,6 +42,13 @@ export default function SiteLayout() {
           <span>Monday – Saturday : 10AM – 6PM</span>
           <span>Offices : Red Reach, Middle East, P.O.Box 6641, Dubai, U.A.E.</span>
         </div>
+        <div className="site-company-bar" aria-label="Companies">
+          {VERTICALS.map((v) => (
+            <NavLink key={v.slug} to={verticalPath(v.slug)}>
+              {v.brand}
+            </NavLink>
+          ))}
+        </div>
         <header className={`site-nav ${scrolled ? 'scrolled' : ''}`}>
           <Link to="/" onClick={() => setOpen(false)}>
             <SiteWordmark />
@@ -58,8 +65,11 @@ export default function SiteLayout() {
               <div className="site-nav-drop-panel">
                 {VERTICALS.map((v) => (
                   <NavLink key={v.slug} to={verticalPath(v.slug)}>
-                    {v.brand}
-                    <span>{v.category}</span>
+                    <img src={siteAsset(v.image)} alt="" />
+                    <span className="site-nav-drop-copy">
+                      {v.brand}
+                      <span>{v.category}</span>
+                    </span>
                   </NavLink>
                 ))}
               </div>

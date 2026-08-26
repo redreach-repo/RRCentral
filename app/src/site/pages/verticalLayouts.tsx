@@ -124,13 +124,15 @@ export function VaLayout({ vertical, playbook, onOpenShot }: LayoutProps) {
         </div>
       </section>
       <StatsRow playbook={playbook} />
-      <section className="site-section" style={{ paddingTop: 0 }}>
-        <div className="site-kicker">Clients on the bench</div>
-        <h2 className="site-h2" style={{ marginBottom: 28 }}>
-          Dedicated people. <em>Your hours.</em>
-        </h2>
-        <QuoteStage />
-      </section>
+      <div className="site-quotes-wrap">
+        <section className="site-section">
+          <div className="site-kicker">Clients on the bench</div>
+          <h2 className="site-h2" style={{ marginBottom: 28 }}>
+            Dedicated people. <em>Your hours.</em>
+          </h2>
+          <QuoteStage />
+        </section>
+      </div>
       <Steps playbook={playbook} />
       <Gallery vertical={vertical} onOpenShot={onOpenShot} />
       <Brief vertical={vertical} playbook={playbook} />
