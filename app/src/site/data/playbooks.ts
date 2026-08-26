@@ -80,10 +80,12 @@ export const PLAYBOOKS: Record<VerticalSlug, VerticalPlaybook> = {
       { title: 'Wellness & recovery', body: 'When the medicine is done, the stay and follow-up still have an owner.' },
     ],
     steps: [
-      { step: '01', title: 'Share the condition', body: 'Reports, questions, and budget — we start with the patient, not a package.' },
-      { step: '02', title: 'Match the centre', body: 'A named coordinator proposes hospitals and specialists used to overseas patients.' },
-      { step: '03', title: 'Travel and treatment', body: 'Flights, stay, admission, and the treatment window written down before you fly.' },
-      { step: '04', title: 'Aftercare', body: 'Follow-up stays with the same owner once you are home.' },
+      { step: '01', title: 'Discover', body: 'Share reports, questions and budget. We start with the patient, not a package.' },
+      { step: '02', title: 'Consult', body: 'A named coordinator reviews the brief and the kind of centre that fits.' },
+      { step: '03', title: 'Choose', body: 'Hospitals and specialists used to overseas patients, written down before you commit.' },
+      { step: '04', title: 'Travel', body: 'Flights, stay and admission planned as one window.' },
+      { step: '05', title: 'Treatment', body: 'The coordinator stays on the case while you are in care.' },
+      { step: '06', title: 'Recovery', body: 'Follow-up stays with the same owner once you are home.' },
     ],
   },
   connect: {
@@ -111,18 +113,18 @@ export const PLAYBOOKS: Record<VerticalSlug, VerticalPlaybook> = {
       { title: 'People ops admin', body: 'Employment paperwork and benefits coordination so you are not the HR desk.' },
     ],
     steps: [
-      { step: '01', title: 'Brief the seat', body: 'Hours, tools, and the work that should leave your desk.' },
-      { step: '02', title: 'Screen, then introduce', body: 'You interview. We already vetted.' },
-      { step: '03', title: 'Start on your clock', body: 'Dedicated coverage — not a rotating task board in another timezone.' },
-      { step: '04', title: 'Stay on the account', body: 'Employment admin and benefits handled so the person can stay.' },
+      { step: '01', title: 'Tell us what you need', body: 'Hours, tools and the work that should leave your desk.' },
+      { step: '02', title: 'We match the talent', body: 'You interview. We already screened.' },
+      { step: '03', title: 'You onboard', body: 'Dedicated coverage on your clock. Not a rotating task board.' },
+      { step: '04', title: 'We support you', body: 'Employment admin and benefits handled so the person can stay.' },
     ],
   },
   wanders: {
-    path: '/travel',
+    path: '/wanders',
     layout: 'travel',
     inspiredBy: 'Black Tomato — destination collections, tailor-made itineraries, enquiry not self-serve booking.',
-    collectionTitle: 'Collections',
-    collectionLede: 'Philippines, Kerala, and the Himalayas — designed around how you want to move, not a brochure departure date.',
+    collectionTitle: 'Destinations',
+    collectionLede: 'Discover, then plan. Philippines, Kerala and the Himalayas, with room to add more when the brief asks.',
     stats: [
       { value: 'Bespoke', label: 'Every itinerary' },
       { value: 'Local', label: 'Guides on the ground' },
@@ -166,18 +168,19 @@ export const PLAYBOOKS: Record<VerticalSlug, VerticalPlaybook> = {
       },
     ],
     steps: [
-      { step: '01', title: 'How you want to move', body: 'Pace, season, and the kind of days you actually want — not a brochure departure.' },
-      { step: '02', title: 'Architect the journey', body: 'Hotels, guides, and days in motion designed as one itinerary.' },
-      { step: '03', title: 'Confirm on the ground', body: 'Local partners treat safety as a process, not a disclaimer.' },
-      { step: '04', title: 'Travel with a Dubai desk', body: 'Someone still owns the trip after you land.' },
+      { step: '01', title: 'Discover', body: 'Where the eye goes first. Islands, backwaters, high country.' },
+      { step: '02', title: 'Dream', body: 'Pace, season and the kind of days you actually want.' },
+      { step: '03', title: 'Explore', body: 'Hotels, guides and days in motion, designed as one itinerary.' },
+      { step: '04', title: 'Plan', body: 'A Dubai desk that already understands Gulf departure rhythms.' },
+      { step: '05', title: 'Wander', body: 'Someone still owns the trip after you land.' },
     ],
   },
   threads: {
-    path: '/uniforms',
+    path: '/threads',
     layout: 'apparel',
     inspiredBy: 'Cintas Design Collective / FIGS — industry lookbooks, samples first, brand on the garment.',
-    collectionTitle: 'Built for the floor',
-    collectionLede: 'Industrial, hospitality, medical, kitchen, and corporate programmes — sampled, stitched, QC’d, then shipped.',
+    collectionTitle: 'Industries',
+    collectionLede: 'Hospitality, healthcare, corporate, industrial, kitchen. Tell us the floor. We specify the garment.',
     stats: [
       { value: 'Sample', label: 'Before production' },
       { value: 'QC', label: 'On every piece' },
@@ -189,12 +192,12 @@ export const PLAYBOOKS: Record<VerticalSlug, VerticalPlaybook> = {
       { title: 'Identity that washes', body: 'Logos placed once, correctly, in threads or inks that survive the laundry.' },
     ],
     collection: [
-      { title: 'Industrial & PPE', body: 'Coveralls, high-vis, safety vests, and workwear that takes a shift.', image: 'threads-1.jpg' },
-      { title: 'Hospitality & front of house', body: 'Uniforms that carry the property as clearly as the signage.', image: 'threads-2.jpg' },
-      { title: 'Medical', body: 'Scrubs and clinic wear specified for comfort across a long floor.', image: 'threads-3.jpg' },
-      { title: 'Kitchen', body: 'Whites, checks, and heat-ready pieces that still look like a brigade.', image: 'threads-4.jpg' },
-      { title: 'Corporate & events', body: 'Polos, shirts, and branded basics for teams that move.', image: 'threads-5.jpg' },
-      { title: 'Custom programmes', body: 'One identity across sites — colours, trims, and placements locked.', image: 'vertical-threads.jpg' },
+      { title: 'Industrial & PPE', body: 'Coveralls, high-vis, safety vests and workwear that takes a shift.', image: 'threads-1.jpg' },
+      { title: 'Hospitality', body: 'Front of house and property uniforms that carry the signage.', image: 'threads-2.jpg' },
+      { title: 'Healthcare', body: 'Scrubs and clinic wear specified for a long floor.', image: 'threads-3.jpg' },
+      { title: 'Kitchen', body: 'Whites, checks and heat-ready pieces for a brigade.', image: 'threads-4.jpg' },
+      { title: 'Corporate & retail', body: 'Polos, shirts and branded basics for teams that move.', image: 'threads-5.jpg' },
+      { title: 'Security & sites', body: 'One identity across posts, with colours and placements locked.', image: 'vertical-threads.jpg' },
     ],
     steps: [
       { step: '01', title: 'Fabric selection', body: 'Comfort, durability, and industry-fit materials and trims.' },
@@ -208,25 +211,25 @@ export const PLAYBOOKS: Record<VerticalSlug, VerticalPlaybook> = {
     path: '/trading',
     layout: 'trade',
     inspiredBy: 'Flexport / specialist sourcing desks — spec in, QC, then Dubai logistics.',
-    collectionTitle: 'What we move',
-    collectionLede: 'Tell us the spec. We find the manufacturer, check the lot, and run it through Dubai’s trade stack.',
+    collectionTitle: 'Where we start',
+    collectionLede: 'Categories we already run. Other specified goods on brief. No fake inventory.',
     stats: [
-      { value: 'Jebel Ali', label: 'Port advantage' },
-      { value: 'Free zone', label: 'Duty and speed' },
-      { value: '8 hrs', label: 'Flight radius to most GDP' },
+      { value: 'Spec in', label: 'Product, quantity, quality, dock' },
+      { value: 'Explore', label: 'Manufacturers, not a shopfront' },
+      { value: 'Dubai', label: 'Port, air and free zone' },
     ],
     promise: [
-      { title: 'Limitless sourcing', body: 'A vetted bench of manufacturers — textiles deep, other categories on brief.' },
-      { title: 'Quality is a gate', body: 'Multi-stage checks so the dock receipt matches the PO.' },
-      { title: 'Dubai as the hub', body: 'Jebel Ali, DXB, and free zones as the operating system, not a slogan.' },
+      { title: 'If you can specify it', body: 'We can explore sourcing it. That is the offer. Not a promise to conjure anything on earth.' },
+      { title: 'Quality is a gate', body: 'Checks so the dock receipt can match the purchase order.' },
+      { title: 'Dubai as the hub', body: 'Jebel Ali, DXB and free zones as the operating system.' },
     ],
     collection: [
-      { title: 'Textiles & apparel', body: 'Fabric lots and finished goods with the QC we already run for RR Threads.' },
-      { title: 'Hospitality supply', body: 'Uniforms adjacent and room/F&B programmes sourced as a set.' },
-      { title: 'Industrial goods', body: 'Specified product, not a catalogue screenshot.' },
-      { title: 'Custom manufacturing', body: 'If you can specify it, we find who can make it — then we stay on the order.' },
-      { title: 'Consolidation', body: 'Lots combined through Dubai so you are not running five freight desks.' },
-      { title: 'Export pathways', body: 'US, Europe, and South America routes from a city built for re-export.' },
+      { title: 'Textiles and apparel', body: 'Fabric lots and finished goods, with the QC we already run for RR Threads.' },
+      { title: 'Hospitality supply', body: 'Uniforms adjacent and room programmes sourced as a set.' },
+      { title: 'Industrial products', body: 'Specified product. Not a catalogue screenshot.' },
+      { title: 'Equipment', body: 'When the brief is a machine or a kit, we start with the spec sheet.' },
+      { title: 'Construction materials', body: 'On request, with quality and logistics written down first.' },
+      { title: 'Special sourcing', body: 'One requirement. We look. Then we tell you what is possible.' },
     ],
     steps: [
       { step: '01', title: 'Send the spec', body: 'Product, quantity, quality bar, and the dock you need it at.' },
@@ -238,18 +241,18 @@ export const PLAYBOOKS: Record<VerticalSlug, VerticalPlaybook> = {
   upskilling: {
     path: '/upskilling',
     layout: 'learn',
-    inspiredBy: 'Practitioner academies — course cards, pass mark, certificate you can show.',
-    collectionTitle: 'Courses',
-    collectionLede: 'Aviation, logistics, hospitality, travel, and healthcare — self-paced, 80% to pass, certificate at the end.',
+    inspiredBy: 'Clean academy intros that send you to the real platform, not a duplicate LMS.',
+    collectionTitle: 'On Sqilah',
+    collectionLede: 'RR Upskilling introduces the work. Sqilah runs the courses. We do not rebuild their catalogue here.',
     stats: [
-      { value: '80%', label: 'Pass mark' },
-      { value: 'Self-paced', label: 'Learn around the roster' },
-      { value: 'Verified', label: 'Certificate on completion' },
+      { value: 'Sqilah', label: 'The learning platform' },
+      { value: 'Industry', label: 'Aviation, logistics, hospitality, travel, healthcare' },
+      { value: 'Red Reach', label: 'When you need the rest of the group' },
     ],
     promise: [
-      { title: 'Built by operators', body: 'Modules from people who still work the industry, not only teach it.' },
-      { title: 'Affordable on purpose', body: 'The point is access — not a luxury tuition page.' },
-      { title: 'Evidence, not attendance', body: 'You pass at 80%. The certificate is the proof.' },
+      { title: 'One click to the platform', body: 'Explore RR Upskilling takes you to sqilah.co, with Sqilah’s own branding.' },
+      { title: 'Industry, not generic MOOCs', body: 'The existing offering sits in aviation, logistics, hospitality, travel and healthcare.' },
+      { title: 'Stay in the group', body: 'When learning is not the whole brief, the other six desks are here.' },
     ],
     collection: [
       { title: 'Airfare & ticketing', body: 'The mechanics of how seats are sold and issued.' },
@@ -270,13 +273,20 @@ export const PLAYBOOKS: Record<VerticalSlug, VerticalPlaybook> = {
 }
 
 export function verticalPath(slug: string | undefined) {
-  if (!slug) return '/verticals'
-  return PLAYBOOKS[slug as VerticalSlug]?.path ?? `/verticals/${slug}`
+  if (!slug) return '/businesses'
+  return PLAYBOOKS[slug as VerticalSlug]?.path ?? `/businesses`
+}
+
+const PATH_ALIASES: Record<string, VerticalSlug> = {
+  '/travel': 'wanders',
+  '/uniforms': 'threads',
 }
 
 export function playbookByPath(pathname: string) {
   const trimmed = pathname.replace(/\/+$/, '') || '/'
   const clean = trimmed.replace(/^\/RRCentral(?=\/|$)/, '') || '/'
+  const alias = PATH_ALIASES[clean]
+  if (alias) return { slug: alias, playbook: PLAYBOOKS[alias] }
   const entry = (Object.entries(PLAYBOOKS) as [VerticalSlug, VerticalPlaybook][]).find(([, p]) => p.path === clean)
   return entry ? { slug: entry[0], playbook: entry[1] } : undefined
 }

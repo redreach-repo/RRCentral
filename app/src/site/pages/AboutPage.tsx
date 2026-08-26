@@ -1,102 +1,66 @@
 import { Link } from 'react-router-dom'
-import { ArrowUpRight } from 'lucide-react'
 import Reveal from '../components/Reveal'
-import Tilt from '../components/Tilt'
+import Seo from '../components/Seo'
 import { siteAsset } from '../assets'
-import { PRINCIPLES, SITE, VERTICALS } from '../data/verticals'
+import { SITE, VERTICALS, WHY_RED_REACH } from '../data/verticals'
+import { webPageJsonLd } from '../data/organization'
 import { verticalPath } from '../data/playbooks'
 
 export default function AboutPage() {
   return (
     <>
+      <Seo
+        title="About Red Reach | Dubai since 2018"
+        description="Red Reach Middle East FZE is a Dubai group founded in 2018. Seven specialist desks for marketing, care, remote teams, travel, uniforms, sourcing and learning."
+        path="/about"
+        image="expertise-laptop.jpg"
+        jsonLd={webPageJsonLd('About Red Reach', '/about', 'Red Reach Middle East FZE, founded in Dubai in 2018.')}
+      />
       <section className="site-page-hero">
         <div className="site-hero-media">
-          <img src={siteAsset('expertise-laptop.jpg')} alt="Red Reach team" />
+          <img src={siteAsset('expertise-laptop.jpg')} alt="Red Reach team at work" />
         </div>
         <div className="site-hero-copy">
-          <div className="site-kicker">About us</div>
+          <div className="site-kicker">About</div>
           <h1 className="site-display">
-            Rooted in
+            A Dubai company
             <br />
-            <em>vision</em>
+            <em>with range.</em>
           </h1>
           <p className="site-lede">
-            Founded in {SITE.founded} in Dubai, Red Reach is a consortium of specialised companies — driven by
-            one commitment: {SITE.tagline}.
+            Founded in {SITE.founded}. Headquartered in Dubai. Red Reach Middle East FZE runs seven specialist
+            desks so a business can market, operate, connect, travel, source, trade and upskill without
+            collecting seven unrelated vendors.
           </p>
         </div>
       </section>
 
       <section className="site-section">
-        <div className="site-split-photo">
-          <div className="site-photo site-frame">
-            <img src={siteAsset('wander-houseboat.jpg')} alt="Journeys from Dubai to the world" />
-          </div>
-          <div>
-            <div className="site-highlights">
-              <article className="site-card">
-                <div className="site-card-body">
-                  <h3>Our mission</h3>
-                  <p>
-                    Deliver client-focused solutions that unlock opportunity. We build partnerships on trust,
-                    transparency, and measurable impact.
-                  </p>
-                </div>
-              </article>
-              <article className="site-card">
-                <div className="site-card-body">
-                  <h3>Our commitment</h3>
-                  <p>
-                    We are a strategic partner, not a ticket desk. Challenges become programmes with owners,
-                    quality bars, and a path to scale.
-                  </p>
-                </div>
-              </article>
-            </div>
-            <div className="site-photo" style={{ marginTop: 16, minHeight: 220 }}>
-              <img src={siteAsset('dubai.jpg')} alt="From Dubai to the Himalayas" />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="site-section" style={{ paddingTop: 0 }}>
-        <div className="site-kicker">The standard</div>
-        <h2 className="site-h2" style={{ marginBottom: 28 }}>
-          Why partner <em>with us</em>
-        </h2>
-        <div className="site-principles">
-          {PRINCIPLES.map((p) => (
-            <article key={p.n} className="site-principle">
-              <strong>{p.n}</strong>
-              <h3>{p.title}</h3>
-              <p className="site-muted">{p.body}</p>
+        <div className="site-why">
+          {WHY_RED_REACH.map((item) => (
+            <article key={item.title}>
+              <h3>{item.title}</h3>
+              <p>{item.body}</p>
             </article>
           ))}
         </div>
       </section>
 
       <section className="site-section" style={{ paddingTop: 0 }}>
-        <div className="site-kicker">Offerings</div>
+        <div className="site-kicker">The desks</div>
         <h2 className="site-h2" style={{ marginBottom: 28 }}>
-          Seven verticals. <em>One group.</em>
+          Seven ways <em>forward.</em>
         </h2>
-        <div className="site-protocol">
+        <div className="site-worlds">
           {VERTICALS.map((v, i) => (
-            <Reveal key={v.slug} delay={i * 70}>
-              <Tilt>
-                <Link to={verticalPath(v.slug)} className="site-offering">
-                  <img src={siteAsset(v.image)} alt={v.brand} />
-                  <div className="site-offering-copy">
-                    <span className="site-chip">{v.category}</span>
-                    <h3>{v.brand}</h3>
-                    <p>{v.summary}</p>
-                    <span>
-                      Know more <ArrowUpRight size={14} />
-                    </span>
-                  </div>
-                </Link>
-              </Tilt>
+            <Reveal key={v.slug} delay={i * 40}>
+              <Link to={verticalPath(v.slug)} className="site-world">
+                <img src={siteAsset(v.image)} alt="" />
+                <div className="site-world-copy">
+                  <span>{v.brand}</span>
+                  <h3>{v.tagline}</h3>
+                </div>
+              </Link>
             </Reveal>
           ))}
         </div>

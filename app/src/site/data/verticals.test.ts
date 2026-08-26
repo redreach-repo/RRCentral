@@ -15,10 +15,10 @@ describe('site verticals', () => {
     expect(new Set(VERTICALS.map((v) => v.slug)).size).toBe(7)
   })
 
-  it('features Connect and Wanders on the home protocol', () => {
-    expect(FEATURED_VERTICALS.map((v) => v.slug).sort()).toEqual(['connect', 'wanders'])
-    expect(verticalBySlug('threads')?.heroAccent).toContain('identity')
-    expect(VERTICALS.every((v) => v.heroLine && v.heroAccent)).toBe(true)
+  it('features Marketing, Care and Wanders on the home editorial', () => {
+    expect(FEATURED_VERTICALS.map((v) => v.slug).sort()).toEqual(['care', 'marketing', 'wanders'])
+    expect(verticalBySlug('threads')?.heroAccent).toContain('programme')
+    expect(VERTICALS.every((v) => v.verb && v.cta && v.seoTitle && v.seoDescription)).toBe(true)
     expect(verticalBySlug('missing')).toBeUndefined()
   })
 

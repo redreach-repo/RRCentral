@@ -1,12 +1,13 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import ContactForm from '../components/ContactForm'
 import PhotoMarquee from '../components/PhotoMarquee'
 import QuoteStage from '../components/QuoteStage'
 import Reveal from '../components/Reveal'
 import { DESTINATION_FILM, THREAD_LOOKBOOK, siteAsset } from '../assets'
+import { SITE, VERTICALS, type Vertical } from '../data/verticals'
 import { verticalPath, type VerticalPlaybook } from '../data/playbooks'
-import { VERTICALS, type Vertical } from '../data/verticals'
-import { THREADS_CATALOGUE, briefAccent, briefTitle, ctaLabel, whatsappHref } from './verticalCopy'
+import { THREADS_CATALOGUE, briefAccent, briefTitle, ctaHref, ctaIsExternal, ctaLabel, whatsappHref } from './verticalCopy'
 
 type LayoutProps = {
   vertical: Vertical
@@ -238,9 +239,35 @@ export function ApparelLayout({ vertical, playbook, onOpenShot }: LayoutProps) {
 }
 
 export function TradeLayout({ vertical, playbook, onOpenShot }: LayoutProps) {
+  const [requirement, setRequirement] = useState('')
   return (
     <>
       <VerticalHero vertical={vertical} playbook={playbook} />
+      <section className="site-trade-search">
+        <form
+          className="site-trade-search-form"
+          onSubmit={(e) => {
+            e.preventDefault()
+            document.getElementById('brief')?.scrollIntoView({ behavior: 'smooth' })
+          }}
+        >
+          <label htmlFor="requirement">What are you looking for?</label>
+          <div>
+            <input
+              id="requirement"
+              name="requirement"
+              value={requirement}
+              onChange={(e) => setRequirement(e.target.value)}
+              placeholder="Product, material, equipment, requirement"
+              autoComplete="off"
+            />
+            <button type="submit" className="site-btn site-btn-primary">
+              Send us your requirement
+            </button>
+          </div>
+          <p>If you can specify it, we can explore sourcing it. No catalogue. A desk.</p>
+        </form>
+      </section>
       <section className="site-ink-band">
         <div className="site-section" style={{ paddingTop: 0, paddingBottom: 0 }}>
           <div className="site-ink-grid">
@@ -277,13 +304,31 @@ export function TradeLayout({ vertical, playbook, onOpenShot }: LayoutProps) {
       <StatsRow playbook={playbook} />
       <Steps playbook={playbook} />
       <Gallery vertical={vertical} onOpenShot={onOpenShot} />
-      <Brief vertical={vertical} playbook={playbook} />
+      <section className="site-section" style={{ paddingTop: 0 }} id="brief">
+        <div className="site-cta">
+          <div>
+            <div className="site-kicker">{vertical.brand}</div>
+            <h2 className="site-h2">
+              Send the
+              <br />
+              <em>requirement.</em>
+            </h2>
+            <p className="site-lede">Share the spec. It is filed in Central so the sourcing desk can follow up.</p>
+          </div>
+          <ContactForm
+            compact
+            defaultVertical="trading"
+            defaultMessage={requirement}
+            submitLabel="Send your requirement"
+          />
+        </div>
+      </section>
       <Related slug={vertical.slug} />
     </>
   )
 }
 
-export function LearnLayout({ vertical, playbook, onOpenShot }: LayoutProps) {
+export function LearnLayout({ vertical, playbook }: LayoutProps) {
   return (
     <>
       <VerticalHero vertical={vertical} playbook={playbook} />
@@ -291,27 +336,31 @@ export function LearnLayout({ vertical, playbook, onOpenShot }: LayoutProps) {
       <section className="site-section">
         <div className="site-section-head">
           <div>
-            <div className="site-kicker">Curriculum</div>
+            <div className="site-kicker">The platform</div>
             <h2 className="site-h2">{playbook.collectionTitle}</h2>
           </div>
-          <p className="site-muted" style={{ maxWidth: 380 }}>
-            {playbook.collectionLede}
-          </p>
+          <a className="site-btn site-btn-primary" href={SITE.sqilah} target="_blank" rel="noreferrer">
+            Explore Sqilah
+          </a>
         </div>
+        <p className="site-lede" style={{ maxWidth: 640 }}>
+          RR Upskilling is the Red Reach introduction. The courses live on Sqilah, with Sqilah&apos;s own
+          branding. Sectors on the platform include aviation, logistics, hospitality, travel and healthcare.
+          We do not duplicate that catalogue here.
+        </p>
         <div className="site-courses">
           {playbook.collection.map((item) => (
             <article key={item.title} className="site-course">
-              <span className="site-course-badge">80% to pass</span>
               <h3>{item.title}</h3>
               <p>{item.body}</p>
-              <a href="#brief">Ask about this course</a>
+              <a href={SITE.sqilah} target="_blank" rel="noreferrer">
+                Open on Sqilah
+              </a>
             </article>
           ))}
         </div>
       </section>
-      <StatsRow playbook={playbook} />
       <Steps playbook={playbook} />
-      <Gallery vertical={vertical} onOpenShot={onOpenShot} />
       <Brief vertical={vertical} playbook={playbook} />
       <Related slug={vertical.slug} />
     </>
@@ -341,7 +390,11 @@ function VerticalHero({
         </h1>
         <p className="site-lede">{vertical.description}</p>
         <div className="site-actions">
-          <a className="site-btn site-btn-primary" href="#brief">
+          <a
+            className="site-btn site-btn-primary"
+            href={ctaHref(playbook.layout)}
+            {...(ctaIsExternal(playbook.layout) ? { target: '_blank', rel: 'noreferrer' } : {})}
+          >
             {ctaLabel(playbook.layout)}
           </a>
           <a className="site-btn site-btn-gold" href={whatsappHref(vertical)} target="_blank" rel="noreferrer">
@@ -469,7 +522,11 @@ function Brief({ vertical, playbook }: { vertical: Vertical; playbook: VerticalP
             Share the brief for {vertical.brand}. It is filed in Central so the right team can follow up.
           </p>
         </div>
-        <ContactForm compact defaultVertical={vertical.slug} />
+        <ContactForm
+          compact
+          defaultVertical={vertical.slug}
+          submitLabel={ctaLabel(playbook.layout) === 'Explore Sqilah' ? 'Ask the desk' : ctaLabel(playbook.layout)}
+        />
       </div>
     </section>
   )
@@ -481,7 +538,7 @@ function Related({ slug }: { slug: string }) {
     <section className="site-section" style={{ paddingTop: 0 }}>
       <div className="site-kicker">The rest of the group</div>
       <h2 className="site-h2" style={{ marginBottom: 28 }}>
-        Other Red Reach <em>companies</em>
+        Other Red Reach <em>desks</em>
       </h2>
       <div className="site-related">
         {related.map((item) => (

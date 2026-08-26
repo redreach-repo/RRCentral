@@ -9,14 +9,16 @@ describe('vertical playbooks', () => {
       '/marketing',
       '/care',
       '/connect',
-      '/travel',
-      '/uniforms',
+      '/wanders',
+      '/threads',
       '/trading',
       '/upskilling',
     ])
     expect(new Set(paths).size).toBe(7)
+    expect(playbookByPath('/wanders')?.slug).toBe('wanders')
     expect(playbookByPath('/travel')?.slug).toBe('wanders')
     expect(playbookByPath('/travel/')?.slug).toBe('wanders')
+    expect(playbookByPath('/RRCentral/threads')?.slug).toBe('threads')
     expect(playbookByPath('/RRCentral/uniforms')?.slug).toBe('threads')
     expect(playbookByPath('/missing')).toBeUndefined()
     expect(VERTICALS.map((v) => v.brand)).toEqual([

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Navigate, useLocation, useParams } from 'react-router-dom'
 import Lightbox from '../components/Lightbox'
+import Seo from '../components/Seo'
 import { THREAD_LOOKBOOK } from '../assets'
+import { webPageJsonLd } from '../data/organization'
 import { PLAYBOOKS, playbookByPath, verticalPath } from '../data/playbooks'
 import { verticalBySlug, type VerticalSlug } from '../data/verticals'
 import {
@@ -17,7 +19,7 @@ import {
 function VerticalAliasRedirect() {
   const { slug } = useParams()
   const next = verticalPath(slug)
-  if (!slug || next === `/verticals/${slug}` || next === '/verticals') return <Navigate to="/" replace />
+  if (!slug || next === '/businesses') return <Navigate to="/businesses" replace />
   return <Navigate to={next} replace />
 }
 
@@ -35,15 +37,6 @@ export default function VerticalPage() {
   useEffect(() => {
     setShot(null)
   }, [slug])
-
-  useEffect(() => {
-    if (!vertical) return
-    const previous = document.title
-    document.title = `${vertical.brand} | Red Reach`
-    return () => {
-      document.title = previous
-    }
-  }, [vertical])
 
   if (!vertical || !playbook || !slug) return <Navigate to="/" replace />
 
@@ -71,6 +64,13 @@ export default function VerticalPage() {
 
   return (
     <div className={`site-vertical site-vertical--${playbook.layout}`}>
+      <Seo
+        title={vertical.seoTitle}
+        description={vertical.seoDescription}
+        path={playbook.path}
+        image={vertical.image}
+        jsonLd={webPageJsonLd(vertical.brand, playbook.path, vertical.seoDescription)}
+      />
       <Layout vertical={vertical} playbook={playbook} onOpenShot={setShot} />
       {shot !== null && lightboxFiles.length > 0 && (
         <Lightbox files={lightboxFiles} index={shot} onIndex={setShot} onClose={() => setShot(null)} />

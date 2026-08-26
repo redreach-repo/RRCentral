@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import CursorGlow from './CursorGlow'
 import SiteWordmark from './SiteWordmark'
 import { siteAsset } from '../assets'
 import { SITE, VERTICALS } from '../data/verticals'
@@ -14,16 +13,11 @@ export default function SiteLayout() {
   const location = useLocation()
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
-  const [progress, setProgress] = useState(0)
   const centralTo = user ? '/app' : '/login'
-  const companyActive = Boolean(playbookByPath(location.pathname))
+  const companyActive = Boolean(playbookByPath(location.pathname)) || location.pathname.includes('businesses')
 
   useEffect(() => {
-    const onScroll = () => {
-      setScrolled(window.scrollY > 8)
-      const max = document.documentElement.scrollHeight - window.innerHeight
-      setProgress(max > 0 ? Math.min(1, window.scrollY / max) : 0)
-    }
+    const onScroll = () => setScrolled(window.scrollY > 8)
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
@@ -35,19 +29,10 @@ export default function SiteLayout() {
 
   return (
     <div className="site-root">
-      <div className="site-progress" style={{ transform: `scaleX(${progress})` }} aria-hidden />
-      <CursorGlow />
       <div className="site-shell">
         <div className="site-topbar">
-          <span>Monday – Saturday : 10AM – 6PM</span>
-          <span>Offices : Red Reach, Middle East, P.O.Box 6641, Dubai, U.A.E.</span>
-        </div>
-        <div className="site-company-bar" aria-label="Companies">
-          {VERTICALS.map((v) => (
-            <NavLink key={v.slug} to={verticalPath(v.slug)}>
-              {v.brand}
-            </NavLink>
-          ))}
+          <span>{SITE.hours}</span>
+          <span>{SITE.addressLines.join(', ')}</span>
         </div>
         <header className={`site-nav ${scrolled ? 'scrolled' : ''}`}>
           <Link to="/" onClick={() => setOpen(false)}>
@@ -57,10 +42,12 @@ export default function SiteLayout() {
             <NavLink to="/" end>
               Home
             </NavLink>
-            <NavLink to="/about">About us</NavLink>
             <div className="site-nav-drop">
-              <NavLink to="/verticals" className={({ isActive }) => (isActive || companyActive ? 'active' : undefined)}>
-                Companies
+              <NavLink
+                to="/businesses"
+                className={({ isActive }) => (isActive || companyActive ? 'active' : undefined)}
+              >
+                Our Businesses
               </NavLink>
               <div className="site-nav-drop-panel">
                 {VERTICALS.map((v) => (
@@ -74,9 +61,11 @@ export default function SiteLayout() {
                 ))}
               </div>
             </div>
-            <NavLink to="/contact">Contact us</NavLink>
+            <NavLink to="/about">About</NavLink>
+            <NavLink to="/insights">Insights</NavLink>
+            <NavLink to="/contact">Contact</NavLink>
             <Link to="/contact" className="site-nav-cta">
-              Get in Touch
+              Talk to us
             </Link>
             <Link to={centralTo} className="site-central-link">
               Central
@@ -95,8 +84,8 @@ export default function SiteLayout() {
           <Link to="/" onClick={() => setOpen(false)}>
             Home
           </Link>
-          <Link to="/verticals" onClick={() => setOpen(false)}>
-            All companies
+          <Link to="/businesses" onClick={() => setOpen(false)}>
+            Our Businesses
           </Link>
           {VERTICALS.map((v) => (
             <Link key={v.slug} to={verticalPath(v.slug)} onClick={() => setOpen(false)}>
@@ -104,10 +93,13 @@ export default function SiteLayout() {
             </Link>
           ))}
           <Link to="/about" onClick={() => setOpen(false)}>
-            About us
+            About
+          </Link>
+          <Link to="/insights" onClick={() => setOpen(false)}>
+            Insights
           </Link>
           <Link to="/contact" onClick={() => setOpen(false)}>
-            Get in Touch
+            Contact
           </Link>
           <Link to={centralTo} className="site-central-link" onClick={() => setOpen(false)}>
             Central
@@ -122,12 +114,11 @@ export default function SiteLayout() {
               <div>
                 <SiteWordmark />
                 <p style={{ marginTop: 14 }}>
-                  {SITE.legal}. Founded {SITE.founded} in Dubai — {SITE.tagline}.
+                  {SITE.legal}. Founded {SITE.founded} in Dubai. {SITE.tagline}
                 </p>
-                <img className="site-footer-map" src={siteAsset('world-map.png')} alt="Red Reach, Dubai" />
               </div>
               <div>
-                <h4>Companies</h4>
+                <h4>Our Businesses</h4>
                 {VERTICALS.map((v) => (
                   <div key={v.slug}>
                     <Link to={verticalPath(v.slug)}>{v.brand}</Link>
@@ -141,6 +132,7 @@ export default function SiteLayout() {
                     {line}
                   </p>
                 ))}
+                <p style={{ margin: '8px 0 0' }}>{SITE.hours}</p>
               </div>
               <div>
                 <h4>Talk</h4>
@@ -156,6 +148,9 @@ export default function SiteLayout() {
                   </a>
                 </p>
                 <p>
+                  <Link to="/insights">Insights</Link>
+                </p>
+                <p>
                   <Link to={centralTo} className="site-central-link">
                     Central
                   </Link>
@@ -166,11 +161,7 @@ export default function SiteLayout() {
               <span>
                 © {new Date().getFullYear()} {SITE.legal}
               </span>
-              <span>
-                <Link to={centralTo}>Central</Link>
-                {' · '}
-                {SITE.location}
-              </span>
+              <span>{SITE.location}</span>
             </div>
           </div>
         </footer>

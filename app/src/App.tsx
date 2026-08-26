@@ -25,6 +25,7 @@ import AboutPage from './site/pages/AboutPage'
 import ContactPage from './site/pages/ContactPage'
 import VerticalPage, { VerticalAliasRedirect } from './site/pages/VerticalPage'
 import VerticalsIndexPage from './site/pages/VerticalsIndexPage'
+import InsightsPage from './site/pages/InsightsPage'
 import { PLAYBOOKS } from './site/data/playbooks'
 
 export default function App() {
@@ -36,9 +37,13 @@ export default function App() {
             <Route element={<SiteLayout />}>
               <Route index element={<HomePage />} />
               <Route path="about" element={<AboutPage />} />
+              <Route path="insights" element={<InsightsPage />} />
               <Route path="contact" element={<ContactPage />} />
-              <Route path="verticals" element={<VerticalsIndexPage />} />
+              <Route path="businesses" element={<VerticalsIndexPage />} />
+              <Route path="verticals" element={<Navigate to="/businesses" replace />} />
               <Route path="verticals/:slug" element={<VerticalAliasRedirect />} />
+              <Route path="travel" element={<Navigate to="/wanders" replace />} />
+              <Route path="uniforms" element={<Navigate to="/threads" replace />} />
               {Object.values(PLAYBOOKS).map((playbook) => (
                 <Route key={playbook.path} path={playbook.path.slice(1)} element={<VerticalPage />} />
               ))}

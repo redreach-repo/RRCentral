@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { VERTICALS } from '../data/verticals'
+import { ENQUIRY_OPTIONS } from '../data/verticals'
 import {
   mailtoForInquiry,
   submitWebsiteInquiry,
@@ -18,15 +18,24 @@ const EMPTY: WebsiteInquiryInput = {
 export default function ContactForm({
   compact = false,
   defaultVertical = '',
+  defaultMessage = '',
+  submitLabel = 'Send the brief',
 }: {
   compact?: boolean
   defaultVertical?: string
+  defaultMessage?: string
+  submitLabel?: string
 }) {
-  const [form, setForm] = useState({ ...EMPTY, vertical: defaultVertical })
+  const [form, setForm] = useState({ ...EMPTY, vertical: defaultVertical, message: defaultMessage })
 
   useEffect(() => {
-    if (defaultVertical) setForm((prev) => ({ ...prev, vertical: defaultVertical }))
-  }, [defaultVertical])
+    setForm((prev) => ({
+      ...prev,
+      vertical: defaultVertical || prev.vertical,
+      message: defaultMessage || prev.message,
+    }))
+  }, [defaultVertical, defaultMessage])
+
   const [errors, setErrors] = useState<Partial<Record<keyof WebsiteInquiryInput, string>>>({})
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'fallback'>('idle')
 
@@ -39,7 +48,7 @@ export default function ContactForm({
     try {
       const result = await submitWebsiteInquiry(form)
       setStatus(result.stored ? 'sent' : 'fallback')
-      if (result.stored) setForm(EMPTY)
+      if (result.stored) setForm({ ...EMPTY, vertical: defaultVertical })
     } catch {
       setStatus('fallback')
     }
@@ -48,7 +57,7 @@ export default function ContactForm({
   if (status === 'sent') {
     return (
       <div className="site-form-success">
-        Received. The team will follow up — this enquiry is now in RR Central as a lead.
+        Received. The team will follow up. This enquiry is now in RR Central as a lead.
       </div>
     )
   }
@@ -83,12 +92,11 @@ export default function ContactForm({
         />
       </label>
       <label>
-        Vertical
+        Desk
         <select value={form.vertical} onChange={(e) => setForm({ ...form, vertical: e.target.value })}>
-          <option value="">What are you looking for?</option>
-          {VERTICALS.map((v) => (
-            <option key={v.slug} value={v.slug}>
-              {v.brand}
+          {ENQUIRY_OPTIONS.map((option) => (
+            <option key={option.value || 'empty'} value={option.value}>
+              {option.label}
             </option>
           ))}
         </select>
@@ -99,6 +107,7 @@ export default function ContactForm({
           value={form.message}
           onChange={(e) => setForm({ ...form, message: e.target.value })}
           rows={compact ? 4 : 6}
+          placeholder={form.vertical === 'trading' ? 'Product, material, equipment, quantity, quality, destination.' : undefined}
         />
         {errors.message && <span className="site-form-error">{errors.message}</span>}
       </label>
@@ -109,7 +118,7 @@ export default function ContactForm({
         </p>
       )}
       <button type="submit" className="site-btn site-btn-primary" disabled={status === 'sending'}>
-        {status === 'sending' ? 'Sending…' : 'Request a conversation'}
+        {status === 'sending' ? 'Sending…' : submitLabel}
       </button>
     </form>
   )
