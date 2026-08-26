@@ -12,10 +12,15 @@ export default function SiteLayout() {
   const { user } = useAuth()
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [progress, setProgress] = useState(0)
   const centralTo = user ? '/app' : '/login'
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8)
+    const onScroll = () => {
+      setScrolled(window.scrollY > 8)
+      const max = document.documentElement.scrollHeight - window.innerHeight
+      setProgress(max > 0 ? Math.min(1, window.scrollY / max) : 0)
+    }
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
@@ -23,6 +28,7 @@ export default function SiteLayout() {
 
   return (
     <div className="site-root">
+      <div className="site-progress" style={{ transform: `scaleX(${progress})` }} aria-hidden />
       <CursorGlow />
       <div className="site-shell">
         <div className="site-topbar">

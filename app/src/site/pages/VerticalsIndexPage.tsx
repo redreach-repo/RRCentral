@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom'
+import { ArrowUpRight } from 'lucide-react'
+import Reveal from '../components/Reveal'
 import { siteAsset } from '../assets'
 import { VERTICALS } from '../data/verticals'
 
@@ -24,17 +26,20 @@ export default function VerticalsIndexPage() {
       </section>
       <section className="site-section">
         <div className="site-protocol">
-          {VERTICALS.map((v) => (
-            <Link key={v.slug} to={`/verticals/${v.slug}`} className="site-card">
-              <div className="site-card-photo">
+          {VERTICALS.map((v, i) => (
+            <Reveal key={v.slug} delay={i * 70}>
+              <Link to={`/verticals/${v.slug}`} className="site-offering">
                 <img src={siteAsset(v.image)} alt={v.brand} />
-              </div>
-              <div className="site-card-body">
-                <div className="site-chip">{v.category}</div>
-                <h3>{v.brand}</h3>
-                <p>{v.summary}</p>
-              </div>
-            </Link>
+                <div className="site-offering-copy">
+                  <span className="site-chip">{v.category}</span>
+                  <h3>{v.brand}</h3>
+                  <p>{v.summary}</p>
+                  <span>
+                    Know more <ArrowUpRight size={14} />
+                  </span>
+                </div>
+              </Link>
+            </Reveal>
           ))}
         </div>
       </section>

@@ -1,8 +1,18 @@
 import { Link } from 'react-router-dom'
 import { ArrowUpRight } from 'lucide-react'
 import ContactForm from '../components/ContactForm'
+import CountUp from '../components/CountUp'
+import LogoMarquee from '../components/LogoMarquee'
 import Marquee from '../components/Marquee'
-import { CLIENT_LOGOS, DESTINATION_PHOTOS, siteAsset } from '../assets'
+import PhotoMarquee from '../components/PhotoMarquee'
+import Reveal from '../components/Reveal'
+import {
+  CLIENT_LOGOS,
+  DESTINATION_FILM,
+  DESTINATION_PHOTOS,
+  THREAD_LOOKBOOK,
+  siteAsset,
+} from '../assets'
 import {
   FEATURED_VERTICALS,
   SITE,
@@ -11,6 +21,8 @@ import {
 } from '../data/verticals'
 
 export default function HomePage() {
+  const years = new Date().getFullYear() - SITE.founded
+
   return (
     <>
       <section className="site-hero">
@@ -65,22 +77,24 @@ export default function HomePage() {
               cta: 'Get in touch',
               img: 'expertise-laptop.jpg',
             },
-          ].map((card) => (
-            <Link key={card.title} to={card.to} className="site-card">
-              <div className="site-card-photo">
-                <img src={siteAsset(card.img)} alt="" />
-              </div>
-              <div className="site-card-body">
-                <div className="site-kicker" style={{ marginBottom: 8 }}>
-                  {card.kicker}
+          ].map((card, i) => (
+            <Reveal key={card.title} delay={i * 90}>
+              <Link to={card.to} className="site-card">
+                <div className="site-card-photo">
+                  <img src={siteAsset(card.img)} alt="" />
                 </div>
-                <h3>{card.title}</h3>
-                <p>{card.body}</p>
-                <span className="site-muted" style={{ display: 'inline-flex', gap: 6, marginTop: 16, fontSize: 12 }}>
-                  {card.cta} <ArrowUpRight size={14} />
-                </span>
-              </div>
-            </Link>
+                <div className="site-card-body">
+                  <div className="site-kicker" style={{ marginBottom: 8 }}>
+                    {card.kicker}
+                  </div>
+                  <h3>{card.title}</h3>
+                  <p>{card.body}</p>
+                  <span className="site-muted" style={{ display: 'inline-flex', gap: 6, marginTop: 16, fontSize: 12 }}>
+                    {card.cta} <ArrowUpRight size={14} />
+                  </span>
+                </div>
+              </Link>
+            </Reveal>
           ))}
         </div>
       </section>
@@ -99,48 +113,50 @@ export default function HomePage() {
           </p>
         </div>
         <div className="site-protocol">
-          {VERTICALS.map((v) => (
-            <Link key={v.slug} to={`/verticals/${v.slug}`} className="site-card">
-              <div className="site-card-photo">
+          {VERTICALS.map((v, i) => (
+            <Reveal key={v.slug} delay={i * 70}>
+              <Link to={`/verticals/${v.slug}`} className="site-offering">
                 <img src={siteAsset(v.image)} alt={v.brand} />
-              </div>
-              <div className="site-card-body">
-                <div className="site-card-icon">
-                  <img src={siteAsset(v.icon)} alt="" />
+                <div className="site-offering-copy">
+                  <div className="site-card-icon">
+                    <img src={siteAsset(v.icon)} alt="" />
+                  </div>
+                  <h3>{v.brand}</h3>
+                  <p>{v.summary}</p>
+                  <span>
+                    Know more <ArrowUpRight size={14} />
+                  </span>
                 </div>
-                <h3>{v.brand}</h3>
-                <p>{v.summary}</p>
-                <span className="site-muted" style={{ display: 'inline-flex', gap: 6, marginTop: 16, fontSize: 12 }}>
-                  Know more <ArrowUpRight size={14} />
-                </span>
-              </div>
-            </Link>
+              </Link>
+            </Reveal>
           ))}
         </div>
       </section>
 
       <section className="site-section" style={{ paddingTop: 0 }}>
         {FEATURED_VERTICALS.map((v, i) => (
-          <article key={v.slug} className={`site-feature ${i % 2 ? 'reverse' : ''}`}>
-            <div className="site-feature-photo">
-              <img src={siteAsset(v.image)} alt={v.brand} />
-            </div>
-            <div className="site-feature-copy">
-              <span className="site-chip">{v.category}</span>
-              <h3>{v.brand}</h3>
-              <p className="site-muted">{v.description}</p>
-              <ul className="site-bullets">
-                {v.bullets.map((b) => (
-                  <li key={b}>{b}</li>
-                ))}
-              </ul>
-              <div className="site-actions" style={{ marginTop: 24 }}>
-                <Link className="site-btn site-btn-primary" to={`/verticals/${v.slug}`}>
-                  View {v.brand}
-                </Link>
+          <Reveal key={v.slug}>
+            <article className={`site-feature ${i % 2 ? 'reverse' : ''}`}>
+              <div className="site-feature-photo site-frame">
+                <img src={siteAsset(v.image)} alt={v.brand} />
               </div>
-            </div>
-          </article>
+              <div className="site-feature-copy">
+                <span className="site-chip">{v.category}</span>
+                <h3>{v.brand}</h3>
+                <p className="site-muted">{v.description}</p>
+                <ul className="site-bullets">
+                  {v.bullets.map((b) => (
+                    <li key={b}>{b}</li>
+                  ))}
+                </ul>
+                <div className="site-actions" style={{ marginTop: 24 }}>
+                  <Link className="site-btn site-btn-primary" to={`/verticals/${v.slug}`}>
+                    View {v.brand}
+                  </Link>
+                </div>
+              </div>
+            </article>
+          </Reveal>
         ))}
       </section>
 
@@ -166,9 +182,11 @@ export default function HomePage() {
         </div>
       </section>
 
+      <PhotoMarquee files={DESTINATION_FILM} />
+
       <section className="site-section" style={{ paddingTop: 12 }}>
         <div className="site-split-photo">
-          <div className="site-photo">
+          <div className="site-photo site-frame">
             <img src={siteAsset('expertise-meeting.jpg')} alt="Growing with our clients" />
           </div>
           <div>
@@ -195,15 +213,21 @@ export default function HomePage() {
             </div>
             <div className="site-stats">
               <div className="site-stat">
-                <strong>{new Date().getFullYear() - SITE.founded}+</strong>
+                <strong>
+                  <CountUp to={years} suffix="+" />
+                </strong>
                 <span>Years from Dubai</span>
               </div>
               <div className="site-stat">
-                <strong>7</strong>
+                <strong>
+                  <CountUp to={7} />
+                </strong>
                 <span>Specialist verticals</span>
               </div>
               <div className="site-stat">
-                <strong>1</strong>
+                <strong>
+                  <CountUp to={1} />
+                </strong>
                 <span>Consortium, every district</span>
               </div>
             </div>
@@ -211,13 +235,27 @@ export default function HomePage() {
         </div>
       </section>
 
-      <Marquee />
+      <section className="site-section" style={{ paddingTop: 12 }}>
+        <div className="site-section-head">
+          <div>
+            <div className="site-kicker">RR Threads</div>
+            <h2 className="site-h2">
+              Uniforms that <em>carry the brand</em>
+            </h2>
+          </div>
+          <Link className="site-btn site-btn-ghost" to="/verticals/threads">
+            View lookbook
+          </Link>
+        </div>
+        <div className="site-lookbook">
+          {THREAD_LOOKBOOK.map((file) => (
+            <img key={file} src={siteAsset(file)} alt="RR Threads uniform" />
+          ))}
+        </div>
+      </section>
 
-      <div className="site-logo-strip" aria-label="Trusted by">
-        {CLIENT_LOGOS.map((file) => (
-          <img key={file} src={siteAsset(file)} alt="" />
-        ))}
-      </div>
+      <Marquee />
+      <LogoMarquee files={CLIENT_LOGOS} />
 
       <div className="site-quotes-wrap">
         <section className="site-section">
@@ -228,6 +266,9 @@ export default function HomePage() {
           <div className="site-quotes">
             {TESTIMONIALS.map((t) => (
               <blockquote key={t.name} className="site-quote">
+                <div className="site-stars" aria-label={`${t.rating} stars`}>
+                  {'★★★★★'.slice(0, t.rating)}
+                </div>
                 <p>“{t.quote}”</p>
                 <footer>
                   {t.name}
@@ -240,6 +281,24 @@ export default function HomePage() {
         </section>
       </div>
 
+      <section className="site-elevate">
+        <img src={siteAsset('wander-himalaya.jpg')} alt="" />
+        <div className="site-elevate-copy">
+          <div className="site-kicker">Get solution fast</div>
+          <h2 className="site-h2">
+            Need solutions to <em>elevate your brand?</em>
+          </h2>
+          <div className="site-actions">
+            <Link className="site-btn site-btn-primary" to="/contact">
+              How can we help
+            </Link>
+            <a className="site-btn site-btn-ghost" href={SITE.whatsapp} target="_blank" rel="noreferrer">
+              WhatsApp
+            </a>
+          </div>
+        </div>
+      </section>
+
       <section className="site-section" id="contact">
         <div className="site-cta">
           <div>
@@ -250,8 +309,7 @@ export default function HomePage() {
               <em>right up there</em>
             </h2>
             <p className="site-lede">
-              Customised services, {new Date().getFullYear() - SITE.founded}+ years of delivery, and a team that
-              stays on the account.
+              Customised services, {years}+ years of delivery, and a team that stays on the account.
             </p>
             <div className="site-photo" style={{ minHeight: 220, marginTop: 8 }}>
               <img src={siteAsset('office-2.jpg')} alt="Red Reach team at work" />
