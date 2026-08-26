@@ -10,6 +10,7 @@ Each division is its own page. **RR Central** is a quiet text link to `/login` (
 |---------|------|
 | Public site | `/`, `/about`, `/insights`, `/contact`, `/businesses` |
 | Divisions | `/marketing`, `/care`, `/connect`, `/wanders`, `/threads`, `/trading`, `/upskilling` |
+| Wanders destinations | `/wanders/philippines`, `/wanders/kerala`, `/wanders/himalaya` |
 | Legacy aliases | `/travel` → `/wanders`, `/uniforms` → `/threads`, `/verticals` → `/businesses` |
 | Central sign-in | `/login` (linked as **Central**) |
 | CRM dashboard | `/app` after sign-in |

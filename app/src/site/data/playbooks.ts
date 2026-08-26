@@ -122,7 +122,7 @@ export const PLAYBOOKS: Record<VerticalSlug, VerticalPlaybook> = {
   wanders: {
     path: '/wanders',
     layout: 'travel',
-    inspiredBy: 'Black Tomato — destination collections, tailor-made itineraries, enquiry not self-serve booking.',
+    inspiredBy: 'Incredible India — full-bleed place names, destination discovery, facts on the photograph, then a plan.',
     collectionTitle: 'Destinations',
     collectionLede: 'Discover, then plan. Philippines, Kerala and the Himalayas, with room to add more when the brief asks.',
     stats: [
@@ -287,6 +287,9 @@ export function playbookByPath(pathname: string) {
   const clean = trimmed.replace(/^\/RRCentral(?=\/|$)/, '') || '/'
   const alias = PATH_ALIASES[clean]
   if (alias) return { slug: alias, playbook: PLAYBOOKS[alias] }
+  if (clean === '/wanders' || clean.startsWith('/wanders/')) {
+    return { slug: 'wanders', playbook: PLAYBOOKS.wanders }
+  }
   const entry = (Object.entries(PLAYBOOKS) as [VerticalSlug, VerticalPlaybook][]).find(([, p]) => p.path === clean)
   return entry ? { slug: entry[0], playbook: entry[1] } : undefined
 }
