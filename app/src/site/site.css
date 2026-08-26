@@ -1967,7 +1967,8 @@
   }
 
   .site-nav-links,
-  .site-call-tab {
+  .site-call-tab,
+  .site-company-bar {
     display: none;
   }
 
@@ -1985,9 +1986,15 @@
   }
 
   .site-mobile-panel a {
-    color: var(--ink);
+    color: #1d1d1d;
     font-size: 16px;
+    font-weight: 600;
     padding: 8px 0;
+  }
+
+  .site-mobile-panel a:hover,
+  .site-mobile-panel a:focus {
+    color: var(--accent);
   }
 
   .site-hero,
