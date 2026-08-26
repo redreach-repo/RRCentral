@@ -4,6 +4,7 @@ import Reveal from '../components/Reveal'
 import Tilt from '../components/Tilt'
 import { siteAsset } from '../assets'
 import { PRINCIPLES, SITE, VERTICALS } from '../data/verticals'
+import { verticalPath } from '../data/playbooks'
 
 export default function AboutPage() {
   return (
@@ -84,7 +85,7 @@ export default function AboutPage() {
           {VERTICALS.map((v, i) => (
             <Reveal key={v.slug} delay={i * 70}>
               <Tilt>
-                <Link to={`/verticals/${v.slug}`} className="site-offering">
+                <Link to={verticalPath(v.slug)} className="site-offering">
                   <img src={siteAsset(v.image)} alt={v.brand} />
                   <div className="site-offering-copy">
                     <span className="site-chip">{v.category}</span>

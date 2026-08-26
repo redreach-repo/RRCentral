@@ -18,6 +18,7 @@ import {
   siteAsset,
 } from '../assets'
 import { FEATURED_VERTICALS, SITE, VERTICALS } from '../data/verticals'
+import { verticalPath } from '../data/playbooks'
 
 export default function HomePage() {
   const years = new Date().getFullYear() - SITE.founded
@@ -50,21 +51,58 @@ export default function HomePage() {
             <br />
             <em>Missing piece</em>
           </h1>
-          <p className="site-lede">
-            The missing piece to unlock business growth — seven specialist verticals, one Dubai consortium.
-          </p>
-          <div className="site-actions">
-            <a className="site-btn site-btn-primary" href="#verticals">
-              Find out more
-            </a>
-            <Link className="site-btn site-btn-gold" to="/contact">
-              Talk to us
-            </Link>
-          </div>
+            <p className="site-lede">
+              Red Reach is seven specialist companies from Dubai: marketing, uniforms, travel, virtual
+              assistance, medical tourism, trading, and upskilling. Open any company — each has its own page.
+            </p>
+            <div className="site-actions">
+              <Link className="site-btn site-btn-primary" to="/verticals">
+                Explore companies
+              </Link>
+              <Link className="site-btn site-btn-gold" to="/contact">
+                Talk to us
+              </Link>
+            </div>
         </div>
-        <a className="site-scroll-cue" href="#verticals" aria-label="Scroll to offerings">
+        <a className="site-scroll-cue" href="#companies" aria-label="Scroll to companies">
           <span />
         </a>
+      </section>
+
+      <section className="site-section" id="companies">
+        <div className="site-section-head">
+          <div>
+            <div className="site-kicker">The group</div>
+            <h2 className="site-h2">
+              Seven companies. <em>Click through.</em>
+            </h2>
+          </div>
+          <p className="site-muted" style={{ maxWidth: 380 }}>
+            Each vertical is a real company page — marketing, uniforms, travel, VAs, medical tourism, trading,
+            and upskilling.
+          </p>
+        </div>
+        <div className="site-protocol">
+          {VERTICALS.map((v, i) => (
+            <Reveal key={v.slug} delay={i * 70}>
+              <Tilt>
+                <Link to={verticalPath(v.slug)} className="site-offering">
+                  <img src={siteAsset(v.image)} alt={v.brand} />
+                  <div className="site-offering-copy">
+                    <div className="site-card-icon">
+                      <img src={siteAsset(v.icon)} alt="" />
+                    </div>
+                    <h3>{v.brand}</h3>
+                    <p>{v.summary}</p>
+                    <span>
+                      Open this company <ArrowUpRight size={14} />
+                    </span>
+                  </div>
+                </Link>
+              </Tilt>
+            </Reveal>
+          ))}
+        </div>
       </section>
 
       <section className="site-section">
@@ -116,42 +154,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="site-section" id="verticals" style={{ paddingTop: 12 }}>
-        <div className="site-section-head">
-          <div>
-            <div className="site-kicker">Where can we help you</div>
-            <h2 className="site-h2">
-              Our <em>offerings</em>
-            </h2>
-          </div>
-          <p className="site-muted" style={{ maxWidth: 360 }}>
-            Specialised services in marketing, care, virtual assistance, travel, uniforms, trading, and
-            upskilling.
-          </p>
-        </div>
-        <div className="site-protocol">
-          {VERTICALS.map((v, i) => (
-            <Reveal key={v.slug} delay={i * 70}>
-              <Tilt>
-                <Link to={`/verticals/${v.slug}`} className="site-offering">
-                  <img src={siteAsset(v.image)} alt={v.brand} />
-                  <div className="site-offering-copy">
-                    <div className="site-card-icon">
-                      <img src={siteAsset(v.icon)} alt="" />
-                    </div>
-                    <h3>{v.brand}</h3>
-                    <p>{v.summary}</p>
-                    <span>
-                      Know more <ArrowUpRight size={14} />
-                    </span>
-                  </div>
-                </Link>
-              </Tilt>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
       <section className="site-section" style={{ paddingTop: 0 }}>
         {FEATURED_VERTICALS.map((v, i) => (
           <Reveal key={v.slug}>
@@ -169,7 +171,7 @@ export default function HomePage() {
                   ))}
                 </ul>
                 <div className="site-actions" style={{ marginTop: 24 }}>
-                  <Link className="site-btn site-btn-primary" to={`/verticals/${v.slug}`}>
+                  <Link className="site-btn site-btn-primary" to={verticalPath(v.slug)}>
                     View {v.brand}
                   </Link>
                 </div>
@@ -187,7 +189,7 @@ export default function HomePage() {
               Journeys worth <em>the photograph</em>
             </h2>
           </div>
-          <Link className="site-btn site-btn-ghost" to="/verticals/wanders">
+          <Link className="site-btn site-btn-ghost" to={verticalPath('wanders')}>
             Explore travel
           </Link>
         </div>
@@ -264,7 +266,7 @@ export default function HomePage() {
               Uniforms that <em>carry the brand</em>
             </h2>
           </div>
-          <Link className="site-btn site-btn-ghost" to="/verticals/threads">
+          <Link className="site-btn site-btn-ghost" to={verticalPath('threads')}>
             View lookbook
           </Link>
         </div>

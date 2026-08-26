@@ -4,6 +4,7 @@ import Reveal from '../components/Reveal'
 import Tilt from '../components/Tilt'
 import { siteAsset } from '../assets'
 import { VERTICALS } from '../data/verticals'
+import { verticalPath } from '../data/playbooks'
 
 export default function VerticalsIndexPage() {
   return (
@@ -13,15 +14,15 @@ export default function VerticalsIndexPage() {
           <img src={siteAsset('vertical-threads.jpg')} alt="Red Reach services" />
         </div>
         <div className="site-hero-copy">
-          <div className="site-kicker">Our execution protocol</div>
+            <div className="site-kicker">The group</div>
           <h1 className="site-display">
-            Seven verticals.
+            Seven specialist companies.
             <br />
             <em>One reach.</em>
           </h1>
           <p className="site-lede">
-            Marketing, care, remote teams, travel, uniforms, trading, and upskilling — specialised companies
-            under Red Reach Middle East FZE.
+            Marketing, uniforms, travel, virtual assistance, medical tourism, trading, and upskilling —
+            each company has its own page. Click through.
           </p>
         </div>
       </section>
@@ -30,7 +31,7 @@ export default function VerticalsIndexPage() {
           {VERTICALS.map((v, i) => (
             <Reveal key={v.slug} delay={i * 70}>
               <Tilt>
-                <Link to={`/verticals/${v.slug}`} className="site-offering">
+                <Link to={verticalPath(v.slug)} className="site-offering">
                   <img src={siteAsset(v.image)} alt={v.brand} />
                   <div className="site-offering-copy">
                     <span className="site-chip">{v.category}</span>

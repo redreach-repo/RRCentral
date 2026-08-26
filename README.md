@@ -2,11 +2,14 @@
 
 Public website + CRM + quotations + invoices for **Red Reach Middle East FZE**.
 
-The GitHub Pages app now serves the **Red Reach marketing site** at `/` (Scalancer-style, all seven verticals). **RR Central** is behind a text link labelled **Central** — it is not a sign-in form on the public pages.
+The live React site is **https://redreach-repo.github.io/RRCentral/**. Merging a PR updates that GitHub Pages URL after the deploy action finishes. **www.redreach.ae is still the Hostinger WordPress site** — it will not change until DNS is pointed at Pages.
+
+Each company is its own page (not one long homepage): marketing, uniforms, travel, virtual assistance, medical tourism, trading, and upskilling. **RR Central** is a quiet text link to `/login` (or `/app` when signed in).
 
 | Surface | Path |
 |---------|------|
-| Public site | `/`, `/about`, `/contact`, `/verticals/:slug` |
+| Public site | `/`, `/about`, `/contact`, `/verticals` |
+| Companies | `/marketing`, `/uniforms`, `/travel`, `/connect`, `/care`, `/trading`, `/upskilling` |
 | Central sign-in | `/login` (linked as **Central**) |
 | CRM dashboard | `/app` after sign-in |
 | CRM modules | `/crm`, `/quotations`, `/wanders`, … |
