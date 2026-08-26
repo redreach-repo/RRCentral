@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import CursorGlow from './CursorGlow'
@@ -10,6 +10,7 @@ import '../site.css'
 
 export default function SiteLayout() {
   const { user } = useAuth()
+  const location = useLocation()
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -25,6 +26,10 @@ export default function SiteLayout() {
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  useEffect(() => {
+    setOpen(false)
+  }, [location.pathname])
 
   return (
     <div className="site-root">
@@ -78,7 +83,9 @@ export default function SiteLayout() {
             Central
           </Link>
         </div>
-        <Outlet />
+        <div className="site-page" key={location.pathname}>
+          <Outlet />
+        </div>
         <footer className="site-footer">
           <div className="site-footer-inner">
             <div className="site-footer-grid">

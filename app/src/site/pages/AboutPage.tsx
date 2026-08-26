@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ArrowUpRight } from 'lucide-react'
 import Reveal from '../components/Reveal'
+import Tilt from '../components/Tilt'
 import { siteAsset } from '../assets'
 import { PRINCIPLES, SITE, VERTICALS } from '../data/verticals'
 
@@ -82,17 +83,19 @@ export default function AboutPage() {
         <div className="site-protocol">
           {VERTICALS.map((v, i) => (
             <Reveal key={v.slug} delay={i * 70}>
-              <Link to={`/verticals/${v.slug}`} className="site-offering">
-                <img src={siteAsset(v.image)} alt={v.brand} />
-                <div className="site-offering-copy">
-                  <span className="site-chip">{v.category}</span>
-                  <h3>{v.brand}</h3>
-                  <p>{v.summary}</p>
-                  <span>
-                    Know more <ArrowUpRight size={14} />
-                  </span>
-                </div>
-              </Link>
+              <Tilt>
+                <Link to={`/verticals/${v.slug}`} className="site-offering">
+                  <img src={siteAsset(v.image)} alt={v.brand} />
+                  <div className="site-offering-copy">
+                    <span className="site-chip">{v.category}</span>
+                    <h3>{v.brand}</h3>
+                    <p>{v.summary}</p>
+                    <span>
+                      Know more <ArrowUpRight size={14} />
+                    </span>
+                  </div>
+                </Link>
+              </Tilt>
             </Reveal>
           ))}
         </div>

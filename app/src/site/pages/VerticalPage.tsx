@@ -1,11 +1,14 @@
+import { useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import ContactForm from '../components/ContactForm'
+import Lightbox from '../components/Lightbox'
 import { siteAsset } from '../assets'
 import { verticalBySlug } from '../data/verticals'
 
 export default function VerticalPage() {
   const { slug } = useParams()
   const vertical = verticalBySlug(slug)
+  const [shot, setShot] = useState<number | null>(null)
   if (!vertical) return <Navigate to="/" replace />
 
   return (
@@ -64,9 +67,11 @@ export default function VerticalPage() {
             Pictures from <em>{vertical.brand}</em>
           </h2>
           <div className="site-gallery">
-            {vertical.gallery.map((file) => (
+            {vertical.gallery.map((file, i) => (
               <figure key={file}>
-                <img src={siteAsset(file)} alt="" />
+                <button type="button" onClick={() => setShot(i)} aria-label="Open photograph">
+                  <img src={siteAsset(file)} alt="" />
+                </button>
               </figure>
             ))}
           </div>
@@ -108,6 +113,9 @@ export default function VerticalPage() {
           <ContactForm compact defaultVertical={vertical.slug} />
         </div>
       </section>
+      {shot !== null && vertical.gallery && (
+        <Lightbox files={vertical.gallery} index={shot} onIndex={setShot} onClose={() => setShot(null)} />
+      )}
     </>
   )
 }

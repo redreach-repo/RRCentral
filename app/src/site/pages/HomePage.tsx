@@ -1,11 +1,15 @@
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowUpRight } from 'lucide-react'
 import ContactForm from '../components/ContactForm'
 import CountUp from '../components/CountUp'
+import Lightbox from '../components/Lightbox'
 import LogoMarquee from '../components/LogoMarquee'
 import Marquee from '../components/Marquee'
 import PhotoMarquee from '../components/PhotoMarquee'
+import QuoteStage from '../components/QuoteStage'
 import Reveal from '../components/Reveal'
+import Tilt from '../components/Tilt'
 import {
   CLIENT_LOGOS,
   DESTINATION_FILM,
@@ -13,20 +17,30 @@ import {
   THREAD_LOOKBOOK,
   siteAsset,
 } from '../assets'
-import {
-  FEATURED_VERTICALS,
-  SITE,
-  TESTIMONIALS,
-  VERTICALS,
-} from '../data/verticals'
+import { FEATURED_VERTICALS, SITE, VERTICALS } from '../data/verticals'
 
 export default function HomePage() {
   const years = new Date().getFullYear() - SITE.founded
+  const heroMedia = useRef<HTMLDivElement>(null)
+  const [wanderShot, setWanderShot] = useState<number | null>(null)
+  const [threadShot, setThreadShot] = useState<number | null>(null)
+
+  useEffect(() => {
+    const el = heroMedia.current
+    if (!el) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const onScroll = () => {
+      el.style.transform = `translate3d(0, ${Math.min(180, window.scrollY * 0.28)}px, 0)`
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   return (
     <>
       <section className="site-hero">
-        <div className="site-hero-media">
+        <div className="site-hero-media" ref={heroMedia}>
           <img src={siteAsset('hero-team.jpg')} alt="Red Reach team" />
         </div>
         <div className="site-hero-copy">
@@ -48,6 +62,9 @@ export default function HomePage() {
             </Link>
           </div>
         </div>
+        <a className="site-scroll-cue" href="#verticals" aria-label="Scroll to offerings">
+          <span />
+        </a>
       </section>
 
       <section className="site-section">
@@ -115,19 +132,21 @@ export default function HomePage() {
         <div className="site-protocol">
           {VERTICALS.map((v, i) => (
             <Reveal key={v.slug} delay={i * 70}>
-              <Link to={`/verticals/${v.slug}`} className="site-offering">
-                <img src={siteAsset(v.image)} alt={v.brand} />
-                <div className="site-offering-copy">
-                  <div className="site-card-icon">
-                    <img src={siteAsset(v.icon)} alt="" />
+              <Tilt>
+                <Link to={`/verticals/${v.slug}`} className="site-offering">
+                  <img src={siteAsset(v.image)} alt={v.brand} />
+                  <div className="site-offering-copy">
+                    <div className="site-card-icon">
+                      <img src={siteAsset(v.icon)} alt="" />
+                    </div>
+                    <h3>{v.brand}</h3>
+                    <p>{v.summary}</p>
+                    <span>
+                      Know more <ArrowUpRight size={14} />
+                    </span>
                   </div>
-                  <h3>{v.brand}</h3>
-                  <p>{v.summary}</p>
-                  <span>
-                    Know more <ArrowUpRight size={14} />
-                  </span>
-                </div>
-              </Link>
+                </Link>
+              </Tilt>
             </Reveal>
           ))}
         </div>
@@ -173,9 +192,11 @@ export default function HomePage() {
           </Link>
         </div>
         <div className="site-mosaic">
-          {DESTINATION_PHOTOS.map((shot) => (
+          {DESTINATION_PHOTOS.map((shot, i) => (
             <figure key={shot.file}>
-              <img src={siteAsset(shot.file)} alt={shot.caption} />
+              <button type="button" onClick={() => setWanderShot(i)} aria-label={`Open ${shot.caption}`}>
+                <img src={siteAsset(shot.file)} alt={shot.caption} />
+              </button>
               <figcaption>{shot.caption}</figcaption>
             </figure>
           ))}
@@ -248,8 +269,10 @@ export default function HomePage() {
           </Link>
         </div>
         <div className="site-lookbook">
-          {THREAD_LOOKBOOK.map((file) => (
-            <img key={file} src={siteAsset(file)} alt="RR Threads uniform" />
+          {THREAD_LOOKBOOK.map((file, i) => (
+            <button key={file} type="button" onClick={() => setThreadShot(i)} aria-label="Open uniform photograph">
+              <img src={siteAsset(file)} alt="RR Threads uniform" />
+            </button>
           ))}
         </div>
       </section>
@@ -263,21 +286,7 @@ export default function HomePage() {
           <h2 className="site-h2" style={{ marginBottom: 28 }}>
             Trusted by some <em>biggest names</em>
           </h2>
-          <div className="site-quotes">
-            {TESTIMONIALS.map((t) => (
-              <blockquote key={t.name} className="site-quote">
-                <div className="site-stars" aria-label={`${t.rating} stars`}>
-                  {'★★★★★'.slice(0, t.rating)}
-                </div>
-                <p>“{t.quote}”</p>
-                <footer>
-                  {t.name}
-                  <br />
-                  {t.role}
-                </footer>
-              </blockquote>
-            ))}
-          </div>
+          <QuoteStage />
         </section>
       </div>
 
@@ -325,6 +334,18 @@ export default function HomePage() {
           <ContactForm compact />
         </div>
       </section>
+      {wanderShot !== null && (
+        <Lightbox
+          files={DESTINATION_PHOTOS.map((shot) => shot.file)}
+          captions={DESTINATION_PHOTOS.map((shot) => shot.caption)}
+          index={wanderShot}
+          onIndex={setWanderShot}
+          onClose={() => setWanderShot(null)}
+        />
+      )}
+      {threadShot !== null && (
+        <Lightbox files={THREAD_LOOKBOOK} index={threadShot} onIndex={setThreadShot} onClose={() => setThreadShot(null)} />
+      )}
     </>
   )
 }
