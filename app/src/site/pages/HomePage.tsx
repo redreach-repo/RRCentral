@@ -86,6 +86,16 @@ export default function HomePage() {
               </Link>
             )
           })}
+          <Link to="/contact" className="site-card">
+            <div className="site-card-icon">
+              <ArrowUpRight size={18} />
+            </div>
+            <h3>Need a path?</h3>
+            <p>Tell us the vertical and the constraint. We will route it in Central to the right team.</p>
+            <span className="site-muted" style={{ display: 'inline-flex', gap: 6, marginTop: 16, fontSize: 12 }}>
+              Talk to us <ArrowUpRight size={14} />
+            </span>
+          </Link>
         </div>
       </section>
 

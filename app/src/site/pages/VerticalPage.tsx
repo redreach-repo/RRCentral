@@ -12,9 +12,9 @@ export default function VerticalPage() {
       <section className="site-page-hero">
         <div className="site-kicker">{vertical.eyebrow}</div>
         <h1 className="site-display">
-          {vertical.brand.replace('RR ', '')}
+          {vertical.heroLine}
           <br />
-          <em>{vertical.tagline.split(' ').slice(-2).join(' ')}</em>
+          <em>{vertical.heroAccent}</em>
         </h1>
         <p className="site-lede">{vertical.description}</p>
         <div className="site-actions">

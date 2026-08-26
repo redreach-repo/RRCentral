@@ -17,7 +17,8 @@ describe('site verticals', () => {
 
   it('features Connect and Wanders on the home protocol', () => {
     expect(FEATURED_VERTICALS.map((v) => v.slug).sort()).toEqual(['connect', 'wanders'])
-    expect(verticalBySlug('threads')?.code).toBe('01')
+    expect(verticalBySlug('threads')?.heroAccent).toContain('identity')
+    expect(VERTICALS.every((v) => v.heroLine && v.heroAccent)).toBe(true)
     expect(verticalBySlug('missing')).toBeUndefined()
   })
 })

@@ -16,6 +16,8 @@ export type Vertical = {
   tagline: string
   summary: string
   description: string
+  heroLine: string
+  heroAccent: string
   bullets: string[]
   highlights: { title: string; body: string }[]
   process?: { step: string; title: string; body: string }[]
@@ -32,6 +34,8 @@ export const VERTICALS: Vertical[] = [
     tagline: 'Elevating brands. Amplifying growth.',
     summary:
       'Data-driven marketing that cuts through noise, fills the pipeline, and turns attention into revenue.',
+    heroLine: 'Elevating brands.',
+    heroAccent: 'Amplifying growth.',
     description:
       'We fuse market understanding with campaigns that do more than look good. RR Marketing partners with you to build awareness, high-intent leads, and a digital presence that actually converts — especially in demanding sectors like logistics and freight.',
     bullets: [
@@ -85,6 +89,8 @@ export const VERTICALS: Vertical[] = [
     tagline: 'Your trusted pathway to world-class care in India.',
     summary:
       'We match patients with India’s leading doctors and hospitals — personalised, transparent, and end-to-end.',
+    heroLine: 'Trusted pathway',
+    heroAccent: 'to care in India.',
     description:
       'RR Care is a patient-first medical tourism platform. We connect people from around the world with trusted doctors, hospitals, and treatment centres in India, selected for quality, ethics, and fit — not just availability.',
     bullets: [
@@ -121,6 +127,8 @@ export const VERTICALS: Vertical[] = [
     tagline: 'Elite remote teams that let you focus on the work that matters.',
     summary:
       'Vetted virtual professionals for admin, research, marketing support, and customer care — without the overhead.',
+    heroLine: 'Productivity',
+    heroAccent: 'enabled globally.',
     description:
       'Based in Dubai and fulfilled with a world-class remote bench, RR Connect gives businesses agile support that scales. From scheduling and data entry to research, content, digital marketing, and customer service, your operations stay lean and uninterrupted.',
     bullets: [
@@ -158,6 +166,8 @@ export const VERTICALS: Vertical[] = [
     tagline: 'Your passport to unforgettable journeys.',
     summary:
       'Tailor-made travel across the Philippines, Kerala, and the Himalayas — designed around how you actually want to move through the world.',
+    heroLine: 'Your passport to',
+    heroAccent: 'unforgettable journeys.',
     description:
       'RR Wanders is more than a travel desk. From Dubai we design bespoke tours: island diving and culture in the Philippines, backwaters and Ayurveda in Kerala, and trekking or cultural immersions across Nepal, Bhutan, and Tibet.',
     bullets: [
@@ -195,6 +205,8 @@ export const VERTICALS: Vertical[] = [
     tagline: 'Uniforms that carry your brand with durability and comfort.',
     summary:
       'Industrial, hospitality, medical, and custom apparel — sampled, produced, and QC’d before it ever reaches your team.',
+    heroLine: 'Crafting your',
+    heroAccent: "brand's identity.",
     description:
       'Uniforms are brand, safety, and confidence stitched together. RR Threads supplies T-shirts, coveralls, PPE, medical and hotel uniforms, kitchen wear, robes, and towels, with samples first and rigorous quality control at the end.',
     bullets: [
@@ -238,6 +250,8 @@ export const VERTICALS: Vertical[] = [
     tagline: 'Unlocking your global potential.',
     summary:
       'If you can specify it, we source it — quality-checked, with Dubai’s trade stack as the advantage.',
+    heroLine: 'Unlocking your',
+    heroAccent: 'global potential.',
     description:
       'From Dubai’s position between Europe, Asia, and Africa, RR Trading connects businesses to vetted manufacturers worldwide. Textiles are a deep specialty; the real promise is limitless sourcing, quality control, and logistics through Jebel Ali, DXB, and free zones.',
     bullets: [
@@ -274,6 +288,8 @@ export const VERTICALS: Vertical[] = [
     tagline: 'Upskill and accelerate your career.',
     summary:
       'Industry courses in aviation, logistics, hospitality, travel, tourism, and healthcare — flexible, certified, practical.',
+    heroLine: 'Upskill and',
+    heroAccent: 'accelerate.',
     description:
       'RR Upskilling (also known as RR Boost) is built by practitioners. The mission is simple: make current industry knowledge accessible and affordable so professionals can move with confidence. Learn at your pace, pass at 80%, and carry a verifiable certificate.',
     bullets: [
