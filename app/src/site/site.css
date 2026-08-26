@@ -2035,6 +2035,273 @@
   }
 }
 
+.site-worlds {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.site-world {
+  position: relative;
+  min-height: 280px;
+  overflow: hidden;
+  color: #fff;
+  display: block;
+}
+
+.site-world img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.site-world-copy {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  min-height: 280px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: linear-gradient(180deg, transparent 20%, rgba(12, 12, 12, 0.78));
+}
+
+.site-world-copy span {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.site-world-copy h3 {
+  margin: 8px 0 0;
+  font-family: var(--serif);
+  font-size: 22px;
+  line-height: 1.25;
+}
+
+.site-world-copy em {
+  margin-top: 14px;
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #fff;
+}
+
+.site-ecosystem-wrap {
+  background: var(--bg-2);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.site-ecosystem {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-top: 1px solid var(--line);
+}
+
+.site-ecosystem a {
+  padding: 22px 16px 28px;
+  border-right: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.site-ecosystem a:last-child {
+  border-right: 0;
+}
+
+.site-ecosystem strong {
+  display: block;
+  font-family: var(--serif);
+  font-size: 18px;
+}
+
+.site-ecosystem span {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.site-why {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 28px;
+}
+
+.site-why h3 {
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.site-editorial {
+  display: grid;
+  gap: 18px;
+}
+
+.site-editorial-card {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 22px;
+  align-items: center;
+  color: inherit;
+}
+
+.site-editorial-card img {
+  width: 100%;
+  height: 240px;
+  object-fit: cover;
+}
+
+.site-editorial-card h3 {
+  font-family: var(--serif);
+  font-size: 28px;
+  margin: 10px 0 8px;
+}
+
+.site-approach {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.site-approach strong {
+  color: var(--accent);
+  letter-spacing: 0.12em;
+  font-size: 12px;
+}
+
+.site-approach h3 {
+  margin: 8px 0;
+  font-size: 20px;
+}
+
+.site-trade-search {
+  background: #111;
+  color: #fff;
+  padding: 36px 28px;
+}
+
+.site-trade-search-form {
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.site-trade-search-form label {
+  display: block;
+  font-family: var(--serif);
+  font-size: 28px;
+  margin-bottom: 14px;
+}
+
+.site-trade-search-form > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.site-trade-search-form input {
+  background: #fff;
+  color: #111;
+  border: 0;
+  padding: 16px 18px;
+  font-size: 16px;
+}
+
+.site-trade-search-form p {
+  margin-top: 12px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.site-insights {
+  display: grid;
+  gap: 18px;
+}
+
+.site-insight {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 18px;
+  color: inherit;
+  align-items: center;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.site-insight img {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+}
+
+.site-insight span {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.site-insight h2 {
+  font-family: var(--serif);
+  font-size: 26px;
+  margin: 6px 0 8px;
+}
+
+.site-vertical--agency .site-capability-list {
+  border-top: 1px solid var(--line);
+}
+
+.site-vertical--medical {
+  --line: rgba(29, 29, 29, 0.08);
+}
+
+.site-vertical--travel .site-page-hero {
+  min-height: 78vh;
+}
+
+.site-vertical--trade .site-ink-band {
+  background: #111;
+}
+
+.site-vertical--learn .site-course-badge {
+  display: none;
+}
+
+@media (max-width: 980px) {
+  .site-worlds,
+  .site-why,
+  .site-editorial-card,
+  .site-approach,
+  .site-ecosystem,
+  .site-insight,
+  .site-trade-search-form > div {
+    grid-template-columns: 1fr;
+  }
+
+  .site-ecosystem {
+    display: grid;
+  }
+
+  .site-editorial-card img,
+  .site-world-copy,
+  .site-world {
+    min-height: 220px;
+    height: auto;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

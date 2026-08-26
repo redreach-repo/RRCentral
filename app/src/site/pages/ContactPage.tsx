@@ -1,23 +1,32 @@
 import ContactForm from '../components/ContactForm'
+import Seo from '../components/Seo'
 import { siteAsset } from '../assets'
+import { webPageJsonLd } from '../data/organization'
 import { SITE } from '../data/verticals'
 
 export default function ContactPage() {
   return (
     <>
+      <Seo
+        title="Contact Red Reach | Talk to the right desk"
+        description="Contact Red Reach Middle East in Dubai. Choose marketing, medical travel, remote teams, travel, uniforms, sourcing, upskilling, or a general enquiry."
+        path="/contact"
+        jsonLd={webPageJsonLd('Contact Red Reach', '/contact', 'Talk to Red Reach Middle East FZE in Dubai.')}
+      />
       <section className="site-page-hero">
         <div className="site-hero-media">
-          <img src={siteAsset('hero-team.jpg')} alt="Red Reach office" />
+          <img src={siteAsset('hero-team.jpg')} alt="Red Reach office, Dubai" />
         </div>
         <div className="site-hero-copy">
-          <div className="site-kicker">Get in touch</div>
+          <div className="site-kicker">Contact</div>
           <h1 className="site-display">
-            Get your business
+            Have a requirement?
             <br />
-            <em>right up there</em>
+            <em>Let&apos;s talk.</em>
           </h1>
           <p className="site-lede">
-            Come by, write, or send a brief. Enquiries land in RR Central so the right vertical can pick them up.
+            Choose the desk. If you are not sure, send a general enquiry. It lands in Central so the right
+            people can pick it up.
           </p>
         </div>
       </section>
@@ -26,13 +35,14 @@ export default function ContactPage() {
           <div>
             <div className="site-card">
               <div className="site-card-photo">
-                <img src={siteAsset('wander-city.jpg')} alt="Visit us" />
+                <img src={siteAsset('dubai.jpg')} alt="Dubai" />
               </div>
               <div className="site-card-body">
                 <h3>Address</h3>
                 {SITE.addressLines.map((line) => (
                   <p key={line}>{line}</p>
                 ))}
+                <p>{SITE.hours}</p>
               </div>
             </div>
             <div className="site-card" style={{ marginTop: 14 }}>
@@ -52,7 +62,7 @@ export default function ContactPage() {
               </div>
             </div>
           </div>
-          <ContactForm />
+          <ContactForm submitLabel="Send the brief" />
         </div>
       </section>
     </>

@@ -23,14 +23,15 @@ export function validateWebsiteInquiry(input: WebsiteInquiryInput): InquiryValid
   if (!input.email.trim()) errors.email = 'Email is required'
   else if (!EMAIL_RE.test(input.email.trim())) errors.email = 'Enter a valid email'
   if (!input.message.trim()) errors.message = 'Tell us how we can help'
-  if (input.vertical && !VERTICALS.some((v) => v.slug === input.vertical || v.brand === input.vertical)) {
-    errors.vertical = 'Choose a vertical'
+  if (input.vertical && input.vertical !== 'general' && !VERTICALS.some((v) => v.slug === input.vertical || v.brand === input.vertical)) {
+    errors.vertical = 'Choose a desk'
   }
   return { ok: Object.keys(errors).length === 0, errors }
 }
 
 export function verticalBrandForInquiry(vertical: string): string {
   const match = VERTICALS.find((v) => v.slug === vertical || v.brand === vertical)
+  if (vertical === 'general') return 'General enquiry'
   return match?.brand || vertical || 'Red Reach'
 }
 
