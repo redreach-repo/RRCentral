@@ -21,4 +21,13 @@ describe('site verticals', () => {
     expect(VERTICALS.every((v) => v.heroLine && v.heroAccent)).toBe(true)
     expect(verticalBySlug('missing')).toBeUndefined()
   })
+
+  it('attaches photography from the original Red Reach site', () => {
+    for (const vertical of VERTICALS) {
+      expect(vertical.image.length).toBeGreaterThan(0)
+      expect(vertical.icon).toMatch(/^icon-\d\.png$/)
+    }
+    expect(verticalBySlug('marketing')?.image).toBe('vertical-marketing.jpg')
+    expect(verticalBySlug('wanders')?.gallery?.length).toBeGreaterThanOrEqual(6)
+  })
 })
