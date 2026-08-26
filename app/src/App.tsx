@@ -19,6 +19,12 @@ import ReportsPage from './pages/ReportsPage'
 import ExpensesPage from './pages/ExpensesPage'
 import SettingsPage from './pages/SettingsPage'
 import DocumentPage from './pages/DocumentPage'
+import SiteLayout from './site/components/SiteLayout'
+import HomePage from './site/pages/HomePage'
+import AboutPage from './site/pages/AboutPage'
+import ContactPage from './site/pages/ContactPage'
+import VerticalPage from './site/pages/VerticalPage'
+import VerticalsIndexPage from './site/pages/VerticalsIndexPage'
 
 export default function App() {
   return (
@@ -26,6 +32,13 @@ export default function App() {
       <SettingsProvider>
         <ToastProvider>
           <Routes>
+            <Route element={<SiteLayout />}>
+              <Route index element={<HomePage />} />
+              <Route path="about" element={<AboutPage />} />
+              <Route path="contact" element={<ContactPage />} />
+              <Route path="verticals" element={<VerticalsIndexPage />} />
+              <Route path="verticals/:slug" element={<VerticalPage />} />
+            </Route>
             <Route path="/login" element={<LoginPage />} />
             <Route
               path="/document/:type/:id"
@@ -36,14 +49,13 @@ export default function App() {
               }
             />
             <Route
-              path="/"
               element={
                 <ProtectedRoute>
                   <Layout />
                 </ProtectedRoute>
               }
             >
-              <Route index element={<DashboardPage />} />
+              <Route path="app" element={<DashboardPage />} />
               <Route path="crm" element={<CrmPage />} />
               <Route path="follow-ups" element={<FollowupsPage />} />
               <Route path="quotations" element={<QuotationsPage />} />

@@ -6,7 +6,7 @@
 import { ALL_SEED_PRODUCTS } from './seedCatalog'
 
 export const DB_NAME = 'rrcentral_local'
-const DB_VERSION = 5
+const DB_VERSION = 6
 
 export const LOCAL_STORES = [
   'app_settings',
@@ -38,6 +38,7 @@ export const LOCAL_STORES = [
   'package_selling_prices',
   'scheduled_departures',
   'customer_bookings',
+  'website_inquiries',
 ] as const
 
 export type LocalStoreName = (typeof LOCAL_STORES)[number]
@@ -423,6 +424,7 @@ function withDefaults(table: string, row: Row): Row {
         'package_selling_prices',
         'scheduled_departures',
         'customer_bookings',
+        'website_inquiries',
       ].includes(table)
     ) {
       next.created_at = now
@@ -475,6 +477,14 @@ function withDefaults(table: string, row: Row): Row {
     if (next.payment_instructions == null) next.payment_instructions = ''
     if (next.supplier_cost_base == null) next.supplier_cost_base = 0
     if (next.estimated_gross_profit_base == null) next.estimated_gross_profit_base = 0
+  }
+
+  if (table === 'website_inquiries') {
+    if (next.status == null) next.status = 'new'
+    if (next.crm_id == null) next.crm_id = ''
+    if (next.phone == null) next.phone = ''
+    if (next.vertical == null) next.vertical = ''
+    if (next.message == null) next.message = ''
   }
 
   if (table === 'customer_payments') {
@@ -825,6 +835,7 @@ export type MigrationDump = {
   package_selling_prices?: Row[]
   scheduled_departures?: Row[]
   customer_bookings?: Row[]
+  website_inquiries?: Row[]
 }
 
 async function clearStore(store: string): Promise<void> {

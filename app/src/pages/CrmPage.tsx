@@ -51,6 +51,7 @@ import {
   syncFollowUpToZohoCalendar,
 } from '../lib/zoho'
 import EmailComposeModal from '../components/EmailComposeModal'
+import WebsiteInquiriesPanel from '../site/components/WebsiteInquiriesPanel'
 import {
   page,
   pageHeader,
@@ -624,6 +625,8 @@ export default function CrmPage() {
           <Plus size={16} /> Add company
         </button>
       </div>
+
+      <WebsiteInquiriesPanel onConverted={() => void load()} />
 
       {error && <div style={errorBanner}>{error}</div>}
 

@@ -652,3 +652,16 @@ export interface WandersTermsAcceptance {
   created_by: string
   created_at: string
 }
+
+/** Public website contact form → RR Central. */
+export interface WebsiteInquiry {
+  id: string
+  name: string
+  email: string
+  phone: string
+  vertical: string
+  message: string
+  status: 'new' | 'converted' | 'closed'
+  crm_id: string
+  created_at: string
+}

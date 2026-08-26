@@ -23,7 +23,7 @@ import BrandLogo from './BrandLogo'
 import styles from './Layout.module.css'
 
 const navItems = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/crm', label: 'CRM', icon: Users },
   { to: '/wanders', label: 'Wanders', icon: Plane },
   { to: '/follow-ups', label: 'Follow-ups', icon: CalendarClock },
@@ -94,6 +94,9 @@ export default function Layout() {
 
         <div className={styles.sidebarFooter}>
           <div className={styles.divisionHint}>Multi-division CRM</div>
+          <NavLink to="/" className={styles.navItem} style={{ marginTop: 8 }}>
+            <span>Public site</span>
+          </NavLink>
         </div>
       </aside>
 
