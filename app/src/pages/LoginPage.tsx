@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { authApi } from '../lib/authApi'
 import BrandLogo from '../components/BrandLogo'
@@ -7,6 +7,7 @@ import styles from './LoginPage.module.css'
 
 export default function LoginPage() {
   const { user, loading, signIn, signInWithEmail, isLocalMode } = useAuth()
+  const location = useLocation()
   const [email, setEmail] = useState('')
   const [seedEmails, setSeedEmails] = useState<string[]>([])
   const [error, setError] = useState('')
@@ -26,7 +27,9 @@ export default function LoginPage() {
   }
 
   if (user) {
-    return <Navigate to="/" replace />
+    const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname
+    const dest = from && from !== '/' && from !== '/login' ? from : '/app'
+    return <Navigate to={dest} replace />
   }
 
   async function handleLocalContinue(e: FormEvent) {
@@ -119,6 +122,11 @@ export default function LoginPage() {
             Sign in with Google
           </button>
         )}
+        <p className={styles.subtitle} style={{ marginTop: 22, marginBottom: 0 }}>
+          <Link to="/" style={{ color: 'rgba(255,255,255,0.55)' }}>
+            Back to the public site
+          </Link>
+        </p>
       </div>
     </div>
   )

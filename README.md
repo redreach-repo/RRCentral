@@ -1,6 +1,17 @@
 # RED REACH Central
 
-CRM + quotations + invoices for **Red Reach Middle East FZE**.
+Public website + CRM + quotations + invoices for **Red Reach Middle East FZE**.
+
+The GitHub Pages app now serves the **Red Reach marketing site** at `/` (Scalancer-style, all seven verticals). **RR Central** is behind a text link labelled **Central** — it is not a sign-in form on the public pages.
+
+| Surface | Path |
+|---------|------|
+| Public site | `/`, `/about`, `/contact`, `/verticals/:slug` |
+| Central sign-in | `/login` (linked as **Central**) |
+| CRM dashboard | `/app` after sign-in |
+| CRM modules | `/crm`, `/quotations`, `/wanders`, … |
+
+Contact forms write **website inquiries** into Central (and create a CRM lead in local mode). On Supabase, run the updated [`app/supabase-schema.sql`](./app/supabase-schema.sql) so `website_inquiries` exists and anonymous visitors can insert.
 
 ## How the team should use it
 

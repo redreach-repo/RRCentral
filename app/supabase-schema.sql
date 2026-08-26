@@ -734,6 +734,23 @@ create index idx_wanders_passengers_deal on wanders_passengers(deal_id);
 create index idx_tour_packages_code on tour_packages(code);
 
 ------------------------------------------------------------
+-- WEBSITE INQUIRIES (public contact form → RR Central)
+------------------------------------------------------------
+create table website_inquiries (
+  id uuid primary key default uuid_generate_v4(),
+  name text not null,
+  email text not null,
+  phone text not null default '',
+  vertical text not null default '',
+  message text not null default '',
+  status text not null default 'new',
+  crm_id text not null default '',
+  created_at timestamptz not null default now()
+);
+
+create index idx_website_inquiries_status on website_inquiries(status);
+
+------------------------------------------------------------
 -- ROW LEVEL SECURITY (all tables readable/writable by authenticated users)
 ------------------------------------------------------------
 alter table app_settings enable row level security;
@@ -765,6 +782,7 @@ alter table package_cost_components enable row level security;
 alter table package_selling_prices enable row level security;
 alter table scheduled_departures enable row level security;
 alter table customer_bookings enable row level security;
+alter table website_inquiries enable row level security;
 
 -- Allow all authenticated users to read/write all tables
 -- (app-level role checks handle admin vs sales permissions)
@@ -797,6 +815,8 @@ create policy "Authenticated users full access" on package_cost_components for a
 create policy "Authenticated users full access" on package_selling_prices for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "Authenticated users full access" on scheduled_departures for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "Authenticated users full access" on customer_bookings for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Authenticated users full access" on website_inquiries for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Public can submit website inquiries" on website_inquiries for insert to anon with check (true);
 
 ------------------------------------------------------------
 -- Optional upgrades for existing databases (run once if upgrading)
@@ -849,3 +869,17 @@ create policy "Authenticated users full access" on customer_bookings for all usi
 -- alter table quotations add column if not exists payment_instructions text not null default '';
 -- alter table quotations add column if not exists supplier_cost_base numeric(14,2) not null default 0;
 -- alter table quotations add column if not exists estimated_gross_profit_base numeric(14,2) not null default 0;
+-- create table if not exists website_inquiries (
+--   id uuid primary key default uuid_generate_v4(),
+--   name text not null,
+--   email text not null,
+--   phone text not null default '',
+--   vertical text not null default '',
+--   message text not null default '',
+--   status text not null default 'new',
+--   crm_id text not null default '',
+--   created_at timestamptz not null default now()
+-- );
+-- alter table website_inquiries enable row level security;
+-- create policy "Authenticated users full access" on website_inquiries for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+-- create policy "Public can submit website inquiries" on website_inquiries for insert to anon with check (true);
