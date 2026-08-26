@@ -11,12 +11,12 @@ export const CLIENT_LOGOS = [
 ] as const
 
 export const DESTINATION_PHOTOS = [
-  { file: 'wander-houseboat.jpg', caption: 'Philippines' },
-  { file: 'wander-tea.jpg', caption: 'Kerala' },
-  { file: 'wander-nepal.jpg', caption: 'Nepal' },
-  { file: 'wander-1.jpg', caption: 'Rice terraces' },
-  { file: 'wander-city.jpg', caption: 'Lakeside cities' },
-  { file: 'wander-himalaya.jpg', caption: 'Himalayas' },
+  { file: 'wander-houseboat.jpg', caption: 'Palawan' },
+  { file: 'wander-tea.jpg', caption: 'Munnar' },
+  { file: 'wander-nepal.jpg', caption: 'Kathmandu' },
+  { file: 'wander-1.jpg', caption: 'Terraces' },
+  { file: 'wander-city.jpg', caption: 'Pokhara' },
+  { file: 'wander-himalaya.jpg', caption: 'High Himalaya' },
 ] as const
 
 export const DESTINATION_FILM = DESTINATION_PHOTOS.map((shot) => shot.file)

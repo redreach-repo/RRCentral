@@ -20,6 +20,7 @@ describe('vertical playbooks', () => {
     expect(playbookByPath('/travel/')?.slug).toBe('wanders')
     expect(playbookByPath('/RRCentral/threads')?.slug).toBe('threads')
     expect(playbookByPath('/RRCentral/uniforms')?.slug).toBe('threads')
+    expect(playbookByPath('/wanders/kerala')?.slug).toBe('wanders')
     expect(playbookByPath('/missing')).toBeUndefined()
     expect(VERTICALS.map((v) => v.brand)).toEqual([
       'RR Marketing',
