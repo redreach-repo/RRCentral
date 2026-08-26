@@ -1,5 +1,6 @@
 import { Link, Navigate, useParams } from 'react-router-dom'
 import ContactForm from '../components/ContactForm'
+import { siteAsset } from '../assets'
 import { verticalBySlug } from '../data/verticals'
 
 export default function VerticalPage() {
@@ -10,26 +11,31 @@ export default function VerticalPage() {
   return (
     <>
       <section className="site-page-hero">
-        <div className="site-kicker">{vertical.eyebrow}</div>
-        <h1 className="site-display">
-          {vertical.heroLine}
-          <br />
-          <em>{vertical.heroAccent}</em>
-        </h1>
-        <p className="site-lede">{vertical.description}</p>
-        <div className="site-actions">
-          <Link className="site-btn site-btn-primary" to="/contact">
-            Start a project
-          </Link>
-          <a className="site-btn site-btn-ghost" href="https://wa.me/971507008977" target="_blank" rel="noreferrer">
-            WhatsApp
-          </a>
+        <div className="site-hero-media">
+          <img src={siteAsset(vertical.image)} alt={vertical.brand} />
+        </div>
+        <div className="site-hero-copy">
+          <div className="site-kicker">{vertical.eyebrow}</div>
+          <h1 className="site-display">
+            {vertical.heroLine}
+            <br />
+            <em>{vertical.heroAccent}</em>
+          </h1>
+          <p className="site-lede">{vertical.description}</p>
+          <div className="site-actions">
+            <Link className="site-btn site-btn-primary" to="/contact">
+              Start a project
+            </Link>
+            <a className="site-btn site-btn-gold" href="https://wa.me/971507008977" target="_blank" rel="noreferrer">
+              WhatsApp
+            </a>
+          </div>
         </div>
       </section>
 
       <section className="site-section">
         <div className="site-feature">
-          <div>
+          <div className="site-feature-copy">
             <span className="site-chip">{vertical.category}</span>
             <h3>{vertical.tagline}</h3>
             <ul className="site-bullets">
@@ -38,16 +44,34 @@ export default function VerticalPage() {
               ))}
             </ul>
           </div>
-          <div className="site-highlights" style={{ gridTemplateColumns: '1fr' }}>
+          <div className="site-highlights" style={{ gridTemplateColumns: '1fr', padding: 18 }}>
             {vertical.highlights.map((h) => (
               <article key={h.title} className="site-card" style={{ minHeight: 0 }}>
-                <h3>{h.title}</h3>
-                <p>{h.body}</p>
+                <div className="site-card-body">
+                  <h3>{h.title}</h3>
+                  <p>{h.body}</p>
+                </div>
               </article>
             ))}
           </div>
         </div>
       </section>
+
+      {vertical.gallery && vertical.gallery.length > 0 && (
+        <section className="site-section" style={{ paddingTop: 0 }}>
+          <div className="site-kicker">In the field</div>
+          <h2 className="site-h2" style={{ marginBottom: 28 }}>
+            Pictures from <em>{vertical.brand}</em>
+          </h2>
+          <div className="site-gallery">
+            {vertical.gallery.map((file) => (
+              <figure key={file}>
+                <img src={siteAsset(file)} alt="" />
+              </figure>
+            ))}
+          </div>
+        </section>
+      )}
 
       {vertical.process && (
         <section className="site-section" style={{ paddingTop: 0 }}>
@@ -78,7 +102,7 @@ export default function VerticalPage() {
             </h2>
             <p className="site-lede">
               Share the brief for {vertical.brand}. It is filed in Central so the team can follow up with a
-              quotation path, not a generic autoresponse.
+              quotation path.
             </p>
           </div>
           <ContactForm compact defaultVertical={vertical.slug} />
