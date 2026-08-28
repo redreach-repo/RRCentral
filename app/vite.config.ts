@@ -2,6 +2,7 @@ import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { copyFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { stripeCheckoutPlugin } from './vite-plugin-stripe-checkout.ts'
 
 /** GitHub Pages serves 404.html for missing paths — copy SPA shell so /login, /reports, etc. work on refresh. */
 function spaFallback404(): Plugin {
@@ -20,6 +21,6 @@ function spaFallback404(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), spaFallback404()],
+  plugins: [react(), spaFallback404(), stripeCheckoutPlugin()],
   base: '/RRCentral/',
 })

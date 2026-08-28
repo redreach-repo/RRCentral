@@ -23,6 +23,8 @@ npm run dev
 
 Open http://localhost:5173/RRCentral/ — pick a seeded admin email. Sheets data auto-imports from `public/migration-data.json` on first load.
 
+Tee Tribe retail lives at http://localhost:5173/RRCentral/shop. Stripe Checkout runs through the Vite `/api/create-checkout-session` plugin when `STRIPE_SECRET_KEY` is set.
+
 ### Cloud mode (Supabase)
 
 1. Create a project at https://supabase.com

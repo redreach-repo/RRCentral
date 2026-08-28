@@ -29,6 +29,14 @@ import InsightsPage from './site/pages/InsightsPage'
 import WandersExplorePage from './site/pages/WandersExplorePage'
 import WandersRegionPage from './site/pages/WandersRegionPage'
 import { PLAYBOOKS } from './site/data/playbooks'
+import ShopLayout from './shop/ShopLayout'
+import ShopHomePage from './shop/pages/ShopHomePage'
+import ShopListingPage from './shop/pages/ShopListingPage'
+import ProductPage from './shop/pages/ProductPage'
+import CartPage from './shop/pages/CartPage'
+import WishlistPage from './shop/pages/WishlistPage'
+import OrderSuccessPage from './shop/pages/OrderSuccessPage'
+import OrderCancelPage from './shop/pages/OrderCancelPage'
 
 export default function App() {
   return (
@@ -36,6 +44,18 @@ export default function App() {
       <SettingsProvider>
         <ToastProvider>
           <Routes>
+            <Route element={<ShopLayout />}>
+              <Route path="shop" element={<ShopHomePage />} />
+              <Route path="shop/c/:category" element={<ShopListingPage />} />
+              <Route path="shop/search" element={<ShopListingPage />} />
+              <Route path="shop/sale" element={<ShopListingPage saleOnly />} />
+              <Route path="shop/p/:slug" element={<ProductPage />} />
+              <Route path="shop/cart" element={<CartPage />} />
+              <Route path="shop/wishlist" element={<WishlistPage />} />
+              <Route path="shop/order/success" element={<OrderSuccessPage />} />
+              <Route path="shop/order/cancel" element={<OrderCancelPage />} />
+            </Route>
+            <Route path="teetribe" element={<Navigate to="/shop" replace />} />
             <Route element={<SiteLayout />}>
               <Route index element={<HomePage />} />
               <Route path="about" element={<AboutPage />} />
