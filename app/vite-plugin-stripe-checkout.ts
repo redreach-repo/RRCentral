@@ -1,7 +1,6 @@
-import { pathToFileURL } from 'node:url'
-import { join } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { Connect, Plugin } from 'vite'
+import type { Connect, Plugin, ViteDevServer } from 'vite'
+import { loadEnv } from 'vite'
 import Stripe from 'stripe'
 
 const PATHS = new Set(['/api/create-checkout-session', '/RRCentral/api/create-checkout-session'])
@@ -15,13 +14,8 @@ type CheckoutRequest = {
 type CheckoutHelpers = {
   parseCheckoutRequest: (input: unknown) => CheckoutRequest | { error: string }
   buildCheckoutSessionParams: (request: CheckoutRequest) =>
-    | { ok: true; params: Stripe.Checkout.SessionCreateParams; totalFils: number; count: number }
+    | { ok: true; params: Record<string, unknown>; totalFils: number; count: number }
     | { ok: false; error: string }
-}
-
-async function loadCheckoutHelpers(): Promise<CheckoutHelpers> {
-  const specifier = pathToFileURL(join(process.cwd(), 'src/shop/checkout.ts')).href
-  return import(specifier) as Promise<CheckoutHelpers>
 }
 
 function readJson(req: IncomingMessage): Promise<unknown> {
@@ -50,7 +44,11 @@ function send(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body))
 }
 
-async function handleCheckout(req: IncomingMessage, res: ServerResponse) {
+async function handleCheckout(
+  req: IncomingMessage,
+  res: ServerResponse,
+  loadHelpers: () => Promise<CheckoutHelpers>,
+) {
   if (req.method === 'OPTIONS') {
     res.statusCode = 204
     res.end()
@@ -69,7 +67,7 @@ async function handleCheckout(req: IncomingMessage, res: ServerResponse) {
     return
   }
 
-  const { parseCheckoutRequest, buildCheckoutSessionParams } = await loadCheckoutHelpers()
+  const { parseCheckoutRequest, buildCheckoutSessionParams } = await loadHelpers()
   const parsed = parseCheckoutRequest(payload)
   if ('error' in parsed) {
     send(res, 400, { error: parsed.error })
@@ -93,18 +91,27 @@ async function handleCheckout(req: IncomingMessage, res: ServerResponse) {
   const stripe = new Stripe(secret, {
     apiVersion: '2026-07-29.dahlia' as Stripe.LatestApiVersion,
   })
-  const session = await stripe.checkout.sessions.create(built.params)
+  const session = await stripe.checkout.sessions.create(
+    built.params as unknown as Stripe.Checkout.SessionCreateParams,
+  )
   send(res, 200, { url: session.url, id: session.id, demo: false })
 }
 
 export function stripeCheckoutPlugin(): Plugin {
+  let devServer: ViteDevServer | undefined
+
+  const loadHelpers = async (): Promise<CheckoutHelpers> => {
+    if (!devServer) throw new Error('Checkout API is only available during Vite dev')
+    return (await devServer.ssrLoadModule('/src/shop/checkout.ts')) as CheckoutHelpers
+  }
+
   const middleware: Connect.NextHandleFunction = (req, res, next) => {
     const url = req.url?.split('?')[0] || ''
     if (!PATHS.has(url)) {
       next()
       return
     }
-    void handleCheckout(req, res).catch((error: unknown) => {
+    void handleCheckout(req, res, loadHelpers).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : 'Checkout failed'
       send(res, 500, { error: message })
     })
@@ -112,7 +119,13 @@ export function stripeCheckoutPlugin(): Plugin {
 
   return {
     name: 'stripe-checkout',
+    configResolved(config) {
+      const env = loadEnv(config.mode, config.envDir || process.cwd(), '')
+      if (env.STRIPE_SECRET_KEY) process.env.STRIPE_SECRET_KEY = env.STRIPE_SECRET_KEY
+      if (env.STRIPE_RESTRICTED_KEY) process.env.STRIPE_RESTRICTED_KEY = env.STRIPE_RESTRICTED_KEY
+    },
     configureServer(server) {
+      devServer = server
       server.middlewares.use(middleware)
     },
     configurePreviewServer(server) {
