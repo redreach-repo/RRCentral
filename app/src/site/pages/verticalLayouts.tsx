@@ -203,6 +203,25 @@ export function ApparelLayout({ vertical, playbook, onOpenShot }: LayoutProps) {
           ))}
         </div>
       </section>
+      <section className="site-section" style={{ paddingTop: 0 }}>
+        <div className="site-cta">
+          <div>
+            <div className="site-kicker">Retail label</div>
+            <h2 className="site-h2">
+              Tee Tribe.
+              <br />
+              <em>Wear your words.</em>
+            </h2>
+            <p className="site-lede">
+              Christian tees, one-liners, minimalist marks and secular city shirts. Same floor as the
+              uniforms. Shop it like Namshi — search, filter, bag, pay with Stripe.
+            </p>
+          </div>
+          <Link to="/shop" className="site-btn site-btn-primary">
+            Shop Tee Tribe
+          </Link>
+        </div>
+      </section>
       <PromiseBand playbook={playbook} />
       <section className="site-section">
         <div className="site-section-head">

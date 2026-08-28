@@ -10,6 +10,7 @@ Each division is its own page. **RR Central** is a quiet text link to `/login` (
 |---------|------|
 | Public site | `/`, `/about`, `/insights`, `/contact`, `/businesses` |
 | Divisions | `/marketing`, `/care`, `/connect`, `/wanders`, `/threads`, `/trading`, `/upskilling` |
+| Tee Tribe shop | `/shop` (also `/teetribe`) — Christian, one-liner, minimalist and secular tees. Pay with Stripe. |
 | Wanders destinations | `/wanders/philippines`, `/wanders/kerala`, `/wanders/himalaya` |
 | Legacy aliases | `/travel` → `/wanders`, `/uniforms` → `/threads`, `/verticals` → `/businesses` |
 | Central sign-in | `/login` (linked as **Central**) |
@@ -53,6 +54,8 @@ cd app
 npm install
 npm run dev
 ```
+
+Open http://localhost:5173/RRCentral/shop for **Tee Tribe**. Checkout talks to a local Vite API at `/api/create-checkout-session`. Without `STRIPE_SECRET_KEY` it completes a demo order. With a Stripe restricted key in `app/.env` (see `app/.env.example`) it redirects to Stripe-hosted Checkout (AED, UAE shipping, no `payment_method_types` so Dashboard payment methods apply). GitHub Pages has no server: set `VITE_CHECKOUT_API_URL` to a Checkout function, or the bag falls back to demo success.
 
 ### Cloud (Supabase) — team sharing
 

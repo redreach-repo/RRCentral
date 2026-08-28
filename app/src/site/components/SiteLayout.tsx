@@ -61,6 +61,7 @@ export default function SiteLayout() {
                 ))}
               </div>
             </div>
+            <NavLink to="/shop">Tee Tribe</NavLink>
             <NavLink to="/about">About</NavLink>
             <NavLink to="/insights">Insights</NavLink>
             <NavLink to="/contact">Contact</NavLink>
@@ -92,6 +93,9 @@ export default function SiteLayout() {
               {v.brand}
             </Link>
           ))}
+          <Link to="/shop" onClick={() => setOpen(false)}>
+            Tee Tribe
+          </Link>
           <Link to="/about" onClick={() => setOpen(false)}>
             About
           </Link>
@@ -146,6 +150,9 @@ export default function SiteLayout() {
                   <a href={SITE.whatsapp} target="_blank" rel="noreferrer">
                     WhatsApp
                   </a>
+                </p>
+                <p>
+                  <Link to="/shop">Tee Tribe shop</Link>
                 </p>
                 <p>
                   <Link to="/insights">Insights</Link>
