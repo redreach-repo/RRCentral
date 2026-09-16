@@ -33,19 +33,42 @@ export function calcLine(qty: number, unitPrice: number, vatRate = VAT_RATE) {
   return { amount, vat_amount, line_total, vat_rate: vatRate }
 }
 
-export function calcTotals(items: DraftLineItem[], vatRate = VAT_RATE) {
+export type DiscountOpts = {
+  /** Percent off subtotal (0–100). Applied before fixed amount. */
+  discountPercent?: number
+  /** Fixed amount off subtotal (in document currency). */
+  discountAmount?: number
+}
+
+/** Discount applied to pre-VAT subtotal. Percent first, then fixed amount. */
+export function applyDiscount(
+  subtotal: number,
+  opts?: DiscountOpts,
+): { discount: number; taxable: number } {
+  const base = round2(Math.max(0, Number(subtotal) || 0))
+  const pct = Math.min(100, Math.max(0, Number(opts?.discountPercent) || 0))
+  const fixed = Math.max(0, Number(opts?.discountAmount) || 0)
+  const fromPct = round2((base * pct) / 100)
+  const discount = round2(Math.min(base, fromPct + fixed))
+  return { discount, taxable: round2(Math.max(0, base - discount)) }
+}
+
+export function calcTotals(items: DraftLineItem[], vatRate = VAT_RATE, discount?: DiscountOpts) {
   let subtotal = 0
-  let vat = 0
   for (const item of items) {
     const qty = item.sizes ? sumSizes(item.sizes) : Number(item.qty) || 0
     const c = calcLine(qty, item.unit_price, vatRate)
     subtotal += c.amount
-    vat += c.vat_amount
   }
+  subtotal = round2(subtotal)
+  const { discount: discountValue, taxable } = applyDiscount(subtotal, discount)
+  const vat = round2(taxable * vatRate)
   return {
-    subtotal: round2(subtotal),
-    vat: round2(vat),
-    total: round2(subtotal + vat),
+    subtotal,
+    discount: discountValue,
+    taxable,
+    vat,
+    total: round2(taxable + vat),
   }
 }
 

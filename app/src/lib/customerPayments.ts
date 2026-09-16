@@ -198,6 +198,8 @@ export function quotationCurrencyDefaults(partial?: Partial<Quotation>): Partial
     payment_instructions: '',
     supplier_cost_base: 0,
     estimated_gross_profit_base: 0,
+    discount_percent: 0,
+    discount_amount: 0,
     ...partial,
   }
 }

@@ -14,6 +14,8 @@ function quote(partial: Partial<Quotation>): Quotation {
     date: partial.date ?? '2026-07-15',
     description: '',
     amount: partial.amount ?? 12500,
+    discount_percent: partial.discount_percent ?? 0,
+    discount_amount: partial.discount_amount ?? 0,
     status: partial.status || 'Sent',
     division_code: '01',
     base_reference: '',

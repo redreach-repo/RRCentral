@@ -477,6 +477,8 @@ function withDefaults(table: string, row: Row): Row {
     if (next.payment_instructions == null) next.payment_instructions = ''
     if (next.supplier_cost_base == null) next.supplier_cost_base = 0
     if (next.estimated_gross_profit_base == null) next.estimated_gross_profit_base = 0
+    if (next.discount_percent == null) next.discount_percent = 0
+    if (next.discount_amount == null) next.discount_amount = 0
   }
 
   if (table === 'website_inquiries') {
