@@ -17,7 +17,7 @@ import {
   type QuoteColumnId,
 } from '../lib/divisionQuoteFormats'
 import { CONNECT_PARTNER } from '../lib/seedDivisionCatalogues'
-import { loadLineItems } from '../lib/lineItems'
+import { loadLineItems, applyDiscount } from '../lib/lineItems'
 import { buildWhatsAppUrl } from '../lib/whatsapp'
 import { resolveLogoUrl } from '../lib/brand'
 import {
@@ -211,21 +211,35 @@ export default function DocumentPage() {
         })
       : ''
   const summary = useMemo(() => {
+    const quote = docType === 'quote' ? (doc as Quotation | null) : null
+    const discountOpts = {
+      discountPercent: Number(quote?.discount_percent) || 0,
+      discountAmount: Number(quote?.discount_amount) || 0,
+    }
     if (items.length) {
-      if (isWandersQuote && !wandersVatEnabled) {
-        const subtotal = items.reduce((s, i) => s + Number(i.amount || 0), 0)
-        return { subtotal, vat: 0, total: subtotal }
-      }
       const subtotal = items.reduce((s, i) => s + Number(i.amount || 0), 0)
-      const vat = items.reduce((s, i) => s + Number(i.vat_amount || 0), 0)
-      const total = items.reduce((s, i) => s + Number(i.line_total || 0), 0)
-      return { subtotal, vat, total }
+      if (isWandersQuote && !wandersVatEnabled) {
+        const { discount, taxable } = applyDiscount(subtotal, discountOpts)
+        return { subtotal, discount, taxable, vat: 0, total: taxable }
+      }
+      const { discount, taxable } = applyDiscount(subtotal, discountOpts)
+      const vat = Math.round(taxable * effectiveVatRate * 100) / 100
+      return { subtotal, discount, taxable, vat, total: Math.round((taxable + vat) * 100) / 100 }
     }
     const total = Number(doc?.amount || 0)
-    if (effectiveVatRate <= 0) return { subtotal: total, vat: 0, total }
-    const subtotal = total / (1 + effectiveVatRate)
-    return { subtotal, vat: total - subtotal, total }
-  }, [items, doc, effectiveVatRate, isWandersQuote, wandersVatEnabled])
+    if (effectiveVatRate <= 0) {
+      return { subtotal: total, discount: 0, taxable: total, vat: 0, total }
+    }
+    // Back-calc when no line items: amount is already after discount+VAT
+    const taxable = total / (1 + effectiveVatRate)
+    return {
+      subtotal: taxable,
+      discount: 0,
+      taxable,
+      vat: total - taxable,
+      total,
+    }
+  }, [items, doc, docType, effectiveVatRate, isWandersQuote, wandersVatEnabled])
 
   async function downloadPdf() {
     if (!sheetRef.current) return
@@ -658,6 +672,22 @@ export default function DocumentPage() {
                 <span>Subtotal</span>
                 <span>{money(summary.subtotal)}</span>
               </div>
+              {summary.discount > 0 ? (
+                <div style={totalRow}>
+                  <span>
+                    Discount
+                    {docType === 'quote' && Number((doc as Quotation).discount_percent) > 0
+                      ? ` (${Number((doc as Quotation).discount_percent)}%)`
+                      : ''}
+                    {docType === 'quote' &&
+                    Number((doc as Quotation).discount_amount) > 0 &&
+                    !(Number((doc as Quotation).discount_percent) > 0)
+                      ? ' (fixed)'
+                      : ''}
+                  </span>
+                  <span>−{money(summary.discount)}</span>
+                </div>
+              ) : null}
               <div style={totalRow}>
                 <span>VAT ({(effectiveVatRate * 100).toFixed(0)}%)</span>
                 <span>{money(summary.vat)}</span>

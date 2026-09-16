@@ -71,6 +71,10 @@ export interface Quotation {
   date: string | null
   description: string
   amount: number
+  /** Percent discount off pre-VAT subtotal (0–100). */
+  discount_percent: number
+  /** Fixed discount amount off pre-VAT subtotal (quotation currency). */
+  discount_amount: number
   status: string
   division_code: string
   base_reference: string

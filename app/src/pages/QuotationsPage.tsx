@@ -106,6 +106,10 @@ interface QuoteForm {
   conversion_fee_estimate: number
   bank_fee_estimate: number
   supplier_cost_base: number
+  /** Percent off subtotal before VAT. */
+  discount_percent: number
+  /** Fixed amount off subtotal before VAT. */
+  discount_amount: number
 }
 
 const emptyForm = (defaults?: Partial<QuoteForm>): QuoteForm => ({
@@ -132,6 +136,8 @@ const emptyForm = (defaults?: Partial<QuoteForm>): QuoteForm => ({
   conversion_fee_estimate: 0,
   bank_fee_estimate: 0,
   supplier_cost_base: 0,
+  discount_percent: 0,
+  discount_amount: 0,
   ...defaults,
 })
 
@@ -355,7 +361,14 @@ export default function QuotationsPage() {
     return list
   }, [quotes, tab, search])
 
-  const totals = useMemo(() => calcTotals(form.items, vatRate), [form.items, vatRate])
+  const totals = useMemo(
+    () =>
+      calcTotals(form.items, vatRate, {
+        discountPercent: form.discount_percent,
+        discountAmount: form.discount_amount,
+      }),
+    [form.items, form.discount_percent, form.discount_amount, vatRate],
+  )
 
   const divisionBrand = (code: string) =>
     DIVISIONS.find((d) => d.code === code)?.brand || code
@@ -400,6 +413,8 @@ export default function QuotationsPage() {
         conversion_fee_estimate: Number(q.conversion_fee_estimate) || 0,
         bank_fee_estimate: Number(q.bank_fee_estimate) || 0,
         supplier_cost_base: Number(q.supplier_cost_base) || 0,
+        discount_percent: Number(q.discount_percent) || 0,
+        discount_amount: Number(q.discount_amount) || 0,
       })
       setEditorOpen(true)
     } catch (e) {
@@ -458,6 +473,8 @@ export default function QuotationsPage() {
         notes: form.notes,
         date: form.date || null,
         amount,
+        discount_percent: Number(form.discount_percent) || 0,
+        discount_amount: Number(form.discount_amount) || 0,
         quote_id: quoteId,
         updated_by: who,
         updated_at: new Date().toISOString(),
@@ -781,7 +798,28 @@ export default function QuotationsPage() {
           description: `${it.description} (${pct}% deposit)`,
         }))
       }
-      const amount = calcTotals(draftItems, vatRate).total
+      // Bake quotation discount into unit prices so invoice lines match the discounted total.
+      const discountOpts = {
+        discountPercent: Number(q.discount_percent) || 0,
+        discountAmount: Number(q.discount_amount) || 0,
+      }
+      const preDiscount = calcTotals(draftItems, vatRate)
+      const withDiscount = calcTotals(draftItems, vatRate, discountOpts)
+      if (withDiscount.discount > 0 && preDiscount.subtotal > 0) {
+        const factor = withDiscount.taxable / preDiscount.subtotal
+        draftItems = draftItems.map((it) => ({
+          ...it,
+          unit_price: Math.round((Number(it.unit_price) || 0) * factor * 100) / 100,
+        }))
+      }
+      const sub = calcTotals(draftItems, vatRate)
+      const amount = sub.total
+
+      const discountNote =
+        Number(q.discount_percent) || Number(q.discount_amount)
+          ? `\nDiscount applied from quotation: ${Number(q.discount_percent) || 0}%` +
+            (Number(q.discount_amount) ? ` + ${Number(q.discount_amount).toFixed(2)}` : '')
+          : ''
 
       const { error } = await db.from('invoices').insert({
         client: q.client,
@@ -794,7 +832,7 @@ export default function QuotationsPage() {
         payment_status: 'Pending',
         payment_terms: q.payment_terms,
         moq: q.moq,
-        notes: q.notes,
+        notes: (q.notes || '') + discountNote,
         delivery_terms: q.delivery_terms,
         created_by: who,
         updated_by: who,
@@ -815,14 +853,13 @@ export default function QuotationsPage() {
       }
 
       // Sync income (no unique constraint on reference_number — select then insert/update)
-      const sub = calcTotals(draftItems, vatRate)
       const incomePayload = {
         client_source: q.client,
         category: q.vertical,
         reference_number: q.reference_number,
         date: format(new Date(), 'yyyy-MM-dd'),
         description: q.description,
-        bill_amount: sub.subtotal,
+        bill_amount: sub.taxable,
         vat: sub.vat,
         total_amount: sub.total,
         status: 'Sent',
@@ -1306,10 +1343,54 @@ export default function QuotationsPage() {
         <div
           style={{
             marginTop: 16,
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+            gap: 12,
+            alignItems: 'end',
+          }}
+        >
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Discount %</label>
+            <input
+              style={inputStyle}
+              type="number"
+              min={0}
+              max={100}
+              step={0.01}
+              value={form.discount_percent || ''}
+              placeholder="0"
+              onChange={(e) =>
+                setForm((f) => ({ ...f, discount_percent: Math.max(0, Number(e.target.value) || 0) }))
+              }
+            />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Discount amount ({form.quotation_currency})</label>
+            <input
+              style={inputStyle}
+              type="number"
+              min={0}
+              step={0.01}
+              value={form.discount_amount || ''}
+              placeholder="0.00"
+              onChange={(e) =>
+                setForm((f) => ({ ...f, discount_amount: Math.max(0, Number(e.target.value) || 0) }))
+              }
+            />
+          </div>
+          <div style={{ fontSize: 13, color: colors.muted, paddingBottom: 8 }}>
+            Applied to subtotal before VAT. You can use % and/or a fixed amount.
+          </div>
+        </div>
+
+        <div
+          style={{
+            marginTop: 16,
             display: 'flex',
             justifyContent: 'flex-end',
             gap: 24,
             fontSize: 14,
+            flexWrap: 'wrap',
           }}
         >
           <div>
@@ -1318,6 +1399,15 @@ export default function QuotationsPage() {
               {form.quotation_currency} {totals.subtotal.toLocaleString('en-AE', { minimumFractionDigits: 2 })}
             </strong>
           </div>
+          {totals.discount > 0 ? (
+            <div>
+              Discount:{' '}
+              <strong style={{ color: colors.danger || '#f87171' }}>
+                −{form.quotation_currency}{' '}
+                {totals.discount.toLocaleString('en-AE', { minimumFractionDigits: 2 })}
+              </strong>
+            </div>
+          ) : null}
           <div>
             VAT ({(vatRate * 100).toFixed(0)}%):{' '}
             <strong>
