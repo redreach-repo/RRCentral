@@ -2,7 +2,19 @@
 
 Public website + CRM + quotations + invoices for **Red Reach Middle East FZE**.
 
-The live React site is **https://redreach-repo.github.io/RRCentral/**. Merging a PR updates that GitHub Pages URL after the deploy action finishes. **www.redreach.ae is still the Hostinger WordPress site** — it will not change until DNS is pointed at Pages.
+## Live CRM URL (bookmark this)
+
+**https://redreach-repo.github.io/RRCentral/**
+
+| What | URL |
+|------|-----|
+| Public site | https://redreach-repo.github.io/RRCentral/ |
+| Sign in | https://redreach-repo.github.io/RRCentral/login |
+| Dashboard | https://redreach-repo.github.io/RRCentral/app |
+
+`https://redreach-repo.github.io/` alone is **not** the CRM — GitHub shows a 404 there until you publish the org redirect in [`org-pages/`](./org-pages/). Merging a PR updates the `/RRCentral/` site after the deploy action finishes.
+
+**www.redreach.ae** is still the Hostinger WordPress site — it will not change until DNS is pointed at Pages.
 
 Each division is its own page. **RR Central** is a quiet text link to `/login` (or `/app` when signed in).
 
@@ -15,7 +27,7 @@ Each division is its own page. **RR Central** is a quiet text link to `/login` (
 | Legacy aliases | `/travel` → `/wanders`, `/uniforms` → `/threads`, `/verticals` → `/businesses` |
 | Central sign-in | `/login` (linked as **Central**) |
 | CRM dashboard | `/app` after sign-in |
-| CRM modules | `/crm`, `/quotations`, `/wanders`, … |
+| CRM modules | `/crm`, `/quotations`, `/app/wanders`, … |
 
 Contact forms write **website inquiries** into Central (and create a CRM lead in local mode). On Supabase, run the updated [`app/supabase-schema.sql`](./app/supabase-schema.sql) so `website_inquiries` exists and anonymous visitors can insert.
 
@@ -34,6 +46,10 @@ https://redreach-repo.github.io/RRCentral/
    *(Or add GitHub Actions secrets `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` and redeploy so everyone is cloud by default.)*
 
 Until Supabase is connected, the orange banner means **local mode** (data stays in that browser only).
+
+## Fix org-root 404
+
+See [`org-pages/README.md`](./org-pages/README.md) — publish that tiny redirect as `redreach-repo.github.io` so the bare domain sends people into Central.
 
 ## Apps
 

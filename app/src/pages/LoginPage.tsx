@@ -54,6 +54,15 @@ export default function LoginPage() {
         <p className={styles.subtitle}>
           Multi-division CRM &amp; quoting for Red Reach Middle East FZE
         </p>
+        <p className={styles.bookmark}>
+          Bookmark this page:{' '}
+          <code className={styles.bookmarkUrl}>…/RRCentral/login</code>
+          <br />
+          <span className={styles.bookmarkHint}>
+            Opening <code>redreach-repo.github.io</code> alone shows a 404 — always include{' '}
+            <code>/RRCentral/</code>
+          </span>
+        </p>
 
         {isLocalMode ? (
           <form className={styles.localForm} onSubmit={(e) => void handleLocalContinue(e)}>

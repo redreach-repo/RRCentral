@@ -146,6 +146,11 @@ export const thStyle: CSSProperties = {
   letterSpacing: '0.04em',
   borderBottom: `1px solid ${colors.border}`,
   whiteSpace: 'nowrap',
+  position: 'sticky',
+  top: 0,
+  background: 'rgba(18, 20, 23, 0.94)',
+  backdropFilter: 'blur(8px)',
+  zIndex: 1,
 }
 
 export const tdStyle: CSSProperties = {

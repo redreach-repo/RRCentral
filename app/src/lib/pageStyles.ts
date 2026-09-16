@@ -129,6 +129,11 @@ export const th: CSSProperties = {
   textTransform: 'uppercase',
   letterSpacing: '0.04em',
   whiteSpace: 'nowrap',
+  position: 'sticky',
+  top: 0,
+  background: 'rgba(18, 20, 23, 0.94)',
+  backdropFilter: 'blur(8px)',
+  zIndex: 1,
 }
 
 export const td: CSSProperties = {

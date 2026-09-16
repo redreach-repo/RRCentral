@@ -91,6 +91,7 @@ export default function App() {
               }
             >
               <Route path="app" element={<DashboardPage />} />
+              <Route path="app/wanders" element={<WandersPage />} />
               <Route path="crm" element={<CrmPage />} />
               <Route path="follow-ups" element={<FollowupsPage />} />
               <Route path="quotations" element={<QuotationsPage />} />
@@ -98,7 +99,6 @@ export default function App() {
               <Route path="catalog" element={<CatalogPage />} />
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="payments" element={<PaymentsPage />} />
-              <Route path="wanders" element={<WandersPage />} />
               <Route path="templates" element={<TemplatesPage />} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="expenses" element={<ExpensesPage />} />

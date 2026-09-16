@@ -16,7 +16,7 @@ body {
   min-height: 100dvh;
   font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
   font-optical-sizing: auto;
-  background: #121417;
+  background: #0e1013;
   color: #f2f4f7;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -79,11 +79,15 @@ img {
 }
 
 :root {
-  --bg: #121417;
+  --bg: #0e1013;
   --sidebar: #1a1d22;
   --accent: #e85d04;
-  --card: rgba(255, 255, 255, 0.06);
+  --accent-soft: #ff9f4a;
+  --card: rgba(255, 255, 255, 0.05);
   --border: rgba(255, 255, 255, 0.12);
   --text: #f2f4f7;
   --muted: rgba(255, 255, 255, 0.5);
+  --success: #22c55e;
+  --danger: #ef4444;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
 }

@@ -26,21 +26,20 @@ import { displayDocumentReference } from '../lib/documents'
 import { hydrateContacts, primaryContact } from '../lib/contacts'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
+import PageHeader from '../components/PageHeader'
 import {
   cardStyle,
   colors,
   dualPanelGridStyle,
   formatMoney,
-  kpiGridStyle,
   pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   sectionTitleStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
 } from '../lib/uiStyles'
+import dash from './DashboardPage.module.css'
 
 interface KpiCardProps {
   label: string
@@ -49,54 +48,33 @@ interface KpiCardProps {
   accent?: string
   hint?: string
   to?: string
+  delay?: number
 }
 
-function KpiCard({ label, value, icon, accent = colors.accent, hint, to }: KpiCardProps) {
+function KpiCard({
+  label,
+  value,
+  icon,
+  accent = colors.accent,
+  hint,
+  to,
+  delay = 0,
+}: KpiCardProps) {
   const inner = (
     <div
+      className={dash.kpi}
       style={{
-        ...cardStyle,
-        display: 'flex',
-        gap: 14,
-        alignItems: 'flex-start',
-        minWidth: 0,
-        background: `linear-gradient(135deg, ${accent}18 0%, ${colors.card} 55%)`,
-        textDecoration: 'none',
-        color: 'inherit',
-        cursor: to ? 'pointer' : undefined,
+        background: `linear-gradient(135deg, ${accent}20 0%, rgba(255,255,255,0.04) 58%)`,
+        animationDelay: `${delay}ms`,
       }}
     >
-      <div
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: 10,
-          background: `${accent}22`,
-          color: accent,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-        }}
-      >
+      <div className={dash.kpiIcon} style={{ background: `${accent}22`, color: accent }}>
         {icon}
       </div>
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>{label}</div>
-        <div
-          style={{
-            fontSize: 20,
-            fontWeight: 700,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-        >
-          {value}
-        </div>
-        {hint ? (
-          <div style={{ fontSize: 11, color: colors.muted2, marginTop: 4 }}>{hint}</div>
-        ) : null}
+        <div className={dash.kpiLabel}>{label}</div>
+        <div className={dash.kpiValue}>{value}</div>
+        {hint ? <div className={dash.kpiHint}>{hint}</div> : null}
       </div>
     </div>
   )
@@ -287,36 +265,40 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div style={pageStyle}>
-        <h1 style={pageTitleStyle}>Dashboard</h1>
-        <p style={pageSubtitleStyle}>Loading metrics…</p>
+      <div className={dash.page} style={pageStyle}>
+        <PageHeader title="Dashboard" subtitle="Loading metrics…" />
       </div>
     )
   }
 
   if (error) {
     return (
-      <div style={pageStyle}>
-        <h1 style={pageTitleStyle}>Dashboard</h1>
+      <div className={dash.page} style={pageStyle}>
+        <PageHeader title="Dashboard" />
         <div style={{ ...cardStyle, color: colors.danger }}>{error}</div>
       </div>
     )
   }
 
   return (
-    <div style={pageStyle}>
-      <h1 style={pageTitleStyle}>Dashboard</h1>
-      <p style={pageSubtitleStyle}>
-        This month ({monthLabel}) — income only counts paid / awarded invoices, not lost quotes
-      </p>
+    <div className={dash.page} style={pageStyle}>
+      <PageHeader
+        title="Dashboard"
+        subtitle={
+          <>
+            This month ({monthLabel}) — income only counts paid / awarded invoices, not lost quotes
+          </>
+        }
+      />
 
-      <div style={kpiGridStyle}>
+      <div className={dash.kpiGrid}>
         <KpiCard
           label={`Income · ${monthLabel}`}
           value={formatMoney(monthIncome)}
           icon={<TrendingUp size={18} />}
           accent="#22c55e"
           hint={`YTD paid ${formatMoney(ytdIncome)}`}
+          delay={40}
         />
         <KpiCard
           label={`Expenses · ${monthLabel}`}
@@ -324,12 +306,14 @@ export default function DashboardPage() {
           icon={<TrendingDown size={18} />}
           accent="#ef4444"
           hint={`YTD ${formatMoney(ytdExpenses)}`}
+          delay={80}
         />
         <KpiCard
           label={`Net · ${monthLabel}`}
           value={formatMoney(monthNet)}
           icon={<Wallet size={18} />}
           accent={monthNet >= 0 ? '#22c55e' : '#ef4444'}
+          delay={120}
         />
         <KpiCard
           label="Open Quotes"
@@ -337,56 +321,52 @@ export default function DashboardPage() {
           icon={<FileText size={18} />}
           accent="#60a5fa"
           hint="Draft / Finalized / Sent"
+          delay={160}
         />
         <KpiCard
           label="Open CRM deals"
           value={String(openPipeline)}
           icon={<Users size={18} />}
-          accent="#a78bfa"
+          accent="#fb923c"
           hint="Not Won / Lost"
           to="/crm"
+          delay={200}
         />
         <KpiCard
           label="Pending Invoices"
           value={String(pendingInvoices)}
           icon={<Receipt size={18} />}
           accent="#facc15"
+          delay={240}
         />
         <KpiCard
           label="Overdue Follow-ups"
           value={String(overdueFollowUps)}
           icon={<AlertTriangle size={18} />}
-          accent="#fb923c"
+          accent="#f97316"
           to="/follow-ups"
+          delay={280}
         />
       </div>
 
-      <div style={{ ...cardStyle, marginBottom: 24 }}>
-        <h2 style={sectionTitleStyle}>CRM pipeline</h2>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+      <div className={dash.panel}>
+        <h2 className={dash.panelTitle}>CRM pipeline</h2>
+        <div className={dash.stageRow}>
           {PIPELINE_STAGES.map((s) => (
             <Link
               key={s}
               to={`/crm?stage=${encodeURIComponent(s)}`}
-              style={{
-                textDecoration: 'none',
-                color: colors.text,
-                border: `1px solid ${colors.border}`,
-                borderRadius: 10,
-                padding: '10px 14px',
-                minWidth: 88,
-                background: 'rgba(255,255,255,0.03)',
-              }}
+              className={dash.stageChip}
             >
-              <div style={{ fontSize: 11, color: colors.muted, marginBottom: 4 }}>{s}</div>
-              <div style={{ fontSize: 20, fontWeight: 700 }}>{pipelineCounts[s] || 0}</div>
+              <div className={dash.stageLabel}>{s}</div>
+              <div className={dash.stageCount}>{pipelineCounts[s] || 0}</div>
             </Link>
           ))}
         </div>
       </div>
 
-      <div style={{ ...cardStyle, marginBottom: 24 }}>
-        <h2 style={sectionTitleStyle}>Division Breakdown</h2>
+      <div className={dash.panel}>
+        <h2 className={dash.panelTitle}>Division Breakdown</h2>
         <div style={tableWrapStyle}>
           <table style={tableStyle}>
             <thead>
