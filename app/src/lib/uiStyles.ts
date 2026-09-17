@@ -171,8 +171,9 @@ export const toolbarStyle: CSSProperties = {
 
 export const selectStyle: CSSProperties = {
   ...inputStyle,
-  width: 'auto',
-  minWidth: 160,
+  width: '100%',
+  minWidth: 0,
+  cursor: 'pointer',
 }
 
 export function formatMoney(amount: number, currency = 'AED'): string {

@@ -304,6 +304,8 @@
   padding-right: max(24px, env(safe-area-inset-right));
   padding-bottom: max(28px, env(safe-area-inset-bottom));
   overflow-x: hidden;
+  container-type: inline-size;
+  container-name: crm-main;
 }
 
 /* Tablet + phone: drawer navigation */
@@ -404,3 +406,40 @@
     padding-right: max(12px, env(safe-area-inset-right));
   }
 }
+
+/* Ultra-narrow / fold-closed */
+@media (max-width: 360px) {
+  .content {
+    padding: 10px 8px;
+    padding-left: max(8px, env(safe-area-inset-left));
+    padding-right: max(8px, env(safe-area-inset-right));
+  }
+
+  .topbar {
+    padding: 0 10px;
+    gap: 8px;
+  }
+
+  .title {
+    font-size: 13px;
+  }
+
+  .menuBtn,
+  .signOutBtn {
+    width: 34px;
+    height: 34px;
+  }
+}
+
+/* Foldable / tall phones in landscape: keep topbar usable */
+@media (max-height: 420px) and (orientation: landscape) {
+  .topbar {
+    height: 48px;
+  }
+
+  .content {
+    padding-top: 12px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+}
+

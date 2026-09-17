@@ -36,6 +36,8 @@ import {
   sortByDateDesc,
 } from '../lib/finance'
 import { deleteFinanceForInvoiceRef, reconcileInvoiceFinance } from '../lib/invoiceFinance'
+import { useCompactCrm } from '../hooks/useMediaQuery'
+import resp from '../styles/crmResponsive.module.css'
 import {
   buttonDangerStyle,
   buttonPrimaryStyle,
@@ -147,6 +149,7 @@ export default function InvoicesPage() {
   const [payHistory, setPayHistory] = useState<PaymentLogEntry[]>([])
   const [divisionCode, setDivisionCode] = useState('01')
   const [payTab, setPayTab] = useState<'All' | 'Pending' | 'Partial' | 'Paid'>('All')
+  const compact = useCompactCrm()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -548,6 +551,40 @@ export default function InvoicesPage() {
     }
   }
 
+  function renderInvoiceActions(inv: Invoice) {
+    return (
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        <button type="button" style={buttonSecondaryStyle} onClick={() => void openEdit(inv)}>
+          <Pencil size={14} />
+        </button>
+        <Link
+          to={`/document/invoice/${inv.id}`}
+          style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}
+        >
+          <ExternalLink size={14} />
+        </Link>
+        {!isCancelledInvoice(inv) && effectiveInvoicePaymentStatus(inv) !== 'Paid' && (
+          <button type="button" style={buttonPrimaryStyle} onClick={() => void openPayment(inv)}>
+            Pay
+          </button>
+        )}
+        {userRole === 'admin' &&
+          !isCancelledInvoice(inv) &&
+          effectiveInvoicePaymentStatus(inv) !== 'Paid' && (
+            <button type="button" style={buttonSecondaryStyle} disabled={saving} onClick={() => void markPaid(inv)}>
+              Mark paid
+            </button>
+          )}
+        <button type="button" style={buttonSecondaryStyle} onClick={() => void duplicate(inv)}>
+          <Copy size={14} />
+        </button>
+        <button type="button" style={buttonDangerStyle} onClick={() => setDeleteTarget(inv)}>
+          <Trash2 size={14} />
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div style={pageStyle}>
       <div style={toolbarStyle}>
@@ -560,22 +597,25 @@ export default function InvoicesPage() {
         </button>
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16, alignItems: 'center' }}>
-        {(['All', 'Pending', 'Partial', 'Paid'] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            style={{
-              ...buttonSecondaryStyle,
-              ...(payTab === t ? { borderColor: colors.accent, color: colors.accent } : null),
-            }}
-            onClick={() => setPayTab(t)}
-          >
-            {t}
-          </button>
-        ))}
+      <div className={resp.toolbar} style={{ marginBottom: 16 }}>
+        <div className={resp.chipRow} style={{ marginBottom: 0, flex: 1 }}>
+          {(['All', 'Pending', 'Partial', 'Paid'] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              style={{
+                ...buttonSecondaryStyle,
+                ...(payTab === t ? { borderColor: colors.accent, color: colors.accent } : null),
+              }}
+              onClick={() => setPayTab(t)}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
         <input
-          style={{ ...inputStyle, maxWidth: 320, marginLeft: 'auto' }}
+          className={resp.toolbarSearch}
+          style={{ ...inputStyle, maxWidth: compact ? '100%' : 320 }}
           placeholder="Search client / ref…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -592,6 +632,32 @@ export default function InvoicesPage() {
           actionLabel="New invoice"
           onAction={openCreate}
         />
+      ) : compact ? (
+        <div className={resp.listStack}>
+          {filtered.map((inv) => (
+            <article key={inv.id} className={resp.card}>
+              <div className={resp.cardTop}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div className={resp.cardTitle} style={{ cursor: 'default' }}>
+                    {inv.reference_number || '—'}
+                  </div>
+                  <div className={resp.cardMeta}>
+                    {inv.client || '—'}
+                    {inv.date ? ` · ${format(new Date(inv.date), 'dd MMM yyyy')}` : ''}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+                  <StatusPill status={inv.status} />
+                  <StatusPill status={effectiveInvoicePaymentStatus(inv)} />
+                </div>
+              </div>
+              <div className={resp.cardMeta} style={{ fontSize: 15, fontWeight: 650, color: colors.text }}>
+                {formatAED(inv.amount)}
+              </div>
+              <div className={resp.cardActions}>{renderInvoiceActions(inv)}</div>
+            </article>
+          ))}
+        </div>
       ) : (
         <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
           <div style={tableWrapStyle}>
@@ -624,38 +690,7 @@ export default function InvoicesPage() {
                     <td style={tdStyle}>
                       <StatusPill status={effectiveInvoicePaymentStatus(inv)} />
                     </td>
-                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                        <button type="button" style={buttonSecondaryStyle} onClick={() => void openEdit(inv)}>
-                          <Pencil size={14} />
-                        </button>
-                        <Link
-                          to={`/document/invoice/${inv.id}`}
-                          style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}
-                        >
-                          <ExternalLink size={14} />
-                        </Link>
-                        {!isCancelledInvoice(inv) &&
-                          effectiveInvoicePaymentStatus(inv) !== 'Paid' && (
-                          <button type="button" style={buttonPrimaryStyle} onClick={() => void openPayment(inv)}>
-                            Pay
-                          </button>
-                        )}
-                        {userRole === 'admin' &&
-                          !isCancelledInvoice(inv) &&
-                          effectiveInvoicePaymentStatus(inv) !== 'Paid' && (
-                          <button type="button" style={buttonSecondaryStyle} disabled={saving} onClick={() => void markPaid(inv)}>
-                            Mark paid
-                          </button>
-                        )}
-                        <button type="button" style={buttonSecondaryStyle} onClick={() => void duplicate(inv)}>
-                          <Copy size={14} />
-                        </button>
-                        <button type="button" style={buttonDangerStyle} onClick={() => setDeleteTarget(inv)}>
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
+                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{renderInvoiceActions(inv)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -762,6 +797,56 @@ export default function InvoicesPage() {
         </div>
 
         <div style={tableWrapStyle}>
+          {compact ? (
+            <div className={resp.lineStack}>
+              {form.items.map((it) => {
+                const line = (Number(it.qty) || 0) * (Number(it.unit_price) || 0) * (1 + vatRate)
+                return (
+                  <div key={it.key} className={resp.lineCard}>
+                    <div className={`${resp.cardField} ${resp.lineCardFull}`}>
+                      <label>Description</label>
+                      <input
+                        style={inputStyle}
+                        value={it.description}
+                        onChange={(e) => updateItem(it.key, { description: e.target.value })}
+                      />
+                    </div>
+                    <div className={resp.cardField}>
+                      <label>Qty</label>
+                      <input
+                        type="number"
+                        style={inputStyle}
+                        value={it.qty}
+                        onChange={(e) => updateItem(it.key, { qty: Number(e.target.value) })}
+                      />
+                    </div>
+                    <div className={resp.cardField}>
+                      <label>Unit price</label>
+                      <input
+                        type="number"
+                        style={inputStyle}
+                        value={it.unit_price}
+                        onChange={(e) => updateItem(it.key, { unit_price: Number(e.target.value) })}
+                      />
+                    </div>
+                    <div className={resp.lineCardActions}>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{formatAED(line)}</div>
+                      <button
+                        type="button"
+                        style={buttonDangerStyle}
+                        disabled={form.items.length <= 1}
+                        onClick={() =>
+                          setForm((f) => ({ ...f, items: f.items.filter((x) => x.key !== it.key) }))
+                        }
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
           <table style={tableStyle}>
             <thead>
               <tr>
@@ -818,9 +903,10 @@ export default function InvoicesPage() {
               })}
             </tbody>
           </table>
+          )}
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 20, marginTop: 12, fontSize: 14 }}>
+        <div className={resp.totalsRow}>
           <span>Subtotal: <strong>{formatAED(totals.subtotal)}</strong></span>
           <span>VAT: <strong>{formatAED(totals.vat)}</strong></span>
           <span>Total: <strong style={{ color: colors.accent }}>{formatAED(totals.total)}</strong></span>

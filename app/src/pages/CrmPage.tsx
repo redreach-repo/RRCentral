@@ -53,6 +53,8 @@ import {
 import EmailComposeModal from '../components/EmailComposeModal'
 import WebsiteInquiriesPanel from '../site/components/WebsiteInquiriesPanel'
 import PageHeader from '../components/PageHeader'
+import { useCompactCrm } from '../hooks/useMediaQuery'
+import resp from '../styles/crmResponsive.module.css'
 import {
   page,
   btn,
@@ -127,7 +129,7 @@ const compactSelect: CSSProperties = {
   fontSize: 12,
   minWidth: 0,
   width: '100%',
-  maxWidth: 140,
+  maxWidth: 160,
 }
 
 function followUpColor(dateStr: string | null): string {
@@ -164,6 +166,7 @@ export default function CrmPage() {
   const [activity, setActivity] = useState<ActivityLogEntry[]>([])
   const [activityLoading, setActivityLoading] = useState(false)
   const [quickBusyId, setQuickBusyId] = useState<string | null>(null)
+  const compact = useCompactCrm()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -448,6 +451,76 @@ export default function CrmPage() {
     }))
   }
 
+  async function openWhatsAppFollowUp(row: CrmEntry) {
+    const p = primaryContact(hydrateContacts(row))
+    const phone = p?.phone || row.mobile_number || ''
+    if (!phone) {
+      showToast('No phone number on this company', 'error')
+      return
+    }
+    setQuickBusyId(row.id)
+    try {
+      const doc = await loadFollowUpDocument(row)
+      const text = buildFollowUpWhatsAppMessage({
+        entry: row,
+        contactName: p?.name,
+        companyName: settings.companyName || 'Red Reach Middle East FZE',
+        doc,
+        quoteTemplate: settings.whatsappFollowUpQuoteMessage || DEFAULT_WHATSAPP_FOLLOWUP_QUOTE,
+        invoiceTemplate:
+          settings.whatsappFollowUpInvoiceMessage || DEFAULT_WHATSAPP_FOLLOWUP_INVOICE,
+        genericTemplate: settings.whatsappCrmMessage || DEFAULT_WHATSAPP_CRM,
+      })
+      window.open(
+        buildWhatsAppUrl(phone, text, settings.whatsappCountryCode || '971'),
+        '_blank',
+        'noopener,noreferrer',
+      )
+      if (doc) {
+        showToast(
+          `WhatsApp ready · ${doc.kind === 'quote' ? 'Quotation' : 'Invoice'} ${doc.ref}`,
+          'success',
+        )
+      }
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not prepare WhatsApp message', 'error')
+    } finally {
+      setQuickBusyId(null)
+    }
+  }
+
+  function renderCrmRowActions(row: CrmEntry) {
+    return (
+      <>
+        <Link
+          to={`/quotations?client=${encodeURIComponent(row.company_name)}&new=1`}
+          style={{ ...btnGhost, display: 'inline-flex', textDecoration: 'none' }}
+          title="Create quote"
+        >
+          <FileText size={14} />
+        </Link>
+        <button type="button" style={btnGhost} onClick={() => setEmailTarget(row)} title="Email">
+          <Mail size={14} />
+        </button>
+        <button
+          type="button"
+          style={btnGhost}
+          title="WhatsApp follow-up"
+          disabled={quickBusyId === row.id}
+          onClick={() => void openWhatsAppFollowUp(row)}
+        >
+          <MessageCircle size={14} />
+        </button>
+        <button type="button" style={btnGhost} onClick={() => openEdit(row)} title="Edit">
+          <Pencil size={14} />
+        </button>
+        <button type="button" style={btnGhost} onClick={() => setDeleteTarget(row)} title="Delete">
+          <Trash2 size={14} />
+        </button>
+      </>
+    )
+  }
+
   function removeContact(id: string) {
     setForm((f) => {
       const next = f.contacts.filter((c) => c.id !== id)
@@ -644,8 +717,8 @@ export default function CrmPage() {
 
       {error && <div style={errorBanner}>{error}</div>}
 
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: 360 }}>
+      <div className={resp.toolbar}>
+        <div className={resp.toolbarSearch}>
           <Search
             size={16}
             style={{
@@ -664,7 +737,7 @@ export default function CrmPage() {
           />
         </div>
         <select
-          style={{ ...input, maxWidth: 180 }}
+          style={{ ...input, flex: '0 1 180px', maxWidth: compact ? '100%' : 180 }}
           value={ownerFilter}
           onChange={(e) => setOwnerFilter(e.target.value)}
           title="Sales owner"
@@ -679,7 +752,7 @@ export default function CrmPage() {
         </select>
       </div>
 
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+      <div className={resp.chipRow}>
         <button type="button" style={chip(stageFilter === 'All')} onClick={() => setStageFilter('All')}>
           All ({stageCounts.All || 0})
         </button>
@@ -695,7 +768,7 @@ export default function CrmPage() {
         ))}
       </div>
 
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      <div className={resp.chipRow}>
         {(['All', 'Overdue', 'Today', 'Upcoming', 'None'] as FollowFilter[]).map((f) => (
           <button key={f} type="button" style={chip(followFilter === f)} onClick={() => setFollowFilter(f)}>
             {f === 'All' ? 'Any follow-up' : f}
@@ -719,6 +792,104 @@ export default function CrmPage() {
           {search || stageFilter !== 'All' || ownerFilter !== 'All' || followFilter !== 'All'
             ? 'No companies match your filters.'
             : 'No CRM entries yet. Add your first company.'}
+        </div>
+      ) : compact ? (
+        <div className={resp.listStack}>
+          {filtered.map((row) => {
+            const contacts = hydrateContacts(row)
+            const display = contactDisplay(contacts)
+            const p = primaryContact(contacts)
+            const busy = quickBusyId === row.id
+            return (
+              <article key={row.id} className={resp.card}>
+                <div className={resp.cardTop}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <button type="button" className={resp.cardTitle} onClick={() => openEdit(row)}>
+                      {row.company_name}
+                    </button>
+                    <div className={resp.cardMeta}>
+                      {display.label}
+                      {display.extra > 0 ? ` · +${display.extra}` : ''}
+                      {row.company_owner ? ` · Owner ${row.company_owner}` : ''}
+                    </div>
+                  </div>
+                  {row.quote_ref ? (
+                    <Link
+                      to={`/quotations?ref=${encodeURIComponent(row.quote_ref)}`}
+                      style={{
+                        color: colors.accent,
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        fontSize: 12,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {row.quote_ref} <ExternalLink size={12} />
+                    </Link>
+                  ) : null}
+                </div>
+                <div className={resp.cardGrid}>
+                  <div className={resp.cardField}>
+                    <label>Stage</label>
+                    <select
+                      style={compactSelect}
+                      disabled={busy}
+                      value={row.pipeline_stage || 'Lead'}
+                      onChange={(e) => void quickPatch(row, { pipeline_stage: e.target.value })}
+                    >
+                      {PIPELINE_STAGES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className={resp.cardField}>
+                    <label>Follow-up</label>
+                    <input
+                      type="date"
+                      style={{
+                        ...compactSelect,
+                        color: followUpColor(row.follow_up_date),
+                        fontWeight: 600,
+                      }}
+                      disabled={busy}
+                      value={row.follow_up_date ? row.follow_up_date.slice(0, 10) : ''}
+                      onChange={(e) =>
+                        void quickPatch(row, { follow_up_date: e.target.value || null })
+                      }
+                    />
+                  </div>
+                  <div className={resp.cardField}>
+                    <label>Next action</label>
+                    <select
+                      style={compactSelect}
+                      disabled={busy}
+                      value={row.next_action || ''}
+                      onChange={(e) => void quickPatch(row, { next_action: e.target.value })}
+                    >
+                      <option value="">—</option>
+                      {NEXT_ACTIONS.map((a) => (
+                        <option key={a} value={a}>
+                          {a}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className={resp.cardField}>
+                    <label>Phone</label>
+                    <div style={{ fontSize: 13, color: colors.text, paddingTop: 6 }}>
+                      {p?.phone || row.mobile_number || row.office_number || '—'}
+                    </div>
+                  </div>
+                </div>
+                <div className={resp.cardMeta}>Sales: {row.owner || 'Unassigned'}</div>
+                <div className={resp.cardActions}>{renderCrmRowActions(row)}</div>
+              </article>
+            )
+          })}
         </div>
       ) : (
         <div style={tableWrap}>
@@ -838,87 +1009,7 @@ export default function CrmPage() {
                         '—'
                       )}
                     </td>
-                    <td style={{ ...td, whiteSpace: 'nowrap' }}>
-                      <Link
-                        to={`/quotations?client=${encodeURIComponent(row.company_name)}&new=1`}
-                        style={{ ...btnGhost, display: 'inline-flex', textDecoration: 'none' }}
-                        title="Create quote"
-                      >
-                        <FileText size={14} />
-                      </Link>
-                      <button
-                        type="button"
-                        style={btnGhost}
-                        onClick={() => setEmailTarget(row)}
-                        title="Email"
-                      >
-                        <Mail size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        style={btnGhost}
-                        title="WhatsApp follow-up"
-                        disabled={quickBusyId === row.id}
-                        onClick={() => {
-                          void (async () => {
-                            const p = primaryContact(hydrateContacts(row))
-                            const phone = p?.phone || row.mobile_number || ''
-                            if (!phone) {
-                              showToast('No phone number on this company', 'error')
-                              return
-                            }
-                            setQuickBusyId(row.id)
-                            try {
-                              const doc = await loadFollowUpDocument(row)
-                              const text = buildFollowUpWhatsAppMessage({
-                                entry: row,
-                                contactName: p?.name,
-                                companyName: settings.companyName || 'Red Reach Middle East FZE',
-                                doc,
-                                quoteTemplate:
-                                  settings.whatsappFollowUpQuoteMessage ||
-                                  DEFAULT_WHATSAPP_FOLLOWUP_QUOTE,
-                                invoiceTemplate:
-                                  settings.whatsappFollowUpInvoiceMessage ||
-                                  DEFAULT_WHATSAPP_FOLLOWUP_INVOICE,
-                                genericTemplate: settings.whatsappCrmMessage || DEFAULT_WHATSAPP_CRM,
-                              })
-                              window.open(
-                                buildWhatsAppUrl(phone, text, settings.whatsappCountryCode || '971'),
-                                '_blank',
-                                'noopener,noreferrer',
-                              )
-                              if (doc) {
-                                showToast(
-                                  `WhatsApp ready · ${doc.kind === 'quote' ? 'Quotation' : 'Invoice'} ${doc.ref}`,
-                                  'success',
-                                )
-                              }
-                            } catch (e) {
-                              showToast(
-                                e instanceof Error ? e.message : 'Could not prepare WhatsApp message',
-                                'error',
-                              )
-                            } finally {
-                              setQuickBusyId(null)
-                            }
-                          })()
-                        }}
-                      >
-                        <MessageCircle size={14} />
-                      </button>
-                      <button type="button" style={btnGhost} onClick={() => openEdit(row)} title="Edit">
-                        <Pencil size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        style={btnGhost}
-                        onClick={() => setDeleteTarget(row)}
-                        title="Delete"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
+                    <td style={{ ...td, whiteSpace: 'nowrap' }}>{renderCrmRowActions(row)}</td>
                   </tr>
                 )
               })}
@@ -928,8 +1019,26 @@ export default function CrmPage() {
       )}
 
       {modalOpen && (
-        <div style={overlay} onClick={closeModal}>
-          <div style={{ ...modal, maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
+        <div
+          style={{
+            ...overlay,
+            alignItems: compact ? 'stretch' : 'center',
+            padding: compact
+              ? 'max(0px, env(safe-area-inset-top)) 0 max(0px, env(safe-area-inset-bottom)) 0'
+              : overlay.padding,
+          }}
+          onClick={closeModal}
+        >
+          <div
+            style={{
+              ...modal,
+              maxWidth: compact ? '100%' : 720,
+              maxHeight: compact ? '100dvh' : '90vh',
+              minHeight: compact ? '100dvh' : undefined,
+              borderRadius: compact ? 0 : 14,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div style={modalHeader}>
               <h3 style={{ margin: 0, fontSize: 16 }}>{editing ? 'Edit company' : 'Add company'}</h3>
               <button type="button" style={btnGhost} onClick={closeModal}>
