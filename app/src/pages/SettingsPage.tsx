@@ -12,6 +12,7 @@ import {
   resetSheetsImportFlag,
 } from '../lib/migrateFromSheets'
 import { clearLocalData, DB_NAME, exportLocalDump } from '../lib/localDb'
+import { importCloudDumpFromFile } from '../lib/importCloudDump'
 import { testZohoConnection } from '../lib/zoho'
 import {
   clearSupabaseRuntimeConfig,
@@ -170,6 +171,7 @@ export default function SettingsPage() {
   const [testingZoho, setTestingZoho] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const backupRef = useRef<HTMLInputElement>(null)
+  const cloudBackupRef = useRef<HTMLInputElement>(null)
   const runtimeCfg = getSupabaseRuntimeConfig()
   const [supabaseUrl, setSupabaseUrl] = useState(runtimeCfg.source === 'runtime' ? runtimeCfg.url : '')
   const [supabaseKey, setSupabaseKey] = useState(
@@ -287,6 +289,30 @@ export default function SettingsPage() {
       window.location.reload()
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Restore failed', 'error')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  async function handleCloudBackupUpload(file: File | null) {
+    if (!file) return
+    if (
+      !window.confirm(
+        'Upload this backup into Supabase? Existing matching rows are updated; new rows are inserted.',
+      )
+    ) {
+      return
+    }
+    setImporting(true)
+    try {
+      const counts = await importCloudDumpFromFile(file)
+      showToast(
+        `Uploaded to cloud: ${counts.crm || 0} CRM, ${counts.quotations || 0} quotes, ${counts.invoices || 0} invoices`,
+        'success',
+      )
+      window.setTimeout(() => window.location.reload(), 700)
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Cloud upload failed', 'error')
     } finally {
       setImporting(false)
     }
@@ -565,6 +591,28 @@ export default function SettingsPage() {
               <br />
               Business data is stored in your Supabase Postgres project. Auth uses Google OAuth via
               Supabase.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+              <button
+                type="button"
+                style={buttonPrimaryStyle}
+                disabled={importing}
+                onClick={() => cloudBackupRef.current?.click()}
+              >
+                <Upload size={14} />
+                {importing ? 'Uploading…' : 'Upload backup JSON to cloud'}
+              </button>
+              <input
+                ref={cloudBackupRef}
+                type="file"
+                accept="application/json,.json"
+                style={{ display: 'none' }}
+                onChange={(e) => void handleCloudBackupUpload(e.target.files?.[0] || null)}
+              />
+            </div>
+            <p style={{ color: colors.muted2, fontSize: 12, marginTop: 0, lineHeight: 1.5 }}>
+              Use the backup file you downloaded while in local mode. This copies CRM, quotes, invoices,
+              and related tables into Supabase.
             </p>
             {runtimeCfg.source === 'runtime' ? (
               <button type="button" style={buttonSecondaryStyle} onClick={disconnectSupabase}>
