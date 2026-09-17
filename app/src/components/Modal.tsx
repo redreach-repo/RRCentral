@@ -15,10 +15,12 @@ const overlayStyle: CSSProperties = {
   inset: 0,
   background: 'rgba(0,0,0,0.65)',
   display: 'flex',
-  alignItems: 'center',
+  alignItems: 'flex-start',
   justifyContent: 'center',
   zIndex: 1000,
-  padding: 16,
+  padding: 'max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left))',
+  overflowY: 'auto',
+  WebkitOverflowScrolling: 'touch',
   animation: 'rrModalFadeIn 160ms ease-out',
 }
 

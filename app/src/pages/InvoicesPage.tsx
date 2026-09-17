@@ -146,6 +146,7 @@ export default function InvoicesPage() {
   const [payNotes, setPayNotes] = useState('')
   const [payHistory, setPayHistory] = useState<PaymentLogEntry[]>([])
   const [divisionCode, setDivisionCode] = useState('01')
+  const [payTab, setPayTab] = useState<'All' | 'Pending' | 'Partial' | 'Paid'>('All')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -194,14 +195,19 @@ export default function InvoicesPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return invoices
-    return invoices.filter(
-      (i) =>
+    return invoices.filter((i) => {
+      if (payTab !== 'All') {
+        const pay = effectiveInvoicePaymentStatus(i)
+        if (pay !== payTab) return false
+      }
+      if (!q) return true
+      return (
         i.client.toLowerCase().includes(q) ||
         i.reference_number.toLowerCase().includes(q) ||
-        i.description.toLowerCase().includes(q),
-    )
-  }, [invoices, search])
+        i.description.toLowerCase().includes(q)
+      )
+    })
+  }, [invoices, search, payTab])
 
   const totals = useMemo(() => calcTotals(form.items, vatRate), [form.items, vatRate])
 
@@ -554,12 +560,27 @@ export default function InvoicesPage() {
         </button>
       </div>
 
-      <input
-        style={{ ...inputStyle, maxWidth: 320, marginBottom: 16 }}
-        placeholder="Search client / ref…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16, alignItems: 'center' }}>
+        {(['All', 'Pending', 'Partial', 'Paid'] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            style={{
+              ...buttonSecondaryStyle,
+              ...(payTab === t ? { borderColor: colors.accent, color: colors.accent } : null),
+            }}
+            onClick={() => setPayTab(t)}
+          >
+            {t}
+          </button>
+        ))}
+        <input
+          style={{ ...inputStyle, maxWidth: 320, marginLeft: 'auto' }}
+          placeholder="Search client / ref…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
 
       {loading ? (
         <div style={{ ...cardStyle, color: colors.muted }}>Loading invoices…</div>
@@ -644,7 +665,7 @@ export default function InvoicesPage() {
       )}
 
       <Modal open={editorOpen} title={editing ? 'Edit invoice' : 'New invoice'} onClose={() => setEditorOpen(false)} width={920}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: 12 }}>
           <div style={fieldStyle}>
             <label style={labelStyle}>Client *</label>
             <input

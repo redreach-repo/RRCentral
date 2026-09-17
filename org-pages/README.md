@@ -1,24 +1,37 @@
-# Fix `redreach-repo.github.io` 404
+# Fix bare `redreach-repo.github.io` 404 + optional custom domain
 
-GitHub Pages for **RRCentral** lives at:
+## A. Org redirect (fixes empty github.io root)
 
-**https://redreach-repo.github.io/RRCentral/**
+1. Create a **new public repo** named exactly: `redreach-repo.github.io`
+2. Upload this folder’s `index.html` as the repo root (or push this folder’s contents to `main`)
+3. Repo → **Settings → Pages** → Source: Deploy from branch → `main` / `/ (root)`
+4. Wait ~1 minute → open https://redreach-repo.github.io/ — it should redirect to Central
 
-The bare org URL (`https://redreach-repo.github.io/`) is a *different* site. It stays empty (404) until you publish an **organization Pages** repo.
+## B. Custom domain `crm.redreach.ae` (optional)
 
-## One-time setup (2 minutes)
+### DNS (Hostinger or your DNS host)
+Add a **CNAME** record:
 
-1. Create a new public repo named exactly: **`redreach-repo.github.io`**
-2. Upload (or push) the `index.html` from this folder as the repo root
-3. Settings → Pages → Source: **Deploy from a branch** → `main` / root
-4. Wait ~1 minute, then open https://redreach-repo.github.io/ — it should redirect into Central
+| Type | Name | Target |
+|------|------|--------|
+| CNAME | `crm` | `redreach-repo.github.io` |
 
-## Bookmark the real CRM
+### GitHub (RRCentral project Pages)
+1. https://github.com/redreach-repo/RRCentral/settings/pages  
+2. **Custom domain:** `crm.redreach.ae` → Save  
+3. Wait for DNS check → enable **Enforce HTTPS**
+
+### App base path
+Today the app is built with base `/RRCentral/`. After a custom domain points at the **same** Pages site, URLs become:
+
+`https://crm.redreach.ae/RRCentral/login`
+
+To serve at domain root (`https://crm.redreach.ae/login`) you must change Vite `base` + React `basename` to `/` and redeploy — ask the team when ready.
+
+## Bookmark URLs (until custom domain)
 
 | What | URL |
 |------|-----|
-| Home / marketing | https://redreach-repo.github.io/RRCentral/ |
-| Sign in | https://redreach-repo.github.io/RRCentral/login |
+| Central home | https://redreach-repo.github.io/RRCentral/ |
+| Login | https://redreach-repo.github.io/RRCentral/login |
 | Dashboard | https://redreach-repo.github.io/RRCentral/app |
-
-Optional later: point `crm.redreach.ae` (or `app.redreach.ae`) at GitHub Pages and set Vite `base` + router `basename` to `/`.
