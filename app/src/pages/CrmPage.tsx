@@ -491,6 +491,22 @@ export default function CrmPage() {
       setError('Company name is required')
       return
     }
+    const stage = form.pipeline_stage || 'Lead'
+    const closed = stage === 'Won' || stage === 'Lost'
+    if (!closed) {
+      if (!form.follow_up_date) {
+        setError('Follow-up date is required for open deals')
+        return
+      }
+      if (!form.next_action.trim()) {
+        setError('Next action is required for open deals')
+        return
+      }
+    }
+    if (closed && !form.outcome_reason.trim()) {
+      setError(`${stage} reason is required`)
+      return
+    }
     setSaving(true)
     setError('')
     const who = user?.email || ''
@@ -511,7 +527,7 @@ export default function CrmPage() {
       follow_up_date: followUpDate,
       next_action: form.next_action,
       owner: form.owner,
-      pipeline_stage: form.pipeline_stage || 'Lead',
+      pipeline_stage: stage,
       quote_ref: form.quote_ref.trim(),
       outcome_reason: form.outcome_reason.trim(),
       updated_by: who,
@@ -616,7 +632,7 @@ export default function CrmPage() {
     <div style={page}>
       <PageHeader
         title="CRM"
-        subtitle="Companies, contacts, owners, and pipeline — quote, follow up, close"
+        subtitle="Open deals need a follow-up date and next action. Close Won/Lost with a reason."
         actions={
           <button type="button" style={btnPrimary} onClick={openCreate}>
             <Plus size={16} /> Add company
@@ -961,21 +977,23 @@ export default function CrmPage() {
                       onChange={(e) => setForm((f) => ({ ...f, trn: e.target.value }))}
                     />
                   </Field>
-                  <Field label="Follow-up date">
+                  <Field label="Follow-up date *">
                     <input
                       type="date"
                       style={input}
                       value={form.follow_up_date}
+                      required={form.pipeline_stage !== 'Won' && form.pipeline_stage !== 'Lost'}
                       onChange={(e) => setForm((f) => ({ ...f, follow_up_date: e.target.value }))}
                     />
                   </Field>
-                  <Field label="Next action">
+                  <Field label="Next action *">
                     <select
                       style={input}
                       value={form.next_action}
+                      required={form.pipeline_stage !== 'Won' && form.pipeline_stage !== 'Lost'}
                       onChange={(e) => setForm((f) => ({ ...f, next_action: e.target.value }))}
                     >
-                      <option value="">—</option>
+                      <option value="">Select next action…</option>
                       {NEXT_ACTIONS.map((a) => (
                         <option key={a} value={a}>
                           {a}

@@ -51,6 +51,8 @@ Until Supabase is connected, the orange banner means **local mode** (data stays 
 
 See [`org-pages/README.md`](./org-pages/README.md) — publish that tiny redirect as `redreach-repo.github.io` so the bare domain sends people into Central.
 
+Team setup checklist (secrets, teammates, backup upload, custom domain): [`docs/TEAM_SETUP.md`](./docs/TEAM_SETUP.md).
+
 ## Apps
 
 | App | Path | Stack |

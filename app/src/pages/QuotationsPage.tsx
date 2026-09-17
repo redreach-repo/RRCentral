@@ -815,6 +815,8 @@ export default function QuotationsPage() {
       const sub = calcTotals(draftItems, vatRate)
       const amount = sub.total
 
+      const depositNote =
+        pct < 100 ? `\nInvoice type: ${pct}% deposit of quotation` : '\nInvoice type: Full amount'
       const discountNote =
         Number(q.discount_percent) || Number(q.discount_amount)
           ? `\nDiscount applied from quotation: ${Number(q.discount_percent) || 0}%` +
@@ -826,13 +828,16 @@ export default function QuotationsPage() {
         vertical: q.vertical,
         reference_number: q.reference_number,
         date: format(new Date(), 'yyyy-MM-dd'),
-        description: q.description,
+        description:
+          pct < 100
+            ? `${q.description} (${pct}% deposit)`.trim()
+            : q.description,
         amount,
         status: 'Sent',
         payment_status: 'Pending',
         payment_terms: q.payment_terms,
         moq: q.moq,
-        notes: (q.notes || '') + discountNote,
+        notes: (q.notes || '') + depositNote + discountNote,
         delivery_terms: q.delivery_terms,
         created_by: who,
         updated_by: who,
@@ -852,17 +857,17 @@ export default function QuotationsPage() {
         showToast('Invoice created, but inventory commit failed', 'error')
       }
 
-      // Sync income (no unique constraint on reference_number — select then insert/update)
+      // Sync income (align with InvoicesPage syncIncome: Open until Paid)
       const incomePayload = {
         client_source: q.client,
         category: q.vertical,
         reference_number: q.reference_number,
         date: format(new Date(), 'yyyy-MM-dd'),
-        description: q.description,
+        description: pct < 100 ? `${q.description} (${pct}% deposit)`.trim() : q.description,
         bill_amount: sub.taxable,
         vat: sub.vat,
         total_amount: sub.total,
-        status: 'Sent',
+        status: 'Open',
         payment_method: settings.paymentMethod || '',
         payment_status: 'Pending',
       }
@@ -1041,7 +1046,7 @@ export default function QuotationsPage() {
         onClose={() => setEditorOpen(false)}
         width={920}
       >
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: 12 }}>
           <div style={{ ...fieldStyle, position: 'relative' }}>
             <label style={labelStyle}>Client *</label>
             <input
@@ -1671,11 +1676,36 @@ export default function QuotationsPage() {
       </Modal>
 
       <Modal open={!!convertTarget} title="Convert to invoice" onClose={() => setConvertTarget(null)} width={440}>
-        <p style={{ color: colors.muted, fontSize: 14, marginTop: 0 }}>
-          Create invoice from <strong style={{ color: colors.text }}>{convertTarget?.reference_number}</strong>
+        <p style={{ color: colors.muted, fontSize: 14, marginTop: 0, lineHeight: 1.5 }}>
+          Create invoice from{' '}
+          <strong style={{ color: colors.text }}>{convertTarget?.reference_number}</strong>
+          . Payment stays <strong style={{ color: colors.text }}>Pending</strong> until you record
+          payment on Invoices. Income is recognized when marked Paid.
         </p>
         <div style={fieldStyle}>
-          <label style={labelStyle}>Deposit % (of line amounts)</label>
+          <label style={labelStyle}>Invoice amount</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+            {[
+              { label: '30% deposit', value: '30' },
+              { label: '50% deposit', value: '50' },
+              { label: 'Full 100%', value: '100' },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                style={{
+                  ...buttonSecondaryStyle,
+                  ...(depositPct === opt.value
+                    ? { borderColor: colors.accent, color: colors.accent }
+                    : null),
+                }}
+                onClick={() => setDepositPct(opt.value)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <label style={labelStyle}>Or custom deposit %</label>
           <input
             type="number"
             min={1}

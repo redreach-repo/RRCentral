@@ -614,6 +614,11 @@ export default function SettingsPage() {
               Use the backup file you downloaded while in local mode. This copies CRM, quotes, invoices,
               and related tables into Supabase.
             </p>
+            <p style={{ color: colors.muted2, fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>
+              To make cloud automatic on every phone, add GitHub Actions secrets{' '}
+              <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code>, then redeploy. After
+              that, teammates can stop using local mode.
+            </p>
             {runtimeCfg.source === 'runtime' ? (
               <button type="button" style={buttonSecondaryStyle} onClick={disconnectSupabase}>
                 Disconnect cloud (back to local)
@@ -793,8 +798,16 @@ export default function SettingsPage() {
       )}
 
       <div style={cardStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h2 style={{ ...sectionTitleStyle, margin: 0 }}>User management</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+          <div>
+            <h2 style={{ ...sectionTitleStyle, margin: 0 }}>User management</h2>
+            <p style={{ color: colors.muted2, fontSize: 12, margin: '6px 0 0', maxWidth: 560, lineHeight: 1.5 }}>
+              Add teammates here with role <strong style={{ color: colors.text }}>admin</strong> or{' '}
+              <strong style={{ color: colors.text }}>sales</strong>. They sign in with Google using the same
+              email. In Supabase → Authentication you can also invite/allow their Google account; Central uses
+              this list for CRM owner dropdowns and admin access.
+            </p>
+          </div>
           <button type="button" style={buttonPrimaryStyle} onClick={openUserCreate}>
             <Plus size={16} /> Add user
           </button>
@@ -857,8 +870,8 @@ export default function SettingsPage() {
             value={userForm.role}
             onChange={(e) => setUserForm((f) => ({ ...f, role: e.target.value as UserRole }))}
           >
-            <option value="sales">sales</option>
-            <option value="admin">admin</option>
+            <option value="sales">sales — CRM, quotes, invoices</option>
+            <option value="admin">admin — Settings, users, Mark paid</option>
           </select>
         </div>
         <div style={{ ...fieldStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
