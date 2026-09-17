@@ -116,7 +116,7 @@ export const table: CSSProperties = {
   width: '100%',
   borderCollapse: 'collapse',
   fontSize: 13,
-  minWidth: 560,
+  minWidth: 0,
 }
 
 export const th: CSSProperties = {

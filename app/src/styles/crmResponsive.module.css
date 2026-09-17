@@ -1,0 +1,177 @@
+/* Shared CRM responsive surfaces — phones, tablets, foldables */
+
+.listStack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cardTitle {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  word-break: break-word;
+  background: none;
+  border: none;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.cardMeta {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px 10px;
+}
+
+.cardField {
+  min-width: 0;
+}
+
+.cardField label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 4px;
+}
+
+.cardField :global(select),
+.cardField :global(input) {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+.cardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.toolbarSearch {
+  flex: 1 1 160px;
+  min-width: 0;
+  max-width: 100%;
+  position: relative;
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.lineStack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lineCard {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  min-width: 0;
+}
+
+.lineCardFull {
+  grid-column: 1 / -1;
+}
+
+.lineCardActions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.totalsRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px 20px;
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .cardActions :global(button),
+  .cardActions :global(a),
+  .lineCardActions :global(button) {
+    min-height: 40px;
+    min-width: 40px;
+  }
+}
+
+@media (max-width: 360px) {
+  .card {
+    padding: 12px;
+    border-radius: 12px;
+  }
+}
+
+/* Fold open / tablet pane: 2-col field grids when content is wide enough */
+@container crm-main (min-width: 420px) {
+  .cardGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .lineCard {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container crm-main (min-width: 640px) {
+  .lineCard {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+

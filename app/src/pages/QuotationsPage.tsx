@@ -59,6 +59,8 @@ import { approveFxRate, quotationCurrencyDefaults } from '../lib/customerPayment
 import { getDivisionQuoteFormat } from '../lib/divisionQuoteFormats'
 import { ensureDivisionCataloguesSeeded } from '../lib/syncDivisionCatalogues'
 import { CONNECT_PARTNER } from '../lib/seedDivisionCatalogues'
+import { useCompactCrm } from '../hooks/useMediaQuery'
+import resp from '../styles/crmResponsive.module.css'
 import {
   buttonDangerStyle,
   buttonPrimaryStyle,
@@ -172,6 +174,7 @@ export default function QuotationsPage() {
   const [convertTarget, setConvertTarget] = useState<Quotation | null>(null)
   const [depositPct, setDepositPct] = useState('100')
   const [clientSuggest, setClientSuggest] = useState(false)
+  const compact = useCompactCrm()
 
   const vatRate = Number(settings.vatRate || VAT_RATE) || VAT_RATE
   const quotePrefix = settings.quotePrefix || 'RR'
@@ -902,6 +905,71 @@ export default function QuotationsPage() {
     .filter((c) => c.company_name.toLowerCase().includes(form.client.toLowerCase()))
     .slice(0, 8)
 
+  function renderQuoteActions(q: Quotation) {
+    return (
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        <button type="button" style={buttonSecondaryStyle} onClick={() => void openEdit(q)} title="Edit">
+          <Pencil size={14} />
+        </button>
+        {(q.reference_number || q.id) && (
+          <Link
+            to={`/document/quote/${q.id}`}
+            style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}
+            title="View / email PDF"
+          >
+            <ExternalLink size={14} /> {compact ? '' : 'PDF / Email'}
+          </Link>
+        )}
+        {q.status === 'Draft' && (
+          <button type="button" style={buttonPrimaryStyle} disabled={saving} onClick={() => void finalize(q)}>
+            Finalize
+          </button>
+        )}
+        {q.status === 'Finalized' && (
+          <>
+            <button type="button" style={buttonSecondaryStyle} disabled={saving} onClick={() => void undoFinalize(q)} title="Undo finalize">
+              <RotateCcw size={14} />
+            </button>
+            <button type="button" style={buttonSecondaryStyle} disabled={saving} onClick={() => void revise(q)}>
+              Revise
+            </button>
+          </>
+        )}
+        {['Finalized', 'Sent', 'Awarded'].includes(q.status) && (
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            onClick={() => {
+              setOutcomeTarget(q)
+              setOutcomeStatus('Awarded')
+              setOutcomeReason(q.outcome_reason || '')
+            }}
+          >
+            Outcome
+          </button>
+        )}
+        {q.status === 'Awarded' && q.reference_number && (
+          <button
+            type="button"
+            style={buttonPrimaryStyle}
+            onClick={() => {
+              setConvertTarget(q)
+              setDepositPct('100')
+            }}
+          >
+            <Receipt size={14} /> Invoice
+          </button>
+        )}
+        <button type="button" style={buttonSecondaryStyle} disabled={saving} onClick={() => void duplicate(q)} title="Duplicate">
+          <Copy size={14} />
+        </button>
+        <button type="button" style={buttonDangerStyle} onClick={() => setDeleteTarget(q)} title="Delete">
+          <Trash2 size={14} />
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div style={pageStyle}>
       <div style={toolbarStyle}>
@@ -914,14 +982,17 @@ export default function QuotationsPage() {
         </button>
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-        {(['All', 'Draft', 'Finalized', 'Sent', 'Awarded'] as StatusTab[]).map((t) => (
-          <button key={t} type="button" style={tabBtn(tab === t)} onClick={() => setTab(t)}>
-            {t}
-          </button>
-        ))}
+      <div className={resp.toolbar} style={{ marginBottom: 16 }}>
+        <div className={resp.chipRow} style={{ marginBottom: 0, flex: 1 }}>
+          {(['All', 'Draft', 'Finalized', 'Sent', 'Awarded'] as StatusTab[]).map((t) => (
+            <button key={t} type="button" style={tabBtn(tab === t)} onClick={() => setTab(t)}>
+              {t}
+            </button>
+          ))}
+        </div>
         <input
-          style={{ ...inputStyle, maxWidth: 260, marginLeft: 'auto' }}
+          className={resp.toolbarSearch}
+          style={{ ...inputStyle, maxWidth: compact ? '100%' : 260 }}
           placeholder="Search client / ref…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -938,6 +1009,34 @@ export default function QuotationsPage() {
           actionLabel="New quotation"
           onAction={() => void openCreate()}
         />
+      ) : compact ? (
+        <div className={resp.listStack}>
+          {filtered.map((q) => (
+            <article key={q.id} className={resp.card}>
+              <div className={resp.cardTop}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div className={resp.cardTitle} style={{ cursor: 'default' }}>
+                    {q.reference_number || <span style={{ color: colors.muted2 }}>DRAFT</span>}
+                  </div>
+                  <div className={resp.cardMeta}>
+                    {q.client || '—'}
+                    {' · '}
+                    {q.vertical || divisionBrand(q.division_code)}
+                    {q.date ? ` · ${format(new Date(q.date), 'dd MMM yyyy')}` : ''}
+                  </div>
+                  {q.valid_until && q.reference_number ? (
+                    <div className={resp.cardMeta}>Valid until {format(new Date(q.valid_until), 'dd MMM yyyy')}</div>
+                  ) : null}
+                </div>
+                <StatusPill status={q.status} />
+              </div>
+              <div className={resp.cardMeta} style={{ fontSize: 15, fontWeight: 650, color: colors.text }}>
+                {formatAED(q.amount)}
+              </div>
+              <div className={resp.cardActions}>{renderQuoteActions(q)}</div>
+            </article>
+          ))}
+        </div>
       ) : (
         <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
           <div style={tableWrapStyle}>
@@ -975,68 +1074,7 @@ export default function QuotationsPage() {
                     <td style={tdStyle}>
                       <StatusPill status={q.status} />
                     </td>
-                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                        <button type="button" style={buttonSecondaryStyle} onClick={() => void openEdit(q)} title="Edit">
-                          <Pencil size={14} />
-                        </button>
-                        {(q.reference_number || q.id) && (
-                          <Link
-                            to={`/document/quote/${q.id}`}
-                            style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}
-                            title="View / email PDF"
-                          >
-                            <ExternalLink size={14} /> PDF / Email
-                          </Link>
-                        )}
-                        {q.status === 'Draft' && (
-                          <button type="button" style={buttonPrimaryStyle} disabled={saving} onClick={() => void finalize(q)}>
-                            Finalize
-                          </button>
-                        )}
-                        {q.status === 'Finalized' && (
-                          <>
-                            <button type="button" style={buttonSecondaryStyle} disabled={saving} onClick={() => void undoFinalize(q)} title="Undo finalize">
-                              <RotateCcw size={14} />
-                            </button>
-                            <button type="button" style={buttonSecondaryStyle} disabled={saving} onClick={() => void revise(q)}>
-                              Revise
-                            </button>
-                          </>
-                        )}
-                        {['Finalized', 'Sent', 'Awarded'].includes(q.status) && (
-                          <button
-                            type="button"
-                            style={buttonSecondaryStyle}
-                            onClick={() => {
-                              setOutcomeTarget(q)
-                              setOutcomeStatus('Awarded')
-                              setOutcomeReason(q.outcome_reason || '')
-                            }}
-                          >
-                            Outcome
-                          </button>
-                        )}
-                        {q.status === 'Awarded' && q.reference_number && (
-                          <button
-                            type="button"
-                            style={buttonPrimaryStyle}
-                            onClick={() => {
-                              setConvertTarget(q)
-                              setDepositPct('100')
-                            }}
-                          >
-                            <Receipt size={14} /> Invoice
-                          </button>
-                        )}
-                        <button type="button" style={buttonSecondaryStyle} disabled={saving} onClick={() => void duplicate(q)} title="Duplicate">
-                          <Copy size={14} />
-                        </button>
-                        <button type="button" style={buttonDangerStyle} onClick={() => setDeleteTarget(q)} title="Delete">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
+                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{renderQuoteActions(q)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1194,7 +1232,17 @@ export default function QuotationsPage() {
           />
         </div>
 
-        <div style={{ marginTop: 8, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div
+          style={{
+            marginTop: 8,
+            marginBottom: 8,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 8,
+            flexWrap: 'wrap',
+          }}
+        >
           <strong style={{ fontSize: 14 }}>Line items</strong>
           <div style={{ display: 'flex', gap: 8 }}>
             {divisionProducts.length > 0 && (
@@ -1242,6 +1290,119 @@ export default function QuotationsPage() {
         </div>
 
         <div style={tableWrapStyle}>
+          {compact ? (
+            <div className={resp.lineStack}>
+              {form.items.map((it) => {
+                const qty = effectiveQty(it)
+                const amount = qty * (Number(it.unit_price) || 0)
+                const vat = amount * vatRate
+                const lineTotal = amount + vat
+                const lineCost = qty * (Number(it.unit_cost) || 0)
+                return (
+                  <div key={it.key} className={resp.lineCard}>
+                    <div className={`${resp.cardField} ${resp.lineCardFull}`}>
+                      <label>Description</label>
+                      <input
+                        style={inputStyle}
+                        value={it.description}
+                        onChange={(e) => updateItem(it.key, { description: e.target.value })}
+                      />
+                      <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          style={{ ...buttonSecondaryStyle, padding: '2px 8px', fontSize: 11 }}
+                          onClick={() =>
+                            updateItem(it.key, {
+                              sizes: it.sizes ? null : emptySizeBreakdown(),
+                              qty: it.sizes ? sumSizes(it.sizes) || 1 : it.qty,
+                            })
+                          }
+                        >
+                          {it.sizes ? 'Clear sizes' : 'Size run'}
+                        </button>
+                        {it.sku ? (
+                          <span style={{ fontSize: 11, color: colors.muted2 }}>SKU {it.sku}</span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className={resp.cardField}>
+                      <label>Qty</label>
+                      <input
+                        type="number"
+                        style={inputStyle}
+                        value={qty}
+                        disabled={!!it.sizes}
+                        onChange={(e) => updateItem(it.key, { qty: Number(e.target.value) })}
+                      />
+                    </div>
+                    <div className={resp.cardField}>
+                      <label>Unit price</label>
+                      <input
+                        type="number"
+                        style={inputStyle}
+                        value={it.unit_price}
+                        onChange={(e) => updateItem(it.key, { unit_price: Number(e.target.value) })}
+                      />
+                    </div>
+                    <div className={resp.cardField}>
+                      <label>Cost</label>
+                      <input
+                        type="number"
+                        style={inputStyle}
+                        value={it.unit_cost || ''}
+                        placeholder="0"
+                        onChange={(e) =>
+                          updateItem(it.key, { unit_cost: Math.max(0, Number(e.target.value) || 0) })
+                        }
+                      />
+                      {lineCost > 0 ? (
+                        <div style={{ fontSize: 10, color: colors.muted2, marginTop: 4 }}>
+                          = {form.quotation_currency} {lineCost.toFixed(2)}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className={resp.lineCardActions}>
+                      <div style={{ fontSize: 12, color: colors.muted }}>
+                        {formatAED(amount)} + VAT {formatAED(vat)} = <strong>{formatAED(lineTotal)}</strong>
+                      </div>
+                      <button
+                        type="button"
+                        style={buttonDangerStyle}
+                        disabled={form.items.length <= 1}
+                        onClick={() =>
+                          setForm((f) => ({ ...f, items: f.items.filter((x) => x.key !== it.key) }))
+                        }
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    {it.sizes ? (
+                      <div className={resp.lineCardFull}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                          {STANDARD_SIZES.map((s) => (
+                            <label key={s} style={{ fontSize: 11, color: colors.muted }}>
+                              {s}
+                              <input
+                                type="number"
+                                min={0}
+                                style={{ ...inputStyle, width: 64, marginTop: 4, display: 'block' }}
+                                value={Number(it.sizes?.[s] || 0)}
+                                onChange={(e) => {
+                                  const next = { ...(it.sizes || {}) }
+                                  next[s] = Number(e.target.value) || 0
+                                  updateItem(it.key, { sizes: next, qty: sumSizes(next) })
+                                }}
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
           <table style={tableStyle}>
             <thead>
               <tr>
@@ -1367,6 +1528,7 @@ export default function QuotationsPage() {
               })}
             </tbody>
           </table>
+          )}
         </div>
 
         <div

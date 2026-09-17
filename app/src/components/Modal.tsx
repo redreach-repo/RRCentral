@@ -1,6 +1,7 @@
 import { useEffect, type CSSProperties, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { colors } from '../lib/uiStyles'
+import { useCompactCrm } from '../hooks/useMediaQuery'
 
 interface ModalProps {
   open: boolean
@@ -18,7 +19,8 @@ const overlayStyle: CSSProperties = {
   alignItems: 'flex-start',
   justifyContent: 'center',
   zIndex: 1000,
-  padding: 'max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left))',
+  padding:
+    'max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left))',
   overflowY: 'auto',
   WebkitOverflowScrolling: 'touch',
   animation: 'rrModalFadeIn 160ms ease-out',
@@ -29,7 +31,7 @@ const cardStyle: CSSProperties = {
   border: `1px solid ${colors.border}`,
   borderRadius: 12,
   width: '100%',
-  maxHeight: '90vh',
+  maxHeight: '90dvh',
   overflow: 'auto',
   boxShadow: '0 20px 60px rgba(0,0,0,0.45)',
   animation: 'rrModalSlideIn 180ms ease-out',
@@ -39,7 +41,8 @@ const headerStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  padding: '16px 20px',
+  gap: 12,
+  padding: '14px 16px',
   borderBottom: `1px solid ${colors.border}`,
   position: 'sticky',
   top: 0,
@@ -52,6 +55,9 @@ const titleStyle: CSSProperties = {
   fontSize: 16,
   fontWeight: 650,
   color: colors.text,
+  lineHeight: 1.25,
+  minWidth: 0,
+  wordBreak: 'break-word',
 }
 
 const closeBtnStyle: CSSProperties = {
@@ -63,13 +69,12 @@ const closeBtnStyle: CSSProperties = {
   borderRadius: 6,
   display: 'inline-flex',
   alignItems: 'center',
-}
-
-const bodyStyle: CSSProperties = {
-  padding: 20,
+  flexShrink: 0,
 }
 
 export default function Modal({ open, title, onClose, children, width = 520 }: ModalProps) {
+  const compact = useCompactCrm()
+
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -86,9 +91,22 @@ export default function Modal({ open, title, onClose, children, width = 520 }: M
 
   if (!open) return null
 
+  const maxWidth =
+    compact
+      ? '100%'
+      : typeof width === 'number'
+        ? `min(${width}px, 100%)`
+        : width
+
   return (
     <div
-      style={overlayStyle}
+      style={{
+        ...overlayStyle,
+        padding: compact
+          ? 'max(0px, env(safe-area-inset-top)) 0 max(0px, env(safe-area-inset-bottom)) 0'
+          : overlayStyle.padding,
+        alignItems: compact ? 'stretch' : 'flex-start',
+      }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
@@ -105,7 +123,13 @@ export default function Modal({ open, title, onClose, children, width = 520 }: M
         }
       `}</style>
       <div
-        style={{ ...cardStyle, maxWidth: typeof width === 'number' ? `min(${width}px, 100%)` : width }}
+        style={{
+          ...cardStyle,
+          maxWidth,
+          borderRadius: compact ? 0 : 12,
+          maxHeight: compact ? '100dvh' : '90dvh',
+          minHeight: compact ? '100dvh' : undefined,
+        }}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -116,7 +140,7 @@ export default function Modal({ open, title, onClose, children, width = 520 }: M
             <X size={18} />
           </button>
         </div>
-        <div style={bodyStyle}>{children}</div>
+        <div style={{ padding: compact ? 14 : 20 }}>{children}</div>
       </div>
     </div>
   )
