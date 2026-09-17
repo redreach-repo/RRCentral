@@ -37,6 +37,7 @@ type ProductForm = {
   name: string
   division_code: string
   unit_price: number
+  unit_cost: number
   moq: number
   fabric: string
   unit: string
@@ -52,6 +53,7 @@ const emptyForm = (): ProductForm => ({
   name: '',
   division_code: '01',
   unit_price: 0,
+  unit_cost: 0,
   moq: 50,
   fabric: '',
   unit: 'pcs',
@@ -123,6 +125,7 @@ export default function CatalogPage() {
       name: p.name || '',
       division_code: p.division_code || '01',
       unit_price: Number(p.unit_price) || 0,
+      unit_cost: Number(p.unit_cost) || 0,
       moq: Number(p.moq) || 50,
       fabric: p.fabric || '',
       unit: p.unit || 'pcs',
@@ -377,6 +380,7 @@ export default function CatalogPage() {
                   <th style={thStyle}>Name</th>
                   <th style={thStyle}>Division</th>
                   <th style={thStyle}>Unit price</th>
+                  <th style={thStyle}>Cost</th>
                   <th style={thStyle}>MOQ</th>
                   <th style={thStyle}>Fabric</th>
                   <th style={thStyle}>Active</th>
@@ -390,6 +394,7 @@ export default function CatalogPage() {
                     <td style={tdStyle}>{p.name}</td>
                     <td style={tdStyle}>{brand(p.division_code)}</td>
                     <td style={tdStyle}>{formatAED(p.unit_price)}</td>
+                    <td style={tdStyle}>{formatAED(Number(p.unit_cost) || 0)}</td>
                     <td style={tdStyle}>{p.moq}</td>
                     <td style={tdStyle}>{p.fabric || '—'}</td>
                     <td style={tdStyle}>
@@ -441,8 +446,17 @@ export default function CatalogPage() {
             </select>
           </div>
           <div style={fieldStyle}>
-            <label style={labelStyle}>Unit price</label>
+            <label style={labelStyle}>Unit price (sell)</label>
             <input type="number" style={inputStyle} value={form.unit_price} onChange={(e) => setForm((f) => ({ ...f, unit_price: Number(e.target.value) }))} />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Unit cost</label>
+            <input
+              type="number"
+              style={inputStyle}
+              value={form.unit_cost}
+              onChange={(e) => setForm((f) => ({ ...f, unit_cost: Math.max(0, Number(e.target.value) || 0) }))}
+            />
           </div>
           <div style={fieldStyle}>
             <label style={labelStyle}>MOQ</label>

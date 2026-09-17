@@ -447,6 +447,11 @@ function withDefaults(table: string, row: Row): Row {
     if (next.stock_reserved == null) next.stock_reserved = 0
     if (next.reorder_level == null) next.reorder_level = 20
     if (next.track_sizes == null) next.track_sizes = false
+    if (next.unit_cost == null) next.unit_cost = 0
+  }
+
+  if (table === 'line_items') {
+    if (next.unit_cost == null) next.unit_cost = 0
   }
 
   if (table === 'inventory_movements') {

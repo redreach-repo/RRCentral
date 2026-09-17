@@ -441,6 +441,11 @@ export default function QuotationsPage() {
       const quoteId = editing?.quote_id || makeQuoteId()
       const fxRate = Number(form.fx_rate) || 1
       const baseAmount = toBaseAmount(amount, fxRate)
+      const lineCostDoc = totals.cost
+      const lineCostBase = toBaseAmount(lineCostDoc, fxRate)
+      const revenueBase = toBaseAmount(totals.taxable, fxRate)
+      const supplierCostBase =
+        lineCostDoc > 0 ? lineCostBase : Number(form.supplier_cost_base) || 0
       const currencyFields = {
         currency: form.quotation_currency,
         quotation_currency: form.quotation_currency,
@@ -459,8 +464,8 @@ export default function QuotationsPage() {
         accept_other_payment_currency: form.accept_other_payment_currency,
         rate_valid_until: form.rate_valid_until || null,
         payment_instructions: form.payment_instructions,
-        supplier_cost_base: Number(form.supplier_cost_base) || 0,
-        estimated_gross_profit_base: baseAmount - (Number(form.supplier_cost_base) || 0),
+        supplier_cost_base: supplierCostBase,
+        estimated_gross_profit_base: revenueBase - supplierCostBase,
       }
       const payload = {
         client: form.client.trim(),
@@ -1209,6 +1214,7 @@ export default function QuotationsPage() {
                           .join(' — '),
                         qty: p.moq || 1,
                         unit_price: Number(p.unit_price) || 0,
+                        unit_cost: Number(p.unit_cost) || 0,
                         sku: p.sku || '',
                         sizes: p.track_sizes ? emptySizeBreakdown() : null,
                       }),
@@ -1242,6 +1248,7 @@ export default function QuotationsPage() {
                 <th style={thStyle}>Description</th>
                 <th style={thStyle}>Qty</th>
                 <th style={thStyle}>Unit price</th>
+                <th style={thStyle}>Cost</th>
                 <th style={thStyle}>Amount</th>
                 <th style={thStyle}>VAT</th>
                 <th style={thStyle}>Total</th>
@@ -1254,6 +1261,7 @@ export default function QuotationsPage() {
                 const amount = qty * (Number(it.unit_price) || 0)
                 const vat = amount * vatRate
                 const lineTotal = amount + vat
+                const lineCost = qty * (Number(it.unit_cost) || 0)
                 return (
                   <Fragment key={it.key}>
                     <tr>
@@ -1281,7 +1289,7 @@ export default function QuotationsPage() {
                           ) : null}
                         </div>
                       </td>
-                      <td style={{ ...tdStyle, width: 90 }}>
+                      <td style={{ ...tdStyle, width: 80 }}>
                         <input
                           type="number"
                           style={inputStyle}
@@ -1290,13 +1298,29 @@ export default function QuotationsPage() {
                           onChange={(e) => updateItem(it.key, { qty: Number(e.target.value) })}
                         />
                       </td>
-                      <td style={{ ...tdStyle, width: 120 }}>
+                      <td style={{ ...tdStyle, width: 110 }}>
                         <input
                           type="number"
                           style={inputStyle}
                           value={it.unit_price}
                           onChange={(e) => updateItem(it.key, { unit_price: Number(e.target.value) })}
                         />
+                      </td>
+                      <td style={{ ...tdStyle, width: 110 }}>
+                        <input
+                          type="number"
+                          style={inputStyle}
+                          value={it.unit_cost || ''}
+                          placeholder="0"
+                          onChange={(e) =>
+                            updateItem(it.key, { unit_cost: Math.max(0, Number(e.target.value) || 0) })
+                          }
+                        />
+                        {lineCost > 0 ? (
+                          <div style={{ fontSize: 10, color: colors.muted2, marginTop: 4 }}>
+                            = {form.quotation_currency} {lineCost.toFixed(2)}
+                          </div>
+                        ) : null}
                       </td>
                       <td style={tdStyle}>{formatAED(amount)}</td>
                       <td style={tdStyle}>{formatAED(vat)}</td>
@@ -1316,7 +1340,7 @@ export default function QuotationsPage() {
                     </tr>
                     {it.sizes ? (
                       <tr>
-                        <td style={tdStyle} colSpan={7}>
+                        <td style={tdStyle} colSpan={8}>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                             {STANDARD_SIZES.map((s) => (
                               <label key={s} style={{ fontSize: 11, color: colors.muted }}>
@@ -1425,6 +1449,25 @@ export default function QuotationsPage() {
               {form.quotation_currency} {totals.total.toLocaleString('en-AE', { minimumFractionDigits: 2 })}
             </strong>
           </div>
+          {totals.cost > 0 ? (
+            <>
+              <div>
+                Cost:{' '}
+                <strong>
+                  {form.quotation_currency}{' '}
+                  {totals.cost.toLocaleString('en-AE', { minimumFractionDigits: 2 })}
+                </strong>
+              </div>
+              <div>
+                Gross profit:{' '}
+                <strong style={{ color: totals.profit >= 0 ? colors.success : colors.danger }}>
+                  {form.quotation_currency}{' '}
+                  {totals.profit.toLocaleString('en-AE', { minimumFractionDigits: 2 })}
+                </strong>
+                <span style={{ color: colors.muted2, marginLeft: 6 }}>({totals.marginPct}% margin)</span>
+              </div>
+            </>
+          ) : null}
           <div style={{ color: colors.muted2 }}>
             ≈ AED {toBaseAmount(totals.total, form.fx_rate).toLocaleString('en-AE', { minimumFractionDigits: 2 })}
           </div>
@@ -1577,13 +1620,16 @@ export default function QuotationsPage() {
               />
             </div>
             <div style={fieldStyle}>
-              <label style={labelStyle}>Supplier cost (AED)</label>
+              <label style={labelStyle}>Supplier cost override (AED)</label>
               <input
                 type="number"
                 style={inputStyle}
                 value={form.supplier_cost_base}
                 onChange={(e) => setForm((f) => ({ ...f, supplier_cost_base: Number(e.target.value) }))}
               />
+              <div style={{ fontSize: 11, color: colors.muted2, marginTop: 4 }}>
+                Leave 0 to use line-item costs. Line costs win when entered.
+              </div>
             </div>
             <div style={{ ...fieldStyle, display: 'flex', alignItems: 'center', gap: 8, paddingTop: 22 }}>
               <input

@@ -242,6 +242,8 @@ export interface LineItem {
   description: string
   qty: number
   unit_price: number
+  /** Cost per unit (supplier / landed). Same currency as unit_price. */
+  unit_cost: number
   vat_rate: number
   amount: number
   vat_amount: number
@@ -260,6 +262,8 @@ export interface Product {
   name: string
   division_code: string
   unit_price: number
+  /** Default cost when adding from catalog to a quote. */
+  unit_cost: number
   moq: number
   fabric: string
   unit: string

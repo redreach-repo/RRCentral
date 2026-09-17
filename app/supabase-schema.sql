@@ -576,6 +576,7 @@ create table line_items (
   description text not null default '',
   qty numeric(10,2) not null default 0,
   unit_price numeric(12,2) not null default 0,
+  unit_cost numeric(12,2) not null default 0,
   vat_rate numeric(5,4) not null default 0.05,
   amount numeric(12,2) not null default 0,
   vat_amount numeric(12,2) not null default 0,
@@ -595,6 +596,7 @@ create table products (
   name text not null,
   division_code text not null default '01',
   unit_price numeric(12,2) not null default 0,
+  unit_cost numeric(12,2) not null default 0,
   moq integer not null default 50,
   fabric text not null default '',
   unit text not null default 'pcs',
@@ -842,6 +844,8 @@ create policy "Public can submit website inquiries" on website_inquiries for ins
 -- alter table products add column if not exists size_stock jsonb not null default '{}'::jsonb;
 -- alter table line_items add column if not exists sku text not null default '';
 -- alter table line_items add column if not exists sizes_json jsonb;
+-- alter table line_items add column if not exists unit_cost numeric(12,2) not null default 0;
+-- alter table products add column if not exists unit_cost numeric(12,2) not null default 0;
 -- create table if not exists inventory_movements (
 --   id uuid primary key default uuid_generate_v4(),
 --   sku text not null default '',

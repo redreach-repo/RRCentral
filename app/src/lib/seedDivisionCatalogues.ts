@@ -14,6 +14,7 @@ function product(
     name,
     division_code: division,
     unit_price: 0,
+    unit_cost: 0,
     moq: 1,
     fabric: '',
     unit,
