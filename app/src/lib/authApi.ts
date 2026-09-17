@@ -151,7 +151,14 @@ function supabaseAuthApi(): AuthApi {
     getSession: () => supabase.auth.getSession(),
     onAuthStateChange: (cb) => supabase.auth.onAuthStateChange(cb),
     signOut: () => supabase.auth.signOut(),
-    signInWithOAuth: (opts) => supabase.auth.signInWithOAuth(opts),
+    signInWithOAuth: (opts) => {
+      const base = import.meta.env.BASE_URL || '/'
+      const redirectTo = new URL(base, window.location.origin).href
+      return supabase.auth.signInWithOAuth({
+        provider: opts.provider,
+        options: { redirectTo },
+      })
+    },
   }
 }
 
