@@ -52,11 +52,9 @@ import {
 } from '../lib/zoho'
 import EmailComposeModal from '../components/EmailComposeModal'
 import WebsiteInquiriesPanel from '../site/components/WebsiteInquiriesPanel'
+import PageHeader from '../components/PageHeader'
 import {
   page,
-  pageHeader,
-  pageTitle,
-  pageSub,
   btn,
   btnPrimary,
   btnDanger,
@@ -616,15 +614,15 @@ export default function CrmPage() {
 
   return (
     <div style={page}>
-      <div style={pageHeader}>
-        <div>
-          <h2 style={pageTitle}>CRM / Sales Visits</h2>
-          <p style={pageSub}>Companies, contacts, company owner, and sales assignment</p>
-        </div>
-        <button type="button" style={btnPrimary} onClick={openCreate}>
-          <Plus size={16} /> Add company
-        </button>
-      </div>
+      <PageHeader
+        title="CRM"
+        subtitle="Companies, contacts, owners, and pipeline — quote, follow up, close"
+        actions={
+          <button type="button" style={btnPrimary} onClick={openCreate}>
+            <Plus size={16} /> Add company
+          </button>
+        }
+      />
 
       <WebsiteInquiriesPanel onConverted={() => void load()} />
 

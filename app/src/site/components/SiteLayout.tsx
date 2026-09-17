@@ -68,7 +68,7 @@ export default function SiteLayout() {
             <Link to="/contact" className="site-nav-cta">
               Talk to us
             </Link>
-            <Link to={centralTo} className="site-central-link">
+            <Link to={centralTo} className="site-central-link" title="Open RED REACH Central CRM">
               Central
             </Link>
           </nav>
