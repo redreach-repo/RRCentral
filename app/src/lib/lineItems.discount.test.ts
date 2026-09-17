@@ -28,5 +28,19 @@ describe('quotation discount', () => {
     expect(t.discount).toBe(0)
     expect(t.vat).toBe(5)
     expect(t.total).toBe(105)
+    expect(t.cost).toBe(0)
+    expect(t.profit).toBe(100)
+  })
+
+  it('computes cost and gross profit after discount', () => {
+    const items = [
+      newDraftLine({ description: 'Polo', qty: 10, unit_price: 100, unit_cost: 40 }),
+    ]
+    // sell 1000 − 10% = 900 taxable; cost 400; profit 500; margin 55.56%
+    const t = calcTotals(items, 0.05, { discountPercent: 10 })
+    expect(t.taxable).toBe(900)
+    expect(t.cost).toBe(400)
+    expect(t.profit).toBe(500)
+    expect(t.marginPct).toBe(55.56)
   })
 })

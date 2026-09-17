@@ -14,6 +14,7 @@ export type SeedProduct = {
   name: string
   division_code: string
   unit_price: number
+  unit_cost: number
   moq: number
   fabric: string
   unit: string
@@ -38,6 +39,7 @@ function cat(
     name,
     division_code: DIV,
     unit_price: opts.unit_price ?? 0,
+    unit_cost: opts.unit_cost ?? 0,
     moq: opts.moq ?? MOQ,
     fabric: opts.fabric ?? '',
     unit: opts.unit ?? 'pcs',

@@ -8,6 +8,8 @@ export interface DraftLineItem {
   description: string
   qty: number
   unit_price: number
+  /** Supplier / landed cost per unit (same currency as unit_price). */
+  unit_cost: number
   remarks?: string
   sku?: string
   sizes?: SizeBreakdown | null
@@ -19,6 +21,7 @@ export function newDraftLine(partial?: Partial<DraftLineItem>): DraftLineItem {
     description: '',
     qty: 1,
     unit_price: 0,
+    unit_cost: 0,
     remarks: '',
     sku: '',
     sizes: null,
@@ -55,20 +58,28 @@ export function applyDiscount(
 
 export function calcTotals(items: DraftLineItem[], vatRate = VAT_RATE, discount?: DiscountOpts) {
   let subtotal = 0
+  let cost = 0
   for (const item of items) {
     const qty = item.sizes ? sumSizes(item.sizes) : Number(item.qty) || 0
     const c = calcLine(qty, item.unit_price, vatRate)
     subtotal += c.amount
+    cost += round2(qty * (Number(item.unit_cost) || 0))
   }
   subtotal = round2(subtotal)
+  cost = round2(cost)
   const { discount: discountValue, taxable } = applyDiscount(subtotal, discount)
   const vat = round2(taxable * vatRate)
+  const profit = round2(taxable - cost)
+  const marginPct = taxable > 0 ? round2((profit / taxable) * 100) : 0
   return {
     subtotal,
     discount: discountValue,
     taxable,
     vat,
     total: round2(taxable + vat),
+    cost,
+    profit,
+    marginPct,
   }
 }
 
@@ -97,6 +108,7 @@ export function toDraftItems(rows: LineItem[]): DraftLineItem[] {
       description: r.description || '',
       qty: sizes ? sumSizes(sizes) : Number(r.qty) || 0,
       unit_price: Number(r.unit_price) || 0,
+      unit_cost: Number(r.unit_cost) || 0,
       remarks: r.remarks || '',
       sku: r.sku || '',
       sizes,
@@ -132,7 +144,12 @@ export async function saveLineItems(
     .eq('reference', reference)
 
   const filtered = items.filter(
-    (i) => i.description.trim() || Number(i.qty) || Number(i.unit_price) || (i.sizes && sumSizes(i.sizes)),
+    (i) =>
+      i.description.trim() ||
+      Number(i.qty) ||
+      Number(i.unit_price) ||
+      Number(i.unit_cost) ||
+      (i.sizes && sumSizes(i.sizes)),
   )
   if (!filtered.length) return
 
@@ -150,6 +167,7 @@ export async function saveLineItems(
       description: item.description.trim(),
       qty,
       unit_price: Number(item.unit_price) || 0,
+      unit_cost: Number(item.unit_cost) || 0,
       vat_rate: c.vat_rate,
       amount: c.amount,
       vat_amount: c.vat_amount,
