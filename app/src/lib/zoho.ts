@@ -149,6 +149,15 @@ export async function testZohoConnection(settings: ZohoSettings): Promise<string
     try {
       const account = await resolveMailAccount(settings)
       parts.push(`Mail: ${account.accountId}`)
+      try {
+        const folderId = await resolveInboxFolderId(settings)
+        const inbox = await listZohoInboxMessages(settings, { limit: 1, folderId })
+        parts.push(`Inbox OK (${inbox.length ? 'readable' : 'empty'})`)
+      } catch (inboxErr) {
+        parts.push(
+          `Inbox: ${inboxErr instanceof Error ? inboxErr.message : 'read failed — add ZohoMail.messages.READ scope'}`,
+        )
+      }
     } catch (e) {
       parts.push(`Mail: ${e instanceof Error ? e.message : 'failed'}`)
     }
@@ -379,6 +388,131 @@ export async function sendZohoMail(
         `Send mail failed (${res.status})`,
     )
   }
+}
+
+export type ZohoMailFolder = {
+  folderId: string
+  folderName: string
+  folderType?: string
+}
+
+export type ZohoInboxMessage = {
+  messageId: string
+  subject: string
+  fromAddress: string
+  sender: string
+  summary: string
+  receivedTime: number
+  status: 'read' | 'unread'
+  hasAttachment: boolean
+  folderId: string
+  toAddress?: string
+}
+
+export async function listZohoMailFolders(settings: ZohoSettings): Promise<ZohoMailFolder[]> {
+  if (!isZohoMailEnabled(settings)) {
+    throw new Error('Zoho Mail is disabled in Settings — set Mail to yes')
+  }
+  const account = await resolveMailAccount(settings)
+  const res = await zohoFetch(
+    settings,
+    `${mailDomain(settings)}/api/accounts/${encodeURIComponent(account.accountId)}/folders`,
+  )
+  const data = (await res.json().catch(() => ({}))) as {
+    data?: Array<{
+      folderId?: string | number
+      folderName?: string
+      folderType?: string
+    }>
+    status?: { description?: string }
+  }
+  if (!res.ok) {
+    throw new Error(data.status?.description || `List folders failed (${res.status})`)
+  }
+  return (data.data || [])
+    .filter((f) => f.folderId != null)
+    .map((f) => ({
+      folderId: String(f.folderId),
+      folderName: f.folderName || '',
+      folderType: f.folderType,
+    }))
+}
+
+export async function resolveInboxFolderId(settings: ZohoSettings): Promise<string> {
+  const folders = await listZohoMailFolders(settings)
+  const inbox =
+    folders.find((f) => /inbox/i.test(f.folderName)) ||
+    folders.find((f) => String(f.folderType || '').toLowerCase() === 'inbox') ||
+    folders[0]
+  if (!inbox?.folderId) throw new Error('No Zoho Mail inbox folder found')
+  return inbox.folderId
+}
+
+function normalizeZohoMessage(raw: Record<string, unknown>): ZohoInboxMessage | null {
+  const messageId = String(raw.messageId || '')
+  if (!messageId) return null
+  const received = Number(raw.receivedTime || raw.sentDateInGMT || 0)
+  const statusRaw = String(raw.status ?? '1')
+  // Zoho: status "0" often unread, "1" read (varies by API version)
+  const unread = statusRaw === '0' || String(raw.status2 || '') === '0'
+  return {
+    messageId,
+    subject: String(raw.subject || '(no subject)'),
+    fromAddress: String(raw.fromAddress || ''),
+    sender: String(raw.sender || raw.fromAddress || ''),
+    summary: String(raw.summary || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+    receivedTime: Number.isFinite(received) ? received : 0,
+    status: unread ? 'unread' : 'read',
+    hasAttachment: String(raw.hasAttachment || '0') !== '0' && String(raw.hasAttachment) !== 'false',
+    folderId: String(raw.folderId || ''),
+    toAddress: raw.toAddress ? String(raw.toAddress) : undefined,
+  }
+}
+
+/** Recent inbox messages from Zoho Mail (requires ZohoMail.messages.READ scope). */
+export async function listZohoInboxMessages(
+  settings: ZohoSettings,
+  opts?: { limit?: number; status?: 'all' | 'read' | 'unread'; folderId?: string },
+): Promise<ZohoInboxMessage[]> {
+  if (!isZohoMailEnabled(settings)) {
+    throw new Error('Zoho Mail is disabled in Settings — set Mail to yes')
+  }
+  const account = await resolveMailAccount(settings)
+  const folderId = opts?.folderId || (await resolveInboxFolderId(settings))
+  const limit = Math.min(Math.max(opts?.limit || 25, 1), 50)
+  const params = new URLSearchParams({
+    folderId,
+    start: '1',
+    limit: String(limit),
+    status: opts?.status || 'all',
+    includeto: 'true',
+    sortBy: 'date',
+    sortorder: 'false',
+  })
+  const res = await zohoFetch(
+    settings,
+    `${mailDomain(settings)}/api/accounts/${encodeURIComponent(account.accountId)}/messages/view?${params}`,
+  )
+  const data = (await res.json().catch(() => ({}))) as {
+    data?: Array<Record<string, unknown>>
+    status?: { description?: string }
+  }
+  if (!res.ok) {
+    const desc = data.status?.description || `List inbox failed (${res.status})`
+    if (res.status === 0 || /Failed to fetch|NetworkError|CORS/i.test(desc)) {
+      throw new Error(
+        'Could not reach Zoho Mail from this browser (network/CORS). Confirm Mail is yes, scopes include ZohoMail.messages.READ, and try again.',
+      )
+    }
+    throw new Error(desc)
+  }
+  return (data.data || [])
+    .map((row) => normalizeZohoMessage(row))
+    .filter((m): m is ZohoInboxMessage => Boolean(m))
+}
+
+export function zohoMailWebUrl(settings: ZohoSettings): string {
+  return `${mailDomain(settings)}/`
 }
 
 export function openMailto(to: string, subject: string, body: string) {

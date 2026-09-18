@@ -27,6 +27,7 @@ import { hydrateContacts, primaryContact } from '../lib/contacts'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
 import PageHeader from '../components/PageHeader'
+import ZohoInboxPanel from '../components/ZohoInboxPanel'
 import {
   cardStyle,
   colors,
@@ -579,6 +580,10 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <ZohoInboxPanel crmEntries={crm} />
       </div>
     </div>
   )

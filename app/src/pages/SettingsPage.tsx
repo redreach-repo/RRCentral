@@ -144,7 +144,7 @@ const ZOHO_KEYS = [
   { key: 'zohoCalendarUid', label: 'Calendar UID (optional)' },
   { key: 'zohoMailAccountId', label: 'Mail account ID (optional)' },
   { key: 'zohoCalendarEnabled', label: 'Calendar sync (yes/no)' },
-  { key: 'zohoMailEnabled', label: 'Mail send (yes/no)' },
+  { key: 'zohoMailEnabled', label: 'Mail send + inbox (yes/no)' },
 ] as const
 
 type UserForm = { email: string; name: string; role: UserRole; active: boolean }
@@ -687,8 +687,9 @@ export default function SettingsPage() {
           <Plug size={18} /> Zoho Calendar &amp; Mail
         </h2>
         <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.55 }}>
-          Connect Zoho so CRM follow-ups sync to Calendar and Email sends via Zoho Mail.
-          Create a Self Client in the{' '}
+          Connect Zoho so CRM follow-ups sync to Calendar, you can send mail from CRM, and your{' '}
+          <strong>Zoho inbox</strong> appears on the Dashboard matched to CRM companies. Create a
+          Self Client in the{' '}
           <a
             href="https://api-console.zoho.com/"
             target="_blank"
@@ -698,12 +699,13 @@ export default function SettingsPage() {
             Zoho API Console
           </a>
           , generate a refresh token with scopes{' '}
-          <code style={{ color: '#ff9f4a' }}>ZohoCalendar.event.ALL</code> and{' '}
-          <code style={{ color: '#ff9f4a' }}>ZohoMail.messages.CREATE</code>
-          (plus <code style={{ color: '#ff9f4a' }}>ZohoMail.accounts.READ</code>), then paste
-          credentials below. Set Calendar sync / Mail send to <strong>yes</strong> to enable.
-          Use regional domains if your org is on .eu / .in (e.g.{' '}
-          <code>https://accounts.zoho.eu</code>).
+          <code style={{ color: '#ff9f4a' }}>ZohoCalendar.event.ALL</code>,{' '}
+          <code style={{ color: '#ff9f4a' }}>ZohoMail.messages.READ</code>,{' '}
+          <code style={{ color: '#ff9f4a' }}>ZohoMail.messages.CREATE</code>,{' '}
+          <code style={{ color: '#ff9f4a' }}>ZohoMail.folders.READ</code>, and{' '}
+          <code style={{ color: '#ff9f4a' }}>ZohoMail.accounts.READ</code>, then paste credentials
+          below. Set Calendar sync / Mail to <strong>yes</strong> to enable. Use regional domains if
+          your org is on .eu / .in (e.g. <code>https://accounts.zoho.eu</code>).
         </p>
         <div
           style={{
