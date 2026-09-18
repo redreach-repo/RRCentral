@@ -88,6 +88,32 @@ function corsHint(status: number): string {
   return `Zoho token refresh failed (${status})`
 }
 
+/** Preferred slug, plus the accidental Dashboard default name if already deployed. */
+const ZOHO_PROXY_SLUGS = ['zoho-proxy', 'bright-function'] as const
+
+function isMissingFunctionError(msg: string): boolean {
+  return /404|not found|Failed to send|Function not found/i.test(msg)
+}
+
+async function invokeZohoProxy(body: Record<string, unknown>): Promise<{ data: unknown; error: Error | null }> {
+  const supabase = getSupabaseClient()
+  let lastError: Error | null = null
+  for (const slug of ZOHO_PROXY_SLUGS) {
+    const { data, error } = await supabase.functions.invoke(slug, { body })
+    if (!error) return { data, error: null }
+    const err = error instanceof Error ? error : new Error(error.message || String(error))
+    lastError = err
+    if (!isMissingFunctionError(err.message)) return { data: null, error: err }
+  }
+  return {
+    data: null,
+    error: new Error(
+      lastError?.message ||
+        'Zoho proxy not deployed. In Supabase → Edge Functions, deploy `zoho-proxy` (file index.ts), then retry.',
+    ),
+  }
+}
+
 async function refreshTokenViaProxy(settings: ZohoSettings): Promise<{
   access_token?: string
   expires_in?: number
@@ -95,25 +121,20 @@ async function refreshTokenViaProxy(settings: ZohoSettings): Promise<{
   error_description?: string
   status: number
 }> {
-  const supabase = getSupabaseClient()
-  const { data, error } = await supabase.functions.invoke('zoho-proxy', {
-    body: {
-      action: 'token',
-      accountsDomain: accountsDomain(settings),
-      clientId: setting(settings, 'zohoClientId'),
-      clientSecret: setting(settings, 'zohoClientSecret'),
-      refreshToken: setting(settings, 'zohoRefreshToken'),
-    },
+  const { data, error } = await invokeZohoProxy({
+    action: 'token',
+    accountsDomain: accountsDomain(settings),
+    clientId: setting(settings, 'zohoClientId'),
+    clientSecret: setting(settings, 'zohoClientSecret'),
+    refreshToken: setting(settings, 'zohoRefreshToken'),
   })
   if (error) {
-    const msg = error.message || String(error)
-    // Function missing / not deployed
-    if (/404|not found|Failed to send/i.test(msg)) {
+    if (isMissingFunctionError(error.message)) {
       throw new Error(
         'Zoho proxy not deployed. In Supabase → Edge Functions, deploy `zoho-proxy` from this repo (supabase/functions/zoho-proxy), then retry.',
       )
     }
-    throw new Error(msg)
+    throw error
   }
   const payload = (data || {}) as {
     access_token?: string
@@ -225,15 +246,12 @@ async function zohoFetch(
       headers.forEach((v, k) => {
         headerObj[k] = v
       })
-      const supabase = getSupabaseClient()
-      const { data, error } = await supabase.functions.invoke('zoho-proxy', {
-        body: {
-          action: 'api',
-          url,
-          method: init.method || 'GET',
-          headers: headerObj,
-          body: typeof init.body === 'string' ? init.body : init.body ? String(init.body) : null,
-        },
+      const { data, error } = await invokeZohoProxy({
+        action: 'api',
+        url,
+        method: init.method || 'GET',
+        headers: headerObj,
+        body: typeof init.body === 'string' ? init.body : init.body ? String(init.body) : null,
       })
       if (error) throw error
       const wrapped = data as { ok?: boolean; status?: number; body?: unknown }

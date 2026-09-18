@@ -715,9 +715,11 @@ export default function SettingsPage() {
             npx supabase functions deploy zoho-proxy --project-ref YOUR_PROJECT_REF
           </code>
           <br />
-          Or in Supabase Dashboard → Edge Functions → Create function named{' '}
-          <code>zoho-proxy</code> and paste{' '}
-          <code>supabase/functions/zoho-proxy/index.ts</code> from the repo. Also confirm{' '}
+          Or in Supabase Dashboard → Edge Functions → Create: function name{' '}
+          <code>zoho-proxy</code>, file name <code>index.ts</code> (required — not the
+          function name), paste the full repo file{' '}
+          <code>supabase/functions/zoho-proxy/index.ts</code>. If you already deployed as{' '}
+          <code>bright-function</code>, that also works. Also confirm{' '}
           <strong>Client ID</strong> is the full value (not truncated in the field).
         </p>
         <div
