@@ -30,7 +30,8 @@ import { hydrateContacts, primaryContact } from '../lib/contacts'
 import { isZohoMailEnabled } from '../lib/zoho'
 import EmailComposeModal from '../components/EmailComposeModal'
 import { logActivity } from '../lib/activity'
-import { syncCrmFromQuote } from '../lib/crmSync'
+import { findCrmByCompany, syncCrmFromQuote } from '../lib/crmSync'
+import { useAuth } from '../contexts/AuthContext'
 import {
   applyMessageTemplate,
   DEFAULT_EMAIL_QUOTE_BODY,
@@ -45,6 +46,7 @@ export default function DocumentPage() {
   const docType: DocType = type === 'invoice' ? 'invoice' : 'quote'
   const { settings } = useSettings()
   const { showToast } = useToast()
+  const { user } = useAuth()
   const sheetRef = useRef<HTMLDivElement>(null)
 
   const [loading, setLoading] = useState(true)
@@ -311,12 +313,28 @@ export default function DocumentPage() {
       .eq('id', quote.id)
     if (!err) {
       setQuote({ ...quote, status: 'Sent' })
-      await logActivity('email_quote', 'quotation', displayRef, quote.client, '')
       await syncCrmFromQuote({
         client: quote.client,
         quoteRef: quote.reference_number,
         quoteStatus: 'Sent',
       })
+    }
+  }
+
+  async function onEmailSent() {
+    const clientName = doc?.client || ''
+    const crm = clientName ? await findCrmByCompany(clientName) : null
+    await logActivity(
+      docType === 'invoice' ? 'email_invoice' : 'email_quote',
+      docType === 'invoice' ? 'invoice' : 'quotation',
+      displayRef,
+      `Emailed ${title.toLowerCase()} to ${clientName || 'client'}`,
+      user?.email || '',
+      crm?.id || null,
+    )
+    await markQuoteSent()
+    if (crm) {
+      showToast('Email sent · logged on CRM timeline', 'success')
     }
   }
 
@@ -869,7 +887,7 @@ export default function DocumentPage() {
         )}
         zohoEnabled={isZohoMailEnabled(settings)}
         onClose={() => setEmailOpen(false)}
-        onSent={() => void markQuoteSent()}
+        onSent={() => void onEmailSent()}
       />
 
       <style>{`

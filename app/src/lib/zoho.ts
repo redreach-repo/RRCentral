@@ -597,6 +597,16 @@ export async function resolveInboxFolderId(settings: ZohoSettings): Promise<stri
   return inbox.folderId
 }
 
+export async function resolveSentFolderId(settings: ZohoSettings): Promise<string> {
+  const folders = await listZohoMailFolders(settings)
+  const sent =
+    folders.find((f) => /^sent/i.test(f.folderName.trim())) ||
+    folders.find((f) => /sent\s*mail|sent\s*items/i.test(f.folderName)) ||
+    folders.find((f) => String(f.folderType || '').toLowerCase() === 'sent')
+  if (!sent?.folderId) throw new Error('No Zoho Mail Sent folder found')
+  return sent.folderId
+}
+
 function normalizeZohoMessage(raw: Record<string, unknown>): ZohoInboxMessage | null {
   const messageId = String(raw.messageId || '')
   if (!messageId) return null
@@ -618,22 +628,21 @@ function normalizeZohoMessage(raw: Record<string, unknown>): ZohoInboxMessage | 
   }
 }
 
-/** Recent inbox messages from Zoho Mail (requires ZohoMail.messages.READ scope). */
-export async function listZohoInboxMessages(
+/** Messages from a specific Zoho Mail folder (requires ZohoMail.messages.READ). */
+export async function listZohoFolderMessages(
   settings: ZohoSettings,
-  opts?: { limit?: number; status?: 'all' | 'read' | 'unread'; folderId?: string },
+  opts: { folderId: string; limit?: number; status?: 'all' | 'read' | 'unread' },
 ): Promise<ZohoInboxMessage[]> {
   if (!isZohoMailEnabled(settings)) {
     throw new Error('Zoho Mail is disabled in Settings — set Mail to yes')
   }
   const account = await resolveMailAccount(settings)
-  const folderId = opts?.folderId || (await resolveInboxFolderId(settings))
-  const limit = Math.min(Math.max(opts?.limit || 25, 1), 50)
+  const limit = Math.min(Math.max(opts.limit || 25, 1), 50)
   const params = new URLSearchParams({
-    folderId,
+    folderId: opts.folderId,
     start: '1',
     limit: String(limit),
-    status: opts?.status || 'all',
+    status: opts.status || 'all',
     includeto: 'true',
     sortBy: 'date',
     sortorder: 'false',
@@ -647,7 +656,7 @@ export async function listZohoInboxMessages(
     status?: { description?: string }
   }
   if (!res.ok) {
-    const desc = data.status?.description || `List inbox failed (${res.status})`
+    const desc = data.status?.description || `List messages failed (${res.status})`
     if (res.status === 0 || /Failed to fetch|NetworkError|CORS/i.test(desc)) {
       throw new Error(
         'Could not reach Zoho Mail from this browser (network/CORS). Confirm Mail is yes, scopes include ZohoMail.messages.READ, and try again.',
@@ -658,6 +667,28 @@ export async function listZohoInboxMessages(
   return (data.data || [])
     .map((row) => normalizeZohoMessage(row))
     .filter((m): m is ZohoInboxMessage => Boolean(m))
+}
+
+/** Recent inbox messages from Zoho Mail (requires ZohoMail.messages.READ scope). */
+export async function listZohoInboxMessages(
+  settings: ZohoSettings,
+  opts?: { limit?: number; status?: 'all' | 'read' | 'unread'; folderId?: string },
+): Promise<ZohoInboxMessage[]> {
+  const folderId = opts?.folderId || (await resolveInboxFolderId(settings))
+  return listZohoFolderMessages(settings, {
+    folderId,
+    limit: opts?.limit,
+    status: opts?.status,
+  })
+}
+
+/** Recent Sent-folder messages (mail you sent from Zoho / CRM). */
+export async function listZohoSentMessages(
+  settings: ZohoSettings,
+  opts?: { limit?: number },
+): Promise<ZohoInboxMessage[]> {
+  const folderId = await resolveSentFolderId(settings)
+  return listZohoFolderMessages(settings, { folderId, limit: opts?.limit, status: 'all' })
 }
 
 export function zohoMailWebUrl(settings: ZohoSettings): string {

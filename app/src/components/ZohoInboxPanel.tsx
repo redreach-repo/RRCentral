@@ -8,7 +8,9 @@ import {
   isZohoConfigured,
   isZohoMailEnabled,
   listZohoInboxMessages,
+  listZohoSentMessages,
   zohoMailWebUrl,
+  type ZohoInboxMessage,
 } from '../lib/zoho'
 import { attachCrmMatches, type InboxRow } from '../lib/zohoInboxMatch'
 import {
@@ -28,13 +30,17 @@ type Props = {
   crmEntries: CrmEntry[]
 }
 
+type Mailbox = 'inbox' | 'sent'
+type Filter = 'all' | 'crm' | 'unread'
+
 export default function ZohoInboxPanel({ crmEntries }: Props) {
   const { settings } = useSettings()
   const compact = useCompactCrm()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [rows, setRows] = useState<InboxRow[]>([])
-  const [filter, setFilter] = useState<'all' | 'crm' | 'unread'>('all')
+  const [mailbox, setMailbox] = useState<Mailbox>('inbox')
+  const [filter, setFilter] = useState<Filter>('all')
 
   const enabled = isZohoMailEnabled(settings)
   const configured = isZohoConfigured(settings)
@@ -44,15 +50,20 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
     setLoading(true)
     setError('')
     try {
-      const messages = await listZohoInboxMessages(settings, { limit: 30, status: 'all' })
+      let messages: ZohoInboxMessage[]
+      if (mailbox === 'sent') {
+        messages = await listZohoSentMessages(settings, { limit: 30 })
+      } else {
+        messages = await listZohoInboxMessages(settings, { limit: 30, status: 'all' })
+      }
       setRows(attachCrmMatches(messages, crmEntries))
     } catch (e) {
       setRows([])
-      setError(e instanceof Error ? e.message : 'Could not load Zoho inbox')
+      setError(e instanceof Error ? e.message : 'Could not load Zoho mail')
     } finally {
       setLoading(false)
     }
-  }, [enabled, settings, crmEntries])
+  }, [enabled, settings, crmEntries, mailbox])
 
   useEffect(() => {
     if (!enabled) return
@@ -73,14 +84,14 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
       <div style={cardStyle}>
         <h2 style={sectionTitleStyle}>
           <Mail size={18} style={{ verticalAlign: 'middle', marginRight: 8 }} />
-          Zoho inbox
+          Zoho mail
         </h2>
         <p style={{ color: colors.muted, fontSize: 13, margin: 0, lineHeight: 1.5 }}>
           Connect Zoho Mail in{' '}
           <Link to="/settings" style={{ color: colors.accent }}>
             Settings
           </Link>{' '}
-          to see your inbox here, matched to CRM companies.
+          to see inbox and sent mail here, matched to CRM companies.
         </p>
       </div>
     )
@@ -91,7 +102,7 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
       <div style={cardStyle}>
         <h2 style={sectionTitleStyle}>
           <Mail size={18} style={{ verticalAlign: 'middle', marginRight: 8 }} />
-          Zoho inbox
+          Zoho mail
         </h2>
         <p style={{ color: colors.muted, fontSize: 13, margin: 0, lineHeight: 1.5 }}>
           Zoho credentials are saved, but Mail is set to <strong>no</strong>. Set{' '}
@@ -117,12 +128,14 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
         <div>
           <h2 style={{ ...sectionTitleStyle, margin: 0 }}>
             <Mail size={18} style={{ verticalAlign: 'middle', marginRight: 8 }} />
-            Zoho inbox
+            Zoho mail
           </h2>
           <p style={{ color: colors.muted2, fontSize: 12, margin: '4px 0 0' }}>
             {rows.length
-              ? `${unread} unread · ${crmHits} matched to CRM`
-              : 'Recent mail from your Zoho account'}
+              ? `${mailbox === 'sent' ? 'Sent' : `${unread} unread`} · ${crmHits} matched to CRM`
+              : mailbox === 'sent'
+                ? 'Mail you sent from Zoho / CRM'
+                : 'Mail others sent you (not your outbound quotes)'}
           </p>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -141,12 +154,40 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
         </div>
       </div>
 
+      <div className={resp.chipRow} style={{ marginBottom: 8 }}>
+        {(
+          [
+            ['inbox', 'Inbox'],
+            ['sent', 'Sent'],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => {
+              setMailbox(id)
+              setFilter('all')
+            }}
+            style={{
+              ...buttonSecondaryStyle,
+              ...(mailbox === id
+                ? { borderColor: colors.accent, color: colors.accent, background: `${colors.accent}18` }
+                : null),
+              padding: '6px 10px',
+              fontSize: 12,
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className={resp.chipRow}>
         {(
           [
             ['all', `All (${rows.length})`],
             ['crm', `CRM matches (${crmHits})`],
-            ['unread', `Unread (${unread})`],
+            ...(mailbox === 'inbox' ? ([['unread', `Unread (${unread})`]] as const) : []),
           ] as const
         ).map(([id, label]) => (
           <button
@@ -179,7 +220,7 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
             lineHeight: 1.45,
           }}
         >
-          <div style={{ fontWeight: 650, marginBottom: 4 }}>Inbox unavailable</div>
+          <div style={{ fontWeight: 650, marginBottom: 4 }}>Mail unavailable</div>
           {error}
           <div style={{ marginTop: 8, color: colors.muted }}>
             Tip: regenerate your Zoho refresh token with{' '}
@@ -194,18 +235,20 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
         </div>
       ) : loading && !rows.length ? (
         <div style={{ color: colors.muted, fontSize: 13, padding: '20px 0' }}>
-          <Loader2 size={16} style={{ verticalAlign: 'middle', marginRight: 8 }} /> Loading inbox…
+          <Loader2 size={16} style={{ verticalAlign: 'middle', marginRight: 8 }} /> Loading mail…
         </div>
       ) : visible.length === 0 ? (
-        <p style={{ color: colors.muted, fontSize: 13, margin: '8px 0 0' }}>
+        <p style={{ color: colors.muted, fontSize: 13, margin: '8px 0 0', lineHeight: 1.5 }}>
           {filter === 'crm'
-            ? 'No recent emails match CRM contact addresses yet.'
-            : 'No messages in this view.'}
+            ? 'No recent emails match CRM contact addresses yet. Add the contact email on the company card.'
+            : mailbox === 'sent'
+              ? 'No sent messages yet. After you email a quote/invoice via Zoho, open Sent and hit Refresh.'
+              : 'Inbox is empty here. Quotes you send appear under Sent — not Inbox.'}
         </p>
       ) : compact ? (
         <div className={resp.listStack} style={{ marginTop: 4 }}>
           {visible.map((m) => (
-            <InboxCard key={m.messageId} message={m} />
+            <InboxCard key={m.messageId} message={m} mailbox={mailbox} />
           ))}
         </div>
       ) : (
@@ -214,7 +257,7 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
             <thead>
               <tr>
                 <th style={thStyle}>When</th>
-                <th style={thStyle}>From</th>
+                <th style={thStyle}>{mailbox === 'sent' ? 'To' : 'From'}</th>
                 <th style={thStyle}>Subject</th>
                 <th style={thStyle}>CRM</th>
               </tr>
@@ -226,10 +269,18 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
                     {m.receivedTime ? format(new Date(m.receivedTime), 'dd MMM HH:mm') : '—'}
                   </td>
                   <td style={tdStyle}>
-                    <div>{m.sender || m.fromAddress || '—'}</div>
-                    {m.sender && m.fromAddress ? (
-                      <div style={{ fontSize: 11, color: colors.muted2 }}>{m.fromAddress}</div>
-                    ) : null}
+                    {mailbox === 'sent' ? (
+                      <>
+                        <div>{m.toAddress || '—'}</div>
+                      </>
+                    ) : (
+                      <>
+                        <div>{m.sender || m.fromAddress || '—'}</div>
+                        {m.sender && m.fromAddress ? (
+                          <div style={{ fontSize: 11, color: colors.muted2 }}>{m.fromAddress}</div>
+                        ) : null}
+                      </>
+                    )}
                   </td>
                   <td style={tdStyle}>
                     <div>{m.subject}</div>
@@ -271,7 +322,7 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
   )
 }
 
-function InboxCard({ message: m }: { message: InboxRow }) {
+function InboxCard({ message: m, mailbox }: { message: InboxRow; mailbox: Mailbox }) {
   return (
     <article className={resp.card} style={m.status === 'unread' ? { borderColor: 'rgba(232,93,4,0.45)' } : undefined}>
       <div className={resp.cardTop}>
@@ -280,20 +331,16 @@ function InboxCard({ message: m }: { message: InboxRow }) {
             {m.subject}
           </div>
           <div className={resp.cardMeta}>
-            {m.sender || m.fromAddress}
+            {mailbox === 'sent' ? m.toAddress || '—' : m.sender || m.fromAddress}
             {m.receivedTime ? ` · ${format(new Date(m.receivedTime), 'dd MMM HH:mm')}` : ''}
-            {m.status === 'unread' ? ' · Unread' : ''}
           </div>
+          {m.crm ? (
+            <Link to={`/crm?edit=${m.crm.crmId}`} style={{ color: colors.accent, fontSize: 12 }}>
+              {m.crm.companyName}
+            </Link>
+          ) : null}
         </div>
       </div>
-      {m.summary ? <div className={resp.cardMeta}>{m.summary.slice(0, 160)}</div> : null}
-      {m.crm ? (
-        <Link to={`/crm?edit=${m.crm.crmId}`} style={{ color: colors.accent, fontSize: 13, textDecoration: 'none' }}>
-          CRM: {m.crm.companyName}
-        </Link>
-      ) : (
-        <span className={resp.cardMeta}>No CRM match</span>
-      )}
     </article>
   )
 }
