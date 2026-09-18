@@ -718,8 +718,7 @@ export default function SettingsPage() {
           Or in Supabase Dashboard → Edge Functions → Create function named{' '}
           <code>zoho-proxy</code> and paste{' '}
           <code>supabase/functions/zoho-proxy/index.ts</code> from the repo. Also confirm{' '}
-          <strong>Client ID</strong> is the full value ending in{' '}
-          <code style={{ color: '#ff9f4a' }}>DIOS38H</code> (not truncated).
+          <strong>Client ID</strong> is the full value (not truncated in the field).
         </p>
         <div
           style={{
