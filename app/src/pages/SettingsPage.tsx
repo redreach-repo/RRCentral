@@ -707,6 +707,19 @@ export default function SettingsPage() {
           below. Set Calendar sync / Mail to <strong>yes</strong> to enable. Use regional domains if
           your org is on .eu / .in (e.g. <code>https://accounts.zoho.eu</code>).
         </p>
+        <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.55 }}>
+          <strong style={{ color: colors.text }}>Safari tip:</strong> Zoho blocks direct browser
+          calls (error 405). Keep Supabase connected, then deploy the repo edge function once:
+          <br />
+          <code style={{ color: '#ff9f4a' }}>
+            npx supabase functions deploy zoho-proxy --project-ref YOUR_PROJECT_REF
+          </code>
+          <br />
+          Or in Supabase Dashboard → Edge Functions → Create function named{' '}
+          <code>zoho-proxy</code> and paste{' '}
+          <code>supabase/functions/zoho-proxy/index.ts</code> from the repo. Also confirm{' '}
+          <strong>Client ID</strong> is the full value (not truncated in the field).
+        </p>
         <div
           style={{
             display: 'grid',
