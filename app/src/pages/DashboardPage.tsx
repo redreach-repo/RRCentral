@@ -344,7 +344,7 @@ export default function DashboardPage() {
           value={String(overdueFollowUps)}
           icon={<AlertTriangle size={18} />}
           accent="#f97316"
-          to="/follow-ups"
+          to="/crm?follow=Due&owner=me"
           delay={280}
         />
       </div>

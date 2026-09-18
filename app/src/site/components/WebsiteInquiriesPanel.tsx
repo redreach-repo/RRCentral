@@ -5,26 +5,37 @@ import type { WebsiteInquiry } from '../../lib/types'
 import { verticalBrandForInquiry } from '../../lib/websiteLeads'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
-import { btn, btnPrimary, colors } from '../../lib/pageStyles'
+import { btnGhost, btnPrimary, colors } from '../../lib/pageStyles'
+import { resolveSalesOwnerName } from '../../lib/crmWorkQueue'
 
-export default function WebsiteInquiriesPanel({ onConverted }: { onConverted?: () => void }) {
+export default function WebsiteInquiriesPanel({
+  onConverted,
+}: {
+  onConverted?: (crmId?: string) => void
+}) {
   const { user } = useAuth()
   const { showToast } = useToast()
   const [rows, setRows] = useState<WebsiteInquiry[]>([])
   const [busy, setBusy] = useState<string | null>(null)
+  const [ownerName, setOwnerName] = useState('')
 
   const load = useCallback(async () => {
     try {
-      const { data, error } = await db.from('website_inquiries').select('*').order('created_at', { ascending: false })
+      const [{ data, error }, usersRes] = await Promise.all([
+        db.from('website_inquiries').select('*').order('created_at', { ascending: false }),
+        db.from('app_users').select('email,name').eq('active', true),
+      ])
       if (error) {
         setRows([])
         return
       }
       setRows(((data as WebsiteInquiry[]) || []).filter((r) => r.status === 'new'))
+      const users = (usersRes.data || []) as { email: string; name: string }[]
+      setOwnerName(resolveSalesOwnerName(user?.email, users))
     } catch {
       setRows([])
     }
-  }, [])
+  }, [user?.email])
 
   useEffect(() => {
     void load()
@@ -36,14 +47,32 @@ export default function WebsiteInquiriesPanel({ onConverted }: { onConverted?: (
       const lead = buildCrmLeadFromInquiry(row)
       lead.created_by = user?.email || 'website'
       lead.updated_by = user?.email || 'website'
+      lead.owner = ownerName || user?.email || ''
       const { error } = await db.from('crm').insert(lead)
       if (error) throw error
       await db.from('website_inquiries').update({ status: 'converted', crm_id: lead.id }).eq('id', row.id)
       showToast('Website enquiry added to CRM', 'success')
-      onConverted?.()
+      onConverted?.(lead.id)
       await load()
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Could not convert enquiry', 'error')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function dismiss(row: WebsiteInquiry) {
+    setBusy(row.id)
+    try {
+      const { error } = await db
+        .from('website_inquiries')
+        .update({ status: 'closed' })
+        .eq('id', row.id)
+      if (error) throw error
+      showToast('Enquiry dismissed', 'success')
+      await load()
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not dismiss enquiry', 'error')
     } finally {
       setBusy(null)
     }
@@ -76,9 +105,10 @@ export default function WebsiteInquiriesPanel({ onConverted }: { onConverted?: (
               alignItems: 'flex-start',
               borderTop: `1px solid ${colors.border}`,
               paddingTop: 10,
+              flexWrap: 'wrap',
             }}
           >
-            <div>
+            <div style={{ minWidth: 0, flex: 1 }}>
               <div>
                 {row.name} · {verticalBrandForInquiry(row.vertical)}
               </div>
@@ -87,20 +117,27 @@ export default function WebsiteInquiriesPanel({ onConverted }: { onConverted?: (
               </div>
               <div style={{ color: colors.muted2, fontSize: 13, marginTop: 4 }}>{row.message}</div>
             </div>
-            <button
-              type="button"
-              style={btnPrimary}
-              disabled={busy === row.id}
-              onClick={() => void convert(row)}
-            >
-              {busy === row.id ? 'Adding…' : 'Add to CRM'}
-            </button>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                style={btnGhost}
+                disabled={busy === row.id}
+                onClick={() => void dismiss(row)}
+              >
+                Dismiss
+              </button>
+              <button
+                type="button"
+                style={btnPrimary}
+                disabled={busy === row.id}
+                onClick={() => void convert(row)}
+              >
+                {busy === row.id ? 'Adding…' : 'Add to CRM'}
+              </button>
+            </div>
           </div>
         ))}
       </div>
-      <button type="button" style={{ ...btn, marginTop: 12 }} onClick={() => void load()}>
-        Refresh
-      </button>
     </section>
   )
 }

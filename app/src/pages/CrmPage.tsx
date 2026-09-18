@@ -13,6 +13,10 @@ import {
   UserPlus,
   MessageCircle,
   FileText,
+  MessageSquarePlus,
+  LayoutGrid,
+  List,
+  Phone,
 } from 'lucide-react'
 import { db } from '../lib/db'
 import { CRM_OUTCOME_REASONS, NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
@@ -53,8 +57,19 @@ import {
 import EmailComposeModal from '../components/EmailComposeModal'
 import WebsiteInquiriesPanel from '../site/components/WebsiteInquiriesPanel'
 import PageHeader from '../components/PageHeader'
+import CrmLogTouchModal, { type LogTouchPayload } from '../components/CrmLogTouchModal'
+import CrmPipelineBoard from '../components/CrmPipelineBoard'
 import { useCompactCrm } from '../hooks/useMediaQuery'
 import resp from '../styles/crmResponsive.module.css'
+import {
+  computeDueCounts,
+  crmSearchHaystack,
+  matchesFollowFilter,
+  resolveSalesOwnerName,
+  sortByFollowUpUrgency,
+  type CrmViewMode,
+  type FollowBucket,
+} from '../lib/crmWorkQueue'
 import {
   page,
   btn,
@@ -94,7 +109,9 @@ type CrmForm = {
   outcome_reason: string
 }
 
-type FollowFilter = 'All' | 'Overdue' | 'Today' | 'Upcoming' | 'None'
+type FollowFilter = FollowBucket
+
+type SheetTab = 'overview' | 'contacts' | 'activity'
 
 const emptyForm = (): CrmForm => ({
   company_name: '',
@@ -166,7 +183,19 @@ export default function CrmPage() {
   const [activity, setActivity] = useState<ActivityLogEntry[]>([])
   const [activityLoading, setActivityLoading] = useState(false)
   const [quickBusyId, setQuickBusyId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<CrmViewMode>('list')
+  const [logTouchTarget, setLogTouchTarget] = useState<CrmEntry | null>(null)
+  const [outcomeTarget, setOutcomeTarget] = useState<CrmEntry | null>(null)
+  const [outcomeStage, setOutcomeStage] = useState<'Won' | 'Lost'>('Won')
+  const [outcomeReason, setOutcomeReason] = useState('')
+  const [sheetTab, setSheetTab] = useState<SheetTab>('overview')
+  const [defaultsReady, setDefaultsReady] = useState(false)
   const compact = useCompactCrm()
+
+  const myOwnerName = useMemo(
+    () => resolveSalesOwnerName(user?.email, owners),
+    [user?.email, owners],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -219,6 +248,7 @@ export default function CrmPage() {
       quote_ref: entry.quote_ref || '',
       outcome_reason: entry.outcome_reason || '',
     })
+    setSheetTab('overview')
     setModalOpen(true)
     setActivityLoading(true)
     void (async () => {
@@ -285,19 +315,48 @@ export default function CrmPage() {
     const stage = searchParams.get('stage')
     const follow = searchParams.get('follow')
     const owner = searchParams.get('owner')
+    const view = searchParams.get('view')
+    const hasFilterParams = Boolean(stage || follow || owner || view)
+
     if (stage) setStageFilter(stage)
-    if (follow === 'Overdue' || follow === 'Today' || follow === 'Upcoming' || follow === 'None') {
+    if (
+      follow === 'Due' ||
+      follow === 'Overdue' ||
+      follow === 'Today' ||
+      follow === 'Upcoming' ||
+      follow === 'None' ||
+      follow === 'All'
+    ) {
       setFollowFilter(follow)
     }
-    if (owner === 'Unassigned' || owner === '') setOwnerFilter('Unassigned')
-    else if (owner) setOwnerFilter(owner)
+    if (owner === 'me' && myOwnerName) setOwnerFilter(myOwnerName)
+    else if (owner === 'Unassigned' || owner === '') setOwnerFilter('Unassigned')
+    else if (owner && owner !== 'me') setOwnerFilter(owner)
+    if (view === 'board' || view === 'list') setViewMode(view)
+
+    if (!defaultsReady && !loading && !hasFilterParams) {
+      if (myOwnerName) setOwnerFilter(myOwnerName)
+      setFollowFilter('Due')
+      setDefaultsReady(true)
+    } else if (!defaultsReady && !loading && hasFilterParams) {
+      setDefaultsReady(true)
+    }
+
     if (!editId || loading || !entries.length) return
     const found = entries.find((e) => e.id === editId)
     if (found) {
       openEdit(found)
       setSearchParams({}, { replace: true })
     }
-  }, [searchParams, entries, loading, openEdit, setSearchParams])
+  }, [
+    searchParams,
+    entries,
+    loading,
+    openEdit,
+    setSearchParams,
+    myOwnerName,
+    defaultsReady,
+  ])
 
   const ownerOptions = useMemo(() => {
     const names = new Set<string>()
@@ -313,44 +372,24 @@ export default function CrmPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    const today = startOfDay(new Date())
-    return entries.filter((e) => {
+    const rows = entries.filter((e) => {
       if (stageFilter !== 'All' && (e.pipeline_stage || 'Lead') !== stageFilter) return false
       if (ownerFilter === 'Unassigned') {
         if (e.owner) return false
       } else if (ownerFilter !== 'All' && (e.owner || '') !== ownerFilter) {
         return false
       }
-      if (followFilter !== 'All') {
-        if (followFilter === 'None') {
-          if (e.follow_up_date) return false
-        } else if (!e.follow_up_date) {
-          return false
-        } else {
-          try {
-            const d = startOfDay(parseISO(e.follow_up_date.slice(0, 10)))
-            if (followFilter === 'Overdue' && !(isBefore(d, today) && !isToday(d))) return false
-            if (followFilter === 'Today' && !isToday(d)) return false
-            if (followFilter === 'Upcoming' && !(d > today)) return false
-          } catch {
-            return false
-          }
-        }
-      }
+      if (!matchesFollowFilter(e, followFilter)) return false
       if (!q) return true
-      if (e.company_name.toLowerCase().includes(q)) return true
-      if ((e.company_owner || '').toLowerCase().includes(q)) return true
-      if ((e.address || '').toLowerCase().includes(q)) return true
-      if ((e.trn || '').toLowerCase().includes(q)) return true
-      if ((e.quote_ref || '').toLowerCase().includes(q)) return true
-      return hydrateContacts(e).some(
-        (c) =>
-          c.name.toLowerCase().includes(q) ||
-          c.email.toLowerCase().includes(q) ||
-          c.phone.toLowerCase().includes(q),
-      )
+      return crmSearchHaystack(e).includes(q)
     })
+    return [...rows].sort(sortByFollowUpUrgency)
   }, [entries, search, stageFilter, ownerFilter, followFilter])
+
+  const dueCounts = useMemo(
+    () => computeDueCounts(entries, myOwnerName),
+    [entries, myOwnerName],
+  )
 
   const stageCounts = useMemo(() => {
     const counts: Record<string, number> = { All: entries.length }
@@ -366,6 +405,13 @@ export default function CrmPage() {
     entry: CrmEntry,
     patch: Partial<Pick<CrmEntry, 'pipeline_stage' | 'follow_up_date' | 'next_action' | 'outcome_reason'>>,
   ) {
+    if (patch.pipeline_stage === 'Won' || patch.pipeline_stage === 'Lost') {
+      setOutcomeTarget(entry)
+      setOutcomeStage(patch.pipeline_stage)
+      setOutcomeReason(entry.outcome_reason || '')
+      return
+    }
+
     setQuickBusyId(entry.id)
     setError('')
     try {
@@ -421,12 +467,124 @@ export default function CrmPage() {
     }
   }
 
+  async function confirmOutcome() {
+    if (!outcomeTarget || !outcomeReason.trim()) {
+      showToast('Outcome reason is required', 'error')
+      return
+    }
+    const entry = outcomeTarget
+    setQuickBusyId(entry.id)
+    try {
+      const { error: err } = await db
+        .from('crm')
+        .update({
+          pipeline_stage: outcomeStage,
+          outcome_reason: outcomeReason.trim(),
+          updated_by: user?.email || '',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', entry.id)
+      if (err) throw err
+      await logActivity(
+        'close_crm',
+        'crm',
+        entry.company_name,
+        `${outcomeStage}: ${outcomeReason.trim()}`,
+        user?.email || '',
+        entry.id,
+      )
+      showToast(`Marked ${outcomeStage}`, 'success')
+      setOutcomeTarget(null)
+      setOutcomeReason('')
+      await load()
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not close deal', 'error')
+    } finally {
+      setQuickBusyId(null)
+    }
+  }
+
+  async function saveLogTouch(payload: LogTouchPayload) {
+    if (!logTouchTarget) return
+    const entry = logTouchTarget
+    setQuickBusyId(entry.id)
+    try {
+      const { error: err } = await db.from('follow_up_updates').insert({
+        crm_id: entry.id,
+        company: entry.company_name,
+        update_text: payload.text,
+        user_email: user?.email || '',
+      })
+      if (err) throw err
+
+      const patch: Record<string, unknown> = {
+        updated_by: user?.email || '',
+        updated_at: new Date().toISOString(),
+      }
+      if (payload.pipeline_stage) patch.pipeline_stage = payload.pipeline_stage
+      if (payload.next_action) patch.next_action = payload.next_action
+      if (payload.clearDate) patch.follow_up_date = null
+      else if (payload.follow_up_date) patch.follow_up_date = payload.follow_up_date
+
+      if (isZohoCalendarEnabled(settings) && (payload.clearDate || payload.follow_up_date)) {
+        try {
+          const contacts = hydrateContacts(entry)
+          const p = primaryContact(contacts)
+          if (payload.clearDate) {
+            if (entry.calendar_event_id) {
+              await deleteZohoCalendarEvent(settings, entry.calendar_event_id)
+              patch.calendar_event_id = ''
+            }
+          } else if (payload.follow_up_date) {
+            const eventId = await syncFollowUpToZohoCalendar(settings, {
+              company: entry.company_name,
+              nextAction: payload.next_action || entry.next_action,
+              owner: entry.owner,
+              contactName: p?.name,
+              contactEmail: p?.email,
+              followUpDate: payload.follow_up_date,
+              existingEventId: entry.calendar_event_id || undefined,
+            })
+            if (eventId) patch.calendar_event_id = eventId
+          }
+        } catch (calErr) {
+          showToast(
+            calErr instanceof Error
+              ? `Saved locally; Zoho Calendar: ${calErr.message}`
+              : 'Saved locally; calendar sync failed',
+            'error',
+          )
+        }
+      }
+
+      const { error: crmErr } = await db.from('crm').update(patch).eq('id', entry.id)
+      if (crmErr) throw crmErr
+
+      await logActivity(
+        'followup_update',
+        'crm',
+        entry.company_name,
+        payload.text.slice(0, 120),
+        user?.email || '',
+        entry.id,
+      )
+      showToast('Touch logged', 'success')
+      setLogTouchTarget(null)
+      await load()
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Failed to save touch', 'error')
+    } finally {
+      setQuickBusyId(null)
+    }
+  }
+
   function openCreate() {
     setEditing(null)
     const defaultOwner =
       owners.find((o) => o.email === user?.email)?.name || user?.email || ''
     setForm({ ...emptyForm(), owner: defaultOwner })
     setActivity([])
+    setSheetTab('overview')
     setModalOpen(true)
   }
 
@@ -476,11 +634,21 @@ export default function CrmPage() {
         '_blank',
         'noopener,noreferrer',
       )
+      await logActivity(
+        'whatsapp_crm',
+        'crm',
+        row.company_name,
+        doc ? `${doc.kind} ${doc.ref}` : 'Follow-up WhatsApp',
+        user?.email || '',
+        row.id,
+      )
       if (doc) {
         showToast(
           `WhatsApp ready · ${doc.kind === 'quote' ? 'Quotation' : 'Invoice'} ${doc.ref}`,
           'success',
         )
+      } else {
+        showToast('WhatsApp opened', 'success')
       }
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Could not prepare WhatsApp message', 'error')
@@ -490,8 +658,29 @@ export default function CrmPage() {
   }
 
   function renderCrmRowActions(row: CrmEntry) {
+    const phone = primaryContact(hydrateContacts(row))?.phone || row.mobile_number || row.office_number || ''
     return (
       <>
+        <button
+          type="button"
+          style={btnGhost}
+          title="Log touch"
+          onClick={() => setLogTouchTarget(row)}
+        >
+          <MessageSquarePlus size={14} />
+        </button>
+        {phone ? (
+          <a
+            href={`tel:${phone.replace(/\s+/g, '')}`}
+            style={{ ...btnGhost, display: 'inline-flex', textDecoration: 'none' }}
+            title="Call"
+            onClick={() => {
+              void logActivity('call_crm', 'crm', row.company_name, phone, user?.email || '', row.id)
+            }}
+          >
+            <Phone size={14} />
+          </a>
+        ) : null}
         <Link
           to={`/quotations?client=${encodeURIComponent(row.company_name)}&new=1`}
           style={{ ...btnGhost, display: 'inline-flex', textDecoration: 'none' }}
@@ -704,18 +893,102 @@ export default function CrmPage() {
   return (
     <div style={page}>
       <PageHeader
-        title="CRM"
-        subtitle="Open deals need a follow-up date and next action. Close Won/Lost with a reason."
+        title="Pipeline"
+        subtitle="My Day opens overdue & today by default. Log every touch. Switch to board when you need the full funnel."
         actions={
-          <button type="button" style={btnPrimary} onClick={openCreate}>
-            <Plus size={16} /> Add company
-          </button>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+            <div className={resp.viewToggle} role="group" aria-label="CRM view">
+              <button
+                type="button"
+                aria-pressed={viewMode === 'list'}
+                onClick={() => setViewMode('list')}
+              >
+                <List size={14} /> List
+              </button>
+              <button
+                type="button"
+                aria-pressed={viewMode === 'board'}
+                onClick={() => setViewMode('board')}
+              >
+                <LayoutGrid size={14} /> Board
+              </button>
+            </div>
+            <button type="button" style={btnPrimary} onClick={openCreate}>
+              <Plus size={16} /> Add company
+            </button>
+          </div>
         }
       />
 
-      <WebsiteInquiriesPanel onConverted={() => void load()} />
+      <WebsiteInquiriesPanel
+        onConverted={(crmId) => {
+          void (async () => {
+            await load()
+            if (crmId) setSearchParams({ edit: crmId })
+          })()
+        }}
+      />
 
       {error && <div style={errorBanner}>{error}</div>}
+
+      <div className={resp.dueStrip}>
+        <button
+          type="button"
+          className={`${resp.dueTile} ${ownerFilter === myOwnerName && followFilter === 'Due' ? resp.dueTileActive : ''}`}
+          onClick={() => {
+            if (myOwnerName) setOwnerFilter(myOwnerName)
+            setFollowFilter('Due')
+            setStageFilter('All')
+          }}
+        >
+          <span className={resp.dueTileValue} style={{ color: colors.warn }}>
+            {dueCounts.overdue + dueCounts.today}
+          </span>
+          <span className={resp.dueTileLabel}>My Day</span>
+        </button>
+        <button
+          type="button"
+          className={`${resp.dueTile} ${followFilter === 'Overdue' ? resp.dueTileActive : ''}`}
+          onClick={() => setFollowFilter('Overdue')}
+        >
+          <span className={resp.dueTileValue} style={{ color: colors.danger }}>
+            {dueCounts.overdue}
+          </span>
+          <span className={resp.dueTileLabel}>Overdue</span>
+        </button>
+        <button
+          type="button"
+          className={`${resp.dueTile} ${followFilter === 'Today' ? resp.dueTileActive : ''}`}
+          onClick={() => setFollowFilter('Today')}
+        >
+          <span className={resp.dueTileValue} style={{ color: colors.warn }}>
+            {dueCounts.today}
+          </span>
+          <span className={resp.dueTileLabel}>Today</span>
+        </button>
+        <button
+          type="button"
+          className={`${resp.dueTile} ${followFilter === 'Upcoming' ? resp.dueTileActive : ''}`}
+          onClick={() => setFollowFilter('Upcoming')}
+        >
+          <span className={resp.dueTileValue} style={{ color: colors.success }}>
+            {dueCounts.upcoming}
+          </span>
+          <span className={resp.dueTileLabel}>Upcoming</span>
+        </button>
+        <button
+          type="button"
+          className={`${resp.dueTile} ${ownerFilter === 'All' && followFilter === 'All' && stageFilter === 'All' ? resp.dueTileActive : ''}`}
+          onClick={() => {
+            setOwnerFilter('All')
+            setFollowFilter('All')
+            setStageFilter('All')
+          }}
+        >
+          <span className={resp.dueTileValue}>{entries.length}</span>
+          <span className={resp.dueTileLabel}>All deals</span>
+        </button>
+      </div>
 
       <div className={resp.toolbar}>
         <div className={resp.toolbarSearch}>
@@ -731,7 +1004,7 @@ export default function CrmPage() {
           />
           <input
             style={{ ...input, paddingLeft: 36 }}
-            placeholder="Search company or contact…"
+            placeholder="Search company, contact, owner, notes…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -742,19 +1015,22 @@ export default function CrmPage() {
           onChange={(e) => setOwnerFilter(e.target.value)}
           title="Sales owner"
         >
-          <option value="All">All owners</option>
+          <option value="All">All sales owners</option>
+          {myOwnerName ? <option value={myOwnerName}>Me ({myOwnerName})</option> : null}
           <option value="Unassigned">Unassigned</option>
-          {ownerOptions.map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
+          {ownerOptions
+            .filter((o) => o !== myOwnerName)
+            .map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
         </select>
       </div>
 
       <div className={resp.chipRow}>
         <button type="button" style={chip(stageFilter === 'All')} onClick={() => setStageFilter('All')}>
-          All ({stageCounts.All || 0})
+          All stages ({stageCounts.All || 0})
         </button>
         {PIPELINE_STAGES.map((s) => (
           <button
@@ -769,9 +1045,9 @@ export default function CrmPage() {
       </div>
 
       <div className={resp.chipRow}>
-        {(['All', 'Overdue', 'Today', 'Upcoming', 'None'] as FollowFilter[]).map((f) => (
+        {(['All', 'Due', 'Overdue', 'Today', 'Upcoming', 'None'] as FollowFilter[]).map((f) => (
           <button key={f} type="button" style={chip(followFilter === f)} onClick={() => setFollowFilter(f)}>
-            {f === 'All' ? 'Any follow-up' : f}
+            {f === 'All' ? 'Any follow-up' : f === 'Due' ? 'Due (overdue + today)' : f}
           </button>
         ))}
       </div>
@@ -790,9 +1066,18 @@ export default function CrmPage() {
           }}
         >
           {search || stageFilter !== 'All' || ownerFilter !== 'All' || followFilter !== 'All'
-            ? 'No companies match your filters.'
+            ? 'No companies match your filters. Try My Day or All deals above.'
             : 'No CRM entries yet. Add your first company.'}
         </div>
+      ) : viewMode === 'board' ? (
+        <CrmPipelineBoard
+          entries={filtered}
+          busyId={quickBusyId}
+          onOpen={openEdit}
+          onMoveStage={(row, stage) => void quickPatch(row, { pipeline_stage: stage })}
+          onLogTouch={setLogTouchTarget}
+          renderActions={renderCrmRowActions}
+        />
       ) : compact ? (
         <div className={resp.listStack}>
           {filtered.map((row) => {
@@ -810,7 +1095,7 @@ export default function CrmPage() {
                     <div className={resp.cardMeta}>
                       {display.label}
                       {display.extra > 0 ? ` · +${display.extra}` : ''}
-                      {row.company_owner ? ` · Owner ${row.company_owner}` : ''}
+                      {row.company_owner ? ` · Client owner: ${row.company_owner}` : ''}
                     </div>
                   </div>
                   {row.quote_ref ? (
@@ -881,11 +1166,20 @@ export default function CrmPage() {
                   <div className={resp.cardField}>
                     <label>Phone</label>
                     <div style={{ fontSize: 13, color: colors.text, paddingTop: 6 }}>
-                      {p?.phone || row.mobile_number || row.office_number || '—'}
+                      {p?.phone || row.mobile_number || row.office_number ? (
+                        <a
+                          href={`tel:${(p?.phone || row.mobile_number || row.office_number || '').replace(/\s+/g, '')}`}
+                          style={{ color: colors.accent, textDecoration: 'none' }}
+                        >
+                          {p?.phone || row.mobile_number || row.office_number}
+                        </a>
+                      ) : (
+                        '—'
+                      )}
                     </div>
                   </div>
                 </div>
-                <div className={resp.cardMeta}>Sales: {row.owner || 'Unassigned'}</div>
+                <div className={resp.cardMeta}>Sales owner: {row.owner || 'Unassigned'}</div>
                 <div className={resp.cardActions}>{renderCrmRowActions(row)}</div>
               </article>
             )
@@ -1040,23 +1334,67 @@ export default function CrmPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={modalHeader}>
-              <h3 style={{ margin: 0, fontSize: 16 }}>{editing ? 'Edit company' : 'Add company'}</h3>
+              <h3 style={{ margin: 0, fontSize: 16, minWidth: 0, wordBreak: 'break-word' }}>
+                {editing ? editing.company_name : 'Add company'}
+              </h3>
               <button type="button" style={btnGhost} onClick={closeModal}>
                 <X size={18} />
               </button>
             </div>
             <form onSubmit={(e) => void handleSave(e)}>
               <div style={modalBody}>
-                <div style={formGrid}>
+                {editing ? (
+                  <div className={resp.sheetTabs} role="tablist">
+                    {(
+                      [
+                        ['overview', 'Overview'],
+                        ['contacts', 'Contacts'],
+                        ['activity', 'Activity'],
+                      ] as const
+                    ).map(([id, tabLabel]) => (
+                      <button
+                        key={id}
+                        type="button"
+                        role="tab"
+                        aria-selected={sheetTab === id}
+                        className={`${resp.sheetTab} ${sheetTab === id ? resp.sheetTabActive : ''}`}
+                        onClick={() => setSheetTab(id)}
+                      >
+                        {tabLabel}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+
+                {editing ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
+                    <button type="button" style={btn} onClick={() => setLogTouchTarget(editing)}>
+                      <MessageSquarePlus size={14} /> Log touch
+                    </button>
+                    <Link
+                      to={`/quotations?client=${encodeURIComponent(editing.company_name)}&new=1`}
+                      style={{ ...btn, textDecoration: 'none' }}
+                    >
+                      <FileText size={14} /> New quote
+                    </Link>
+                  </div>
+                ) : null}
+
+                <div
+                  style={{
+                    ...formGrid,
+                    display: sheetTab === 'overview' || !editing ? 'grid' : 'none',
+                  }}
+                >
                   <Field label="Company *">
                     <input
                       style={input}
-                      required
+                      required={sheetTab === 'overview' || !editing}
                       value={form.company_name}
                       onChange={(e) => setForm((f) => ({ ...f, company_name: e.target.value }))}
                     />
                   </Field>
-                  <Field label="Company owner">
+                  <Field label="Client business owner">
                     <input
                       style={input}
                       value={form.company_owner}
@@ -1185,18 +1523,13 @@ export default function CrmPage() {
                   )}
                 </div>
 
-                {editing ? (
-                  <div style={{ marginBottom: 12 }}>
-                    <Link
-                      to={`/quotations?client=${encodeURIComponent(form.company_name || editing.company_name)}&new=1`}
-                      style={{ ...btnPrimary, display: 'inline-flex', textDecoration: 'none', fontSize: 13 }}
-                    >
-                      <FileText size={14} /> Create quote for this company
-                    </Link>
-                  </div>
-                ) : null}
-
-                <div style={{ marginTop: 8, marginBottom: 8 }}>
+                <div
+                  style={{
+                    display: sheetTab === 'contacts' || !editing ? 'block' : 'none',
+                    marginTop: 8,
+                    marginBottom: 8,
+                  }}
+                >
                   <div
                     style={{
                       display: 'flex',
@@ -1290,27 +1623,29 @@ export default function CrmPage() {
                   ) : null}
                 </div>
 
-                <Field label="Notes">
-                  <textarea
-                    style={{ ...input, minHeight: 80, resize: 'vertical' }}
-                    value={form.notes}
-                    onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                  />
-                </Field>
+                <div style={{ display: sheetTab === 'overview' || !editing ? 'block' : 'none' }}>
+                  <Field label="Notes">
+                    <textarea
+                      style={{ ...input, minHeight: 80, resize: 'vertical' }}
+                      value={form.notes}
+                      onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                    />
+                  </Field>
+                </div>
 
                 {editing ? (
-                  <div style={{ marginTop: 16 }}>
+                  <div style={{ marginTop: 16, display: sheetTab === 'activity' ? 'block' : 'none' }}>
                     <label style={{ ...label, marginBottom: 8 }}>Activity timeline</label>
                     {activityLoading ? (
                       <p style={{ color: colors.muted, fontSize: 13 }}>Loading activity…</p>
                     ) : activity.length === 0 ? (
                       <p style={{ color: colors.muted2, fontSize: 13 }}>
-                        No activity yet. Saves, follow-ups, and quotes for this company will appear here.
+                        No activity yet. Log a touch, send WhatsApp/email, or save changes to build the timeline.
                       </p>
                     ) : (
                       <div
                         style={{
-                          maxHeight: 220,
+                          maxHeight: 320,
                           overflowY: 'auto',
                           border: `1px solid ${colors.border}`,
                           borderRadius: 10,
@@ -1360,6 +1695,72 @@ export default function CrmPage() {
         </div>
       )}
 
+      <CrmLogTouchModal
+        open={!!logTouchTarget}
+        entry={logTouchTarget}
+        busy={!!logTouchTarget && quickBusyId === logTouchTarget.id}
+        onClose={() => setLogTouchTarget(null)}
+        onSave={saveLogTouch}
+      />
+
+      {outcomeTarget && (
+        <div style={overlay} onClick={() => setOutcomeTarget(null)}>
+          <div style={{ ...modal, maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+            <div style={modalHeader}>
+              <h3 style={{ margin: 0, fontSize: 16 }}>
+                Mark {outcomeStage} — {outcomeTarget.company_name}
+              </h3>
+              <button type="button" style={btnGhost} onClick={() => setOutcomeTarget(null)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div style={modalBody}>
+              <Field label={`${outcomeStage} reason *`}>
+                <select
+                  style={input}
+                  value={
+                    CRM_OUTCOME_REASONS.includes(outcomeReason as (typeof CRM_OUTCOME_REASONS)[number])
+                      ? outcomeReason
+                      : ''
+                  }
+                  onChange={(e) => setOutcomeReason(e.target.value)}
+                >
+                  <option value="">Select reason…</option>
+                  {CRM_OUTCOME_REASONS.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  style={{ ...input, marginTop: 8 }}
+                  placeholder="Or type a custom reason"
+                  value={
+                    CRM_OUTCOME_REASONS.includes(outcomeReason as (typeof CRM_OUTCOME_REASONS)[number])
+                      ? ''
+                      : outcomeReason
+                  }
+                  onChange={(e) => setOutcomeReason(e.target.value)}
+                />
+              </Field>
+            </div>
+            <div style={modalFooter}>
+              <button type="button" style={btn} onClick={() => setOutcomeTarget(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                style={btnPrimary}
+                disabled={quickBusyId === outcomeTarget.id}
+                onClick={() => void confirmOutcome()}
+              >
+                Confirm {outcomeStage}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {deleteTarget && (
         <div style={overlay} onClick={() => setDeleteTarget(null)}>
           <div style={{ ...modal, maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
@@ -1400,6 +1801,18 @@ export default function CrmPage() {
         })}
         zohoEnabled={isZohoMailEnabled(settings)}
         onClose={() => setEmailTarget(null)}
+        onSent={async () => {
+          if (!emailTarget) return
+          await logActivity(
+            'email_crm',
+            'crm',
+            emailTarget.company_name,
+            'Email sent from CRM',
+            user?.email || '',
+            emailTarget.id,
+          )
+          showToast('Email logged on timeline', 'success')
+        }}
       />
     </div>
   )
