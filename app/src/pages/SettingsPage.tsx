@@ -688,7 +688,8 @@ export default function SettingsPage() {
         </h2>
         <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.55 }}>
           Connect Zoho so CRM follow-ups sync to Calendar, you can send mail from CRM, and your{' '}
-          <strong>Zoho inbox</strong> appears on the Dashboard matched to CRM companies. Create a
+          <strong>Zoho mail</strong> (Inbox + Sent) appears on the Dashboard matched to CRM companies.
+          Create a
           Self Client in the{' '}
           <a
             href="https://api-console.zoho.com/"
