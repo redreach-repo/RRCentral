@@ -138,9 +138,6 @@ export default function WebsiteInquiriesPanel({
           </div>
         ))}
       </div>
-      <button type="button" style={{ ...btn, marginTop: 12 }} onClick={() => void load()}>
-        Refresh
-      </button>
     </section>
   )
 }
