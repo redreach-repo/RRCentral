@@ -91,25 +91,41 @@ function corsHint(status: number): string {
 /** Preferred slug, plus the accidental Dashboard default name if already deployed. */
 const ZOHO_PROXY_SLUGS = ['zoho-proxy', 'bright-function'] as const
 
-function isMissingFunctionError(msg: string): boolean {
-  return /404|not found|Failed to send|Function not found/i.test(msg)
+function functionsErrorStatus(error: unknown): number | null {
+  const ctx = (error as { context?: { status?: number } } | null)?.context
+  return typeof ctx?.status === 'number' ? ctx.status : null
 }
 
+/**
+ * Try preferred slug then Dashboard default.
+ * supabase-js maps a missing function (HTTP 404) to FunctionsHttpError
+ * ("Edge Function returned a non-2xx status code"), so we must check
+ * `error.context.status` — not the message — before giving up.
+ */
 async function invokeZohoProxy(body: Record<string, unknown>): Promise<{ data: unknown; error: Error | null }> {
   const supabase = getSupabaseClient()
+  let sawMissing = false
   let lastError: Error | null = null
   for (const slug of ZOHO_PROXY_SLUGS) {
     const { data, error } = await supabase.functions.invoke(slug, { body })
     if (!error) return { data, error: null }
-    const err = error instanceof Error ? error : new Error(error.message || String(error))
+    const err =
+      error instanceof Error ? error : new Error((error as { message?: string }).message || String(error))
     lastError = err
-    if (!isMissingFunctionError(err.message)) return { data: null, error: err }
+    const status = functionsErrorStatus(error)
+    const missing = status === 404 || /Failed to send a request/i.test(err.message)
+    if (missing) {
+      sawMissing = true
+      continue
+    }
+    return { data: null, error: err }
   }
   return {
     data: null,
     error: new Error(
-      lastError?.message ||
-        'Zoho proxy not deployed. In Supabase → Edge Functions, deploy `zoho-proxy` (file index.ts), then retry.',
+      sawMissing
+        ? 'Zoho proxy not deployed. In Supabase → Edge Functions, deploy `zoho-proxy` (file index.ts), then retry.'
+        : lastError?.message || 'Zoho proxy failed',
     ),
   }
 }
@@ -129,11 +145,6 @@ async function refreshTokenViaProxy(settings: ZohoSettings): Promise<{
     refreshToken: setting(settings, 'zohoRefreshToken'),
   })
   if (error) {
-    if (isMissingFunctionError(error.message)) {
-      throw new Error(
-        'Zoho proxy not deployed. In Supabase → Edge Functions, deploy `zoho-proxy` from this repo (supabase/functions/zoho-proxy), then retry.',
-      )
-    }
     throw error
   }
   const payload = (data || {}) as {
