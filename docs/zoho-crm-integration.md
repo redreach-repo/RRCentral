@@ -2,7 +2,11 @@
 
 ## Current state in this repo
 
-RRCentral’s React app integrates **Zoho Calendar** and **Zoho Mail** only (`app/src/lib/zoho.ts`), using Self Client credentials stored in `app_settings`.
+RRCentral’s React app integrates **Zoho Calendar** and **Zoho Mail** (`app/src/lib/zoho.ts`), using Self Client credentials stored in `app_settings`.
+
+Mail supports:
+- **Send** from CRM / documents (`sendZohoMail`)
+- **Inbox read** on the Dashboard (`listZohoInboxMessages`), matched to CRM contacts by email
 
 There is **no** Zoho CRM Lead/module sync for:
 
