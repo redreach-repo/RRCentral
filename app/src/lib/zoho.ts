@@ -1,7 +1,10 @@
 /**
- * Zoho Calendar + Mail client for local/GitHub Pages mode.
- * Uses Self Client refresh token stored in app settings.
+ * Zoho Calendar + Mail client.
+ * Browser calls go through the Supabase `zoho-proxy` edge function when available
+ * (Safari/Chrome block direct Zoho OAuth with CORS → 405).
  */
+
+import { getSupabaseClient, isSupabaseConfigured } from './supabaseConfig'
 
 export type ZohoSettings = Record<string, string>
 
@@ -75,6 +78,80 @@ function writeTokenCache(cache: TokenCache) {
   sessionStorage.setItem(TOKEN_CACHE_KEY, JSON.stringify(cache))
 }
 
+function corsHint(status: number): string {
+  if (status === 405 || status === 0) {
+    return (
+      'Browser blocked Zoho (CORS). Connect Supabase cloud, deploy the `zoho-proxy` edge function, ' +
+      'then try again. See Settings → Zoho for deploy steps.'
+    )
+  }
+  return `Zoho token refresh failed (${status})`
+}
+
+async function refreshTokenViaProxy(settings: ZohoSettings): Promise<{
+  access_token?: string
+  expires_in?: number
+  error?: string
+  error_description?: string
+  status: number
+}> {
+  const supabase = getSupabaseClient()
+  const { data, error } = await supabase.functions.invoke('zoho-proxy', {
+    body: {
+      action: 'token',
+      accountsDomain: accountsDomain(settings),
+      clientId: setting(settings, 'zohoClientId'),
+      clientSecret: setting(settings, 'zohoClientSecret'),
+      refreshToken: setting(settings, 'zohoRefreshToken'),
+    },
+  })
+  if (error) {
+    const msg = error.message || String(error)
+    // Function missing / not deployed
+    if (/404|not found|Failed to send/i.test(msg)) {
+      throw new Error(
+        'Zoho proxy not deployed. In Supabase → Edge Functions, deploy `zoho-proxy` from this repo (supabase/functions/zoho-proxy), then retry.',
+      )
+    }
+    throw new Error(msg)
+  }
+  const payload = (data || {}) as {
+    access_token?: string
+    expires_in?: number
+    error?: string
+    error_description?: string
+    _httpStatus?: number
+  }
+  return { ...payload, status: payload.access_token ? 200 : Number(payload._httpStatus) || 400 }
+}
+
+async function refreshTokenDirect(settings: ZohoSettings): Promise<{
+  access_token?: string
+  expires_in?: number
+  error?: string
+  error_description?: string
+  status: number
+}> {
+  const body = new URLSearchParams({
+    refresh_token: setting(settings, 'zohoRefreshToken'),
+    client_id: setting(settings, 'zohoClientId'),
+    client_secret: setting(settings, 'zohoClientSecret'),
+    grant_type: 'refresh_token',
+  })
+  const res = await fetch(`${accountsDomain(settings)}/oauth/v2/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  })
+  const data = (await res.json().catch(() => ({}))) as {
+    access_token?: string
+    expires_in?: number
+    error?: string
+    error_description?: string
+  }
+  return { ...data, status: res.status }
+}
+
 export async function getZohoAccessToken(settings: ZohoSettings): Promise<string> {
   if (!isZohoConfigured(settings)) {
     throw new Error('Zoho is not configured — add Client ID, Secret, and Refresh Token in Settings')
@@ -83,29 +160,41 @@ export async function getZohoAccessToken(settings: ZohoSettings): Promise<string
   const cached = readTokenCache(settings)
   if (cached?.accessToken) return cached.accessToken
 
-  const body = new URLSearchParams({
-    refresh_token: setting(settings, 'zohoRefreshToken'),
-    client_id: setting(settings, 'zohoClientId'),
-    client_secret: setting(settings, 'zohoClientSecret'),
-    grant_type: 'refresh_token',
-  })
-
-  const res = await fetch(`${accountsDomain(settings)}/oauth/v2/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  })
-
-  const data = (await res.json().catch(() => ({}))) as {
+  let data: {
     access_token?: string
     expires_in?: number
     error?: string
     error_description?: string
+    status: number
   }
 
-  if (!res.ok || !data.access_token) {
+  if (isSupabaseConfigured()) {
+    try {
+      data = await refreshTokenViaProxy(settings)
+    } catch (proxyErr) {
+      // Fall back to direct call (may work in some browsers / extensions)
+      try {
+        data = await refreshTokenDirect(settings)
+        if (!data.access_token && (data.status === 405 || data.status === 0)) {
+          throw proxyErr
+        }
+      } catch {
+        throw proxyErr instanceof Error ? proxyErr : new Error(String(proxyErr))
+      }
+    }
+  } else {
+    try {
+      data = await refreshTokenDirect(settings)
+    } catch {
+      throw new Error(
+        'Cannot reach Zoho from this browser. Connect Supabase in Settings (cloud mode) and deploy the zoho-proxy edge function.',
+      )
+    }
+  }
+
+  if (!data.access_token) {
     throw new Error(
-      data.error_description || data.error || `Zoho token refresh failed (${res.status})`,
+      data.error_description || data.error || corsHint(data.status),
     )
   }
 
@@ -129,6 +218,37 @@ async function zohoFetch(
   if (!headers.has('Content-Type') && init.body) {
     headers.set('Content-Type', 'application/json')
   }
+
+  if (isSupabaseConfigured()) {
+    try {
+      const headerObj: Record<string, string> = {}
+      headers.forEach((v, k) => {
+        headerObj[k] = v
+      })
+      const supabase = getSupabaseClient()
+      const { data, error } = await supabase.functions.invoke('zoho-proxy', {
+        body: {
+          action: 'api',
+          url,
+          method: init.method || 'GET',
+          headers: headerObj,
+          body: typeof init.body === 'string' ? init.body : init.body ? String(init.body) : null,
+        },
+      })
+      if (error) throw error
+      const wrapped = data as { ok?: boolean; status?: number; body?: unknown }
+      const status = Number(wrapped?.status) || 200
+      const payload = wrapped?.body !== undefined ? wrapped.body : data
+      const text = typeof payload === 'string' ? payload : JSON.stringify(payload ?? {})
+      return new Response(text, {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    } catch {
+      // fall through to direct
+    }
+  }
+
   return fetch(url, { ...init, headers })
 }
 
