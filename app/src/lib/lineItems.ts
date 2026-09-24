@@ -1,7 +1,7 @@
 import { VAT_RATE } from './config'
 import { db } from './db'
 import { formatSizes, parseSizesJson, sumSizes, type SizeBreakdown } from './sizes'
-import type { LineItem } from './types'
+import type { LineItem, LineItemDocType } from './types'
 
 export interface DraftLineItem {
   key: string
@@ -117,7 +117,7 @@ export function toDraftItems(rows: LineItem[]): DraftLineItem[] {
 }
 
 export async function loadLineItems(
-  docType: 'Quote' | 'Invoice',
+  docType: LineItemDocType,
   reference: string,
 ): Promise<LineItem[]> {
   if (!reference) return []
@@ -132,7 +132,7 @@ export async function loadLineItems(
 }
 
 export async function saveLineItems(
-  docType: 'Quote' | 'Invoice',
+  docType: LineItemDocType,
   reference: string,
   items: DraftLineItem[],
   vatRate = VAT_RATE,
@@ -183,7 +183,7 @@ export async function saveLineItems(
 }
 
 export async function deleteLineItems(
-  docType: 'Quote' | 'Invoice',
+  docType: LineItemDocType,
   references: string[],
 ): Promise<void> {
   for (const ref of references) {

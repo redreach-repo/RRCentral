@@ -234,9 +234,36 @@ export interface Invoice {
   updated_at: string
 }
 
+/** Goods receipt / packing slip generated from a quotation. Quantities only — no prices. */
+export interface DeliveryNote {
+  id: string
+  client: string
+  vertical: string
+  division_code: string
+  reference_number: string
+  date: string | null
+  delivery_date: string | null
+  description: string
+  /** Finalized quotation reference this note is based on. */
+  quote_ref: string
+  quote_id: string
+  status: string
+  delivery_terms: string
+  ship_to: string
+  notes: string
+  received_by: string
+  vehicle_notes: string
+  created_by: string
+  updated_by: string
+  created_at: string
+  updated_at: string
+}
+
+export type LineItemDocType = 'Quote' | 'Invoice' | 'DeliveryNote'
+
 export interface LineItem {
   id: string
-  doc_type: 'Quote' | 'Invoice'
+  doc_type: LineItemDocType
   reference: string
   line_no: number
   description: string

@@ -6,7 +6,7 @@
 import { ALL_SEED_PRODUCTS } from './seedCatalog'
 
 export const DB_NAME = 'rrcentral_local'
-const DB_VERSION = 6
+const DB_VERSION = 7
 
 export const LOCAL_STORES = [
   'app_settings',
@@ -16,6 +16,7 @@ export const LOCAL_STORES = [
   'follow_up_updates',
   'quotations',
   'invoices',
+  'delivery_notes',
   'line_items',
   'products',
   'quote_templates',
@@ -74,6 +75,7 @@ const DEFAULT_SETTINGS: { key: string; value: string }[] = [
   { key: 'currency', value: 'AED' },
   { key: 'quotePrefix', value: 'RR' },
   { key: 'invoicePrefix', value: 'RR' },
+  { key: 'deliveryNotePrefix', value: 'DN' },
   { key: 'quoteValidityDays', value: '14' },
   { key: 'moqDefault', value: '50' },
   { key: 'logoUrl', value: '' },
@@ -405,6 +407,7 @@ function withDefaults(table: string, row: Row): Row {
         'follow_up_updates',
         'quotations',
         'invoices',
+        'delivery_notes',
         'line_items',
         'quote_templates',
         'expenses',
@@ -433,7 +436,11 @@ function withDefaults(table: string, row: Row): Row {
 
   if (
     next.updated_at == null &&
-    (table === 'crm' || table === 'quotations' || table === 'invoices' || table === 'products')
+    (table === 'crm' ||
+      table === 'quotations' ||
+      table === 'invoices' ||
+      table === 'delivery_notes' ||
+      table === 'products')
   ) {
     next.updated_at = now
   }
@@ -820,6 +827,7 @@ export type MigrationDump = {
   follow_up_updates?: Row[]
   quotations?: Row[]
   invoices?: Row[]
+  delivery_notes?: Row[]
   line_items?: Row[]
   products?: Row[]
   quote_templates?: Row[]

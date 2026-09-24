@@ -36,6 +36,7 @@ insert into app_settings (key, value) values
   ('currency', 'AED'),
   ('quotePrefix', 'RR'),
   ('invoicePrefix', 'RR'),
+  ('deliveryNotePrefix', 'DN'),
   ('quoteValidityDays', '14'),
   ('moqDefault', '50'),
   ('logoUrl', ''),
@@ -566,11 +567,40 @@ create table invoices (
 );
 
 ------------------------------------------------------------
--- LINE ITEMS (shared by quotes & invoices)
+-- DELIVERY NOTES (goods receipt generated from a quotation)
+------------------------------------------------------------
+create table delivery_notes (
+  id uuid primary key default uuid_generate_v4(),
+  client text not null default '',
+  vertical text not null default '',
+  division_code text not null default '01',
+  reference_number text not null default '',
+  date date,
+  delivery_date date,
+  description text not null default '',
+  quote_ref text not null default '',
+  quote_id text not null default '',
+  status text not null default 'Issued',
+  delivery_terms text not null default '',
+  ship_to text not null default '',
+  notes text not null default '',
+  received_by text not null default '',
+  vehicle_notes text not null default '',
+  created_by text not null default '',
+  updated_by text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index idx_delivery_notes_quote_ref on delivery_notes(quote_ref);
+create index idx_delivery_notes_status on delivery_notes(status);
+
+------------------------------------------------------------
+-- LINE ITEMS (shared by quotes, invoices, and delivery notes)
 ------------------------------------------------------------
 create table line_items (
   id uuid primary key default uuid_generate_v4(),
-  doc_type text not null check (doc_type in ('Quote', 'Invoice')),
+  doc_type text not null check (doc_type in ('Quote', 'Invoice', 'DeliveryNote')),
   reference text not null,
   line_no integer not null default 1,
   description text not null default '',
@@ -764,6 +794,7 @@ alter table crm enable row level security;
 alter table follow_up_updates enable row level security;
 alter table quotations enable row level security;
 alter table invoices enable row level security;
+alter table delivery_notes enable row level security;
 alter table line_items enable row level security;
 alter table products enable row level security;
 alter table quote_templates enable row level security;
@@ -797,6 +828,7 @@ create policy "Authenticated users full access" on crm for all using (auth.role(
 create policy "Authenticated users full access" on follow_up_updates for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "Authenticated users full access" on quotations for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "Authenticated users full access" on invoices for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Authenticated users full access" on delivery_notes for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "Authenticated users full access" on line_items for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "Authenticated users full access" on products for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "Authenticated users full access" on quote_templates for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
@@ -891,3 +923,30 @@ create policy "Public can submit website inquiries" on website_inquiries for ins
 -- alter table website_inquiries enable row level security;
 -- create policy "Authenticated users full access" on website_inquiries for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 -- create policy "Public can submit website inquiries" on website_inquiries for insert to anon with check (true);
+-- insert into app_settings (key, value) values ('deliveryNotePrefix', 'DN') on conflict (key) do nothing;
+-- create table if not exists delivery_notes (
+--   id uuid primary key default uuid_generate_v4(),
+--   client text not null default '',
+--   vertical text not null default '',
+--   division_code text not null default '01',
+--   reference_number text not null default '',
+--   date date,
+--   delivery_date date,
+--   description text not null default '',
+--   quote_ref text not null default '',
+--   quote_id text not null default '',
+--   status text not null default 'Issued',
+--   delivery_terms text not null default '',
+--   ship_to text not null default '',
+--   notes text not null default '',
+--   received_by text not null default '',
+--   vehicle_notes text not null default '',
+--   created_by text not null default '',
+--   updated_by text not null default '',
+--   created_at timestamptz not null default now(),
+--   updated_at timestamptz not null default now()
+-- );
+-- alter table line_items drop constraint if exists line_items_doc_type_check;
+-- alter table line_items add constraint line_items_doc_type_check check (doc_type in ('Quote', 'Invoice', 'DeliveryNote'));
+-- alter table delivery_notes enable row level security;
+-- create policy "Authenticated users full access" on delivery_notes for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');

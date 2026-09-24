@@ -4,7 +4,7 @@ import { format } from 'date-fns'
 import { ArrowLeft, Download, Mail, MessageCircle, Printer } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS, VAT_RATE } from '../lib/config'
-import type { Client, CrmContact, CrmEntry, Invoice, LineItem, Quotation } from '../lib/types'
+import type { Client, CrmContact, CrmEntry, DeliveryNote, Invoice, LineItem, Quotation } from '../lib/types'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatAED } from '../lib/money'
@@ -26,6 +26,12 @@ import {
   elementToPdfBlob,
   quoteValidUntil,
 } from '../lib/documents'
+import {
+  DELIVERY_NOTE_COLUMNS,
+  deliveryNoteTotalQty,
+  parseDocumentType,
+  type PrintableDocType,
+} from '../lib/deliveryNotes'
 import { hydrateContacts, primaryContact } from '../lib/contacts'
 import { isZohoMailEnabled } from '../lib/zoho'
 import EmailComposeModal from '../components/EmailComposeModal'
@@ -39,11 +45,9 @@ import {
   DEFAULT_WHATSAPP_QUOTE,
 } from '../lib/templates'
 
-type DocType = 'quote' | 'invoice'
-
 export default function DocumentPage() {
   const { type = 'quote', id = '' } = useParams<{ type: string; id: string }>()
-  const docType: DocType = type === 'invoice' ? 'invoice' : 'quote'
+  const docType: PrintableDocType = parseDocumentType(type)
   const { settings } = useSettings()
   const { showToast } = useToast()
   const { user } = useAuth()
@@ -53,6 +57,7 @@ export default function DocumentPage() {
   const [error, setError] = useState('')
   const [quote, setQuote] = useState<Quotation | null>(null)
   const [invoice, setInvoice] = useState<Invoice | null>(null)
+  const [deliveryNote, setDeliveryNote] = useState<DeliveryNote | null>(null)
   const [items, setItems] = useState<LineItem[]>([])
   const [client, setClient] = useState<Client | null>(null)
   const [emailContacts, setEmailContacts] = useState<CrmContact[]>([])
@@ -63,74 +68,68 @@ export default function DocumentPage() {
     setLoading(true)
     setError('')
     try {
+      async function attachClient(company: string) {
+        if (!company) {
+          setClient(null)
+          setEmailContacts([])
+          return
+        }
+        const { data: c } = await db
+          .from('clients')
+          .select('*')
+          .ilike('company_name', company)
+          .maybeSingle()
+        setClient((c as Client) || null)
+        const { data: crm } = await db
+          .from('crm')
+          .select('*')
+          .ilike('company_name', company)
+          .maybeSingle()
+        const fromCrm = crm ? hydrateContacts(crm as CrmEntry) : []
+        if (fromCrm.length) setEmailContacts(fromCrm)
+        else if (c) {
+          setEmailContacts(
+            hydrateContacts({
+              primary_contact: (c as Client).primary_contact,
+              email_phone: (c as Client).email,
+              mobile_number: (c as Client).mobile,
+              contacts: (c as Client).contacts,
+            }),
+          )
+        } else setEmailContacts([])
+      }
+
+      setQuote(null)
+      setInvoice(null)
+      setDeliveryNote(null)
+
       if (docType === 'quote') {
         const { data, error: err } = await db.from('quotations').select('*').eq('id', id).maybeSingle()
         if (err) throw err
         if (!data) throw new Error('Quotation not found')
         const q = data as Quotation
         setQuote(q)
-        setInvoice(null)
         const lines = await loadLineItems('Quote', q.quote_id)
         setItems(lines)
-        if (q.client) {
-          const { data: c } = await db
-            .from('clients')
-            .select('*')
-            .ilike('company_name', q.client)
-            .maybeSingle()
-          setClient((c as Client) || null)
-          const { data: crm } = await db
-            .from('crm')
-            .select('*')
-            .ilike('company_name', q.client)
-            .maybeSingle()
-          const fromCrm = crm ? hydrateContacts(crm as CrmEntry) : []
-          if (fromCrm.length) setEmailContacts(fromCrm)
-          else if (c) {
-            setEmailContacts(
-              hydrateContacts({
-                primary_contact: (c as Client).primary_contact,
-                email_phone: (c as Client).email,
-                mobile_number: (c as Client).mobile,
-                contacts: (c as Client).contacts,
-              }),
-            )
-          } else setEmailContacts([])
-        }
+        await attachClient(q.client)
+      } else if (docType === 'delivery-note') {
+        const { data, error: err } = await db.from('delivery_notes').select('*').eq('id', id).maybeSingle()
+        if (err) throw err
+        if (!data) throw new Error('Delivery note not found')
+        const note = data as DeliveryNote
+        setDeliveryNote(note)
+        const lines = await loadLineItems('DeliveryNote', note.reference_number)
+        setItems(lines)
+        await attachClient(note.client)
       } else {
         const { data, error: err } = await db.from('invoices').select('*').eq('id', id).maybeSingle()
         if (err) throw err
         if (!data) throw new Error('Invoice not found')
         const inv = data as Invoice
         setInvoice(inv)
-        setQuote(null)
         const lines = await loadLineItems('Invoice', inv.reference_number)
         setItems(lines)
-        if (inv.client) {
-          const { data: c } = await db
-            .from('clients')
-            .select('*')
-            .ilike('company_name', inv.client)
-            .maybeSingle()
-          setClient((c as Client) || null)
-          const { data: crm } = await db
-            .from('crm')
-            .select('*')
-            .ilike('company_name', inv.client)
-            .maybeSingle()
-          const fromCrm = crm ? hydrateContacts(crm as CrmEntry) : []
-          if (fromCrm.length) setEmailContacts(fromCrm)
-          else if (c) {
-            setEmailContacts(
-              hydrateContacts({
-                primary_contact: (c as Client).primary_contact,
-                email_phone: (c as Client).email,
-                mobile_number: (c as Client).mobile,
-                contacts: (c as Client).contacts,
-              }),
-            )
-          } else setEmailContacts([])
-        }
+        await attachClient(inv.client)
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load document')
@@ -143,27 +142,38 @@ export default function DocumentPage() {
     void load()
   }, [load])
 
-  const doc = quote || invoice
+  const doc = quote || invoice || deliveryNote
+  const isDeliveryNote = docType === 'delivery-note'
   const displayRef = displayDocumentReference({
-    referenceNumber: quote?.reference_number || invoice?.reference_number,
+    referenceNumber: quote?.reference_number || invoice?.reference_number || deliveryNote?.reference_number,
     fallbackId: quote?.quote_id,
     status: doc?.status,
   })
   const title =
     docType === 'quote'
       ? getDivisionQuoteFormat(quote?.division_code, settings).documentTitle
-      : 'INVOICE'
+      : docType === 'delivery-note'
+        ? 'DELIVERY NOTE'
+        : 'INVOICE'
   const quoteFormat = getDivisionQuoteFormat(
-    docType === 'quote' ? quote?.division_code : '01',
+    docType === 'quote' ? quote?.division_code : deliveryNote?.division_code || '01',
     settings,
   )
+  const lineColumns = isDeliveryNote ? DELIVERY_NOTE_COLUMNS : quoteFormat.columns
+  const backTo =
+    docType === 'quote' ? '/quotations' : docType === 'delivery-note' ? '/delivery-notes' : '/invoices'
   const isDraft =
     displayRef === 'DRAFT' ||
-    (quote ? !quote.reference_number || quote.status === 'Draft' : invoice?.status === 'Draft')
+    (quote
+      ? !quote.reference_number || quote.status === 'Draft'
+      : deliveryNote
+        ? deliveryNote.status === 'Draft'
+        : invoice?.status === 'Draft')
   const division =
-    DIVISIONS.find((d) => d.code === quote?.division_code)?.brand ||
+    DIVISIONS.find((d) => d.code === (quote?.division_code || deliveryNote?.division_code))?.brand ||
     quote?.vertical ||
     invoice?.vertical ||
+    deliveryNote?.vertical ||
     ''
 
   const validityDays = Number(settings.quoteValidityDays || 14) || 14
@@ -195,6 +205,7 @@ export default function DocumentPage() {
     }
     return formatMoneyAmount(n, docCurrency)
   }
+  const goodsQtyLabel = `${deliveryNoteTotalQty(items)} pcs as listed (not an invoice)`
   const wandersLegalReady =
     Boolean(settings.wandersLegalEntityName) &&
     settings.wandersLegalEntityName !== 'TBC' &&
@@ -228,7 +239,7 @@ export default function DocumentPage() {
       const vat = Math.round(taxable * effectiveVatRate * 100) / 100
       return { subtotal, discount, taxable, vat, total: Math.round((taxable + vat) * 100) / 100 }
     }
-    const total = Number(doc?.amount || 0)
+    const total = Number(doc && 'amount' in doc ? doc.amount : 0)
     if (effectiveVatRate <= 0) {
       return { subtotal: total, discount: 0, taxable: total, vat: 0, total }
     }
@@ -288,7 +299,7 @@ export default function DocumentPage() {
       contactGreeting: p?.name || client?.primary_contact ? ` ${p?.name || client?.primary_contact}` : '',
       titleLower: title.toLowerCase(),
       ref: displayRef,
-      amount: money(summary.total),
+      amount: isDeliveryNote ? goodsQtyLabel : money(summary.total),
       company,
       client: doc?.client || '',
       contact: p?.name || client?.primary_contact || 'team',
@@ -345,7 +356,7 @@ export default function DocumentPage() {
     company: settings.companyName || 'Red Reach Middle East FZE',
     client: doc?.client || '',
     contact: primaryContact(emailContacts)?.name || client?.primary_contact || 'team',
-    amount: money(summary.total),
+    amount: isDeliveryNote ? goodsQtyLabel : money(summary.total),
     validUntil: validUntil ? format(new Date(validUntil), 'dd MMM yyyy') : '',
     validUntilLine: validUntil && docType === 'quote' ? `\nValid until: ${format(new Date(validUntil), 'dd MMM yyyy')}` : '',
   }
@@ -362,7 +373,7 @@ export default function DocumentPage() {
     return (
       <div style={{ minHeight: '100vh', background: '#f0f0f0', color: '#333', padding: 40 }}>
         <p style={{ color: '#b91c1c' }}>{error || 'Document not found'}</p>
-        <Link to={docType === 'quote' ? '/quotations' : '/invoices'}>Back</Link>
+        <Link to={backTo}>Back</Link>
       </div>
     )
   }
@@ -383,7 +394,7 @@ export default function DocumentPage() {
         }}
       >
         <Link
-          to={docType === 'quote' ? '/quotations' : '/invoices'}
+          to={backTo}
           style={{
             marginRight: 'auto',
             color: 'rgba(255,255,255,0.8)',
@@ -515,6 +526,18 @@ export default function DocumentPage() {
                       {format(new Date(validUntil), 'dd MMM yyyy')}
                     </div>
                   ) : null}
+                  {isDeliveryNote && deliveryNote?.quote_ref ? (
+                    <div>
+                      <span style={{ color: '#555' }}>Quotation: </span>
+                      {deliveryNote.quote_ref}
+                    </div>
+                  ) : null}
+                  {isDeliveryNote && deliveryNote?.delivery_date ? (
+                    <div>
+                      <span style={{ color: '#555' }}>Delivery: </span>
+                      {format(new Date(deliveryNote.delivery_date), 'dd MMM yyyy')}
+                    </div>
+                  ) : null}
                   {'payment_status' in doc && (
                     <div>
                       <span style={{ color: '#555' }}>Payment: </span>
@@ -549,7 +572,7 @@ export default function DocumentPage() {
                     color: '#555',
                   }}
                 >
-                  {quoteFormat.sectionHeadings.billTo}
+                  {isDeliveryNote ? 'Deliver to' : quoteFormat.sectionHeadings.billTo}
                 </h3>
                 <p style={{ margin: 0, lineHeight: 1.5, fontSize: 14 }}>
                   <strong>{doc.client}</strong>
@@ -595,9 +618,20 @@ export default function DocumentPage() {
                     color: '#555',
                   }}
                 >
-                  {quoteFormat.sectionHeadings.scope}
+                  {isDeliveryNote ? 'Against quotation' : quoteFormat.sectionHeadings.scope}
                 </h3>
                 <p style={{ margin: 0, lineHeight: 1.5, fontSize: 14 }}>{doc.description || '—'}</p>
+                {isDeliveryNote && deliveryNote?.quote_ref ? (
+                  <p style={{ margin: '10px 0 0', fontSize: 12.5, color: '#444', lineHeight: 1.45 }}>
+                    <strong>Quotation:</strong> {deliveryNote.quote_ref}
+                    {deliveryNote.ship_to ? (
+                      <>
+                        <br />
+                        <strong>Ship to:</strong> {deliveryNote.ship_to}
+                      </>
+                    ) : null}
+                  </p>
+                ) : null}
                 {docType === 'quote' && quoteFormat.showPartnerFulfillment ? (
                   <p style={{ margin: '10px 0 0', fontSize: 12.5, color: '#444', lineHeight: 1.45 }}>
                     <strong>Fulfilment partner:</strong> {quoteFormat.partnerName || CONNECT_PARTNER.name}{' '}
@@ -622,13 +656,13 @@ export default function DocumentPage() {
                 color: '#555',
               }}
             >
-              {quoteFormat.sectionHeadings.lines}
+              {isDeliveryNote ? 'Goods delivered' : quoteFormat.sectionHeadings.lines}
             </h3>
 
             <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8, fontSize: 13.5 }}>
               <thead>
                 <tr>
-                  {quoteFormat.columns.map((h) => (
+                  {lineColumns.map((h) => (
                     <th
                       key={h}
                       style={{
@@ -653,7 +687,7 @@ export default function DocumentPage() {
                 {items.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={quoteFormat.columns.length}
+                      colSpan={lineColumns.length}
                       style={{ padding: 12, color: '#555' }}
                     >
                       No line items
@@ -662,7 +696,7 @@ export default function DocumentPage() {
                 ) : (
                   items.map((it) => (
                     <tr key={it.id}>
-                      {quoteFormat.columns.map((col) => (
+                      {lineColumns.map((col) => (
                         <td
                           key={col}
                           style={{
@@ -685,6 +719,23 @@ export default function DocumentPage() {
               </tbody>
             </table>
 
+            {isDeliveryNote ? (
+              <div style={{ width: 280, margin: '18px 0 0 auto', fontSize: 14 }}>
+                <div
+                  style={{
+                    ...totalRow,
+                    marginTop: 6,
+                    paddingTop: 10,
+                    borderTop: '2px solid #222',
+                    fontWeight: 800,
+                    fontSize: 16,
+                  }}
+                >
+                  <span>Total qty</span>
+                  <span>{deliveryNoteTotalQty(items)}</span>
+                </div>
+              </div>
+            ) : (
             <div style={{ width: 280, margin: '18px 0 0 auto', fontSize: 14 }}>
               <div style={totalRow}>
                 <span>Subtotal</span>
@@ -724,14 +775,30 @@ export default function DocumentPage() {
                 <span>{money(summary.total)}</span>
               </div>
             </div>
+            )}
 
             <div style={{ marginTop: 28, fontSize: 12.5, lineHeight: 1.55, color: '#333' }}>
               <h3 style={{ margin: '0 0 8px', fontSize: 13, color: '#c1121f' }}>
-                {quoteFormat.sectionHeadings.commercial}
+                {isDeliveryNote ? 'Delivery' : quoteFormat.sectionHeadings.commercial}
               </h3>
+              {isDeliveryNote ? (
+                <>
+                  <div>This document is a delivery note, not a tax invoice.</div>
+                  <div>Delivery: {doc.delivery_terms || settings.deliveryTerms || '—'}</div>
+                  {deliveryNote?.vehicle_notes ? (
+                    <div>Vehicle / driver: {deliveryNote.vehicle_notes}</div>
+                  ) : null}
+                  {deliveryNote?.received_by ? (
+                    <div>Received by: {deliveryNote.received_by}</div>
+                  ) : null}
+                </>
+              ) : (
+                <>
               <div>
                 Payment terms:{' '}
-                {doc.payment_terms || quoteFormat.defaultPaymentTerms || settings.paymentTerms || '—'}
+                {'payment_terms' in doc
+                  ? doc.payment_terms || quoteFormat.defaultPaymentTerms || settings.paymentTerms || '—'
+                  : quoteFormat.defaultPaymentTerms || settings.paymentTerms || '—'}
               </div>
               {quoteFormat.showDelivery ? (
                 <div>Delivery: {doc.delivery_terms || settings.deliveryTerms || '—'}</div>
@@ -793,6 +860,8 @@ export default function DocumentPage() {
                   A/C {settings.bankAccount} · IBAN {settings.iban}
                 </div>
               )}
+                </>
+              )}
             </div>
 
             {isWandersQuote && (
@@ -813,15 +882,17 @@ export default function DocumentPage() {
             )}
 
             {(doc.notes ||
-              quoteFormat.defaultScopeNotes ||
-              (!isWandersQuote && settings.quoteTerms) ||
+              (!isDeliveryNote && quoteFormat.defaultScopeNotes) ||
+              (!isDeliveryNote && !isWandersQuote && settings.quoteTerms) ||
               (isWandersQuote && wandersTermsBlock)) && (
               <div style={{ marginTop: 22, fontSize: 12.5, lineHeight: 1.55, color: '#333' }}>
                 <h3 style={{ margin: '0 0 8px', fontSize: 13, color: '#c1121f' }}>
                   {quoteFormat.sectionHeadings.terms}
                 </h3>
                 <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                  {isWandersQuote
+                  {isDeliveryNote
+                    ? doc.notes
+                    : isWandersQuote
                     ? [doc.notes, wandersTermsBlock].filter(Boolean).join('\n\n')
                     : [doc.notes, quoteFormat.defaultScopeNotes || settings.quoteTerms]
                         .filter(Boolean)
@@ -849,10 +920,22 @@ export default function DocumentPage() {
               }}
             >
               <div style={{ borderTop: '1px solid #bbb', paddingTop: 10, marginTop: 48 }}>
-                For {settings.companyName || 'Red Reach Middle East FZE'}
+                {isDeliveryNote
+                  ? `Delivered by ${settings.companyName || 'Red Reach Middle East FZE'}`
+                  : `For ${settings.companyName || 'Red Reach Middle East FZE'}`}
+                {isDeliveryNote ? (
+                  <div style={{ fontWeight: 400, marginTop: 28, color: '#555', fontSize: 12 }}>
+                    Name / date
+                  </div>
+                ) : null}
               </div>
               <div style={{ borderTop: '1px solid #bbb', paddingTop: 10, marginTop: 48 }}>
-                Client acceptance
+                {isDeliveryNote ? 'Received by (goods in good order)' : 'Client acceptance'}
+                {isDeliveryNote ? (
+                  <div style={{ fontWeight: 400, marginTop: 28, color: '#555', fontSize: 12 }}>
+                    {deliveryNote?.received_by || 'Name / signature / date'}
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>

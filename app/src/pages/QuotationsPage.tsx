@@ -10,6 +10,7 @@ import {
   Receipt,
   RotateCcw,
   Trash2,
+  Truck,
 } from 'lucide-react'
 import { db } from '../lib/db'
 import {
@@ -49,6 +50,10 @@ import {
 } from '../lib/referenceNumber'
 import { sortByDateDesc } from '../lib/finance'
 import { isQuotePastValidity, quoteValidUntil } from '../lib/documents'
+import {
+  canCreateDeliveryNoteFromQuote,
+  createDeliveryNoteFromQuote,
+} from '../lib/deliveryNotes'
 import {
   BASE_CURRENCY,
   CURRENCY_LABELS,
@@ -173,6 +178,7 @@ export default function QuotationsPage() {
   const [outcomeReason, setOutcomeReason] = useState('')
   const [convertTarget, setConvertTarget] = useState<Quotation | null>(null)
   const [depositPct, setDepositPct] = useState('100')
+  const [dnTarget, setDnTarget] = useState<Quotation | null>(null)
   const [clientSuggest, setClientSuggest] = useState(false)
   const compact = useCompactCrm()
 
@@ -901,6 +907,25 @@ export default function QuotationsPage() {
     }
   }
 
+  async function createDeliveryNote() {
+    if (!dnTarget) return
+    setSaving(true)
+    try {
+      const note = await createDeliveryNoteFromQuote({
+        quote: dnTarget,
+        who,
+        prefix: settings.deliveryNotePrefix || 'DN',
+      })
+      showToast(`Delivery note ${note.reference_number} created`, 'success')
+      setDnTarget(null)
+      navigate(`/document/delivery-note/${note.id}`)
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not create delivery note', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const clientMatches = clients
     .filter((c) => c.company_name.toLowerCase().includes(form.client.toLowerCase()))
     .slice(0, 8)
@@ -958,6 +983,16 @@ export default function QuotationsPage() {
             }}
           >
             <Receipt size={14} /> Invoice
+          </button>
+        )}
+        {canCreateDeliveryNoteFromQuote(q) && (
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            title="Create delivery note from this quotation"
+            onClick={() => setDnTarget(q)}
+          >
+            <Truck size={14} /> {compact ? '' : 'Delivery note'}
           </button>
         )}
         <button type="button" style={buttonSecondaryStyle} disabled={saving} onClick={() => void duplicate(q)} title="Duplicate">
@@ -1927,6 +1962,28 @@ export default function QuotationsPage() {
           <button type="button" style={buttonSecondaryStyle} onClick={() => setConvertTarget(null)}>Cancel</button>
           <button type="button" style={buttonPrimaryStyle} disabled={saving} onClick={() => void convertToInvoice()}>
             Create invoice
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!dnTarget}
+        title="Create delivery note"
+        onClose={() => setDnTarget(null)}
+        width={460}
+      >
+        <p style={{ color: colors.muted, fontSize: 14, marginTop: 0, lineHeight: 1.5 }}>
+          Create a delivery note from quotation{' '}
+          <strong style={{ color: colors.text }}>{dnTarget?.reference_number}</strong>
+          {dnTarget?.client ? ` for ${dnTarget.client}` : ''}. Line items and quantities are copied;
+          prices are omitted.
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button type="button" style={buttonSecondaryStyle} onClick={() => setDnTarget(null)}>
+            Cancel
+          </button>
+          <button type="button" style={buttonPrimaryStyle} disabled={saving} onClick={() => void createDeliveryNote()}>
+            {saving ? 'Creating…' : 'Create delivery note'}
           </button>
         </div>
       </Modal>

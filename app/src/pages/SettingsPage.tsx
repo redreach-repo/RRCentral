@@ -72,6 +72,7 @@ const QUOTE_KEYS = [
   { key: 'currency', label: 'Currency' },
   { key: 'quotePrefix', label: 'Quote prefix' },
   { key: 'invoicePrefix', label: 'Invoice prefix' },
+  { key: 'deliveryNotePrefix', label: 'Delivery note prefix' },
 ] as const
 
 /** Editable per-division PDF title/closing — change anytime per customer standards. */
