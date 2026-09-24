@@ -125,7 +125,10 @@ export default function CustomerFilesPage() {
     async (company: string) => {
       const name = company.trim()
       setSelected(name)
-      setSearchParams(name ? { company: name } : {}, { replace: true })
+      const current = (searchParams.get('company') || '').trim()
+      if (name !== current) {
+        setSearchParams(name ? { company: name } : {}, { replace: true })
+      }
       if (!name) {
         setFolder(null)
         setDriveFolderUrl('')
@@ -148,7 +151,7 @@ export default function CustomerFilesPage() {
         setLoadingFolder(false)
       }
     },
-    [setSearchParams, showToast],
+    [searchParams, setSearchParams, showToast],
   )
 
   useEffect(() => {
@@ -156,12 +159,11 @@ export default function CustomerFilesPage() {
   }, [loadCompanies])
 
   useEffect(() => {
-    const fromUrl = searchParams.get('company') || ''
-    if (fromUrl && fromUrl !== selected) {
-      void openCompany(fromUrl)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only hydrate from URL once companies may load
-  }, [searchParams])
+    const fromUrl = (searchParams.get('company') || '').trim()
+    if (!fromUrl) return
+    if (fromUrl === selected) return
+    void openCompany(fromUrl)
+  }, [searchParams, selected, openCompany])
 
   const filteredCompanies = useMemo(() => {
     const q = search.trim().toLowerCase()
