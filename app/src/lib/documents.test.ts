@@ -24,11 +24,16 @@ describe('documents', () => {
     ).toBe('DRAFT')
     expect(
       displayDocumentReference({
-        referenceNumber: 'RR-01-26001',
-        fallbackId: 'Q-1',
-        status: 'Finalized',
+        referenceNumber: 'DN-01-26001',
+        status: 'Issued',
       }),
-    ).toBe('RR-01-26001')
+    ).toBe('DN-01-26001')
+    expect(
+      displayDocumentReference({
+        referenceNumber: 'DN-DRAFT-1',
+        status: 'Draft',
+      }),
+    ).toBe('DRAFT')
   })
 
   it('computes valid until and past-validity', () => {

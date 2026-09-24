@@ -10,6 +10,7 @@ import CrmPage from './pages/CrmPage'
 import FollowupsPage from './pages/FollowupsPage'
 import QuotationsPage from './pages/QuotationsPage'
 import InvoicesPage from './pages/InvoicesPage'
+import DeliveryNotesPage from './pages/DeliveryNotesPage'
 import CatalogPage from './pages/CatalogPage'
 import InventoryPage from './pages/InventoryPage'
 import PaymentsPage from './pages/PaymentsPage'
@@ -96,6 +97,7 @@ export default function App() {
               <Route path="follow-ups" element={<FollowupsPage />} />
               <Route path="quotations" element={<QuotationsPage />} />
               <Route path="invoices" element={<InvoicesPage />} />
+              <Route path="delivery-notes" element={<DeliveryNotesPage />} />
               <Route path="catalog" element={<CatalogPage />} />
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="payments" element={<PaymentsPage />} />

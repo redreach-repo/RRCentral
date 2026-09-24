@@ -19,6 +19,8 @@ export const QUOTE_STATUSES = [
 
 export const INVOICE_STATUSES = ['Draft', 'Sent', 'Awarded', 'Cancelled'] as const
 
+export const DELIVERY_NOTE_STATUSES = ['Draft', 'Issued', 'Delivered'] as const
+
 export const PAYMENT_STATUSES = ['Pending', 'Partial', 'Paid', 'Overdue'] as const
 
 export const NEXT_ACTIONS = [

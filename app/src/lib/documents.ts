@@ -15,7 +15,7 @@ export function displayDocumentReference(opts: {
   draftLabel?: string
 }): string {
   const ref = String(opts.referenceNumber || '').trim()
-  if (ref && !isInternalDraftId(ref) && !/^INV-DRAFT-/i.test(ref)) return ref
+  if (ref && !isInternalDraftId(ref) && !/^INV-DRAFT-/i.test(ref) && !/^DN-DRAFT-/i.test(ref)) return ref
   const status = String(opts.status || '').toLowerCase()
   if (status === 'draft' || !ref || isInternalDraftId(opts.fallbackId) || isInternalDraftId(ref)) {
     return opts.draftLabel || 'DRAFT'
