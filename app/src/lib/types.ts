@@ -351,10 +351,19 @@ export interface Expense {
   date: string | null
   vendor: string
   category: string
+  /** VAT-inclusive total paid to the supplier (AED). */
   amount: number
   payment_method: string
   references_text: string
   notes: string
+  /** Linked quotation reference (e.g. RR-01-26003) for COGS / profit. */
+  quote_ref?: string
+  /** Supplier tax invoice number. */
+  supplier_invoice_no?: string
+  /** Exclusive of VAT when known from the supplier invoice. */
+  amount_ex_vat?: number | null
+  /** Input VAT paid on the supplier invoice. */
+  vat_amount?: number | null
   created_at: string
 }
 

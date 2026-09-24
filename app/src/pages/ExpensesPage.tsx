@@ -1,15 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { Paperclip, Pencil, Plus, Trash2, Wallet } from 'lucide-react'
+import { FileUp, Paperclip, Pencil, Plus, Trash2, Wallet } from 'lucide-react'
 import { db } from '../lib/db'
-import { PAYMENT_METHODS } from '../lib/config'
-import type { Attachment, Expense } from '../lib/types'
+import { PAYMENT_METHODS, VAT_RATE } from '../lib/config'
+import type { Attachment, Expense, Quotation } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
+import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
 import { formatAED } from '../lib/money'
 import { logActivity } from '../lib/activity'
+import { expenseVatParts } from '../lib/finance'
+import { isUndefinedColumnError } from '../lib/errors'
+import { round2 } from '../lib/lineItems'
+import {
+  supplierInvoiceProfit,
+  type ParsedSupplierInvoice,
+} from '../lib/supplierInvoiceParse'
 import {
   buttonDangerStyle,
   buttonPrimaryStyle,
@@ -32,6 +40,7 @@ import {
 } from '../lib/uiStyles'
 
 const CATEGORIES = [
+  'Uniforms / Cost of goods',
   'Office',
   'Travel',
   'Marketing',
@@ -49,9 +58,13 @@ type ExpenseForm = {
   vendor: string
   category: string
   amount: number
+  amount_ex_vat: number
+  vat_amount: number
   payment_method: string
   references_text: string
   notes: string
+  quote_ref: string
+  supplier_invoice_no: string
 }
 
 const emptyForm = (): ExpenseForm => ({
@@ -59,15 +72,37 @@ const emptyForm = (): ExpenseForm => ({
   vendor: '',
   category: CATEGORIES[0],
   amount: 0,
+  amount_ex_vat: 0,
+  vat_amount: 0,
   payment_method: PAYMENT_METHODS[0],
   references_text: '',
   notes: '',
+  quote_ref: '',
+  supplier_invoice_no: '',
 })
+
+function applyVatInclusive(inclusive: number, rate: number): Pick<ExpenseForm, 'amount' | 'amount_ex_vat' | 'vat_amount'> {
+  const amount = round2(Math.max(0, inclusive))
+  if (amount <= 0 || rate <= 0) return { amount, amount_ex_vat: amount, vat_amount: 0 }
+  const amount_ex_vat = round2(amount / (1 + rate))
+  const vat_amount = round2(amount - amount_ex_vat)
+  return { amount, amount_ex_vat, vat_amount }
+}
+
+function applyExVat(exclusive: number, rate: number): Pick<ExpenseForm, 'amount' | 'amount_ex_vat' | 'vat_amount'> {
+  const amount_ex_vat = round2(Math.max(0, exclusive))
+  const vat_amount = round2(amount_ex_vat * rate)
+  return { amount_ex_vat, vat_amount, amount: round2(amount_ex_vat + vat_amount) }
+}
 
 export default function ExpensesPage() {
   const { user } = useAuth()
+  const { settings } = useSettings()
   const { showToast } = useToast()
+  const vatRate = Number(settings.vatRate || VAT_RATE) || VAT_RATE
+
   const [expenses, setExpenses] = useState<Expense[]>([])
+  const [quotes, setQuotes] = useState<Quotation[]>([])
   const [loading, setLoading] = useState(true)
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
@@ -75,19 +110,22 @@ export default function ExpensesPage() {
   const [editing, setEditing] = useState<Expense | null>(null)
   const [form, setForm] = useState<ExpenseForm>(emptyForm())
   const [saving, setSaving] = useState(false)
+  const [parsing, setParsing] = useState(false)
+  const [parseHint, setParseHint] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Expense | null>(null)
   const [attachments, setAttachments] = useState<Attachment[]>([])
-  const [pendingFiles, setPendingFiles] = useState<{ name: string; dataUrl: string }[]>([])
+  const [pendingFiles, setPendingFiles] = useState<{ name: string; dataUrl: string; mime?: string }[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const { data, error } = await db
-        .from('expenses')
-        .select('*')
-        .order('date', { ascending: false })
-      if (error) throw error
-      setExpenses((data || []) as Expense[])
+      const [expRes, quoteRes] = await Promise.all([
+        db.from('expenses').select('*').order('date', { ascending: false }),
+        db.from('quotations').select('*').order('date', { ascending: false }),
+      ])
+      if (expRes.error) throw expRes.error
+      setExpenses((expRes.data || []) as Expense[])
+      if (!quoteRes.error) setQuotes((quoteRes.data || []) as Quotation[])
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Failed to load expenses', 'error')
     } finally {
@@ -114,6 +152,30 @@ export default function ExpensesPage() {
     [filtered],
   )
 
+  const linkedQuote = useMemo(
+    () => quotes.find((q) => q.reference_number === form.quote_ref || q.quote_id === form.quote_ref) || null,
+    [quotes, form.quote_ref],
+  )
+
+  const profitPreview = useMemo(() => {
+    if (!linkedQuote) return null
+    const exclusive = form.amount_ex_vat > 0 ? form.amount_ex_vat : expenseVatParts({
+      amount: form.amount,
+      amount_ex_vat: form.amount_ex_vat,
+      vat_amount: form.vat_amount,
+    } as Expense, vatRate).exclusive
+    const vat = form.vat_amount > 0 || form.amount_ex_vat > 0
+      ? form.vat_amount
+      : expenseVatParts({ amount: form.amount } as Expense, vatRate).vat
+    return supplierInvoiceProfit({
+      quoteAmount: Number(linkedQuote.amount) || 0,
+      quoteOffsetVat: Boolean(linkedQuote.offset_vat),
+      expenseExclusive: exclusive,
+      expenseVat: vat,
+      vatRate,
+    })
+  }, [linkedQuote, form.amount, form.amount_ex_vat, form.vat_amount, vatRate])
+
   async function loadAttachments(expenseId: string) {
     const { data } = await db
       .from('attachments')
@@ -129,39 +191,98 @@ export default function ExpensesPage() {
     setForm(emptyForm())
     setAttachments([])
     setPendingFiles([])
+    setParseHint('')
     setOpen(true)
   }
 
+  function openCreateSupplierInvoice() {
+    openCreate()
+    setForm((f) => ({ ...f, category: 'Uniforms / Cost of goods' }))
+  }
+
   function openEdit(e: Expense) {
+    const parts = expenseVatParts(e, vatRate)
     setEditing(e)
     setForm({
       date: e.date ? e.date.slice(0, 10) : format(new Date(), 'yyyy-MM-dd'),
       vendor: e.vendor || '',
       category: e.category || CATEGORIES[0],
-      amount: Number(e.amount) || 0,
+      amount: Number(e.amount) || parts.inclusive || 0,
+      amount_ex_vat: Number(e.amount_ex_vat) || parts.exclusive || 0,
+      vat_amount: Number(e.vat_amount) || parts.vat || 0,
       payment_method: e.payment_method || PAYMENT_METHODS[0],
       references_text: e.references_text || '',
       notes: e.notes || '',
+      quote_ref: e.quote_ref || '',
+      supplier_invoice_no: e.supplier_invoice_no || '',
     })
     setPendingFiles([])
+    setParseHint('')
     setOpen(true)
     void loadAttachments(e.id)
   }
 
-  async function readFileAsDataUrl(file: File): Promise<{ name: string; dataUrl: string }> {
+  async function readFileAsDataUrl(file: File): Promise<{ name: string; dataUrl: string; mime?: string }> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
-      reader.onload = () => resolve({ name: file.name, dataUrl: String(reader.result || '') })
+      reader.onload = () =>
+        resolve({ name: file.name, dataUrl: String(reader.result || ''), mime: file.type })
       reader.onerror = () => reject(reader.error || new Error('Read failed'))
       reader.readAsDataURL(file)
     })
   }
 
+  function applyParsedInvoice(parsed: ParsedSupplierInvoice) {
+    setForm((f) => ({
+      ...f,
+      vendor: parsed.vendor || f.vendor,
+      date: parsed.date || f.date,
+      supplier_invoice_no: parsed.supplierInvoiceNo || f.supplier_invoice_no,
+      amount: parsed.amountInclusive ?? f.amount,
+      amount_ex_vat: parsed.amountExVat ?? f.amount_ex_vat,
+      vat_amount: parsed.vatAmount ?? f.vat_amount,
+      category: f.category === CATEGORIES[0] || !f.category ? 'Uniforms / Cost of goods' : f.category,
+      notes: [
+        f.notes.trim(),
+        parsed.trn ? `Supplier TRN ${parsed.trn}` : '',
+        parsed.rawTextSample && !parsed.amountInclusive
+          ? 'PDF text extracted — check totals manually.'
+          : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      references_text: f.references_text || parsed.supplierInvoiceNo || '',
+    }))
+    setParseHint(
+      parsed.confidence === 'high'
+        ? 'Filled from the PDF. Check the figures before saving.'
+        : parsed.confidence === 'medium'
+          ? 'Partially filled from the PDF. Confirm vendor, date, and totals.'
+          : 'Could only read a little from the PDF. Enter the missing fields.',
+    )
+  }
+
   async function onPickFiles(files: FileList | null) {
     if (!files?.length) return
     try {
-      const rows = await Promise.all([...files].map((f) => readFileAsDataUrl(f)))
+      const list = [...files]
+      const rows = await Promise.all(list.map((f) => readFileAsDataUrl(f)))
       setPendingFiles((prev) => [...prev, ...rows])
+
+      const pdf = list.find((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name))
+      if (!pdf) return
+      setParsing(true)
+      try {
+        const { parseSupplierInvoicePdf } = await import('../lib/supplierInvoicePdf')
+        const parsed = await parseSupplierInvoicePdf(pdf, vatRate)
+        applyParsedInvoice(parsed)
+        showToast('Supplier invoice PDF read — review the form', 'success')
+      } catch (e) {
+        setParseHint('Could not read text from this PDF. Fill the form manually.')
+        showToast(e instanceof Error ? e.message : 'PDF parse failed', 'error')
+      } finally {
+        setParsing(false)
+      }
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Could not read file', 'error')
     }
@@ -182,6 +303,24 @@ export default function ExpensesPage() {
     }
   }
 
+  async function syncQuoteSupplierCost(quote: Quotation, exclusiveCost: number) {
+    const cost = round2(Math.max(0, exclusiveCost))
+    const quoteAmount = Number(quote.amount) || 0
+    const revenueExclusive = quote.offset_vat
+      ? quoteAmount
+      : vatRate > 0
+        ? round2(quoteAmount / (1 + vatRate))
+        : quoteAmount
+    const payload = {
+      supplier_cost_base: cost,
+      estimated_gross_profit_base: round2(revenueExclusive - cost),
+      updated_by: user?.email || '',
+      updated_at: new Date().toISOString(),
+    }
+    const { error } = await db.from('quotations').update(payload).eq('id', quote.id)
+    if (error) throw error
+  }
+
   async function save() {
     if (!form.vendor.trim()) {
       showToast('Vendor is required', 'error')
@@ -189,37 +328,92 @@ export default function ExpensesPage() {
     }
     setSaving(true)
     try {
+      const parts =
+        form.amount_ex_vat > 0 || form.vat_amount > 0
+          ? {
+              amount_ex_vat: round2(form.amount_ex_vat),
+              vat_amount: round2(form.vat_amount),
+              amount:
+                form.amount > 0
+                  ? round2(form.amount)
+                  : round2(form.amount_ex_vat + form.vat_amount),
+            }
+          : applyVatInclusive(form.amount, vatRate)
+
       const payload = {
         date: form.date || null,
         vendor: form.vendor.trim(),
         category: form.category,
-        amount: Number(form.amount) || 0,
+        amount: parts.amount,
+        amount_ex_vat: parts.amount_ex_vat,
+        vat_amount: parts.vat_amount,
         payment_method: form.payment_method,
         references_text: form.references_text.trim(),
         notes: form.notes.trim(),
+        quote_ref: form.quote_ref.trim(),
+        supplier_invoice_no: form.supplier_invoice_no.trim(),
       }
+
       let expenseId = editing?.id || ''
       if (editing) {
-        const { error } = await db.from('expenses').update(payload).eq('id', editing.id)
-        if (error) throw error
+        let { error } = await db.from('expenses').update(payload).eq('id', editing.id)
+        if (error && isUndefinedColumnError(error)) {
+          const {
+            amount_ex_vat: _a,
+            vat_amount: _v,
+            quote_ref: _q,
+            supplier_invoice_no: _s,
+            ...legacy
+          } = payload
+          const retry = await db.from('expenses').update(legacy).eq('id', editing.id)
+          if (retry.error) throw retry.error
+          showToast(
+            'Saved without supplier-invoice columns. Run supabase-supplier-invoice-expense-upgrade.sql in Supabase.',
+            'error',
+          )
+        } else if (error) throw error
         expenseId = editing.id
       } else {
         const newId = crypto.randomUUID()
-        const { error } = await db.from('expenses').insert({ ...payload, id: newId })
-        if (error) throw error
+        let { error } = await db.from('expenses').insert({ ...payload, id: newId })
+        if (error && isUndefinedColumnError(error)) {
+          const {
+            amount_ex_vat: _a,
+            vat_amount: _v,
+            quote_ref: _q,
+            supplier_invoice_no: _s,
+            ...legacy
+          } = payload
+          const retry = await db.from('expenses').insert({ ...legacy, id: newId })
+          if (retry.error) throw retry.error
+          showToast(
+            'Saved without supplier-invoice columns. Run supabase-supplier-invoice-expense-upgrade.sql in Supabase.',
+            'error',
+          )
+        } else if (error) throw error
         expenseId = newId
       }
+
       if (pendingFiles.length && expenseId) {
         await saveAttachmentsFor(expenseId)
       }
+
+      if (linkedQuote && parts.amount_ex_vat > 0) {
+        try {
+          await syncQuoteSupplierCost(linkedQuote, parts.amount_ex_vat)
+        } catch {
+          /* quote sync is best-effort */
+        }
+      }
+
       await logActivity(
         editing ? 'update_expense' : 'save_expense',
         'expense',
         payload.vendor,
-        `${payload.category} · ${formatAED(payload.amount)}`,
+        `${payload.category} · ${formatAED(payload.amount)}${payload.quote_ref ? ` · ${payload.quote_ref}` : ''}`,
         user?.email || '',
       )
-      showToast('Expense saved', 'success')
+      showToast('Expense saved — it will show in finance reports', 'success')
       setOpen(false)
       await load()
     } catch (e) {
@@ -264,11 +458,18 @@ export default function ExpensesPage() {
       <div style={toolbarStyle}>
         <div>
           <h1 style={pageTitleStyle}>Expenses</h1>
-          <p style={pageSubtitleStyle}>Vendors, categories, receipts, and spend</p>
+          <p style={pageSubtitleStyle}>
+            Vendor bills, uniform supplier invoices, receipts — and spend in finance reports
+          </p>
         </div>
-        <button type="button" style={buttonPrimaryStyle} onClick={openCreate}>
-          <Plus size={16} /> Add expense
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button type="button" style={buttonSecondaryStyle} onClick={openCreateSupplierInvoice}>
+            <FileUp size={16} /> Supplier invoice
+          </button>
+          <button type="button" style={buttonPrimaryStyle} onClick={openCreate}>
+            <Plus size={16} /> Add expense
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
@@ -292,9 +493,9 @@ export default function ExpensesPage() {
         <EmptyState
           icon={<Wallet size={22} />}
           title="No expenses"
-          subtitle="Track spend by vendor and category."
-          actionLabel="Add expense"
-          onAction={openCreate}
+          subtitle="Upload a supplier PDF or add spend by vendor."
+          actionLabel="Supplier invoice"
+          onAction={openCreateSupplierInvoice}
         />
       ) : (
         <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
@@ -305,89 +506,77 @@ export default function ExpensesPage() {
                   <th style={thStyle}>Date</th>
                   <th style={thStyle}>Vendor</th>
                   <th style={thStyle}>Category</th>
-                  <th style={thStyle}>Amount</th>
-                  <th style={thStyle}>Method</th>
-                  <th style={thStyle}>Ref</th>
+                  <th style={thStyle}>Ex-VAT</th>
+                  <th style={thStyle}>VAT paid</th>
+                  <th style={thStyle}>Total</th>
+                  <th style={thStyle}>Quote</th>
                   <th style={thStyle}></th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((e) => (
-                  <tr key={e.id}>
-                    <td style={tdStyle}>
-                      {e.date ? format(parseISO(e.date.slice(0, 10)), 'dd MMM yyyy') : '—'}
-                    </td>
-                    <td style={tdStyle}>{e.vendor}</td>
-                    <td style={tdStyle}>{e.category || '—'}</td>
-                    <td style={tdStyle}>{formatAED(e.amount)}</td>
-                    <td style={tdStyle}>{e.payment_method || '—'}</td>
-                    <td style={tdStyle}>{e.references_text || '—'}</td>
-                    <td style={tdStyle}>
-                      <button type="button" style={buttonSecondaryStyle} onClick={() => openEdit(e)}>
-                        <Pencil size={14} />
-                      </button>{' '}
-                      <button type="button" style={buttonDangerStyle} onClick={() => setDeleteTarget(e)}>
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map((e) => {
+                  const parts = expenseVatParts(e, vatRate)
+                  return (
+                    <tr key={e.id}>
+                      <td style={tdStyle}>
+                        {e.date ? format(parseISO(e.date.slice(0, 10)), 'dd MMM yyyy') : '—'}
+                      </td>
+                      <td style={tdStyle}>
+                        {e.vendor}
+                        {e.supplier_invoice_no ? (
+                          <div style={{ fontSize: 11, color: colors.muted2 }}>{e.supplier_invoice_no}</div>
+                        ) : null}
+                      </td>
+                      <td style={tdStyle}>{e.category || '—'}</td>
+                      <td style={tdStyle}>{formatAED(parts.exclusive)}</td>
+                      <td style={tdStyle}>{formatAED(parts.vat)}</td>
+                      <td style={tdStyle}>{formatAED(parts.inclusive)}</td>
+                      <td style={tdStyle}>{e.quote_ref || e.references_text || '—'}</td>
+                      <td style={tdStyle}>
+                        <button type="button" style={buttonSecondaryStyle} onClick={() => openEdit(e)}>
+                          <Pencil size={14} />
+                        </button>{' '}
+                        <button type="button" style={buttonDangerStyle} onClick={() => setDeleteTarget(e)}>
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      <Modal open={open} title={editing ? 'Edit expense' : 'Add expense'} onClose={() => setOpen(false)} width={560}>
-        <div style={formGridStyle}>
-          <div style={fieldStyle}>
-            <label style={labelStyle}>Date</label>
-            <input type="date" style={inputStyle} value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
-          </div>
-          <div style={fieldStyle}>
-            <label style={labelStyle}>Amount</label>
-            <input type="number" style={inputStyle} value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: Number(e.target.value) }))} />
-          </div>
-          <div style={fieldStyle}>
-            <label style={labelStyle}>Vendor *</label>
-            <input style={inputStyle} value={form.vendor} onChange={(e) => setForm((f) => ({ ...f, vendor: e.target.value }))} />
-          </div>
-          <div style={fieldStyle}>
-            <label style={labelStyle}>Category</label>
-            <select style={selectStyle} value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}>
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-          <div style={fieldStyle}>
-            <label style={labelStyle}>Payment method</label>
-            <select style={selectStyle} value={form.payment_method} onChange={(e) => setForm((f) => ({ ...f, payment_method: e.target.value }))}>
-              {PAYMENT_METHODS.map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-          </div>
-          <div style={fieldStyle}>
-            <label style={labelStyle}>Reference</label>
-            <input style={inputStyle} value={form.references_text} onChange={(e) => setForm((f) => ({ ...f, references_text: e.target.value }))} />
-          </div>
-        </div>
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Notes</label>
-          <textarea style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
-        </div>
+      <Modal
+        open={open}
+        title={editing ? 'Edit expense' : 'Add expense / supplier invoice'}
+        onClose={() => setOpen(false)}
+        width={640}
+      >
         <div style={fieldStyle}>
           <label style={labelStyle}>
-            <Paperclip size={12} style={{ marginRight: 4 }} />
-            Receipts / attachments
+            <FileUp size={12} style={{ marginRight: 4 }} />
+            Upload supplier invoice PDF
           </label>
           <input
             type="file"
-            accept="image/*,.pdf"
+            accept="application/pdf,image/*,.pdf"
             multiple
+            disabled={parsing}
             onChange={(e) => void onPickFiles(e.target.files)}
           />
+          <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted, lineHeight: 1.45 }}>
+            PDF text is copied into the form when possible (vendor, date, invoice no, totals, VAT). Always
+            review before saving. The file is stored as an attachment.
+          </p>
+          {parsing ? (
+            <p style={{ margin: '6px 0 0', fontSize: 13, color: colors.accent }}>Reading PDF…</p>
+          ) : null}
+          {parseHint ? (
+            <p style={{ margin: '6px 0 0', fontSize: 13, color: colors.muted }}>{parseHint}</p>
+          ) : null}
           {pendingFiles.length > 0 ? (
             <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 12, color: colors.muted }}>
               {pendingFiles.map((f) => (
@@ -395,7 +584,173 @@ export default function ExpensesPage() {
               ))}
             </ul>
           ) : null}
-          {attachments.length > 0 ? (
+        </div>
+
+        <div style={formGridStyle}>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Date</label>
+            <input
+              type="date"
+              style={inputStyle}
+              value={form.date}
+              onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+            />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Supplier invoice no.</label>
+            <input
+              style={inputStyle}
+              value={form.supplier_invoice_no}
+              onChange={(e) => setForm((f) => ({ ...f, supplier_invoice_no: e.target.value }))}
+            />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Vendor *</label>
+            <input
+              style={inputStyle}
+              value={form.vendor}
+              onChange={(e) => setForm((f) => ({ ...f, vendor: e.target.value }))}
+            />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Category</label>
+            <select
+              style={selectStyle}
+              value={form.category}
+              onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Amount ex-VAT</label>
+            <input
+              type="number"
+              step="0.01"
+              style={inputStyle}
+              value={form.amount_ex_vat || ''}
+              onChange={(e) => {
+                const exclusive = Number(e.target.value) || 0
+                setForm((f) => ({ ...f, ...applyExVat(exclusive, vatRate) }))
+              }}
+            />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>VAT paid ({(vatRate * 100).toFixed(0)}%)</label>
+            <input
+              type="number"
+              step="0.01"
+              style={inputStyle}
+              value={form.vat_amount || ''}
+              onChange={(e) => {
+                const vat_amount = round2(Number(e.target.value) || 0)
+                setForm((f) => ({
+                  ...f,
+                  vat_amount,
+                  amount: round2((Number(f.amount_ex_vat) || 0) + vat_amount),
+                }))
+              }}
+            />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Total incl. VAT</label>
+            <input
+              type="number"
+              step="0.01"
+              style={inputStyle}
+              value={form.amount || ''}
+              onChange={(e) => {
+                const inclusive = Number(e.target.value) || 0
+                setForm((f) => ({ ...f, ...applyVatInclusive(inclusive, vatRate) }))
+              }}
+            />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Payment method</label>
+            <select
+              style={selectStyle}
+              value={form.payment_method}
+              onChange={(e) => setForm((f) => ({ ...f, payment_method: e.target.value }))}
+            >
+              {PAYMENT_METHODS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Link to quotation</label>
+            <select
+              style={selectStyle}
+              value={form.quote_ref}
+              onChange={(e) => setForm((f) => ({ ...f, quote_ref: e.target.value }))}
+            >
+              <option value="">— None —</option>
+              {quotes.map((q) => (
+                <option key={q.id} value={q.reference_number || q.quote_id}>
+                  {(q.reference_number || q.quote_id) + ` · ${q.client} · ${formatAED(Number(q.amount) || 0)}`}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Reference</label>
+            <input
+              style={inputStyle}
+              value={form.references_text}
+              onChange={(e) => setForm((f) => ({ ...f, references_text: e.target.value }))}
+              placeholder="PO / internal ref"
+            />
+          </div>
+        </div>
+
+        {profitPreview && linkedQuote ? (
+          <div style={{ ...cardStyle, padding: 12, marginTop: 8, fontSize: 13, lineHeight: 1.55 }}>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>
+              Profit vs {linkedQuote.reference_number || linkedQuote.quote_id}
+            </div>
+            <div>
+              Customer revenue (ex-VAT): <strong>{formatAED(profitPreview.revenueExclusive)}</strong>
+            </div>
+            <div>
+              Supplier cost (ex-VAT): <strong>{formatAED(profitPreview.expenseExclusive)}</strong>
+            </div>
+            <div>
+              VAT paid on supplier invoice: <strong>{formatAED(profitPreview.expenseVat)}</strong>
+            </div>
+            <div>
+              Gross profit:{' '}
+              <strong style={{ color: profitPreview.profit >= 0 ? colors.success : colors.danger }}>
+                {formatAED(profitPreview.profit)}
+              </strong>{' '}
+              <span style={{ color: colors.muted2 }}>({profitPreview.marginPct}% margin)</span>
+            </div>
+            <div style={{ color: colors.muted2, fontSize: 12 }}>
+              Net VAT position on this deal (output − input): {formatAED(profitPreview.netVatPosition)}
+            </div>
+          </div>
+        ) : null}
+
+        <div style={fieldStyle}>
+          <label style={labelStyle}>Notes</label>
+          <textarea
+            style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }}
+            value={form.notes}
+            onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+          />
+        </div>
+
+        {attachments.length > 0 ? (
+          <div style={fieldStyle}>
+            <label style={labelStyle}>
+              <Paperclip size={12} style={{ marginRight: 4 }} />
+              Saved attachments
+            </label>
             <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13 }}>
               {attachments.map((a) => (
                 <li key={a.id} style={{ marginBottom: 4 }}>
@@ -408,11 +763,16 @@ export default function ExpensesPage() {
                 </li>
               ))}
             </ul>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
+
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button type="button" style={buttonSecondaryStyle} onClick={() => setOpen(false)}>Cancel</button>
-          <button type="button" style={buttonPrimaryStyle} disabled={saving} onClick={() => void save()}>Save</button>
+          <button type="button" style={buttonSecondaryStyle} onClick={() => setOpen(false)}>
+            Cancel
+          </button>
+          <button type="button" style={buttonPrimaryStyle} disabled={saving || parsing} onClick={() => void save()}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
         </div>
       </Modal>
 
@@ -421,8 +781,12 @@ export default function ExpensesPage() {
           Delete expense for <strong style={{ color: colors.text }}>{deleteTarget?.vendor}</strong>?
         </p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-          <button type="button" style={buttonSecondaryStyle} onClick={() => setDeleteTarget(null)}>Cancel</button>
-          <button type="button" style={buttonDangerStyle} disabled={saving} onClick={() => void confirmDelete()}>Delete</button>
+          <button type="button" style={buttonSecondaryStyle} onClick={() => setDeleteTarget(null)}>
+            Cancel
+          </button>
+          <button type="button" style={buttonDangerStyle} disabled={saving} onClick={() => void confirmDelete()}>
+            Delete
+          </button>
         </div>
       </Modal>
     </div>

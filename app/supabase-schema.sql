@@ -697,6 +697,14 @@ create table expenses (
   payment_method text not null default '',
   references_text text not null default '',
   notes text not null default '',
+  /** Linked quotation reference (e.g. RR-01-26003) for COGS / profit. */
+  quote_ref text not null default '',
+  /** Supplier tax invoice number from the PDF. */
+  supplier_invoice_no text not null default '',
+  /** Exclusive of VAT when known from the supplier invoice. */
+  amount_ex_vat numeric(12,2),
+  /** Input VAT paid on the supplier invoice. */
+  vat_amount numeric(12,2),
   created_at timestamptz not null default now()
 );
 
