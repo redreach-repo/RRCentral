@@ -269,7 +269,7 @@ export default function CustomerFilesPage() {
             type="button"
             style={buttonPrimaryStyle}
             onClick={() => setAddOpen(true)}
-            disabled={missingTable}
+            title={missingTable ? 'Run supabase-customer-files-upgrade.sql to enable Drive links' : undefined}
           >
             <Plus size={16} /> Add Drive link
           </button>
@@ -487,7 +487,34 @@ export default function CustomerFilesPage() {
                     {rows.length === 0 ? (
                       <p style={{ margin: 0, padding: '14px 16px', color: colors.muted, fontSize: 13 }}>
                         Nothing here yet
-                        {cat.id === 'payment_slip' ? ' — add a Drive link for a remittance slip.' : '.'}
+                        {cat.id === 'payment_slip' ? (
+                          <>
+                            {' '}
+                            —{' '}
+                            <button
+                              type="button"
+                              style={{
+                                appearance: 'none',
+                                border: 0,
+                                background: 'transparent',
+                                color: colors.accent,
+                                cursor: 'pointer',
+                                padding: 0,
+                                fontSize: 13,
+                                textDecoration: 'underline',
+                              }}
+                              onClick={() => {
+                                setAddForm((f) => ({ ...f, category: 'payment_slip' }))
+                                setAddOpen(true)
+                              }}
+                            >
+                              add a Drive link
+                            </button>
+                            .
+                          </>
+                        ) : (
+                          '.'
+                        )}
                       </p>
                     ) : (
                       <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
