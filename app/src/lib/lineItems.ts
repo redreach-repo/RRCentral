@@ -131,19 +131,8 @@ export async function loadLineItems(
   return (data || []) as LineItem[]
 }
 
-export async function saveLineItems(
-  docType: LineItemDocType,
-  reference: string,
-  items: DraftLineItem[],
-  vatRate = VAT_RATE,
-): Promise<void> {
-  await db
-    .from('line_items')
-    .delete()
-    .eq('doc_type', docType)
-    .eq('reference', reference)
-
-  const filtered = items.filter(
+export function filterDraftLineItems(items: DraftLineItem[]): DraftLineItem[] {
+  return items.filter(
     (i) =>
       i.description.trim() ||
       Number(i.qty) ||
@@ -151,9 +140,15 @@ export async function saveLineItems(
       Number(i.unit_cost) ||
       (i.sizes && sumSizes(i.sizes)),
   )
-  if (!filtered.length) return
+}
 
-  const rows = filtered.map((item, idx) => {
+export function toPersistedLineItemRows(
+  docType: LineItemDocType,
+  reference: string,
+  items: DraftLineItem[],
+  vatRate = VAT_RATE,
+) {
+  return filterDraftLineItems(items).map((item, idx) => {
     const qty = item.sizes ? sumSizes(item.sizes) : Number(item.qty) || 0
     const c = calcLine(qty, item.unit_price, vatRate)
     const sizeLabel = item.sizes ? formatSizes(item.sizes) : ''
@@ -177,6 +172,23 @@ export async function saveLineItems(
       sizes_json: item.sizes || null,
     }
   })
+}
+
+export async function saveLineItems(
+  docType: LineItemDocType,
+  reference: string,
+  items: DraftLineItem[],
+  vatRate = VAT_RATE,
+): Promise<void> {
+  const { error: deleteError } = await db
+    .from('line_items')
+    .delete()
+    .eq('doc_type', docType)
+    .eq('reference', reference)
+  if (deleteError) throw deleteError
+
+  const rows = toPersistedLineItemRows(docType, reference, items, vatRate)
+  if (!rows.length) return
 
   const { error } = await db.from('line_items').insert(rows)
   if (error) throw error

@@ -18,6 +18,8 @@ import {
 } from '../lib/divisionQuoteFormats'
 import { CONNECT_PARTNER } from '../lib/seedDivisionCatalogues'
 import { loadLineItems, applyDiscount } from '../lib/lineItems'
+import { getDeliveryNote, loadDeliveryNoteLineItems } from '../lib/deliveryNoteStore'
+import { errorMessage } from '../lib/errors'
 import { buildWhatsAppUrl } from '../lib/whatsapp'
 import { resolveLogoUrl } from '../lib/brand'
 import {
@@ -117,12 +119,10 @@ export default function DocumentPage() {
         setItems(lines)
         await attachClient(q.client)
       } else if (docType === 'delivery-note') {
-        const { data, error: err } = await db.from('delivery_notes').select('*').eq('id', id).maybeSingle()
-        if (err) throw err
-        if (!data) throw new Error('Delivery note not found')
-        const note = data as DeliveryNote
+        const note = await getDeliveryNote(id)
+        if (!note) throw new Error('Delivery note not found')
         setDeliveryNote(note)
-        const lines = await loadLineItems('DeliveryNote', note.reference_number)
+        const lines = await loadDeliveryNoteLineItems(note.reference_number)
         setItems(lines)
         await attachClient(note.client)
       } else {
@@ -136,7 +136,7 @@ export default function DocumentPage() {
         await attachClient(inv.client)
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load document')
+      setError(errorMessage(e, 'Failed to load document'))
     } finally {
       setLoading(false)
     }
@@ -328,7 +328,7 @@ export default function DocumentPage() {
       showToast(`Delivery note ${note.reference_number} created`, 'success')
       navigate(`/document/delivery-note/${note.id}`)
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not create delivery note', 'error')
+      showToast(errorMessage(e, 'Could not create delivery note'), 'error')
     } finally {
       setDnBusy(false)
     }

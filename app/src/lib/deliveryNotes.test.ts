@@ -3,12 +3,21 @@ import type { LineItem, Quotation } from './types'
 import {
   buildDeliveryNoteRow,
   canCreateDeliveryNoteFromQuote,
+  draftsFromQuoteLines,
   deliveryNoteTotalQty,
   matchQuoteForDeliveryNote,
   nextDeliveryNoteReference,
   parseDocumentType,
+  quoteLineLookupKeys,
   toDeliveryNoteLineDrafts,
 } from './deliveryNotes'
+import { parseDeliveryNotesStoreValue } from './deliveryNoteStore'
+import {
+  errorMessage,
+  isCheckConstraintError,
+  isMissingRelationError,
+  shouldFallbackDeliveryNoteStorage,
+} from './errors'
 
 function quote(partial: Partial<Quotation> = {}): Pick<
   Quotation,
@@ -150,5 +159,67 @@ describe('delivery notes from quotations', () => {
 
   it('sums delivered quantities', () => {
     expect(deliveryNoteTotalQty([{ qty: 12 }, { qty: 3 }, { qty: 0 }])).toBe(15)
+  })
+
+  it('looks up Maxtherm quote lines by quote_id or RR-01-26003', () => {
+    expect(
+      quoteLineLookupKeys({
+        quote_id: 'Q-max',
+        reference_number: 'RR-01-26003',
+        id: 'uuid-1',
+      }),
+    ).toEqual(['Q-max', 'RR-01-26003', 'uuid-1'])
+  })
+
+  it('builds delivery-note lines from the quotation description when quote lines are missing', () => {
+    const drafts = draftsFromQuoteLines([], quote({ description: 'Maxtherm uniforms RR-01-26003' }))
+    expect(drafts).toHaveLength(1)
+    expect(drafts[0].description).toBe('Maxtherm uniforms RR-01-26003')
+    expect(drafts[0].qty).toBe(1)
+    expect(drafts[0].unit_price).toBe(0)
+  })
+
+  it('surfaces PostgREST objects instead of a generic toast', () => {
+    expect(
+      errorMessage(
+        { code: 'PGRST205', message: "Could not find the table 'public.delivery_notes' in the schema cache" },
+        'Could not create delivery note',
+      ),
+    ).toContain('delivery_notes')
+    expect(errorMessage(new Error('Finalize the quotation before creating a delivery note'))).toContain(
+      'Finalize',
+    )
+  })
+
+  it('treats a missing delivery_notes table as fallback storage', () => {
+    expect(
+      isMissingRelationError({
+        code: 'PGRST205',
+        message: "Could not find the table 'public.delivery_notes' in the schema cache",
+      }),
+    ).toBe(true)
+    expect(
+      isCheckConstraintError({
+        code: '23514',
+        message: 'new row for relation "line_items" violates check constraint "line_items_doc_type_check"',
+      }),
+    ).toBe(true)
+    expect(
+      shouldFallbackDeliveryNoteStorage({
+        code: 'PGRST205',
+        message: "Could not find the table 'public.delivery_notes' in the schema cache",
+      }),
+    ).toBe(true)
+  })
+
+  it('parses delivery notes stored in app_settings when the table is missing', () => {
+    const parsed = parseDeliveryNotesStoreValue(
+      JSON.stringify({
+        notes: [{ id: 'dn-1', reference_number: 'DN-01-26001', quote_ref: 'RR-01-26003', client: 'Maxtherm' }],
+        items: [{ id: 'li-1', reference: 'DN-01-26001', description: 'Polo', qty: 12, line_no: 1 }],
+      }),
+    )
+    expect(parsed.notes[0].quote_ref).toBe('RR-01-26003')
+    expect(parsed.items[0].qty).toBe(12)
   })
 })

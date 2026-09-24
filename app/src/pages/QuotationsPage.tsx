@@ -50,6 +50,7 @@ import {
 } from '../lib/referenceNumber'
 import { sortByDateDesc } from '../lib/finance'
 import { isQuotePastValidity, quoteValidUntil } from '../lib/documents'
+import { errorMessage } from '../lib/errors'
 import {
   canCreateDeliveryNoteFromQuote,
   createDeliveryNoteFromQuote,
@@ -933,7 +934,7 @@ export default function QuotationsPage() {
       setDnTarget(null)
       navigate(`/document/delivery-note/${note.id}`)
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not create delivery note', 'error')
+      showToast(errorMessage(e, 'Could not create delivery note'), 'error')
     } finally {
       setSaving(false)
     }

@@ -617,7 +617,6 @@ class QueryBuilder implements PromiseLike<QueryResult> {
   }
 
   select(columns = '*') {
-    this.mode = 'select'
     this.columns = columns
     return this
   }

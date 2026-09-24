@@ -20,11 +20,15 @@ import {
   toDeliveryNoteLineDrafts,
 } from '../lib/deliveryNotes'
 import {
-  deleteLineItems,
-  loadLineItems,
-  saveLineItems,
-  type DraftLineItem,
-} from '../lib/lineItems'
+  deleteDeliveryNote,
+  deleteDeliveryNoteLineItems,
+  listDeliveryNotes,
+  loadDeliveryNoteLineItems,
+  saveDeliveryNoteLineItems,
+  updateDeliveryNote,
+} from '../lib/deliveryNoteStore'
+import { errorMessage } from '../lib/errors'
+import { type DraftLineItem } from '../lib/lineItems'
 import { sortByDateDesc } from '../lib/finance'
 import { useCompactCrm } from '../hooks/useMediaQuery'
 import resp from '../styles/crmResponsive.module.css'
@@ -98,16 +102,15 @@ export default function DeliveryNotesPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [nRes, qRes] = await Promise.all([
-        db.from('delivery_notes').select('*').order('created_at', { ascending: false }),
+      const [notesRows, qRes] = await Promise.all([
+        listDeliveryNotes(),
         db.from('quotations').select('*').order('created_at', { ascending: false }),
       ])
-      if (nRes.error) throw nRes.error
       if (qRes.error) throw qRes.error
-      setNotes(sortByDateDesc((nRes.data || []) as DeliveryNote[]))
+      setNotes(sortByDateDesc(notesRows))
       setQuotes((qRes.data || []) as Quotation[])
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to load delivery notes', 'error')
+      showToast(errorMessage(e, 'Failed to load delivery notes'), 'error')
     } finally {
       setLoading(false)
     }
@@ -169,7 +172,7 @@ export default function DeliveryNotesPage() {
       setQuotePick('')
       navigate(`/document/delivery-note/${note.id}`)
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not create delivery note', 'error')
+      showToast(errorMessage(e, 'Could not create delivery note'), 'error')
     } finally {
       setSaving(false)
     }
@@ -177,7 +180,7 @@ export default function DeliveryNotesPage() {
 
   async function openEdit(note: DeliveryNote) {
     try {
-      const items = await loadLineItems('DeliveryNote', note.reference_number)
+      const items = await loadDeliveryNoteLineItems(note.reference_number)
       setEditing(note)
       setForm({
         delivery_date: (note.delivery_date || note.date || '').slice(0, 10),
@@ -190,7 +193,7 @@ export default function DeliveryNotesPage() {
         items: toDeliveryNoteLineDrafts(items),
       })
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to load line items', 'error')
+      showToast(errorMessage(e, 'Failed to load line items'), 'error')
     }
   }
 
@@ -205,28 +208,24 @@ export default function DeliveryNotesPage() {
     if (!editing) return
     setSaving(true)
     try {
-      const { error } = await db
-        .from('delivery_notes')
-        .update({
-          delivery_date: form.delivery_date || null,
-          status: form.status,
-          delivery_terms: form.delivery_terms,
-          ship_to: form.ship_to,
-          notes: form.notes,
-          received_by: form.received_by,
-          vehicle_notes: form.vehicle_notes,
-          updated_by: who,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', editing.id)
-      if (error) throw error
-      await saveLineItems('DeliveryNote', editing.reference_number, form.items, 0)
+      await updateDeliveryNote(editing.id, {
+        delivery_date: form.delivery_date || null,
+        status: form.status,
+        delivery_terms: form.delivery_terms,
+        ship_to: form.ship_to,
+        notes: form.notes,
+        received_by: form.received_by,
+        vehicle_notes: form.vehicle_notes,
+        updated_by: who,
+        updated_at: new Date().toISOString(),
+      })
+      await saveDeliveryNoteLineItems(editing.reference_number, form.items)
       await logActivity('update_delivery_note', 'delivery_note', editing.reference_number, editing.client, who)
       showToast('Delivery note saved', 'success')
       setEditing(null)
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Save failed', 'error')
+      showToast(errorMessage(e, 'Save failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -236,9 +235,8 @@ export default function DeliveryNotesPage() {
     if (!deleteTarget) return
     setSaving(true)
     try {
-      await deleteLineItems('DeliveryNote', [deleteTarget.reference_number])
-      const { error } = await db.from('delivery_notes').delete().eq('id', deleteTarget.id)
-      if (error) throw error
+      await deleteDeliveryNoteLineItems(deleteTarget.reference_number)
+      await deleteDeliveryNote(deleteTarget.id)
       await logActivity(
         'delete_delivery_note',
         'delivery_note',
@@ -250,7 +248,7 @@ export default function DeliveryNotesPage() {
       setDeleteTarget(null)
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Delete failed', 'error')
+      showToast(errorMessage(e, 'Delete failed'), 'error')
     } finally {
       setSaving(false)
     }
