@@ -923,6 +923,8 @@ create policy "Public can submit website inquiries" on website_inquiries for ins
 -- alter table website_inquiries enable row level security;
 -- create policy "Authenticated users full access" on website_inquiries for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 -- create policy "Public can submit website inquiries" on website_inquiries for insert to anon with check (true);
+-- Until this block is run, Central stores delivery notes in app_settings
+-- (key delivery_notes_store) so Maxtherm-style notes can still print.
 -- insert into app_settings (key, value) values ('deliveryNotePrefix', 'DN') on conflict (key) do nothing;
 -- create table if not exists delivery_notes (
 --   id uuid primary key default uuid_generate_v4(),

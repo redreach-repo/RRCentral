@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import { ArrowLeft, Download, Mail, MessageCircle, Printer } from 'lucide-react'
+import { ArrowLeft, Download, Mail, MessageCircle, Printer, Truck } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS, VAT_RATE } from '../lib/config'
 import type { Client, CrmContact, CrmEntry, DeliveryNote, Invoice, LineItem, Quotation } from '../lib/types'
@@ -18,6 +18,8 @@ import {
 } from '../lib/divisionQuoteFormats'
 import { CONNECT_PARTNER } from '../lib/seedDivisionCatalogues'
 import { loadLineItems, applyDiscount } from '../lib/lineItems'
+import { getDeliveryNote, loadDeliveryNoteLineItems } from '../lib/deliveryNoteStore'
+import { errorMessage } from '../lib/errors'
 import { buildWhatsAppUrl } from '../lib/whatsapp'
 import { resolveLogoUrl } from '../lib/brand'
 import {
@@ -28,6 +30,8 @@ import {
 } from '../lib/documents'
 import {
   DELIVERY_NOTE_COLUMNS,
+  canCreateDeliveryNoteFromQuote,
+  createDeliveryNoteFromQuote,
   deliveryNoteTotalQty,
   parseDocumentType,
   type PrintableDocType,
@@ -51,6 +55,7 @@ export default function DocumentPage() {
   const { settings } = useSettings()
   const { showToast } = useToast()
   const { user } = useAuth()
+  const navigate = useNavigate()
   const sheetRef = useRef<HTMLDivElement>(null)
 
   const [loading, setLoading] = useState(true)
@@ -62,6 +67,7 @@ export default function DocumentPage() {
   const [client, setClient] = useState<Client | null>(null)
   const [emailContacts, setEmailContacts] = useState<CrmContact[]>([])
   const [pdfBusy, setPdfBusy] = useState(false)
+  const [dnBusy, setDnBusy] = useState(false)
   const [emailOpen, setEmailOpen] = useState(false)
 
   const load = useCallback(async () => {
@@ -113,12 +119,10 @@ export default function DocumentPage() {
         setItems(lines)
         await attachClient(q.client)
       } else if (docType === 'delivery-note') {
-        const { data, error: err } = await db.from('delivery_notes').select('*').eq('id', id).maybeSingle()
-        if (err) throw err
-        if (!data) throw new Error('Delivery note not found')
-        const note = data as DeliveryNote
+        const note = await getDeliveryNote(id)
+        if (!note) throw new Error('Delivery note not found')
         setDeliveryNote(note)
-        const lines = await loadLineItems('DeliveryNote', note.reference_number)
+        const lines = await loadDeliveryNoteLineItems(note.reference_number)
         setItems(lines)
         await attachClient(note.client)
       } else {
@@ -132,7 +136,7 @@ export default function DocumentPage() {
         await attachClient(inv.client)
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load document')
+      setError(errorMessage(e, 'Failed to load document'))
     } finally {
       setLoading(false)
     }
@@ -309,6 +313,27 @@ export default function DocumentPage() {
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
+  async function createDnFromQuote() {
+    if (!quote || !canCreateDeliveryNoteFromQuote(quote)) {
+      showToast('Finalize this quotation before creating a delivery note', 'error')
+      return
+    }
+    setDnBusy(true)
+    try {
+      const note = await createDeliveryNoteFromQuote({
+        quote,
+        who: user?.email || '',
+        prefix: settings.deliveryNotePrefix || 'DN',
+      })
+      showToast(`Delivery note ${note.reference_number} created`, 'success')
+      navigate(`/document/delivery-note/${note.id}`)
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not create delivery note'), 'error')
+    } finally {
+      setDnBusy(false)
+    }
+  }
+
   async function markQuoteSent() {
     if (docType !== 'quote' || !quote) return
     if (!['Finalized', 'Draft'].includes(quote.status)) return
@@ -419,6 +444,11 @@ export default function DocumentPage() {
         <ToolbarBtn onClick={shareWhatsApp} accent>
           <MessageCircle size={14} /> WhatsApp
         </ToolbarBtn>
+        {docType === 'quote' && quote && canCreateDeliveryNoteFromQuote(quote) ? (
+          <ToolbarBtn onClick={() => void createDnFromQuote()} disabled={dnBusy}>
+            <Truck size={14} /> {dnBusy ? 'Creating…' : 'Delivery note'}
+          </ToolbarBtn>
+        ) : null}
       </div>
 
       <div

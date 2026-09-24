@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ExternalLink, Pencil, Plus, Trash2, Truck } from 'lucide-react'
 import { db } from '../lib/db'
@@ -16,14 +16,19 @@ import {
   canCreateDeliveryNoteFromQuote,
   createDeliveryNoteFromQuote,
   deliveryNoteTotalQty,
+  matchQuoteForDeliveryNote,
   toDeliveryNoteLineDrafts,
 } from '../lib/deliveryNotes'
 import {
-  deleteLineItems,
-  loadLineItems,
-  saveLineItems,
-  type DraftLineItem,
-} from '../lib/lineItems'
+  deleteDeliveryNote,
+  deleteDeliveryNoteLineItems,
+  listDeliveryNotes,
+  loadDeliveryNoteLineItems,
+  saveDeliveryNoteLineItems,
+  updateDeliveryNote,
+} from '../lib/deliveryNoteStore'
+import { errorMessage } from '../lib/errors'
+import { type DraftLineItem } from '../lib/lineItems'
 import { sortByDateDesc } from '../lib/finance'
 import { useCompactCrm } from '../hooks/useMediaQuery'
 import resp from '../styles/crmResponsive.module.css'
@@ -76,6 +81,7 @@ export default function DeliveryNotesPage() {
   const { settings } = useSettings()
   const { showToast } = useToast()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const compact = useCompactCrm()
   const who = user?.email || ''
   const prefix = settings.deliveryNotePrefix || 'DN'
@@ -88,6 +94,7 @@ export default function DeliveryNotesPage() {
   const [saving, setSaving] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [quotePick, setQuotePick] = useState('')
+  const [quoteFilter, setQuoteFilter] = useState('')
   const [editing, setEditing] = useState<DeliveryNote | null>(null)
   const [form, setForm] = useState<NoteForm>(emptyForm())
   const [deleteTarget, setDeleteTarget] = useState<DeliveryNote | null>(null)
@@ -95,16 +102,15 @@ export default function DeliveryNotesPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [nRes, qRes] = await Promise.all([
-        db.from('delivery_notes').select('*').order('created_at', { ascending: false }),
+      const [notesRows, qRes] = await Promise.all([
+        listDeliveryNotes(),
         db.from('quotations').select('*').order('created_at', { ascending: false }),
       ])
-      if (nRes.error) throw nRes.error
       if (qRes.error) throw qRes.error
-      setNotes(sortByDateDesc((nRes.data || []) as DeliveryNote[]))
+      setNotes(sortByDateDesc(notesRows))
       setQuotes((qRes.data || []) as Quotation[])
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to load delivery notes', 'error')
+      showToast(errorMessage(e, 'Failed to load delivery notes'), 'error')
     } finally {
       setLoading(false)
     }
@@ -114,10 +120,29 @@ export default function DeliveryNotesPage() {
     void load()
   }, [load])
 
-  const eligibleQuotes = useMemo(
-    () => quotes.filter(canCreateDeliveryNoteFromQuote),
-    [quotes],
-  )
+  useEffect(() => {
+    if (loading) return
+    const query =
+      searchParams.get('quote') ||
+      searchParams.get('ref') ||
+      searchParams.get('client') ||
+      ''
+    if (!query) return
+    const match = matchQuoteForDeliveryNote(quotes, query)
+    setQuoteFilter(query)
+    setCreateOpen(true)
+    if (match) setQuotePick(match.id)
+    setSearchParams({}, { replace: true })
+  }, [loading, quotes, searchParams, setSearchParams])
+
+  const eligibleQuotes = useMemo(() => {
+    const all = quotes.filter(canCreateDeliveryNoteFromQuote)
+    const q = quoteFilter.trim().toLowerCase()
+    if (!q) return all
+    return all.filter((row) =>
+      `${row.reference_number} ${row.client} ${row.status}`.toLowerCase().includes(q),
+    )
+  }, [quotes, quoteFilter])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -134,7 +159,7 @@ export default function DeliveryNotesPage() {
   }, [notes, search, tab])
 
   async function createFromQuote() {
-    const quote = eligibleQuotes.find((q) => q.id === quotePick)
+    const quote = quotes.find((q) => q.id === quotePick)
     if (!quote) {
       showToast('Select a quotation', 'error')
       return
@@ -147,7 +172,7 @@ export default function DeliveryNotesPage() {
       setQuotePick('')
       navigate(`/document/delivery-note/${note.id}`)
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not create delivery note', 'error')
+      showToast(errorMessage(e, 'Could not create delivery note'), 'error')
     } finally {
       setSaving(false)
     }
@@ -155,7 +180,7 @@ export default function DeliveryNotesPage() {
 
   async function openEdit(note: DeliveryNote) {
     try {
-      const items = await loadLineItems('DeliveryNote', note.reference_number)
+      const items = await loadDeliveryNoteLineItems(note.reference_number)
       setEditing(note)
       setForm({
         delivery_date: (note.delivery_date || note.date || '').slice(0, 10),
@@ -168,7 +193,7 @@ export default function DeliveryNotesPage() {
         items: toDeliveryNoteLineDrafts(items),
       })
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to load line items', 'error')
+      showToast(errorMessage(e, 'Failed to load line items'), 'error')
     }
   }
 
@@ -183,28 +208,24 @@ export default function DeliveryNotesPage() {
     if (!editing) return
     setSaving(true)
     try {
-      const { error } = await db
-        .from('delivery_notes')
-        .update({
-          delivery_date: form.delivery_date || null,
-          status: form.status,
-          delivery_terms: form.delivery_terms,
-          ship_to: form.ship_to,
-          notes: form.notes,
-          received_by: form.received_by,
-          vehicle_notes: form.vehicle_notes,
-          updated_by: who,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', editing.id)
-      if (error) throw error
-      await saveLineItems('DeliveryNote', editing.reference_number, form.items, 0)
+      await updateDeliveryNote(editing.id, {
+        delivery_date: form.delivery_date || null,
+        status: form.status,
+        delivery_terms: form.delivery_terms,
+        ship_to: form.ship_to,
+        notes: form.notes,
+        received_by: form.received_by,
+        vehicle_notes: form.vehicle_notes,
+        updated_by: who,
+        updated_at: new Date().toISOString(),
+      })
+      await saveDeliveryNoteLineItems(editing.reference_number, form.items)
       await logActivity('update_delivery_note', 'delivery_note', editing.reference_number, editing.client, who)
       showToast('Delivery note saved', 'success')
       setEditing(null)
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Save failed', 'error')
+      showToast(errorMessage(e, 'Save failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -214,9 +235,8 @@ export default function DeliveryNotesPage() {
     if (!deleteTarget) return
     setSaving(true)
     try {
-      await deleteLineItems('DeliveryNote', [deleteTarget.reference_number])
-      const { error } = await db.from('delivery_notes').delete().eq('id', deleteTarget.id)
-      if (error) throw error
+      await deleteDeliveryNoteLineItems(deleteTarget.reference_number)
+      await deleteDeliveryNote(deleteTarget.id)
       await logActivity(
         'delete_delivery_note',
         'delivery_note',
@@ -228,7 +248,7 @@ export default function DeliveryNotesPage() {
       setDeleteTarget(null)
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Delete failed', 'error')
+      showToast(errorMessage(e, 'Delete failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -365,9 +385,18 @@ export default function DeliveryNotesPage() {
           receipt, not an invoice.
         </p>
         <div style={fieldStyle}>
+          <label style={labelStyle}>Find quotation</label>
+          <input
+            style={inputStyle}
+            placeholder="Maxtherm or RR-01-26003"
+            value={quoteFilter}
+            onChange={(e) => setQuoteFilter(e.target.value)}
+          />
+        </div>
+        <div style={fieldStyle}>
           <label style={labelStyle}>Quotation</label>
           <select style={selectStyle} value={quotePick} onChange={(e) => setQuotePick(e.target.value)}>
-            <option value="">Select a finalized quotation…</option>
+            <option value="">Select a quotation…</option>
             {eligibleQuotes.map((q) => (
               <option key={q.id} value={q.id}>
                 {q.reference_number} — {q.client || 'No client'} ({q.status})
@@ -375,9 +404,13 @@ export default function DeliveryNotesPage() {
             ))}
           </select>
         </div>
-        {eligibleQuotes.length === 0 ? (
+        {quotes.filter(canCreateDeliveryNoteFromQuote).length === 0 ? (
           <p style={{ color: colors.muted, fontSize: 13 }}>
             No eligible quotations. Finalize a quotation first, then return here.
+          </p>
+        ) : eligibleQuotes.length === 0 ? (
+          <p style={{ color: colors.muted, fontSize: 13 }}>
+            No quotation matches “{quoteFilter}”. Try the exact ref RR-01-26003 or the client name.
           </p>
         ) : null}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
