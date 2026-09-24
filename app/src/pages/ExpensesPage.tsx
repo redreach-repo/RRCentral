@@ -12,12 +12,19 @@ import EmptyState from '../components/EmptyState'
 import { formatAED } from '../lib/money'
 import { logActivity } from '../lib/activity'
 import { expenseVatParts } from '../lib/finance'
-import { isUndefinedColumnError } from '../lib/errors'
 import { round2 } from '../lib/lineItems'
 import {
   supplierInvoiceProfit,
   type ParsedSupplierInvoice,
 } from '../lib/supplierInvoiceParse'
+import {
+  expenseReportDescription,
+  formatSupplierExpenseDescription,
+  saveAttachmentsToExpense,
+  saveAttachmentsToQuote,
+  syncQuoteSupplierCostFromExpense,
+} from '../lib/supplierInvoiceStore'
+import { isUndefinedColumnError } from '../lib/errors'
 import {
   buttonDangerStyle,
   buttonPrimaryStyle,
@@ -290,35 +297,10 @@ export default function ExpensesPage() {
 
   async function saveAttachmentsFor(expenseId: string) {
     const who = user?.email || ''
-    for (const file of pendingFiles) {
-      await db.from('attachments').insert({
-        entity_type: 'expense',
-        entity_ref: expenseId,
-        file_name: file.name,
-        storage_path: '',
-        url: file.dataUrl,
-        uploaded_by: who,
-        uploaded_at: new Date().toISOString(),
-      })
+    await saveAttachmentsToExpense({ expenseId, files: pendingFiles, uploadedBy: who })
+    if (linkedQuote) {
+      await saveAttachmentsToQuote({ quote: linkedQuote, files: pendingFiles, uploadedBy: who })
     }
-  }
-
-  async function syncQuoteSupplierCost(quote: Quotation, exclusiveCost: number) {
-    const cost = round2(Math.max(0, exclusiveCost))
-    const quoteAmount = Number(quote.amount) || 0
-    const revenueExclusive = quote.offset_vat
-      ? quoteAmount
-      : vatRate > 0
-        ? round2(quoteAmount / (1 + vatRate))
-        : quoteAmount
-    const payload = {
-      supplier_cost_base: cost,
-      estimated_gross_profit_base: round2(revenueExclusive - cost),
-      updated_by: user?.email || '',
-      updated_at: new Date().toISOString(),
-    }
-    const { error } = await db.from('quotations').update(payload).eq('id', quote.id)
-    if (error) throw error
   }
 
   async function save() {
@@ -340,6 +322,21 @@ export default function ExpensesPage() {
             }
           : applyVatInclusive(form.amount, vatRate)
 
+      const quoteRef = form.quote_ref.trim()
+      const autoDescription = quoteRef
+        ? formatSupplierExpenseDescription(form.vendor, quoteRef)
+        : ''
+      const extraNotes = form.notes
+        .split(/\n/)
+        .map((l) => l.trim())
+        .filter((l) => l && !/^payment to\b/i.test(l))
+        .join('\n')
+      const notes = autoDescription
+        ? extraNotes
+          ? `${autoDescription}\n${extraNotes}`
+          : autoDescription
+        : form.notes.trim()
+
       const payload = {
         date: form.date || null,
         vendor: form.vendor.trim(),
@@ -348,9 +345,9 @@ export default function ExpensesPage() {
         amount_ex_vat: parts.amount_ex_vat,
         vat_amount: parts.vat_amount,
         payment_method: form.payment_method,
-        references_text: form.references_text.trim(),
-        notes: form.notes.trim(),
-        quote_ref: form.quote_ref.trim(),
+        references_text: quoteRef || form.references_text.trim(),
+        notes,
+        quote_ref: quoteRef,
         supplier_invoice_no: form.supplier_invoice_no.trim(),
       }
 
@@ -400,7 +397,12 @@ export default function ExpensesPage() {
 
       if (linkedQuote && parts.amount_ex_vat > 0) {
         try {
-          await syncQuoteSupplierCost(linkedQuote, parts.amount_ex_vat)
+          await syncQuoteSupplierCostFromExpense({
+            quote: linkedQuote,
+            exclusiveCost: parts.amount_ex_vat,
+            vatRate,
+            updatedBy: user?.email || '',
+          })
         } catch {
           /* quote sync is best-effort */
         }
@@ -413,7 +415,12 @@ export default function ExpensesPage() {
         `${payload.category} · ${formatAED(payload.amount)}${payload.quote_ref ? ` · ${payload.quote_ref}` : ''}`,
         user?.email || '',
       )
-      showToast('Expense saved — it will show in finance reports', 'success')
+      showToast(
+        linkedQuote
+          ? `Saved on quotation ${linkedQuote.reference_number || linkedQuote.quote_id} and in expenses`
+          : 'Expense saved — it will show in finance reports',
+        'success',
+      )
       setOpen(false)
       await load()
     } catch (e) {
@@ -526,6 +533,11 @@ export default function ExpensesPage() {
                         {e.supplier_invoice_no ? (
                           <div style={{ fontSize: 11, color: colors.muted2 }}>{e.supplier_invoice_no}</div>
                         ) : null}
+                        {e.quote_ref || /^payment to\b/i.test(String(e.notes || '')) ? (
+                          <div style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
+                            {expenseReportDescription(e)}
+                          </div>
+                        ) : null}
                       </td>
                       <td style={tdStyle}>{e.category || '—'}</td>
                       <td style={tdStyle}>{formatAED(parts.exclusive)}</td>
@@ -569,7 +581,8 @@ export default function ExpensesPage() {
           />
           <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted, lineHeight: 1.45 }}>
             PDF text is copied into the form when possible (vendor, date, invoice no, totals, VAT). Always
-            review before saving. The file is stored as an attachment.
+            review before saving. When a quotation is linked, the PDF is stored on that quotation as well
+            as on this expense.
           </p>
           {parsing ? (
             <p style={{ margin: '6px 0 0', fontSize: 13, color: colors.accent }}>Reading PDF…</p>

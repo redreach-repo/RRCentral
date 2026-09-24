@@ -5,6 +5,7 @@ import {
   Copy,
   ExternalLink,
   FilePlus2,
+  FileUp,
   Pencil,
   Plus,
   Receipt,
@@ -16,11 +17,12 @@ import { db } from '../lib/db'
 import {
   DELIVERY_TERMS,
   DIVISIONS,
+  PAYMENT_METHODS,
   PAYMENT_TERMS,
   QUOTE_STATUSES,
   VAT_RATE,
 } from '../lib/config'
-import type { Client, Product, Quotation, QuoteTemplate } from '../lib/types'
+import type { Attachment, Client, Expense, Product, Quotation, QuoteTemplate } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
@@ -63,6 +65,15 @@ import {
   createDeliveryNoteFromQuote,
   matchQuoteForDeliveryNote,
 } from '../lib/deliveryNotes'
+import {
+  supplierInvoiceProfit,
+  type ParsedSupplierInvoice,
+} from '../lib/supplierInvoiceParse'
+import {
+  loadQuoteSupplierExpenses,
+  loadQuoteSupplierInvoiceAttachments,
+  saveSupplierInvoiceForQuote,
+} from '../lib/supplierInvoiceStore'
 import {
   BASE_CURRENCY,
   CURRENCY_LABELS,
@@ -191,6 +202,24 @@ export default function QuotationsPage() {
   const [convertTarget, setConvertTarget] = useState<Quotation | null>(null)
   const [depositPct, setDepositPct] = useState('100')
   const [dnTarget, setDnTarget] = useState<Quotation | null>(null)
+  const [supplierInvoiceTarget, setSupplierInvoiceTarget] = useState<Quotation | null>(null)
+  const [supplierInvoiceForm, setSupplierInvoiceForm] = useState({
+    date: format(new Date(), 'yyyy-MM-dd'),
+    vendor: '',
+    supplier_invoice_no: '',
+    amount: 0,
+    amount_ex_vat: 0,
+    vat_amount: 0,
+    payment_method: 'Bank transfer',
+    notes: '',
+  })
+  const [supplierInvoiceFiles, setSupplierInvoiceFiles] = useState<
+    { name: string; dataUrl: string }[]
+  >([])
+  const [supplierInvoiceAttachments, setSupplierInvoiceAttachments] = useState<Attachment[]>([])
+  const [supplierInvoiceExpenses, setSupplierInvoiceExpenses] = useState<Expense[]>([])
+  const [supplierInvoiceParsing, setSupplierInvoiceParsing] = useState(false)
+  const [supplierInvoiceHint, setSupplierInvoiceHint] = useState('')
   const [vatFoldOpen, setVatFoldOpen] = useState(false)
   const [vatFoldTarget, setVatFoldTarget] = useState('')
   const [clientSuggest, setClientSuggest] = useState(false)
@@ -414,8 +443,177 @@ export default function QuotationsPage() {
     [vatFoldOpen, form.items, vatRate, vatFoldTargetAmount],
   )
 
+  const supplierInvoiceProfitPreview = useMemo(() => {
+    if (!supplierInvoiceTarget) return null
+    return supplierInvoiceProfit({
+      quoteAmount: Number(supplierInvoiceTarget.amount) || 0,
+      quoteOffsetVat: Boolean(supplierInvoiceTarget.offset_vat),
+      expenseExclusive: supplierInvoiceForm.amount_ex_vat,
+      expenseVat: supplierInvoiceForm.vat_amount,
+      vatRate,
+    })
+  }, [supplierInvoiceTarget, supplierInvoiceForm.amount_ex_vat, supplierInvoiceForm.vat_amount, vatRate])
+
   const divisionBrand = (code: string) =>
     DIVISIONS.find((d) => d.code === code)?.brand || code
+
+  async function openSupplierInvoice(q: Quotation) {
+    setSupplierInvoiceTarget(q)
+    setSupplierInvoiceForm({
+      date: format(new Date(), 'yyyy-MM-dd'),
+      vendor: '',
+      supplier_invoice_no: '',
+      amount: 0,
+      amount_ex_vat: 0,
+      vat_amount: 0,
+      payment_method: PAYMENT_METHODS[0] || 'Bank transfer',
+      notes: '',
+    })
+    setSupplierInvoiceFiles([])
+    setSupplierInvoiceHint('')
+    try {
+      const [atts, exps] = await Promise.all([
+        loadQuoteSupplierInvoiceAttachments(q),
+        loadQuoteSupplierExpenses(q),
+      ])
+      setSupplierInvoiceAttachments(atts)
+      setSupplierInvoiceExpenses(exps)
+      const latest = exps[0]
+      if (latest) {
+        const extraNotes = String(latest.notes || '')
+          .split(/\n/)
+          .map((l) => l.trim())
+          .filter((l) => l && !/^payment to\b/i.test(l))
+          .join('\n')
+        setSupplierInvoiceForm({
+          date: latest.date ? latest.date.slice(0, 10) : format(new Date(), 'yyyy-MM-dd'),
+          vendor: latest.vendor || '',
+          supplier_invoice_no: latest.supplier_invoice_no || '',
+          amount: Number(latest.amount) || 0,
+          amount_ex_vat: Number(latest.amount_ex_vat) || 0,
+          vat_amount: Number(latest.vat_amount) || 0,
+          payment_method: latest.payment_method || PAYMENT_METHODS[0] || 'Bank transfer',
+          notes: extraNotes,
+        })
+      }
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not load supplier invoices', 'error')
+      setSupplierInvoiceAttachments([])
+      setSupplierInvoiceExpenses([])
+    }
+  }
+
+  function applySupplierParsed(parsed: ParsedSupplierInvoice) {
+    setSupplierInvoiceForm((f) => ({
+      ...f,
+      vendor: parsed.vendor || f.vendor,
+      date: parsed.date || f.date,
+      supplier_invoice_no: parsed.supplierInvoiceNo || f.supplier_invoice_no,
+      amount: parsed.amountInclusive ?? f.amount,
+      amount_ex_vat: parsed.amountExVat ?? f.amount_ex_vat,
+      vat_amount: parsed.vatAmount ?? f.vat_amount,
+      notes: [f.notes.trim(), parsed.trn ? `Supplier TRN ${parsed.trn}` : ''].filter(Boolean).join('\n'),
+    }))
+    setSupplierInvoiceHint(
+      parsed.confidence === 'high'
+        ? 'Filled from the PDF. Check the figures before saving.'
+        : 'Partially filled from the PDF. Confirm totals before saving.',
+    )
+  }
+
+  async function onSupplierInvoiceFiles(files: FileList | null) {
+    if (!files?.length) return
+    try {
+      const list = [...files]
+      const rows = await Promise.all(
+        list.map(
+          (file) =>
+            new Promise<{ name: string; dataUrl: string }>((resolve, reject) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve({ name: file.name, dataUrl: String(reader.result || '') })
+              reader.onerror = () => reject(reader.error || new Error('Read failed'))
+              reader.readAsDataURL(file)
+            }),
+        ),
+      )
+      setSupplierInvoiceFiles((prev) => [...prev, ...rows])
+      const pdf = list.find((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name))
+      if (!pdf) return
+      setSupplierInvoiceParsing(true)
+      try {
+        const { parseSupplierInvoicePdf } = await import('../lib/supplierInvoicePdf')
+        applySupplierParsed(await parseSupplierInvoicePdf(pdf, vatRate))
+        showToast('Supplier invoice PDF read — review the form', 'success')
+      } catch (e) {
+        setSupplierInvoiceHint('Could not read text from this PDF. Fill the form manually.')
+        showToast(e instanceof Error ? e.message : 'PDF parse failed', 'error')
+      } finally {
+        setSupplierInvoiceParsing(false)
+      }
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not read file', 'error')
+    }
+  }
+
+  async function saveSupplierInvoice() {
+    if (!supplierInvoiceTarget) return
+    if (!supplierInvoiceForm.vendor.trim()) {
+      showToast('Vendor is required', 'error')
+      return
+    }
+    if (!supplierInvoiceForm.amount && !supplierInvoiceForm.amount_ex_vat) {
+      showToast('Enter the supplier invoice total', 'error')
+      return
+    }
+    setSaving(true)
+    try {
+      const amount_ex_vat =
+        supplierInvoiceForm.amount_ex_vat > 0
+          ? round2(supplierInvoiceForm.amount_ex_vat)
+          : round2(supplierInvoiceForm.amount / (1 + vatRate))
+      const vat_amount =
+        supplierInvoiceForm.vat_amount > 0
+          ? round2(supplierInvoiceForm.vat_amount)
+          : round2(supplierInvoiceForm.amount - amount_ex_vat)
+      const amount =
+        supplierInvoiceForm.amount > 0
+          ? round2(supplierInvoiceForm.amount)
+          : round2(amount_ex_vat + vat_amount)
+
+      const result = await saveSupplierInvoiceForQuote({
+        quote: supplierInvoiceTarget,
+        files: supplierInvoiceFiles,
+        uploadedBy: who,
+        vendor: supplierInvoiceForm.vendor,
+        date: supplierInvoiceForm.date || null,
+        amount,
+        amount_ex_vat,
+        vat_amount,
+        payment_method: supplierInvoiceForm.payment_method,
+        notes: supplierInvoiceForm.notes,
+        supplier_invoice_no: supplierInvoiceForm.supplier_invoice_no,
+        expenseId: supplierInvoiceExpenses[0]?.id,
+        vatRate,
+      })
+      await logActivity(
+        'save_supplier_invoice',
+        'quotation',
+        result.quoteRef,
+        `${supplierInvoiceForm.vendor} · ${formatAED(amount)}`,
+        who,
+      )
+      showToast(
+        `Supplier invoice saved on ${result.quoteRef}. VAT paid ${formatAED(vat_amount)}; profit ${formatAED(result.profit.profit)}.`,
+        'success',
+      )
+      setSupplierInvoiceTarget(null)
+      await load()
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not save supplier invoice', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   async function openCreate() {
     setEditing(null)
@@ -1061,6 +1259,14 @@ export default function QuotationsPage() {
             <Truck size={14} /> {compact ? '' : 'Delivery note'}
           </button>
         )}
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          title="Store supplier invoice on this quotation"
+          onClick={() => void openSupplierInvoice(q)}
+        >
+          <FileUp size={14} /> {compact ? '' : 'Supplier invoice'}
+        </button>
         <button type="button" style={buttonSecondaryStyle} disabled={saving} onClick={() => void duplicate(q)} title="Duplicate">
           <Copy size={14} />
         </button>
@@ -2200,6 +2406,212 @@ export default function QuotationsPage() {
           </button>
           <button type="button" style={buttonPrimaryStyle} disabled={saving} onClick={() => void createDeliveryNote()}>
             {saving ? 'Creating…' : 'Create delivery note'}
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!supplierInvoiceTarget}
+        title={`Supplier invoice · ${supplierInvoiceTarget?.reference_number || supplierInvoiceTarget?.quote_id || ''}`}
+        onClose={() => setSupplierInvoiceTarget(null)}
+        width={640}
+      >
+        <p style={{ color: colors.muted, fontSize: 14, marginTop: 0, lineHeight: 1.5 }}>
+          The PDF is stored on this quotation. A matching expense is created so VAT paid and cost show
+          in finance reports, and gross profit is calculated against the quote total.
+        </p>
+        <div style={fieldStyle}>
+          <label style={labelStyle}>
+            <FileUp size={12} style={{ marginRight: 4 }} />
+            Upload supplier invoice PDF
+          </label>
+          <input
+            type="file"
+            accept="application/pdf,image/*,.pdf"
+            multiple
+            disabled={supplierInvoiceParsing}
+            onChange={(e) => void onSupplierInvoiceFiles(e.target.files)}
+          />
+          {supplierInvoiceParsing ? (
+            <p style={{ margin: '6px 0 0', fontSize: 13, color: colors.accent }}>Reading PDF…</p>
+          ) : null}
+          {supplierInvoiceHint ? (
+            <p style={{ margin: '6px 0 0', fontSize: 13, color: colors.muted }}>{supplierInvoiceHint}</p>
+          ) : null}
+          {supplierInvoiceFiles.length > 0 ? (
+            <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 12, color: colors.muted }}>
+              {supplierInvoiceFiles.map((f) => (
+                <li key={f.name + f.dataUrl.slice(0, 20)}>{f.name} (pending save)</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+        <div style={formGridStyle}>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Date</label>
+            <input
+              type="date"
+              style={inputStyle}
+              value={supplierInvoiceForm.date}
+              onChange={(e) => setSupplierInvoiceForm((f) => ({ ...f, date: e.target.value }))}
+            />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Supplier invoice no.</label>
+            <input
+              style={inputStyle}
+              value={supplierInvoiceForm.supplier_invoice_no}
+              onChange={(e) =>
+                setSupplierInvoiceForm((f) => ({ ...f, supplier_invoice_no: e.target.value }))
+              }
+            />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Vendor *</label>
+            <input
+              style={inputStyle}
+              value={supplierInvoiceForm.vendor}
+              onChange={(e) => setSupplierInvoiceForm((f) => ({ ...f, vendor: e.target.value }))}
+            />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Payment method</label>
+            <select
+              style={selectStyle}
+              value={supplierInvoiceForm.payment_method}
+              onChange={(e) =>
+                setSupplierInvoiceForm((f) => ({ ...f, payment_method: e.target.value }))
+              }
+            >
+              {PAYMENT_METHODS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Amount ex-VAT</label>
+            <input
+              type="number"
+              step="0.01"
+              style={inputStyle}
+              value={supplierInvoiceForm.amount_ex_vat || ''}
+              onChange={(e) => {
+                const amount_ex_vat = round2(Number(e.target.value) || 0)
+                const vat_amount = round2(amount_ex_vat * vatRate)
+                setSupplierInvoiceForm((f) => ({
+                  ...f,
+                  amount_ex_vat,
+                  vat_amount,
+                  amount: round2(amount_ex_vat + vat_amount),
+                }))
+              }}
+            />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>VAT paid</label>
+            <input
+              type="number"
+              step="0.01"
+              style={inputStyle}
+              value={supplierInvoiceForm.vat_amount || ''}
+              onChange={(e) => {
+                const vat_amount = round2(Number(e.target.value) || 0)
+                setSupplierInvoiceForm((f) => ({
+                  ...f,
+                  vat_amount,
+                  amount: round2((Number(f.amount_ex_vat) || 0) + vat_amount),
+                }))
+              }}
+            />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Total incl. VAT</label>
+            <input
+              type="number"
+              step="0.01"
+              style={inputStyle}
+              value={supplierInvoiceForm.amount || ''}
+              onChange={(e) => {
+                const amount = round2(Number(e.target.value) || 0)
+                const amount_ex_vat = vatRate > 0 ? round2(amount / (1 + vatRate)) : amount
+                setSupplierInvoiceForm((f) => ({
+                  ...f,
+                  amount,
+                  amount_ex_vat,
+                  vat_amount: round2(amount - amount_ex_vat),
+                }))
+              }}
+            />
+          </div>
+        </div>
+        {supplierInvoiceProfitPreview ? (
+          <div style={{ ...cardStyle, padding: 12, marginTop: 8, fontSize: 13, lineHeight: 1.55 }}>
+            <div>
+              Customer revenue (ex-VAT):{' '}
+              <strong>{formatAED(supplierInvoiceProfitPreview.revenueExclusive)}</strong>
+            </div>
+            <div>
+              Supplier cost (ex-VAT):{' '}
+              <strong>{formatAED(supplierInvoiceProfitPreview.expenseExclusive)}</strong>
+            </div>
+            <div>
+              VAT paid: <strong>{formatAED(supplierInvoiceProfitPreview.expenseVat)}</strong>
+            </div>
+            <div>
+              Gross profit:{' '}
+              <strong
+                style={{
+                  color:
+                    supplierInvoiceProfitPreview.profit >= 0 ? colors.success : colors.danger,
+                }}
+              >
+                {formatAED(supplierInvoiceProfitPreview.profit)}
+              </strong>{' '}
+              <span style={{ color: colors.muted2 }}>
+                ({supplierInvoiceProfitPreview.marginPct}% margin)
+              </span>
+            </div>
+          </div>
+        ) : null}
+        <div style={fieldStyle}>
+          <label style={labelStyle}>Notes</label>
+          <textarea
+            style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }}
+            value={supplierInvoiceForm.notes}
+            onChange={(e) => setSupplierInvoiceForm((f) => ({ ...f, notes: e.target.value }))}
+          />
+        </div>
+        {supplierInvoiceAttachments.length > 0 ? (
+          <div style={fieldStyle}>
+            <label style={labelStyle}>PDFs on this quotation</label>
+            <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13 }}>
+              {supplierInvoiceAttachments.map((a) => (
+                <li key={a.id}>
+                  <a href={a.url} target="_blank" rel="noreferrer" style={{ color: colors.accent }}>
+                    {a.file_name || 'Supplier invoice'}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            onClick={() => setSupplierInvoiceTarget(null)}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            style={buttonPrimaryStyle}
+            disabled={saving || supplierInvoiceParsing}
+            onClick={() => void saveSupplierInvoice()}
+          >
+            {saving ? 'Saving…' : 'Save on quotation'}
           </button>
         </div>
       </Modal>
