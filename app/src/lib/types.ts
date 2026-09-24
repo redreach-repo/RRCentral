@@ -99,6 +99,11 @@ export interface Quotation {
   division_code: string
   base_reference: string
   revision: number
+  /**
+   * Shared deal key. Sibling “branch” quotes keep the same deal_ref so one
+   * supplier invoice can cover several customer quotes (partial delivery).
+   */
+  deal_ref?: string
   quote_id: string
   payment_terms: string
   moq: string

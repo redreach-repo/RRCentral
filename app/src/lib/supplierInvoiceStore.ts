@@ -4,15 +4,20 @@ import { isUndefinedColumnError } from './errors'
 import { expenseVatParts } from './finance'
 import { round2 } from './lineItems'
 import { supplierInvoiceProfit } from './supplierInvoiceParse'
+import {
+  allocateSupplierCostAcrossDeal,
+  resolveDealRef,
+} from './dealQuotes'
 import type { Attachment, Expense, Quotation } from './types'
 import { ensureVendor } from './vendors'
 
-/** Attachments for supplier PDFs live on the quotation (not only on the expense). */
+/** Attachments for supplier PDFs live on the quotation / deal (not only on the expense). */
 export const QUOTE_SUPPLIER_INVOICE_ENTITY = 'quotation_supplier_invoice'
 
 /**
  * Expense report wording, e.g. "Payment to ACME Uniforms LLC for RR-01-26003".
  * Company name comes from the supplier invoice vendor field.
+ * When a deal has branches, quoteRef is the shared deal_ref.
  */
 export function formatSupplierExpenseDescription(vendor: string, quoteRef: string): string {
   const company = String(vendor || '').trim() || 'supplier'
@@ -32,14 +37,17 @@ export function expenseReportDescription(row: Pick<Expense, 'vendor' | 'quote_re
   return notes || String(row.references_text || '').trim() || String(row.vendor || '').trim()
 }
 
-export function quoteAttachmentRefs(quote: Pick<Quotation, 'reference_number' | 'quote_id' | 'id'>): string[] {
-  return [quote.reference_number, quote.quote_id, quote.id]
+export function quoteAttachmentRefs(
+  quote: Pick<Quotation, 'deal_ref' | 'reference_number' | 'quote_id' | 'id' | 'base_reference'>,
+): string[] {
+  return [resolveDealRef(quote), quote.deal_ref, quote.reference_number, quote.base_reference, quote.quote_id, quote.id]
     .map((v) => String(v || '').trim())
     .filter(Boolean)
+    .filter((v, i, arr) => arr.indexOf(v) === i)
 }
 
 export async function loadQuoteSupplierInvoiceAttachments(
-  quote: Pick<Quotation, 'reference_number' | 'quote_id' | 'id'>,
+  quote: Pick<Quotation, 'deal_ref' | 'reference_number' | 'quote_id' | 'id' | 'base_reference'>,
 ): Promise<Attachment[]> {
   const refs = quoteAttachmentRefs(quote)
   if (!refs.length) return []
@@ -55,7 +63,7 @@ export async function loadQuoteSupplierInvoiceAttachments(
 }
 
 export async function loadQuoteSupplierExpenses(
-  quote: Pick<Quotation, 'reference_number' | 'quote_id' | 'id'>,
+  quote: Pick<Quotation, 'deal_ref' | 'reference_number' | 'quote_id' | 'id' | 'base_reference'>,
 ): Promise<Expense[]> {
   const refs = quoteAttachmentRefs(quote)
   if (!refs.length) return []
@@ -68,17 +76,22 @@ export async function loadQuoteSupplierExpenses(
   })
 }
 
+export async function loadDealQuotes(dealRef: string): Promise<Quotation[]> {
+  const key = String(dealRef || '').trim()
+  if (!key) return []
+  const { data, error } = await db.from('quotations').select('*').order('created_at', { ascending: true })
+  if (error) throw error
+  return ((data || []) as Quotation[]).filter((q) => resolveDealRef(q) === key)
+}
+
 export type PendingAttachment = { name: string; dataUrl: string; mime?: string }
 
 export async function saveAttachmentsToQuote(opts: {
-  quote: Pick<Quotation, 'reference_number' | 'quote_id' | 'id'>
+  quote: Pick<Quotation, 'deal_ref' | 'reference_number' | 'quote_id' | 'id' | 'base_reference'>
   files: PendingAttachment[]
   uploadedBy: string
 }): Promise<string> {
-  const entityRef =
-    String(opts.quote.reference_number || '').trim() ||
-    String(opts.quote.quote_id || '').trim() ||
-    String(opts.quote.id || '').trim()
+  const entityRef = resolveDealRef(opts.quote)
   if (!entityRef) throw new Error('Quotation needs a reference before attaching a supplier invoice')
   for (const file of opts.files) {
     const { error } = await db.from('attachments').insert({
@@ -116,7 +129,7 @@ export async function saveAttachmentsToExpense(opts: {
 
 export async function upsertSupplierInvoiceExpense(opts: {
   expenseId?: string
-  quote: Pick<Quotation, 'reference_number' | 'quote_id' | 'id'>
+  quote: Pick<Quotation, 'deal_ref' | 'reference_number' | 'quote_id' | 'id' | 'base_reference'>
   vendor: string
   date: string | null
   category: string
@@ -127,11 +140,8 @@ export async function upsertSupplierInvoiceExpense(opts: {
   references_text: string
   notes: string
   supplier_invoice_no: string
-}): Promise<{ expenseId: string; usedLegacyColumns: boolean }> {
-  const quoteRef =
-    String(opts.quote.reference_number || '').trim() ||
-    String(opts.quote.quote_id || '').trim() ||
-    String(opts.quote.id || '').trim()
+}): Promise<{ expenseId: string; usedLegacyColumns: boolean; dealRef: string }> {
+  const dealRef = resolveDealRef(opts.quote)
   const payload = {
     date: opts.date,
     vendor: opts.vendor.trim(),
@@ -140,9 +150,9 @@ export async function upsertSupplierInvoiceExpense(opts: {
     amount_ex_vat: round2(opts.amount_ex_vat),
     vat_amount: round2(opts.vat_amount),
     payment_method: opts.payment_method,
-    references_text: opts.references_text.trim(),
+    references_text: opts.references_text.trim() || dealRef,
     notes: opts.notes.trim(),
-    quote_ref: quoteRef,
+    quote_ref: dealRef,
     supplier_invoice_no: opts.supplier_invoice_no.trim(),
   }
 
@@ -177,7 +187,7 @@ export async function upsertSupplierInvoiceExpense(opts: {
     } else if (error) throw error
   }
 
-  return { expenseId, usedLegacyColumns }
+  return { expenseId, usedLegacyColumns, dealRef }
 }
 
 export async function syncQuoteSupplierCostFromExpense(opts: {
@@ -187,23 +197,24 @@ export async function syncQuoteSupplierCostFromExpense(opts: {
   updatedBy: string
 }) {
   const rate = Number(opts.vatRate) || VAT_RATE
-  const cost = round2(Math.max(0, opts.exclusiveCost))
-  const quoteAmount = Number(opts.quote.amount) || 0
-  const revenueExclusive = opts.quote.offset_vat
-    ? quoteAmount
-    : rate > 0
-      ? round2(quoteAmount / (1 + rate))
-      : quoteAmount
-  const { error } = await db
-    .from('quotations')
-    .update({
-      supplier_cost_base: cost,
-      estimated_gross_profit_base: round2(revenueExclusive - cost),
-      updated_by: opts.updatedBy,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', opts.quote.id)
-  if (error) throw error
+  const dealRef = resolveDealRef(opts.quote)
+  const siblings = await loadDealQuotes(dealRef)
+  const pool = siblings.length ? siblings : [opts.quote]
+  const shares = allocateSupplierCostAcrossDeal(pool, opts.exclusiveCost, rate)
+  const now = new Date().toISOString()
+  for (const share of shares) {
+    const { error } = await db
+      .from('quotations')
+      .update({
+        supplier_cost_base: share.costExclusive,
+        estimated_gross_profit_base: share.profit,
+        updated_by: opts.updatedBy,
+        updated_at: now,
+      })
+      .eq('id', share.quoteId)
+    if (error) throw error
+  }
+  return shares
 }
 
 /** Save PDF on the quotation, mirror as finance expense, update quote GP. */
@@ -224,21 +235,27 @@ export async function saveSupplierInvoiceForQuote(opts: {
   expenseId?: string
   vatRate?: number
 }) {
-  const quoteRef =
-    String(opts.quote.reference_number || '').trim() ||
-    String(opts.quote.quote_id || '').trim() ||
-    String(opts.quote.id || '').trim()
-  if (!quoteRef) throw new Error('Save or finalize the quotation first so it has a reference')
+  const dealRef = resolveDealRef(opts.quote)
+  if (!dealRef) throw new Error('Save or finalize the quotation first so it has a reference')
+
+  // Ensure the quote carries deal_ref so siblings can find the shared invoice.
+  if (!String(opts.quote.deal_ref || '').trim()) {
+    const { error: dealErr } = await db
+      .from('quotations')
+      .update({ deal_ref: dealRef, updated_at: new Date().toISOString() })
+      .eq('id', opts.quote.id)
+    if (dealErr && !isUndefinedColumnError(dealErr)) throw dealErr
+  }
 
   if (opts.files.length) {
     await saveAttachmentsToQuote({
-      quote: opts.quote,
+      quote: { ...opts.quote, deal_ref: dealRef },
       files: opts.files,
       uploadedBy: opts.uploadedBy,
     })
   }
 
-  const description = formatSupplierExpenseDescription(opts.vendor, quoteRef)
+  const description = formatSupplierExpenseDescription(opts.vendor, dealRef)
   const extraNotes = String(opts.notes || '')
     .split(/\n/)
     .map((l) => l.trim())
@@ -248,7 +265,7 @@ export async function saveSupplierInvoiceForQuote(opts: {
 
   const { expenseId, usedLegacyColumns } = await upsertSupplierInvoiceExpense({
     expenseId: opts.expenseId,
-    quote: opts.quote,
+    quote: { ...opts.quote, deal_ref: dealRef },
     vendor: opts.vendor,
     date: opts.date,
     category: opts.category || 'Uniforms / Cost of goods',
@@ -256,7 +273,7 @@ export async function saveSupplierInvoiceForQuote(opts: {
     amount_ex_vat: opts.amount_ex_vat,
     vat_amount: opts.vat_amount,
     payment_method: opts.payment_method,
-    references_text: quoteRef,
+    references_text: dealRef,
     notes,
     supplier_invoice_no: opts.supplier_invoice_no || '',
   })
@@ -279,9 +296,10 @@ export async function saveSupplierInvoiceForQuote(opts: {
     /* vendor registry optional until SQL upgrade */
   }
 
+  let shares = null
   try {
-    await syncQuoteSupplierCostFromExpense({
-      quote: opts.quote,
+    shares = await syncQuoteSupplierCostFromExpense({
+      quote: { ...opts.quote, deal_ref: dealRef },
       exclusiveCost: opts.amount_ex_vat,
       vatRate: opts.vatRate,
       updatedBy: opts.uploadedBy,
@@ -298,7 +316,7 @@ export async function saveSupplierInvoiceForQuote(opts: {
     vatRate: opts.vatRate,
   })
 
-  return { expenseId, quoteRef, usedLegacyColumns, profit }
+  return { expenseId, quoteRef: dealRef, dealRef, usedLegacyColumns, profit, shares }
 }
 
 export function expensePartsOrForm(

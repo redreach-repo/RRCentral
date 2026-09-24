@@ -6,6 +6,7 @@ import {
   ExternalLink,
   FilePlus2,
   FileUp,
+  GitBranch,
   Pencil,
   Plus,
   Receipt,
@@ -74,6 +75,7 @@ import {
   loadQuoteSupplierInvoiceAttachments,
   saveSupplierInvoiceForQuote,
 } from '../lib/supplierInvoiceStore'
+import { resolveDealRef } from '../lib/dealQuotes'
 import { listVendors } from '../lib/vendors'
 import {
   BASE_CURRENCY,
@@ -608,7 +610,7 @@ export default function QuotationsPage() {
         who,
       )
       showToast(
-        `Supplier invoice saved on ${result.quoteRef}. VAT paid ${formatAED(vat_amount)}; profit ${formatAED(result.profit.profit)}.`,
+        `Supplier invoice saved on deal ${result.dealRef || result.quoteRef}. VAT paid ${formatAED(vat_amount)}; cost shared across branch quotes when they have revenue.`,
         'success',
       )
       setSupplierInvoiceTarget(null)
@@ -817,6 +819,7 @@ export default function QuotationsPage() {
         .update({
           reference_number: reference,
           base_reference: reference,
+          deal_ref: String(q.deal_ref || '').trim() || reference,
           status: 'Finalized',
           revision: q.revision || 0,
           valid_until: validUntil,
@@ -824,7 +827,21 @@ export default function QuotationsPage() {
           updated_at: new Date().toISOString(),
         })
         .eq('id', q.id)
-      if (error) throw error
+      if (error && isUndefinedColumnError(error)) {
+        const retry = await db
+          .from('quotations')
+          .update({
+            reference_number: reference,
+            base_reference: reference,
+            status: 'Finalized',
+            revision: q.revision || 0,
+            valid_until: validUntil,
+            updated_by: who,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', q.id)
+        if (retry.error) throw retry.error
+      } else if (error) throw error
       await logActivity('finalize_quote', 'quotation', reference, q.client, who)
       await syncCrmFromQuote({
         client: q.client,
@@ -967,6 +984,99 @@ export default function QuotationsPage() {
       await load()
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Duplicate failed', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /**
+   * Branch a quote for partial delivery: new draft under the same deal_ref so one
+   * supplier invoice can cover both. Parent stays active (not superseded).
+   */
+  async function branchQuote(q: Quotation) {
+    const dealRef = resolveDealRef(q)
+    if (!dealRef) {
+      showToast('Finalize the quotation first so it has a reference to branch from', 'error')
+      return
+    }
+    setSaving(true)
+    try {
+      // Ensure parent carries deal_ref for shared supplier invoice / cost.
+      if (!String(q.deal_ref || '').trim()) {
+        const { error: parentErr } = await db
+          .from('quotations')
+          .update({ deal_ref: dealRef, updated_by: who, updated_at: new Date().toISOString() })
+          .eq('id', q.id)
+        if (parentErr && !isUndefinedColumnError(parentErr)) throw parentErr
+      }
+
+      const items = await loadLineItems('Quote', q.quote_id)
+      const newQuoteId = makeQuoteId()
+      const branchNote = `Branch of ${q.reference_number || q.quote_id} — keep only the lines still to deliver. Same supplier invoice / deal ${dealRef}.`
+      const payload = {
+        client: q.client,
+        vertical: q.vertical,
+        division_code: q.division_code,
+        description: q.description,
+        payment_terms: q.payment_terms,
+        delivery_terms: q.delivery_terms,
+        moq: q.moq,
+        notes: [q.notes, branchNote].filter(Boolean).join('\n'),
+        date: format(new Date(), 'yyyy-MM-dd'),
+        amount: 0,
+        discount_percent: Number(q.discount_percent) || 0,
+        discount_amount: Number(q.discount_amount) || 0,
+        offset_vat: Boolean(q.offset_vat),
+        status: 'Draft',
+        reference_number: '',
+        base_reference: '',
+        revision: 0,
+        deal_ref: dealRef,
+        quote_id: newQuoteId,
+        supplier_cost_base: 0,
+        estimated_gross_profit_base: 0,
+        created_by: who,
+        updated_by: who,
+        ...quotationCurrencyDefaults(),
+        quotation_currency: q.quotation_currency || BASE_CURRENCY,
+        payment_currency: q.payment_currency || BASE_CURRENCY,
+        supplier_currency: q.supplier_currency || BASE_CURRENCY,
+        booking_currency: q.booking_currency || BASE_CURRENCY,
+        fx_rate: Number(q.fx_rate) || 1,
+      }
+      const { error } = await db.from('quotations').insert(payload)
+      if (error && isUndefinedColumnError(error)) {
+        const { deal_ref: _d, offset_vat: _o, ...legacy } = payload
+        const retry = await db.from('quotations').insert(legacy)
+        if (retry.error) throw retry.error
+        showToast(
+          'Branch created, but deal_ref is missing on the database. Run supabase-quote-deal-branch-upgrade.sql.',
+          'error',
+        )
+      } else if (error) throw error
+
+      // Copy lines so you can delete the ones already delivered and keep the rest.
+      await saveLineItems('Quote', newQuoteId, toDraftItems(items), vatRate)
+      await logActivity(
+        'branch_quote',
+        'quotation',
+        'DRAFT',
+        `Branch of ${q.reference_number || q.quote_id} · deal ${dealRef}`,
+        who,
+      )
+      showToast(
+        `Branch draft created under deal ${dealRef}. Keep only the undelivered lines, then finalize / invoice.`,
+        'success',
+      )
+      await load()
+      const { data: fresh } = await db
+        .from('quotations')
+        .select('*')
+        .eq('quote_id', newQuoteId)
+        .maybeSingle()
+      if (fresh) await openEdit(fresh as Quotation)
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Branch failed', 'error')
     } finally {
       setSaving(false)
     }
@@ -1278,6 +1388,17 @@ export default function QuotationsPage() {
         >
           <FileUp size={14} /> {compact ? '' : 'Supplier invoice'}
         </button>
+        {(q.reference_number || q.deal_ref) && q.status !== 'Superseded' ? (
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={saving}
+            title="Branch for partial delivery — same supplier invoice / deal, new customer quote"
+            onClick={() => void branchQuote(q)}
+          >
+            <GitBranch size={14} /> {compact ? '' : 'Branch'}
+          </button>
+        ) : null}
         <button type="button" style={buttonSecondaryStyle} disabled={saving} onClick={() => void duplicate(q)} title="Duplicate">
           <Copy size={14} />
         </button>
@@ -1380,6 +1501,19 @@ export default function QuotationsPage() {
                       {q.valid_until && q.reference_number ? (
                         <div style={{ fontSize: 11, color: colors.muted2 }}>
                           Valid until {format(new Date(q.valid_until), 'dd MMM yyyy')}
+                        </div>
+                      ) : null}
+                      {resolveDealRef(q) &&
+                      resolveDealRef(q) !== (q.reference_number || q.quote_id) ? (
+                        <div style={{ fontSize: 11, color: colors.muted2 }}>
+                          Deal {resolveDealRef(q)}
+                        </div>
+                      ) : q.deal_ref &&
+                        quotes.some(
+                          (o) => o.id !== q.id && resolveDealRef(o) === resolveDealRef(q),
+                        ) ? (
+                        <div style={{ fontSize: 11, color: colors.muted2 }}>
+                          Deal {resolveDealRef(q)} · branched
                         </div>
                       ) : null}
                     </td>
@@ -2428,8 +2562,10 @@ export default function QuotationsPage() {
         width={640}
       >
         <p style={{ color: colors.muted, fontSize: 14, marginTop: 0, lineHeight: 1.5 }}>
-          The PDF is stored on this quotation. A matching expense is created so VAT paid and cost show
-          in finance reports, and gross profit is calculated against the quote total.
+          The PDF is stored on this quotation’s <strong style={{ color: colors.text }}>deal</strong>{' '}
+          ({supplierInvoiceTarget ? resolveDealRef(supplierInvoiceTarget) : '—'}). A matching expense
+          is created for finance reports. If this deal has branch quotes, supplier cost is split by
+          each quote’s revenue for profit.
         </p>
         <div style={fieldStyle}>
           <label style={labelStyle}>
