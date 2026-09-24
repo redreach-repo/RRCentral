@@ -79,6 +79,10 @@ export type CustomerDocumentCategory =
   | 'quotation'
   | 'invoice'
   | 'delivery_note'
+  | 'signed_quotation'
+  | 'signed_invoice'
+  | 'signed_delivery_note'
+  /** @deprecated Kept so older WorkDrive rows still load. */
   | 'payment_slip'
   | 'supplier_invoice'
   | 'other'

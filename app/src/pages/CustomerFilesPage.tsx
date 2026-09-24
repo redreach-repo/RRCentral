@@ -4,14 +4,12 @@ import { format, parseISO } from 'date-fns'
 import {
   ExternalLink,
   FileText,
-  FileUp,
   FolderOpen,
   Link2,
   Plus,
   Receipt,
   Trash2,
   Truck,
-  Wallet,
 } from 'lucide-react'
 import { db } from '../lib/db'
 import type { CrmEntry, CustomerDocumentCategory } from '../lib/types'
@@ -24,7 +22,7 @@ import StatusPill from '../components/StatusPill'
 import { logActivity } from '../lib/activity'
 import { errorMessage, isMissingRelationError } from '../lib/errors'
 import {
-  CUSTOMER_DOCUMENT_CATEGORIES,
+  CUSTOMER_FOLDER_SECTIONS,
   deleteCustomerDocument,
   isWorkDriveShareUrl,
   loadCustomerFolder,
@@ -48,7 +46,6 @@ import {
   pageStyle,
   pageSubtitleStyle,
   pageTitleStyle,
-  selectStyle,
   toolbarStyle,
 } from '../lib/uiStyles'
 
@@ -62,22 +59,26 @@ function formatWhen(value?: string | null): string {
   }
 }
 
-function categoryIcon(category: CustomerDocumentCategory) {
-  switch (category) {
+function sectionIcon(sectionId: 'quotation' | 'invoice' | 'delivery_note') {
+  switch (sectionId) {
     case 'quotation':
       return <FileText size={16} />
     case 'invoice':
       return <Receipt size={16} />
     case 'delivery_note':
       return <Truck size={16} />
-    case 'payment_slip':
-      return <Wallet size={16} />
-    case 'supplier_invoice':
-      return <FileUp size={16} />
-    default:
-      return <FolderOpen size={16} />
   }
 }
+
+type SignedSection = (typeof CUSTOMER_FOLDER_SECTIONS)[number]
+
+const emptyAddForm = (section?: SignedSection) => ({
+  category: (section?.signedCategory || 'signed_quotation') as CustomerDocumentCategory,
+  title: section?.signedTitle || '',
+  driveUrl: '',
+  relatedRef: '',
+  notes: 'Signed copy',
+})
 
 export default function CustomerFilesPage() {
   const { user } = useAuth()
@@ -97,14 +98,15 @@ export default function CustomerFilesPage() {
   const [driveFolderUrl, setDriveFolderUrl] = useState('')
   const [savingFolder, setSavingFolder] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
+  const [addSection, setAddSection] = useState<SignedSection>(CUSTOMER_FOLDER_SECTIONS[0])
   const [savingDoc, setSavingDoc] = useState(false)
-  const [addForm, setAddForm] = useState({
-    category: 'payment_slip' as CustomerDocumentCategory,
-    title: '',
-    driveUrl: '',
-    relatedRef: '',
-    notes: '',
-  })
+  const [addForm, setAddForm] = useState(() => emptyAddForm(CUSTOMER_FOLDER_SECTIONS[0]))
+
+  function openSignedUpload(section: SignedSection) {
+    setAddSection(section)
+    setAddForm(emptyAddForm(section))
+    setAddOpen(true)
+  }
 
   const rootDrive = (
     settings.customerWorkDriveRootUrl ||
@@ -229,15 +231,9 @@ export default function CustomerFilesPage() {
         `${addForm.category}: ${addForm.title}`,
         who,
       )
-      showToast('WorkDrive file linked', 'success')
+      showToast('Signed copy linked', 'success')
       setAddOpen(false)
-      setAddForm({
-        category: 'payment_slip',
-        title: '',
-        driveUrl: '',
-        relatedRef: '',
-        notes: '',
-      })
+      setAddForm(emptyAddForm(addSection))
       await openCompany(selected)
     } catch (e) {
       if (isMissingRelationError(e)) {
@@ -268,23 +264,9 @@ export default function CustomerFilesPage() {
         <div>
           <h1 style={pageTitleStyle}>Customer files</h1>
           <p style={pageSubtitleStyle}>
-            One folder per customer — quotes, invoices, delivery notes, and WorkDrive uploads
+            One folder per customer — quotations, invoices, delivery notes, and signed WorkDrive copies
           </p>
         </div>
-        {selected ? (
-          <button
-            type="button"
-            style={buttonPrimaryStyle}
-            onClick={() => setAddOpen(true)}
-            title={
-              missingTable
-                ? 'Run supabase-customer-files-upgrade.sql to enable WorkDrive links'
-                : undefined
-            }
-          >
-            <Plus size={16} /> Add WorkDrive link
-          </button>
-        ) : null}
       </div>
 
       {missingTable ? (
@@ -359,7 +341,7 @@ export default function CustomerFilesPage() {
             <EmptyState
               icon={<FolderOpen size={22} />}
               title="Open a customer folder"
-              subtitle="Pick a company to see quotations, invoices, delivery notes, and WorkDrive-linked payment slips — files stay on Zoho WorkDrive so Supabase stays light."
+              subtitle="Pick a company to see quotations, invoices, and delivery notes — and attach signed copies from Zoho WorkDrive."
             />
           ) : loadingFolder ? (
             <div style={{ ...cardStyle, color: colors.muted }}>Opening folder…</div>
@@ -468,15 +450,15 @@ export default function CustomerFilesPage() {
                     </button>
                   </div>
                   <p style={{ margin: '8px 0 0', fontSize: 12, color: colors.muted, lineHeight: 1.45 }}>
-                    Upload payment slips and signed copies in Zoho WorkDrive (keeps Supabase / hosting
-                    light), then paste share links below. Set a shared Customers root folder in
-                    Settings → Customer WorkDrive.
+                    Keep signed quotes, invoices, and delivery notes in Zoho WorkDrive, then paste
+                    share links in each section below. Set a shared Customers root folder in Settings →
+                    Customer WorkDrive.
                   </p>
                 </div>
               </header>
 
-              {CUSTOMER_DOCUMENT_CATEGORIES.map((cat) => {
-                const rows = folder.byCategory[cat.id]
+              {CUSTOMER_FOLDER_SECTIONS.map((cat) => {
+                const rows = folder.bySection[cat.id]
                 return (
                   <section key={cat.id} style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
                     <div
@@ -486,46 +468,44 @@ export default function CustomerFilesPage() {
                         gap: 10,
                         padding: '14px 16px',
                         borderBottom: `1px solid ${colors.border}`,
+                        flexWrap: 'wrap',
                       }}
                     >
-                      <span style={{ color: colors.accent }}>{categoryIcon(cat.id)}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ color: colors.accent }}>{sectionIcon(cat.id)}</span>
+                      <div style={{ flex: 1, minWidth: 140 }}>
                         <div style={{ fontWeight: 700, fontSize: 14 }}>{cat.label}</div>
                         <div style={{ fontSize: 12, color: colors.muted2 }}>{cat.hint}</div>
                       </div>
                       <span style={{ fontSize: 12, color: colors.muted }}>{rows.length}</span>
+                      <button
+                        type="button"
+                        style={buttonSecondaryStyle}
+                        disabled={missingTable}
+                        onClick={() => openSignedUpload(cat)}
+                      >
+                        <Plus size={14} /> {cat.signedButton}
+                      </button>
                     </div>
                     {rows.length === 0 ? (
                       <p style={{ margin: 0, padding: '14px 16px', color: colors.muted, fontSize: 13 }}>
-                        Nothing here yet
-                        {cat.id === 'payment_slip' ? (
-                          <>
-                            {' '}
-                            —{' '}
-                            <button
-                              type="button"
-                              style={{
-                                appearance: 'none',
-                                border: 0,
-                                background: 'transparent',
-                                color: colors.accent,
-                                cursor: 'pointer',
-                                padding: 0,
-                                fontSize: 13,
-                                textDecoration: 'underline',
-                              }}
-                              onClick={() => {
-                                setAddForm((f) => ({ ...f, category: 'payment_slip' }))
-                                setAddOpen(true)
-                              }}
-                            >
-                              add a WorkDrive link
-                            </button>
-                            .
-                          </>
-                        ) : (
-                          '.'
-                        )}
+                        Nothing here yet —{' '}
+                        <button
+                          type="button"
+                          style={{
+                            appearance: 'none',
+                            border: 0,
+                            background: 'transparent',
+                            color: colors.accent,
+                            cursor: 'pointer',
+                            padding: 0,
+                            fontSize: 13,
+                            textDecoration: 'underline',
+                          }}
+                          onClick={() => openSignedUpload(cat)}
+                        >
+                          {cat.signedButton.toLowerCase()}
+                        </button>
+                        .
                       </p>
                     ) : (
                       <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
@@ -545,7 +525,7 @@ export default function CustomerFilesPage() {
                             <div style={{ minWidth: 0, flex: 1 }}>
                               <div style={{ fontWeight: 600, fontSize: 13 }}>{item.title}</div>
                               <div style={{ fontSize: 12, color: colors.muted2, marginTop: 2 }}>
-                                {item.kind === 'crm' ? 'In CRM' : 'On WorkDrive'}
+                                {item.kind === 'crm' ? 'In CRM' : 'Signed · WorkDrive'}
                                 {item.subtitle ? ` · ${item.subtitle}` : ''}
                                 {item.date ? ` · ${formatWhen(item.date)}` : ''}
                               </div>
@@ -593,34 +573,22 @@ export default function CustomerFilesPage() {
         </section>
       </div>
 
-      <Modal open={addOpen} title="Link a WorkDrive file" onClose={() => setAddOpen(false)} width={520}>
+      <Modal
+        open={addOpen}
+        title={addSection.signedTitle}
+        onClose={() => setAddOpen(false)}
+        width={520}
+      >
         <p style={{ color: colors.muted, fontSize: 14, marginTop: 0, lineHeight: 1.5 }}>
-          Upload the file to this customer’s Zoho WorkDrive folder, copy the share link, and paste it
-          here. The CRM only stores the link — not the file bytes.
+          {addSection.signedHint} The CRM only stores the link — not the file bytes.
         </p>
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Category</label>
-          <select
-            style={selectStyle}
-            value={addForm.category}
-            onChange={(e) =>
-              setAddForm((f) => ({ ...f, category: e.target.value as CustomerDocumentCategory }))
-            }
-          >
-            {CUSTOMER_DOCUMENT_CATEGORIES.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-        </div>
         <div style={fieldStyle}>
           <label style={labelStyle}>Title *</label>
           <input
             style={inputStyle}
             value={addForm.title}
             onChange={(e) => setAddForm((f) => ({ ...f, title: e.target.value }))}
-            placeholder="e.g. Payment slip 12 Sep"
+            placeholder={addSection.signedTitle}
           />
         </div>
         <div style={fieldStyle}>
@@ -638,15 +606,7 @@ export default function CustomerFilesPage() {
             style={inputStyle}
             value={addForm.relatedRef}
             onChange={(e) => setAddForm((f) => ({ ...f, relatedRef: e.target.value }))}
-            placeholder="Invoice or quote number"
-          />
-        </div>
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Notes</label>
-          <textarea
-            style={{ ...inputStyle, minHeight: 64, resize: 'vertical' }}
-            value={addForm.notes}
-            onChange={(e) => setAddForm((f) => ({ ...f, notes: e.target.value }))}
+            placeholder="e.g. RR-01-26001 or DN-01-26001"
           />
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
@@ -659,7 +619,7 @@ export default function CustomerFilesPage() {
             disabled={savingDoc}
             onClick={() => void addDriveFile()}
           >
-            {savingDoc ? 'Saving…' : 'Save link'}
+            {savingDoc ? 'Saving…' : 'Save signed copy'}
           </button>
         </div>
       </Modal>
