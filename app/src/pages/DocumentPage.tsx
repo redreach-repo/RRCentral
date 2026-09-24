@@ -17,7 +17,7 @@ import {
   type QuoteColumnId,
 } from '../lib/divisionQuoteFormats'
 import { CONNECT_PARTNER } from '../lib/seedDivisionCatalogues'
-import { loadLineItems, applyDiscount } from '../lib/lineItems'
+import { loadLineItems, applyDiscount, calcTotals, toDraftItems, quoteOffsetsVat } from '../lib/lineItems'
 import { getDeliveryNote, loadDeliveryNoteLineItems } from '../lib/deliveryNoteStore'
 import { errorMessage } from '../lib/errors'
 import { buildWhatsAppUrl } from '../lib/whatsapp'
@@ -229,23 +229,24 @@ export default function DocumentPage() {
       : ''
   const summary = useMemo(() => {
     const quote = docType === 'quote' ? (doc as Quotation | null) : null
+    const offsetVat = quoteOffsetsVat(quote, settings)
     const discountOpts = {
-      discountPercent: Number(quote?.discount_percent) || 0,
-      discountAmount: Number(quote?.discount_amount) || 0,
+      discountPercent: offsetVat ? 0 : Number(quote?.discount_percent) || 0,
+      discountAmount: offsetVat ? 0 : Number(quote?.discount_amount) || 0,
+      offsetVat,
     }
     if (items.length) {
-      const subtotal = items.reduce((s, i) => s + Number(i.amount || 0), 0)
       if (isWandersQuote && !wandersVatEnabled) {
+        const subtotal = items.reduce((s, i) => s + Number(i.amount || 0), 0)
         const { discount, taxable } = applyDiscount(subtotal, discountOpts)
-        return { subtotal, discount, taxable, vat: 0, total: taxable }
+        return { subtotal, discount, taxable, vat: 0, total: taxable, offsetVat: false }
       }
-      const { discount, taxable } = applyDiscount(subtotal, discountOpts)
-      const vat = Math.round(taxable * effectiveVatRate * 100) / 100
-      return { subtotal, discount, taxable, vat, total: Math.round((taxable + vat) * 100) / 100 }
+      const totals = calcTotals(toDraftItems(items), effectiveVatRate, discountOpts)
+      return { ...totals, offsetVat }
     }
     const total = Number(doc && 'amount' in doc ? doc.amount : 0)
     if (effectiveVatRate <= 0) {
-      return { subtotal: total, discount: 0, taxable: total, vat: 0, total }
+      return { subtotal: total, discount: 0, taxable: total, vat: 0, total, offsetVat: false }
     }
     // Back-calc when no line items: amount is already after discount+VAT
     const taxable = total / (1 + effectiveVatRate)
@@ -255,8 +256,9 @@ export default function DocumentPage() {
       taxable,
       vat: total - taxable,
       total,
+      offsetVat: false,
     }
-  }, [items, doc, docType, effectiveVatRate, isWandersQuote, wandersVatEnabled])
+  }, [items, doc, docType, effectiveVatRate, isWandersQuote, wandersVatEnabled, settings])
 
   async function downloadPdf() {
     if (!sheetRef.current) return
@@ -771,26 +773,43 @@ export default function DocumentPage() {
                 <span>Subtotal</span>
                 <span>{money(summary.subtotal)}</span>
               </div>
-              {summary.discount > 0 ? (
-                <div style={totalRow}>
-                  <span>
-                    Discount
-                    {docType === 'quote' && Number((doc as Quotation).discount_percent) > 0
-                      ? ` (${Number((doc as Quotation).discount_percent)}%)`
-                      : ''}
-                    {docType === 'quote' &&
-                    Number((doc as Quotation).discount_amount) > 0 &&
-                    !(Number((doc as Quotation).discount_percent) > 0)
-                      ? ' (fixed)'
-                      : ''}
-                  </span>
-                  <span>−{money(summary.discount)}</span>
-                </div>
-              ) : null}
-              <div style={totalRow}>
-                <span>VAT ({(effectiveVatRate * 100).toFixed(0)}%)</span>
-                <span>{money(summary.vat)}</span>
-              </div>
+              {summary.offsetVat ? (
+                <>
+                  <div style={totalRow}>
+                    <span>VAT ({(effectiveVatRate * 100).toFixed(0)}%)</span>
+                    <span>{money(summary.vat)}</span>
+                  </div>
+                  {summary.discount > 0 ? (
+                    <div style={totalRow}>
+                      <span>Discount (VAT)</span>
+                      <span>−{money(summary.discount)}</span>
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  {summary.discount > 0 ? (
+                    <div style={totalRow}>
+                      <span>
+                        Discount
+                        {docType === 'quote' && Number((doc as Quotation).discount_percent) > 0
+                          ? ` (${Number((doc as Quotation).discount_percent)}%)`
+                          : ''}
+                        {docType === 'quote' &&
+                        Number((doc as Quotation).discount_amount) > 0 &&
+                        !(Number((doc as Quotation).discount_percent) > 0)
+                          ? ' (fixed)'
+                          : ''}
+                      </span>
+                      <span>−{money(summary.discount)}</span>
+                    </div>
+                  ) : null}
+                  <div style={totalRow}>
+                    <span>VAT ({(effectiveVatRate * 100).toFixed(0)}%)</span>
+                    <span>{money(summary.vat)}</span>
+                  </div>
+                </>
+              )}
               <div
                 style={{
                   ...totalRow,

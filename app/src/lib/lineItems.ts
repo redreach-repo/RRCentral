@@ -41,6 +41,61 @@ export type DiscountOpts = {
   discountPercent?: number
   /** Fixed amount off subtotal (in document currency). */
   discountAmount?: number
+  /**
+   * Add VAT to the subtotal, then give that VAT amount as a commercial discount
+   * so the customer pays the ex-VAT figure (e.g. 4,535 + 226.75 VAT − 226.75 = 4,535).
+   */
+  offsetVat?: boolean
+}
+
+export const OFFSET_VAT_SETTING_KEY = 'offset_vat_quotes'
+
+export function parseOffsetVatQuoteKeys(raw: string | undefined | null): string[] {
+  const text = String(raw || '').trim()
+  if (!text) return []
+  try {
+    const parsed = JSON.parse(text) as unknown
+    if (Array.isArray(parsed)) return parsed.map((v) => String(v || '').trim()).filter(Boolean)
+  } catch {
+    /* comma-separated fallback */
+  }
+  return text
+    .split(/[\s,]+/)
+    .map((v) => v.trim())
+    .filter(Boolean)
+}
+
+export function quoteOffsetsVat(
+  quote:
+    | {
+        offset_vat?: boolean | null
+        quote_id?: string
+        reference_number?: string
+        id?: string
+      }
+    | null
+    | undefined,
+  settings?: Record<string, string>,
+): boolean {
+  if (!quote) return false
+  if (quote.offset_vat === true) return true
+  const keys = parseOffsetVatQuoteKeys(settings?.[OFFSET_VAT_SETTING_KEY])
+  if (!keys.length) return false
+  return [quote.quote_id, quote.reference_number, quote.id]
+    .map((k) => String(k || '').trim())
+    .filter(Boolean)
+    .some((k) => keys.includes(k))
+}
+
+export function withOffsetVatQuoteKeys(existing: string[], ids: string[], enabled: boolean): string[] {
+  const set = new Set(existing)
+  for (const id of ids) {
+    const key = String(id || '').trim()
+    if (!key) continue
+    if (enabled) set.add(key)
+    else set.delete(key)
+  }
+  return [...set]
 }
 
 /** Discount applied to pre-VAT subtotal. Percent first, then fixed amount. */
@@ -67,6 +122,21 @@ export function calcTotals(items: DraftLineItem[], vatRate = VAT_RATE, discount?
   }
   subtotal = round2(subtotal)
   cost = round2(cost)
+  if (discount?.offsetVat && vatRate > 0) {
+    const vat = round2(subtotal * vatRate)
+    const profit = round2(subtotal - cost)
+    const marginPct = subtotal > 0 ? round2((profit / subtotal) * 100) : 0
+    return {
+      subtotal,
+      discount: vat,
+      taxable: subtotal,
+      vat,
+      total: subtotal,
+      cost,
+      profit,
+      marginPct,
+    }
+  }
   const { discount: discountValue, taxable } = applyDiscount(subtotal, discount)
   const vat = round2(taxable * vatRate)
   const profit = round2(taxable - cost)

@@ -43,4 +43,17 @@ describe('quotation discount', () => {
     expect(t.profit).toBe(500)
     expect(t.marginPct).toBe(55.56)
   })
+
+  it('adds VAT to 4535 then discounts that VAT so Maxtherm pays 4535', () => {
+    const items = [
+      newDraftLine({ description: 'Burgundy Polo T-shirt', qty: 75, unit_price: 35 }),
+      newDraftLine({ description: 'Non woven Tote Bags', qty: 35, unit_price: 10 }),
+      newDraftLine({ description: 'Hoodies', qty: 26, unit_price: 60 }),
+    ]
+    const t = calcTotals(items, 0.05, { offsetVat: true })
+    expect(t.subtotal).toBe(4535)
+    expect(t.vat).toBe(226.75)
+    expect(t.discount).toBe(226.75)
+    expect(t.total).toBe(4535)
+  })
 })

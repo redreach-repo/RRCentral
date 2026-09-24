@@ -75,6 +75,8 @@ export interface Quotation {
   discount_percent: number
   /** Fixed discount amount off pre-VAT subtotal (quotation currency). */
   discount_amount: number
+  /** Add VAT to the subtotal, then discount that VAT so the customer pays the ex-VAT amount. */
+  offset_vat?: boolean
   status: string
   division_code: string
   base_reference: string

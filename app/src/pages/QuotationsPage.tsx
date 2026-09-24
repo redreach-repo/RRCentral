@@ -35,8 +35,12 @@ import {
   loadLineItems,
   makeQuoteId,
   newDraftLine,
+  OFFSET_VAT_SETTING_KEY,
+  parseOffsetVatQuoteKeys,
+  quoteOffsetsVat,
   saveLineItems,
   toDraftItems,
+  withOffsetVatQuoteKeys,
   type DraftLineItem,
 } from '../lib/lineItems'
 import { STANDARD_SIZES, emptySizeBreakdown, sumSizes } from '../lib/sizes'
@@ -50,7 +54,7 @@ import {
 } from '../lib/referenceNumber'
 import { sortByDateDesc } from '../lib/finance'
 import { isQuotePastValidity, quoteValidUntil } from '../lib/documents'
-import { errorMessage } from '../lib/errors'
+import { errorMessage, isUndefinedColumnError } from '../lib/errors'
 import {
   canCreateDeliveryNoteFromQuote,
   createDeliveryNoteFromQuote,
@@ -119,6 +123,8 @@ interface QuoteForm {
   discount_percent: number
   /** Fixed amount off subtotal before VAT. */
   discount_amount: number
+  /** Add VAT then discount that VAT so the customer pays the subtotal. */
+  offset_vat: boolean
 }
 
 const emptyForm = (defaults?: Partial<QuoteForm>): QuoteForm => ({
@@ -147,6 +153,7 @@ const emptyForm = (defaults?: Partial<QuoteForm>): QuoteForm => ({
   supplier_cost_base: 0,
   discount_percent: 0,
   discount_amount: 0,
+  offset_vat: false,
   ...defaults,
 })
 
@@ -159,7 +166,7 @@ const tabBtn = (active: boolean): CSSProperties => ({
 
 export default function QuotationsPage() {
   const { user } = useAuth()
-  const { settings } = useSettings()
+  const { settings, updateSetting } = useSettings()
   const { showToast } = useToast()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -387,10 +394,11 @@ export default function QuotationsPage() {
   const totals = useMemo(
     () =>
       calcTotals(form.items, vatRate, {
-        discountPercent: form.discount_percent,
-        discountAmount: form.discount_amount,
+        discountPercent: form.offset_vat ? 0 : form.discount_percent,
+        discountAmount: form.offset_vat ? 0 : form.discount_amount,
+        offsetVat: form.offset_vat,
       }),
-    [form.items, form.discount_percent, form.discount_amount, vatRate],
+    [form.items, form.discount_percent, form.discount_amount, form.offset_vat, vatRate],
   )
 
   const divisionBrand = (code: string) =>
@@ -438,6 +446,7 @@ export default function QuotationsPage() {
         supplier_cost_base: Number(q.supplier_cost_base) || 0,
         discount_percent: Number(q.discount_percent) || 0,
         discount_amount: Number(q.discount_amount) || 0,
+        offset_vat: quoteOffsetsVat(q, settings),
       })
       setEditorOpen(true)
     } catch (e) {
@@ -501,8 +510,9 @@ export default function QuotationsPage() {
         notes: form.notes,
         date: form.date || null,
         amount,
-        discount_percent: Number(form.discount_percent) || 0,
-        discount_amount: Number(form.discount_amount) || 0,
+        discount_percent: form.offset_vat ? 0 : Number(form.discount_percent) || 0,
+        discount_amount: form.offset_vat ? 0 : Number(form.discount_amount) || 0,
+        offset_vat: form.offset_vat,
         quote_id: quoteId,
         updated_by: who,
         updated_at: new Date().toISOString(),
@@ -521,7 +531,11 @@ export default function QuotationsPage() {
 
       if (editing) {
         const { error } = await db.from('quotations').update(payload).eq('id', editing.id)
-        if (error) throw error
+        if (error && isUndefinedColumnError(error)) {
+          const { offset_vat: _omit, ...withoutFlag } = payload
+          const retry = await db.from('quotations').update(withoutFlag).eq('id', editing.id)
+          if (retry.error) throw retry.error
+        } else if (error) throw error
       } else {
         const { error } = await db.from('quotations').insert({
           ...payload,
@@ -533,10 +547,32 @@ export default function QuotationsPage() {
           revision: 0,
           created_by: who,
         })
-        if (error) throw error
+        if (error && isUndefinedColumnError(error)) {
+          const { offset_vat: _omit, ...withoutFlag } = payload
+          const retry = await db.from('quotations').insert({
+            ...withoutFlag,
+            ...quotationCurrencyDefaults(),
+            ...currencyFields,
+            status: 'Draft',
+            reference_number: '',
+            base_reference: '',
+            revision: 0,
+            created_by: who,
+          })
+          if (retry.error) throw retry.error
+        } else if (error) throw error
       }
 
       await saveLineItems('Quote', quoteId, form.items, vatRate)
+      const flagIds = [quoteId, editing?.id, editing?.reference_number].filter(
+        (v): v is string => Boolean(v),
+      )
+      const nextFlags = withOffsetVatQuoteKeys(
+        parseOffsetVatQuoteKeys(settings[OFFSET_VAT_SETTING_KEY]),
+        flagIds,
+        form.offset_vat,
+      )
+      await updateSetting(OFFSET_VAT_SETTING_KEY, JSON.stringify(nextFlags))
       await logActivity('save_quote', 'quotation', 'DRAFT', `${payload.client} · Draft`, who)
       showToast('Draft saved', 'success')
       setEditorOpen(false)
@@ -827,26 +863,29 @@ export default function QuotationsPage() {
         }))
       }
       // Bake quotation discount into unit prices so invoice lines match the discounted total.
+      const offsetVat = quoteOffsetsVat(q, settings)
       const discountOpts = {
-        discountPercent: Number(q.discount_percent) || 0,
-        discountAmount: Number(q.discount_amount) || 0,
+        discountPercent: offsetVat ? 0 : Number(q.discount_percent) || 0,
+        discountAmount: offsetVat ? 0 : Number(q.discount_amount) || 0,
+        offsetVat,
       }
       const preDiscount = calcTotals(draftItems, vatRate)
       const withDiscount = calcTotals(draftItems, vatRate, discountOpts)
-      if (withDiscount.discount > 0 && preDiscount.subtotal > 0) {
+      if (!offsetVat && withDiscount.discount > 0 && preDiscount.subtotal > 0) {
         const factor = withDiscount.taxable / preDiscount.subtotal
         draftItems = draftItems.map((it) => ({
           ...it,
           unit_price: Math.round((Number(it.unit_price) || 0) * factor * 100) / 100,
         }))
       }
-      const sub = calcTotals(draftItems, vatRate)
+      const sub = offsetVat ? withDiscount : calcTotals(draftItems, vatRate)
       const amount = sub.total
 
       const depositNote =
         pct < 100 ? `\nInvoice type: ${pct}% deposit of quotation` : '\nInvoice type: Full amount'
-      const discountNote =
-        Number(q.discount_percent) || Number(q.discount_amount)
+      const discountNote = offsetVat
+        ? `\nVAT of ${sub.vat.toFixed(2)} given as a commercial discount; net ${sub.total.toFixed(2)}`
+        : Number(q.discount_percent) || Number(q.discount_amount)
           ? `\nDiscount applied from quotation: ${Number(q.discount_percent) || 0}%` +
             (Number(q.discount_amount) ? ` + ${Number(q.discount_amount).toFixed(2)}` : '')
           : ''
@@ -1599,6 +1638,7 @@ export default function QuotationsPage() {
               step={0.01}
               value={form.discount_percent || ''}
               placeholder="0"
+              disabled={form.offset_vat}
               onChange={(e) =>
                 setForm((f) => ({ ...f, discount_percent: Math.max(0, Number(e.target.value) || 0) }))
               }
@@ -1613,13 +1653,37 @@ export default function QuotationsPage() {
               step={0.01}
               value={form.discount_amount || ''}
               placeholder="0.00"
+              disabled={form.offset_vat}
               onChange={(e) =>
                 setForm((f) => ({ ...f, discount_amount: Math.max(0, Number(e.target.value) || 0) }))
               }
             />
           </div>
+          <label style={{ ...fieldStyle, flexDirection: 'row', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={form.offset_vat}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  offset_vat: e.target.checked,
+                  discount_percent: e.target.checked ? 0 : f.discount_percent,
+                  discount_amount: e.target.checked ? 0 : f.discount_amount,
+                }))
+              }
+            />
+            <span style={{ fontSize: 13, color: colors.text, lineHeight: 1.4 }}>
+              Give VAT as a discount
+              <span style={{ display: 'block', color: colors.muted, fontSize: 12 }}>
+                Adds VAT to the subtotal, then discounts that VAT so the customer pays {form.quotation_currency}{' '}
+                {totals.subtotal.toLocaleString('en-AE', { minimumFractionDigits: 2 })}.
+              </span>
+            </span>
+          </label>
           <div style={{ fontSize: 13, color: colors.muted, paddingBottom: 8 }}>
-            Applied to subtotal before VAT. You can use % and/or a fixed amount.
+            {form.offset_vat
+              ? 'VAT is shown, then taken off as a commercial discount.'
+              : 'Applied to subtotal before VAT. You can use % and/or a fixed amount.'}
           </div>
         </div>
 
@@ -1641,7 +1705,7 @@ export default function QuotationsPage() {
           </div>
           {totals.discount > 0 ? (
             <div>
-              Discount:{' '}
+              {form.offset_vat ? 'Discount (VAT)' : 'Discount'}:{' '}
               <strong style={{ color: colors.danger || '#f87171' }}>
                 −{form.quotation_currency}{' '}
                 {totals.discount.toLocaleString('en-AE', { minimumFractionDigits: 2 })}
