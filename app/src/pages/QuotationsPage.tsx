@@ -53,6 +53,7 @@ import { isQuotePastValidity, quoteValidUntil } from '../lib/documents'
 import {
   canCreateDeliveryNoteFromQuote,
   createDeliveryNoteFromQuote,
+  matchQuoteForDeliveryNote,
 } from '../lib/deliveryNotes'
 import {
   BASE_CURRENCY,
@@ -275,9 +276,21 @@ export default function QuotationsPage() {
   }, [load])
 
   useEffect(() => {
-    const ref = searchParams.get('ref')
+    const ref = searchParams.get('ref') || searchParams.get('quote')
+    const client = searchParams.get('client')
     if (ref) setSearch(ref)
+    else if (client && searchParams.get('new') !== '1') setSearch(client)
   }, [searchParams])
+
+  useEffect(() => {
+    if (loading) return
+    const wantDn = searchParams.get('dn') === '1' || searchParams.get('deliveryNote') === '1'
+    if (!wantDn) return
+    const query = searchParams.get('quote') || searchParams.get('ref') || searchParams.get('client') || search
+    const match = matchQuoteForDeliveryNote(quotes, query)
+    if (match) setDnTarget(match)
+    setSearchParams({}, { replace: true })
+  }, [loading, quotes, search, searchParams, setSearchParams])
 
   useEffect(() => {
     const wantNew = searchParams.get('new') === '1'
