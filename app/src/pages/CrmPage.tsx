@@ -13,6 +13,7 @@ import {
   UserPlus,
   MessageCircle,
   FileText,
+  FolderOpen,
   MessageSquarePlus,
   LayoutGrid,
   List,
@@ -1376,6 +1377,12 @@ export default function CrmPage() {
                       style={{ ...btn, textDecoration: 'none' }}
                     >
                       <FileText size={14} /> New quote
+                    </Link>
+                    <Link
+                      to={`/customer-files?company=${encodeURIComponent(editing.company_name)}`}
+                      style={{ ...btn, textDecoration: 'none' }}
+                    >
+                      <FolderOpen size={14} /> Files
                     </Link>
                   </div>
                 ) : null}

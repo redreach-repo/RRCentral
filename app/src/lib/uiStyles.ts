@@ -10,6 +10,7 @@ export const colors = {
   muted2: 'rgba(255,255,255,0.45)',
   danger: '#ef4444',
   success: '#22c55e',
+  warn: '#f59e0b',
 }
 
 export const pageStyle: CSSProperties = {

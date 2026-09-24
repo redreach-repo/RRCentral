@@ -7,6 +7,7 @@ import {
   Users,
   CalendarClock,
   FileText,
+  FolderOpen,
   Receipt,
   Truck,
   Package,
@@ -49,6 +50,7 @@ const navGroups: NavGroup[] = [
       { to: '/quotations', label: 'Quotations', icon: FileText },
       { to: '/invoices', label: 'Invoices', icon: Receipt },
       { to: '/delivery-notes', label: 'Delivery notes', icon: Truck },
+      { to: '/customer-files', label: 'Customer files', icon: FolderOpen },
     ],
   },
   {
@@ -85,6 +87,7 @@ const titleByPath: { match: (path: string) => boolean; title: string }[] = [
   { match: (p) => p.startsWith('/quotations'), title: 'Quotations' },
   { match: (p) => p.startsWith('/invoices'), title: 'Invoices' },
   { match: (p) => p.startsWith('/delivery-notes'), title: 'Delivery notes' },
+  { match: (p) => p.startsWith('/customer-files'), title: 'Customer files' },
   { match: (p) => p.startsWith('/app/wanders'), title: 'Wanders' },
   { match: (p) => p.startsWith('/catalog'), title: 'Catalog' },
   { match: (p) => p.startsWith('/inventory'), title: 'Inventory' },
