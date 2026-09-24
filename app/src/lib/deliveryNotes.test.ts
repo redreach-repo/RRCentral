@@ -4,6 +4,7 @@ import {
   buildDeliveryNoteRow,
   canCreateDeliveryNoteFromQuote,
   deliveryNoteTotalQty,
+  matchQuoteForDeliveryNote,
   nextDeliveryNoteReference,
   parseDocumentType,
   toDeliveryNoteLineDrafts,
@@ -11,6 +12,7 @@ import {
 
 function quote(partial: Partial<Quotation> = {}): Pick<
   Quotation,
+  | 'id'
   | 'client'
   | 'vertical'
   | 'division_code'
@@ -22,6 +24,7 @@ function quote(partial: Partial<Quotation> = {}): Pick<
   | 'status'
 > {
   return {
+    id: 'q-1',
     client: 'Acme Trading',
     vertical: 'RR Threads',
     division_code: '01',
@@ -67,14 +70,47 @@ describe('delivery notes from quotations', () => {
     expect(parseDocumentType('')).toBe('quote')
   })
 
-  it('allows delivery notes only from finalized quotations', () => {
+  it('allows a delivery note from any issued quotation, including Maxtherm RR-01-26003', () => {
     expect(canCreateDeliveryNoteFromQuote(quote({ status: 'Awarded' }))).toBe(true)
     expect(canCreateDeliveryNoteFromQuote(quote({ status: 'Sent' }))).toBe(true)
     expect(canCreateDeliveryNoteFromQuote(quote({ status: 'Finalized' }))).toBe(true)
+    expect(
+      canCreateDeliveryNoteFromQuote(
+        quote({
+          client: 'Maxtherm',
+          reference_number: 'RR-01-26003',
+          status: 'Sent',
+        }),
+      ),
+    ).toBe(true)
+    expect(
+      canCreateDeliveryNoteFromQuote(
+        quote({
+          client: 'Maxtherm',
+          reference_number: 'RR-01-26003',
+          status: 'Not awarded',
+        }),
+      ),
+    ).toBe(true)
     expect(canCreateDeliveryNoteFromQuote(quote({ status: 'Draft' }))).toBe(false)
     expect(canCreateDeliveryNoteFromQuote(quote({ status: 'Awarded', reference_number: '' }))).toBe(
       false,
     )
+  })
+
+  it('matches a quotation by Maxtherm name or RR-01-26003', () => {
+    const quotes = [
+      quote({ id: 'q-other', client: 'Acme', reference_number: 'RR-01-26001', status: 'Sent' }),
+      quote({
+        id: 'q-maxtherm',
+        client: 'Maxtherm',
+        reference_number: 'RR-01-26003',
+        status: 'Sent',
+      }),
+    ] as Array<Quotation>
+    expect(matchQuoteForDeliveryNote(quotes, 'RR-01-26003')?.id).toBe('q-maxtherm')
+    expect(matchQuoteForDeliveryNote(quotes, 'maxtherm')?.id).toBe('q-maxtherm')
+    expect(matchQuoteForDeliveryNote(quotes, 'RR-01-26003 Maxtherm')?.id).toBe('q-maxtherm')
   })
 
   it('copies quote lines without prices', () => {

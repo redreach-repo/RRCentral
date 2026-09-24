@@ -1,6 +1,7 @@
 import { format } from 'date-fns'
 import { db } from './db'
 import { logActivity } from './activity'
+import { isInternalDraftId } from './documents'
 import { generateReference } from './referenceNumber'
 import { loadLineItems, saveLineItems, toDraftItems, type DraftLineItem } from './lineItems'
 import type { Client, DeliveryNote, LineItem, Quotation } from './types'
@@ -26,8 +27,31 @@ export function parseDocumentType(type: string | undefined | null): PrintableDoc
 export function canCreateDeliveryNoteFromQuote(
   q: Pick<Quotation, 'status' | 'reference_number'>,
 ): boolean {
-  if (!String(q.reference_number || '').trim()) return false
-  return ['Finalized', 'Sent', 'Awarded'].includes(q.status)
+  const ref = String(q.reference_number || '').trim()
+  if (!ref || isInternalDraftId(ref) || /^INV-DRAFT-/i.test(ref) || /^DN-DRAFT-/i.test(ref)) {
+    return false
+  }
+  const status = String(q.status || '').toLowerCase()
+  if (status === 'draft' || status === 'superseded') return false
+  return true
+}
+
+/** Find a quotation by customer-facing ref (e.g. RR-01-26003) or client name (e.g. Maxtherm). */
+export function matchQuoteForDeliveryNote<
+  T extends Pick<Quotation, 'client' | 'status' | 'reference_number'>,
+>(quotes: T[], query: string): T | undefined {
+  const q = String(query || '').trim().toLowerCase()
+  if (!q) return undefined
+  const eligible = quotes.filter(canCreateDeliveryNoteFromQuote)
+  const exactRef = eligible.find((row) => String(row.reference_number || '').toLowerCase() === q)
+  if (exactRef) return exactRef
+  const exactClient = eligible.find((row) => String(row.client || '').toLowerCase() === q)
+  if (exactClient) return exactClient
+  const tokens = q.split(/[\s,;/]+/).filter(Boolean)
+  return eligible.find((row) => {
+    const hay = `${row.reference_number} ${row.client}`.toLowerCase()
+    return tokens.every((token) => hay.includes(token))
+  })
 }
 
 /** Delivery notes copy quote quantities but never prices. */

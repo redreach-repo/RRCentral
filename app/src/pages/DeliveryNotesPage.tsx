@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ExternalLink, Pencil, Plus, Trash2, Truck } from 'lucide-react'
 import { db } from '../lib/db'
@@ -16,6 +16,7 @@ import {
   canCreateDeliveryNoteFromQuote,
   createDeliveryNoteFromQuote,
   deliveryNoteTotalQty,
+  matchQuoteForDeliveryNote,
   toDeliveryNoteLineDrafts,
 } from '../lib/deliveryNotes'
 import {
@@ -76,6 +77,7 @@ export default function DeliveryNotesPage() {
   const { settings } = useSettings()
   const { showToast } = useToast()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const compact = useCompactCrm()
   const who = user?.email || ''
   const prefix = settings.deliveryNotePrefix || 'DN'
@@ -88,6 +90,7 @@ export default function DeliveryNotesPage() {
   const [saving, setSaving] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [quotePick, setQuotePick] = useState('')
+  const [quoteFilter, setQuoteFilter] = useState('')
   const [editing, setEditing] = useState<DeliveryNote | null>(null)
   const [form, setForm] = useState<NoteForm>(emptyForm())
   const [deleteTarget, setDeleteTarget] = useState<DeliveryNote | null>(null)
@@ -114,10 +117,29 @@ export default function DeliveryNotesPage() {
     void load()
   }, [load])
 
-  const eligibleQuotes = useMemo(
-    () => quotes.filter(canCreateDeliveryNoteFromQuote),
-    [quotes],
-  )
+  useEffect(() => {
+    if (loading) return
+    const query =
+      searchParams.get('quote') ||
+      searchParams.get('ref') ||
+      searchParams.get('client') ||
+      ''
+    if (!query) return
+    const match = matchQuoteForDeliveryNote(quotes, query)
+    setQuoteFilter(query)
+    setCreateOpen(true)
+    if (match) setQuotePick(match.id)
+    setSearchParams({}, { replace: true })
+  }, [loading, quotes, searchParams, setSearchParams])
+
+  const eligibleQuotes = useMemo(() => {
+    const all = quotes.filter(canCreateDeliveryNoteFromQuote)
+    const q = quoteFilter.trim().toLowerCase()
+    if (!q) return all
+    return all.filter((row) =>
+      `${row.reference_number} ${row.client} ${row.status}`.toLowerCase().includes(q),
+    )
+  }, [quotes, quoteFilter])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -134,7 +156,7 @@ export default function DeliveryNotesPage() {
   }, [notes, search, tab])
 
   async function createFromQuote() {
-    const quote = eligibleQuotes.find((q) => q.id === quotePick)
+    const quote = quotes.find((q) => q.id === quotePick)
     if (!quote) {
       showToast('Select a quotation', 'error')
       return
@@ -365,9 +387,18 @@ export default function DeliveryNotesPage() {
           receipt, not an invoice.
         </p>
         <div style={fieldStyle}>
+          <label style={labelStyle}>Find quotation</label>
+          <input
+            style={inputStyle}
+            placeholder="Maxtherm or RR-01-26003"
+            value={quoteFilter}
+            onChange={(e) => setQuoteFilter(e.target.value)}
+          />
+        </div>
+        <div style={fieldStyle}>
           <label style={labelStyle}>Quotation</label>
           <select style={selectStyle} value={quotePick} onChange={(e) => setQuotePick(e.target.value)}>
-            <option value="">Select a finalized quotation…</option>
+            <option value="">Select a quotation…</option>
             {eligibleQuotes.map((q) => (
               <option key={q.id} value={q.id}>
                 {q.reference_number} — {q.client || 'No client'} ({q.status})
@@ -375,9 +406,13 @@ export default function DeliveryNotesPage() {
             ))}
           </select>
         </div>
-        {eligibleQuotes.length === 0 ? (
+        {quotes.filter(canCreateDeliveryNoteFromQuote).length === 0 ? (
           <p style={{ color: colors.muted, fontSize: 13 }}>
             No eligible quotations. Finalize a quotation first, then return here.
+          </p>
+        ) : eligibleQuotes.length === 0 ? (
+          <p style={{ color: colors.muted, fontSize: 13 }}>
+            No quotation matches “{quoteFilter}”. Try the exact ref RR-01-26003 or the client name.
           </p>
         ) : null}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
