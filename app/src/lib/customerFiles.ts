@@ -9,20 +9,54 @@ import type {
   Quotation,
 } from './types'
 
-export const CUSTOMER_DOCUMENT_CATEGORIES: {
-  id: CustomerDocumentCategory
+export const CUSTOMER_FOLDER_SECTIONS: {
+  id: 'quotation' | 'invoice' | 'delivery_note'
   label: string
   hint: string
+  signedCategory: 'signed_quotation' | 'signed_invoice' | 'signed_delivery_note'
+  signedButton: string
+  signedTitle: string
+  signedHint: string
 }[] = [
-  { id: 'quotation', label: 'Quotations', hint: 'Customer quotes from CRM' },
-  { id: 'invoice', label: 'Invoices', hint: 'Tax invoices from CRM' },
-  { id: 'delivery_note', label: 'Delivery notes', hint: 'Goods receipts from CRM' },
-  { id: 'payment_slip', label: 'Payment slips', hint: 'Customer remittance on WorkDrive' },
-  { id: 'supplier_invoice', label: 'Supplier invoices', hint: 'Vendor PDFs on WorkDrive' },
-  { id: 'other', label: 'Other', hint: 'Contracts, specs, misc' },
+  {
+    id: 'quotation',
+    label: 'Quotations',
+    hint: 'CRM quotes + signed quote on WorkDrive',
+    signedCategory: 'signed_quotation',
+    signedButton: 'Add signed quote',
+    signedTitle: 'Signed quotation',
+    signedHint: 'Upload the signed quote PDF to Zoho WorkDrive, then paste the share link.',
+  },
+  {
+    id: 'invoice',
+    label: 'Invoices',
+    hint: 'CRM invoices + signed invoice on WorkDrive',
+    signedCategory: 'signed_invoice',
+    signedButton: 'Add signed invoice',
+    signedTitle: 'Signed invoice',
+    signedHint: 'Upload the signed invoice PDF to Zoho WorkDrive, then paste the share link.',
+  },
+  {
+    id: 'delivery_note',
+    label: 'Delivery notes',
+    hint: 'CRM delivery notes + signed DN on WorkDrive',
+    signedCategory: 'signed_delivery_note',
+    signedButton: 'Add signed delivery note',
+    signedTitle: 'Signed delivery note',
+    signedHint: 'Upload the customer-signed DN to Zoho WorkDrive, then paste the share link.',
+  },
 ]
 
+/** @deprecated Use CUSTOMER_FOLDER_SECTIONS — kept for older imports. */
+export const CUSTOMER_DOCUMENT_CATEGORIES = CUSTOMER_FOLDER_SECTIONS.map((s) => ({
+  id: s.id as CustomerDocumentCategory,
+  label: s.label,
+  hint: s.hint,
+}))
+
 export const WORKDRIVE_STORAGE_PROVIDER = 'zoho_workdrive'
+
+export type FolderSectionId = (typeof CUSTOMER_FOLDER_SECTIONS)[number]['id']
 
 export type FolderItemKind = 'crm' | 'workdrive'
 
@@ -30,13 +64,13 @@ export type CustomerFolderItem = {
   key: string
   kind: FolderItemKind
   category: CustomerDocumentCategory
+  /** Which folder section this row belongs to (quotes / invoices / DNs). */
+  section: FolderSectionId
   title: string
   subtitle?: string
   date?: string | null
   status?: string
-  /** In-app document route when kind is crm */
   href?: string
-  /** Zoho WorkDrive (or other) share URL when kind is workdrive */
   driveUrl?: string
   documentId?: string
   relatedRef?: string
@@ -46,8 +80,27 @@ export type CustomerFolder = {
   company: string
   crm: CrmEntry | null
   items: CustomerFolderItem[]
-  byCategory: Record<CustomerDocumentCategory, CustomerFolderItem[]>
+  bySection: Record<FolderSectionId, CustomerFolderItem[]>
+  /** @deprecated Prefer bySection */
+  byCategory: Record<string, CustomerFolderItem[]>
   missingDocumentsTable?: boolean
+}
+
+/** Map stored categories onto the three customer-folder sections. */
+export function sectionForCategory(category: CustomerDocumentCategory): FolderSectionId | null {
+  switch (category) {
+    case 'quotation':
+    case 'signed_quotation':
+      return 'quotation'
+    case 'invoice':
+    case 'signed_invoice':
+      return 'invoice'
+    case 'delivery_note':
+    case 'signed_delivery_note':
+      return 'delivery_note'
+    default:
+      return null
+  }
 }
 
 /** Accept Zoho WorkDrive share / folder links (incl. regional + external hosts). */
@@ -112,7 +165,7 @@ function filterByCompany<T extends { client?: string; company_name?: string }>(
   return rows.filter((row) => companiesMatch(String(row.client || row.company_name || ''), company))
 }
 
-/** Build a customer folder from live CRM docs + WorkDrive-linked uploads. */
+/** Build a customer folder from live CRM docs + signed WorkDrive uploads. */
 export function buildCustomerFolder(opts: {
   company: string
   crm: CrmEntry | null
@@ -130,6 +183,7 @@ export function buildCustomerFolder(opts: {
       key: `quote-${q.id}`,
       kind: 'crm',
       category: 'quotation',
+      section: 'quotation',
       title: ref,
       subtitle: q.description || undefined,
       date: q.date,
@@ -145,6 +199,7 @@ export function buildCustomerFolder(opts: {
       key: `invoice-${inv.id}`,
       kind: 'crm',
       category: 'invoice',
+      section: 'invoice',
       title: ref,
       subtitle: inv.description || undefined,
       date: inv.date,
@@ -160,6 +215,7 @@ export function buildCustomerFolder(opts: {
       key: `dn-${dn.id}`,
       kind: 'crm',
       category: 'delivery_note',
+      section: 'delivery_note',
       title: ref,
       subtitle: dn.quote_ref ? `Quote ${dn.quote_ref}` : dn.description || undefined,
       date: dn.delivery_date || dn.date,
@@ -170,12 +226,17 @@ export function buildCustomerFolder(opts: {
   }
 
   for (const doc of opts.documents) {
+    const section = sectionForCategory(doc.category)
+    if (!section) continue // hide payment slips / supplier / other from this folder
+    const signed =
+      doc.category.startsWith('signed_') || /signed/i.test(doc.title) || /signed/i.test(doc.notes)
     items.push({
       key: `doc-${doc.id}`,
       kind: 'workdrive',
       category: doc.category,
-      title: doc.title || doc.file_name || 'WorkDrive file',
-      subtitle: doc.notes || undefined,
+      section,
+      title: doc.title || doc.file_name || 'Signed copy',
+      subtitle: signed ? doc.notes || 'Signed copy on WorkDrive' : doc.notes || undefined,
       date: doc.uploaded_at,
       driveUrl: doc.drive_url,
       documentId: doc.id,
@@ -185,15 +246,23 @@ export function buildCustomerFolder(opts: {
 
   items.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
 
-  const byCategory = Object.fromEntries(
-    CUSTOMER_DOCUMENT_CATEGORIES.map((c) => [c.id, [] as CustomerFolderItem[]]),
-  ) as Record<CustomerDocumentCategory, CustomerFolderItem[]>
-
+  const bySection: Record<FolderSectionId, CustomerFolderItem[]> = {
+    quotation: [],
+    invoice: [],
+    delivery_note: [],
+  }
   for (const item of items) {
-    byCategory[item.category].push(item)
+    bySection[item.section].push(item)
   }
 
-  return { company, crm: opts.crm, items, byCategory }
+  // Back-compat alias used by older UI snapshots / tests
+  const byCategory = {
+    quotation: bySection.quotation,
+    invoice: bySection.invoice,
+    delivery_note: bySection.delivery_note,
+  }
+
+  return { company, crm: opts.crm, items, bySection, byCategory }
 }
 
 export async function loadCustomerDocuments(company: string): Promise<CustomerDocument[]> {

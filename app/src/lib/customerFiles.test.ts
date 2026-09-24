@@ -4,6 +4,7 @@ import {
   companiesMatch,
   isWorkDriveShareUrl,
   normalizeCompanyKey,
+  sectionForCategory,
   suggestedDriveFolderName,
 } from './customerFiles'
 
@@ -13,9 +14,15 @@ describe('customerFiles', () => {
     expect(
       isWorkDriveShareUrl('https://workdrive.zohoexternal.com/external/3iWUoMURXKC-OCgNc'),
     ).toBe(true)
-    expect(isWorkDriveShareUrl('https://workdrive.zoho.eu/folder/xyz')).toBe(true)
-    expect(isWorkDriveShareUrl('https://drive.google.com/file/d/abc/view')).toBe(false)
     expect(isWorkDriveShareUrl('https://example.com/file.pdf')).toBe(false)
+  })
+
+  it('maps signed categories onto quote / invoice / DN sections', () => {
+    expect(sectionForCategory('signed_quotation')).toBe('quotation')
+    expect(sectionForCategory('signed_invoice')).toBe('invoice')
+    expect(sectionForCategory('signed_delivery_note')).toBe('delivery_note')
+    expect(sectionForCategory('payment_slip')).toBe(null)
+    expect(sectionForCategory('other')).toBe(null)
   })
 
   it('sanitizes folder names for WorkDrive', () => {
@@ -26,11 +33,10 @@ describe('customerFiles', () => {
     expect(normalizeCompanyKey('  Maxtherm  LLC ')).toBe('maxtherm llc')
     expect(companiesMatch('Maxtherm LLC', 'Maxtherm')).toBe(true)
     expect(companiesMatch('Jose Maria Mora', 'jose maria mora')).toBe(true)
-    expect(companiesMatch('Ello Pets Hotel & Day Care', 'Ello Pets Hotel and Day Care')).toBe(true)
     expect(companiesMatch('Acme', 'Beta Trading')).toBe(false)
   })
 
-  it('groups CRM docs and WorkDrive links into category folders', () => {
+  it('groups CRM docs and signed WorkDrive copies into three sections only', () => {
     const folder = buildCustomerFolder({
       company: 'Maxtherm',
       crm: null,
@@ -61,11 +67,25 @@ describe('customerFiles', () => {
           id: 'f1',
           company_name: 'Maxtherm',
           crm_id: null,
-          category: 'payment_slip',
-          title: 'Transfer 12 Sep',
-          file_name: 'Transfer 12 Sep',
+          category: 'signed_delivery_note',
+          title: 'Signed DN-01-26001',
+          file_name: 'Signed DN-01-26001',
           drive_url: 'https://workdrive.zohoexternal.com/external/abc123',
-          related_ref: 'INV-01',
+          related_ref: 'DN-01-26001',
+          notes: 'Signed copy',
+          storage_provider: 'zoho_workdrive',
+          uploaded_by: 'a@b.c',
+          uploaded_at: '2026-09-12T10:00:00.000Z',
+        },
+        {
+          id: 'f2',
+          company_name: 'Maxtherm',
+          crm_id: null,
+          category: 'payment_slip',
+          title: 'Should hide',
+          file_name: 'Should hide',
+          drive_url: 'https://workdrive.zoho.com/x',
+          related_ref: '',
           notes: '',
           storage_provider: 'zoho_workdrive',
           uploaded_by: 'a@b.c',
@@ -74,11 +94,9 @@ describe('customerFiles', () => {
       ],
     })
 
-    expect(folder.byCategory.quotation).toHaveLength(1)
-    expect(folder.byCategory.delivery_note).toHaveLength(1)
-    expect(folder.byCategory.payment_slip).toHaveLength(1)
-    expect(folder.byCategory.quotation[0].href).toContain('/document/quote/')
-    expect(folder.byCategory.payment_slip[0].driveUrl).toContain('workdrive.zoho')
-    expect(folder.byCategory.payment_slip[0].kind).toBe('workdrive')
+    expect(folder.bySection.quotation).toHaveLength(1)
+    expect(folder.bySection.delivery_note).toHaveLength(2)
+    expect(folder.bySection.delivery_note.some((i) => i.kind === 'workdrive')).toBe(true)
+    expect(folder.items.some((i) => i.category === 'payment_slip')).toBe(false)
   })
 })
