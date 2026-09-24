@@ -9,41 +9,66 @@ import type {
   Quotation,
 } from './types'
 
+export const COMMUNICATION_KINDS: {
+  id: 'email' | 'whatsapp' | 'call_notes' | 'communication'
+  label: string
+}[] = [
+  { id: 'email', label: 'Email' },
+  { id: 'whatsapp', label: 'WhatsApp chat' },
+  { id: 'call_notes', label: 'Call / meeting notes' },
+  { id: 'communication', label: 'Other communication' },
+]
+
 export const CUSTOMER_FOLDER_SECTIONS: {
-  id: 'quotation' | 'invoice' | 'delivery_note'
+  id: 'quotation' | 'invoice' | 'delivery_note' | 'communication'
   label: string
   hint: string
-  signedCategory: 'signed_quotation' | 'signed_invoice' | 'signed_delivery_note'
-  signedButton: string
-  signedTitle: string
-  signedHint: string
+  uploadButton: string
+  uploadTitle: string
+  uploadHint: string
+  /** Signed-doc sections use a fixed category; communications pick a kind. */
+  mode: 'signed' | 'communication'
+  signedCategory?: 'signed_quotation' | 'signed_invoice' | 'signed_delivery_note'
 }[] = [
   {
     id: 'quotation',
     label: 'Quotations',
     hint: 'CRM quotes + signed quote on WorkDrive',
+    mode: 'signed',
     signedCategory: 'signed_quotation',
-    signedButton: 'Add signed quote',
-    signedTitle: 'Signed quotation',
-    signedHint: 'Upload the signed quote PDF to Zoho WorkDrive, then paste the share link.',
+    uploadButton: 'Add signed quote',
+    uploadTitle: 'Signed quotation',
+    uploadHint: 'Upload the signed quote PDF to Zoho WorkDrive, then paste the share link.',
   },
   {
     id: 'invoice',
     label: 'Invoices',
     hint: 'CRM invoices + signed invoice on WorkDrive',
+    mode: 'signed',
     signedCategory: 'signed_invoice',
-    signedButton: 'Add signed invoice',
-    signedTitle: 'Signed invoice',
-    signedHint: 'Upload the signed invoice PDF to Zoho WorkDrive, then paste the share link.',
+    uploadButton: 'Add signed invoice',
+    uploadTitle: 'Signed invoice',
+    uploadHint: 'Upload the signed invoice PDF to Zoho WorkDrive, then paste the share link.',
   },
   {
     id: 'delivery_note',
     label: 'Delivery notes',
     hint: 'CRM delivery notes + signed DN on WorkDrive',
+    mode: 'signed',
     signedCategory: 'signed_delivery_note',
-    signedButton: 'Add signed delivery note',
-    signedTitle: 'Signed delivery note',
-    signedHint: 'Upload the customer-signed DN to Zoho WorkDrive, then paste the share link.',
+    uploadButton: 'Add signed delivery note',
+    uploadTitle: 'Signed delivery note',
+    uploadHint: 'Upload the customer-signed DN to Zoho WorkDrive, then paste the share link.',
+  },
+  {
+    id: 'communication',
+    label: 'Communications',
+    hint: 'Emails, WhatsApp chats, call notes on WorkDrive',
+    mode: 'communication',
+    uploadButton: 'Add communication',
+    uploadTitle: 'Communication',
+    uploadHint:
+      'Save the email export, WhatsApp chat, or notes PDF in Zoho WorkDrive, then paste the share link here.',
   },
 ]
 
@@ -64,7 +89,7 @@ export type CustomerFolderItem = {
   key: string
   kind: FolderItemKind
   category: CustomerDocumentCategory
-  /** Which folder section this row belongs to (quotes / invoices / DNs). */
+  /** Which folder section this row belongs to. */
   section: FolderSectionId
   title: string
   subtitle?: string
@@ -86,7 +111,11 @@ export type CustomerFolder = {
   missingDocumentsTable?: boolean
 }
 
-/** Map stored categories onto the three customer-folder sections. */
+export function communicationKindLabel(category: CustomerDocumentCategory): string {
+  return COMMUNICATION_KINDS.find((k) => k.id === category)?.label || 'Communication'
+}
+
+/** Map stored categories onto customer-folder sections. */
 export function sectionForCategory(category: CustomerDocumentCategory): FolderSectionId | null {
   switch (category) {
     case 'quotation':
@@ -98,6 +127,11 @@ export function sectionForCategory(category: CustomerDocumentCategory): FolderSe
     case 'delivery_note':
     case 'signed_delivery_note':
       return 'delivery_note'
+    case 'email':
+    case 'whatsapp':
+    case 'call_notes':
+    case 'communication':
+      return 'communication'
     default:
       return null
   }
@@ -230,13 +264,18 @@ export function buildCustomerFolder(opts: {
     if (!section) continue // hide payment slips / supplier / other from this folder
     const signed =
       doc.category.startsWith('signed_') || /signed/i.test(doc.title) || /signed/i.test(doc.notes)
+    const isComms = section === 'communication'
     items.push({
       key: `doc-${doc.id}`,
       kind: 'workdrive',
       category: doc.category,
       section,
-      title: doc.title || doc.file_name || 'Signed copy',
-      subtitle: signed ? doc.notes || 'Signed copy on WorkDrive' : doc.notes || undefined,
+      title: doc.title || doc.file_name || (isComms ? 'Communication' : 'Signed copy'),
+      subtitle: isComms
+        ? [communicationKindLabel(doc.category), doc.notes].filter(Boolean).join(' · ') || undefined
+        : signed
+          ? doc.notes || 'Signed copy on WorkDrive'
+          : doc.notes || undefined,
       date: doc.uploaded_at,
       driveUrl: doc.drive_url,
       documentId: doc.id,
@@ -250,6 +289,7 @@ export function buildCustomerFolder(opts: {
     quotation: [],
     invoice: [],
     delivery_note: [],
+    communication: [],
   }
   for (const item of items) {
     bySection[item.section].push(item)
@@ -260,6 +300,7 @@ export function buildCustomerFolder(opts: {
     quotation: bySection.quotation,
     invoice: bySection.invoice,
     delivery_note: bySection.delivery_note,
+    communication: bySection.communication,
   }
 
   return { company, crm: opts.crm, items, bySection, byCategory }
