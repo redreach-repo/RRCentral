@@ -480,6 +480,11 @@ export default function QuotationsPage() {
       setSupplierInvoiceExpenses(exps)
       const latest = exps[0]
       if (latest) {
+        const extraNotes = String(latest.notes || '')
+          .split(/\n/)
+          .map((l) => l.trim())
+          .filter((l) => l && !/^payment to\b/i.test(l))
+          .join('\n')
         setSupplierInvoiceForm({
           date: latest.date ? latest.date.slice(0, 10) : format(new Date(), 'yyyy-MM-dd'),
           vendor: latest.vendor || '',
@@ -488,7 +493,7 @@ export default function QuotationsPage() {
           amount_ex_vat: Number(latest.amount_ex_vat) || 0,
           vat_amount: Number(latest.vat_amount) || 0,
           payment_method: latest.payment_method || PAYMENT_METHODS[0] || 'Bank transfer',
-          notes: latest.notes || '',
+          notes: extraNotes,
         })
       }
     } catch (e) {

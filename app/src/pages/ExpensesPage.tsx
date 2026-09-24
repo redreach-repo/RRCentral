@@ -18,6 +18,8 @@ import {
   type ParsedSupplierInvoice,
 } from '../lib/supplierInvoiceParse'
 import {
+  expenseReportDescription,
+  formatSupplierExpenseDescription,
   saveAttachmentsToExpense,
   saveAttachmentsToQuote,
   syncQuoteSupplierCostFromExpense,
@@ -320,6 +322,21 @@ export default function ExpensesPage() {
             }
           : applyVatInclusive(form.amount, vatRate)
 
+      const quoteRef = form.quote_ref.trim()
+      const autoDescription = quoteRef
+        ? formatSupplierExpenseDescription(form.vendor, quoteRef)
+        : ''
+      const extraNotes = form.notes
+        .split(/\n/)
+        .map((l) => l.trim())
+        .filter((l) => l && !/^payment to\b/i.test(l))
+        .join('\n')
+      const notes = autoDescription
+        ? extraNotes
+          ? `${autoDescription}\n${extraNotes}`
+          : autoDescription
+        : form.notes.trim()
+
       const payload = {
         date: form.date || null,
         vendor: form.vendor.trim(),
@@ -328,9 +345,9 @@ export default function ExpensesPage() {
         amount_ex_vat: parts.amount_ex_vat,
         vat_amount: parts.vat_amount,
         payment_method: form.payment_method,
-        references_text: form.references_text.trim(),
-        notes: form.notes.trim(),
-        quote_ref: form.quote_ref.trim(),
+        references_text: quoteRef || form.references_text.trim(),
+        notes,
+        quote_ref: quoteRef,
         supplier_invoice_no: form.supplier_invoice_no.trim(),
       }
 
@@ -515,6 +532,11 @@ export default function ExpensesPage() {
                         {e.vendor}
                         {e.supplier_invoice_no ? (
                           <div style={{ fontSize: 11, color: colors.muted2 }}>{e.supplier_invoice_no}</div>
+                        ) : null}
+                        {e.quote_ref || /^payment to\b/i.test(String(e.notes || '')) ? (
+                          <div style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
+                            {expenseReportDescription(e)}
+                          </div>
                         ) : null}
                       </td>
                       <td style={tdStyle}>{e.category || '—'}</td>

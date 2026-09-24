@@ -29,6 +29,7 @@ import {
   quarterMonths,
   type VatQuarter,
 } from '../lib/finance'
+import { expenseReportDescription } from '../lib/supplierInvoiceStore'
 import { loadDeletedInvoiceRefs, reconcileInvoiceFinance } from '../lib/invoiceFinance'
 import {
   buttonPrimaryStyle,
@@ -270,7 +271,8 @@ export default function ReportsPage() {
           month: monthKey(r.date) || '',
           vendor: r.vendor,
           category: r.category,
-          reference: r.references_text,
+          reference: r.quote_ref || r.references_text,
+          description: expenseReportDescription(r),
           notes: r.notes,
           ...parts,
         }
@@ -408,9 +410,9 @@ export default function ReportsPage() {
           .map(escapeCsv)
           .join(','),
       )
-      const expenseHeader = ['Date', 'Vendor', 'Category', 'Reference', 'Exclusive', 'VAT', 'Inclusive']
+      const expenseHeader = ['Date', 'Description', 'Vendor', 'Category', 'Quote', 'Exclusive', 'VAT', 'Inclusive']
       const expenseRows = vatReport.expenseRows.map((r) =>
-        [r.date, r.vendor, r.category, r.reference, r.exclusive, r.vat, r.inclusive]
+        [r.date, r.description, r.vendor, r.category, r.reference, r.exclusive, r.vat, r.inclusive]
           .map(escapeCsv)
           .join(','),
       )
@@ -718,7 +720,7 @@ export default function ReportsPage() {
                   <thead>
                     <tr>
                       <th style={thStyle}>Date</th>
-                      <th style={thStyle}>Vendor</th>
+                      <th style={thStyle}>Description</th>
                       <th style={thStyle}>Category</th>
                       <th style={thStyle}>Exclusive</th>
                       <th style={thStyle}>VAT</th>
@@ -729,7 +731,7 @@ export default function ReportsPage() {
                     {vatReport.expenseRows.map((r) => (
                       <tr key={r.id}>
                         <td style={tdStyle}>{r.date || '—'}</td>
-                        <td style={tdStyle}>{r.vendor || '—'}</td>
+                        <td style={tdStyle}>{r.description || r.vendor || '—'}</td>
                         <td style={tdStyle}>{r.category || '—'}</td>
                         <td style={tdStyle}>{formatAED(r.exclusive)}</td>
                         <td style={tdStyle}>{formatAED(r.vat)}</td>

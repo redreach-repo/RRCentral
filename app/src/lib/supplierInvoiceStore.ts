@@ -9,6 +9,28 @@ import type { Attachment, Expense, Quotation } from './types'
 /** Attachments for supplier PDFs live on the quotation (not only on the expense). */
 export const QUOTE_SUPPLIER_INVOICE_ENTITY = 'quotation_supplier_invoice'
 
+/**
+ * Expense report wording, e.g. "Payment to ACME Uniforms LLC for RR-01-26003".
+ * Company name comes from the supplier invoice vendor field.
+ */
+export function formatSupplierExpenseDescription(vendor: string, quoteRef: string): string {
+  const company = String(vendor || '').trim() || 'supplier'
+  const quote = String(quoteRef || '').trim()
+  if (!quote) return `Payment to ${company}`
+  return `Payment to ${company} for ${quote}`
+}
+
+/** Prefer stored payment description; else build from vendor + quote_ref. */
+export function expenseReportDescription(row: Pick<Expense, 'vendor' | 'quote_ref' | 'notes' | 'references_text'>): string {
+  const notes = String(row.notes || '').trim()
+  if (/^payment to\b/i.test(notes)) {
+    return notes.split(/\n/)[0].trim()
+  }
+  const quote = String(row.quote_ref || '').trim()
+  if (quote) return formatSupplierExpenseDescription(row.vendor, quote)
+  return notes || String(row.references_text || '').trim() || String(row.vendor || '').trim()
+}
+
 export function quoteAttachmentRefs(quote: Pick<Quotation, 'reference_number' | 'quote_id' | 'id'>): string[] {
   return [quote.reference_number, quote.quote_id, quote.id]
     .map((v) => String(v || '').trim())
@@ -215,6 +237,14 @@ export async function saveSupplierInvoiceForQuote(opts: {
     })
   }
 
+  const description = formatSupplierExpenseDescription(opts.vendor, quoteRef)
+  const extraNotes = String(opts.notes || '')
+    .split(/\n/)
+    .map((l) => l.trim())
+    .filter((l) => l && !/^payment to\b/i.test(l))
+    .join('\n')
+  const notes = extraNotes ? `${description}\n${extraNotes}` : description
+
   const { expenseId, usedLegacyColumns } = await upsertSupplierInvoiceExpense({
     expenseId: opts.expenseId,
     quote: opts.quote,
@@ -225,8 +255,8 @@ export async function saveSupplierInvoiceForQuote(opts: {
     amount_ex_vat: opts.amount_ex_vat,
     vat_amount: opts.vat_amount,
     payment_method: opts.payment_method,
-    references_text: opts.references_text || opts.supplier_invoice_no || '',
-    notes: opts.notes || '',
+    references_text: quoteRef,
+    notes,
     supplier_invoice_no: opts.supplier_invoice_no || '',
   })
 
