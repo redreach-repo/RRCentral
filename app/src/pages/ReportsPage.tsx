@@ -706,7 +706,9 @@ export default function ReportsPage() {
           <div style={cardStyle}>
             <h2 style={{ margin: '0 0 12px', fontSize: 16 }}>Expenses / Input VAT</h2>
             <p style={{ margin: '0 0 12px', fontSize: 12, color: colors.muted }}>
-              Expense amounts are treated as VAT-inclusive and split at {(vatRate * 100).toFixed(0)}%.
+              Uses the VAT on the supplier invoice when saved; otherwise treats the amount as
+              VAT-inclusive and splits at {(vatRate * 100).toFixed(0)}%. Uniform supplier invoices
+              under Expenses count here as purchases.
             </p>
             {vatReport.expenseRows.length === 0 ? (
               <EmptyState title="No expenses this quarter" subtitle="Add expenses to calculate input VAT." />

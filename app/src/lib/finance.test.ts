@@ -90,4 +90,14 @@ describe('finance', () => {
     expect(exp.inclusive).toBe(105)
     expect(Math.round(exp.exclusive * 100) / 100).toBe(100)
   })
+
+  it('prefers explicit supplier-invoice VAT fields on expenses', () => {
+    const exp = expenseVatParts(
+      { amount: 2520, amount_ex_vat: 2400, vat_amount: 120 } as Expense,
+      0.05,
+    )
+    expect(exp.exclusive).toBe(2400)
+    expect(exp.vat).toBe(120)
+    expect(exp.inclusive).toBe(2520)
+  })
 })

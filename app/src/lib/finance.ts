@@ -137,9 +137,23 @@ export function incomeVatParts(row: IncomeEntry, vatRate = 0.05): { exclusive: n
   return { exclusive, vat: vatAmt, inclusive: total }
 }
 
-/** Assume expense amounts are VAT-inclusive unless noted otherwise. */
+/** Prefer explicit supplier-invoice VAT fields; else assume amount is VAT-inclusive. */
 export function expenseVatParts(row: Expense, vatRate = 0.05): { exclusive: number; vat: number; inclusive: number } {
   const inclusive = Number(row.amount || 0)
+  const explicitEx = Number(row.amount_ex_vat)
+  const explicitVat = Number(row.vat_amount)
+  const hasEx = Number.isFinite(explicitEx) && explicitEx > 0
+  const hasVat = Number.isFinite(explicitVat) && explicitVat >= 0 && row.vat_amount != null
+  if (hasEx || hasVat) {
+    const exclusive = hasEx
+      ? Math.round(explicitEx * 100) / 100
+      : Math.round(Math.max(0, inclusive - explicitVat) * 100) / 100
+    const vat = hasVat
+      ? Math.round(explicitVat * 100) / 100
+      : Math.round(Math.max(0, inclusive - exclusive) * 100) / 100
+    const incl = inclusive > 0 ? inclusive : Math.round((exclusive + vat) * 100) / 100
+    return { exclusive, vat, inclusive: incl }
+  }
   if (inclusive <= 0) return { exclusive: 0, vat: 0, inclusive: 0 }
   const exclusive = Math.round((inclusive / (1 + vatRate)) * 100) / 100
   const vat = Math.round((inclusive - exclusive) * 100) / 100
