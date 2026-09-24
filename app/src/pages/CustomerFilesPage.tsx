@@ -25,7 +25,7 @@ import { errorMessage, isMissingRelationError } from '../lib/errors'
 import {
   CUSTOMER_DOCUMENT_CATEGORIES,
   deleteCustomerDocument,
-  isDriveShareUrl,
+  isWorkDriveShareUrl,
   loadCustomerFolder,
   saveCustomerDriveLink,
   suggestedDriveFolderName,
@@ -103,7 +103,11 @@ export default function CustomerFilesPage() {
     notes: '',
   })
 
-  const rootDrive = (settings.customerDriveRootUrl || '').trim()
+  const rootDrive = (
+    settings.customerWorkDriveRootUrl ||
+    settings.customerDriveRootUrl ||
+    ''
+  ).trim()
 
   const loadCompanies = useCallback(async () => {
     setLoadingList(true)
@@ -175,7 +179,7 @@ export default function CustomerFilesPage() {
 
   async function saveDriveFolder() {
     if (!folder?.crm?.id) {
-      showToast('Save this company in CRM first, then link its Drive folder', 'error')
+      showToast('Save this company in CRM first, then link its WorkDrive folder', 'error')
       return
     }
     setSavingFolder(true)
@@ -188,10 +192,10 @@ export default function CustomerFilesPage() {
         driveFolderUrl || '(cleared)',
         who,
       )
-      showToast('Drive folder linked', 'success')
+      showToast('WorkDrive folder linked', 'success')
       await openCompany(folder.company)
     } catch (e) {
-      showToast(errorMessage(e, 'Could not save Drive folder link'), 'error')
+      showToast(errorMessage(e, 'Could not save WorkDrive folder link'), 'error')
     } finally {
       setSavingFolder(false)
     }
@@ -199,8 +203,8 @@ export default function CustomerFilesPage() {
 
   async function addDriveFile() {
     if (!selected) return
-    if (!isDriveShareUrl(addForm.driveUrl) && addForm.driveUrl.trim()) {
-      showToast('Use a Google Drive or Docs share link', 'error')
+    if (!isWorkDriveShareUrl(addForm.driveUrl) && addForm.driveUrl.trim()) {
+      showToast('Use a Zoho WorkDrive share link', 'error')
       return
     }
     setSavingDoc(true)
@@ -222,7 +226,7 @@ export default function CustomerFilesPage() {
         `${addForm.category}: ${addForm.title}`,
         who,
       )
-      showToast('Drive file linked', 'success')
+      showToast('WorkDrive file linked', 'success')
       setAddOpen(false)
       setAddForm({
         category: 'payment_slip',
@@ -237,7 +241,7 @@ export default function CustomerFilesPage() {
         setMissingTable(true)
         showToast('Run supabase-customer-files-upgrade.sql in Supabase first', 'error')
       } else {
-        showToast(errorMessage(e, 'Could not save Drive link'), 'error')
+        showToast(errorMessage(e, 'Could not save WorkDrive link'), 'error')
       }
     } finally {
       setSavingDoc(false)
@@ -248,7 +252,7 @@ export default function CustomerFilesPage() {
     if (!item.documentId) return
     try {
       await deleteCustomerDocument(item.documentId)
-      showToast('Link removed (file stays on Drive)', 'success')
+      showToast('Link removed (file stays on WorkDrive)', 'success')
       if (selected) await openCompany(selected)
     } catch (e) {
       showToast(errorMessage(e, 'Could not remove link'), 'error')
@@ -261,7 +265,7 @@ export default function CustomerFilesPage() {
         <div>
           <h1 style={pageTitleStyle}>Customer files</h1>
           <p style={pageSubtitleStyle}>
-            One folder per customer — quotes, invoices, delivery notes, and Drive uploads
+            One folder per customer — quotes, invoices, delivery notes, and WorkDrive uploads
           </p>
         </div>
         {selected ? (
@@ -269,9 +273,13 @@ export default function CustomerFilesPage() {
             type="button"
             style={buttonPrimaryStyle}
             onClick={() => setAddOpen(true)}
-            title={missingTable ? 'Run supabase-customer-files-upgrade.sql to enable Drive links' : undefined}
+            title={
+              missingTable
+                ? 'Run supabase-customer-files-upgrade.sql to enable WorkDrive links'
+                : undefined
+            }
           >
-            <Plus size={16} /> Add Drive link
+            <Plus size={16} /> Add WorkDrive link
           </button>
         ) : null}
       </div>
@@ -281,7 +289,7 @@ export default function CustomerFilesPage() {
           <strong style={{ color: colors.warn }}>SQL needed</strong>
           <p style={{ margin: '8px 0 0', color: colors.muted, fontSize: 14, lineHeight: 1.5 }}>
             Run <code style={{ color: colors.accent }}>supabase-customer-files-upgrade.sql</code> in
-            the Supabase SQL editor so customer folders and Drive links can be saved.
+            the Supabase SQL editor so customer folders and WorkDrive links can be saved.
           </p>
         </div>
       ) : null}
@@ -334,7 +342,7 @@ export default function CustomerFilesPage() {
                     </div>
                     <div style={{ fontSize: 11, color: colors.muted2, marginTop: 2 }}>
                       {c.pipeline_stage || 'Lead'}
-                      {c.drive_folder_url ? ' · Drive linked' : ''}
+                      {c.drive_folder_url ? ' · WorkDrive linked' : ''}
                     </div>
                   </button>
                 )
@@ -348,7 +356,7 @@ export default function CustomerFilesPage() {
             <EmptyState
               icon={<FolderOpen size={22} />}
               title="Open a customer folder"
-              subtitle="Pick a company to see quotations, invoices, delivery notes, and Drive-linked payment slips — files stay on Google Drive so Supabase stays light."
+              subtitle="Pick a company to see quotations, invoices, delivery notes, and WorkDrive-linked payment slips — files stay on Zoho WorkDrive so Supabase stays light."
             />
           ) : loadingFolder ? (
             <div style={{ ...cardStyle, color: colors.muted }}>Opening folder…</div>
@@ -395,7 +403,7 @@ export default function CustomerFilesPage() {
                     </h2>
                     <p style={{ margin: '8px 0 0', color: colors.muted, fontSize: 13 }}>
                       {folder.items.length} item{folder.items.length === 1 ? '' : 's'} · suggested
-                      Drive folder name:{' '}
+                      WorkDrive folder name:{' '}
                       <strong style={{ color: colors.text }}>
                         {suggestedDriveFolderName(folder.company)}
                       </strong>
@@ -409,7 +417,7 @@ export default function CustomerFilesPage() {
                         rel="noreferrer"
                         style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}
                       >
-                        <ExternalLink size={14} /> Open in Drive
+                        <ExternalLink size={14} /> Open in WorkDrive
                       </a>
                     ) : null}
                     {rootDrive ? (
@@ -438,12 +446,12 @@ export default function CustomerFilesPage() {
                 <div style={{ ...fieldStyle, marginTop: 16, marginBottom: 0 }}>
                   <label style={labelStyle}>
                     <Link2 size={12} style={{ marginRight: 4 }} />
-                    Google Drive folder URL
+                    Zoho WorkDrive folder URL
                   </label>
                   <div className={resp.toolbar} style={{ marginBottom: 0, gap: 8 }}>
                     <input
                       style={{ ...inputStyle, flex: 1 }}
-                      placeholder="https://drive.google.com/drive/folders/…"
+                      placeholder="https://workdrive.zoho.com/… or share link"
                       value={driveFolderUrl}
                       onChange={(e) => setDriveFolderUrl(e.target.value)}
                     />
@@ -457,9 +465,9 @@ export default function CustomerFilesPage() {
                     </button>
                   </div>
                   <p style={{ margin: '8px 0 0', fontSize: 12, color: colors.muted, lineHeight: 1.45 }}>
-                    Upload payment slips and signed copies in Drive (keeps Supabase / hosting light),
-                    then paste share links below. Set a shared Customers root folder in Settings →
-                    Customer Drive.
+                    Upload payment slips and signed copies in Zoho WorkDrive (keeps Supabase / hosting
+                    light), then paste share links below. Set a shared Customers root folder in
+                    Settings → Customer WorkDrive.
                   </p>
                 </div>
               </header>
@@ -508,7 +516,7 @@ export default function CustomerFilesPage() {
                                 setAddOpen(true)
                               }}
                             >
-                              add a Drive link
+                              add a WorkDrive link
                             </button>
                             .
                           </>
@@ -534,7 +542,7 @@ export default function CustomerFilesPage() {
                             <div style={{ minWidth: 0, flex: 1 }}>
                               <div style={{ fontWeight: 600, fontSize: 13 }}>{item.title}</div>
                               <div style={{ fontSize: 12, color: colors.muted2, marginTop: 2 }}>
-                                {item.kind === 'crm' ? 'In CRM' : 'On Drive'}
+                                {item.kind === 'crm' ? 'In CRM' : 'On WorkDrive'}
                                 {item.subtitle ? ` · ${item.subtitle}` : ''}
                                 {item.date ? ` · ${formatWhen(item.date)}` : ''}
                               </div>
@@ -556,7 +564,7 @@ export default function CustomerFilesPage() {
                                   rel="noreferrer"
                                   style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}
                                 >
-                                  <ExternalLink size={14} /> Drive
+                                  <ExternalLink size={14} /> WorkDrive
                                 </a>
                               ) : null}
                               {item.documentId ? (
@@ -582,9 +590,9 @@ export default function CustomerFilesPage() {
         </section>
       </div>
 
-      <Modal open={addOpen} title="Link a Drive file" onClose={() => setAddOpen(false)} width={520}>
+      <Modal open={addOpen} title="Link a WorkDrive file" onClose={() => setAddOpen(false)} width={520}>
         <p style={{ color: colors.muted, fontSize: 14, marginTop: 0, lineHeight: 1.5 }}>
-          Upload the file to this customer’s Google Drive folder, copy the share link, and paste it
+          Upload the file to this customer’s Zoho WorkDrive folder, copy the share link, and paste it
           here. The CRM only stores the link — not the file bytes.
         </p>
         <div style={fieldStyle}>
@@ -613,12 +621,12 @@ export default function CustomerFilesPage() {
           />
         </div>
         <div style={fieldStyle}>
-          <label style={labelStyle}>Google Drive share link *</label>
+          <label style={labelStyle}>Zoho WorkDrive share link *</label>
           <input
             style={inputStyle}
             value={addForm.driveUrl}
             onChange={(e) => setAddForm((f) => ({ ...f, driveUrl: e.target.value }))}
-            placeholder="https://drive.google.com/…"
+            placeholder="https://workdrive.zoho.com/… or workdrive.zohoexternal.com/…"
           />
         </div>
         <div style={fieldStyle}>

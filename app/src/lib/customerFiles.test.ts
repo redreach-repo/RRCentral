@@ -1,22 +1,30 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildCustomerFolder,
-  isDriveShareUrl,
+  isWorkDriveShareUrl,
   suggestedDriveFolderName,
 } from './customerFiles'
 
 describe('customerFiles', () => {
-  it('accepts Google Drive / Docs share URLs', () => {
-    expect(isDriveShareUrl('https://drive.google.com/file/d/abc/view')).toBe(true)
-    expect(isDriveShareUrl('https://docs.google.com/document/d/xyz')).toBe(true)
-    expect(isDriveShareUrl('https://example.com/file.pdf')).toBe(false)
+  it('accepts Zoho WorkDrive share URLs', () => {
+    expect(
+      isWorkDriveShareUrl('https://workdrive.zoho.com/folder/abc'),
+    ).toBe(true)
+    expect(
+      isWorkDriveShareUrl('https://workdrive.zohoexternal.com/external/3iWUoMURXKC-OCgNc'),
+    ).toBe(true)
+    expect(
+      isWorkDriveShareUrl('https://workdrive.zoho.eu/folder/xyz'),
+    ).toBe(true)
+    expect(isWorkDriveShareUrl('https://drive.google.com/file/d/abc/view')).toBe(false)
+    expect(isWorkDriveShareUrl('https://example.com/file.pdf')).toBe(false)
   })
 
-  it('sanitizes folder names for Drive', () => {
+  it('sanitizes folder names for WorkDrive', () => {
     expect(suggestedDriveFolderName('Acme / Trading: LLC')).toBe('Acme Trading LLC')
   })
 
-  it('groups CRM docs and Drive links into category folders', () => {
+  it('groups CRM docs and WorkDrive links into category folders', () => {
     const folder = buildCustomerFolder({
       company: 'Maxtherm',
       crm: null,
@@ -50,10 +58,10 @@ describe('customerFiles', () => {
           category: 'payment_slip',
           title: 'Transfer 12 Sep',
           file_name: 'Transfer 12 Sep',
-          drive_url: 'https://drive.google.com/file/d/x/view',
+          drive_url: 'https://workdrive.zohoexternal.com/external/abc123',
           related_ref: 'INV-01',
           notes: '',
-          storage_provider: 'google_drive',
+          storage_provider: 'zoho_workdrive',
           uploaded_by: 'a@b.c',
           uploaded_at: '2026-09-12T10:00:00.000Z',
         },
@@ -64,6 +72,7 @@ describe('customerFiles', () => {
     expect(folder.byCategory.delivery_note).toHaveLength(1)
     expect(folder.byCategory.payment_slip).toHaveLength(1)
     expect(folder.byCategory.quotation[0].href).toContain('/document/quote/')
-    expect(folder.byCategory.payment_slip[0].driveUrl).toContain('drive.google.com')
+    expect(folder.byCategory.payment_slip[0].driveUrl).toContain('workdrive.zoho')
+    expect(folder.byCategory.payment_slip[0].kind).toBe('workdrive')
   })
 })

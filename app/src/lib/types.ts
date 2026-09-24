@@ -65,7 +65,7 @@ export interface CrmEntry {
   /** Why the deal was Won or Lost (company-level). */
   outcome_reason: string
   calendar_event_id: string
-  /** Google Drive folder URL for this customer's files (files stay on Drive). */
+  /** Zoho WorkDrive folder URL for this customer's files (files stay on WorkDrive). */
   drive_folder_url?: string
   contacts?: CrmContact[]
   created_by: string
@@ -74,7 +74,7 @@ export interface CrmEntry {
   updated_at: string
 }
 
-/** File index for a customer folder — binaries live on Google Drive. */
+/** File index for a customer folder — binaries live on Zoho WorkDrive. */
 export type CustomerDocumentCategory =
   | 'quotation'
   | 'invoice'

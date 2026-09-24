@@ -14,14 +14,16 @@ export const CUSTOMER_DOCUMENT_CATEGORIES: {
   label: string
   hint: string
 }[] = [
-  { id: 'quotation', label: 'Quotations', hint: 'Quote PDFs stored on Drive' },
+  { id: 'quotation', label: 'Quotations', hint: 'Quote PDFs on WorkDrive' },
   { id: 'invoice', label: 'Invoices', hint: 'Tax invoice PDFs' },
   { id: 'delivery_note', label: 'Delivery notes', hint: 'Signed or issued DN copies' },
   { id: 'payment_slip', label: 'Payment slips', hint: 'Bank transfers, remittance advice' },
   { id: 'other', label: 'Other', hint: 'Contracts, specs, misc' },
 ]
 
-export type FolderItemKind = 'crm' | 'drive'
+export const WORKDRIVE_STORAGE_PROVIDER = 'zoho_workdrive'
+
+export type FolderItemKind = 'crm' | 'workdrive'
 
 export type CustomerFolderItem = {
   key: string
@@ -33,7 +35,7 @@ export type CustomerFolderItem = {
   status?: string
   /** In-app document route when kind is crm */
   href?: string
-  /** External Drive (or other) URL when kind is drive */
+  /** Zoho WorkDrive (or other) share URL when kind is workdrive */
   driveUrl?: string
   documentId?: string
   relatedRef?: string
@@ -47,15 +49,20 @@ export type CustomerFolder = {
   missingDocumentsTable?: boolean
 }
 
-export function isDriveShareUrl(url: string): boolean {
+/** Accept Zoho WorkDrive share / folder links (incl. regional + external hosts). */
+export function isWorkDriveShareUrl(url: string): boolean {
   const u = url.trim().toLowerCase()
   if (!u) return false
   return (
-    u.includes('drive.google.com') ||
-    u.includes('docs.google.com') ||
-    u.includes('sheets.google.com') ||
-    u.includes('slides.google.com')
+    u.includes('workdrive.zoho') ||
+    u.includes('workdrive.zohoexternal.com') ||
+    /https?:\/\/[^/]*zoho[^/]*\/workdrive\//.test(u)
   )
+}
+
+/** @deprecated Prefer isWorkDriveShareUrl — kept for older call sites. */
+export function isDriveShareUrl(url: string): boolean {
+  return isWorkDriveShareUrl(url)
 }
 
 export function suggestedDriveFolderName(company: string): string {
@@ -66,7 +73,7 @@ export function suggestedDriveFolderName(company: string): string {
     .trim()
 }
 
-/** Build a customer folder from live CRM docs + Drive-linked uploads. */
+/** Build a customer folder from live CRM docs + WorkDrive-linked uploads. */
 export function buildCustomerFolder(opts: {
   company: string
   crm: CrmEntry | null
@@ -126,9 +133,9 @@ export function buildCustomerFolder(opts: {
   for (const doc of opts.documents) {
     items.push({
       key: `doc-${doc.id}`,
-      kind: 'drive',
+      kind: 'workdrive',
       category: doc.category,
-      title: doc.title || doc.file_name || 'Drive file',
+      title: doc.title || doc.file_name || 'WorkDrive file',
       subtitle: doc.notes || undefined,
       date: doc.uploaded_at,
       driveUrl: doc.drive_url,
@@ -224,7 +231,7 @@ export async function saveCustomerDriveLink(opts: {
   const driveUrl = opts.driveUrl.trim()
   const title = opts.title.trim()
   if (!company) throw new Error('Company is required')
-  if (!driveUrl) throw new Error('Paste a Google Drive share link')
+  if (!driveUrl) throw new Error('Paste a Zoho WorkDrive share link')
   if (!title) throw new Error('Give the file a short title')
 
   const row = {
@@ -236,7 +243,7 @@ export async function saveCustomerDriveLink(opts: {
     drive_url: driveUrl,
     related_ref: (opts.relatedRef || '').trim(),
     notes: (opts.notes || '').trim(),
-    storage_provider: 'google_drive',
+    storage_provider: WORKDRIVE_STORAGE_PROVIDER,
     uploaded_by: opts.uploadedBy,
     uploaded_at: new Date().toISOString(),
   }

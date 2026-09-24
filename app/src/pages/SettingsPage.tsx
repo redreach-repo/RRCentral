@@ -102,8 +102,8 @@ const SYSTEM_KEYS = [
 
 const CUSTOMER_DRIVE_KEYS = [
   {
-    key: 'customerDriveRootUrl',
-    label: 'Customers root folder URL (Google Drive)',
+    key: 'customerWorkDriveRootUrl',
+    label: 'Customers root folder URL (Zoho WorkDrive)',
   },
 ] as const
 
@@ -651,8 +651,8 @@ export default function SettingsPage() {
       )}
       {renderSection('System', 'System', SYSTEM_KEYS)}
       {renderSection(
-        'Customer Drive (files stay on Google Drive — CRM stores links only)',
-        'Customer Drive',
+        'Customer WorkDrive (files stay on Zoho WorkDrive — CRM stores links only)',
+        'Customer WorkDrive',
         CUSTOMER_DRIVE_KEYS,
       )}
 
