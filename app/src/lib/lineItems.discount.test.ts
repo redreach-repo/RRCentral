@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyDiscount, calcTotals, newDraftLine } from './lineItems'
+import { applyDiscount, calcTotals, foldVatIntoUnitPrices, newDraftLine } from './lineItems'
 
 describe('quotation discount', () => {
   it('applies percent then fixed amount before VAT', () => {
@@ -55,5 +55,23 @@ describe('quotation discount', () => {
     expect(t.vat).toBe(226.75)
     expect(t.discount).toBe(226.75)
     expect(t.total).toBe(4535)
+  })
+
+  it('folds exclusive prices so 4535 becomes VAT-inclusive (FTA still gets 5%)', () => {
+    const items = [
+      newDraftLine({ description: 'Burgundy Polo T-shirt', qty: 75, unit_price: 35 }),
+      newDraftLine({ description: 'Non woven Tote Bags', qty: 35, unit_price: 10 }),
+      newDraftLine({ description: 'Hoodies', qty: 26, unit_price: 60 }),
+    ]
+    const folded = foldVatIntoUnitPrices(items, 0.05)
+    expect(folded.inclusiveTotal).toBe(4535)
+    expect(folded.total).toBe(4535)
+    expect(folded.vat).toBe(215.95)
+    expect(folded.exclusiveSubtotal).toBe(4319.05)
+    expect(folded.items[0].unit_price).toBeCloseTo(2500 / 75, 6)
+    const after = calcTotals(folded.items, 0.05)
+    expect(after.discount).toBe(0)
+    expect(after.total).toBe(4535)
+    expect(after.vat).toBe(215.95)
   })
 })

@@ -169,6 +169,67 @@ export function effectiveQty(item: DraftLineItem): number {
   return Number(item.qty) || 0
 }
 
+/**
+ * Treat current line prices as exclusive, then lower them so today's subtotal
+ * becomes the VAT-inclusive amount the customer pays (FTA still gets 5%).
+ */
+export function foldVatIntoUnitPrices(items: DraftLineItem[], vatRate = VAT_RATE) {
+  const rate = Number(vatRate) || 0
+  const rows = items.map((item) => {
+    const qty = effectiveQty(item)
+    const incl = round2(qty * (Number(item.unit_price) || 0))
+    return { item, qty, incl }
+  })
+  const inclusiveTotal = round2(rows.reduce((sum, row) => sum + row.incl, 0))
+  const snapshot = (next: DraftLineItem[], changed: boolean) => {
+    const after = calcTotals(next, rate)
+    return {
+      items: next,
+      inclusiveTotal,
+      exclusiveSubtotal: after.subtotal,
+      vat: after.vat,
+      total: after.total,
+      changed,
+    }
+  }
+  if (rate <= 0 || inclusiveTotal <= 0) return snapshot(items, false)
+
+  const exclusiveTarget = round2(inclusiveTotal / (1 + rate))
+  const adjustable = rows
+    .map((row, idx) => (row.qty > 0 && row.incl > 0 ? idx : -1))
+    .filter((idx) => idx >= 0)
+  if (!adjustable.length) return snapshot(items, false)
+
+  const exclByIndex = rows.map(() => 0)
+  let allocated = 0
+  adjustable.forEach((idx, j) => {
+    const isLast = j === adjustable.length - 1
+    const excl = isLast ? round2(exclusiveTarget - allocated) : round2(rows[idx].incl / (1 + rate))
+    if (!isLast) allocated += excl
+    exclByIndex[idx] = Math.max(0, excl)
+  })
+
+  const applyExcl = (excl: number[]) =>
+    items.map((item, i) => {
+      const qty = rows[i].qty
+      const amount = excl[i]
+      if (qty <= 0 || amount <= 0) return item
+      return { ...item, unit_price: amount / qty }
+    })
+
+  let next = applyExcl(exclByIndex)
+  let after = calcTotals(next, rate)
+  const last = adjustable[adjustable.length - 1]
+  for (const step of [0.01, -0.01, 0.02, -0.02, 0.03, -0.03]) {
+    if (after.total === inclusiveTotal) break
+    exclByIndex[last] = round2(Math.max(0, exclByIndex[last] + step))
+    next = applyExcl(exclByIndex)
+    after = calcTotals(next, rate)
+  }
+
+  return snapshot(next, true)
+}
+
 export function toDraftItems(rows: LineItem[]): DraftLineItem[] {
   if (!rows.length) return [newDraftLine()]
   return rows.map((r) => {

@@ -41,6 +41,7 @@ import {
   saveLineItems,
   toDraftItems,
   withOffsetVatQuoteKeys,
+  foldVatIntoUnitPrices,
   type DraftLineItem,
 } from '../lib/lineItems'
 import { STANDARD_SIZES, emptySizeBreakdown, sumSizes } from '../lib/sizes'
@@ -188,6 +189,7 @@ export default function QuotationsPage() {
   const [convertTarget, setConvertTarget] = useState<Quotation | null>(null)
   const [depositPct, setDepositPct] = useState('100')
   const [dnTarget, setDnTarget] = useState<Quotation | null>(null)
+  const [vatFoldOpen, setVatFoldOpen] = useState(false)
   const [clientSuggest, setClientSuggest] = useState(false)
   const compact = useCompactCrm()
 
@@ -399,6 +401,10 @@ export default function QuotationsPage() {
         offsetVat: form.offset_vat,
       }),
     [form.items, form.discount_percent, form.discount_amount, form.offset_vat, vatRate],
+  )
+  const vatFoldPreview = useMemo(
+    () => (vatFoldOpen ? foldVatIntoUnitPrices(form.items, vatRate) : null),
+    [vatFoldOpen, form.items, vatRate],
   )
 
   const divisionBrand = (code: string) =>
@@ -1675,15 +1681,30 @@ export default function QuotationsPage() {
             <span style={{ fontSize: 13, color: colors.text, lineHeight: 1.4 }}>
               Give VAT as a discount
               <span style={{ display: 'block', color: colors.muted, fontSize: 12 }}>
-                Adds VAT to the subtotal, then discounts that VAT so the customer pays {form.quotation_currency}{' '}
-                {totals.subtotal.toLocaleString('en-AE', { minimumFractionDigits: 2 })}.
+                Writes VAT off on the PDF. The customer pays the ex-VAT amount; this is not the FTA-clean option.
               </span>
             </span>
           </label>
+          <div style={{ ...fieldStyle, gridColumn: '1 / -1' }}>
+            <button
+              type="button"
+              style={buttonSecondaryStyle}
+              disabled={vatRate <= 0 || totals.subtotal <= 0}
+              onClick={() => setVatFoldOpen(true)}
+            >
+              Include VAT in this total
+            </button>
+            <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted, lineHeight: 1.45 }}>
+              Lowers unit prices so {form.quotation_currency}{' '}
+              {totals.subtotal.toLocaleString('en-AE', { minimumFractionDigits: 2 })} is what they pay, including
+              5% VAT. You still remit VAT to the FTA. Use this instead of a discount line. Only apply once on
+              exclusive prices.
+            </p>
+          </div>
           <div style={{ fontSize: 13, color: colors.muted, paddingBottom: 8 }}>
             {form.offset_vat
               ? 'VAT is shown, then taken off as a commercial discount.'
-              : 'Applied to subtotal before VAT. You can use % and/or a fixed amount.'}
+              : 'Percent/fixed discount applies to subtotal before VAT.'}
           </div>
         </div>
 
@@ -1955,6 +1976,57 @@ export default function QuotationsPage() {
           </button>
           <button type="button" style={buttonPrimaryStyle} disabled={saving} onClick={() => void saveDraft()}>
             {saving ? 'Saving…' : 'Save Draft'}
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={vatFoldOpen}
+        title="Include VAT in this total"
+        onClose={() => setVatFoldOpen(false)}
+        width={480}
+      >
+        <p style={{ color: colors.muted, fontSize: 14, marginTop: 0, lineHeight: 1.55 }}>
+          Unit prices will be lowered so the customer still pays the current subtotal, but that figure
+          becomes <strong style={{ color: colors.text }}>VAT-inclusive</strong>. You still remit 5% to the
+          FTA. The PDF shows subtotal + VAT, with no discount line.
+        </p>
+        {vatFoldPreview ? (
+          <div style={{ ...cardStyle, padding: 12, fontSize: 14, lineHeight: 1.6 }}>
+            <div>They pay: <strong>{form.quotation_currency} {vatFoldPreview.inclusiveTotal.toLocaleString('en-AE', { minimumFractionDigits: 2 })}</strong></div>
+            <div>New subtotal (ex-VAT): {form.quotation_currency} {vatFoldPreview.exclusiveSubtotal.toLocaleString('en-AE', { minimumFractionDigits: 2 })}</div>
+            <div>VAT to FTA: {form.quotation_currency} {vatFoldPreview.vat.toLocaleString('en-AE', { minimumFractionDigits: 2 })}</div>
+            <div>Quoted total: <strong>{form.quotation_currency} {vatFoldPreview.total.toLocaleString('en-AE', { minimumFractionDigits: 2 })}</strong></div>
+          </div>
+        ) : null}
+        <p style={{ color: colors.muted2, fontSize: 12, lineHeight: 1.45 }}>
+          Use this on exclusive prices only. Applying it twice will cut prices again.
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+          <button type="button" style={buttonSecondaryStyle} onClick={() => setVatFoldOpen(false)}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            style={buttonPrimaryStyle}
+            disabled={!vatFoldPreview?.changed}
+            onClick={() => {
+              if (!vatFoldPreview?.changed) return
+              setForm((f) => ({
+                ...f,
+                items: vatFoldPreview.items,
+                offset_vat: false,
+                discount_percent: 0,
+                discount_amount: 0,
+              }))
+              setVatFoldOpen(false)
+              showToast(
+                `Prices adjusted. Total ${form.quotation_currency} ${vatFoldPreview.total.toLocaleString('en-AE', { minimumFractionDigits: 2 })} includes VAT ${vatFoldPreview.vat.toLocaleString('en-AE', { minimumFractionDigits: 2 })}`,
+                'success',
+              )
+            }}
+          >
+            Adjust prices
           </button>
         </div>
       </Modal>
