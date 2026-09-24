@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import { ExternalLink, Pencil, Plus, Trash2, Truck } from 'lucide-react'
+import { ExternalLink, FileUp, Paperclip, Pencil, Plus, Trash2, Truck } from 'lucide-react'
 import { db } from '../lib/db'
 import { DELIVERY_NOTE_STATUSES, DELIVERY_TERMS } from '../lib/config'
-import type { DeliveryNote, Quotation } from '../lib/types'
+import type { Attachment, DeliveryNote, Quotation } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
@@ -27,6 +27,12 @@ import {
   saveDeliveryNoteLineItems,
   updateDeliveryNote,
 } from '../lib/deliveryNoteStore'
+import {
+  deleteSignedDeliveryNoteAttachment,
+  loadSignedDeliveryNoteAttachments,
+  saveSignedDeliveryNoteAttachments,
+  type PendingSignedFile,
+} from '../lib/signedDeliveryNotes'
 import { errorMessage } from '../lib/errors'
 import { type DraftLineItem } from '../lib/lineItems'
 import { sortByDateDesc } from '../lib/finance'
@@ -97,7 +103,50 @@ export default function DeliveryNotesPage() {
   const [quoteFilter, setQuoteFilter] = useState('')
   const [editing, setEditing] = useState<DeliveryNote | null>(null)
   const [form, setForm] = useState<NoteForm>(emptyForm())
+  const [signedAttachments, setSignedAttachments] = useState<Attachment[]>([])
+  const [pendingSignedFiles, setPendingSignedFiles] = useState<PendingSignedFile[]>([])
   const [deleteTarget, setDeleteTarget] = useState<DeliveryNote | null>(null)
+
+  function closeEdit() {
+    setEditing(null)
+    setSignedAttachments([])
+    setPendingSignedFiles([])
+  }
+
+  async function refreshSignedAttachments(note: DeliveryNote) {
+    const rows = await loadSignedDeliveryNoteAttachments(note)
+    setSignedAttachments(rows)
+  }
+
+  async function readFileAsDataUrl(file: File): Promise<PendingSignedFile> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () =>
+        resolve({ name: file.name, dataUrl: String(reader.result || ''), mime: file.type })
+      reader.onerror = () => reject(reader.error || new Error('Read failed'))
+      reader.readAsDataURL(file)
+    })
+  }
+
+  async function onPickSignedFiles(files: FileList | null) {
+    if (!files?.length) return
+    try {
+      const rows = await Promise.all([...files].map((f) => readFileAsDataUrl(f)))
+      setPendingSignedFiles((prev) => [...prev, ...rows])
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not read file'), 'error')
+    }
+  }
+
+  async function removeSignedAttachment(id: string) {
+    try {
+      await deleteSignedDeliveryNoteAttachment(id)
+      setSignedAttachments((prev) => prev.filter((a) => a.id !== id))
+      showToast('Signed copy removed', 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not remove signed copy'), 'error')
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -182,6 +231,7 @@ export default function DeliveryNotesPage() {
     try {
       const items = await loadDeliveryNoteLineItems(note.reference_number)
       setEditing(note)
+      setPendingSignedFiles([])
       setForm({
         delivery_date: (note.delivery_date || note.date || '').slice(0, 10),
         status: note.status || 'Issued',
@@ -191,6 +241,9 @@ export default function DeliveryNotesPage() {
         received_by: note.received_by || '',
         vehicle_notes: note.vehicle_notes || '',
         items: toDeliveryNoteLineDrafts(items),
+      })
+      void refreshSignedAttachments(note).catch((e) => {
+        showToast(errorMessage(e, 'Failed to load signed copies'), 'error')
       })
     } catch (e) {
       showToast(errorMessage(e, 'Failed to load line items'), 'error')
@@ -220,9 +273,28 @@ export default function DeliveryNotesPage() {
         updated_at: new Date().toISOString(),
       })
       await saveDeliveryNoteLineItems(editing.reference_number, form.items)
+      if (pendingSignedFiles.length) {
+        await saveSignedDeliveryNoteAttachments({
+          note: editing,
+          files: pendingSignedFiles,
+          uploadedBy: who,
+        })
+        await logActivity(
+          'save_signed_delivery_note',
+          'delivery_note',
+          editing.reference_number,
+          editing.client,
+          who,
+        )
+      }
       await logActivity('update_delivery_note', 'delivery_note', editing.reference_number, editing.client, who)
-      showToast('Delivery note saved', 'success')
-      setEditing(null)
+      showToast(
+        pendingSignedFiles.length
+          ? 'Delivery note and signed copy saved'
+          : 'Delivery note saved',
+        'success',
+      )
+      closeEdit()
       await load()
     } catch (e) {
       showToast(errorMessage(e, 'Save failed'), 'error')
@@ -431,7 +503,7 @@ export default function DeliveryNotesPage() {
       <Modal
         open={!!editing}
         title={editing ? `Edit ${editing.reference_number}` : 'Edit delivery note'}
-        onClose={() => setEditing(null)}
+        onClose={closeEdit}
         width={860}
       >
         <p style={{ color: colors.muted, fontSize: 13, marginTop: 0 }}>
@@ -556,8 +628,64 @@ export default function DeliveryNotesPage() {
             onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
           />
         </div>
+        <div style={fieldStyle}>
+          <label style={labelStyle}>
+            <FileUp size={12} style={{ marginRight: 4 }} />
+            Signed delivery note (PDF or photo)
+          </label>
+          <input
+            type="file"
+            accept="application/pdf,image/*,.pdf"
+            multiple
+            onChange={(e) => {
+              void onPickSignedFiles(e.target.files)
+              e.target.value = ''
+            }}
+          />
+          <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted, lineHeight: 1.45 }}>
+            Upload the customer-signed copy after delivery. Saved with this delivery note.
+          </p>
+          {pendingSignedFiles.length > 0 ? (
+            <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 12, color: colors.muted }}>
+              {pendingSignedFiles.map((f) => (
+                <li key={f.name + f.dataUrl.slice(0, 24)}>
+                  {f.name} (pending save){' '}
+                  <button
+                    type="button"
+                    style={ghostTiny}
+                    onClick={() =>
+                      setPendingSignedFiles((prev) => prev.filter((p) => p.dataUrl !== f.dataUrl))
+                    }
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+        {signedAttachments.length > 0 ? (
+          <div style={fieldStyle}>
+            <label style={labelStyle}>
+              <Paperclip size={12} style={{ marginRight: 4 }} />
+              Saved signed copies
+            </label>
+            <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13 }}>
+              {signedAttachments.map((a) => (
+                <li key={a.id} style={{ marginBottom: 4 }}>
+                  <a href={a.url} target="_blank" rel="noreferrer" style={{ color: colors.accent }}>
+                    {a.file_name || 'Signed delivery note'}
+                  </a>{' '}
+                  <button type="button" style={ghostTiny} onClick={() => void removeSignedAttachment(a.id)}>
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button type="button" style={buttonSecondaryStyle} onClick={() => setEditing(null)}>
+          <button type="button" style={buttonSecondaryStyle} onClick={closeEdit}>
             Cancel
           </button>
           <button type="button" style={buttonPrimaryStyle} disabled={saving} onClick={() => void saveNote()}>
@@ -582,4 +710,15 @@ export default function DeliveryNotesPage() {
       </Modal>
     </div>
   )
+}
+
+const ghostTiny = {
+  appearance: 'none' as const,
+  border: 0,
+  background: 'transparent',
+  color: colors.muted,
+  cursor: 'pointer',
+  fontSize: 12,
+  padding: 0,
+  textDecoration: 'underline',
 }

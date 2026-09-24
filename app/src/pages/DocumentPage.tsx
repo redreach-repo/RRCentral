@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import { ArrowLeft, Download, Mail, MessageCircle, Printer, Truck } from 'lucide-react'
+import { ArrowLeft, Download, FileUp, Mail, MessageCircle, Paperclip, Printer, Truck } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS, VAT_RATE } from '../lib/config'
-import type { Client, CrmContact, CrmEntry, DeliveryNote, Invoice, LineItem, Quotation } from '../lib/types'
+import type { Attachment, Client, CrmContact, CrmEntry, DeliveryNote, Invoice, LineItem, Quotation } from '../lib/types'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatAED } from '../lib/money'
@@ -19,6 +19,12 @@ import {
 import { CONNECT_PARTNER } from '../lib/seedDivisionCatalogues'
 import { loadLineItems, applyDiscount, calcTotals, toDraftItems, quoteOffsetsVat } from '../lib/lineItems'
 import { getDeliveryNote, loadDeliveryNoteLineItems } from '../lib/deliveryNoteStore'
+import {
+  deleteSignedDeliveryNoteAttachment,
+  loadSignedDeliveryNoteAttachments,
+  saveSignedDeliveryNoteAttachments,
+  type PendingSignedFile,
+} from '../lib/signedDeliveryNotes'
 import { errorMessage } from '../lib/errors'
 import { buildWhatsAppUrl } from '../lib/whatsapp'
 import { resolveLogoUrl } from '../lib/brand'
@@ -69,6 +75,9 @@ export default function DocumentPage() {
   const [pdfBusy, setPdfBusy] = useState(false)
   const [dnBusy, setDnBusy] = useState(false)
   const [emailOpen, setEmailOpen] = useState(false)
+  const [signedAttachments, setSignedAttachments] = useState<Attachment[]>([])
+  const [pendingSignedFiles, setPendingSignedFiles] = useState<PendingSignedFile[]>([])
+  const [signedBusy, setSignedBusy] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -118,6 +127,8 @@ export default function DocumentPage() {
         const lines = await loadLineItems('Quote', q.quote_id)
         setItems(lines)
         await attachClient(q.client)
+        setSignedAttachments([])
+        setPendingSignedFiles([])
       } else if (docType === 'delivery-note') {
         const note = await getDeliveryNote(id)
         if (!note) throw new Error('Delivery note not found')
@@ -125,6 +136,13 @@ export default function DocumentPage() {
         const lines = await loadDeliveryNoteLineItems(note.reference_number)
         setItems(lines)
         await attachClient(note.client)
+        try {
+          const signed = await loadSignedDeliveryNoteAttachments(note)
+          setSignedAttachments(signed)
+        } catch {
+          setSignedAttachments([])
+        }
+        setPendingSignedFiles([])
       } else {
         const { data, error: err } = await db.from('invoices').select('*').eq('id', id).maybeSingle()
         if (err) throw err
@@ -134,6 +152,8 @@ export default function DocumentPage() {
         const lines = await loadLineItems('Invoice', inv.reference_number)
         setItems(lines)
         await attachClient(inv.client)
+        setSignedAttachments([])
+        setPendingSignedFiles([])
       }
     } catch (e) {
       setError(errorMessage(e, 'Failed to load document'))
@@ -273,6 +293,67 @@ export default function DocumentPage() {
       showToast(e instanceof Error ? e.message : 'PDF failed', 'error')
     } finally {
       setPdfBusy(false)
+    }
+  }
+
+  async function readSignedFileAsDataUrl(file: File): Promise<PendingSignedFile> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () =>
+        resolve({ name: file.name, dataUrl: String(reader.result || ''), mime: file.type })
+      reader.onerror = () => reject(reader.error || new Error('Read failed'))
+      reader.readAsDataURL(file)
+    })
+  }
+
+  async function onPickSignedFiles(files: FileList | null) {
+    if (!files?.length || !deliveryNote) return
+    try {
+      const rows = await Promise.all([...files].map((f) => readSignedFileAsDataUrl(f)))
+      setPendingSignedFiles((prev) => [...prev, ...rows])
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not read file'), 'error')
+    }
+  }
+
+  async function saveSignedCopies() {
+    if (!deliveryNote || !pendingSignedFiles.length) return
+    setSignedBusy(true)
+    try {
+      await saveSignedDeliveryNoteAttachments({
+        note: deliveryNote,
+        files: pendingSignedFiles,
+        uploadedBy: user?.email || '',
+      })
+      await logActivity(
+        'save_signed_delivery_note',
+        'delivery_note',
+        deliveryNote.reference_number,
+        deliveryNote.client,
+        user?.email || '',
+      )
+      const refreshed = await loadSignedDeliveryNoteAttachments(deliveryNote)
+      setSignedAttachments(refreshed)
+      setPendingSignedFiles([])
+      showToast('Signed delivery note saved', 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not save signed copy'), 'error')
+    } finally {
+      setSignedBusy(false)
+    }
+  }
+
+  async function removeSignedCopy(attachmentId: string) {
+    if (!deliveryNote) return
+    setSignedBusy(true)
+    try {
+      await deleteSignedDeliveryNoteAttachment(attachmentId)
+      setSignedAttachments((prev) => prev.filter((a) => a.id !== attachmentId))
+      showToast('Signed copy removed', 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not remove signed copy'), 'error')
+    } finally {
+      setSignedBusy(false)
     }
   }
 
@@ -452,6 +533,140 @@ export default function DocumentPage() {
           </ToolbarBtn>
         ) : null}
       </div>
+
+      {isDeliveryNote && deliveryNote ? (
+        <div
+          className="no-print"
+          style={{
+            width: 'min(900px, calc(100% - 24px))',
+            margin: '16px auto 0',
+            background: '#fff',
+            borderRadius: 12,
+            padding: '14px 18px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              fontWeight: 700,
+              fontSize: 14,
+              marginBottom: 8,
+            }}
+          >
+            <FileUp size={16} /> Signed delivery note
+          </div>
+          <p style={{ margin: '0 0 10px', fontSize: 13, color: '#555', lineHeight: 1.45 }}>
+            Upload the customer-signed PDF or photo after goods are received. Stored with this
+            delivery note.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+            <input
+              type="file"
+              accept="application/pdf,image/*,.pdf"
+              multiple
+              disabled={signedBusy}
+              onChange={(e) => {
+                void onPickSignedFiles(e.target.files)
+                e.target.value = ''
+              }}
+            />
+            {pendingSignedFiles.length > 0 ? (
+              <button
+                type="button"
+                disabled={signedBusy}
+                onClick={() => void saveSignedCopies()}
+                style={{
+                  appearance: 'none',
+                  border: 0,
+                  borderRadius: 8,
+                  padding: '8px 12px',
+                  fontWeight: 600,
+                  cursor: signedBusy ? 'wait' : 'pointer',
+                  background: '#e85d04',
+                  color: '#fff',
+                  fontSize: 13,
+                }}
+              >
+                {signedBusy ? 'Saving…' : `Save ${pendingSignedFiles.length} file(s)`}
+              </button>
+            ) : null}
+          </div>
+          {pendingSignedFiles.length > 0 ? (
+            <ul style={{ margin: '10px 0 0', paddingLeft: 18, fontSize: 12, color: '#666' }}>
+              {pendingSignedFiles.map((f) => (
+                <li key={f.name + f.dataUrl.slice(0, 24)}>
+                  {f.name} (pending){' '}
+                  <button
+                    type="button"
+                    style={{
+                      appearance: 'none',
+                      border: 0,
+                      background: 'transparent',
+                      color: '#888',
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      fontSize: 12,
+                      padding: 0,
+                    }}
+                    onClick={() =>
+                      setPendingSignedFiles((prev) => prev.filter((p) => p.dataUrl !== f.dataUrl))
+                    }
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {signedAttachments.length > 0 ? (
+            <div style={{ marginTop: 12 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontWeight: 600,
+                  fontSize: 13,
+                  marginBottom: 6,
+                }}
+              >
+                <Paperclip size={14} /> Saved signed copies
+              </div>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
+                {signedAttachments.map((a) => (
+                  <li key={a.id} style={{ marginBottom: 4 }}>
+                    <a href={a.url} target="_blank" rel="noreferrer" style={{ color: '#c1121f' }}>
+                      {a.file_name || 'Signed delivery note'}
+                    </a>{' '}
+                    <button
+                      type="button"
+                      disabled={signedBusy}
+                      style={{
+                        appearance: 'none',
+                        border: 0,
+                        background: 'transparent',
+                        color: '#888',
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        fontSize: 12,
+                        padding: 0,
+                      }}
+                      onClick={() => void removeSignedCopy(a.id)}
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p style={{ margin: '10px 0 0', fontSize: 12, color: '#888' }}>No signed copy saved yet.</p>
+          )}
+        </div>
+      ) : null}
 
       <div
         style={{
@@ -1026,6 +1241,7 @@ export default function DocumentPage() {
         @media print {
           body { background: #fff !important; }
           a, button { display: none !important; }
+          .no-print { display: none !important; }
         }
       `}</style>
     </div>
