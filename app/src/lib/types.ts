@@ -24,6 +24,24 @@ export interface Client {
   created_at: string
 }
 
+/** Supplier / vendor company (who you buy uniforms and other goods from). */
+export interface Vendor {
+  id: string
+  company_name: string
+  primary_contact: string
+  email: string
+  mobile: string
+  office: string
+  address: string
+  trn: string
+  website: string
+  payment_terms: string
+  notes: string
+  active: boolean
+  created_at: string
+  updated_at: string
+}
+
 export interface CrmEntry {
   id: string
   company_name: string

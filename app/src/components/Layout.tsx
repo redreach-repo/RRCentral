@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
+  Building2,
   LayoutDashboard,
   Banknote,
   Users,
@@ -67,6 +68,7 @@ const navGroups: NavGroup[] = [
       { to: '/payments', label: 'Payments', icon: Banknote },
       { to: '/reports', label: 'Reports', icon: BarChart3 },
       { to: '/expenses', label: 'Expenses', icon: Wallet },
+      { to: '/vendors', label: 'Vendors', icon: Building2 },
     ],
   },
   {
@@ -90,6 +92,7 @@ const titleByPath: { match: (path: string) => boolean; title: string }[] = [
   { match: (p) => p.startsWith('/templates'), title: 'Templates' },
   { match: (p) => p.startsWith('/reports'), title: 'Reports' },
   { match: (p) => p.startsWith('/expenses'), title: 'Expenses' },
+  { match: (p) => p.startsWith('/vendors'), title: 'Vendors' },
   { match: (p) => p.startsWith('/settings'), title: 'Settings' },
 ]
 
