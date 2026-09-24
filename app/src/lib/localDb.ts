@@ -455,7 +455,7 @@ function withDefaults(table: string, row: Row): Row {
 
   if (table === 'customer_documents') {
     if (next.uploaded_at == null) next.uploaded_at = now
-    if (next.storage_provider == null) next.storage_provider = 'google_drive'
+    if (next.storage_provider == null) next.storage_provider = 'zoho_workdrive'
     if (next.category == null) next.category = 'other'
     if (next.title == null) next.title = ''
     if (next.file_name == null) next.file_name = ''
@@ -853,6 +853,7 @@ export type MigrationDump = {
   expenses?: Row[]
   payment_log?: Row[]
   attachments?: Row[]
+  customer_documents?: Row[]
   activity_log?: Row[]
   inventory_movements?: Row[]
   customer_payments?: Row[]

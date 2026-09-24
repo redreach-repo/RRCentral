@@ -764,7 +764,7 @@ create table attachments (
 );
 
 ------------------------------------------------------------
--- CUSTOMER DOCUMENTS (Google Drive links — binaries stay on Drive)
+-- CUSTOMER DOCUMENTS (Zoho WorkDrive links — binaries stay on WorkDrive)
 ------------------------------------------------------------
 create table customer_documents (
   id uuid primary key default uuid_generate_v4(),
@@ -776,7 +776,7 @@ create table customer_documents (
   drive_url text not null default '',
   related_ref text not null default '',
   notes text not null default '',
-  storage_provider text not null default 'google_drive',
+  storage_provider text not null default 'zoho_workdrive',
   uploaded_by text not null default '',
   uploaded_at timestamptz not null default now()
 );

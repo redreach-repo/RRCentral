@@ -1,4 +1,4 @@
--- Customer document folders (Google Drive links — files stay on Drive)
+-- Customer document folders (Zoho WorkDrive links — files stay on WorkDrive)
 -- Run in Supabase SQL editor after deploy.
 
 alter table crm
@@ -14,10 +14,14 @@ create table if not exists customer_documents (
   drive_url text not null default '',
   related_ref text not null default '',
   notes text not null default '',
-  storage_provider text not null default 'google_drive',
+  storage_provider text not null default 'zoho_workdrive',
   uploaded_by text not null default '',
   uploaded_at timestamptz not null default now()
 );
+
+-- Prefer WorkDrive for new rows if the table already existed with google_drive default
+alter table customer_documents
+  alter column storage_provider set default 'zoho_workdrive';
 
 create index if not exists idx_customer_documents_company
   on customer_documents (lower(company_name));
@@ -40,6 +44,7 @@ create policy "Anon users full access" on customer_documents
 
 insert into app_settings (key, value)
 values
+  ('customerWorkDriveRootUrl', ''),
   ('customerDriveRootUrl', ''),
-  ('customerDriveHint', 'Create one Google Drive folder per customer. Upload payment slips and signed DNs there, then paste the share link into Customer files in the CRM.')
+  ('customerDriveHint', 'Create one Zoho WorkDrive folder per customer. Upload payment slips and signed DNs there, then paste the share link into Customer files in the CRM.')
 on conflict (key) do nothing;
