@@ -130,6 +130,7 @@ create table crm (
   quote_ref text not null default '',
   outcome_reason text not null default '',
   calendar_event_id text not null default '',
+  drive_folder_url text not null default '',
   contacts jsonb not null default '[]'::jsonb,
   created_by text not null default '',
   updated_by text not null default '',
@@ -749,7 +750,7 @@ create table payment_log (
 );
 
 ------------------------------------------------------------
--- ATTACHMENTS
+-- ATTACHMENTS (legacy inline data URLs — prefer Drive for new files)
 ------------------------------------------------------------
 create table attachments (
   id uuid primary key default uuid_generate_v4(),
@@ -758,6 +759,24 @@ create table attachments (
   file_name text not null default '',
   storage_path text not null default '',
   url text not null default '',
+  uploaded_by text not null default '',
+  uploaded_at timestamptz not null default now()
+);
+
+------------------------------------------------------------
+-- CUSTOMER DOCUMENTS (Google Drive links — binaries stay on Drive)
+------------------------------------------------------------
+create table customer_documents (
+  id uuid primary key default uuid_generate_v4(),
+  company_name text not null default '',
+  crm_id uuid references crm(id) on delete set null,
+  category text not null default 'other',
+  title text not null default '',
+  file_name text not null default '',
+  drive_url text not null default '',
+  related_ref text not null default '',
+  notes text not null default '',
+  storage_provider text not null default 'google_drive',
   uploaded_by text not null default '',
   uploaded_at timestamptz not null default now()
 );
@@ -791,6 +810,8 @@ create index idx_line_items_ref on line_items(doc_type, reference);
 create index idx_payment_log_invoice on payment_log(invoice_ref);
 create index idx_activity_log_entity on activity_log(entity, reference);
 create index idx_attachments_entity on attachments(entity_type, entity_ref);
+create index idx_customer_documents_company on customer_documents (lower(company_name));
+create index idx_customer_documents_crm on customer_documents (crm_id);
 create index idx_income_date on income(date);
 create index idx_expenses_date on expenses(date);
 create index idx_customer_payments_booking on customer_payments(booking_id);
@@ -837,6 +858,7 @@ alter table income enable row level security;
 alter table expenses enable row level security;
 alter table payment_log enable row level security;
 alter table attachments enable row level security;
+alter table customer_documents enable row level security;
 alter table activity_log enable row level security;
 alter table inventory_movements enable row level security;
 alter table customer_payments enable row level security;
@@ -872,6 +894,7 @@ create policy "Authenticated users full access" on income for all using (auth.ro
 create policy "Authenticated users full access" on expenses for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "Authenticated users full access" on payment_log for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "Authenticated users full access" on attachments for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Authenticated users full access" on customer_documents for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "Authenticated users full access" on activity_log for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "Authenticated users full access" on inventory_movements for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "Authenticated users full access" on customer_payments for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');

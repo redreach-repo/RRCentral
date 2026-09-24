@@ -65,11 +65,36 @@ export interface CrmEntry {
   /** Why the deal was Won or Lost (company-level). */
   outcome_reason: string
   calendar_event_id: string
+  /** Google Drive folder URL for this customer's files (files stay on Drive). */
+  drive_folder_url?: string
   contacts?: CrmContact[]
   created_by: string
   updated_by: string
   created_at: string
   updated_at: string
+}
+
+/** File index for a customer folder — binaries live on Google Drive. */
+export type CustomerDocumentCategory =
+  | 'quotation'
+  | 'invoice'
+  | 'delivery_note'
+  | 'payment_slip'
+  | 'other'
+
+export interface CustomerDocument {
+  id: string
+  company_name: string
+  crm_id: string | null
+  category: CustomerDocumentCategory
+  title: string
+  file_name: string
+  drive_url: string
+  related_ref: string
+  notes: string
+  storage_provider: string
+  uploaded_by: string
+  uploaded_at: string
 }
 
 export interface FollowUpUpdate {

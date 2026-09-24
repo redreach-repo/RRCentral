@@ -100,6 +100,13 @@ const SYSTEM_KEYS = [
   { key: 'followUpDaysAfterQuote', label: 'Follow-up days after quote' },
 ] as const
 
+const CUSTOMER_DRIVE_KEYS = [
+  {
+    key: 'customerDriveRootUrl',
+    label: 'Customers root folder URL (Google Drive)',
+  },
+] as const
+
 const WANDERS_KEYS = [
   { key: 'wandersTradingName', label: 'Trading / brand name' },
   { key: 'wandersLegalEntityName', label: 'Registered legal entity (TBC)' },
@@ -643,6 +650,11 @@ export default function SettingsPage() {
         WANDERS_KEYS,
       )}
       {renderSection('System', 'System', SYSTEM_KEYS)}
+      {renderSection(
+        'Customer Drive (files stay on Google Drive — CRM stores links only)',
+        'Customer Drive',
+        CUSTOMER_DRIVE_KEYS,
+      )}
 
       <div style={{ ...cardStyle, marginBottom: 20 }}>
         <h2 style={sectionTitleStyle}>Message templates</h2>

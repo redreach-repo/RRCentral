@@ -6,7 +6,7 @@
 import { ALL_SEED_PRODUCTS } from './seedCatalog'
 
 export const DB_NAME = 'rrcentral_local'
-const DB_VERSION = 8
+const DB_VERSION = 9
 
 export const LOCAL_STORES = [
   'app_settings',
@@ -25,6 +25,7 @@ export const LOCAL_STORES = [
   'expenses',
   'payment_log',
   'attachments',
+  'customer_documents',
   'activity_log',
   'inventory_movements',
   'customer_payments',
@@ -450,6 +451,19 @@ function withDefaults(table: string, row: Row): Row {
 
   if (table === 'attachments' && next.uploaded_at == null) {
     next.uploaded_at = now
+  }
+
+  if (table === 'customer_documents') {
+    if (next.uploaded_at == null) next.uploaded_at = now
+    if (next.storage_provider == null) next.storage_provider = 'google_drive'
+    if (next.category == null) next.category = 'other'
+    if (next.title == null) next.title = ''
+    if (next.file_name == null) next.file_name = ''
+    if (next.drive_url == null) next.drive_url = ''
+    if (next.related_ref == null) next.related_ref = ''
+    if (next.notes == null) next.notes = ''
+    if (next.company_name == null) next.company_name = ''
+    if (next.uploaded_by == null) next.uploaded_by = ''
   }
 
   if (table === 'products') {
