@@ -853,6 +853,7 @@ export type MigrationDump = {
   expenses?: Row[]
   payment_log?: Row[]
   attachments?: Row[]
+  customer_documents?: Row[]
   activity_log?: Row[]
   inventory_movements?: Row[]
   customer_payments?: Row[]
