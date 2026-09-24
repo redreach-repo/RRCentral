@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { applyDiscount, calcTotals, foldVatIntoUnitPrices, newDraftLine } from './lineItems'
+import {
+  applyDiscount,
+  calcTotals,
+  foldVatIntoUnitPrices,
+  newDraftLine,
+  parseMoneyInput,
+} from './lineItems'
 
 describe('quotation discount', () => {
   it('applies percent then fixed amount before VAT', () => {
@@ -73,5 +79,55 @@ describe('quotation discount', () => {
     expect(after.discount).toBe(0)
     expect(after.total).toBe(4535)
     expect(after.vat).toBe(215.95)
+  })
+
+  it('parses a typed desired total with commas', () => {
+    expect(parseMoneyInput('4,500')).toBe(4500)
+    expect(parseMoneyInput('4500.00')).toBe(4500)
+    expect(parseMoneyInput('')).toBeNull()
+    expect(parseMoneyInput(-10)).toBeNull()
+  })
+
+  it('rounds Maxtherm down to a 4,500 VAT-inclusive total', () => {
+    const items = [
+      newDraftLine({ description: 'Burgundy Polo T-shirt', qty: 75, unit_price: 35 }),
+      newDraftLine({ description: 'Non woven Tote Bags', qty: 35, unit_price: 10 }),
+      newDraftLine({ description: 'Hoodies', qty: 26, unit_price: 60 }),
+    ]
+    const folded = foldVatIntoUnitPrices(items, 0.05, 4500)
+    expect(folded.matched).toBe(true)
+    expect(folded.total).toBe(4500)
+    expect(folded.vat).toBe(214.29)
+    expect(folded.exclusiveSubtotal).toBe(4285.71)
+    expect(folded.items[0].unit_price).toBeCloseTo((2625 / 4535) * 4285.71 / 75, 4)
+    const after = calcTotals(folded.items, 0.05)
+    expect(after.discount).toBe(0)
+    expect(after.total).toBe(4500)
+  })
+
+  it('rounds Maxtherm up to a 4,600 VAT-inclusive total', () => {
+    const items = [
+      newDraftLine({ description: 'Burgundy Polo T-shirt', qty: 75, unit_price: 35 }),
+      newDraftLine({ description: 'Non woven Tote Bags', qty: 35, unit_price: 10 }),
+      newDraftLine({ description: 'Hoodies', qty: 26, unit_price: 60 }),
+    ]
+    const folded = foldVatIntoUnitPrices(items, 0.05, 4600)
+    expect(folded.matched).toBe(true)
+    expect(folded.total).toBe(4600)
+    expect(folded.vat).toBe(219.05)
+    expect(folded.exclusiveSubtotal).toBe(4380.95)
+  })
+
+  it('is a no-op when prices already produce the desired inclusive total', () => {
+    const items = [
+      newDraftLine({ description: 'Burgundy Polo T-shirt', qty: 75, unit_price: 35 }),
+      newDraftLine({ description: 'Non woven Tote Bags', qty: 35, unit_price: 10 }),
+      newDraftLine({ description: 'Hoodies', qty: 26, unit_price: 60 }),
+    ]
+    const once = foldVatIntoUnitPrices(items, 0.05, 4535)
+    const twice = foldVatIntoUnitPrices(once.items, 0.05, 4535)
+    expect(twice.changed).toBe(false)
+    expect(twice.total).toBe(4535)
+    expect(twice.vat).toBe(215.95)
   })
 })

@@ -42,6 +42,8 @@ import {
   toDraftItems,
   withOffsetVatQuoteKeys,
   foldVatIntoUnitPrices,
+  parseMoneyInput,
+  round2,
   type DraftLineItem,
 } from '../lib/lineItems'
 import { STANDARD_SIZES, emptySizeBreakdown, sumSizes } from '../lib/sizes'
@@ -190,6 +192,7 @@ export default function QuotationsPage() {
   const [depositPct, setDepositPct] = useState('100')
   const [dnTarget, setDnTarget] = useState<Quotation | null>(null)
   const [vatFoldOpen, setVatFoldOpen] = useState(false)
+  const [vatFoldTarget, setVatFoldTarget] = useState('')
   const [clientSuggest, setClientSuggest] = useState(false)
   const compact = useCompactCrm()
 
@@ -402,9 +405,13 @@ export default function QuotationsPage() {
       }),
     [form.items, form.discount_percent, form.discount_amount, form.offset_vat, vatRate],
   )
+  const vatFoldTargetAmount = parseMoneyInput(vatFoldTarget)
   const vatFoldPreview = useMemo(
-    () => (vatFoldOpen ? foldVatIntoUnitPrices(form.items, vatRate) : null),
-    [vatFoldOpen, form.items, vatRate],
+    () =>
+      vatFoldOpen
+        ? foldVatIntoUnitPrices(form.items, vatRate, vatFoldTargetAmount)
+        : null,
+    [vatFoldOpen, form.items, vatRate, vatFoldTargetAmount],
   )
 
   const divisionBrand = (code: string) =>
@@ -1690,15 +1697,19 @@ export default function QuotationsPage() {
               type="button"
               style={buttonSecondaryStyle}
               disabled={vatRate <= 0 || totals.subtotal <= 0}
-              onClick={() => setVatFoldOpen(true)}
+              onClick={() => {
+                const current = round2(totals.subtotal)
+                setVatFoldTarget(Number.isInteger(current) ? String(current) : current.toFixed(2))
+                setVatFoldOpen(true)
+              }}
             >
               Include VAT in this total
             </button>
             <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted, lineHeight: 1.45 }}>
-              Lowers unit prices so {form.quotation_currency}{' '}
-              {totals.subtotal.toLocaleString('en-AE', { minimumFractionDigits: 2 })} is what they pay, including
-              5% VAT. You still remit VAT to the FTA. Use this instead of a discount line. Only apply once on
-              exclusive prices.
+              Rewrites unit prices so they pay a VAT-inclusive total you choose — keep{' '}
+              {form.quotation_currency}{' '}
+              {totals.subtotal.toLocaleString('en-AE', { minimumFractionDigits: 2 })} or round it.
+              You still remit 5% to the FTA. Use this instead of a discount line.
             </p>
           </div>
           <div style={{ fontSize: 13, color: colors.muted, paddingBottom: 8 }}>
@@ -1987,20 +1998,75 @@ export default function QuotationsPage() {
         width={480}
       >
         <p style={{ color: colors.muted, fontSize: 14, marginTop: 0, lineHeight: 1.55 }}>
-          Unit prices will be lowered so the customer still pays the current subtotal, but that figure
-          becomes <strong style={{ color: colors.text }}>VAT-inclusive</strong>. You still remit 5% to the
-          FTA. The PDF shows subtotal + VAT, with no discount line.
+          Enter what they should pay, including VAT. Round up or down if you want a cleaner figure.
+          Unit prices will be rewritten so the quoted total matches, with no discount line. You still
+          remit 5% to the FTA.
         </p>
-        {vatFoldPreview ? (
-          <div style={{ ...cardStyle, padding: 12, fontSize: 14, lineHeight: 1.6 }}>
-            <div>They pay: <strong>{form.quotation_currency} {vatFoldPreview.inclusiveTotal.toLocaleString('en-AE', { minimumFractionDigits: 2 })}</strong></div>
-            <div>New subtotal (ex-VAT): {form.quotation_currency} {vatFoldPreview.exclusiveSubtotal.toLocaleString('en-AE', { minimumFractionDigits: 2 })}</div>
-            <div>VAT to FTA: {form.quotation_currency} {vatFoldPreview.vat.toLocaleString('en-AE', { minimumFractionDigits: 2 })}</div>
-            <div>Quoted total: <strong>{form.quotation_currency} {vatFoldPreview.total.toLocaleString('en-AE', { minimumFractionDigits: 2 })}</strong></div>
+        <div style={fieldStyle}>
+          <label style={labelStyle}>Desired total (incl. VAT)</label>
+          <input
+            type="text"
+            inputMode="decimal"
+            style={inputStyle}
+            value={vatFoldTarget}
+            placeholder={round2(totals.subtotal).toFixed(2)}
+            onChange={(e) => setVatFoldTarget(e.target.value)}
+          />
+        </div>
+        {vatFoldPreview && vatFoldTargetAmount ? (
+          <div style={{ ...cardStyle, padding: 12, fontSize: 14, lineHeight: 1.6, marginTop: 12 }}>
+            <div>
+              They pay:{' '}
+              <strong>
+                {form.quotation_currency}{' '}
+                {vatFoldPreview.total.toLocaleString('en-AE', { minimumFractionDigits: 2 })}
+              </strong>
+            </div>
+            <div>
+              New subtotal (ex-VAT): {form.quotation_currency}{' '}
+              {vatFoldPreview.exclusiveSubtotal.toLocaleString('en-AE', { minimumFractionDigits: 2 })}
+            </div>
+            <div>
+              VAT to FTA: {form.quotation_currency}{' '}
+              {vatFoldPreview.vat.toLocaleString('en-AE', { minimumFractionDigits: 2 })}
+            </div>
+            {vatFoldPreview.matched ? null : (
+              <div style={{ color: colors.danger || '#f87171', fontSize: 13 }}>
+                Could not land exactly on {form.quotation_currency}{' '}
+                {vatFoldTargetAmount.toLocaleString('en-AE', { minimumFractionDigits: 2 })}. Closest
+                quoted total is shown above.
+              </div>
+            )}
+            {vatFoldPreview.changed ? (
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${colors.border}`, fontSize: 13 }}>
+                {vatFoldPreview.items.map((next, i) => {
+                  const prev = form.items[i]
+                  const qty = effectiveQty(prev)
+                  const beforeAmt = round2(qty * (Number(prev.unit_price) || 0))
+                  const afterAmt = round2(qty * (Number(next.unit_price) || 0))
+                  if (beforeAmt === afterAmt) return null
+                  return (
+                    <div
+                      key={prev.key}
+                      style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}
+                    >
+                      <span style={{ color: colors.muted }}>{prev.description || `Line ${i + 1}`}</span>
+                      <span>
+                        {beforeAmt.toLocaleString('en-AE', { minimumFractionDigits: 2 })} →{' '}
+                        {afterAmt.toLocaleString('en-AE', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        ) : (
+          <p style={{ color: colors.muted2, fontSize: 13 }}>Enter a total greater than 0 to preview the new prices.</p>
+        )}
         <p style={{ color: colors.muted2, fontSize: 12, lineHeight: 1.45 }}>
-          Use this on exclusive prices only. Applying it twice will cut prices again.
+          Line amounts stay in the same proportion. If this quote is already VAT-inclusive, enter a
+          new total only when you want to round it.
         </p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setVatFoldOpen(false)}>
@@ -2009,7 +2075,7 @@ export default function QuotationsPage() {
           <button
             type="button"
             style={buttonPrimaryStyle}
-            disabled={!vatFoldPreview?.changed}
+            disabled={!vatFoldPreview?.changed || !vatFoldTargetAmount}
             onClick={() => {
               if (!vatFoldPreview?.changed) return
               setForm((f) => ({

@@ -169,34 +169,60 @@ export function effectiveQty(item: DraftLineItem): number {
   return Number(item.qty) || 0
 }
 
+/** Parse a typed money amount (commas allowed). Returns null if empty or invalid. */
+export function parseMoneyInput(raw: string | number | null | undefined): number | null {
+  if (typeof raw === 'number') return Number.isFinite(raw) && raw > 0 ? round2(raw) : null
+  const text = String(raw ?? '')
+    .replace(/,/g, '')
+    .replace(/[^\d.-]/g, '')
+    .trim()
+  if (!text) return null
+  const n = Number(text)
+  if (!Number.isFinite(n) || n <= 0) return null
+  return round2(n)
+}
+
 /**
- * Treat current line prices as exclusive, then lower them so today's subtotal
- * becomes the VAT-inclusive amount the customer pays (FTA still gets 5%).
+ * Rewrite exclusive unit prices so the quoted total (subtotal + VAT, no discount)
+ * equals `inclusiveTarget`. Omit the target to keep today's exclusive subtotal as
+ * the amount they pay, including VAT. Line shares stay proportional.
  */
-export function foldVatIntoUnitPrices(items: DraftLineItem[], vatRate = VAT_RATE) {
-  const rate = Number(vatRate) || 0
+export function foldVatIntoUnitPrices(
+  items: DraftLineItem[],
+  vatRate = VAT_RATE,
+  inclusiveTarget?: number | null,
+) {
+  const rate = Math.max(0, Number(vatRate) || 0)
   const rows = items.map((item) => {
     const qty = effectiveQty(item)
-    const incl = round2(qty * (Number(item.unit_price) || 0))
-    return { item, qty, incl }
+    const amount = round2(qty * (Number(item.unit_price) || 0))
+    return { item, qty, amount }
   })
-  const inclusiveTotal = round2(rows.reduce((sum, row) => sum + row.incl, 0))
+  const sourceTotal = round2(rows.reduce((sum, row) => sum + row.amount, 0))
+  const requested = Number(inclusiveTarget)
+  const target =
+    Number.isFinite(requested) && requested > 0 ? round2(requested) : sourceTotal
+
   const snapshot = (next: DraftLineItem[], changed: boolean) => {
     const after = calcTotals(next, rate)
     return {
       items: next,
-      inclusiveTotal,
+      inclusiveTotal: target,
       exclusiveSubtotal: after.subtotal,
       vat: after.vat,
       total: after.total,
       changed,
+      matched: after.total === target,
     }
   }
-  if (rate <= 0 || inclusiveTotal <= 0) return snapshot(items, false)
+  if (target <= 0 || sourceTotal <= 0) return snapshot(items, false)
 
-  const exclusiveTarget = round2(inclusiveTotal / (1 + rate))
+  const current = calcTotals(items, rate)
+  if (current.total === target && current.discount === 0) return snapshot(items, false)
+
+  const exclusiveTarget = rate > 0 ? round2(target / (1 + rate)) : target
   const adjustable = rows
-    .map((row, idx) => (row.qty > 0 && row.incl > 0 ? idx : -1))
+    .map((row, idx) => (row.qty > 0 && row.amount > 0 ? idx : -1))
     .filter((idx) => idx >= 0)
   if (!adjustable.length) return snapshot(items, false)
 
@@ -204,7 +230,9 @@ export function foldVatIntoUnitPrices(items: DraftLineItem[], vatRate = VAT_RATE
   let allocated = 0
   adjustable.forEach((idx, j) => {
     const isLast = j === adjustable.length - 1
-    const excl = isLast ? round2(exclusiveTarget - allocated) : round2(rows[idx].incl / (1 + rate))
+    const excl = isLast
+      ? round2(exclusiveTarget - allocated)
+      : round2((rows[idx].amount / sourceTotal) * exclusiveTarget)
     if (!isLast) allocated += excl
     exclByIndex[idx] = Math.max(0, excl)
   })
@@ -220,14 +248,15 @@ export function foldVatIntoUnitPrices(items: DraftLineItem[], vatRate = VAT_RATE
   let next = applyExcl(exclByIndex)
   let after = calcTotals(next, rate)
   const last = adjustable[adjustable.length - 1]
-  for (const step of [0.01, -0.01, 0.02, -0.02, 0.03, -0.03]) {
-    if (after.total === inclusiveTotal) break
-    exclByIndex[last] = round2(Math.max(0, exclByIndex[last] + step))
+  for (let i = 0; i < 80 && after.total !== target; i++) {
+    const dir = after.total < target ? 1 : -1
+    exclByIndex[last] = round2(Math.max(0, exclByIndex[last] + dir * 0.01))
     next = applyExcl(exclByIndex)
     after = calcTotals(next, rate)
   }
 
-  return snapshot(next, true)
+  const changed = next.some((item, i) => Math.abs((item.unit_price || 0) - (items[i].unit_price || 0)) > 1e-9)
+  return snapshot(next, changed)
 }
 
 export function toDraftItems(rows: LineItem[]): DraftLineItem[] {
