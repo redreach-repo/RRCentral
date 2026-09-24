@@ -4,6 +4,7 @@ import { format, parseISO } from 'date-fns'
 import {
   ExternalLink,
   FileText,
+  FileUp,
   FolderOpen,
   Link2,
   Plus,
@@ -71,6 +72,8 @@ function categoryIcon(category: CustomerDocumentCategory) {
       return <Truck size={16} />
     case 'payment_slip':
       return <Wallet size={16} />
+    case 'supplier_invoice':
+      return <FileUp size={16} />
     default:
       return <FolderOpen size={16} />
   }

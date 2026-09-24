@@ -80,6 +80,7 @@ export type CustomerDocumentCategory =
   | 'invoice'
   | 'delivery_note'
   | 'payment_slip'
+  | 'supplier_invoice'
   | 'other'
 
 export interface CustomerDocument {

@@ -86,6 +86,36 @@ export async function loadDealQuotes(dealRef: string): Promise<Quotation[]> {
 
 export type PendingAttachment = { name: string; dataUrl: string; mime?: string }
 
+/** WorkDrive share link stored as a light attachment row (url is https, not a data: blob). */
+export type PendingWorkDriveLink = { title: string; url: string }
+
+function isDataUrlBlob(url: string): boolean {
+  return String(url || '').trim().toLowerCase().startsWith('data:')
+}
+
+/** Delete bulky PDF data-URLs previously stored on quotations / mirrored expenses. Keeps expense metadata. */
+export async function clearSupplierInvoiceBlobs(): Promise<{ quoteAttachments: number; expenseAttachments: number }> {
+  const { data, error } = await db.from('attachments').select('*')
+  if (error) throw error
+  const rows = (data || []) as Attachment[]
+  let quoteAttachments = 0
+  let expenseAttachments = 0
+  for (const row of rows) {
+    if (!isDataUrlBlob(row.url)) continue
+    const type = String(row.entity_type || '')
+    if (type !== QUOTE_SUPPLIER_INVOICE_ENTITY && type !== 'expense') continue
+    // Only clear expense blobs that look like invoice PDFs (avoid wiping unrelated expense receipts unless data URL).
+    if (type === 'expense' && !/\.pdf$/i.test(row.file_name || '') && !/invoice/i.test(row.file_name || '')) {
+      continue
+    }
+    const { error: delErr } = await db.from('attachments').delete().eq('id', row.id)
+    if (delErr) throw delErr
+    if (type === QUOTE_SUPPLIER_INVOICE_ENTITY) quoteAttachments += 1
+    else expenseAttachments += 1
+  }
+  return { quoteAttachments, expenseAttachments }
+}
+
 export async function saveAttachmentsToQuote(opts: {
   quote: Pick<Quotation, 'deal_ref' | 'reference_number' | 'quote_id' | 'id' | 'base_reference'>
   files: PendingAttachment[]
@@ -94,11 +124,15 @@ export async function saveAttachmentsToQuote(opts: {
   const entityRef = resolveDealRef(opts.quote)
   if (!entityRef) throw new Error('Quotation needs a reference before attaching a supplier invoice')
   for (const file of opts.files) {
+    // Refuse to persist data-URL blobs — use WorkDrive links instead.
+    if (isDataUrlBlob(file.dataUrl)) {
+      throw new Error('Upload the PDF to Zoho WorkDrive and paste the share link instead of storing the file here')
+    }
     const { error } = await db.from('attachments').insert({
       entity_type: QUOTE_SUPPLIER_INVOICE_ENTITY,
       entity_ref: entityRef,
       file_name: file.name,
-      storage_path: '',
+      storage_path: 'zoho_workdrive',
       url: file.dataUrl,
       uploaded_by: opts.uploadedBy,
       uploaded_at: new Date().toISOString(),
@@ -108,17 +142,62 @@ export async function saveAttachmentsToQuote(opts: {
   return entityRef
 }
 
+export async function saveWorkDriveLinkToQuote(opts: {
+  quote: Pick<Quotation, 'deal_ref' | 'reference_number' | 'quote_id' | 'id' | 'base_reference' | 'client'>
+  link: PendingWorkDriveLink
+  uploadedBy: string
+}): Promise<string> {
+  const entityRef = resolveDealRef(opts.quote)
+  if (!entityRef) throw new Error('Quotation needs a reference before attaching a supplier invoice')
+  const url = opts.link.url.trim()
+  const title = opts.link.title.trim() || 'Supplier invoice'
+  if (!url) throw new Error('Paste a Zoho WorkDrive share link')
+
+  const { error } = await db.from('attachments').insert({
+    entity_type: QUOTE_SUPPLIER_INVOICE_ENTITY,
+    entity_ref: entityRef,
+    file_name: title,
+    storage_path: 'zoho_workdrive',
+    url,
+    uploaded_by: opts.uploadedBy,
+    uploaded_at: new Date().toISOString(),
+  })
+  if (error) throw error
+
+  // Also index on the customer folder when we know the client name.
+  const company = String(opts.quote.client || '').trim()
+  if (company) {
+    try {
+      const { saveCustomerDriveLink } = await import('./customerFiles')
+      await saveCustomerDriveLink({
+        company,
+        category: 'supplier_invoice',
+        title,
+        driveUrl: url,
+        relatedRef: entityRef,
+        notes: 'Supplier invoice',
+        uploadedBy: opts.uploadedBy,
+      })
+    } catch {
+      /* customer_documents optional until SQL upgrade */
+    }
+  }
+
+  return entityRef
+}
+
 export async function saveAttachmentsToExpense(opts: {
   expenseId: string
   files: PendingAttachment[]
   uploadedBy: string
 }) {
   for (const file of opts.files) {
+    if (isDataUrlBlob(file.dataUrl)) continue
     const { error } = await db.from('attachments').insert({
       entity_type: 'expense',
       entity_ref: opts.expenseId,
       file_name: file.name,
-      storage_path: '',
+      storage_path: 'zoho_workdrive',
       url: file.dataUrl,
       uploaded_by: opts.uploadedBy,
       uploaded_at: new Date().toISOString(),
@@ -217,10 +296,11 @@ export async function syncQuoteSupplierCostFromExpense(opts: {
   return shares
 }
 
-/** Save PDF on the quotation, mirror as finance expense, update quote GP. */
+/** Save WorkDrive link on the quotation, mirror as finance expense, update quote GP. */
 export async function saveSupplierInvoiceForQuote(opts: {
   quote: Quotation
-  files: PendingAttachment[]
+  files?: PendingAttachment[]
+  workDriveLink?: PendingWorkDriveLink | null
   uploadedBy: string
   vendor: string
   date: string | null
@@ -247,7 +327,21 @@ export async function saveSupplierInvoiceForQuote(opts: {
     if (dealErr && !isUndefinedColumnError(dealErr)) throw dealErr
   }
 
-  if (opts.files.length) {
+  // Clear old data-URL blobs once when saving the new WorkDrive-based flow.
+  try {
+    await clearSupplierInvoiceBlobs()
+  } catch {
+    /* best-effort purge */
+  }
+
+  const link = opts.workDriveLink
+  if (link?.url.trim()) {
+    await saveWorkDriveLinkToQuote({
+      quote: { ...opts.quote, deal_ref: dealRef },
+      link,
+      uploadedBy: opts.uploadedBy,
+    })
+  } else if (opts.files?.length) {
     await saveAttachmentsToQuote({
       quote: { ...opts.quote, deal_ref: dealRef },
       files: opts.files,
@@ -278,10 +372,10 @@ export async function saveSupplierInvoiceForQuote(opts: {
     supplier_invoice_no: opts.supplier_invoice_no || '',
   })
 
-  if (opts.files.length) {
+  if (link?.url.trim()) {
     await saveAttachmentsToExpense({
       expenseId,
-      files: opts.files,
+      files: [{ name: link.title || 'Supplier invoice', dataUrl: link.url.trim() }],
       uploadedBy: opts.uploadedBy,
     })
   }

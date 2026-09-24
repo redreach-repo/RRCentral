@@ -68,13 +68,14 @@ import {
 } from '../lib/deliveryNotes'
 import {
   supplierInvoiceProfit,
-  type ParsedSupplierInvoice,
 } from '../lib/supplierInvoiceParse'
 import {
+  clearSupplierInvoiceBlobs,
   loadQuoteSupplierExpenses,
   loadQuoteSupplierInvoiceAttachments,
   saveSupplierInvoiceForQuote,
 } from '../lib/supplierInvoiceStore'
+import { isWorkDriveShareUrl } from '../lib/customerFiles'
 import { resolveDealRef } from '../lib/dealQuotes'
 import { listVendors } from '../lib/vendors'
 import {
@@ -217,12 +218,10 @@ export default function QuotationsPage() {
     payment_method: 'Bank transfer',
     notes: '',
   })
-  const [supplierInvoiceFiles, setSupplierInvoiceFiles] = useState<
-    { name: string; dataUrl: string }[]
-  >([])
+  const [supplierInvoiceWorkDriveUrl, setSupplierInvoiceWorkDriveUrl] = useState('')
+  const [supplierInvoiceWorkDriveTitle, setSupplierInvoiceWorkDriveTitle] = useState('')
   const [supplierInvoiceAttachments, setSupplierInvoiceAttachments] = useState<Attachment[]>([])
   const [supplierInvoiceExpenses, setSupplierInvoiceExpenses] = useState<Expense[]>([])
-  const [supplierInvoiceParsing, setSupplierInvoiceParsing] = useState(false)
   const [supplierInvoiceHint, setSupplierInvoiceHint] = useState('')
   const [vendorSuggest, setVendorSuggest] = useState(false)
   const [vatFoldOpen, setVatFoldOpen] = useState(false)
@@ -476,15 +475,38 @@ export default function QuotationsPage() {
       payment_method: PAYMENT_METHODS[0] || 'Bank transfer',
       notes: '',
     })
-    setSupplierInvoiceFiles([])
-    setSupplierInvoiceHint('')
+    setSupplierInvoiceWorkDriveUrl('')
+    setSupplierInvoiceWorkDriveTitle('')
+    setSupplierInvoiceHint(
+      'Upload the PDF to Zoho WorkDrive, then paste the share link here. Old PDF blobs in Supabase are cleared automatically.',
+    )
     try {
+      // Free Supabase space from legacy data-URL supplier PDFs.
+      try {
+        const cleared = await clearSupplierInvoiceBlobs()
+        if (cleared.quoteAttachments || cleared.expenseAttachments) {
+          showToast(
+            `Cleared ${cleared.quoteAttachments + cleared.expenseAttachments} stored PDF blob(s) from Supabase`,
+            'success',
+          )
+        }
+      } catch {
+        /* ignore purge errors */
+      }
+
       const [atts, exps] = await Promise.all([
         loadQuoteSupplierInvoiceAttachments(q),
         loadQuoteSupplierExpenses(q),
       ])
-      setSupplierInvoiceAttachments(atts)
+      // Prefer WorkDrive https links; hide leftover data-URL blobs from the list.
+      const links = atts.filter((a) => !String(a.url || '').startsWith('data:'))
+      setSupplierInvoiceAttachments(links)
       setSupplierInvoiceExpenses(exps)
+      const latestLink = links[0]
+      if (latestLink) {
+        setSupplierInvoiceWorkDriveUrl(latestLink.url || '')
+        setSupplierInvoiceWorkDriveTitle(latestLink.file_name || '')
+      }
       const latest = exps[0]
       if (latest) {
         const extraNotes = String(latest.notes || '')
@@ -510,58 +532,6 @@ export default function QuotationsPage() {
     }
   }
 
-  function applySupplierParsed(parsed: ParsedSupplierInvoice) {
-    setSupplierInvoiceForm((f) => ({
-      ...f,
-      vendor: parsed.vendor || f.vendor,
-      date: parsed.date || f.date,
-      supplier_invoice_no: parsed.supplierInvoiceNo || f.supplier_invoice_no,
-      amount: parsed.amountInclusive ?? f.amount,
-      amount_ex_vat: parsed.amountExVat ?? f.amount_ex_vat,
-      vat_amount: parsed.vatAmount ?? f.vat_amount,
-      notes: [f.notes.trim(), parsed.trn ? `Supplier TRN ${parsed.trn}` : ''].filter(Boolean).join('\n'),
-    }))
-    setSupplierInvoiceHint(
-      parsed.confidence === 'high'
-        ? 'Filled from the PDF. Check the figures before saving.'
-        : 'Partially filled from the PDF. Confirm totals before saving.',
-    )
-  }
-
-  async function onSupplierInvoiceFiles(files: FileList | null) {
-    if (!files?.length) return
-    try {
-      const list = [...files]
-      const rows = await Promise.all(
-        list.map(
-          (file) =>
-            new Promise<{ name: string; dataUrl: string }>((resolve, reject) => {
-              const reader = new FileReader()
-              reader.onload = () => resolve({ name: file.name, dataUrl: String(reader.result || '') })
-              reader.onerror = () => reject(reader.error || new Error('Read failed'))
-              reader.readAsDataURL(file)
-            }),
-        ),
-      )
-      setSupplierInvoiceFiles((prev) => [...prev, ...rows])
-      const pdf = list.find((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name))
-      if (!pdf) return
-      setSupplierInvoiceParsing(true)
-      try {
-        const { parseSupplierInvoicePdf } = await import('../lib/supplierInvoicePdf')
-        applySupplierParsed(await parseSupplierInvoicePdf(pdf, vatRate))
-        showToast('Supplier invoice PDF read — review the form', 'success')
-      } catch (e) {
-        setSupplierInvoiceHint('Could not read text from this PDF. Fill the form manually.')
-        showToast(e instanceof Error ? e.message : 'PDF parse failed', 'error')
-      } finally {
-        setSupplierInvoiceParsing(false)
-      }
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not read file', 'error')
-    }
-  }
-
   async function saveSupplierInvoice() {
     if (!supplierInvoiceTarget) return
     if (!supplierInvoiceForm.vendor.trim()) {
@@ -570,6 +540,11 @@ export default function QuotationsPage() {
     }
     if (!supplierInvoiceForm.amount && !supplierInvoiceForm.amount_ex_vat) {
       showToast('Enter the supplier invoice total', 'error')
+      return
+    }
+    const linkUrl = supplierInvoiceWorkDriveUrl.trim()
+    if (linkUrl && !isWorkDriveShareUrl(linkUrl)) {
+      showToast('Use a Zoho WorkDrive share link', 'error')
       return
     }
     setSaving(true)
@@ -589,7 +564,15 @@ export default function QuotationsPage() {
 
       const result = await saveSupplierInvoiceForQuote({
         quote: supplierInvoiceTarget,
-        files: supplierInvoiceFiles,
+        workDriveLink: linkUrl
+          ? {
+              url: linkUrl,
+              title:
+                supplierInvoiceWorkDriveTitle.trim() ||
+                supplierInvoiceForm.supplier_invoice_no.trim() ||
+                'Supplier invoice',
+            }
+          : null,
         uploadedBy: who,
         vendor: supplierInvoiceForm.vendor,
         date: supplierInvoiceForm.date || null,
@@ -2562,35 +2545,30 @@ export default function QuotationsPage() {
         width={640}
       >
         <p style={{ color: colors.muted, fontSize: 14, marginTop: 0, lineHeight: 1.5 }}>
-          The PDF is stored on this quotation’s <strong style={{ color: colors.text }}>deal</strong>{' '}
-          ({supplierInvoiceTarget ? resolveDealRef(supplierInvoiceTarget) : '—'}). A matching expense
-          is created for finance reports. If this deal has branch quotes, supplier cost is split by
-          each quote’s revenue for profit.
+          Store the PDF on <strong style={{ color: colors.text }}>Zoho WorkDrive</strong>, then paste
+          the share link on this quotation’s deal (
+          {supplierInvoiceTarget ? resolveDealRef(supplierInvoiceTarget) : '—'}). A matching expense
+          is created for finance reports. Branch quotes on the same deal share the supplier cost.
         </p>
         <div style={fieldStyle}>
           <label style={labelStyle}>
             <FileUp size={12} style={{ marginRight: 4 }} />
-            Upload supplier invoice PDF
+            Zoho WorkDrive share link
           </label>
           <input
-            type="file"
-            accept="application/pdf,image/*,.pdf"
-            multiple
-            disabled={supplierInvoiceParsing}
-            onChange={(e) => void onSupplierInvoiceFiles(e.target.files)}
+            style={inputStyle}
+            value={supplierInvoiceWorkDriveUrl}
+            onChange={(e) => setSupplierInvoiceWorkDriveUrl(e.target.value)}
+            placeholder="https://workdrive.zoho.com/… or workdrive.zohoexternal.com/…"
           />
-          {supplierInvoiceParsing ? (
-            <p style={{ margin: '6px 0 0', fontSize: 13, color: colors.accent }}>Reading PDF…</p>
-          ) : null}
+          <input
+            style={{ ...inputStyle, marginTop: 8 }}
+            value={supplierInvoiceWorkDriveTitle}
+            onChange={(e) => setSupplierInvoiceWorkDriveTitle(e.target.value)}
+            placeholder="Link title (optional) — e.g. Uniforms INV-8821"
+          />
           {supplierInvoiceHint ? (
             <p style={{ margin: '6px 0 0', fontSize: 13, color: colors.muted }}>{supplierInvoiceHint}</p>
-          ) : null}
-          {supplierInvoiceFiles.length > 0 ? (
-            <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 12, color: colors.muted }}>
-              {supplierInvoiceFiles.map((f) => (
-                <li key={f.name + f.dataUrl.slice(0, 20)}>{f.name} (pending save)</li>
-              ))}
-            </ul>
           ) : null}
         </div>
         <div style={formGridStyle}>
@@ -2788,7 +2766,7 @@ export default function QuotationsPage() {
         </div>
         {supplierInvoiceAttachments.length > 0 ? (
           <div style={fieldStyle}>
-            <label style={labelStyle}>PDFs on this quotation</label>
+            <label style={labelStyle}>WorkDrive links on this quotation</label>
             <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13 }}>
               {supplierInvoiceAttachments.map((a) => (
                 <li key={a.id}>
@@ -2811,7 +2789,7 @@ export default function QuotationsPage() {
           <button
             type="button"
             style={buttonPrimaryStyle}
-            disabled={saving || supplierInvoiceParsing}
+            disabled={saving}
             onClick={() => void saveSupplierInvoice()}
           >
             {saving ? 'Saving…' : 'Save on quotation'}

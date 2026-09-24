@@ -14,10 +14,11 @@ export const CUSTOMER_DOCUMENT_CATEGORIES: {
   label: string
   hint: string
 }[] = [
-  { id: 'quotation', label: 'Quotations', hint: 'Quote PDFs on WorkDrive' },
-  { id: 'invoice', label: 'Invoices', hint: 'Tax invoice PDFs' },
-  { id: 'delivery_note', label: 'Delivery notes', hint: 'Signed or issued DN copies' },
-  { id: 'payment_slip', label: 'Payment slips', hint: 'Bank transfers, remittance advice' },
+  { id: 'quotation', label: 'Quotations', hint: 'Customer quotes from CRM' },
+  { id: 'invoice', label: 'Invoices', hint: 'Tax invoices from CRM' },
+  { id: 'delivery_note', label: 'Delivery notes', hint: 'Goods receipts from CRM' },
+  { id: 'payment_slip', label: 'Payment slips', hint: 'Customer remittance on WorkDrive' },
+  { id: 'supplier_invoice', label: 'Supplier invoices', hint: 'Vendor PDFs on WorkDrive' },
   { id: 'other', label: 'Other', hint: 'Contracts, specs, misc' },
 ]
 
@@ -71,6 +72,44 @@ export function suggestedDriveFolderName(company: string): string {
     .replace(/[\\/:*?"<>|]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+/** Normalize company names so CRM ↔ quote/invoice client mismatches still match. */
+export function normalizeCompanyKey(name: string): string {
+  return String(name || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function stripLegalSuffixes(key: string): string {
+  return key
+    .replace(/\b(llc|ltd|l l c|fze|fzco|fzc|co|company|trading|group|inc|corp|corporation)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+export function companiesMatch(a: string, b: string): boolean {
+  const na = normalizeCompanyKey(a)
+  const nb = normalizeCompanyKey(b)
+  if (!na || !nb) return false
+  if (na === nb) return true
+  const sa = stripLegalSuffixes(na)
+  const sb = stripLegalSuffixes(nb)
+  if (sa && sb && sa === sb) return true
+  if (sa.length >= 5 && sb.length >= 5 && (sa.includes(sb) || sb.includes(sa))) return true
+  return false
+}
+
+function filterByCompany<T extends { client?: string; company_name?: string }>(
+  rows: T[],
+  company: string,
+): T[] {
+  return rows.filter((row) => companiesMatch(String(row.client || row.company_name || ''), company))
 }
 
 /** Build a customer folder from live CRM docs + WorkDrive-linked uploads. */
@@ -163,10 +202,29 @@ export async function loadCustomerDocuments(company: string): Promise<CustomerDo
   const { data, error } = await db
     .from('customer_documents')
     .select('*')
-    .ilike('company_name', name)
     .order('uploaded_at', { ascending: false })
   if (error) throw error
-  return (data || []) as CustomerDocument[]
+  return filterByCompany((data || []) as CustomerDocument[], name)
+}
+
+async function loadRowsMatchingCompany<T extends { client?: string }>(
+  table: 'quotations' | 'invoices' | 'delivery_notes',
+  company: string,
+): Promise<T[]> {
+  const name = company.trim()
+  if (!name) return []
+
+  // Prefer exact (case-insensitive), then widen with %…% and filter client-side.
+  const exact = await db.from(table).select('*').ilike('client', name).order('created_at', { ascending: false })
+  if (exact.error) throw exact.error
+  let rows = (exact.data || []) as T[]
+  if (rows.length) return rows
+
+  const token = normalizeCompanyKey(name).split(' ').filter((t) => t.length >= 3)[0] || name
+  const pattern = `%${token}%`
+  const loose = await db.from(table).select('*').ilike('client', pattern).order('created_at', { ascending: false })
+  if (loose.error) throw loose.error
+  return filterByCompany((loose.data || []) as T[], name)
 }
 
 export async function loadCustomerFolder(company: string): Promise<CustomerFolder> {
@@ -182,35 +240,49 @@ export async function loadCustomerFolder(company: string): Promise<CustomerFolde
     })
   }
 
-  const [crmRes, qRes, iRes, dnRes, docsResult] = await Promise.all([
-    db.from('crm').select('*').ilike('company_name', name).limit(1).maybeSingle(),
-    db.from('quotations').select('*').ilike('client', name).order('created_at', { ascending: false }),
-    db.from('invoices').select('*').ilike('client', name).order('created_at', { ascending: false }),
+  const emptyDocs = { documents: [] as CustomerDocument[], missing: false as const }
+
+  const [crmRes, quotations, invoices, deliveryNotes, docsResult] = await Promise.all([
     db
-      .from('delivery_notes')
+      .from('crm')
       .select('*')
-      .ilike('client', name)
-      .order('created_at', { ascending: false }),
-    loadCustomerDocuments(name).then(
-      (documents) => ({ documents, missing: false as const }),
-      (err: unknown) => {
-        if (isMissingRelationError(err)) return { documents: [] as CustomerDocument[], missing: true as const }
-        throw err
-      },
-    ),
+      .order('updated_at', { ascending: false })
+      .then(async (res: { data: unknown; error: { message: string } | null }) => {
+        if (res.error) return res
+        const match = ((res.data || []) as CrmEntry[]).find((c) => companiesMatch(c.company_name, name))
+        return { data: match || null, error: null as { message: string } | null }
+      }),
+    loadRowsMatchingCompany<Quotation>('quotations', name).catch((err: unknown) => {
+      if (isMissingRelationError(err)) return [] as Quotation[]
+      throw err
+    }),
+    loadRowsMatchingCompany<Invoice>('invoices', name).catch((err: unknown) => {
+      if (isMissingRelationError(err)) return [] as Invoice[]
+      throw err
+    }),
+    loadRowsMatchingCompany<DeliveryNote>('delivery_notes', name).catch((err: unknown) => {
+      if (isMissingRelationError(err)) return [] as DeliveryNote[]
+      throw err
+    }),
+    loadCustomerDocuments(name)
+      .then(
+        (documents) => ({ documents, missing: false as const }),
+        (err: unknown) => {
+          if (isMissingRelationError(err)) return { documents: [] as CustomerDocument[], missing: true as const }
+          throw err
+        },
+      )
+      .catch(() => emptyDocs),
   ])
 
   if (crmRes.error) throw crmRes.error
-  if (qRes.error) throw qRes.error
-  if (iRes.error) throw iRes.error
-  if (dnRes.error) throw dnRes.error
 
   const folder = buildCustomerFolder({
     company: name,
     crm: (crmRes.data as CrmEntry) || null,
-    quotations: (qRes.data || []) as Quotation[],
-    invoices: (iRes.data || []) as Invoice[],
-    deliveryNotes: (dnRes.data || []) as DeliveryNote[],
+    quotations,
+    invoices,
+    deliveryNotes,
     documents: docsResult.documents,
   })
 
