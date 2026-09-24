@@ -47,6 +47,17 @@ export function isUnsupportedDocTypeError(err: unknown): boolean {
   return /invalid input value for enum/.test(msg) || (/doc_type/.test(msg) && /check/.test(msg))
 }
 
+export function isUndefinedColumnError(err: unknown): boolean {
+  const code = errorCode(err)
+  const msg = errorMessage(err).toLowerCase()
+  return (
+    code === 'PGRST204' ||
+    code === '42703' ||
+    (/schema cache/.test(msg) && /column/.test(msg)) ||
+    /could not find the .*column/.test(msg)
+  )
+}
+
 export function shouldFallbackDeliveryNoteStorage(err: unknown): boolean {
   return isMissingRelationError(err) || isCheckConstraintError(err) || isUnsupportedDocTypeError(err)
 }

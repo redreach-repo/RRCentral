@@ -41,6 +41,61 @@ export type DiscountOpts = {
   discountPercent?: number
   /** Fixed amount off subtotal (in document currency). */
   discountAmount?: number
+  /**
+   * Add VAT to the subtotal, then give that VAT amount as a commercial discount
+   * so the customer pays the ex-VAT figure (e.g. 4,535 + 226.75 VAT − 226.75 = 4,535).
+   */
+  offsetVat?: boolean
+}
+
+export const OFFSET_VAT_SETTING_KEY = 'offset_vat_quotes'
+
+export function parseOffsetVatQuoteKeys(raw: string | undefined | null): string[] {
+  const text = String(raw || '').trim()
+  if (!text) return []
+  try {
+    const parsed = JSON.parse(text) as unknown
+    if (Array.isArray(parsed)) return parsed.map((v) => String(v || '').trim()).filter(Boolean)
+  } catch {
+    /* comma-separated fallback */
+  }
+  return text
+    .split(/[\s,]+/)
+    .map((v) => v.trim())
+    .filter(Boolean)
+}
+
+export function quoteOffsetsVat(
+  quote:
+    | {
+        offset_vat?: boolean | null
+        quote_id?: string
+        reference_number?: string
+        id?: string
+      }
+    | null
+    | undefined,
+  settings?: Record<string, string>,
+): boolean {
+  if (!quote) return false
+  if (quote.offset_vat === true) return true
+  const keys = parseOffsetVatQuoteKeys(settings?.[OFFSET_VAT_SETTING_KEY])
+  if (!keys.length) return false
+  return [quote.quote_id, quote.reference_number, quote.id]
+    .map((k) => String(k || '').trim())
+    .filter(Boolean)
+    .some((k) => keys.includes(k))
+}
+
+export function withOffsetVatQuoteKeys(existing: string[], ids: string[], enabled: boolean): string[] {
+  const set = new Set(existing)
+  for (const id of ids) {
+    const key = String(id || '').trim()
+    if (!key) continue
+    if (enabled) set.add(key)
+    else set.delete(key)
+  }
+  return [...set]
 }
 
 /** Discount applied to pre-VAT subtotal. Percent first, then fixed amount. */
@@ -67,6 +122,21 @@ export function calcTotals(items: DraftLineItem[], vatRate = VAT_RATE, discount?
   }
   subtotal = round2(subtotal)
   cost = round2(cost)
+  if (discount?.offsetVat && vatRate > 0) {
+    const vat = round2(subtotal * vatRate)
+    const profit = round2(subtotal - cost)
+    const marginPct = subtotal > 0 ? round2((profit / subtotal) * 100) : 0
+    return {
+      subtotal,
+      discount: vat,
+      taxable: subtotal,
+      vat,
+      total: subtotal,
+      cost,
+      profit,
+      marginPct,
+    }
+  }
   const { discount: discountValue, taxable } = applyDiscount(subtotal, discount)
   const vat = round2(taxable * vatRate)
   const profit = round2(taxable - cost)
@@ -97,6 +167,67 @@ export function formatMoney(n: number, currency = 'AED'): string {
 export function effectiveQty(item: DraftLineItem): number {
   if (item.sizes) return sumSizes(item.sizes)
   return Number(item.qty) || 0
+}
+
+/**
+ * Treat current line prices as exclusive, then lower them so today's subtotal
+ * becomes the VAT-inclusive amount the customer pays (FTA still gets 5%).
+ */
+export function foldVatIntoUnitPrices(items: DraftLineItem[], vatRate = VAT_RATE) {
+  const rate = Number(vatRate) || 0
+  const rows = items.map((item) => {
+    const qty = effectiveQty(item)
+    const incl = round2(qty * (Number(item.unit_price) || 0))
+    return { item, qty, incl }
+  })
+  const inclusiveTotal = round2(rows.reduce((sum, row) => sum + row.incl, 0))
+  const snapshot = (next: DraftLineItem[], changed: boolean) => {
+    const after = calcTotals(next, rate)
+    return {
+      items: next,
+      inclusiveTotal,
+      exclusiveSubtotal: after.subtotal,
+      vat: after.vat,
+      total: after.total,
+      changed,
+    }
+  }
+  if (rate <= 0 || inclusiveTotal <= 0) return snapshot(items, false)
+
+  const exclusiveTarget = round2(inclusiveTotal / (1 + rate))
+  const adjustable = rows
+    .map((row, idx) => (row.qty > 0 && row.incl > 0 ? idx : -1))
+    .filter((idx) => idx >= 0)
+  if (!adjustable.length) return snapshot(items, false)
+
+  const exclByIndex = rows.map(() => 0)
+  let allocated = 0
+  adjustable.forEach((idx, j) => {
+    const isLast = j === adjustable.length - 1
+    const excl = isLast ? round2(exclusiveTarget - allocated) : round2(rows[idx].incl / (1 + rate))
+    if (!isLast) allocated += excl
+    exclByIndex[idx] = Math.max(0, excl)
+  })
+
+  const applyExcl = (excl: number[]) =>
+    items.map((item, i) => {
+      const qty = rows[i].qty
+      const amount = excl[i]
+      if (qty <= 0 || amount <= 0) return item
+      return { ...item, unit_price: amount / qty }
+    })
+
+  let next = applyExcl(exclByIndex)
+  let after = calcTotals(next, rate)
+  const last = adjustable[adjustable.length - 1]
+  for (const step of [0.01, -0.01, 0.02, -0.02, 0.03, -0.03]) {
+    if (after.total === inclusiveTotal) break
+    exclByIndex[last] = round2(Math.max(0, exclByIndex[last] + step))
+    next = applyExcl(exclByIndex)
+    after = calcTotals(next, rate)
+  }
+
+  return snapshot(next, true)
 }
 
 export function toDraftItems(rows: LineItem[]): DraftLineItem[] {

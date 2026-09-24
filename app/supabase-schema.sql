@@ -139,6 +139,7 @@ create table quotations (
   amount numeric(12,2) not null default 0,
   discount_percent numeric(8,4) not null default 0,
   discount_amount numeric(12,2) not null default 0,
+  offset_vat boolean not null default false,
   status text not null default 'Draft',
   division_code text not null default '01',
   base_reference text not null default '',
@@ -909,6 +910,7 @@ create policy "Public can submit website inquiries" on website_inquiries for ins
 -- alter table quotations add column if not exists estimated_gross_profit_base numeric(14,2) not null default 0;
 -- alter table quotations add column if not exists discount_percent numeric(8,4) not null default 0;
 -- alter table quotations add column if not exists discount_amount numeric(12,2) not null default 0;
+-- alter table quotations add column if not exists offset_vat boolean not null default false;
 -- create table if not exists website_inquiries (
 --   id uuid primary key default uuid_generate_v4(),
 --   name text not null,
