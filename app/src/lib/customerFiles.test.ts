@@ -1,27 +1,33 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildCustomerFolder,
+  companiesMatch,
   isWorkDriveShareUrl,
+  normalizeCompanyKey,
   suggestedDriveFolderName,
 } from './customerFiles'
 
 describe('customerFiles', () => {
   it('accepts Zoho WorkDrive share URLs', () => {
-    expect(
-      isWorkDriveShareUrl('https://workdrive.zoho.com/folder/abc'),
-    ).toBe(true)
+    expect(isWorkDriveShareUrl('https://workdrive.zoho.com/folder/abc')).toBe(true)
     expect(
       isWorkDriveShareUrl('https://workdrive.zohoexternal.com/external/3iWUoMURXKC-OCgNc'),
     ).toBe(true)
-    expect(
-      isWorkDriveShareUrl('https://workdrive.zoho.eu/folder/xyz'),
-    ).toBe(true)
+    expect(isWorkDriveShareUrl('https://workdrive.zoho.eu/folder/xyz')).toBe(true)
     expect(isWorkDriveShareUrl('https://drive.google.com/file/d/abc/view')).toBe(false)
     expect(isWorkDriveShareUrl('https://example.com/file.pdf')).toBe(false)
   })
 
   it('sanitizes folder names for WorkDrive', () => {
     expect(suggestedDriveFolderName('Acme / Trading: LLC')).toBe('Acme Trading LLC')
+  })
+
+  it('matches CRM company names to quote clients despite suffixes/spacing', () => {
+    expect(normalizeCompanyKey('  Maxtherm  LLC ')).toBe('maxtherm llc')
+    expect(companiesMatch('Maxtherm LLC', 'Maxtherm')).toBe(true)
+    expect(companiesMatch('Jose Maria Mora', 'jose maria mora')).toBe(true)
+    expect(companiesMatch('Ello Pets Hotel & Day Care', 'Ello Pets Hotel and Day Care')).toBe(true)
+    expect(companiesMatch('Acme', 'Beta Trading')).toBe(false)
   })
 
   it('groups CRM docs and WorkDrive links into category folders', () => {
