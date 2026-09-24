@@ -22,7 +22,7 @@ import {
   QUOTE_STATUSES,
   VAT_RATE,
 } from '../lib/config'
-import type { Attachment, Client, Expense, Product, Quotation, QuoteTemplate } from '../lib/types'
+import type { Attachment, Client, Expense, Product, Quotation, QuoteTemplate, Vendor } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
@@ -74,6 +74,7 @@ import {
   loadQuoteSupplierInvoiceAttachments,
   saveSupplierInvoiceForQuote,
 } from '../lib/supplierInvoiceStore'
+import { listVendors } from '../lib/vendors'
 import {
   BASE_CURRENCY,
   CURRENCY_LABELS,
@@ -188,6 +189,7 @@ export default function QuotationsPage() {
   const [quotes, setQuotes] = useState<Quotation[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [vendors, setVendors] = useState<Vendor[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<StatusTab>('All')
   const [search, setSearch] = useState('')
@@ -220,6 +222,7 @@ export default function QuotationsPage() {
   const [supplierInvoiceExpenses, setSupplierInvoiceExpenses] = useState<Expense[]>([])
   const [supplierInvoiceParsing, setSupplierInvoiceParsing] = useState(false)
   const [supplierInvoiceHint, setSupplierInvoiceHint] = useState('')
+  const [vendorSuggest, setVendorSuggest] = useState(false)
   const [vatFoldOpen, setVatFoldOpen] = useState(false)
   const [vatFoldTarget, setVatFoldTarget] = useState('')
   const [clientSuggest, setClientSuggest] = useState(false)
@@ -238,15 +241,17 @@ export default function QuotationsPage() {
     setLoading(true)
     try {
       await ensureDivisionCataloguesSeeded().catch(() => undefined)
-      const [qRes, cRes, pRes] = await Promise.all([
+      const [qRes, cRes, pRes, vendorRows] = await Promise.all([
         db.from('quotations').select('*').order('created_at', { ascending: false }),
         db.from('clients').select('*').order('company_name'),
         db.from('products').select('*').eq('active', true).order('name'),
+        listVendors().catch(() => [] as Vendor[]),
       ])
       if (qRes.error) throw qRes.error
       if (cRes.error) throw cRes.error
       if (pRes.error) throw pRes.error
       setProducts((pRes.data || []) as Product[])
+      setVendors(vendorRows)
 
       const validityDays = Number(settings.quoteValidityDays || 14) || 14
       let rows = sortByDateDesc((qRes.data || []) as Quotation[])
@@ -1193,6 +1198,12 @@ export default function QuotationsPage() {
   const clientMatches = clients
     .filter((c) => c.company_name.toLowerCase().includes(form.client.toLowerCase()))
     .slice(0, 8)
+
+  const vendorMatches = useMemo(() => {
+    const q = supplierInvoiceForm.vendor.trim().toLowerCase()
+    if (!q) return vendors.slice(0, 8)
+    return vendors.filter((v) => v.company_name.toLowerCase().includes(q)).slice(0, 8)
+  }, [vendors, supplierInvoiceForm.vendor])
 
   function renderQuoteActions(q: Quotation) {
     return (
@@ -2457,22 +2468,78 @@ export default function QuotationsPage() {
             />
           </div>
           <div style={fieldStyle}>
-            <label style={labelStyle}>Supplier invoice no.</label>
+            <label style={labelStyle}>Invoice number (from their PDF)</label>
             <input
               style={inputStyle}
               value={supplierInvoiceForm.supplier_invoice_no}
               onChange={(e) =>
                 setSupplierInvoiceForm((f) => ({ ...f, supplier_invoice_no: e.target.value }))
               }
+              placeholder="e.g. INV-8821 — not a vendor ID"
             />
+            <p style={{ margin: '4px 0 0', fontSize: 11, color: colors.muted }}>
+              The number on the supplier’s tax invoice. You do not register a vendor number.
+            </p>
           </div>
-          <div style={fieldStyle}>
-            <label style={labelStyle}>Vendor *</label>
+          <div style={{ ...fieldStyle, position: 'relative' }}>
+            <label style={labelStyle}>Vendor company *</label>
             <input
               style={inputStyle}
               value={supplierInvoiceForm.vendor}
-              onChange={(e) => setSupplierInvoiceForm((f) => ({ ...f, vendor: e.target.value }))}
+              onChange={(e) => {
+                setSupplierInvoiceForm((f) => ({ ...f, vendor: e.target.value }))
+                setVendorSuggest(true)
+              }}
+              onFocus={() => setVendorSuggest(true)}
+              onBlur={() => window.setTimeout(() => setVendorSuggest(false), 150)}
+              placeholder="Company name from the invoice"
             />
+            {vendorSuggest && vendorMatches.length > 0 ? (
+              <div
+                style={{
+                  position: 'absolute',
+                  zIndex: 5,
+                  left: 0,
+                  right: 0,
+                  top: '100%',
+                  background: '#1a1d22',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: 8,
+                  maxHeight: 180,
+                  overflow: 'auto',
+                }}
+              >
+                {vendorMatches.map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '8px 12px',
+                      background: 'transparent',
+                      border: 'none',
+                      color: colors.text,
+                      cursor: 'pointer',
+                      fontSize: 13,
+                    }}
+                    onMouseDown={() => {
+                      setSupplierInvoiceForm((f) => ({ ...f, vendor: v.company_name }))
+                      setVendorSuggest(false)
+                    }}
+                  >
+                    {v.company_name}
+                    {v.trn ? (
+                      <span style={{ color: colors.muted2, marginLeft: 8 }}>TRN {v.trn}</span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <p style={{ margin: '4px 0 0', fontSize: 11, color: colors.muted }}>
+              Pick a registered vendor or type a new company — saving registers them under Vendors.
+            </p>
           </div>
           <div style={fieldStyle}>
             <label style={labelStyle}>Payment method</label>

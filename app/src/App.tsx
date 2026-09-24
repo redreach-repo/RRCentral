@@ -18,6 +18,7 @@ import WandersPage from './pages/WandersPage'
 import TemplatesPage from './pages/TemplatesPage'
 import ReportsPage from './pages/ReportsPage'
 import ExpensesPage from './pages/ExpensesPage'
+import VendorsPage from './pages/VendorsPage'
 import SettingsPage from './pages/SettingsPage'
 import DocumentPage from './pages/DocumentPage'
 import SiteLayout from './site/components/SiteLayout'
@@ -104,6 +105,7 @@ export default function App() {
               <Route path="templates" element={<TemplatesPage />} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="expenses" element={<ExpensesPage />} />
+              <Route path="vendors" element={<VendorsPage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

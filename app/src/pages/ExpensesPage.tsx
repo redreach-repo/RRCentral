@@ -3,7 +3,7 @@ import { format, parseISO } from 'date-fns'
 import { FileUp, Paperclip, Pencil, Plus, Trash2, Wallet } from 'lucide-react'
 import { db } from '../lib/db'
 import { PAYMENT_METHODS, VAT_RATE } from '../lib/config'
-import type { Attachment, Expense, Quotation } from '../lib/types'
+import type { Attachment, Expense, Quotation, Vendor } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
@@ -24,7 +24,9 @@ import {
   saveAttachmentsToQuote,
   syncQuoteSupplierCostFromExpense,
 } from '../lib/supplierInvoiceStore'
+import { ensureVendor, listVendors } from '../lib/vendors'
 import { isUndefinedColumnError } from '../lib/errors'
+import { Link } from 'react-router-dom'
 import {
   buttonDangerStyle,
   buttonPrimaryStyle,
@@ -110,6 +112,8 @@ export default function ExpensesPage() {
 
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [quotes, setQuotes] = useState<Quotation[]>([])
+  const [vendors, setVendors] = useState<Vendor[]>([])
+  const [vendorSuggest, setVendorSuggest] = useState(false)
   const [loading, setLoading] = useState(true)
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
@@ -126,13 +130,15 @@ export default function ExpensesPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [expRes, quoteRes] = await Promise.all([
+      const [expRes, quoteRes, vendorRows] = await Promise.all([
         db.from('expenses').select('*').order('date', { ascending: false }),
         db.from('quotations').select('*').order('date', { ascending: false }),
+        listVendors().catch(() => [] as Vendor[]),
       ])
       if (expRes.error) throw expRes.error
       setExpenses((expRes.data || []) as Expense[])
       if (!quoteRes.error) setQuotes((quoteRes.data || []) as Quotation[])
+      setVendors(vendorRows)
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Failed to load expenses', 'error')
     } finally {
@@ -163,6 +169,14 @@ export default function ExpensesPage() {
     () => quotes.find((q) => q.reference_number === form.quote_ref || q.quote_id === form.quote_ref) || null,
     [quotes, form.quote_ref],
   )
+
+  const vendorMatches = useMemo(() => {
+    const q = form.vendor.trim().toLowerCase()
+    if (!q) return vendors.slice(0, 8)
+    return vendors
+      .filter((v) => v.company_name.toLowerCase().includes(q))
+      .slice(0, 8)
+  }, [vendors, form.vendor])
 
   const profitPreview = useMemo(() => {
     if (!linkedQuote) return null
@@ -408,6 +422,16 @@ export default function ExpensesPage() {
         }
       }
 
+      try {
+        const trnMatch = form.notes.match(/Supplier TRN\s+(\d{9,15})/i)
+        await ensureVendor({
+          company_name: payload.vendor,
+          trn: trnMatch?.[1] || '',
+        })
+      } catch {
+        /* vendor registry is best-effort until SQL upgrade runs */
+      }
+
       await logActivity(
         editing ? 'update_expense' : 'save_expense',
         'expense',
@@ -610,20 +634,86 @@ export default function ExpensesPage() {
             />
           </div>
           <div style={fieldStyle}>
-            <label style={labelStyle}>Supplier invoice no.</label>
+            <label style={labelStyle}>Invoice number (from their PDF)</label>
             <input
               style={inputStyle}
               value={form.supplier_invoice_no}
               onChange={(e) => setForm((f) => ({ ...f, supplier_invoice_no: e.target.value }))}
+              placeholder="e.g. INV-8821 — not a vendor ID"
             />
+            <p style={{ margin: '4px 0 0', fontSize: 11, color: colors.muted }}>
+              The number printed on the supplier’s tax invoice. You do not need a CRM vendor number.
+            </p>
           </div>
-          <div style={fieldStyle}>
-            <label style={labelStyle}>Vendor *</label>
+          <div style={{ ...fieldStyle, position: 'relative' }}>
+            <label style={labelStyle}>Vendor company *</label>
             <input
               style={inputStyle}
               value={form.vendor}
-              onChange={(e) => setForm((f) => ({ ...f, vendor: e.target.value }))}
+              list="expense-vendor-suggestions"
+              onChange={(e) => {
+                setForm((f) => ({ ...f, vendor: e.target.value }))
+                setVendorSuggest(true)
+              }}
+              onFocus={() => setVendorSuggest(true)}
+              onBlur={() => window.setTimeout(() => setVendorSuggest(false), 150)}
+              placeholder="Company name — pick a registered vendor or type a new one"
             />
+            <datalist id="expense-vendor-suggestions">
+              {vendors.map((v) => (
+                <option key={v.id} value={v.company_name} />
+              ))}
+            </datalist>
+            {vendorSuggest && vendorMatches.length > 0 ? (
+              <div
+                style={{
+                  position: 'absolute',
+                  zIndex: 5,
+                  left: 0,
+                  right: 0,
+                  top: '100%',
+                  background: '#1a1d22',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: 8,
+                  maxHeight: 180,
+                  overflow: 'auto',
+                }}
+              >
+                {vendorMatches.map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '8px 12px',
+                      background: 'transparent',
+                      border: 'none',
+                      color: colors.text,
+                      cursor: 'pointer',
+                      fontSize: 13,
+                    }}
+                    onMouseDown={() => {
+                      setForm((f) => ({ ...f, vendor: v.company_name }))
+                      setVendorSuggest(false)
+                    }}
+                  >
+                    {v.company_name}
+                    {v.trn ? (
+                      <span style={{ color: colors.muted2, marginLeft: 8 }}>TRN {v.trn}</span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <p style={{ margin: '4px 0 0', fontSize: 11, color: colors.muted }}>
+              Register suppliers under{' '}
+              <Link to="/vendors" style={{ color: colors.accent }}>
+                Vendors
+              </Link>
+              . Saving also registers a new company name automatically.
+            </p>
           </div>
           <div style={fieldStyle}>
             <label style={labelStyle}>Category</label>

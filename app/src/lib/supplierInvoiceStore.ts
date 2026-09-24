@@ -5,6 +5,7 @@ import { expenseVatParts } from './finance'
 import { round2 } from './lineItems'
 import { supplierInvoiceProfit } from './supplierInvoiceParse'
 import type { Attachment, Expense, Quotation } from './types'
+import { ensureVendor } from './vendors'
 
 /** Attachments for supplier PDFs live on the quotation (not only on the expense). */
 export const QUOTE_SUPPLIER_INVOICE_ENTITY = 'quotation_supplier_invoice'
@@ -266,6 +267,16 @@ export async function saveSupplierInvoiceForQuote(opts: {
       files: opts.files,
       uploadedBy: opts.uploadedBy,
     })
+  }
+
+  try {
+    const trnMatch = String(opts.notes || '').match(/Supplier TRN\s+(\d{9,15})/i)
+    await ensureVendor({
+      company_name: opts.vendor,
+      trn: trnMatch?.[1] || '',
+    })
+  } catch {
+    /* vendor registry optional until SQL upgrade */
   }
 
   try {
