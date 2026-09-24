@@ -167,6 +167,8 @@ create table quotations (
   division_code text not null default '01',
   base_reference text not null default '',
   revision integer not null default 0,
+  /** Shared deal key — sibling branches share one supplier invoice / cost pool. */
+  deal_ref text not null default '',
   quote_id text not null default '',
   payment_terms text not null default '',
   moq text not null default '',
