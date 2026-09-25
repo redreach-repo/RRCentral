@@ -1,13 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Building2, Pencil, Plus, Trash2 } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
+import { Building2, ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react'
 import { db } from '../lib/db'
-import type { Vendor } from '../lib/types'
+import type { Attachment, Expense, Vendor } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
 import { logActivity } from '../lib/activity'
 import { errorMessage, isMissingRelationError } from '../lib/errors'
+import { expenseVatParts } from '../lib/finance'
+import { formatAED } from '../lib/money'
+import {
+  listExpenseAttachmentsForIds,
+  listExpensesForVendor,
+} from '../lib/supplierInvoiceStore'
 import { listVendors } from '../lib/vendors'
 import {
   buttonDangerStyle,
@@ -55,6 +62,10 @@ const emptyForm = (): VendorForm => ({
   notes: '',
 })
 
+function isHttpUrl(url: string): boolean {
+  return /^https?:\/\//i.test(String(url || '').trim())
+}
+
 export default function VendorsPage() {
   const { user } = useAuth()
   const { showToast } = useToast()
@@ -67,6 +78,9 @@ export default function VendorsPage() {
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Vendor | null>(null)
   const [missingTable, setMissingTable] = useState(false)
+  const [vendorInvoices, setVendorInvoices] = useState<Expense[]>([])
+  const [invoiceAttachments, setInvoiceAttachments] = useState<Attachment[]>([])
+  const [invoicesLoading, setInvoicesLoading] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -90,6 +104,42 @@ export default function VendorsPage() {
     void load()
   }, [load])
 
+  const loadVendorInvoices = useCallback(
+    async (companyName: string) => {
+      setInvoicesLoading(true)
+      setVendorInvoices([])
+      setInvoiceAttachments([])
+      try {
+        const rows = await listExpensesForVendor(companyName)
+        setVendorInvoices(rows)
+        const attachments = await listExpenseAttachmentsForIds(rows.map((r) => r.id))
+        setInvoiceAttachments(attachments)
+      } catch (e) {
+        showToast(errorMessage(e, 'Failed to load vendor invoices'), 'error')
+      } finally {
+        setInvoicesLoading(false)
+      }
+    },
+    [showToast],
+  )
+
+  const attachmentsByExpense = useMemo(() => {
+    const map = new Map<string, Attachment[]>()
+    for (const a of invoiceAttachments) {
+      const key = String(a.entity_ref || '').trim()
+      if (!key) continue
+      const list = map.get(key) || []
+      list.push(a)
+      map.set(key, list)
+    }
+    return map
+  }, [invoiceAttachments])
+
+  const invoiceTotal = useMemo(
+    () => vendorInvoices.reduce((sum, e) => sum + (Number(e.amount) || 0), 0),
+    [vendorInvoices],
+  )
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return vendors
@@ -106,6 +156,8 @@ export default function VendorsPage() {
   function openCreate() {
     setEditing(null)
     setForm(emptyForm())
+    setVendorInvoices([])
+    setInvoiceAttachments([])
     setOpen(true)
   }
 
@@ -124,6 +176,7 @@ export default function VendorsPage() {
       notes: v.notes || '',
     })
     setOpen(true)
+    void loadVendorInvoices(v.company_name)
   }
 
   async function save() {
@@ -298,7 +351,7 @@ export default function VendorsPage() {
         open={open}
         title={editing ? 'Edit vendor' : 'Register vendor'}
         onClose={() => setOpen(false)}
-        width={640}
+        width={editing ? 760 : 640}
       >
         <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.45 }}>
           Enter the supplier’s <strong style={{ color: colors.text }}>company name</strong> as it
@@ -390,6 +443,110 @@ export default function VendorsPage() {
             onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
           />
         </div>
+
+        {editing ? (
+          <div style={{ marginTop: 8, marginBottom: 16 }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'baseline',
+                gap: 12,
+                marginBottom: 8,
+              }}
+            >
+              <label style={{ ...labelStyle, marginBottom: 0 }}>Supplier invoices</label>
+              {!invoicesLoading && vendorInvoices.length > 0 ? (
+                <span style={{ fontSize: 12, color: colors.muted }}>
+                  {vendorInvoices.length} invoice{vendorInvoices.length === 1 ? '' : 's'} ·{' '}
+                  {formatAED(invoiceTotal)} total
+                </span>
+              ) : null}
+            </div>
+            {invoicesLoading ? (
+              <div style={{ fontSize: 13, color: colors.muted }}>Loading invoices…</div>
+            ) : vendorInvoices.length === 0 ? (
+              <div
+                style={{
+                  fontSize: 13,
+                  color: colors.muted,
+                  lineHeight: 1.45,
+                  padding: '10px 12px',
+                  background: colors.card,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: 8,
+                }}
+              >
+                No supplier invoices linked to this company name yet. Save one from a quotation or
+                Expenses — match the vendor name exactly.
+              </div>
+            ) : (
+              <div style={{ ...tableWrapStyle, maxHeight: 280, overflow: 'auto', borderRadius: 8 }}>
+                <table style={tableStyle}>
+                  <thead>
+                    <tr>
+                      <th style={thStyle}>Date</th>
+                      <th style={thStyle}>Invoice #</th>
+                      <th style={thStyle}>Total</th>
+                      <th style={thStyle}>Quote</th>
+                      <th style={thStyle}>File</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {vendorInvoices.map((e) => {
+                      const parts = expenseVatParts(e)
+                      const files = attachmentsByExpense.get(e.id) || []
+                      const links = files.filter((a) => isHttpUrl(a.url))
+                      return (
+                        <tr key={e.id}>
+                          <td style={tdStyle}>
+                            {e.date ? format(parseISO(e.date.slice(0, 10)), 'dd MMM yyyy') : '—'}
+                          </td>
+                          <td style={tdStyle}>{e.supplier_invoice_no || '—'}</td>
+                          <td style={tdStyle}>
+                            {formatAED(parts.inclusive)}
+                            {parts.vat > 0 ? (
+                              <div style={{ fontSize: 11, color: colors.muted2 }}>
+                                VAT {formatAED(parts.vat)}
+                              </div>
+                            ) : null}
+                          </td>
+                          <td style={tdStyle}>{e.quote_ref || e.references_text || '—'}</td>
+                          <td style={tdStyle}>
+                            {links.length === 0 ? (
+                              <span style={{ color: colors.muted2 }}>—</span>
+                            ) : (
+                              links.map((a) => (
+                                <a
+                                  key={a.id}
+                                  href={a.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    color: '#c1121f',
+                                    fontSize: 12,
+                                    marginRight: 8,
+                                  }}
+                                >
+                                  <ExternalLink size={12} />
+                                  {a.file_name || 'Open'}
+                                </a>
+                              ))
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ) : null}
+
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setOpen(false)}>
             Cancel
