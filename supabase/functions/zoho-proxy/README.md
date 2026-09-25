@@ -11,6 +11,14 @@ npx supabase link --project-ref YOUR_RR_CENTRAL_REF
 npx supabase functions deploy zoho-proxy
 ```
 
+After deploying, regenerate the Zoho refresh token with Mail **and** WorkDrive scopes if you use
+**Dashboard → Scan & file to WorkDrive**:
+
+- `ZohoMail.messages.READ`, `ZohoMail.folders.READ`, `ZohoMail.accounts.READ`
+- `WorkDrive.files.CREATE`, `WorkDrive.files.READ`, `WorkDrive.links.CREATE`
+
+Set Settings → WorkDrive auto-file = **yes** and Customers root folder URL/ID.
+
 ## Deploy (Supabase Dashboard)
 
 Edge Functions → **Create a new function**. Three fields must match exactly:
