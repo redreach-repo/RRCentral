@@ -6,6 +6,7 @@ import {
   FileText,
   FolderOpen,
   Link2,
+  MessageCircle,
   Plus,
   Receipt,
   Trash2,
@@ -22,6 +23,7 @@ import StatusPill from '../components/StatusPill'
 import { logActivity } from '../lib/activity'
 import { errorMessage, isMissingRelationError } from '../lib/errors'
 import {
+  COMMUNICATION_KINDS,
   CUSTOMER_FOLDER_SECTIONS,
   deleteCustomerDocument,
   isWorkDriveShareUrl,
@@ -31,6 +33,7 @@ import {
   updateCrmDriveFolderUrl,
   type CustomerFolder,
   type CustomerFolderItem,
+  type FolderSectionId,
 } from '../lib/customerFiles'
 import { useCompactCrm } from '../hooks/useMediaQuery'
 import resp from '../styles/crmResponsive.module.css'
@@ -59,7 +62,7 @@ function formatWhen(value?: string | null): string {
   }
 }
 
-function sectionIcon(sectionId: 'quotation' | 'invoice' | 'delivery_note') {
+function sectionIcon(sectionId: FolderSectionId) {
   switch (sectionId) {
     case 'quotation':
       return <FileText size={16} />
@@ -67,18 +70,31 @@ function sectionIcon(sectionId: 'quotation' | 'invoice' | 'delivery_note') {
       return <Receipt size={16} />
     case 'delivery_note':
       return <Truck size={16} />
+    case 'communication':
+      return <MessageCircle size={16} />
   }
 }
 
-type SignedSection = (typeof CUSTOMER_FOLDER_SECTIONS)[number]
+type FolderSection = (typeof CUSTOMER_FOLDER_SECTIONS)[number]
 
-const emptyAddForm = (section?: SignedSection) => ({
-  category: (section?.signedCategory || 'signed_quotation') as CustomerDocumentCategory,
-  title: section?.signedTitle || '',
-  driveUrl: '',
-  relatedRef: '',
-  notes: 'Signed copy',
-})
+const emptyAddForm = (section?: FolderSection) => {
+  const isComms = section?.mode === 'communication'
+  return {
+    category: (isComms
+      ? 'email'
+      : section?.signedCategory || 'signed_quotation') as CustomerDocumentCategory,
+    title: isComms ? '' : section?.uploadTitle || '',
+    driveUrl: '',
+    relatedRef: '',
+    notes: isComms ? '' : 'Signed copy',
+  }
+}
+
+function itemKindLabel(item: CustomerFolderItem): string {
+  if (item.kind === 'crm') return 'In CRM'
+  if (item.section === 'communication') return 'WorkDrive'
+  return 'Signed · WorkDrive'
+}
 
 export default function CustomerFilesPage() {
   const { user } = useAuth()
@@ -98,11 +114,11 @@ export default function CustomerFilesPage() {
   const [driveFolderUrl, setDriveFolderUrl] = useState('')
   const [savingFolder, setSavingFolder] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
-  const [addSection, setAddSection] = useState<SignedSection>(CUSTOMER_FOLDER_SECTIONS[0])
+  const [addSection, setAddSection] = useState<FolderSection>(CUSTOMER_FOLDER_SECTIONS[0])
   const [savingDoc, setSavingDoc] = useState(false)
   const [addForm, setAddForm] = useState(() => emptyAddForm(CUSTOMER_FOLDER_SECTIONS[0]))
 
-  function openSignedUpload(section: SignedSection) {
+  function openUpload(section: FolderSection) {
     setAddSection(section)
     setAddForm(emptyAddForm(section))
     setAddOpen(true)
@@ -213,6 +229,7 @@ export default function CustomerFilesPage() {
       return
     }
     setSavingDoc(true)
+    const isComms = addSection.mode === 'communication'
     try {
       await saveCustomerDriveLink({
         company: selected,
@@ -231,7 +248,7 @@ export default function CustomerFilesPage() {
         `${addForm.category}: ${addForm.title}`,
         who,
       )
-      showToast('Signed copy linked', 'success')
+      showToast(isComms ? 'Communication linked' : 'Signed copy linked', 'success')
       setAddOpen(false)
       setAddForm(emptyAddForm(addSection))
       await openCompany(selected)
@@ -258,13 +275,16 @@ export default function CustomerFilesPage() {
     }
   }
 
+  const isCommsModal = addSection.mode === 'communication'
+
   return (
     <div style={pageStyle}>
       <div style={toolbarStyle}>
         <div>
           <h1 style={pageTitleStyle}>Customer files</h1>
           <p style={pageSubtitleStyle}>
-            One folder per customer — quotations, invoices, delivery notes, and signed WorkDrive copies
+            One folder per customer — quotes, invoices, delivery notes, communications, and signed
+            WorkDrive copies
           </p>
         </div>
       </div>
@@ -341,7 +361,7 @@ export default function CustomerFilesPage() {
             <EmptyState
               icon={<FolderOpen size={22} />}
               title="Open a customer folder"
-              subtitle="Pick a company to see quotations, invoices, and delivery notes — and attach signed copies from Zoho WorkDrive."
+              subtitle="Pick a company to see quotations, invoices, delivery notes, and communications — and attach Zoho WorkDrive share links."
             />
           ) : loadingFolder ? (
             <div style={{ ...cardStyle, color: colors.muted }}>Opening folder…</div>
@@ -450,7 +470,7 @@ export default function CustomerFilesPage() {
                     </button>
                   </div>
                   <p style={{ margin: '8px 0 0', fontSize: 12, color: colors.muted, lineHeight: 1.45 }}>
-                    Keep signed quotes, invoices, and delivery notes in Zoho WorkDrive, then paste
+                    Keep signed docs, emails, WhatsApp chats, and notes in Zoho WorkDrive, then paste
                     share links in each section below. Set a shared Customers root folder in Settings →
                     Customer WorkDrive.
                   </p>
@@ -481,9 +501,9 @@ export default function CustomerFilesPage() {
                         type="button"
                         style={buttonSecondaryStyle}
                         disabled={missingTable}
-                        onClick={() => openSignedUpload(cat)}
+                        onClick={() => openUpload(cat)}
                       >
-                        <Plus size={14} /> {cat.signedButton}
+                        <Plus size={14} /> {cat.uploadButton}
                       </button>
                     </div>
                     {rows.length === 0 ? (
@@ -501,9 +521,9 @@ export default function CustomerFilesPage() {
                             fontSize: 13,
                             textDecoration: 'underline',
                           }}
-                          onClick={() => openSignedUpload(cat)}
+                          onClick={() => openUpload(cat)}
                         >
-                          {cat.signedButton.toLowerCase()}
+                          {cat.uploadButton.toLowerCase()}
                         </button>
                         .
                       </p>
@@ -525,7 +545,7 @@ export default function CustomerFilesPage() {
                             <div style={{ minWidth: 0, flex: 1 }}>
                               <div style={{ fontWeight: 600, fontSize: 13 }}>{item.title}</div>
                               <div style={{ fontSize: 12, color: colors.muted2, marginTop: 2 }}>
-                                {item.kind === 'crm' ? 'In CRM' : 'Signed · WorkDrive'}
+                                {itemKindLabel(item)}
                                 {item.subtitle ? ` · ${item.subtitle}` : ''}
                                 {item.date ? ` · ${formatWhen(item.date)}` : ''}
                               </div>
@@ -575,20 +595,45 @@ export default function CustomerFilesPage() {
 
       <Modal
         open={addOpen}
-        title={addSection.signedTitle}
+        title={addSection.uploadTitle}
         onClose={() => setAddOpen(false)}
         width={520}
       >
         <p style={{ color: colors.muted, fontSize: 14, marginTop: 0, lineHeight: 1.5 }}>
-          {addSection.signedHint} The CRM only stores the link — not the file bytes.
+          {addSection.uploadHint} The CRM only stores the link — not the file bytes.
         </p>
+        {isCommsModal ? (
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Type *</label>
+            <select
+              style={inputStyle}
+              value={addForm.category}
+              onChange={(e) =>
+                setAddForm((f) => ({
+                  ...f,
+                  category: e.target.value as CustomerDocumentCategory,
+                }))
+              }
+            >
+              {COMMUNICATION_KINDS.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
         <div style={fieldStyle}>
           <label style={labelStyle}>Title *</label>
           <input
             style={inputStyle}
             value={addForm.title}
             onChange={(e) => setAddForm((f) => ({ ...f, title: e.target.value }))}
-            placeholder={addSection.signedTitle}
+            placeholder={
+              isCommsModal
+                ? 'e.g. Email thread – uniforms RFQ'
+                : addSection.uploadTitle
+            }
           />
         </div>
         <div style={fieldStyle}>
@@ -606,9 +651,24 @@ export default function CustomerFilesPage() {
             style={inputStyle}
             value={addForm.relatedRef}
             onChange={(e) => setAddForm((f) => ({ ...f, relatedRef: e.target.value }))}
-            placeholder="e.g. RR-01-26001 or DN-01-26001"
+            placeholder={
+              isCommsModal
+                ? 'e.g. RR-01-26001 or contact name'
+                : 'e.g. RR-01-26001 or DN-01-26001'
+            }
           />
         </div>
+        {isCommsModal ? (
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Notes (optional)</label>
+            <input
+              style={inputStyle}
+              value={addForm.notes}
+              onChange={(e) => setAddForm((f) => ({ ...f, notes: e.target.value }))}
+              placeholder="e.g. Exported from WhatsApp · Mar 2026"
+            />
+          </div>
+        ) : null}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setAddOpen(false)}>
             Cancel
@@ -619,7 +679,7 @@ export default function CustomerFilesPage() {
             disabled={savingDoc}
             onClick={() => void addDriveFile()}
           >
-            {savingDoc ? 'Saving…' : 'Save signed copy'}
+            {savingDoc ? 'Saving…' : isCommsModal ? 'Save communication' : 'Save signed copy'}
           </button>
         </div>
       </Modal>
