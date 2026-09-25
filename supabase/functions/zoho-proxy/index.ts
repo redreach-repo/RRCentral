@@ -1,9 +1,9 @@
-// Zoho API proxy — browsers cannot call Zoho OAuth/Mail APIs directly (CORS → 405).
+// Zoho API proxy — browsers cannot call Zoho OAuth/Mail/WorkDrive APIs directly (CORS → 405).
 // Deploy: supabase functions deploy zoho-proxy --project-ref <your-ref>
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
 const ALLOWED_HOST_RE =
-  /^([a-z0-9-]+\.)*(zoho\.com|zoho\.eu|zoho\.in|zoho\.com\.au|zohoapis\.com|zohoapis\.eu|zohoapis\.in)$/i
+  /^([a-z0-9-]+\.)*(zoho\.com|zoho\.eu|zoho\.in|zoho\.com\.au|zohoapis\.com|zohoapis\.eu|zohoapis\.in|upload\.zoho\.com|upload\.zoho\.eu|upload\.zoho\.in)$/i
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -32,6 +32,14 @@ function assertZohoUrl(raw: string): URL {
   return url
 }
 
+function base64ToBytes(b64: string): Uint8Array {
+  const cleaned = b64.replace(/^data:[^;]+;base64,/, "").replace(/\s+/g, "")
+  const bin = atob(cleaned)
+  const out = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
+  return out
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
@@ -51,6 +59,12 @@ Deno.serve(async (req: Request) => {
       method?: string
       headers?: Record<string, string>
       body?: string | null
+      /** WorkDrive multipart upload (base64 file body). */
+      parentId?: string
+      filename?: string
+      contentBase64?: string
+      contentType?: string
+      authorization?: string
     }
 
     const action = payload.action || "token"
@@ -103,8 +117,43 @@ Deno.serve(async (req: Request) => {
       } catch {
         /* keep text */
       }
-      // Always HTTP 200 from the edge function so supabase.functions.invoke
-      // surfaces Zoho's real status/body to the browser client.
+      return json(200, { ok: res.ok, status: res.status, body: parsed })
+    }
+
+    if (action === "upload") {
+      const target = assertZohoUrl(
+        String(payload.url || "https://www.zohoapis.com/workdrive/api/v1/upload"),
+      )
+      const parentId = String(payload.parentId || "").trim()
+      const filename = String(payload.filename || "file.bin").trim()
+      const auth = String(payload.authorization || payload.headers?.Authorization || "").trim()
+      const contentBase64 = String(payload.contentBase64 || "")
+      if (!parentId) return json(400, { error: "parentId is required" })
+      if (!auth) return json(400, { error: "authorization is required" })
+      if (!contentBase64) return json(400, { error: "contentBase64 is required" })
+
+      const bytes = base64ToBytes(contentBase64)
+      const form = new FormData()
+      form.append("parent_id", parentId)
+      form.append("override-name-exist", "true")
+      form.append(
+        "content",
+        new Blob([bytes], { type: payload.contentType || "application/octet-stream" }),
+        filename,
+      )
+
+      const res = await fetch(target.toString(), {
+        method: "POST",
+        headers: { Authorization: auth },
+        body: form,
+      })
+      const text = await res.text()
+      let parsed: unknown = text
+      try {
+        parsed = JSON.parse(text)
+      } catch {
+        /* keep text */
+      }
       return json(200, { ok: res.ok, status: res.status, body: parsed })
     }
 

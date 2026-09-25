@@ -6,7 +6,10 @@ RRCentral’s React app integrates **Zoho Calendar** and **Zoho Mail** (`app/src
 
 Mail supports:
 - **Send** from CRM / documents (`sendZohoMail`)
-- **Inbox read** on the Dashboard (`listZohoInboxMessages`), matched to CRM contacts by email
+- **Inbox + Sent read** on the Dashboard (`listZohoInboxMessages` / `listZohoSentMessages`), matched to CRM contacts by email
+- **Scan & file to WorkDrive** (`scanAndFileCrmEmails`): for matched messages, create the customer folder under the Customers root (if needed), upload an HTML archive of the email, and link it under Customer files → Communications
+
+WorkDrive auto-file requires Settings → WorkDrive = yes, a Customers root folder URL/ID, Supabase `zoho-proxy` deployed with the upload action, and OAuth scopes including `WorkDrive.files.CREATE` + `WorkDrive.links.CREATE`.
 
 There is **no** Zoho CRM Lead/module sync for:
 

@@ -105,6 +105,14 @@ const CUSTOMER_DRIVE_KEYS = [
     key: 'customerWorkDriveRootUrl',
     label: 'Customers root folder URL (Zoho WorkDrive)',
   },
+  {
+    key: 'zohoWorkDriveRootFolderId',
+    label: 'Customers root folder ID (optional if URL contains /folder/…)',
+  },
+  {
+    key: 'zohoWorkDriveEnabled',
+    label: 'WorkDrive auto-file emails (yes/no)',
+  },
 ] as const
 
 const WANDERS_KEYS = [
@@ -149,10 +157,12 @@ const ZOHO_KEYS = [
   { key: 'zohoAccountsDomain', label: 'Accounts domain' },
   { key: 'zohoCalendarDomain', label: 'Calendar domain' },
   { key: 'zohoMailDomain', label: 'Mail domain' },
+  { key: 'zohoWorkDriveApiDomain', label: 'WorkDrive API domain (optional)' },
   { key: 'zohoCalendarUid', label: 'Calendar UID (optional)' },
   { key: 'zohoMailAccountId', label: 'Mail account ID (optional)' },
   { key: 'zohoCalendarEnabled', label: 'Calendar sync (yes/no)' },
   { key: 'zohoMailEnabled', label: 'Mail send + inbox (yes/no)' },
+  { key: 'zohoWorkDriveEnabled', label: 'WorkDrive auto-file (yes/no)' },
 ] as const
 
 type UserForm = { email: string; name: string; role: UserRole; active: boolean }
@@ -651,7 +661,7 @@ export default function SettingsPage() {
       )}
       {renderSection('System', 'System', SYSTEM_KEYS)}
       {renderSection(
-        'Customer WorkDrive (files stay on Zoho WorkDrive — CRM stores links only)',
+        'Customer WorkDrive (files stay on Zoho WorkDrive — CRM stores links only). Enable WorkDrive auto-file and set the Customers root so Dashboard → Scan & file can archive matched emails.',
         'Customer WorkDrive',
         CUSTOMER_DRIVE_KEYS,
       )}

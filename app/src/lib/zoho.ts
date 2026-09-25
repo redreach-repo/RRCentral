@@ -691,6 +691,29 @@ export async function listZohoSentMessages(
   return listZohoFolderMessages(settings, { folderId, limit: opts?.limit, status: 'all' })
 }
 
+/** HTML body for a message (for archival to WorkDrive). */
+export async function getZohoMessageHtml(
+  settings: ZohoSettings,
+  opts: { folderId: string; messageId: string },
+): Promise<string> {
+  if (!isZohoMailEnabled(settings)) {
+    throw new Error('Zoho Mail is disabled in Settings')
+  }
+  const account = await resolveMailAccount(settings)
+  const res = await zohoFetch(
+    settings,
+    `${mailDomain(settings)}/api/accounts/${encodeURIComponent(account.accountId)}/folders/${encodeURIComponent(opts.folderId)}/messages/${encodeURIComponent(opts.messageId)}/content`,
+  )
+  const data = (await res.json().catch(() => ({}))) as {
+    data?: { content?: string; messageId?: string }
+    status?: { description?: string }
+  }
+  if (!res.ok) {
+    throw new Error(data.status?.description || `Get message content failed (${res.status})`)
+  }
+  return String(data.data?.content || '').trim()
+}
+
 export function zohoMailWebUrl(settings: ZohoSettings): string {
   return `${mailDomain(settings)}/`
 }
