@@ -76,6 +76,33 @@ export async function loadQuoteSupplierExpenses(
   })
 }
 
+/** Match expenses to a vendor registry row by company name (case-insensitive). */
+export function expensesMatchVendor(expenses: Expense[], companyName: string): Expense[] {
+  const key = String(companyName || '').trim().toLowerCase()
+  if (!key) return []
+  return expenses
+    .filter((e) => String(e.vendor || '').trim().toLowerCase() === key)
+    .slice()
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+}
+
+/** All supplier invoices / expenses recorded under this vendor company name. */
+export async function listExpensesForVendor(companyName: string): Promise<Expense[]> {
+  const { data, error } = await db.from('expenses').select('*').order('date', { ascending: false })
+  if (error) throw error
+  return expensesMatchVendor((data || []) as Expense[], companyName)
+}
+
+/** PDF / WorkDrive links saved on expense rows (entity_type = expense). */
+export async function listExpenseAttachmentsForIds(expenseIds: string[]): Promise<Attachment[]> {
+  const ids = expenseIds.map((id) => String(id || '').trim()).filter(Boolean)
+  if (!ids.length) return []
+  const { data, error } = await db.from('attachments').select('*').eq('entity_type', 'expense')
+  if (error) throw error
+  const set = new Set(ids)
+  return ((data || []) as Attachment[]).filter((a) => set.has(String(a.entity_ref || '').trim()))
+}
+
 export async function loadDealQuotes(dealRef: string): Promise<Quotation[]> {
   const key = String(dealRef || '').trim()
   if (!key) return []

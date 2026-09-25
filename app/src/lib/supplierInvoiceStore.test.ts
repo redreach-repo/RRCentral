@@ -1,10 +1,25 @@
 import { describe, expect, it } from 'vitest'
+import type { Expense } from './types'
 import {
   expenseReportDescription,
+  expensesMatchVendor,
   formatSupplierExpenseDescription,
   quoteAttachmentRefs,
   QUOTE_SUPPLIER_INVOICE_ENTITY,
 } from './supplierInvoiceStore'
+
+function expense(partial: Partial<Expense> & Pick<Expense, 'id' | 'vendor'>): Expense {
+  return {
+    date: null,
+    category: '',
+    amount: 0,
+    payment_method: '',
+    references_text: '',
+    notes: '',
+    created_at: '',
+    ...partial,
+  }
+}
 
 describe('supplierInvoiceStore', () => {
   it('uses a dedicated attachment entity type on the quotation', () => {
@@ -44,5 +59,16 @@ describe('supplierInvoiceStore', () => {
         references_text: 'RR-01-26003',
       }),
     ).toBe('Payment to ACME Uniforms LLC for RR-01-26003')
+  })
+
+  it('lists expenses for a vendor by company name (case-insensitive)', () => {
+    const rows = [
+      expense({ id: '1', vendor: 'ACME Uniforms LLC', date: '2026-03-01', amount: 100 }),
+      expense({ id: '2', vendor: 'acme uniforms llc', date: '2026-04-01', amount: 200 }),
+      expense({ id: '3', vendor: 'Other Co', date: '2026-05-01', amount: 50 }),
+    ]
+    const matched = expensesMatchVendor(rows, 'Acme Uniforms LLC')
+    expect(matched.map((e) => e.id)).toEqual(['2', '1'])
+    expect(expensesMatchVendor(rows, '')).toEqual([])
   })
 })
