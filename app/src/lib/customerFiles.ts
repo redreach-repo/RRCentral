@@ -20,14 +20,14 @@ export const COMMUNICATION_KINDS: {
 ]
 
 export const CUSTOMER_FOLDER_SECTIONS: {
-  id: 'quotation' | 'invoice' | 'delivery_note' | 'communication'
+  id: 'quotation' | 'invoice' | 'delivery_note' | 'communication' | 'purchasing'
   label: string
   hint: string
   uploadButton: string
   uploadTitle: string
   uploadHint: string
   /** Signed-doc sections use a fixed category; communications pick a kind. */
-  mode: 'signed' | 'communication'
+  mode: 'signed' | 'communication' | 'purchasing'
   signedCategory?: 'signed_quotation' | 'signed_invoice' | 'signed_delivery_note'
 }[] = [
   {
@@ -70,6 +70,15 @@ export const CUSTOMER_FOLDER_SECTIONS: {
     uploadHint:
       'Save the email export, WhatsApp chat, or notes PDF in Zoho WorkDrive, then paste the share link here.',
   },
+  {
+    id: 'purchasing',
+    label: 'Purchasing',
+    hint: 'Supplier invoices linked from quotes (WorkDrive)',
+    mode: 'purchasing',
+    uploadButton: 'Add supplier invoice',
+    uploadTitle: 'Supplier invoice',
+    uploadHint: 'Paste the Zoho WorkDrive share link for the supplier invoice PDF.',
+  },
 ]
 
 /** @deprecated Use CUSTOMER_FOLDER_SECTIONS — kept for older imports. */
@@ -111,6 +120,22 @@ export type CustomerFolder = {
   missingDocumentsTable?: boolean
 }
 
+export type RelatedRefOption = { value: string; label: string }
+
+export type FolderChecklistItem = {
+  id: string
+  level: 'warn' | 'info'
+  message: string
+}
+
+export type FolderFileCounts = {
+  workdrive: number
+  signed: number
+  communication: number
+  purchasing: number
+  hasFolderUrl: boolean
+}
+
 export function communicationKindLabel(category: CustomerDocumentCategory): string {
   return COMMUNICATION_KINDS.find((k) => k.id === category)?.label || 'Communication'
 }
@@ -132,6 +157,8 @@ export function sectionForCategory(category: CustomerDocumentCategory): FolderSe
     case 'call_notes':
     case 'communication':
       return 'communication'
+    case 'supplier_invoice':
+      return 'purchasing'
     default:
       return null
   }
@@ -159,6 +186,142 @@ export function suggestedDriveFolderName(company: string): string {
     .replace(/[\\/:*?"<>|]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+/** Suggested title when linking a WorkDrive file (naming convention helper). */
+export function suggestedDocumentTitle(
+  category: CustomerDocumentCategory,
+  relatedRef?: string,
+  company?: string,
+): string {
+  const ref = String(relatedRef || '').trim()
+  const co = String(company || '').trim()
+  switch (category) {
+    case 'signed_quotation':
+      return ref ? `Signed ${ref}` : 'Signed quotation'
+    case 'signed_invoice':
+      return ref ? `Signed ${ref}` : 'Signed invoice'
+    case 'signed_delivery_note':
+      return ref ? `Signed ${ref}` : 'Signed delivery note'
+    case 'email':
+      return ref ? `Email – ${ref}` : co ? `Email – ${co}` : 'Email thread'
+    case 'whatsapp':
+      return ref ? `WhatsApp – ${ref}` : co ? `WhatsApp – ${co}` : 'WhatsApp chat'
+    case 'call_notes':
+      return ref ? `Call notes – ${ref}` : co ? `Call notes – ${co}` : 'Call / meeting notes'
+    case 'communication':
+      return ref ? `Communication – ${ref}` : co ? `Communication – ${co}` : 'Communication'
+    case 'supplier_invoice':
+      return ref ? `Supplier invoice – ${ref}` : 'Supplier invoice'
+    default:
+      return ref || 'WorkDrive file'
+  }
+}
+
+export function relatedRefOptionsForSection(
+  folder: CustomerFolder | null | undefined,
+  sectionId: FolderSectionId,
+): RelatedRefOption[] {
+  if (!folder) return []
+  const seen = new Set<string>()
+  const opts: RelatedRefOption[] = []
+  const push = (value: string, label: string) => {
+    const v = value.trim()
+    if (!v || seen.has(v)) return
+    seen.add(v)
+    opts.push({ value: v, label })
+  }
+
+  if (sectionId === 'quotation' || sectionId === 'communication' || sectionId === 'purchasing') {
+    for (const item of folder.bySection.quotation.filter((i) => i.kind === 'crm')) {
+      push(item.relatedRef || item.title, `${item.title}${item.status ? ` · ${item.status}` : ''}`)
+    }
+  }
+  if (sectionId === 'invoice' || sectionId === 'communication') {
+    for (const item of folder.bySection.invoice.filter((i) => i.kind === 'crm')) {
+      push(item.relatedRef || item.title, `${item.title}${item.status ? ` · ${item.status}` : ''}`)
+    }
+  }
+  if (sectionId === 'delivery_note' || sectionId === 'communication') {
+    for (const item of folder.bySection.delivery_note.filter((i) => i.kind === 'crm')) {
+      push(item.relatedRef || item.title, `${item.title}${item.status ? ` · ${item.status}` : ''}`)
+    }
+  }
+  return opts
+}
+
+export function folderFileCounts(folder: CustomerFolder | null | undefined): FolderFileCounts {
+  const items = folder?.items || []
+  const workdrive = items.filter((i) => i.kind === 'workdrive')
+  return {
+    workdrive: workdrive.length,
+    signed: workdrive.filter((i) =>
+      ['quotation', 'invoice', 'delivery_note'].includes(i.section),
+    ).length,
+    communication: folder?.bySection.communication.length || 0,
+    purchasing: folder?.bySection.purchasing.length || 0,
+    hasFolderUrl: Boolean(folder?.crm?.drive_folder_url?.trim()),
+  }
+}
+
+/** Soft nudges for missing folder link or awarded quotes without a signed copy. */
+export function buildFolderChecklist(folder: CustomerFolder): FolderChecklistItem[] {
+  const items: FolderChecklistItem[] = []
+  if (!folder.crm?.drive_folder_url?.trim()) {
+    items.push({
+      id: 'no-folder',
+      level: 'warn',
+      message:
+        'No WorkDrive folder linked yet — create the customer folder in Zoho and paste the URL above.',
+    })
+  }
+
+  const awarded = folder.bySection.quotation.filter(
+    (i) => i.kind === 'crm' && /award|won|accepted|confirmed/i.test(String(i.status || '')),
+  )
+  const signedRefs = new Set(
+    folder.bySection.quotation
+      .filter((i) => i.kind === 'workdrive')
+      .map((i) => String(i.relatedRef || i.title || '').trim().toLowerCase())
+      .filter(Boolean),
+  )
+  for (const q of awarded) {
+    const ref = String(q.relatedRef || q.title || '').trim()
+    if (!ref) continue
+    const key = ref.toLowerCase()
+    const hasSigned =
+      signedRefs.has(key) ||
+      folder.bySection.quotation.some(
+        (i) =>
+          i.kind === 'workdrive' &&
+          (String(i.title || '').toLowerCase().includes(key) ||
+            String(i.relatedRef || '').toLowerCase() === key),
+      )
+    if (!hasSigned) {
+      items.push({
+        id: `signed-missing-${ref}`,
+        level: 'info',
+        message: `${ref} is ${q.status} — link the signed quote on WorkDrive when you have it.`,
+      })
+    }
+  }
+  return items
+}
+
+/** Filter folder items by a free-text query (title, subtitle, related ref, category). */
+export function filterFolderItems(
+  items: CustomerFolderItem[],
+  query: string,
+): CustomerFolderItem[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return items
+  return items.filter((item) =>
+    [item.title, item.subtitle, item.relatedRef, item.category, item.status]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+      .includes(q),
+  )
 }
 
 /** Normalize company names so CRM ↔ quote/invoice client mismatches still match. */
@@ -261,21 +424,24 @@ export function buildCustomerFolder(opts: {
 
   for (const doc of opts.documents) {
     const section = sectionForCategory(doc.category)
-    if (!section) continue // hide payment slips / supplier / other from this folder
+    if (!section) continue // hide payment slips / other from this folder
     const signed =
       doc.category.startsWith('signed_') || /signed/i.test(doc.title) || /signed/i.test(doc.notes)
     const isComms = section === 'communication'
+    const isPurchasing = section === 'purchasing'
+    const parts = [
+      isComms ? communicationKindLabel(doc.category) : null,
+      doc.related_ref ? `Ref ${doc.related_ref}` : null,
+      doc.notes ||
+        (signed ? 'Signed copy on WorkDrive' : isPurchasing ? 'Supplier invoice on WorkDrive' : null),
+    ].filter(Boolean)
     items.push({
       key: `doc-${doc.id}`,
       kind: 'workdrive',
       category: doc.category,
       section,
-      title: doc.title || doc.file_name || (isComms ? 'Communication' : 'Signed copy'),
-      subtitle: isComms
-        ? [communicationKindLabel(doc.category), doc.notes].filter(Boolean).join(' · ') || undefined
-        : signed
-          ? doc.notes || 'Signed copy on WorkDrive'
-          : doc.notes || undefined,
+      title: doc.title || doc.file_name || (isComms ? 'Communication' : isPurchasing ? 'Supplier invoice' : 'Signed copy'),
+      subtitle: parts.length ? parts.join(' · ') : undefined,
       date: doc.uploaded_at,
       driveUrl: doc.drive_url,
       documentId: doc.id,
@@ -290,6 +456,7 @@ export function buildCustomerFolder(opts: {
     invoice: [],
     delivery_note: [],
     communication: [],
+    purchasing: [],
   }
   for (const item of items) {
     bySection[item.section].push(item)
@@ -301,6 +468,7 @@ export function buildCustomerFolder(opts: {
     invoice: bySection.invoice,
     delivery_note: bySection.delivery_note,
     communication: bySection.communication,
+    purchasing: bySection.purchasing,
   }
 
   return { company, crm: opts.crm, items, bySection, byCategory }
@@ -414,6 +582,7 @@ export async function saveCustomerDriveLink(opts: {
   const title = opts.title.trim()
   if (!company) throw new Error('Company is required')
   if (!driveUrl) throw new Error('Paste a Zoho WorkDrive share link')
+  if (!isWorkDriveShareUrl(driveUrl)) throw new Error('Use a Zoho WorkDrive share link')
   if (!title) throw new Error('Give the file a short title')
 
   const row = {

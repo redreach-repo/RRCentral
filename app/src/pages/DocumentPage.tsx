@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import { ArrowLeft, Download, FileUp, Mail, MessageCircle, Paperclip, Printer, Truck } from 'lucide-react'
+import { ArrowLeft, Download, ExternalLink, FileUp, Link2, Mail, MessageCircle, Paperclip, Printer, Truck } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS, VAT_RATE } from '../lib/config'
-import type { Attachment, Client, CrmContact, CrmEntry, DeliveryNote, Invoice, LineItem, Quotation } from '../lib/types'
+import type { Attachment, Client, CrmContact, CrmEntry, CustomerDocument, DeliveryNote, Invoice, LineItem, Quotation } from '../lib/types'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatAED } from '../lib/money'
@@ -22,8 +22,6 @@ import { getDeliveryNote, loadDeliveryNoteLineItems } from '../lib/deliveryNoteS
 import {
   deleteSignedDeliveryNoteAttachment,
   loadSignedDeliveryNoteAttachments,
-  saveSignedDeliveryNoteAttachments,
-  type PendingSignedFile,
 } from '../lib/signedDeliveryNotes'
 import { errorMessage } from '../lib/errors'
 import { buildWhatsAppUrl } from '../lib/whatsapp'
@@ -45,8 +43,11 @@ import {
 import { hydrateContacts, primaryContact } from '../lib/contacts'
 import { isZohoMailEnabled } from '../lib/zoho'
 import EmailComposeModal from '../components/EmailComposeModal'
+import LinkWorkDriveModal from '../components/LinkWorkDriveModal'
+import SaveToFolderPrompt from '../components/SaveToFolderPrompt'
 import { logActivity } from '../lib/activity'
 import { findCrmByCompany, syncCrmFromQuote } from '../lib/crmSync'
+import { loadCustomerDocuments } from '../lib/customerFiles'
 import { useAuth } from '../contexts/AuthContext'
 import {
   applyMessageTemplate,
@@ -76,8 +77,11 @@ export default function DocumentPage() {
   const [dnBusy, setDnBusy] = useState(false)
   const [emailOpen, setEmailOpen] = useState(false)
   const [signedAttachments, setSignedAttachments] = useState<Attachment[]>([])
-  const [pendingSignedFiles, setPendingSignedFiles] = useState<PendingSignedFile[]>([])
   const [signedBusy, setSignedBusy] = useState(false)
+  const [crmRecord, setCrmRecord] = useState<CrmEntry | null>(null)
+  const [workdriveLinks, setWorkdriveLinks] = useState<CustomerDocument[]>([])
+  const [linkMode, setLinkMode] = useState<'signed' | 'communication' | null>(null)
+  const [savePrompt, setSavePrompt] = useState<'email' | 'whatsapp' | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -128,7 +132,22 @@ export default function DocumentPage() {
         setItems(lines)
         await attachClient(q.client)
         setSignedAttachments([])
-        setPendingSignedFiles([])
+        setWorkdriveLinks([])
+        const crm = await findCrmByCompany(q.client)
+        setCrmRecord(crm)
+        try {
+          const docs = await loadCustomerDocuments(q.client)
+          setWorkdriveLinks(
+            docs.filter(
+              (d) =>
+                d.category === 'signed_quotation' &&
+                (d.related_ref === (q.reference_number || q.quote_id) ||
+                  d.title.includes(q.reference_number || '')),
+            ),
+          )
+        } catch {
+          setWorkdriveLinks([])
+        }
       } else if (docType === 'delivery-note') {
         const note = await getDeliveryNote(id)
         if (!note) throw new Error('Delivery note not found')
@@ -136,13 +155,27 @@ export default function DocumentPage() {
         const lines = await loadDeliveryNoteLineItems(note.reference_number)
         setItems(lines)
         await attachClient(note.client)
+        const crm = await findCrmByCompany(note.client)
+        setCrmRecord(crm)
         try {
           const signed = await loadSignedDeliveryNoteAttachments(note)
           setSignedAttachments(signed)
         } catch {
           setSignedAttachments([])
         }
-        setPendingSignedFiles([])
+        try {
+          const docs = await loadCustomerDocuments(note.client)
+          setWorkdriveLinks(
+            docs.filter(
+              (d) =>
+                d.category === 'signed_delivery_note' &&
+                (d.related_ref === note.reference_number ||
+                  d.title.includes(note.reference_number || '')),
+            ),
+          )
+        } catch {
+          setWorkdriveLinks([])
+        }
       } else {
         const { data, error: err } = await db.from('invoices').select('*').eq('id', id).maybeSingle()
         if (err) throw err
@@ -153,7 +186,21 @@ export default function DocumentPage() {
         setItems(lines)
         await attachClient(inv.client)
         setSignedAttachments([])
-        setPendingSignedFiles([])
+        const crm = await findCrmByCompany(inv.client)
+        setCrmRecord(crm)
+        try {
+          const docs = await loadCustomerDocuments(inv.client)
+          setWorkdriveLinks(
+            docs.filter(
+              (d) =>
+                d.category === 'signed_invoice' &&
+                (d.related_ref === inv.reference_number ||
+                  d.title.includes(inv.reference_number || '')),
+            ),
+          )
+        } catch {
+          setWorkdriveLinks([])
+        }
       }
     } catch (e) {
       setError(errorMessage(e, 'Failed to load document'))
@@ -296,50 +343,26 @@ export default function DocumentPage() {
     }
   }
 
-  async function readSignedFileAsDataUrl(file: File): Promise<PendingSignedFile> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () =>
-        resolve({ name: file.name, dataUrl: String(reader.result || ''), mime: file.type })
-      reader.onerror = () => reject(reader.error || new Error('Read failed'))
-      reader.readAsDataURL(file)
-    })
-  }
-
-  async function onPickSignedFiles(files: FileList | null) {
-    if (!files?.length || !deliveryNote) return
+  async function refreshWorkdriveLinks() {
+    const clientName = doc?.client || ''
+    if (!clientName) return
     try {
-      const rows = await Promise.all([...files].map((f) => readSignedFileAsDataUrl(f)))
-      setPendingSignedFiles((prev) => [...prev, ...rows])
-    } catch (e) {
-      showToast(errorMessage(e, 'Could not read file'), 'error')
-    }
-  }
-
-  async function saveSignedCopies() {
-    if (!deliveryNote || !pendingSignedFiles.length) return
-    setSignedBusy(true)
-    try {
-      await saveSignedDeliveryNoteAttachments({
-        note: deliveryNote,
-        files: pendingSignedFiles,
-        uploadedBy: user?.email || '',
-      })
-      await logActivity(
-        'save_signed_delivery_note',
-        'delivery_note',
-        deliveryNote.reference_number,
-        deliveryNote.client,
-        user?.email || '',
+      const docs = await loadCustomerDocuments(clientName)
+      const cat =
+        docType === 'quote'
+          ? 'signed_quotation'
+          : docType === 'invoice'
+            ? 'signed_invoice'
+            : 'signed_delivery_note'
+      setWorkdriveLinks(
+        docs.filter(
+          (d) =>
+            d.category === cat &&
+            (d.related_ref === displayRef || d.title.includes(displayRef)),
+        ),
       )
-      const refreshed = await loadSignedDeliveryNoteAttachments(deliveryNote)
-      setSignedAttachments(refreshed)
-      setPendingSignedFiles([])
-      showToast('Signed delivery note saved', 'success')
-    } catch (e) {
-      showToast(errorMessage(e, 'Could not save signed copy'), 'error')
-    } finally {
-      setSignedBusy(false)
+    } catch {
+      /* optional until SQL */
     }
   }
 
@@ -349,7 +372,7 @@ export default function DocumentPage() {
     try {
       await deleteSignedDeliveryNoteAttachment(attachmentId)
       setSignedAttachments((prev) => prev.filter((a) => a.id !== attachmentId))
-      showToast('Signed copy removed', 'success')
+      showToast('Legacy signed copy removed', 'success')
     } catch (e) {
       showToast(errorMessage(e, 'Could not remove signed copy'), 'error')
     } finally {
@@ -378,7 +401,7 @@ export default function DocumentPage() {
     }
   }
 
-  function shareWhatsApp() {
+  async function shareWhatsApp() {
     const p = primaryContact(emailContacts)
     const phone = p?.phone || client?.mobile || ''
     const company = settings.companyName || 'Red Reach Middle East FZE'
@@ -394,6 +417,17 @@ export default function DocumentPage() {
     })
     const url = buildWhatsAppUrl(phone, text, settings.whatsappCountryCode || '971')
     window.open(url, '_blank', 'noopener,noreferrer')
+    const clientName = doc?.client || ''
+    const crm = crmRecord || (clientName ? await findCrmByCompany(clientName) : null)
+    await logActivity(
+      'whatsapp_document',
+      docType === 'invoice' ? 'invoice' : docType === 'delivery-note' ? 'delivery_note' : 'quotation',
+      displayRef,
+      clientName,
+      user?.email || '',
+      crm?.id || null,
+    )
+    setSavePrompt('whatsapp')
   }
 
   async function createDnFromQuote() {
@@ -442,7 +476,7 @@ export default function DocumentPage() {
 
   async function onEmailSent() {
     const clientName = doc?.client || ''
-    const crm = clientName ? await findCrmByCompany(clientName) : null
+    const crm = crmRecord || (clientName ? await findCrmByCompany(clientName) : null)
     await logActivity(
       docType === 'invoice' ? 'email_invoice' : 'email_quote',
       docType === 'invoice' ? 'invoice' : 'quotation',
@@ -452,9 +486,7 @@ export default function DocumentPage() {
       crm?.id || null,
     )
     await markQuoteSent()
-    if (crm) {
-      showToast('Email sent · logged on CRM timeline', 'success')
-    }
+    setSavePrompt('email')
   }
 
   const emailVars = {
@@ -524,8 +556,14 @@ export default function DocumentPage() {
         <ToolbarBtn onClick={() => void prepareEmail()} disabled={pdfBusy}>
           <Mail size={14} /> Email PDF
         </ToolbarBtn>
-        <ToolbarBtn onClick={shareWhatsApp} accent>
+        <ToolbarBtn onClick={() => void shareWhatsApp()} accent>
           <MessageCircle size={14} /> WhatsApp
+        </ToolbarBtn>
+        <ToolbarBtn onClick={() => setLinkMode('signed')}>
+          <Link2 size={14} /> Link signed
+        </ToolbarBtn>
+        <ToolbarBtn onClick={() => setLinkMode('communication')}>
+          <FileUp size={14} /> Link chat / email
         </ToolbarBtn>
         {docType === 'quote' && quote && canCreateDeliveryNoteFromQuote(quote) ? (
           <ToolbarBtn onClick={() => void createDnFromQuote()} disabled={dnBusy}>
@@ -534,7 +572,7 @@ export default function DocumentPage() {
         ) : null}
       </div>
 
-      {isDeliveryNote && deliveryNote ? (
+      {doc ? (
         <div
           className="no-print"
           style={{
@@ -556,73 +594,84 @@ export default function DocumentPage() {
               marginBottom: 8,
             }}
           >
-            <FileUp size={16} /> Signed delivery note
+            <Link2 size={16} /> Customer folder · WorkDrive
           </div>
           <p style={{ margin: '0 0 10px', fontSize: 13, color: '#555', lineHeight: 1.45 }}>
-            Upload the customer-signed PDF or photo after goods are received. Stored with this
-            delivery note.
+            Keep signed copies and chat exports on Zoho WorkDrive. Paste the share link here — the CRM
+            only stores the URL (not file bytes).
           </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
-            <input
-              type="file"
-              accept="application/pdf,image/*,.pdf"
-              multiple
-              disabled={signedBusy}
-              onChange={(e) => {
-                void onPickSignedFiles(e.target.files)
-                e.target.value = ''
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+            <button
+              type="button"
+              onClick={() => setLinkMode('signed')}
+              style={{
+                appearance: 'none',
+                border: 0,
+                borderRadius: 8,
+                padding: '8px 12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                background: '#e85d04',
+                color: '#fff',
+                fontSize: 13,
               }}
-            />
-            {pendingSignedFiles.length > 0 ? (
-              <button
-                type="button"
-                disabled={signedBusy}
-                onClick={() => void saveSignedCopies()}
+            >
+              Link signed {isDeliveryNote ? 'delivery note' : title.toLowerCase()}
+            </button>
+            <button
+              type="button"
+              onClick={() => setLinkMode('communication')}
+              style={{
+                appearance: 'none',
+                border: '1px solid #ddd',
+                borderRadius: 8,
+                padding: '8px 12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                background: '#fff',
+                color: '#333',
+                fontSize: 13,
+              }}
+            >
+              Link email / WhatsApp
+            </button>
+            {doc.client ? (
+              <Link
+                to={`/customer-files?company=${encodeURIComponent(doc.client)}`}
                 style={{
-                  appearance: 'none',
-                  border: 0,
+                  border: '1px solid #ddd',
                   borderRadius: 8,
                   padding: '8px 12px',
                   fontWeight: 600,
-                  cursor: signedBusy ? 'wait' : 'pointer',
-                  background: '#e85d04',
-                  color: '#fff',
+                  textDecoration: 'none',
+                  background: '#fff',
+                  color: '#333',
                   fontSize: 13,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
                 }}
               >
-                {signedBusy ? 'Saving…' : `Save ${pendingSignedFiles.length} file(s)`}
-              </button>
+                Open customer folder
+              </Link>
             ) : null}
           </div>
-          {pendingSignedFiles.length > 0 ? (
-            <ul style={{ margin: '10px 0 0', paddingLeft: 18, fontSize: 12, color: '#666' }}>
-              {pendingSignedFiles.map((f) => (
-                <li key={f.name + f.dataUrl.slice(0, 24)}>
-                  {f.name} (pending){' '}
-                  <button
-                    type="button"
-                    style={{
-                      appearance: 'none',
-                      border: 0,
-                      background: 'transparent',
-                      color: '#888',
-                      cursor: 'pointer',
-                      textDecoration: 'underline',
-                      fontSize: 12,
-                      padding: 0,
-                    }}
-                    onClick={() =>
-                      setPendingSignedFiles((prev) => prev.filter((p) => p.dataUrl !== f.dataUrl))
-                    }
-                  >
-                    Remove
-                  </button>
+          {workdriveLinks.length > 0 ? (
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
+              {workdriveLinks.map((d) => (
+                <li key={d.id} style={{ marginBottom: 4 }}>
+                  <a href={d.drive_url} target="_blank" rel="noreferrer" style={{ color: '#c1121f' }}>
+                    <ExternalLink size={12} style={{ verticalAlign: -1, marginRight: 4 }} />
+                    {d.title || 'WorkDrive file'}
+                  </a>
                 </li>
               ))}
             </ul>
-          ) : null}
-          {signedAttachments.length > 0 ? (
-            <div style={{ marginTop: 12 }}>
+          ) : (
+            <p style={{ margin: 0, fontSize: 12, color: '#888' }}>No WorkDrive link for this document yet.</p>
+          )}
+          {isDeliveryNote && signedAttachments.length > 0 ? (
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #eee' }}>
               <div
                 style={{
                   display: 'flex',
@@ -631,14 +680,15 @@ export default function DocumentPage() {
                   fontWeight: 600,
                   fontSize: 13,
                   marginBottom: 6,
+                  color: '#888',
                 }}
               >
-                <Paperclip size={14} /> Saved signed copies
+                <Paperclip size={14} /> Legacy copies stored in CRM (prefer WorkDrive above)
               </div>
               <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
                 {signedAttachments.map((a) => (
                   <li key={a.id} style={{ marginBottom: 4 }}>
-                    <a href={a.url} target="_blank" rel="noreferrer" style={{ color: '#c1121f' }}>
+                    <a href={a.url} target="_blank" rel="noreferrer" style={{ color: '#888' }}>
                       {a.file_name || 'Signed delivery note'}
                     </a>{' '}
                     <button
@@ -662,9 +712,7 @@ export default function DocumentPage() {
                 ))}
               </ul>
             </div>
-          ) : (
-            <p style={{ margin: '10px 0 0', fontSize: 12, color: '#888' }}>No signed copy saved yet.</p>
-          )}
+          ) : null}
         </div>
       ) : null}
 
@@ -1235,6 +1283,46 @@ export default function DocumentPage() {
         zohoEnabled={isZohoMailEnabled(settings)}
         onClose={() => setEmailOpen(false)}
         onSent={() => void onEmailSent()}
+      />
+
+      <LinkWorkDriveModal
+        open={linkMode === 'signed'}
+        onClose={() => setLinkMode(null)}
+        onSaved={() => refreshWorkdriveLinks()}
+        company={doc.client || ''}
+        crmId={crmRecord?.id || null}
+        uploadedBy={user?.email || ''}
+        mode="signed"
+        category={
+          docType === 'quote'
+            ? 'signed_quotation'
+            : docType === 'invoice'
+              ? 'signed_invoice'
+              : 'signed_delivery_note'
+        }
+        defaultRelatedRef={displayRef}
+        relatedRefOptions={displayRef ? [{ value: displayRef, label: displayRef }] : []}
+      />
+
+      <LinkWorkDriveModal
+        open={linkMode === 'communication'}
+        onClose={() => setLinkMode(null)}
+        onSaved={() => refreshWorkdriveLinks()}
+        company={doc.client || ''}
+        crmId={crmRecord?.id || null}
+        uploadedBy={user?.email || ''}
+        mode="communication"
+        defaultCategory={savePrompt === 'whatsapp' ? 'whatsapp' : 'email'}
+        defaultRelatedRef={displayRef}
+        relatedRefOptions={displayRef ? [{ value: displayRef, label: displayRef }] : []}
+      />
+
+      <SaveToFolderPrompt
+        open={!!savePrompt}
+        company={doc.client || ''}
+        channel={savePrompt || 'email'}
+        onClose={() => setSavePrompt(null)}
+        onFileNow={() => setLinkMode('communication')}
       />
 
       <style>{`

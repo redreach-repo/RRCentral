@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import { ExternalLink, FileUp, Paperclip, Pencil, Plus, Trash2, Truck } from 'lucide-react'
+import { ExternalLink, Link2, Paperclip, Pencil, Plus, Trash2, Truck } from 'lucide-react'
 import { db } from '../lib/db'
 import { DELIVERY_NOTE_STATUSES, DELIVERY_TERMS } from '../lib/config'
 import type { Attachment, DeliveryNote, Quotation } from '../lib/types'
@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
+import LinkWorkDriveModal from '../components/LinkWorkDriveModal'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
 import { logActivity } from '../lib/activity'
@@ -30,8 +31,6 @@ import {
 import {
   deleteSignedDeliveryNoteAttachment,
   loadSignedDeliveryNoteAttachments,
-  saveSignedDeliveryNoteAttachments,
-  type PendingSignedFile,
 } from '../lib/signedDeliveryNotes'
 import { errorMessage } from '../lib/errors'
 import { type DraftLineItem } from '../lib/lineItems'
@@ -104,38 +103,18 @@ export default function DeliveryNotesPage() {
   const [editing, setEditing] = useState<DeliveryNote | null>(null)
   const [form, setForm] = useState<NoteForm>(emptyForm())
   const [signedAttachments, setSignedAttachments] = useState<Attachment[]>([])
-  const [pendingSignedFiles, setPendingSignedFiles] = useState<PendingSignedFile[]>([])
+  const [linkSignedOpen, setLinkSignedOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<DeliveryNote | null>(null)
 
   function closeEdit() {
     setEditing(null)
     setSignedAttachments([])
-    setPendingSignedFiles([])
+    setLinkSignedOpen(false)
   }
 
   async function refreshSignedAttachments(note: DeliveryNote) {
     const rows = await loadSignedDeliveryNoteAttachments(note)
     setSignedAttachments(rows)
-  }
-
-  async function readFileAsDataUrl(file: File): Promise<PendingSignedFile> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () =>
-        resolve({ name: file.name, dataUrl: String(reader.result || ''), mime: file.type })
-      reader.onerror = () => reject(reader.error || new Error('Read failed'))
-      reader.readAsDataURL(file)
-    })
-  }
-
-  async function onPickSignedFiles(files: FileList | null) {
-    if (!files?.length) return
-    try {
-      const rows = await Promise.all([...files].map((f) => readFileAsDataUrl(f)))
-      setPendingSignedFiles((prev) => [...prev, ...rows])
-    } catch (e) {
-      showToast(errorMessage(e, 'Could not read file'), 'error')
-    }
   }
 
   async function removeSignedAttachment(id: string) {
@@ -231,8 +210,7 @@ export default function DeliveryNotesPage() {
     try {
       const items = await loadDeliveryNoteLineItems(note.reference_number)
       setEditing(note)
-      setPendingSignedFiles([])
-      setForm({
+            setForm({
         delivery_date: (note.delivery_date || note.date || '').slice(0, 10),
         status: note.status || 'Issued',
         delivery_terms: note.delivery_terms || '',
@@ -273,27 +251,8 @@ export default function DeliveryNotesPage() {
         updated_at: new Date().toISOString(),
       })
       await saveDeliveryNoteLineItems(editing.reference_number, form.items)
-      if (pendingSignedFiles.length) {
-        await saveSignedDeliveryNoteAttachments({
-          note: editing,
-          files: pendingSignedFiles,
-          uploadedBy: who,
-        })
-        await logActivity(
-          'save_signed_delivery_note',
-          'delivery_note',
-          editing.reference_number,
-          editing.client,
-          who,
-        )
-      }
       await logActivity('update_delivery_note', 'delivery_note', editing.reference_number, editing.client, who)
-      showToast(
-        pendingSignedFiles.length
-          ? 'Delivery note and signed copy saved'
-          : 'Delivery note saved',
-        'success',
-      )
+      showToast('Delivery note saved', 'success')
       closeEdit()
       await load()
     } catch (e) {
@@ -630,45 +589,32 @@ export default function DeliveryNotesPage() {
         </div>
         <div style={fieldStyle}>
           <label style={labelStyle}>
-            <FileUp size={12} style={{ marginRight: 4 }} />
-            Signed delivery note (PDF or photo)
+            <Link2 size={12} style={{ marginRight: 4 }} />
+            Signed delivery note (WorkDrive)
           </label>
-          <input
-            type="file"
-            accept="application/pdf,image/*,.pdf"
-            multiple
-            onChange={(e) => {
-              void onPickSignedFiles(e.target.files)
-              e.target.value = ''
-            }}
-          />
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <button type="button" style={buttonSecondaryStyle} onClick={() => setLinkSignedOpen(true)}>
+              <Link2 size={14} /> Link signed DN on WorkDrive
+            </button>
+            {editing?.client ? (
+              <Link
+                to={`/customer-files?company=${encodeURIComponent(editing.client)}`}
+                style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}
+              >
+                Open customer folder
+              </Link>
+            ) : null}
+          </div>
           <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted, lineHeight: 1.45 }}>
-            Upload the customer-signed copy after delivery. Saved with this delivery note.
+            Prefer Zoho WorkDrive — paste the share link so the CRM stays light. Legacy in-app copies
+            below can still be removed.
           </p>
-          {pendingSignedFiles.length > 0 ? (
-            <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 12, color: colors.muted }}>
-              {pendingSignedFiles.map((f) => (
-                <li key={f.name + f.dataUrl.slice(0, 24)}>
-                  {f.name} (pending save){' '}
-                  <button
-                    type="button"
-                    style={ghostTiny}
-                    onClick={() =>
-                      setPendingSignedFiles((prev) => prev.filter((p) => p.dataUrl !== f.dataUrl))
-                    }
-                  >
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
         </div>
         {signedAttachments.length > 0 ? (
           <div style={fieldStyle}>
             <label style={labelStyle}>
               <Paperclip size={12} style={{ marginRight: 4 }} />
-              Saved signed copies
+              Legacy signed copies (in CRM)
             </label>
             <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13 }}>
               {signedAttachments.map((a) => (
@@ -693,6 +639,21 @@ export default function DeliveryNotesPage() {
           </button>
         </div>
       </Modal>
+
+      <LinkWorkDriveModal
+        open={linkSignedOpen && !!editing}
+        onClose={() => setLinkSignedOpen(false)}
+        company={editing?.client || ''}
+        uploadedBy={who}
+        mode="signed"
+        category="signed_delivery_note"
+        defaultRelatedRef={editing?.reference_number || ''}
+        relatedRefOptions={
+          editing?.reference_number
+            ? [{ value: editing.reference_number, label: editing.reference_number }]
+            : []
+        }
+      />
 
       <Modal open={!!deleteTarget} title="Delete delivery note?" onClose={() => setDeleteTarget(null)} width={420}>
         <p style={{ color: colors.muted, fontSize: 14 }}>
