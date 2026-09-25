@@ -1,0 +1,10 @@
+{
+  "name": "RED REACH Central",
+  "install": "cd app && npm ci",
+  "terminals": [
+    {
+      "name": "app dev server",
+      "command": "cd app && npm run dev"
+    }
+  ]
+}
