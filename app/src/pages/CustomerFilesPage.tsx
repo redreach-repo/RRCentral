@@ -7,28 +7,29 @@ import {
   FolderOpen,
   Link2,
   MessageCircle,
+  Package,
   Plus,
   Receipt,
   Trash2,
   Truck,
 } from 'lucide-react'
 import { db } from '../lib/db'
-import type { CrmEntry, CustomerDocumentCategory } from '../lib/types'
+import type { CrmEntry } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
-import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
 import StatusPill from '../components/StatusPill'
+import LinkWorkDriveModal, { type LinkWorkDriveMode } from '../components/LinkWorkDriveModal'
 import { logActivity } from '../lib/activity'
 import { errorMessage, isMissingRelationError } from '../lib/errors'
 import {
-  COMMUNICATION_KINDS,
+  buildFolderChecklist,
   CUSTOMER_FOLDER_SECTIONS,
   deleteCustomerDocument,
-  isWorkDriveShareUrl,
+  filterFolderItems,
   loadCustomerFolder,
-  saveCustomerDriveLink,
+  relatedRefOptionsForSection,
   suggestedDriveFolderName,
   updateCrmDriveFolderUrl,
   type CustomerFolder,
@@ -72,28 +73,24 @@ function sectionIcon(sectionId: FolderSectionId) {
       return <Truck size={16} />
     case 'communication':
       return <MessageCircle size={16} />
+    case 'purchasing':
+      return <Package size={16} />
   }
 }
 
 type FolderSection = (typeof CUSTOMER_FOLDER_SECTIONS)[number]
 
-const emptyAddForm = (section?: FolderSection) => {
-  const isComms = section?.mode === 'communication'
-  return {
-    category: (isComms
-      ? 'email'
-      : section?.signedCategory || 'signed_quotation') as CustomerDocumentCategory,
-    title: isComms ? '' : section?.uploadTitle || '',
-    driveUrl: '',
-    relatedRef: '',
-    notes: isComms ? '' : 'Signed copy',
-  }
-}
-
 function itemKindLabel(item: CustomerFolderItem): string {
   if (item.kind === 'crm') return 'In CRM'
   if (item.section === 'communication') return 'WorkDrive'
+  if (item.section === 'purchasing') return 'Purchasing · WorkDrive'
   return 'Signed · WorkDrive'
+}
+
+function sectionToMode(section: FolderSection): LinkWorkDriveMode {
+  if (section.mode === 'communication') return 'communication'
+  if (section.mode === 'purchasing') return 'purchasing'
+  return 'signed'
 }
 
 export default function CustomerFilesPage() {
@@ -106,6 +103,7 @@ export default function CustomerFilesPage() {
 
   const [companies, setCompanies] = useState<CrmEntry[]>([])
   const [search, setSearch] = useState('')
+  const [fileQuery, setFileQuery] = useState('')
   const [selected, setSelected] = useState('')
   const [folder, setFolder] = useState<CustomerFolder | null>(null)
   const [loadingList, setLoadingList] = useState(true)
@@ -115,12 +113,9 @@ export default function CustomerFilesPage() {
   const [savingFolder, setSavingFolder] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [addSection, setAddSection] = useState<FolderSection>(CUSTOMER_FOLDER_SECTIONS[0])
-  const [savingDoc, setSavingDoc] = useState(false)
-  const [addForm, setAddForm] = useState(() => emptyAddForm(CUSTOMER_FOLDER_SECTIONS[0]))
 
   function openUpload(section: FolderSection) {
     setAddSection(section)
-    setAddForm(emptyAddForm(section))
     setAddOpen(true)
   }
 
@@ -129,6 +124,11 @@ export default function CustomerFilesPage() {
     settings.customerDriveRootUrl ||
     ''
   ).trim()
+
+  const checklist = useMemo(
+    () => (folder ? buildFolderChecklist({ ...folder, crm: folder.crm ? { ...folder.crm, drive_folder_url: driveFolderUrl } : null }) : []),
+    [folder, driveFolderUrl],
+  )
 
   const loadCompanies = useCallback(async () => {
     setLoadingList(true)
@@ -165,6 +165,7 @@ export default function CustomerFilesPage() {
         setFolder(next)
         setDriveFolderUrl(next.crm?.drive_folder_url || '')
         setMissingTable(Boolean(next.missingDocumentsTable))
+        setFileQuery('')
       } catch (e) {
         if (isMissingRelationError(e)) {
           setMissingTable(true)
@@ -212,6 +213,7 @@ export default function CustomerFilesPage() {
         folder.company,
         driveFolderUrl || '(cleared)',
         who,
+        folder.crm.id,
       )
       showToast('WorkDrive folder linked', 'success')
       await openCompany(folder.company)
@@ -219,48 +221,6 @@ export default function CustomerFilesPage() {
       showToast(errorMessage(e, 'Could not save WorkDrive folder link'), 'error')
     } finally {
       setSavingFolder(false)
-    }
-  }
-
-  async function addDriveFile() {
-    if (!selected) return
-    if (!isWorkDriveShareUrl(addForm.driveUrl) && addForm.driveUrl.trim()) {
-      showToast('Use a Zoho WorkDrive share link', 'error')
-      return
-    }
-    setSavingDoc(true)
-    const isComms = addSection.mode === 'communication'
-    try {
-      await saveCustomerDriveLink({
-        company: selected,
-        crmId: folder?.crm?.id || null,
-        category: addForm.category,
-        title: addForm.title,
-        driveUrl: addForm.driveUrl,
-        relatedRef: addForm.relatedRef,
-        notes: addForm.notes,
-        uploadedBy: who,
-      })
-      await logActivity(
-        'add_customer_drive_file',
-        'customer_document',
-        selected,
-        `${addForm.category}: ${addForm.title}`,
-        who,
-      )
-      showToast(isComms ? 'Communication linked' : 'Signed copy linked', 'success')
-      setAddOpen(false)
-      setAddForm(emptyAddForm(addSection))
-      await openCompany(selected)
-    } catch (e) {
-      if (isMissingRelationError(e)) {
-        setMissingTable(true)
-        showToast('Run supabase-customer-files-upgrade.sql in Supabase first', 'error')
-      } else {
-        showToast(errorMessage(e, 'Could not save WorkDrive link'), 'error')
-      }
-    } finally {
-      setSavingDoc(false)
     }
   }
 
@@ -275,16 +235,14 @@ export default function CustomerFilesPage() {
     }
   }
 
-  const isCommsModal = addSection.mode === 'communication'
-
   return (
     <div style={pageStyle}>
       <div style={toolbarStyle}>
         <div>
           <h1 style={pageTitleStyle}>Customer files</h1>
           <p style={pageSubtitleStyle}>
-            One folder per customer — quotes, invoices, delivery notes, communications, and signed
-            WorkDrive copies
+            One folder per customer — quotes, invoices, delivery notes, communications, purchasing,
+            and signed WorkDrive copies
           </p>
         </div>
       </div>
@@ -361,7 +319,7 @@ export default function CustomerFilesPage() {
             <EmptyState
               icon={<FolderOpen size={22} />}
               title="Open a customer folder"
-              subtitle="Pick a company to see quotations, invoices, delivery notes, and communications — and attach Zoho WorkDrive share links."
+              subtitle="Pick a company to see quotations, invoices, delivery notes, communications, and purchasing — and attach Zoho WorkDrive share links."
             />
           ) : loadingFolder ? (
             <div style={{ ...cardStyle, color: colors.muted }}>Opening folder…</div>
@@ -412,6 +370,28 @@ export default function CustomerFilesPage() {
                       <strong style={{ color: colors.text }}>
                         {suggestedDriveFolderName(folder.company)}
                       </strong>
+                      <button
+                        type="button"
+                        style={{
+                          appearance: 'none',
+                          border: 0,
+                          background: 'transparent',
+                          color: colors.accent,
+                          cursor: 'pointer',
+                          marginLeft: 6,
+                          fontSize: 12,
+                          textDecoration: 'underline',
+                          padding: 0,
+                        }}
+                        onClick={() => {
+                          void navigator.clipboard?.writeText(
+                            suggestedDriveFolderName(folder.company),
+                          )
+                          showToast('Folder name copied', 'success')
+                        }}
+                      >
+                        Copy
+                      </button>
                     </p>
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -470,15 +450,55 @@ export default function CustomerFilesPage() {
                     </button>
                   </div>
                   <p style={{ margin: '8px 0 0', fontSize: 12, color: colors.muted, lineHeight: 1.45 }}>
-                    Keep signed docs, emails, WhatsApp chats, and notes in Zoho WorkDrive, then paste
-                    share links in each section below. Set a shared Customers root folder in Settings →
+                    Keep signed docs, emails, WhatsApp chats, supplier invoices, and notes in Zoho
+                    WorkDrive, then paste share links below. Set a shared Customers root in Settings →
                     Customer WorkDrive.
                   </p>
+                </div>
+
+                {checklist.length > 0 ? (
+                  <ul
+                    style={{
+                      listStyle: 'none',
+                      margin: '14px 0 0',
+                      padding: 0,
+                      display: 'grid',
+                      gap: 8,
+                    }}
+                  >
+                    {checklist.map((c) => (
+                      <li
+                        key={c.id}
+                        style={{
+                          fontSize: 13,
+                          lineHeight: 1.45,
+                          padding: '10px 12px',
+                          borderRadius: 8,
+                          border: `1px solid ${c.level === 'warn' ? colors.warn : colors.border}`,
+                          background:
+                            c.level === 'warn' ? `${colors.warn}18` : 'rgba(255,255,255,0.03)',
+                          color: colors.text,
+                        }}
+                      >
+                        {c.message}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                <div style={{ ...fieldStyle, marginTop: 14, marginBottom: 0 }}>
+                  <label style={labelStyle}>Search in this folder</label>
+                  <input
+                    style={inputStyle}
+                    placeholder="Filter by title, ref, WhatsApp, signed…"
+                    value={fileQuery}
+                    onChange={(e) => setFileQuery(e.target.value)}
+                  />
                 </div>
               </header>
 
               {CUSTOMER_FOLDER_SECTIONS.map((cat) => {
-                const rows = folder.bySection[cat.id]
+                const rows = filterFolderItems(folder.bySection[cat.id], fileQuery)
                 return (
                   <section key={cat.id} style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
                     <div
@@ -508,24 +528,30 @@ export default function CustomerFilesPage() {
                     </div>
                     {rows.length === 0 ? (
                       <p style={{ margin: 0, padding: '14px 16px', color: colors.muted, fontSize: 13 }}>
-                        Nothing here yet —{' '}
-                        <button
-                          type="button"
-                          style={{
-                            appearance: 'none',
-                            border: 0,
-                            background: 'transparent',
-                            color: colors.accent,
-                            cursor: 'pointer',
-                            padding: 0,
-                            fontSize: 13,
-                            textDecoration: 'underline',
-                          }}
-                          onClick={() => openUpload(cat)}
-                        >
-                          {cat.uploadButton.toLowerCase()}
-                        </button>
-                        .
+                        {fileQuery.trim()
+                          ? 'No matches in this section.'
+                          : (
+                            <>
+                              Nothing here yet —{' '}
+                              <button
+                                type="button"
+                                style={{
+                                  appearance: 'none',
+                                  border: 0,
+                                  background: 'transparent',
+                                  color: colors.accent,
+                                  cursor: 'pointer',
+                                  padding: 0,
+                                  fontSize: 13,
+                                  textDecoration: 'underline',
+                                }}
+                                onClick={() => openUpload(cat)}
+                              >
+                                {cat.uploadButton.toLowerCase()}
+                              </button>
+                              .
+                            </>
+                          )}
                       </p>
                     ) : (
                       <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
@@ -593,96 +619,19 @@ export default function CustomerFilesPage() {
         </section>
       </div>
 
-      <Modal
+      <LinkWorkDriveModal
         open={addOpen}
-        title={addSection.uploadTitle}
         onClose={() => setAddOpen(false)}
-        width={520}
-      >
-        <p style={{ color: colors.muted, fontSize: 14, marginTop: 0, lineHeight: 1.5 }}>
-          {addSection.uploadHint} The CRM only stores the link — not the file bytes.
-        </p>
-        {isCommsModal ? (
-          <div style={fieldStyle}>
-            <label style={labelStyle}>Type *</label>
-            <select
-              style={inputStyle}
-              value={addForm.category}
-              onChange={(e) =>
-                setAddForm((f) => ({
-                  ...f,
-                  category: e.target.value as CustomerDocumentCategory,
-                }))
-              }
-            >
-              {COMMUNICATION_KINDS.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : null}
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Title *</label>
-          <input
-            style={inputStyle}
-            value={addForm.title}
-            onChange={(e) => setAddForm((f) => ({ ...f, title: e.target.value }))}
-            placeholder={
-              isCommsModal
-                ? 'e.g. Email thread – uniforms RFQ'
-                : addSection.uploadTitle
-            }
-          />
-        </div>
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Zoho WorkDrive share link *</label>
-          <input
-            style={inputStyle}
-            value={addForm.driveUrl}
-            onChange={(e) => setAddForm((f) => ({ ...f, driveUrl: e.target.value }))}
-            placeholder="https://workdrive.zoho.com/… or workdrive.zohoexternal.com/…"
-          />
-        </div>
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Related ref (optional)</label>
-          <input
-            style={inputStyle}
-            value={addForm.relatedRef}
-            onChange={(e) => setAddForm((f) => ({ ...f, relatedRef: e.target.value }))}
-            placeholder={
-              isCommsModal
-                ? 'e.g. RR-01-26001 or contact name'
-                : 'e.g. RR-01-26001 or DN-01-26001'
-            }
-          />
-        </div>
-        {isCommsModal ? (
-          <div style={fieldStyle}>
-            <label style={labelStyle}>Notes (optional)</label>
-            <input
-              style={inputStyle}
-              value={addForm.notes}
-              onChange={(e) => setAddForm((f) => ({ ...f, notes: e.target.value }))}
-              placeholder="e.g. Exported from WhatsApp · Mar 2026"
-            />
-          </div>
-        ) : null}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button type="button" style={buttonSecondaryStyle} onClick={() => setAddOpen(false)}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            style={buttonPrimaryStyle}
-            disabled={savingDoc}
-            onClick={() => void addDriveFile()}
-          >
-            {savingDoc ? 'Saving…' : isCommsModal ? 'Save communication' : 'Save signed copy'}
-          </button>
-        </div>
-      </Modal>
+        onSaved={() => (selected ? openCompany(selected) : undefined)}
+        company={selected}
+        crmId={folder?.crm?.id || null}
+        uploadedBy={who}
+        mode={sectionToMode(addSection)}
+        category={addSection.signedCategory}
+        title={addSection.uploadTitle}
+        hint={addSection.uploadHint}
+        relatedRefOptions={relatedRefOptionsForSection(folder, addSection.id)}
+      />
     </div>
   )
 }

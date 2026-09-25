@@ -21,11 +21,15 @@ import {
 } from 'lucide-react'
 import { db } from '../lib/db'
 import { CRM_OUTCOME_REASONS, NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
-import type { ActivityLogEntry, AppUser, CrmContact, CrmEntry } from '../lib/types'
+import type { ActivityLogEntry, AppUser, CrmContact, CrmEntry, CustomerDocument } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { logActivity } from '../lib/activity'
+import {
+  communicationKindLabel,
+  loadCustomerDocuments,
+} from '../lib/customerFiles'
 import { buildWhatsAppUrl } from '../lib/whatsapp'
 import { displayDocumentReference } from '../lib/documents'
 import {
@@ -56,6 +60,8 @@ import {
   syncFollowUpToZohoCalendar,
 } from '../lib/zoho'
 import EmailComposeModal from '../components/EmailComposeModal'
+import LinkWorkDriveModal from '../components/LinkWorkDriveModal'
+import SaveToFolderPrompt from '../components/SaveToFolderPrompt'
 import WebsiteInquiriesPanel from '../site/components/WebsiteInquiriesPanel'
 import PageHeader from '../components/PageHeader'
 import CrmLogTouchModal, { type LogTouchPayload } from '../components/CrmLogTouchModal'
@@ -186,6 +192,9 @@ export default function CrmPage() {
   const [quickBusyId, setQuickBusyId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<CrmViewMode>('list')
   const [logTouchTarget, setLogTouchTarget] = useState<CrmEntry | null>(null)
+  const [savePromptTarget, setSavePromptTarget] = useState<{ entry: CrmEntry; channel: 'email' | 'whatsapp' } | null>(null)
+  const [linkFileTarget, setLinkFileTarget] = useState<{ entry: CrmEntry; channel: 'email' | 'whatsapp' } | null>(null)
+  const [folderDocs, setFolderDocs] = useState<CustomerDocument[]>([])
   const [outcomeTarget, setOutcomeTarget] = useState<CrmEntry | null>(null)
   const [outcomeStage, setOutcomeStage] = useState<'Won' | 'Lost'>('Won')
   const [outcomeReason, setOutcomeReason] = useState('')
@@ -255,12 +264,14 @@ export default function CrmPage() {
     void (async () => {
       try {
         const company = entry.company_name
-        const [actRes, actByCrmRes, fuRes, quoteRes] = await Promise.all([
+        const [actRes, actByCrmRes, fuRes, quoteRes, folderDocsList] = await Promise.all([
           db.from('activity_log').select('*').order('created_at', { ascending: false }).limit(120),
           db.from('activity_log').select('*').eq('crm_id', entry.id).order('created_at', { ascending: false }).limit(40),
           db.from('follow_up_updates').select('*').eq('crm_id', entry.id).order('created_at', { ascending: false }),
           db.from('quotations').select('*').ilike('client', company).order('created_at', { ascending: false }).limit(10),
+          loadCustomerDocuments(company).catch(() => [] as CustomerDocument[]),
         ])
+        setFolderDocs(folderDocsList)
         const byCrm = (actByCrmRes.data || []) as ActivityLogEntry[]
         const byCrmIds = new Set(byCrm.map((a) => a.id))
         const legacy = ((actRes.data || []) as ActivityLogEntry[]).filter(
@@ -299,12 +310,38 @@ export default function CrmPage() {
               created_at: q.created_at || '',
             }) satisfies ActivityLogEntry,
         )
-        const merged = [...logs, ...updates, ...quotes].sort((a, b) =>
+        const fileEvents = folderDocsList.map(
+          (d, i) =>
+            ({
+              id: `wd-${d.id || i}`,
+              action: d.category.startsWith('signed_')
+                ? 'workdrive_signed'
+                : d.category === 'supplier_invoice'
+                  ? 'workdrive_supplier'
+                  : 'workdrive_communication',
+              entity: 'customer_document',
+              reference: d.title || d.file_name || 'WorkDrive file',
+              details: [
+                ['email', 'whatsapp', 'call_notes', 'communication'].includes(d.category)
+                  ? communicationKindLabel(d.category)
+                  : d.category.replace(/_/g, ' '),
+                d.related_ref ? `Ref ${d.related_ref}` : '',
+                d.drive_url ? 'WorkDrive link' : '',
+              ]
+                .filter(Boolean)
+                .join(' · '),
+              user_email: d.uploaded_by || '',
+              created_at: d.uploaded_at || '',
+              crm_id: entry.id,
+            }) satisfies ActivityLogEntry,
+        )
+        const merged = [...logs, ...updates, ...quotes, ...fileEvents].sort((a, b) =>
           String(b.created_at).localeCompare(String(a.created_at)),
         )
         setActivity(merged.slice(0, 40))
       } catch {
         setActivity([])
+        setFolderDocs([])
       } finally {
         setActivityLoading(false)
       }
@@ -651,6 +688,7 @@ export default function CrmPage() {
       } else {
         showToast('WhatsApp opened', 'success')
       }
+      setSavePromptTarget({ entry: row, channel: 'whatsapp' })
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Could not prepare WhatsApp message', 'error')
     } finally {
@@ -1383,7 +1421,33 @@ export default function CrmPage() {
                       style={{ ...btn, textDecoration: 'none' }}
                     >
                       <FolderOpen size={14} /> Files
+                      {folderDocs.length ? ` (${folderDocs.length})` : ''}
                     </Link>
+                    {editing.drive_folder_url ? (
+                      <a
+                        href={editing.drive_folder_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ ...btn, textDecoration: 'none' }}
+                      >
+                        <ExternalLink size={14} /> WorkDrive
+                      </a>
+                    ) : (
+                      <Link
+                        to={`/customer-files?company=${encodeURIComponent(editing.company_name)}`}
+                        style={{ ...btn, textDecoration: 'none', opacity: 0.85 }}
+                        title="Link a Zoho WorkDrive folder"
+                      >
+                        <FolderOpen size={14} /> Link folder
+                      </Link>
+                    )}
+                    <button
+                      type="button"
+                      style={btn}
+                      onClick={() => setLinkFileTarget({ entry: editing, channel: 'email' })}
+                    >
+                      <MessageCircle size={14} /> File chat
+                    </button>
                   </div>
                 ) : null}
 
@@ -1818,8 +1882,40 @@ export default function CrmPage() {
             user?.email || '',
             emailTarget.id,
           )
-          showToast('Email logged on timeline', 'success')
+          const target = emailTarget
+          setEmailTarget(null)
+          setSavePromptTarget({ entry: target, channel: 'email' })
         }}
+      />
+
+      <SaveToFolderPrompt
+        open={!!savePromptTarget}
+        company={savePromptTarget?.entry.company_name || ''}
+        channel={savePromptTarget?.channel || 'email'}
+        onClose={() => setSavePromptTarget(null)}
+        onFileNow={() => {
+          if (!savePromptTarget) return
+          setLinkFileTarget(savePromptTarget)
+          setSavePromptTarget(null)
+        }}
+      />
+
+      <LinkWorkDriveModal
+        open={!!linkFileTarget}
+        onClose={() => setLinkFileTarget(null)}
+        onSaved={async () => {
+          if (!linkFileTarget) return
+          const docs = await loadCustomerDocuments(linkFileTarget.entry.company_name).catch(() => [])
+          setFolderDocs(docs)
+          if (editing?.id === linkFileTarget.entry.id) {
+            openEdit({ ...linkFileTarget.entry })
+          }
+        }}
+        company={linkFileTarget?.entry.company_name || ''}
+        crmId={linkFileTarget?.entry.id || null}
+        uploadedBy={user?.email || ''}
+        mode="communication"
+        defaultCategory={linkFileTarget?.channel === 'whatsapp' ? 'whatsapp' : 'email'}
       />
     </div>
   )

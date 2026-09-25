@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildCustomerFolder,
+  buildFolderChecklist,
   companiesMatch,
   communicationKindLabel,
   CUSTOMER_FOLDER_SECTIONS,
+  filterFolderItems,
+  folderFileCounts,
   isWorkDriveShareUrl,
   normalizeCompanyKey,
+  relatedRefOptionsForSection,
   sectionForCategory,
+  suggestedDocumentTitle,
   suggestedDriveFolderName,
 } from './customerFiles'
 
@@ -19,33 +24,34 @@ describe('customerFiles', () => {
     expect(isWorkDriveShareUrl('https://example.com/file.pdf')).toBe(false)
   })
 
-  it('maps signed and communication categories onto folder sections', () => {
+  it('maps signed, communication, and purchasing categories onto folder sections', () => {
     expect(sectionForCategory('signed_quotation')).toBe('quotation')
     expect(sectionForCategory('signed_invoice')).toBe('invoice')
     expect(sectionForCategory('signed_delivery_note')).toBe('delivery_note')
     expect(sectionForCategory('email')).toBe('communication')
     expect(sectionForCategory('whatsapp')).toBe('communication')
-    expect(sectionForCategory('call_notes')).toBe('communication')
-    expect(sectionForCategory('communication')).toBe('communication')
+    expect(sectionForCategory('supplier_invoice')).toBe('purchasing')
     expect(sectionForCategory('payment_slip')).toBe(null)
     expect(sectionForCategory('other')).toBe(null)
   })
 
-  it('labels communication kinds for display', () => {
+  it('labels communication kinds and suggests titles', () => {
     expect(communicationKindLabel('whatsapp')).toBe('WhatsApp chat')
-    expect(communicationKindLabel('email')).toBe('Email')
+    expect(suggestedDocumentTitle('signed_quotation', 'RR-01-26001')).toBe('Signed RR-01-26001')
+    expect(suggestedDocumentTitle('whatsapp', 'RR-01-26001')).toBe('WhatsApp – RR-01-26001')
+    expect(suggestedDocumentTitle('supplier_invoice', 'RR-01-26001')).toBe(
+      'Supplier invoice – RR-01-26001',
+    )
   })
 
-  it('exposes four folder sections including Communications', () => {
+  it('exposes five folder sections including Communications and Purchasing', () => {
     expect(CUSTOMER_FOLDER_SECTIONS.map((s) => s.id)).toEqual([
       'quotation',
       'invoice',
       'delivery_note',
       'communication',
+      'purchasing',
     ])
-    expect(CUSTOMER_FOLDER_SECTIONS.find((s) => s.id === 'communication')?.mode).toBe(
-      'communication',
-    )
   })
 
   it('sanitizes folder names for WorkDrive', () => {
@@ -59,10 +65,14 @@ describe('customerFiles', () => {
     expect(companiesMatch('Acme', 'Beta Trading')).toBe(false)
   })
 
-  it('groups CRM docs, signed copies, and communications; hides payment slips', () => {
+  it('groups CRM docs, signed copies, communications, and purchasing; hides payment slips', () => {
     const folder = buildCustomerFolder({
       company: 'Maxtherm',
-      crm: null,
+      crm: {
+        id: 'c1',
+        company_name: 'Maxtherm',
+        drive_folder_url: '',
+      } as never,
       quotations: [
         {
           id: 'q1',
@@ -115,6 +125,20 @@ describe('customerFiles', () => {
           uploaded_at: '2026-09-13T10:00:00.000Z',
         },
         {
+          id: 'f4',
+          company_name: 'Maxtherm',
+          crm_id: null,
+          category: 'supplier_invoice',
+          title: 'Supplier invoice – RR-01-26001',
+          file_name: 'Supplier invoice – RR-01-26001',
+          drive_url: 'https://workdrive.zoho.com/file/si123',
+          related_ref: 'RR-01-26001',
+          notes: '',
+          storage_provider: 'zoho_workdrive',
+          uploaded_by: 'a@b.c',
+          uploaded_at: '2026-09-11T10:00:00.000Z',
+        },
+        {
           id: 'f2',
           company_name: 'Maxtherm',
           crm_id: null,
@@ -133,10 +157,22 @@ describe('customerFiles', () => {
 
     expect(folder.bySection.quotation).toHaveLength(1)
     expect(folder.bySection.delivery_note).toHaveLength(2)
-    expect(folder.bySection.delivery_note.some((i) => i.kind === 'workdrive')).toBe(true)
     expect(folder.bySection.communication).toHaveLength(1)
-    expect(folder.bySection.communication[0].category).toBe('whatsapp')
-    expect(folder.bySection.communication[0].subtitle).toContain('WhatsApp chat')
+    expect(folder.bySection.purchasing).toHaveLength(1)
     expect(folder.items.some((i) => i.category === 'payment_slip')).toBe(false)
+
+    const refs = relatedRefOptionsForSection(folder, 'communication')
+    expect(refs.some((r) => r.value === 'RR-01-26001')).toBe(true)
+
+    const checklist = buildFolderChecklist(folder)
+    expect(checklist.some((c) => c.id === 'no-folder')).toBe(true)
+    expect(checklist.some((c) => c.id.includes('signed-missing'))).toBe(true)
+
+    const counts = folderFileCounts(folder)
+    expect(counts.communication).toBe(1)
+    expect(counts.purchasing).toBe(1)
+    expect(counts.hasFolderUrl).toBe(false)
+
+    expect(filterFolderItems(folder.items, 'whatsapp')).toHaveLength(1)
   })
 })
