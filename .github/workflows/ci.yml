@@ -1,0 +1,67 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  app:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - name: Checkout Edge Function bundle is up to date
+        run: npm run build:checkout-fn -- --check
+      - run: npm run build
+      - name: No customer data in the published folder
+        run: |
+          if find public dist -name 'migration-data*.json' -o -name 'rrcentral-backup-*.json' | grep -q .; then
+            echo "::error::Data dumps must never be published (app/public is public)."; exit 1
+          fi
+      - name: Dependency audit (production, high+)
+        run: npm audit --omit=dev --audit-level=high
+
+  edge-functions:
+    name: Type-check Edge Functions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check supabase/functions/zoho-proxy/index.ts supabase/functions/create-checkout-session/index.ts
+
+  migrations:
+    name: Apply migrations + RLS tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash supabase/tests/run.sh

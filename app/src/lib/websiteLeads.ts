@@ -35,6 +35,9 @@ export function verticalBrandForInquiry(vertical: string): string {
   return match?.brand || vertical || 'Red Reach'
 }
 
+/** Must match the "Public submit inquiry" RLS policy limits. */
+export const INQUIRY_LIMITS = { name: 200, email: 320, phone: 50, vertical: 100, message: 5000 } as const
+
 export function buildWebsiteInquiry(
   input: WebsiteInquiryInput,
   now = new Date(),
@@ -42,11 +45,11 @@ export function buildWebsiteInquiry(
 ): WebsiteInquiry {
   return {
     id,
-    name: input.name.trim(),
-    email: input.email.trim(),
-    phone: input.phone.trim(),
-    vertical: input.vertical.trim(),
-    message: input.message.trim(),
+    name: input.name.trim().slice(0, INQUIRY_LIMITS.name),
+    email: input.email.trim().slice(0, INQUIRY_LIMITS.email),
+    phone: input.phone.trim().slice(0, INQUIRY_LIMITS.phone),
+    vertical: input.vertical.trim().slice(0, INQUIRY_LIMITS.vertical),
+    message: input.message.trim().slice(0, INQUIRY_LIMITS.message),
     status: 'new',
     crm_id: '',
     created_at: now.toISOString(),

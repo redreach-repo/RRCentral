@@ -57,8 +57,11 @@ var CONFIG = {
     'alfred@redreach.ae',
     'jacob@redreach.ae'
   ],
-  /** Shared secret for GitHub Pages → Apps Script API (override in App Settings key apiToken) */
-  API_TOKEN: 'rr-central-2026-change-me',
+  /**
+   * Shared secret for the external API / migration export. Leave empty here —
+   * set a random 32+ character value in App Settings key apiToken to enable.
+   */
+  API_TOKEN: '',
   ROLES: ['admin', 'sales'],
   FABRIC_OPTIONS: ['', 'GB', 'PV', 'TW'],
   PORTAL_DEFAULT: 'https://crm.redreach.ae',

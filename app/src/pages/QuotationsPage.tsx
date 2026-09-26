@@ -1033,7 +1033,7 @@ export default function QuotationsPage() {
         const retry = await db.from('quotations').insert(legacy)
         if (retry.error) throw retry.error
         showToast(
-          'Branch created, but deal_ref is missing on the database. Run supabase-quote-deal-branch-upgrade.sql.',
+          'Branch created, but deal_ref is missing on the database. Run supabase/migrations/20260924205429_quote_deal_branch.sql.',
           'error',
         )
       } else if (error) throw error

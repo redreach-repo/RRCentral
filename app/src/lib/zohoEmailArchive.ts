@@ -391,7 +391,7 @@ export function crmHasAnyContactEmail(entries: CrmEntry[]): boolean {
 export function archiveSetupHint(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err)
   if (isMissingRelationError(err)) {
-    return 'Run supabase-customer-files-upgrade.sql so customer_documents exists.'
+    return 'Run supabase/migrations/20260924224316_customer_files.sql so customer_documents exists.'
   }
   return msg
 }

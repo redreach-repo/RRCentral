@@ -9,3 +9,12 @@ appscript/.clasp.json
 app/dist/
 .env
 .env.local
+.env.*
+!.env.example
+
+# Never commit customer data — app/public/ is published to the internet.
+migration-data*.json
+rrcentral-backup-*.json
+*.dump
+*.sql.gz
+app/public/invoices/

@@ -8,7 +8,6 @@ import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import {
   importSheetsDumpFromFile,
-  importSheetsDumpFromUrl,
   resetSheetsImportFlag,
 } from '../lib/migrateFromSheets'
 import { clearLocalData, DB_NAME, exportLocalDump } from '../lib/localDb'
@@ -257,24 +256,6 @@ export default function SettingsPage() {
       window.location.reload()
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Import failed', 'error')
-    } finally {
-      setImporting(false)
-    }
-  }
-
-  async function handleImportBundled() {
-    setImporting(true)
-    try {
-      resetSheetsImportFlag()
-      const url = `${import.meta.env.BASE_URL}migration-data.json`
-      const counts = await importSheetsDumpFromUrl(url)
-      showToast(
-        `Imported Sheets data: ${counts.crm || 0} CRM, ${counts.quotations || 0} quotes, ${counts.invoices || 0} invoices`,
-        'success',
-      )
-      window.location.reload()
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Bundled dump not found — export from Apps Script first', 'error')
     } finally {
       setImporting(false)
     }
@@ -557,7 +538,7 @@ export default function SettingsPage() {
             <ol style={{ color: colors.muted2, fontSize: 12, margin: '0 0 12px', paddingLeft: 18, lineHeight: 1.55 }}>
               <li>
                 In Supabase: open your project → <strong style={{ color: colors.text }}>SQL Editor</strong> → paste
-                and run <code>app/supabase-schema.sql</code> from this repo.
+                and apply the SQL files in <code>supabase/migrations/</code> (oldest first).
               </li>
               <li>
                 In Supabase: <strong style={{ color: colors.text }}>Authentication → Providers → Google</strong> →
@@ -806,26 +787,19 @@ export default function SettingsPage() {
         <div style={{ ...cardStyle, marginBottom: 20 }}>
           <h2 style={sectionTitleStyle}>Import Google Sheets data</h2>
           <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
-            Pull your existing CRM, quotes, invoices, and catalog from the Apps Script spreadsheet
-            into this browser. This replaces local data — download a backup first.
+            Pull your existing CRM, quotes, invoices, and catalog from an Apps Script migration
+            export into this browser. This replaces local data — download a backup first. Never
+            put export files in <code>app/public</code>: everything there is published online.
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             <button
               type="button"
               style={buttonPrimaryStyle}
               disabled={importing}
-              onClick={() => void handleImportBundled()}
-            >
-              <Upload size={14} style={{ marginRight: 6 }} />
-              {importing ? 'Importing…' : 'Import bundled Sheets dump'}
-            </button>
-            <button
-              type="button"
-              style={buttonSecondaryStyle}
-              disabled={importing}
               onClick={() => fileRef.current?.click()}
             >
-              Upload migration JSON…
+              <Upload size={14} style={{ marginRight: 6 }} />
+              {importing ? 'Importing…' : 'Upload migration JSON…'}
             </button>
             <input
               ref={fileRef}
