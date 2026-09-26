@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { buildDivisionPipeline } from '../lib/divisionPipeline'
 import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -11,7 +12,7 @@ import {
 } from 'lucide-react'
 import { addDays, format, isWithinInterval, parseISO, startOfDay, startOfMonth } from 'date-fns'
 import { db } from '../lib/db'
-import { DIVISIONS, PIPELINE_STAGES } from '../lib/config'
+import { PIPELINE_STAGES } from '../lib/config'
 import type { CrmEntry, Expense, IncomeEntry, Invoice, Quotation } from '../lib/types'
 import {
   countsTowardIncome,
@@ -229,21 +230,10 @@ export default function DashboardPage() {
   }, [crm])
 
   /** Pipeline = open quotes only. Awarded = won revenue potential (not income until paid). */
-  const divisionBreakdown = useMemo(() => {
-    return DIVISIONS.map((d) => {
-      const rows = quotations.filter((q) => (q.division_code || '01') === d.code)
-      const open = rows.filter((q) => ['Draft', 'Finalized', 'Sent'].includes(q.status))
-      const awarded = rows.filter((q) => q.status === 'Awarded')
-      return {
-        code: d.code,
-        brand: d.brand,
-        openCount: open.length,
-        openAmount: open.reduce((s, q) => s + Number(q.amount || 0), 0),
-        awardedCount: awarded.length,
-        awardedAmount: awarded.reduce((s, q) => s + Number(q.amount || 0), 0),
-      }
-    })
-  }, [quotations])
+  const divisionBreakdown = useMemo(
+    () => buildDivisionPipeline(quotations, invoices),
+    [quotations, invoices],
+  )
 
   const recentQuotes = quotations.slice(0, 6)
   const recentInvoices = invoices.filter((i) => i.status !== 'Cancelled').slice(0, 6)
@@ -367,7 +357,7 @@ export default function DashboardPage() {
       </div>
 
       <div className={dash.panel}>
-        <h2 className={dash.panelTitle}>Division Breakdown</h2>
+        <h2 className={dash.panelTitle}>Pipeline &amp; conversion by division</h2>
         <div style={tableWrapStyle}>
           <table style={tableStyle}>
             <thead>
@@ -377,6 +367,10 @@ export default function DashboardPage() {
                 <th style={thStyle}>Open amount</th>
                 <th style={thStyle}>Awarded</th>
                 <th style={thStyle}>Awarded amount</th>
+                <th style={thStyle}>Win rate</th>
+                <th style={thStyle}>Avg won deal</th>
+                <th style={thStyle}>Invoiced</th>
+                <th style={thStyle}>Outstanding</th>
               </tr>
             </thead>
             <tbody>
@@ -390,13 +384,22 @@ export default function DashboardPage() {
                   <td style={tdStyle}>{formatMoney(d.openAmount)}</td>
                   <td style={tdStyle}>{d.awardedCount}</td>
                   <td style={tdStyle}>{formatMoney(d.awardedAmount)}</td>
+                  <td style={tdStyle} title={`${d.awardedCount} won · ${d.lostCount} lost/expired`}>
+                    {d.winRate === null ? '—' : `${Math.round(d.winRate * 100)}%`}
+                  </td>
+                  <td style={tdStyle}>{d.avgWonAmount ? formatMoney(d.avgWonAmount) : '—'}</td>
+                  <td style={tdStyle}>{formatMoney(d.invoicedAmount)}</td>
+                  <td style={{ ...tdStyle, color: d.outstandingAmount ? colors.warn : undefined }}>
+                    {formatMoney(d.outstandingAmount)}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         <p style={{ margin: '10px 0 0', fontSize: 12, color: colors.muted }}>
-          Not awarded / expired quotes are excluded from open and awarded amounts. Awarded is not income until invoiced and paid.
+          Win rate = awarded ÷ (awarded + not awarded + expired). Invoiced excludes draft and cancelled invoices;
+          outstanding is what is still unpaid. Invoice division comes from its reference (RR-01-… = division 01).
         </p>
       </div>
 

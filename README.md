@@ -51,6 +51,14 @@ https://redreach-repo.github.io/RRCentral/
 
 Until Supabase is connected, the orange banner means **local mode** (data stays in that browser only).
 
+## What's in Central
+
+- **Access control** — only teammates listed in Settings → Users can sign in to data; admin vs sales enforced by the database ([`docs/SECURITY.md`](./docs/SECURITY.md)).
+- **Audit log** (admin) — who created, changed or deleted what, with before/after values.
+- **Follow-up reminders** — bell + sidebar badge with overdue / due-today counts; optional once-a-day desktop notification.
+- **Pipeline & conversion by division** on the Dashboard — open, awarded, win rate, average won deal, invoiced, outstanding.
+- **Nightly encrypted backups** ([`docs/BACKUPS.md`](./docs/BACKUPS.md)).
+
 ## Fix org-root 404
 
 See [`org-pages/README.md`](./org-pages/README.md) — publish that tiny redirect as `redreach-repo.github.io` so the bare domain sends people into Central.
