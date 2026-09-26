@@ -21,6 +21,7 @@ import ExpensesPage from './pages/ExpensesPage'
 import VendorsPage from './pages/VendorsPage'
 import CustomerFilesPage from './pages/CustomerFilesPage'
 import SettingsPage from './pages/SettingsPage'
+import AuditLogPage from './pages/AuditLogPage'
 import DocumentPage from './pages/DocumentPage'
 import SiteLayout from './site/components/SiteLayout'
 import HomePage from './site/pages/HomePage'
@@ -109,6 +110,7 @@ export default function App() {
               <Route path="expenses" element={<ExpensesPage />} />
               <Route path="vendors" element={<VendorsPage />} />
               <Route path="settings" element={<SettingsPage />} />
+              <Route path="audit-log" element={<AuditLogPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

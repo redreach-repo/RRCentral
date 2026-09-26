@@ -28,7 +28,7 @@ Tee Tribe retail lives at http://localhost:5173/RRCentral/shop. Stripe Checkout 
 ### Cloud mode (Supabase)
 
 1. Create a project at https://supabase.com
-2. SQL Editor → run `supabase-schema.sql`
+2. Apply `supabase/migrations/*.sql` in filename order (`npx supabase db push` or the SQL Editor)
 3. Auth → Google provider + redirect URLs:
    - `http://localhost:5173/RRCentral/`
    - `https://redreach-repo.github.io/RRCentral/`
@@ -50,7 +50,7 @@ Dashboard (monthly income/expense), CRM with **multiple contacts**, **pipeline s
 Local IndexedDB is fine for a single browser. For the whole team:
 
 1. Create a project at https://supabase.com
-2. SQL Editor → run [`supabase-schema.sql`](./supabase-schema.sql)
+2. Apply [`supabase/migrations/`](../supabase/migrations/) in filename order (`npx supabase db push` or the SQL Editor)
 3. Auth → enable **Google**, add redirect URLs for local + GitHub Pages
 4. Copy Project URL + anon key into `app/.env` (and GitHub Actions secrets `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`)
 5. Redeploy — the app switches from local mode to shared Postgres automatically

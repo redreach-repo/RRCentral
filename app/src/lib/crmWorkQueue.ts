@@ -1,4 +1,4 @@
-import { isBefore, isToday, parseISO, startOfDay } from 'date-fns'
+import { isBefore, isSameDay, parseISO, startOfDay } from 'date-fns'
 import type { CrmEntry } from './types'
 
 export type FollowBucket = 'All' | 'Due' | 'Overdue' | 'Today' | 'Upcoming' | 'None'
@@ -26,8 +26,9 @@ export function followUpBucket(dateStr: string | null | undefined, today = start
   if (!dateStr) return 'None'
   try {
     const d = startOfDay(parseISO(dateStr.slice(0, 10)))
-    if (isToday(d)) return 'Today'
-    if (isBefore(d, today)) return 'Overdue'
+    const ref = startOfDay(today)
+    if (isSameDay(d, ref)) return 'Today'
+    if (isBefore(d, ref)) return 'Overdue'
     return 'Upcoming'
   } catch {
     return 'None'

@@ -105,7 +105,7 @@ function applyExVat(exclusive: number, rate: number): Pick<ExpenseForm, 'amount'
 }
 
 export default function ExpensesPage() {
-  const { user } = useAuth()
+  const { user, userRole } = useAuth()
   const { settings } = useSettings()
   const { showToast } = useToast()
   const vatRate = Number(settings.vatRate || VAT_RATE) || VAT_RATE
@@ -379,7 +379,7 @@ export default function ExpensesPage() {
           const retry = await db.from('expenses').update(legacy).eq('id', editing.id)
           if (retry.error) throw retry.error
           showToast(
-            'Saved without supplier-invoice columns. Run supabase-supplier-invoice-expense-upgrade.sql in Supabase.',
+            'Saved without supplier-invoice columns. Run supabase/migrations/20260924195629_supplier_invoice_expense.sql in Supabase.',
             'error',
           )
         } else if (error) throw error
@@ -398,7 +398,7 @@ export default function ExpensesPage() {
           const retry = await db.from('expenses').insert({ ...legacy, id: newId })
           if (retry.error) throw retry.error
           showToast(
-            'Saved without supplier-invoice columns. Run supabase-supplier-invoice-expense-upgrade.sql in Supabase.',
+            'Saved without supplier-invoice columns. Run supabase/migrations/20260924195629_supplier_invoice_expense.sql in Supabase.',
             'error',
           )
         } else if (error) throw error
@@ -456,6 +456,10 @@ export default function ExpensesPage() {
 
   async function confirmDelete() {
     if (!deleteTarget) return
+    if (userRole !== 'admin') {
+      showToast('Only admins can delete expenses', 'error')
+      return
+    }
     setSaving(true)
     try {
       const { data: atts } = await db
@@ -571,10 +575,20 @@ export default function ExpensesPage() {
                       <td style={tdStyle}>
                         <button type="button" style={buttonSecondaryStyle} onClick={() => openEdit(e)}>
                           <Pencil size={14} />
-                        </button>{' '}
-                        <button type="button" style={buttonDangerStyle} onClick={() => setDeleteTarget(e)}>
-                          <Trash2 size={14} />
                         </button>
+                        {userRole === 'admin' && (
+                          <>
+                            {' '}
+                            <button
+                              type="button"
+                              style={buttonDangerStyle}
+                              onClick={() => setDeleteTarget(e)}
+                              aria-label="Delete expense"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </>
+                        )}
                       </td>
                     </tr>
                   )

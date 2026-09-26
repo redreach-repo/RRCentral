@@ -533,6 +533,10 @@ export default function InvoicesPage() {
 
   async function confirmDelete() {
     if (!deleteTarget) return
+    if (userRole !== 'admin') {
+      showToast('Only admins can delete invoices', 'error')
+      return
+    }
     setSaving(true)
     try {
       const ref = deleteTarget.reference_number
@@ -578,9 +582,16 @@ export default function InvoicesPage() {
         <button type="button" style={buttonSecondaryStyle} onClick={() => void duplicate(inv)}>
           <Copy size={14} />
         </button>
-        <button type="button" style={buttonDangerStyle} onClick={() => setDeleteTarget(inv)}>
-          <Trash2 size={14} />
-        </button>
+        {userRole === 'admin' && (
+          <button
+            type="button"
+            style={buttonDangerStyle}
+            onClick={() => setDeleteTarget(inv)}
+            aria-label="Delete invoice"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
       </div>
     )
   }

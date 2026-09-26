@@ -224,7 +224,7 @@ export default function VendorsPage() {
     } catch (e) {
       if (isMissingRelationError(e)) {
         showToast(
-          'Vendors table is missing. Run supabase-vendors-upgrade.sql in Supabase first.',
+          'Vendors table is missing. Run supabase/migrations/20260924203122_vendors.sql in Supabase first.',
           'error',
         )
         setMissingTable(true)
@@ -274,7 +274,7 @@ export default function VendorsPage() {
       {missingTable ? (
         <div style={{ ...cardStyle, color: colors.muted, lineHeight: 1.55 }}>
           The <code>vendors</code> table is not on this database yet. Run{' '}
-          <code>app/supabase-vendors-upgrade.sql</code> in the Supabase SQL editor, then refresh.
+          <code>supabase/migrations/20260924203122_vendors.sql</code> in the Supabase SQL editor, then refresh.
         </div>
       ) : null}
 

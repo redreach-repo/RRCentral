@@ -173,7 +173,7 @@ export default function LinkWorkDriveModal({
       await onSaved?.()
     } catch (e) {
       if (isMissingRelationError(e)) {
-        showToast('Run supabase-customer-files-upgrade.sql in Supabase first', 'error')
+        showToast('Run supabase/migrations/20260924224316_customer_files.sql in Supabase first', 'error')
       } else {
         showToast(errorMessage(e, 'Could not save WorkDrive link'), 'error')
       }

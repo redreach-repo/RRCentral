@@ -65,13 +65,35 @@ export function isSafeUrl(url: string): boolean {
   }
 }
 
-export function parseCheckoutRequest(input: unknown): CheckoutRequest | { error: string } {
+/** True when `url` is on one of the allowed origins (e.g. https://redreach-repo.github.io). */
+export function isAllowedReturnUrl(url: string, allowedOrigins: readonly string[]): boolean {
+  if (!isSafeUrl(url)) return false
+  const origin = new URL(url).origin.toLowerCase()
+  return allowedOrigins.some((allowed) => allowed.replace(/\/$/, '').toLowerCase() === origin)
+}
+
+/**
+ * Validate a checkout request from the browser. Prices are never taken from the
+ * client — only product/colour/size/qty. Pass `allowedOrigins` on a server so
+ * Stripe can only redirect shoppers back to our own site.
+ */
+export function parseCheckoutRequest(
+  input: unknown,
+  allowedOrigins?: readonly string[],
+): CheckoutRequest | { error: string } {
   if (!input || typeof input !== 'object') return { error: 'Invalid checkout payload' }
   const body = input as Record<string, unknown>
   if (!Array.isArray(body.lines) || body.lines.length === 0) return { error: 'Your bag is empty' }
   const successUrl = String(body.successUrl || '')
   const cancelUrl = String(body.cancelUrl || '')
   if (!isSafeUrl(successUrl) || !isSafeUrl(cancelUrl)) return { error: 'Invalid return URL' }
+  if (
+    allowedOrigins &&
+    (!isAllowedReturnUrl(successUrl, allowedOrigins) || !isAllowedReturnUrl(cancelUrl, allowedOrigins))
+  ) {
+    return { error: 'Return URL is not on an allowed site' }
+  }
+  if (body.lines.length > 50) return { error: 'Too many lines in this bag' }
   const lines: CartLine[] = []
   for (const row of body.lines) {
     if (!row || typeof row !== 'object') continue
