@@ -13,7 +13,9 @@ export async function extractPdfText(source: File | ArrayBuffer | Uint8Array): P
       : source instanceof ArrayBuffer
         ? new Uint8Array(source)
         : source
-  const doc = await getDocument({ data }).promise
+  // Text extraction only: no XFA forms, no scripting.
+  const task = getDocument({ data, enableXfa: false })
+  const doc = await task.promise
   const parts: string[] = []
   for (let i = 1; i <= doc.numPages; i++) {
     const page = await doc.getPage(i)
@@ -24,7 +26,7 @@ export async function extractPdfText(source: File | ArrayBuffer | Uint8Array): P
       .join(' ')
     parts.push(pageText)
   }
-  await doc.destroy()
+  await task.destroy()
   return parts.join('\n')
 }
 

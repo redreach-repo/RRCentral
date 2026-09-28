@@ -305,10 +305,10 @@ function normalizeMigrationDateTime_(value) {
 }
 
 function serveMigrationExport_(params) {
-  var token = params.token || '';
-  var expected = getApiToken_();
-  if (expected && String(token) !== expected) {
-    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'Invalid token' }))
+  try {
+    requireApiToken_(params.token || '');
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: String(err.message || err) }))
       .setMimeType(ContentService.MimeType.JSON);
   }
   var dump = exportMigrationDump();

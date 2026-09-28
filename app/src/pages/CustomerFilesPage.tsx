@@ -251,7 +251,7 @@ export default function CustomerFilesPage() {
         <div style={{ ...cardStyle, marginBottom: 16, borderColor: colors.warn }}>
           <strong style={{ color: colors.warn }}>SQL needed</strong>
           <p style={{ margin: '8px 0 0', color: colors.muted, fontSize: 14, lineHeight: 1.5 }}>
-            Run <code style={{ color: colors.accent }}>supabase-customer-files-upgrade.sql</code> in
+            Run <code style={{ color: colors.accent }}>supabase/migrations/20260924224316_customer_files.sql</code> in
             the Supabase SQL editor so customer folders and WorkDrive links can be saved.
           </p>
         </div>

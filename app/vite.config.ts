@@ -19,8 +19,52 @@ function spaFallback404(): Plugin {
   }
 }
 
+/**
+ * Content Security Policy for the production build. GitHub Pages cannot send
+ * HTTP headers, so it goes in a <meta> tag (frame-ancestors is not supported
+ * there). Scripts may only come from our own origin — this blocks injected
+ * <script> tags and inline event handlers. Dev mode is skipped because Vite's
+ * HMR relies on inline scripts.
+ */
+export const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https:",
+  // Supabase (REST + realtime), Zoho, Stripe — runtime-configurable hosts, so https/wss only.
+  "connect-src 'self' https: wss:",
+  "worker-src 'self' blob:",
+  "frame-src 'self' blob: data: https:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  'upgrade-insecure-requests',
+].join('; ')
+
+function securityMetaTags(): Plugin {
+  return {
+    name: 'security-meta-tags',
+    apply: 'build',
+    transformIndexHtml() {
+      return [
+        {
+          tag: 'meta',
+          attrs: { 'http-equiv': 'Content-Security-Policy', content: CONTENT_SECURITY_POLICY },
+          injectTo: 'head-prepend',
+        },
+        {
+          tag: 'meta',
+          attrs: { name: 'referrer', content: 'strict-origin-when-cross-origin' },
+          injectTo: 'head-prepend',
+        },
+      ]
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), spaFallback404(), stripeCheckoutPlugin()],
+  plugins: [react(), securityMetaTags(), spaFallback404(), stripeCheckoutPlugin()],
   base: '/RRCentral/',
 })

@@ -178,6 +178,19 @@
   color: #fff;
 }
 
+.navBadge {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #e85d04;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 18px;
+}
+
 .navItemActive {
   background: rgba(232, 93, 4, 0.16);
   color: #ff9f4a;
@@ -274,6 +287,38 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.reminderBtn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.85);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.reminderBtn:hover {
+  background: rgba(232, 93, 4, 0.15);
+}
+
+.reminderCount {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #e85d04;
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 18px;
 }
 
 .signOutBtn {

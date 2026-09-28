@@ -270,7 +270,7 @@ function ensureSettingsDefaults_() {
     portalBaseUrl: CONFIG.PORTAL_DEFAULT || 'https://crm.redreach.ae',
     bilingualDefault: 'en',
     adminEmails: 'alfredsv@gmail.com, redreachdxb@gmail.com, alfred@redreach.ae, jacob@redreach.ae',
-    apiToken: CONFIG.API_TOKEN || 'rr-central-2026-change-me',
+    apiToken: CONFIG.API_TOKEN || '',
     whatsappCountryCode: '971',
     followUpDaysAfterQuote: '3',
     calendarSync: 'yes',

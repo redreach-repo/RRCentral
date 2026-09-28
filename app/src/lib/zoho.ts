@@ -20,12 +20,16 @@ function setting(settings: ZohoSettings, key: string, fallback = ''): string {
   return String(settings[key] ?? fallback).trim()
 }
 
+/**
+ * In cloud mode the Client Secret and Refresh Token are admin-only (RLS), so
+ * sales users only see the Client ID — the zoho-proxy fills in the secrets
+ * server-side. Local mode still needs all three in the browser.
+ */
 export function isZohoConfigured(settings: ZohoSettings): boolean {
-  return Boolean(
-    setting(settings, 'zohoClientId') &&
-      setting(settings, 'zohoClientSecret') &&
-      setting(settings, 'zohoRefreshToken'),
-  )
+  const clientId = setting(settings, 'zohoClientId')
+  if (!clientId) return false
+  if (setting(settings, 'zohoClientSecret') && setting(settings, 'zohoRefreshToken')) return true
+  return isSupabaseConfigured()
 }
 
 export function isZohoCalendarEnabled(settings: ZohoSettings): boolean {

@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
+  Bell,
+  ShieldCheck,
   Building2,
   LayoutDashboard,
   Banknote,
@@ -22,6 +24,7 @@ import {
   LogOut,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useFollowUpReminders } from '../hooks/useFollowUpReminders'
 import BrandLogo from './BrandLogo'
 import styles from './Layout.module.css'
 
@@ -76,7 +79,10 @@ const navGroups: NavGroup[] = [
   {
     id: 'admin',
     label: 'Admin',
-    items: [{ to: '/settings', label: 'Settings', icon: Settings, adminOnly: true }],
+    items: [
+      { to: '/settings', label: 'Settings', icon: Settings, adminOnly: true },
+      { to: '/audit-log', label: 'Audit log', icon: ShieldCheck, adminOnly: true },
+    ],
   },
 ]
 
@@ -97,12 +103,20 @@ const titleByPath: { match: (path: string) => boolean; title: string }[] = [
   { match: (p) => p.startsWith('/expenses'), title: 'Expenses' },
   { match: (p) => p.startsWith('/vendors'), title: 'Vendors' },
   { match: (p) => p.startsWith('/settings'), title: 'Settings' },
+  { match: (p) => p.startsWith('/audit-log'), title: 'Audit log' },
 ]
 
 export default function Layout() {
   const { user, userRole, signOut, isLocalMode } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
+  const reminders = useFollowUpReminders(user?.email)
+
+  function openReminders() {
+    if (reminders.permission === 'default') void reminders.enableNotifications()
+    navigate('/follow-ups')
+  }
 
   const pageTitle =
     titleByPath.find((t) => t.match(location.pathname))?.title || 'RED REACH Central'
@@ -158,6 +172,11 @@ export default function Layout() {
                   >
                     <Icon size={18} strokeWidth={1.75} />
                     <span>{label}</span>
+                    {to === '/follow-ups' && reminders.due > 0 && (
+                      <span className={styles.navBadge} aria-label={`${reminders.due} due`}>
+                        {reminders.due > 99 ? '99+' : reminders.due}
+                      </span>
+                    )}
                   </NavLink>
                 ))}
               </div>
@@ -190,6 +209,23 @@ export default function Layout() {
           </div>
 
           <div className={styles.topbarRight}>
+            <button
+              type="button"
+              className={styles.reminderBtn}
+              onClick={openReminders}
+              title={
+                reminders.due
+                  ? `${reminders.counts.overdue} overdue, ${reminders.counts.today} due today (${reminders.counts.mine} yours)` +
+                    (reminders.permission === 'default' ? ' — click to enable desktop reminders' : '')
+                  : reminders.permission === 'default'
+                    ? 'Enable desktop reminders for due follow-ups'
+                    : 'No follow-ups due'
+              }
+              aria-label={`Follow-up reminders: ${reminders.due} due`}
+            >
+              <Bell size={16} />
+              {reminders.due > 0 && <span className={styles.reminderCount}>{reminders.due}</span>}
+            </button>
             <span className={styles.userEmail}>{user?.email}</span>
             <button
               type="button"

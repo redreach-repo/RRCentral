@@ -29,7 +29,7 @@ Each division is its own page. **RR Central** is a quiet text link to `/login` (
 | CRM dashboard | `/app` after sign-in |
 | CRM modules | `/crm`, `/quotations`, `/app/wanders`, … |
 
-Contact forms write **website inquiries** into Central (and create a CRM lead in local mode). On Supabase, run the updated [`app/supabase-schema.sql`](./app/supabase-schema.sql) so `website_inquiries` exists and anonymous visitors can insert.
+Contact forms write **website inquiries** into Central (and create a CRM lead in local mode). On Supabase, apply the migrations in [`supabase/migrations/`](./supabase/migrations/) so `website_inquiries` exists and anonymous visitors can insert (only insert — see [`docs/SECURITY.md`](./docs/SECURITY.md)).
 
 ## How the team should use it
 
@@ -38,14 +38,26 @@ Contact forms write **website inquiries** into Central (and create a CRM lead in
 https://redreach-repo.github.io/RRCentral/
 
 1. Create a project at [supabase.com](https://supabase.com)
-2. SQL Editor → run [`app/supabase-schema.sql`](./app/supabase-schema.sql)
+2. Apply the database migrations in [`supabase/migrations/`](./supabase/migrations/), oldest first
+   (`npx supabase db push`, or paste each file into the SQL Editor in filename order).
+   **Before `…_security_rls.sql`, make sure your email is an active admin in `app_users`.**
 3. Auth → Providers → **Google** → enable  
-   Redirect URL: `https://redreach-repo.github.io/RRCentral/`
-4. Project Settings → API → copy **URL** + **anon key**
-5. In the CRM: **Settings → Data & storage → Connect Supabase** → paste → Connect & reload  
+   Redirect URL: `https://redreach-repo.github.io/RRCentral/`  
+   Only people listed in `app_users` (Settings → Users) can see any data — other Google accounts get “No access”.
+4. Deploy the Edge Functions: `zoho-proxy` (Zoho) and `create-checkout-session` (shop) — see [`docs/SECURITY.md`](./docs/SECURITY.md).
+5. Project Settings → API → copy **URL** + **anon key**
+6. In the CRM: **Settings → Data & storage → Connect Supabase** → paste → Connect & reload  
    *(Or add GitHub Actions secrets `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` and redeploy so everyone is cloud by default.)*
 
 Until Supabase is connected, the orange banner means **local mode** (data stays in that browser only).
+
+## What's in Central
+
+- **Access control** — only teammates listed in Settings → Users can sign in to data; admin vs sales enforced by the database ([`docs/SECURITY.md`](./docs/SECURITY.md)).
+- **Audit log** (admin) — who created, changed or deleted what, with before/after values.
+- **Follow-up reminders** — bell + sidebar badge with overdue / due-today counts; optional once-a-day desktop notification.
+- **Pipeline & conversion by division** on the Dashboard — open, awarded, win rate, average won deal, invoiced, outstanding.
+- **Nightly encrypted backups** ([`docs/BACKUPS.md`](./docs/BACKUPS.md)).
 
 ## Fix org-root 404
 
@@ -58,7 +70,8 @@ Team setup checklist (secrets, teammates, backup upload, custom domain): [`docs/
 | App | Path | Stack |
 |-----|------|--------|
 | **React app (team)** | [`app/`](./app/) | Vite + React → GitHub Pages + optional Supabase |
-| Legacy UI | [`web/`](./web/) | Static Pages launcher for Apps Script |
+| Database | [`supabase/`](./supabase/) | Ordered SQL migrations, one-off scripts, Edge Functions |
+| Legacy UI | [`web/`](./web/) | Static Pages launcher for Apps Script (superseded by `app/`; not deployed) |
 | Legacy backend | [`appscript/`](./appscript/) | Google Apps Script + Sheets |
 
 ## React app quick start
@@ -73,7 +86,16 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173/RRCentral/shop for **Tee Tribe**. Checkout talks to a local Vite API at `/api/create-checkout-session`. Without `STRIPE_SECRET_KEY` it completes a demo order. With a Stripe restricted key in `app/.env` (see `app/.env.example`) it redirects to Stripe-hosted Checkout (AED, UAE shipping, no `payment_method_types` so Dashboard payment methods apply). GitHub Pages has no server: set `VITE_CHECKOUT_API_URL` to a Checkout function, or the bag falls back to demo success.
+Open http://localhost:5173/RRCentral/shop for **Tee Tribe**. Locally, checkout talks to a Vite API at `/api/create-checkout-session`. Without `STRIPE_SECRET_KEY` it completes a demo order. With a Stripe restricted key in `app/.env` (see `app/.env.example`) it redirects to Stripe-hosted Checkout (AED, UAE shipping, no `payment_method_types` so Dashboard payment methods apply).
+
+On the live site checkout calls the Supabase Edge Function [`create-checkout-session`](./supabase/functions/create-checkout-session/) (or `VITE_CHECKOUT_API_URL` if set). If it is not deployed the shop shows an error — it never pretends an order succeeded. Prices come from `app/src/shop/checkout.ts`; after changing the catalog run `npm run build:checkout-fn` in `app/` (CI checks this).
+
+### Checks (run before opening a PR — CI runs the same)
+
+```bash
+cd app
+npm run lint && npm run typecheck && npm test
+```
 
 ### Cloud (Supabase) — team sharing
 
@@ -88,6 +110,8 @@ https://script.google.com/macros/s/AKfycbzpBkL38S4dXfUk90yLg3uiKRCWi7Sey5TbnOfyi
 ```
 
 See [`appscript/README.md`](./appscript/README.md) and [`web/README.md`](./web/README.md).
+
+The external API and `?page=migrate` export are **disabled** until an admin sets a random `apiToken` (32+ characters) in the App Settings sheet and redeploys. The old default token is permanently rejected.
 
 ## Admins
 

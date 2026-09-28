@@ -1,0 +1,57 @@
+name: Nightly database backup
+# Encrypted pg_dump of the Supabase database, kept as a workflow artifact.
+# This repository is PUBLIC, so the dump is always encrypted (AES-256) before
+# upload — without BACKUP_PASSPHRASE the job refuses to run.
+#
+# Secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_DB_URL     Supabase → Project Settings → Database → Connection string (URI, session pooler)
+#   BACKUP_PASSPHRASE   long random string — store it in your password manager too
+# Restore: see docs/BACKUPS.md
+on:
+  schedule:
+    - cron: '17 22 * * *' # 02:17 Dubai
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Check secrets
+        id: check
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::warning::SUPABASE_DB_URL is not set — skipping backup."; echo "run=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ ${#BACKUP_PASSPHRASE} -lt 20 ]; then
+            echo "::error::BACKUP_PASSPHRASE must be set (20+ chars). Refusing to upload an unencrypted dump from a public repo."; exit 1
+          fi
+          echo "run=true" >> "$GITHUB_OUTPUT"
+      - name: Dump and encrypt
+        if: steps.check.outputs.run == 'true'
+        run: |
+          set -euo pipefail
+          umask 077
+          stamp=$(date -u +%Y%m%d-%H%M)
+          echo "STAMP=$stamp" >> "$GITHUB_ENV"
+          docker run --rm -e DB_URL="$SUPABASE_DB_URL" postgres:17 \
+            sh -c 'pg_dump "$DB_URL" --format=custom --no-owner --no-privileges --schema=public --schema=auth' \
+            > rrcentral.dump
+          test -s rrcentral.dump
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" \
+            --symmetric --cipher-algo AES256 -o "rrcentral-$stamp.dump.gpg" rrcentral.dump
+          shred -u rrcentral.dump
+          ls -lh rrcentral-*.dump.gpg
+      - uses: actions/upload-artifact@v4
+        if: steps.check.outputs.run == 'true'
+        with:
+          name: rrcentral-db-${{ env.STAMP }}
+          path: rrcentral-*.dump.gpg
+          retention-days: 30
+          if-no-files-found: error

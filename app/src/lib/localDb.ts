@@ -332,14 +332,24 @@ function compareValues(a: unknown, b: unknown): number {
   return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' })
 }
 
-function matchIlike(value: unknown, pattern: string): boolean {
+/** Postgres ILIKE semantics: % and _ are wildcards, backslash escapes them. */
+export function matchIlike(value: unknown, pattern: string): boolean {
   const text = String(value ?? '').toLowerCase()
-  const escaped = pattern
-    .toLowerCase()
-    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    .replace(/%/g, '.*')
-    .replace(/_/g, '.')
-  return new RegExp(`^${escaped}$`).test(text)
+  let re = ''
+  const p = pattern.toLowerCase()
+  for (let i = 0; i < p.length; i++) {
+    const ch = p[i]
+    if (ch === '\\' && i + 1 < p.length) {
+      re += p[++i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    } else if (ch === '%') {
+      re += '.*'
+    } else if (ch === '_') {
+      re += '.'
+    } else {
+      re += ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    }
+  }
+  return new RegExp(`^${re}$`, 's').test(text)
 }
 
 function applyFilters(rows: Row[], filters: Filter[]): Row[] {

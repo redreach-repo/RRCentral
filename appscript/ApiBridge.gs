@@ -5,6 +5,49 @@
 
 var EXTERNAL_REQUEST_USER_ = '';
 
+/** The old default token was committed to the repo — never accept it. */
+var KNOWN_PUBLIC_TOKENS_ = ['rr-central-2026-change-me'];
+var MIN_API_TOKEN_LENGTH_ = 32;
+
+/** Sites allowed to receive API results via postMessage. */
+var ALLOWED_API_ORIGINS_ = [
+  'https://redreach-repo.github.io',
+  'https://redreach.ae',
+  'https://www.redreach.ae',
+  'http://localhost:5173'
+];
+
+function constantTimeEquals_(a, b) {
+  a = String(a || '');
+  b = String(b || '');
+  var diff = a.length ^ b.length;
+  for (var i = 0; i < Math.max(a.length, b.length); i++) {
+    diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  }
+  return diff === 0;
+}
+
+/**
+ * The external API and migration export are disabled unless an admin sets a
+ * random apiToken (32+ characters) in App Settings. Generate one with:
+ *   Utilities.getUuid() + Utilities.getUuid()
+ */
+function requireApiToken_(token) {
+  var expected = getApiToken_();
+  if (
+    !expected ||
+    expected.length < MIN_API_TOKEN_LENGTH_ ||
+    KNOWN_PUBLIC_TOKENS_.indexOf(expected) !== -1
+  ) {
+    throw new Error(
+      'External API is disabled. An admin must set a random apiToken (32+ characters) in App Settings.'
+    );
+  }
+  if (!constantTimeEquals_(token, expected)) {
+    throw new Error('Invalid API token');
+  }
+}
+
 function getApiToken_() {
   try {
     var t = String(getSettings().apiToken || '').trim();
@@ -88,10 +131,7 @@ function getApiHandler_(fnName) {
 }
 
 function dispatchExternalApi_(fnName, args, userEmail, token) {
-  var expected = getApiToken_();
-  if (expected && String(token || '') !== expected) {
-    throw new Error('Invalid API token — copy apiToken from App Settings into web/config.js');
-  }
+  requireApiToken_(token);
   fnName = String(fnName || '').trim();
   var fn = getApiHandler_(fnName);
   if (!fn) throw new Error('Function not allowed: ' + fnName);
@@ -112,7 +152,11 @@ function dispatchExternalApi_(fnName, args, userEmail, token) {
 
 function serveExternalApiPage_(params) {
   var reqId = params.reqId || '';
-  var origin = params.origin || '*';
+  var origin = String(params.origin || '');
+  if (ALLOWED_API_ORIGINS_.indexOf(origin) === -1) {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'Origin not allowed' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
   var payload;
   try {
     var result = dispatchExternalApi_(
@@ -136,7 +180,7 @@ function serveExternalApiPage_(params) {
   var html =
     '<!DOCTYPE html><html><head><meta charset="utf-8"><title>API</title></head><body>' +
     '<script>(function(){var p=' + json + ';' +
-    'function send(w){try{w.postMessage(p,"*");}catch(e){}}' +
+    'function send(w){try{w.postMessage(p,' + JSON.stringify(origin) + ');}catch(e){}}' +
     'send(parent);send(top);if(window.frames){try{send(window.parent);}catch(e2){}}' +
     '})();</script></body></html>';
   return HtmlService.createHtmlOutput(html)

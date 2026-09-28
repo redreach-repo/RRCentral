@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { INTEGRATION_IDENTIFIER, buildCheckoutSessionParams, parseCheckoutRequest } from './checkout'
+import {
+  INTEGRATION_IDENTIFIER,
+  buildCheckoutSessionParams,
+  isAllowedReturnUrl,
+  parseCheckoutRequest,
+} from './checkout'
 
 describe('Tee Tribe Stripe checkout payload', () => {
   const urls = {
@@ -37,5 +42,19 @@ describe('Tee Tribe Stripe checkout payload', () => {
     })
     if ('error' in parsed) throw new Error(parsed.error)
     expect(buildCheckoutSessionParams(parsed)).toEqual({ ok: false, error: 'No valid items to check out' })
+  })
+
+  it('only lets Stripe return shoppers to allowed origins', () => {
+    const line = [{ productId: 'tt-chr-001', colorId: 'black', size: 'M', qty: 1 }]
+    const allowed = ['http://localhost:5173', 'https://redreach-repo.github.io/']
+    expect('error' in parseCheckoutRequest({ lines: line, ...urls }, allowed)).toBe(false)
+    expect(
+      parseCheckoutRequest(
+        { lines: line, successUrl: 'https://evil.example/phish', cancelUrl: urls.cancelUrl },
+        allowed,
+      ),
+    ).toEqual({ error: 'Return URL is not on an allowed site' })
+    expect(isAllowedReturnUrl('https://redreach-repo.github.io/RRCentral/shop', allowed)).toBe(true)
+    expect(isAllowedReturnUrl('https://redreach-repo.github.io.evil.example/', allowed)).toBe(false)
   })
 })

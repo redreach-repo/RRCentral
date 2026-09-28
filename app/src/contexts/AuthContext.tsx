@@ -17,6 +17,8 @@ import type { UserRole } from '../lib/types'
 interface AuthContextValue {
   user: User | null
   userRole: UserRole
+  /** False when signed in but not an active member of app_users (cloud mode). */
+  hasAccess: boolean
   signIn: () => Promise<void>
   signInWithEmail: (email: string) => Promise<void>
   signOut: () => Promise<void>
@@ -27,22 +29,30 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
-async function lookupUserRole(email: string | undefined): Promise<UserRole> {
-  if (!email) return 'sales'
+type Membership = { role: UserRole; active: boolean }
+
+const NO_MEMBERSHIP: Membership = { role: 'sales', active: false }
+
+/**
+ * Look up the signed-in user in app_users. In cloud mode RLS only returns the
+ * row to active team members, so "no row" means "no access".
+ */
+async function lookupMembership(email: string | undefined): Promise<Membership> {
+  if (!email) return NO_MEMBERSHIP
 
   const { data, error } = await db
     .from('app_users')
-    .select('role')
-    .eq('email', email)
+    .select('role, active')
+    .ilike('email', email.replace(/[\\%_]/g, '\\$&'))
     .maybeSingle()
 
-  if (error || !data?.role) return 'sales'
-  return data.role === 'admin' ? 'admin' : 'sales'
+  if (error || !data) return NO_MEMBERSHIP
+  return { role: data.role === 'admin' ? 'admin' : 'sales', active: data.active !== false }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [userRole, setUserRole] = useState<UserRole>('sales')
+  const [membership, setMembership] = useState<Membership>(NO_MEMBERSHIP)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -65,11 +75,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!mounted) return
         const currentUser = session?.user ?? null
         setUser(currentUser)
-        setUserRole(await lookupUserRole(currentUser?.email))
+        setMembership(await lookupMembership(currentUser?.email))
       } catch {
         if (!mounted) return
         setUser(null)
-        setUserRole('sales')
+        setMembership(NO_MEMBERSHIP)
       } finally {
         if (mounted) setLoading(false)
       }
@@ -82,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(currentUser)
       void (async () => {
         try {
-          setUserRole(await lookupUserRole(currentUser?.email))
+          setMembership(await lookupMembership(currentUser?.email))
         } finally {
           setLoading(false)
         }
@@ -113,13 +123,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     await authApi.signOut()
     setUser(null)
-    setUserRole('sales')
+    setMembership(NO_MEMBERSHIP)
   }, [])
 
   const value = useMemo(
     () => ({
       user,
-      userRole,
+      userRole: membership.role,
+      hasAccess: membership.active || !isSupabaseConfigured(),
       signIn,
       signInWithEmail,
       signOut,
@@ -127,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authMode,
       isLocalMode: !isSupabaseConfigured(),
     }),
-    [user, userRole, signIn, signInWithEmail, signOut, loading],
+    [user, membership, signIn, signInWithEmail, signOut, loading],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
