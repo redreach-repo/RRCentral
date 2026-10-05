@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders'
+import { useRecurringDeductionsSync } from '../hooks/useRecurringDeductionsSync'
 import BrandLogo from './BrandLogo'
 import styles from './Layout.module.css'
 
@@ -112,6 +113,7 @@ export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const reminders = useFollowUpReminders(user?.email)
+  useRecurringDeductionsSync(Boolean(user))
 
   function openReminders() {
     if (reminders.permission === 'default') void reminders.enableNotifications()
