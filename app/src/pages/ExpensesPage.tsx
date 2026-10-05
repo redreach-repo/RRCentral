@@ -13,6 +13,7 @@ import { formatAED } from '../lib/money'
 import { logActivity } from '../lib/activity'
 import { expenseVatParts } from '../lib/finance'
 import { round2 } from '../lib/lineItems'
+import { ensureRecurringDeductions } from '../lib/recurringDeductions'
 import {
   supplierInvoiceProfit,
   type ParsedSupplierInvoice,
@@ -130,6 +131,12 @@ export default function ExpensesPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
+      // Append-only: fill missing monthly Bank / Cursor / Zoom rows from Aug 2026.
+      try {
+        await ensureRecurringDeductions()
+      } catch (ensureErr) {
+        console.warn('Recurring deductions ensure failed', ensureErr)
+      }
       const [expRes, quoteRes, vendorRows] = await Promise.all([
         db.from('expenses').select('*').order('date', { ascending: false }),
         db.from('quotations').select('*').order('date', { ascending: false }),
