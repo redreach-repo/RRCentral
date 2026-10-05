@@ -129,13 +129,16 @@ export default function ExpensesPage() {
   const [pendingFiles, setPendingFiles] = useState<{ name: string; dataUrl: string; mime?: string }[]>([])
 
   const syncRecurring = useCallback(async (quiet = false) => {
-    const { inserted, error } = await ensureRecurringDeductions()
+    const { inserted, removed, error } = await ensureRecurringDeductions()
     if (error) {
       if (!quiet) showToast(error, 'error')
       return false
     }
-    if (inserted > 0) {
-      showToast(`Added ${inserted} monthly deductions (Bank, Cursor, Zoom)`, 'success')
+    if (removed > 0 || inserted > 0) {
+      const parts: string[] = []
+      if (removed > 0) parts.push(`removed ${removed} duplicate`)
+      if (inserted > 0) parts.push(`added ${inserted} missing`)
+      showToast(`Monthly deductions updated (${parts.join(', ')})`, 'success')
       return true
     }
     if (!quiet) showToast('Monthly deductions already up to date', 'success')

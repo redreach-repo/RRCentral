@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildMissingRecurringDeductions,
+  findDuplicateRecurringExpenseIds,
   recurringDeductionMonths,
   RECURRING_DEDUCTIONS,
 } from './recurringDeductions'
@@ -43,5 +44,35 @@ describe('recurringDeductions', () => {
     expect(missing.find((m) => m.vendor === 'Bank Service Charge')?.date).toBe('2026-08-01')
     expect(missing.find((m) => m.vendor === 'Cursor')?.date).toBe('2026-08-04')
     expect(missing.find((m) => m.vendor === 'Zoom Account')?.date).toBe('2026-08-08')
+  })
+
+  it('flags duplicate recurring rows for the same vendor+month+amount', () => {
+    const existing = [
+      {
+        id: 'a',
+        date: '2026-08-01',
+        vendor: 'Bank Service Charge',
+        amount: 210,
+        created_at: '2026-08-01T00:00:00.000Z',
+        references_text: '',
+      },
+      {
+        id: 'b',
+        date: '2026-08-01',
+        vendor: 'Bank Service Charge',
+        amount: 210,
+        created_at: '2026-10-05T12:00:00.000Z',
+        references_text: 'Recurring monthly deduction',
+      },
+      {
+        id: 'c',
+        date: '2026-07-01',
+        vendor: 'Bank Service Charge',
+        amount: 210,
+        created_at: '2026-07-01T00:00:00.000Z',
+        references_text: '',
+      },
+    ]
+    expect(findDuplicateRecurringExpenseIds(existing, new Date('2026-08-20'))).toEqual(['b'])
   })
 })

@@ -13,17 +13,20 @@ export function useRecurringDeductionsSync(enabled: boolean) {
     if (!enabled || started.current) return
     started.current = true
     void (async () => {
-      const { inserted, error } = await ensureRecurringDeductions()
+      const { inserted, removed, error } = await ensureRecurringDeductions()
       if (sessionStorage.getItem(SESSION_TOAST_KEY)) return
       if (error) {
         sessionStorage.setItem(SESSION_TOAST_KEY, '1')
         showToast(`${error} Open Finance → Expenses and tap Sync monthly deductions.`, 'error')
         return
       }
-      if (inserted > 0) {
+      if (removed > 0 || inserted > 0) {
         sessionStorage.setItem(SESSION_TOAST_KEY, '1')
+        const parts: string[] = []
+        if (removed > 0) parts.push(`removed ${removed} duplicate`)
+        if (inserted > 0) parts.push(`added ${inserted} missing`)
         showToast(
-          `Added ${inserted} monthly deductions (Bank, Cursor, Zoom). See Finance → Expenses.`,
+          `Monthly deductions updated (${parts.join(', ')}). See Finance → Expenses.`,
           'success',
         )
       }
