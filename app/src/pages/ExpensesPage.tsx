@@ -128,15 +128,24 @@ export default function ExpensesPage() {
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [pendingFiles, setPendingFiles] = useState<{ name: string; dataUrl: string; mime?: string }[]>([])
 
+  const syncRecurring = useCallback(async (quiet = false) => {
+    const { inserted, error } = await ensureRecurringDeductions()
+    if (error) {
+      if (!quiet) showToast(error, 'error')
+      return false
+    }
+    if (inserted > 0) {
+      showToast(`Added ${inserted} monthly deductions (Bank, Cursor, Zoom)`, 'success')
+      return true
+    }
+    if (!quiet) showToast('Monthly deductions already up to date', 'success')
+    return false
+  }, [showToast])
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      // Append-only: fill missing monthly Bank / Cursor / Zoom rows from Aug 2026.
-      try {
-        await ensureRecurringDeductions()
-      } catch (ensureErr) {
-        console.warn('Recurring deductions ensure failed', ensureErr)
-      }
+      await syncRecurring(true)
       const [expRes, quoteRes, vendorRows] = await Promise.all([
         db.from('expenses').select('*').order('date', { ascending: false }),
         db.from('quotations').select('*').order('date', { ascending: false }),
@@ -151,7 +160,7 @@ export default function ExpensesPage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [showToast, syncRecurring])
 
   useEffect(() => {
     void load()
@@ -501,10 +510,18 @@ export default function ExpensesPage() {
         <div>
           <h1 style={pageTitleStyle}>Expenses</h1>
           <p style={pageSubtitleStyle}>
-            Vendor bills, uniform supplier invoices, receipts — and spend in finance reports
+            Vendor bills, uniform supplier invoices, receipts — and spend in finance reports.
+            Monthly Bank (210), Cursor (78.09), and Zoom (54.14) sync from Aug 2026 here.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            onClick={() => void syncRecurring().then(() => load())}
+          >
+            Sync monthly deductions
+          </button>
           <button type="button" style={buttonSecondaryStyle} onClick={openCreateSupplierInvoice}>
             <FileUp size={16} /> Supplier invoice
           </button>

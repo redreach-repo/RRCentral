@@ -1,5 +1,6 @@
 import { format, parseISO, startOfMonth } from 'date-fns'
 import { db } from './db'
+import { errorMessage, isUndefinedColumnError } from './errors'
 import type { Expense } from './types'
 
 /** Monthly deductions that must exist from Aug 2026 onward (append-only). */
@@ -10,6 +11,25 @@ export const RECURRING_DEDUCTIONS = [
 ] as const
 
 const START = startOfMonth(parseISO('2026-08-01'))
+
+export type RecurringDeductionInsert = {
+  date: string
+  vendor: string
+  category: string
+  amount: number
+  amount_ex_vat: number
+  vat_amount: number
+  payment_method: string
+  references_text: string
+  notes: string
+  quote_ref: string
+  supplier_invoice_no: string
+}
+
+export type EnsureRecurringResult = {
+  inserted: number
+  error?: string
+}
 
 function monthKey(date: string | null | undefined): string {
   return (date || '').slice(0, 7)
@@ -39,29 +59,9 @@ export function recurringDeductionMonths(through: Date = new Date()): string[] {
 export function buildMissingRecurringDeductions(
   existing: Pick<Expense, 'date' | 'vendor' | 'amount'>[],
   through: Date = new Date(),
-): Array<{
-  date: string
-  vendor: string
-  category: string
-  amount: number
-  amount_ex_vat: number
-  vat_amount: number
-  payment_method: string
-  references_text: string
-  notes: string
-}> {
+): RecurringDeductionInsert[] {
   const months = recurringDeductionMonths(through)
-  const missing: Array<{
-    date: string
-    vendor: string
-    category: string
-    amount: number
-    amount_ex_vat: number
-    vat_amount: number
-    payment_method: string
-    references_text: string
-    notes: string
-  }> = []
+  const missing: RecurringDeductionInsert[] = []
 
   for (const ym of months) {
     for (const rule of RECURRING_DEDUCTIONS) {
@@ -83,11 +83,28 @@ export function buildMissingRecurringDeductions(
         payment_method: 'Bank Transfer',
         references_text: 'Recurring monthly deduction',
         notes: rule.notes,
+        quote_ref: '',
+        supplier_invoice_no: '',
       })
     }
   }
 
   return missing
+}
+
+async function insertRecurringRows(rows: RecurringDeductionInsert[]): Promise<void> {
+  if (!rows.length) return
+  const { error } = await db.from('expenses').insert(rows)
+  if (!error) return
+  if (isUndefinedColumnError(error)) {
+    const legacy = rows.map(
+      ({ amount_ex_vat: _a, vat_amount: _v, quote_ref: _q, supplier_invoice_no: _s, ...rest }) => rest,
+    )
+    const retry = await db.from('expenses').insert(legacy)
+    if (retry.error) throw retry.error
+    return
+  }
+  throw error
 }
 
 /**
@@ -96,14 +113,16 @@ export function buildMissingRecurringDeductions(
  */
 export async function ensureRecurringDeductions(
   through: Date = new Date(),
-): Promise<{ inserted: number }> {
-  const { data, error } = await db.from('expenses').select('date,vendor,amount')
-  if (error) throw error
-  const existing = (data || []) as Pick<Expense, 'date' | 'vendor' | 'amount'>[]
-  const missing = buildMissingRecurringDeductions(existing, through)
-  if (!missing.length) return { inserted: 0 }
-
-  const { error: insertError } = await db.from('expenses').insert(missing)
-  if (insertError) throw insertError
-  return { inserted: missing.length }
+): Promise<EnsureRecurringResult> {
+  try {
+    const { data, error } = await db.from('expenses').select('date,vendor,amount')
+    if (error) throw error
+    const existing = (data || []) as Pick<Expense, 'date' | 'vendor' | 'amount'>[]
+    const missing = buildMissingRecurringDeductions(existing, through)
+    if (!missing.length) return { inserted: 0 }
+    await insertRecurringRows(missing)
+    return { inserted: missing.length }
+  } catch (e) {
+    return { inserted: 0, error: errorMessage(e, 'Could not sync recurring deductions') }
+  }
 }
