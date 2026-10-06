@@ -12,7 +12,10 @@ import { authApi, isSupabaseConfigured } from '../lib/authApi'
 import { authMode } from '../lib/db'
 import { db } from '../lib/db'
 import { tryAutoImportSheetsDump } from '../lib/migrateFromSheets'
+import { isAllowedLoginEmail, loginEmailDomainError } from '../lib/allowedLoginEmail'
 import type { UserRole } from '../lib/types'
+
+export const LOGIN_DOMAIN_REJECT_KEY = 'rrcentral_login_domain_reject'
 
 interface AuthContextValue {
   user: User | null
@@ -50,6 +53,18 @@ async function lookupMembership(email: string | undefined): Promise<Membership> 
   return { role: data.role === 'admin' ? 'admin' : 'sales', active: data.active !== false }
 }
 
+async function rejectIfDisallowedDomain(user: User | null): Promise<User | null> {
+  if (!user) return null
+  if (isAllowedLoginEmail(user.email || '')) return user
+  try {
+    sessionStorage.setItem(LOGIN_DOMAIN_REJECT_KEY, loginEmailDomainError(user.email || ''))
+  } catch {
+    /* ignore */
+  }
+  await authApi.signOut()
+  return null
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [membership, setMembership] = useState<Membership>(NO_MEMBERSHIP)
@@ -73,7 +88,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           data: { session },
         } = await authApi.getSession()
         if (!mounted) return
-        const currentUser = session?.user ?? null
+        const currentUser = await rejectIfDisallowedDomain(session?.user ?? null)
+        if (!mounted) return
         setUser(currentUser)
         setMembership(await lookupMembership(currentUser?.email))
       } catch {
@@ -88,13 +104,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = authApi.onAuthStateChange((_event, session) => {
-      const currentUser = session?.user ?? null
-      setUser(currentUser)
       void (async () => {
         try {
+          const currentUser = await rejectIfDisallowedDomain(session?.user ?? null)
+          if (!mounted) return
+          setUser(currentUser)
           setMembership(await lookupMembership(currentUser?.email))
         } finally {
-          setLoading(false)
+          if (mounted) setLoading(false)
         }
       })()
     })
@@ -115,6 +132,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithEmail = useCallback(async (email: string) => {
     if (!authApi.signInWithEmail) {
       throw new Error('Email sign-in is only available in local mode')
+    }
+    if (!isAllowedLoginEmail(email)) {
+      throw new Error(loginEmailDomainError(email))
     }
     const { error } = await authApi.signInWithEmail(email)
     if (error) throw new Error(error.message)

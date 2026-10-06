@@ -13,6 +13,7 @@ import {
 import { clearLocalData, DB_NAME, exportLocalDump } from '../lib/localDb'
 import { importCloudDumpFromFile } from '../lib/importCloudDump'
 import { testZohoConnection } from '../lib/zoho'
+import { isAllowedLoginEmail, loginEmailDomainError } from '../lib/allowedLoginEmail'
 import {
   clearSupabaseRuntimeConfig,
   getSupabaseRuntimeConfig,
@@ -417,6 +418,10 @@ export default function SettingsPage() {
       showToast('Email is required', 'error')
       return
     }
+    if (!isAllowedLoginEmail(userForm.email)) {
+      showToast(loginEmailDomainError(userForm.email), 'error')
+      return
+    }
     setBusy(true)
     try {
       const payload = {
@@ -817,10 +822,10 @@ export default function SettingsPage() {
           <div>
             <h2 style={{ ...sectionTitleStyle, margin: 0 }}>User management</h2>
             <p style={{ color: colors.muted2, fontSize: 12, margin: '6px 0 0', maxWidth: 560, lineHeight: 1.5 }}>
-              Add teammates here with role <strong style={{ color: colors.text }}>admin</strong> or{' '}
-              <strong style={{ color: colors.text }}>sales</strong>. They sign in with Google using the same
-              email. In Supabase → Authentication you can also invite/allow their Google account; Central uses
-              this list for CRM owner dropdowns and admin access.
+              Add teammates with an <strong style={{ color: colors.text }}>@redreach.ae</strong> email
+              and role <strong style={{ color: colors.text }}>admin</strong> or{' '}
+              <strong style={{ color: colors.text }}>sales</strong>. They sign in with Google using that
+              company account (Gmail is not allowed).
             </p>
           </div>
           <button type="button" style={buttonPrimaryStyle} onClick={openUserCreate}>
