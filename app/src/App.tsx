@@ -23,16 +23,6 @@ import CustomerFilesPage from './pages/CustomerFilesPage'
 import SettingsPage from './pages/SettingsPage'
 import AuditLogPage from './pages/AuditLogPage'
 import DocumentPage from './pages/DocumentPage'
-import SiteLayout from './site/components/SiteLayout'
-import HomePage from './site/pages/HomePage'
-import AboutPage from './site/pages/AboutPage'
-import ContactPage from './site/pages/ContactPage'
-import VerticalPage, { VerticalAliasRedirect } from './site/pages/VerticalPage'
-import VerticalsIndexPage from './site/pages/VerticalsIndexPage'
-import InsightsPage from './site/pages/InsightsPage'
-import WandersExplorePage from './site/pages/WandersExplorePage'
-import WandersRegionPage from './site/pages/WandersRegionPage'
-import { PLAYBOOKS } from './site/data/playbooks'
 import ShopLayout from './shop/ShopLayout'
 import ShopHomePage from './shop/pages/ShopHomePage'
 import ShopListingPage from './shop/pages/ShopListingPage'
@@ -42,12 +32,17 @@ import WishlistPage from './shop/pages/WishlistPage'
 import OrderSuccessPage from './shop/pages/OrderSuccessPage'
 import OrderCancelPage from './shop/pages/OrderCancelPage'
 
+/**
+ * Central is CRM-first. Marketing pages live on www.redreach.ae (WordPress),
+ * not inside this SPA. Tee Tribe shop stays available under /shop.
+ */
 export default function App() {
   return (
     <AuthProvider>
       <SettingsProvider>
         <ToastProvider>
           <Routes>
+            <Route path="/" element={<Navigate to="/login" replace />} />
             <Route element={<ShopLayout />}>
               <Route path="shop" element={<ShopHomePage />} />
               <Route path="shop/c/:category" element={<ShopListingPage />} />
@@ -60,24 +55,6 @@ export default function App() {
               <Route path="shop/order/cancel" element={<OrderCancelPage />} />
             </Route>
             <Route path="teetribe" element={<Navigate to="/shop" replace />} />
-            <Route element={<SiteLayout />}>
-              <Route index element={<HomePage />} />
-              <Route path="about" element={<AboutPage />} />
-              <Route path="insights" element={<InsightsPage />} />
-              <Route path="contact" element={<ContactPage />} />
-              <Route path="businesses" element={<VerticalsIndexPage />} />
-              <Route path="verticals" element={<Navigate to="/businesses" replace />} />
-              <Route path="verticals/:slug" element={<VerticalAliasRedirect />} />
-              <Route path="travel" element={<Navigate to="/wanders" replace />} />
-              <Route path="uniforms" element={<Navigate to="/threads" replace />} />
-              <Route path="wanders" element={<WandersExplorePage />} />
-              <Route path="wanders/:region" element={<WandersRegionPage />} />
-              {Object.values(PLAYBOOKS)
-                .filter((playbook) => playbook.layout !== 'travel')
-                .map((playbook) => (
-                  <Route key={playbook.path} path={playbook.path.slice(1)} element={<VerticalPage />} />
-                ))}
-            </Route>
             <Route path="/login" element={<LoginPage />} />
             <Route
               path="/document/:type/:id"
@@ -112,7 +89,7 @@ export default function App() {
               <Route path="settings" element={<SettingsPage />} />
               <Route path="audit-log" element={<AuditLogPage />} />
             </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </ToastProvider>
       </SettingsProvider>

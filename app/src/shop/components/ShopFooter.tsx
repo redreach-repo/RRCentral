@@ -34,9 +34,12 @@ export default function ShopFooter() {
         </div>
         <div>
           <h4>Red Reach</h4>
-          <Link to="/">Red Reach home</Link>
-          <Link to="/threads">RR Threads uniforms</Link>
-          <Link to="/contact">Contact</Link>
+          <a href="https://www.redreach.ae" target="_blank" rel="noreferrer">
+            redreach.ae
+          </a>
+          <a href="https://www.redreach.ae/contact" target="_blank" rel="noreferrer">
+            Contact
+          </a>
           <a href="mailto:info@redreach.ae">info@redreach.ae</a>
         </div>
       </div>

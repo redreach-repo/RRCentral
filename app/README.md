@@ -2,6 +2,8 @@
 
 Modern React CRM for Red Reach Middle East FZE. Frontend on GitHub Pages.
 
+**CRM-first:** `/` redirects to `/login`. Public marketing lives on [www.redreach.ae](https://www.redreach.ae). Tee Tribe shop remains at `/shop`. Website inquiry intake on the CRM page is unchanged.
+
 ## Data storage
 
 | Mode | When | Where data lives |
@@ -21,7 +23,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173/RRCentral/ — pick a seeded admin email. Sheets data auto-imports from `public/migration-data.json` on first load.
+Open http://localhost:5173/RRCentral/login — pick a seeded admin email.
 
 Tee Tribe retail lives at http://localhost:5173/RRCentral/shop. Stripe Checkout runs through the Vite `/api/create-checkout-session` plugin when `STRIPE_SECRET_KEY` is set.
 

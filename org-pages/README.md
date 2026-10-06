@@ -32,6 +32,7 @@ To serve at domain root (`https://crm.redreach.ae/login`) you must change Vite `
 
 | What | URL |
 |------|-----|
-| Central home | https://redreach-repo.github.io/RRCentral/ |
-| Login | https://redreach-repo.github.io/RRCentral/login |
+| Login (Central entry) | https://redreach-repo.github.io/RRCentral/login |
 | Dashboard | https://redreach-repo.github.io/RRCentral/app |
+| CRM | https://redreach-repo.github.io/RRCentral/crm |
+| Public marketing site | https://www.redreach.ae |
