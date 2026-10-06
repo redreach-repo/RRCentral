@@ -549,8 +549,13 @@ export default function SettingsPage() {
               <li>
                 In Supabase: <strong style={{ color: colors.text }}>Authentication → Providers → Email</strong> →
                 enable Email (magic link). Add redirect URL{' '}
-                <code>https://redreach-repo.github.io/RRCentral/login</code>. Login emails go to Zoho for
-                @redreach.ae addresses.
+                <code>https://redreach-repo.github.io/RRCentral/login</code>.
+              </li>
+              <li>
+                In Supabase: <strong style={{ color: colors.text }}>Project Settings → Authentication → SMTP</strong>{' '}
+                → enable custom SMTP with Zoho (host <code>smtp.zoho.com</code>, port <code>465</code>, a
+                @redreach.ae mailbox + app password). Built-in Supabase mail is rate-limited and often fails to
+                deliver.
               </li>
               <li>
                 In Supabase: <strong style={{ color: colors.text }}>Project Settings → API</strong> → copy Project

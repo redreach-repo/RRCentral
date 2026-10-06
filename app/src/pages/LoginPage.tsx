@@ -5,6 +5,17 @@ import { authApi } from '../lib/authApi'
 import BrandLogo from '../components/BrandLogo'
 import styles from './LoginPage.module.css'
 
+function friendlyAuthError(raw: string): string {
+  const msg = raw.toLowerCase()
+  if (msg.includes('rate limit') || msg.includes('over_email_send_rate_limit')) {
+    return 'Too many login emails were requested. Wait about an hour, or ask an admin to set Custom SMTP in Supabase (Zoho SMTP) so mail is not rate-limited.'
+  }
+  if (msg.includes('error sending') || msg.includes('mail')) {
+    return `${raw} — check spam, or configure Zoho SMTP under Supabase → Project Settings → Authentication → SMTP.`
+  }
+  return raw
+}
+
 export default function LoginPage() {
   const { user, loading, signInWithEmail, isLocalMode } = useAuth()
   const location = useLocation()
@@ -53,12 +64,11 @@ export default function LoginPage() {
     try {
       const result = await signInWithEmail(email)
       if (result.magicLinkSent) {
-        setInfo(
-          `Check your Zoho inbox for ${email.trim().toLowerCase()} — open the magic link to sign in.`,
-        )
+        setInfo(`Login link sent to ${email.trim().toLowerCase()}. Check inbox and spam.`)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign-in failed')
+      const raw = err instanceof Error ? err.message : 'Sign-in failed'
+      setError(friendlyAuthError(raw))
     } finally {
       setSubmitting(false)
     }
@@ -74,8 +84,6 @@ export default function LoginPage() {
           Multi-division CRM &amp; quoting for Red Reach Middle East FZE
         </p>
         <p className={styles.bookmark}>
-          Sign in with your <strong>@redreach.ae</strong> email (Zoho Mail). Gmail is not allowed.
-          <br />
           Bookmark: <code className={styles.bookmarkUrl}>…/RRCentral/login</code>
         </p>
 
