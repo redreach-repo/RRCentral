@@ -1,4 +1,4 @@
-import { addDays, differenceInCalendarDays, parseISO, startOfDay } from 'date-fns'
+import { differenceInCalendarDays, parseISO, startOfDay } from 'date-fns'
 import type { CompanyDocument } from './types'
 import { companyDocCategoryLabel } from './companyDocs'
 
@@ -46,8 +46,4 @@ export function companyDocAlertLabel(alert: CompanyDocAlert): string {
   if (alert.daysLeft < 0) return `Expired ${Math.abs(alert.daysLeft)}d ago`
   if (alert.daysLeft === 0) return 'Expires today'
   return `Expires in ${alert.daysLeft}d`
-}
-
-export function addDaysIso(from: Date, days: number): string {
-  return addDays(from, days).toISOString().slice(0, 10)
 }
