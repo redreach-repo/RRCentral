@@ -1,5 +1,9 @@
 -- Default Central admin: info@redreach.ae (password set in auth.users below).
 -- After apply, sign in with info@redreach.ae / RedReach2026# and change the password.
+--
+-- The auth.users / auth.identities bootstrap runs only on a full Supabase auth
+-- schema. The CI stub (supabase/tests/supabase_stub.sql) is minimal, so we
+-- skip password hashing there and only ensure a confirmed auth.users row.
 
 insert into public.app_users (email, name, role, active)
 values ('info@redreach.ae', 'Red Reach', 'admin', true)
@@ -12,14 +16,35 @@ set
     else public.app_users.name
   end;
 
--- Create or reset Auth login for info@redreach.ae (bcrypt via pgcrypto).
 do $$
 declare
   v_user_id uuid;
   v_encrypted text;
   v_email text := 'info@redreach.ae';
   v_password text := 'RedReach2026#';
+  v_full_auth boolean;
 begin
+  v_full_auth := to_regclass('auth.identities') is not null
+    and exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'auth'
+        and table_name = 'users'
+        and column_name = 'encrypted_password'
+    );
+
+  if not v_full_auth then
+    if not exists (select 1 from auth.users where lower(email) = v_email) then
+      insert into auth.users (id, email, email_confirmed_at)
+      values (gen_random_uuid(), v_email, now());
+    else
+      update auth.users
+      set email_confirmed_at = coalesce(email_confirmed_at, now())
+      where lower(email) = v_email;
+    end if;
+    return;
+  end if;
+
   create extension if not exists pgcrypto;
 
   v_encrypted := crypt(v_password, gen_salt('bf'));

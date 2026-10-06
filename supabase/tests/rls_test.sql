@@ -117,3 +117,20 @@ select pg_temp.expect(not exists (
   select 1 from audit_log where table_name = 'app_settings' and (new_data::text like '%new-secret%' or old_data::text like '%s3cret%')
 ), 'audit log redacts secrets');
 reset role;
+
+------------------------------------------------------------ company documents vault
+insert into company_documents (category, title, drive_url, expires_on)
+values ('trade_license', 'Trade license', 'https://workdrive.example/doc', current_date + 10);
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from company_documents) = 0, 'sales cannot read company documents');
+select pg_temp.expect(pg_temp.fails($q$insert into company_documents (title) values ('x')$q$), 'sales cannot insert company documents');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select pg_temp.expect((select count(*) from company_documents) = 1, 'admin can read company documents');
+update company_documents set notes = 'renew' where title = 'Trade license';
+select pg_temp.expect((select notes from company_documents where title = 'Trade license') = 'renew', 'admin can update company documents');
+reset role;
