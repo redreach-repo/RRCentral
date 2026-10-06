@@ -39,9 +39,10 @@ Deactivate someone by unticking **Active** in Settings → Users — they lose a
    random value (32+ chars, e.g. `Utilities.getUuid() + Utilities.getUuid()`) in the App
    Settings sheet — or leave it empty to keep the external API/export disabled — then push
    the updated `appscript/` (`clasp push`) and redeploy.
-6. **Supabase Auth settings:** Authentication → Providers → Email: disable sign-ups if you
-   only use Google; keep “Confirm email” on. Authentication → URL configuration: only
-   `https://redreach-repo.github.io/RRCentral/` (and localhost for dev) as redirect URLs.
+6. **Supabase Auth settings:** Authentication → Providers → Email: enable magic link for
+   `@redreach.ae` (Zoho). Prefer disabling Google. Keep “Confirm email” on.
+   Authentication → URL configuration: only
+   `https://redreach-repo.github.io/RRCentral/login` (and localhost for dev) as redirect URLs.
 
 ## Data that was public
 

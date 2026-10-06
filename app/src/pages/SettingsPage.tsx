@@ -548,9 +548,9 @@ export default function SettingsPage() {
               </li>
               <li>
                 In Supabase: <strong style={{ color: colors.text }}>Authentication → Providers → Email</strong> →
-                enable Email / magic link (Zoho delivers to @redreach.ae). Redirect URLs must include this site.
-                enable. Add redirect URL{' '}
-                <code>https://redreach-repo.github.io/RRCentral/</code>
+                enable Email (magic link). Add redirect URL{' '}
+                <code>https://redreach-repo.github.io/RRCentral/login</code>. Login emails go to Zoho for
+                @redreach.ae addresses.
               </li>
               <li>
                 In Supabase: <strong style={{ color: colors.text }}>Project Settings → API</strong> → copy Project

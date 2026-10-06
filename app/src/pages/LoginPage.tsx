@@ -129,7 +129,7 @@ export default function LoginPage() {
               {info}
             </p>
           )}
-          <button type="submit" className={styles.googleBtn} disabled={submitting}>
+          <button type="submit" className={styles.submitBtn} disabled={submitting}>
             {submitting
               ? isLocalMode
                 ? 'Continuing…'

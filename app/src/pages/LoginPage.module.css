@@ -134,7 +134,7 @@
   font-size: 0.92em;
 }
 
-.googleBtn {
+.submitBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -153,17 +153,17 @@
   box-shadow: 0 8px 20px rgba(232, 93, 4, 0.35);
 }
 
-.googleBtn:hover {
+.submitBtn:hover {
   background: #f37316;
   transform: translateY(-1px);
   box-shadow: 0 10px 24px rgba(232, 93, 4, 0.45);
 }
 
-.googleBtn:active {
+.submitBtn:active {
   transform: translateY(0);
 }
 
-.googleBtn:disabled {
+.submitBtn:disabled {
   opacity: 0.65;
   cursor: not-allowed;
   transform: none;

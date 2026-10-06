@@ -11,13 +11,16 @@
 Settings → **Upload backup JSON to cloud** (once), after connecting.
 
 ## Teammates
-1. Central → Settings → **User management** → Add user (email + admin/sales)  
-2. They open Central and **Sign in with Google** using that email  
+1. Central → Settings → **User management** → Add user (email + admin/manager/sales)  
+2. They open Central, enter their **@redreach.ae** email, and open the **magic link** from Zoho Mail  
 3. Supabase → Authentication → Users: confirm they appear after first login  
 
-## Google Auth return URL
+## Email magic-link return URL
+Supabase → Authentication → Providers → **Email** → enable  
 Supabase → Authentication → URL Configuration  
-- Site URL + Redirect: `https://redreach-repo.github.io/RRCentral/`
+- Site URL + Redirect: `https://redreach-repo.github.io/RRCentral/login`
+
+Optional: disable the Google provider so it cannot be used by mistake.
 
 ## Org redirect + domain
 See [`org-pages/README.md`](./org-pages/README.md).

@@ -9,7 +9,7 @@ Modern React CRM for Red Reach Middle East FZE. Frontend on GitHub Pages.
 | Mode | When | Where data lives |
 |------|------|------------------|
 | **Local** (default on GitHub Pages today) | `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` missing or still placeholders | **IndexedDB** in the browser (`rrcentral_local`). Session in `localStorage`. Not shared across devices. |
-| **Supabase** | Real project URL + anon key set at build time | **Postgres** in your Supabase project + Google OAuth |
+| **Supabase** | Real project URL + anon key set at build time | **Postgres** in your Supabase project + email magic link (Zoho) |
 
 In local mode, open **Settings → Data & storage** to download / restore a JSON backup. Clearing site data in the browser deletes the CRM.
 
@@ -31,9 +31,9 @@ Tee Tribe retail lives at http://localhost:5173/RRCentral/shop. Stripe Checkout 
 
 1. Create a project at https://supabase.com
 2. Apply `supabase/migrations/*.sql` in filename order (`npx supabase db push` or the SQL Editor)
-3. Auth → Google provider + redirect URLs:
-   - `http://localhost:5173/RRCentral/`
-   - `https://redreach-repo.github.io/RRCentral/`
+3. Auth → Email provider (magic link) + redirect URLs:
+   - `http://localhost:5173/RRCentral/login`
+   - `https://redreach-repo.github.io/RRCentral/login`
 4. Copy Project URL + anon key into `.env` (from `.env.example`)
 5. For GitHub Pages, add secrets `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`, then push `main`
 
@@ -53,7 +53,7 @@ Local IndexedDB is fine for a single browser. For the whole team:
 
 1. Create a project at https://supabase.com
 2. Apply [`supabase/migrations/`](../supabase/migrations/) in filename order (`npx supabase db push` or the SQL Editor)
-3. Auth → enable **Google**, add redirect URLs for local + GitHub Pages
+3. Auth → enable **Email** (magic link to Zoho for `@redreach.ae`), add redirect URLs for local + GitHub Pages (`…/login`)
 4. Copy Project URL + anon key into `app/.env` (and GitHub Actions secrets `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`)
 5. Redeploy — the app switches from local mode to shared Postgres automatically
 
