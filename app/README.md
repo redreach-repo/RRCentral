@@ -77,7 +77,7 @@ Tokens are stored in local settings (browser IndexedDB in local mode). Browser C
 
 ## Roles
 
-Admins (seeded): `alfred@redreach.ae`, `jacob@redreach.ae`. Login requires an `@redreach.ae` Google account (Gmail blocked).
+Admins (seeded): `alfred@redreach.ae`, `jacob@redreach.ae`. Login is **email magic link** to `@redreach.ae` (Zoho Mail) — Gmail and Google OAuth are not used.
 
 ## Roles
 

@@ -96,7 +96,7 @@ export const localAuth = {
     writeLocalSession(normalized)
     const session = makeLocalSession(normalized)
     notifyLocal('SIGNED_IN', session)
-    return { data: { session, user: session.user }, error: null }
+    return { data: { session, user: session.user, magicLinkSent: false }, error: null }
   },
 
   async getSession() {
@@ -144,12 +144,18 @@ export type AuthApi = {
     data: { subscription: { unsubscribe: () => void } }
   }
   signOut: () => Promise<{ error: unknown }>
-  signInWithOAuth?: (opts: { provider: 'google' }) => Promise<{ error: unknown }>
+  /** Local: signs in immediately. Cloud: sends a magic link to Zoho mail. */
   signInWithEmail?: (email: string) => Promise<{
-    data: { session: Session | null; user: User | null }
+    data: { session: Session | null; user: User | null; magicLinkSent?: boolean }
     error: { message: string } | null
   }>
   listSeedEmails?: () => Promise<string[]>
+}
+
+function loginRedirectUrl(): string {
+  const base = import.meta.env.BASE_URL || '/'
+  const path = `${base.replace(/\/?$/, '/') }login`
+  return new URL(path, window.location.origin).href
 }
 
 function supabaseAuthApi(): AuthApi {
@@ -158,17 +164,31 @@ function supabaseAuthApi(): AuthApi {
     getSession: () => supabase.auth.getSession(),
     onAuthStateChange: (cb) => supabase.auth.onAuthStateChange(cb),
     signOut: () => supabase.auth.signOut(),
-    signInWithOAuth: (opts) => {
-      const base = import.meta.env.BASE_URL || '/'
-      const redirectTo = new URL(base, window.location.origin).href
-      return supabase.auth.signInWithOAuth({
-        provider: opts.provider,
+    signInWithEmail: async (email) => {
+      const normalized = normalizeEmail(email)
+      if (!normalized || !normalized.includes('@')) {
+        return { data: { session: null, user: null }, error: { message: 'Enter a valid email' } }
+      }
+      if (!isAllowedLoginEmail(normalized)) {
+        return {
+          data: { session: null, user: null },
+          error: { message: loginEmailDomainError(normalized) },
+        }
+      }
+      const { error } = await supabase.auth.signInWithOtp({
+        email: normalized,
         options: {
-          redirectTo,
-          // Prefer Google Workspace accounts for redreach.ae (hint; app also enforces).
-          queryParams: { hd: 'redreach.ae', prompt: 'select_account' },
+          emailRedirectTo: loginRedirectUrl(),
+          shouldCreateUser: true,
         },
       })
+      if (error) {
+        return { data: { session: null, user: null }, error: { message: error.message } }
+      }
+      return {
+        data: { session: null, user: null, magicLinkSent: true },
+        error: null,
+      }
     },
   }
 }

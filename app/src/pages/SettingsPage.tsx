@@ -547,7 +547,8 @@ export default function SettingsPage() {
                 and apply the SQL files in <code>supabase/migrations/</code> (oldest first).
               </li>
               <li>
-                In Supabase: <strong style={{ color: colors.text }}>Authentication → Providers → Google</strong> →
+                In Supabase: <strong style={{ color: colors.text }}>Authentication → Providers → Email</strong> →
+                enable Email / magic link (Zoho delivers to @redreach.ae). Redirect URLs must include this site.
                 enable. Add redirect URL{' '}
                 <code>https://redreach-repo.github.io/RRCentral/</code>
               </li>
@@ -594,8 +595,8 @@ export default function SettingsPage() {
               Source:{' '}
               {runtimeCfg.source === 'env' ? 'build environment variables' : 'Settings credentials'}
               <br />
-              Business data is stored in your Supabase Postgres project. Auth uses Google OAuth via
-              Supabase.
+              Business data is stored in your Supabase Postgres project. Auth uses email magic links
+              (Zoho inbox for @redreach.ae).
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
               <button
@@ -824,9 +825,10 @@ export default function SettingsPage() {
             <h2 style={{ ...sectionTitleStyle, margin: 0 }}>User management</h2>
             <p style={{ color: colors.muted2, fontSize: 12, margin: '6px 0 0', maxWidth: 560, lineHeight: 1.5 }}>
               Add teammates with an <strong style={{ color: colors.text }}>@redreach.ae</strong> email
-              and role <strong style={{ color: colors.text }}>admin</strong> or{' '}
-              <strong style={{ color: colors.text }}>sales</strong>. They sign in with Google using that
-              company account (Gmail is not allowed).
+              and role <strong style={{ color: colors.text }}>admin</strong>,{' '}
+              <strong style={{ color: colors.text }}>manager</strong>, or{' '}
+              <strong style={{ color: colors.text }}>sales</strong>. They sign in with a magic link to
+              their Zoho inbox (Gmail is not allowed).
             </p>
           </div>
           <button type="button" style={buttonPrimaryStyle} onClick={openUserCreate}>
