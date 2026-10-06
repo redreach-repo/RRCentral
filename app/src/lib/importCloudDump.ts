@@ -45,7 +45,7 @@ function prepareRows(store: string, rows: Row[]): Row[] {
       const next: Row = {
         email,
         name: String(row.name || email.split('@')[0] || ''),
-        role: row.role === 'admin' ? 'admin' : 'sales',
+        role: row.role === 'admin' || row.role === 'manager' ? row.role : 'sales',
         active: row.active !== false,
       }
       if (isUuid(row.id)) next.id = row.id

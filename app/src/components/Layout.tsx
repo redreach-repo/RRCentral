@@ -26,6 +26,7 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders'
 import { useRecurringDeductionsSync } from '../hooks/useRecurringDeductionsSync'
+import { roleAtLeast } from '../lib/permissions'
 import BrandLogo from './BrandLogo'
 import styles from './Layout.module.css'
 
@@ -34,7 +35,8 @@ type NavItem = {
   label: string
   icon: typeof LayoutDashboard
   end?: boolean
-  adminOnly?: boolean
+  /** Minimum role required (admin > manager > sales). */
+  minRole?: 'admin' | 'manager' | 'sales'
 }
 
 type NavGroup = { id: string; label: string; items: NavItem[] }
@@ -81,8 +83,8 @@ const navGroups: NavGroup[] = [
     id: 'admin',
     label: 'Admin',
     items: [
-      { to: '/settings', label: 'Settings', icon: Settings, adminOnly: true },
-      { to: '/audit-log', label: 'Audit log', icon: ShieldCheck, adminOnly: true },
+      { to: '/settings', label: 'Settings', icon: Settings, minRole: 'admin' },
+      { to: '/audit-log', label: 'Audit log', icon: ShieldCheck, minRole: 'admin' },
     ],
   },
 ]
@@ -156,7 +158,7 @@ export default function Layout() {
         <nav className={styles.nav}>
           {navGroups.map((group) => {
             const items = group.items.filter(
-              (item) => !item.adminOnly || userRole === 'admin',
+              (item) => !item.minRole || roleAtLeast(userRole, item.minRole),
             )
             if (!items.length) return null
             return (

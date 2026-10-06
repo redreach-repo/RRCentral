@@ -13,6 +13,7 @@ import {
 } from '../lib/config'
 import type { Client, Invoice, PaymentLogEntry } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
+import { can } from '../lib/permissions'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
@@ -442,7 +443,7 @@ export default function InvoicesPage() {
   }
 
   async function markPaid(inv: Invoice) {
-    if (userRole !== 'admin') {
+    if (!can(userRole, 'invoice.markPaid')) {
       showToast('Only admins can mark invoices as paid', 'error')
       return
     }
@@ -533,7 +534,7 @@ export default function InvoicesPage() {
 
   async function confirmDelete() {
     if (!deleteTarget) return
-    if (userRole !== 'admin') {
+    if (!can(userRole, 'invoice.delete')) {
       showToast('Only admins can delete invoices', 'error')
       return
     }
@@ -572,7 +573,7 @@ export default function InvoicesPage() {
             Pay
           </button>
         )}
-        {userRole === 'admin' &&
+        {can(userRole, 'invoice.markPaid') &&
           !isCancelledInvoice(inv) &&
           effectiveInvoicePaymentStatus(inv) !== 'Paid' && (
             <button type="button" style={buttonSecondaryStyle} disabled={saving} onClick={() => void markPaid(inv)}>
@@ -582,7 +583,7 @@ export default function InvoicesPage() {
         <button type="button" style={buttonSecondaryStyle} onClick={() => void duplicate(inv)}>
           <Copy size={14} />
         </button>
-        {userRole === 'admin' && (
+        {can(userRole, 'invoice.delete') && (
           <button
             type="button"
             style={buttonDangerStyle}

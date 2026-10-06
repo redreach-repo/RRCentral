@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { ShieldCheck } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { can } from '../lib/permissions'
 import EmptyState from '../components/EmptyState'
 import {
   AUDIT_TABLE_LABELS,
@@ -71,7 +72,7 @@ export default function AuditLogPage() {
     return () => window.clearTimeout(t)
   }, [load])
 
-  if (userRole !== 'admin') {
+  if (!can(userRole, 'audit.read')) {
     return (
       <div style={pageStyle}>
         <EmptyState title="Admins only" subtitle="Ask an admin if you need to see the audit trail." />

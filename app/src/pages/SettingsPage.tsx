@@ -14,6 +14,7 @@ import { clearLocalData, DB_NAME, exportLocalDump } from '../lib/localDb'
 import { importCloudDumpFromFile } from '../lib/importCloudDump'
 import { testZohoConnection } from '../lib/zoho'
 import { isAllowedLoginEmail, loginEmailDomainError } from '../lib/allowedLoginEmail'
+import { can, ROLE_DESCRIPTIONS, ROLE_LABELS, USER_ROLES } from '../lib/permissions'
 import {
   clearSupabaseRuntimeConfig,
   getSupabaseRuntimeConfig,
@@ -242,7 +243,7 @@ export default function SettingsPage() {
   }, [showToast])
 
   useEffect(() => {
-    if (userRole === 'admin') void loadUsers()
+    if (can(userRole, 'users.manage')) void loadUsers()
   }, [userRole, loadUsers])
 
   async function handleImportFile(file: File | null) {
@@ -339,7 +340,7 @@ export default function SettingsPage() {
     }
   }
 
-  if (userRole !== 'admin') {
+  if (!can(userRole, 'settings.manage')) {
     return (
       <div style={pageStyle}>
         <h1 style={pageTitleStyle}>Settings</h1>
@@ -890,8 +891,11 @@ export default function SettingsPage() {
             value={userForm.role}
             onChange={(e) => setUserForm((f) => ({ ...f, role: e.target.value as UserRole }))}
           >
-            <option value="sales">sales — CRM, quotes, invoices</option>
-            <option value="admin">admin — Settings, users, Mark paid</option>
+            {USER_ROLES.map((role) => (
+              <option key={role} value={role}>
+                {ROLE_LABELS[role]} — {ROLE_DESCRIPTIONS[role]}
+              </option>
+            ))}
           </select>
         </div>
         <div style={{ ...fieldStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
