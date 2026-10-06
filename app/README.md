@@ -77,5 +77,5 @@ Tokens are stored in local settings (browser IndexedDB in local mode). Browser C
 
 ## Roles
 
-Admins (seeded): `alfredsv@gmail.com`, `redreachdxb@gmail.com`, `alfred@redreach.ae`, `jacob@redreach.ae`  
+Admins (seeded): `alfred@redreach.ae`, `jacob@redreach.ae`. Login requires an `@redreach.ae` Google account (Gmail blocked).  
 Other signed-in users default to `sales`.

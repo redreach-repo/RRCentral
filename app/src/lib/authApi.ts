@@ -1,6 +1,7 @@
 import type { Session, User } from '@supabase/supabase-js'
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseConfig'
 import { initLocalDb, localDb, DEFAULT_ADMINS } from './localDb'
+import { isAllowedLoginEmail, loginEmailDomainError, normalizeEmail } from './allowedLoginEmail'
 
 const LOCAL_SESSION_KEY = 'rrcentral_local_session'
 
@@ -62,9 +63,15 @@ function notifyLocal(event: string, session: Session | null) {
 
 export const localAuth = {
   async signInWithEmail(email: string) {
-    const normalized = email.trim().toLowerCase()
+    const normalized = normalizeEmail(email)
     if (!normalized || !normalized.includes('@')) {
       return { data: { session: null, user: null }, error: { message: 'Enter a valid email' } }
+    }
+    if (!isAllowedLoginEmail(normalized)) {
+      return {
+        data: { session: null, user: null },
+        error: { message: loginEmailDomainError(normalized) },
+      }
     }
 
     await initLocalDb()
@@ -123,11 +130,11 @@ export const localAuth = {
     const { data } = await localDb.from('app_users').select('email').order('email')
     const rows = (data || []) as { email: string }[]
     const emails = rows
-      .map((r) => String(r.email || '').trim().toLowerCase())
-      .filter(Boolean)
+      .map((r) => normalizeEmail(r.email || ''))
+      .filter((e) => isAllowedLoginEmail(e))
     const unique = [...new Set(emails)].sort((a, b) => a.localeCompare(b))
     if (unique.length > 0) return unique
-    return DEFAULT_ADMINS.map((a) => a.email)
+    return DEFAULT_ADMINS.map((a) => a.email).filter(isAllowedLoginEmail)
   },
 }
 
@@ -156,7 +163,11 @@ function supabaseAuthApi(): AuthApi {
       const redirectTo = new URL(base, window.location.origin).href
       return supabase.auth.signInWithOAuth({
         provider: opts.provider,
-        options: { redirectTo },
+        options: {
+          redirectTo,
+          // Prefer Google Workspace accounts for redreach.ae (hint; app also enforces).
+          queryParams: { hd: 'redreach.ae', prompt: 'select_account' },
+        },
       })
     },
   }

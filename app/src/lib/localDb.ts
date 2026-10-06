@@ -166,20 +166,6 @@ const DEFAULT_ADMINS: {
   created_at: string
 }[] = [
   {
-    email: 'alfredsv@gmail.com',
-    name: 'Alfred',
-    role: 'admin',
-    active: true,
-    created_at: new Date().toISOString(),
-  },
-  {
-    email: 'redreachdxb@gmail.com',
-    name: 'Red Reach DXB',
-    role: 'admin',
-    active: true,
-    created_at: new Date().toISOString(),
-  },
-  {
     email: 'alfred@redreach.ae',
     name: 'Alfred',
     role: 'admin',
