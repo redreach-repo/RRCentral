@@ -183,7 +183,11 @@ function supabaseAuthApi(): AuthApi {
         },
       })
       if (error) {
-        return { data: { session: null, user: null }, error: { message: error.message } }
+        const message =
+          /rate limit|over_email_send_rate_limit/i.test(error.message)
+            ? 'email rate limit exceeded'
+            : error.message
+        return { data: { session: null, user: null }, error: { message } }
       }
       return {
         data: { session: null, user: null, magicLinkSent: true },
