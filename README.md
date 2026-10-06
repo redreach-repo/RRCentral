@@ -115,7 +115,8 @@ The external API and `?page=migrate` export are **disabled** until an admin sets
 
 ## Admins
 
-- `alfredsv@gmail.com`
-- `redreachdxb@gmail.com`
+- `info@redreach.ae` (default login — apply `20261006170000_default_admin_info.sql`)
 - `alfred@redreach.ae`
 - `jacob@redreach.ae`
+- `alfredsv@gmail.com` (legacy — deactivated for login)
+- `redreachdxb@gmail.com` (legacy — deactivated for login)

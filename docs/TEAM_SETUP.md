@@ -10,17 +10,18 @@
 ## Data in Supabase
 Settings → **Upload backup JSON to cloud** (once), after connecting.
 
+## Default admin login
+1. Apply migration `supabase/migrations/20261006170000_default_admin_info.sql` in the Supabase SQL Editor  
+   (or deploy/invoke `bootstrap-admin` — see that function’s README)
+2. Sign in at Central:
+   - Email: `info@redreach.ae`
+   - Password: `RedReach2026#`
+3. Immediately change the password under **Settings → My password**
+
 ## Login (email + password)
 1. Supabase → Authentication → Providers → **Email** → enable  
 2. Deploy edge function: `supabase functions deploy manage-auth-user --project-ref pszjylxrpvlumldtptrr`  
-3. **First admin bootstrap** (one time): Supabase → Authentication → Users → open your `@redreach.ae` user → set a password  
-4. Sign in at Central with email + password  
-5. Settings → **My password** to change it anytime  
-
-## Teammates
-1. Central → Settings → **User management** → Add user (email + role + initial password)  
-2. They sign in with that email + password, then change it under **My password**  
-3. To reset someone’s password later: Edit user → enter a new password → Save  
+3. Settings → **User management** to add teammates with an initial password  
 
 Optional: disable the Google provider so it cannot be used by mistake.
 

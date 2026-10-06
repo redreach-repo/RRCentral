@@ -76,9 +76,17 @@ CRM follow-ups can sync to Zoho Calendar; Email actions can send via Zoho Mail.
 
 Tokens are stored in local settings (browser IndexedDB in local mode). Browser CORS must allow Zoho API calls from your Pages origin; if a call is blocked, use a backend proxy later.
 
-## Roles
+## Default admin (`info@redreach.ae`)
 
-Admins (seeded): `alfred@redreach.ae`, `jacob@redreach.ae`. Login is **email + password** for `@redreach.ae` — admins set initial passwords in Settings → User management; each user can change their own password after login.
+Admins (seeded): `info@redreach.ae`, `alfred@redreach.ae`, `jacob@redreach.ae`.
+
+After applying `supabase/migrations/20261006170000_default_admin_info.sql`:
+
+- Email: `info@redreach.ae`
+- Temporary password: `RedReach2026#`
+
+Change it immediately under Settings → My password.
+
 
 ## Roles
 
