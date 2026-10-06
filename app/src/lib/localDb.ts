@@ -6,7 +6,7 @@
 import { ALL_SEED_PRODUCTS } from './seedCatalog'
 
 export const DB_NAME = 'rrcentral_local'
-const DB_VERSION = 9
+const DB_VERSION = 10
 
 export const LOCAL_STORES = [
   'app_settings',
@@ -26,6 +26,7 @@ export const LOCAL_STORES = [
   'payment_log',
   'attachments',
   'customer_documents',
+  'company_documents',
   'activity_log',
   'inventory_movements',
   'customer_payments',
@@ -857,6 +858,7 @@ export type MigrationDump = {
   payment_log?: Row[]
   attachments?: Row[]
   customer_documents?: Row[]
+  company_documents?: Row[]
   activity_log?: Row[]
   inventory_movements?: Row[]
   customer_payments?: Row[]
