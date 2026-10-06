@@ -77,5 +77,15 @@ Tokens are stored in local settings (browser IndexedDB in local mode). Browser C
 
 ## Roles
 
-Admins (seeded): `alfred@redreach.ae`, `jacob@redreach.ae`. Login requires an `@redreach.ae` Google account (Gmail blocked).  
+Admins (seeded): `alfred@redreach.ae`, `jacob@redreach.ae`. Login requires an `@redreach.ae` Google account (Gmail blocked).
+
+## Roles
+
+| Role | Can |
+|------|-----|
+| **admin** | Users, Settings/secrets, audit log, delete invoices/expenses, mark paid |
+| **manager** | All CRM data, reassign owners, delete quotes/CRM mistakes — no Settings |
+| **sales** | Day-to-day CRM, quotes, invoices — no Settings, audit, or hard finance deletes |
+
+Permissions are defined in `app/src/lib/permissions.ts`.  
 Other signed-in users default to `sales`.

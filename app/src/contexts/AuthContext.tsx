@@ -13,6 +13,7 @@ import { authMode } from '../lib/db'
 import { db } from '../lib/db'
 import { tryAutoImportSheetsDump } from '../lib/migrateFromSheets'
 import { isAllowedLoginEmail, loginEmailDomainError } from '../lib/allowedLoginEmail'
+import { normalizeUserRole } from '../lib/permissions'
 import type { UserRole } from '../lib/types'
 
 export const LOGIN_DOMAIN_REJECT_KEY = 'rrcentral_login_domain_reject'
@@ -50,7 +51,7 @@ async function lookupMembership(email: string | undefined): Promise<Membership> 
     .maybeSingle()
 
   if (error || !data) return NO_MEMBERSHIP
-  return { role: data.role === 'admin' ? 'admin' : 'sales', active: data.active !== false }
+  return { role: normalizeUserRole(data.role), active: data.active !== false }
 }
 
 async function rejectIfDisallowedDomain(user: User | null): Promise<User | null> {

@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'sales'
+export type UserRole = 'admin' | 'manager' | 'sales'
 
 export interface CrmContact {
   id: string

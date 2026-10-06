@@ -5,6 +5,7 @@ import { db } from '../lib/db'
 import { PAYMENT_METHODS, VAT_RATE } from '../lib/config'
 import type { Attachment, Expense, Quotation, Vendor } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
+import { can } from '../lib/permissions'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
@@ -475,7 +476,7 @@ export default function ExpensesPage() {
 
   async function confirmDelete() {
     if (!deleteTarget) return
-    if (userRole !== 'admin') {
+    if (!can(userRole, 'expense.delete')) {
       showToast('Only admins can delete expenses', 'error')
       return
     }
@@ -603,7 +604,7 @@ export default function ExpensesPage() {
                         <button type="button" style={buttonSecondaryStyle} onClick={() => openEdit(e)}>
                           <Pencil size={14} />
                         </button>
-                        {userRole === 'admin' && (
+                        {can(userRole, 'expense.delete') && (
                           <>
                             {' '}
                             <button
