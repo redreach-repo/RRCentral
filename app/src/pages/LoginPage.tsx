@@ -80,14 +80,10 @@ export default function LoginPage() {
         </p>
 
         <form className={styles.localForm} onSubmit={(e) => void handleContinue(e)}>
-          {isLocalMode ? (
+          {isLocalMode && (
             <p className={styles.localBanner}>
               Local mode (this browser only). Use an @redreach.ae email. To share with colleagues:
               Settings → Data &amp; storage → Connect Supabase.
-            </p>
-          ) : (
-            <p className={styles.localBanner}>
-              We will email a one-time login link to your Zoho inbox. No Google account needed.
             </p>
           )}
           <label className={styles.fieldLabel} htmlFor="login-email">
