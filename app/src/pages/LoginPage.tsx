@@ -1,28 +1,28 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth, LOGIN_DOMAIN_REJECT_KEY } from '../contexts/AuthContext'
-import { authApi } from '../lib/authApi'
+import { authApi, MIN_PASSWORD_LENGTH } from '../lib/authApi'
 import BrandLogo from '../components/BrandLogo'
 import styles from './LoginPage.module.css'
 
 function friendlyAuthError(raw: string): string {
   const msg = raw.toLowerCase()
-  if (msg.includes('rate limit') || msg.includes('over_email_send_rate_limit')) {
-    return 'Too many login emails were requested. Wait about an hour, or ask an admin to set Custom SMTP in Supabase (Zoho SMTP) so mail is not rate-limited.'
+  if (msg.includes('invalid login') || msg.includes('invalid credentials')) {
+    return 'Wrong email or password. Ask an admin to set or reset your password in Settings → User management.'
   }
-  if (msg.includes('error sending') || msg.includes('mail')) {
-    return `${raw} — check spam, or configure Zoho SMTP under Supabase → Project Settings → Authentication → SMTP.`
+  if (msg.includes('email not confirmed')) {
+    return 'This account is not confirmed yet. Ask an admin to set your password again in User management.'
   }
   return raw
 }
 
 export default function LoginPage() {
-  const { user, loading, signInWithEmail, isLocalMode } = useAuth()
+  const { user, loading, signInWithPassword, isLocalMode } = useAuth()
   const location = useLocation()
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [seedEmails, setSeedEmails] = useState<string[]>([])
   const [error, setError] = useState('')
-  const [info, setInfo] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
@@ -59,13 +59,9 @@ export default function LoginPage() {
   async function handleContinue(e: FormEvent) {
     e.preventDefault()
     setError('')
-    setInfo('')
     setSubmitting(true)
     try {
-      const result = await signInWithEmail(email)
-      if (result.magicLinkSent) {
-        setInfo(`Login link sent to ${email.trim().toLowerCase()}. Check inbox and spam.`)
-      }
+      await signInWithPassword(email, password)
     } catch (err) {
       const raw = err instanceof Error ? err.message : 'Sign-in failed'
       setError(friendlyAuthError(raw))
@@ -127,20 +123,25 @@ export default function LoginPage() {
               ))}
             </div>
           )}
+          <label className={styles.fieldLabel} htmlFor="login-password">
+            Password
+          </label>
+          <input
+            id="login-password"
+            className={styles.emailInput}
+            type="password"
+            placeholder={
+              isLocalMode ? 'Any password (local mode)' : `At least ${MIN_PASSWORD_LENGTH} characters`
+            }
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            required={!isLocalMode}
+            minLength={isLocalMode ? undefined : MIN_PASSWORD_LENGTH}
+          />
           {error && <p className={styles.error}>{error}</p>}
-          {info && (
-            <p className={styles.localBanner} style={{ marginTop: 10 }}>
-              {info}
-            </p>
-          )}
           <button type="submit" className={styles.submitBtn} disabled={submitting}>
-            {submitting
-              ? isLocalMode
-                ? 'Continuing…'
-                : 'Sending link…'
-              : isLocalMode
-                ? 'Continue'
-                : 'Email me a login link'}
+            {submitting ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
 

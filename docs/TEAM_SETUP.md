@@ -10,28 +10,17 @@
 ## Data in Supabase
 Settings → **Upload backup JSON to cloud** (once), after connecting.
 
+## Login (email + password)
+1. Supabase → Authentication → Providers → **Email** → enable  
+2. Deploy edge function: `supabase functions deploy manage-auth-user --project-ref pszjylxrpvlumldtptrr`  
+3. **First admin bootstrap** (one time): Supabase → Authentication → Users → open your `@redreach.ae` user → set a password  
+4. Sign in at Central with email + password  
+5. Settings → **My password** to change it anytime  
+
 ## Teammates
-1. Central → Settings → **User management** → Add user (email + admin/manager/sales)  
-2. They open Central, enter their **@redreach.ae** email, and open the **magic link**  
-3. Supabase → Authentication → Users: confirm they appear after first login  
-
-## Email magic-link (required for login mail to arrive)
-Supabase → Authentication → Providers → **Email** → enable  
-Supabase → Authentication → URL Configuration  
-- Site URL + Redirect: `https://redreach-repo.github.io/RRCentral/login`
-
-### Custom SMTP via Zoho (strongly recommended)
-Supabase’s built-in mailer has a very low hourly rate limit. Without custom SMTP, login links often do not arrive.
-
-1. Zoho Mail → create an **App Password** for the sending mailbox (e.g. `noreply@redreach.ae` or an admin address)
-2. Supabase → **Project Settings → Authentication → SMTP Settings** → enable  
-   - Host: `smtp.zoho.com` (or `smtp.zoho.eu` / regional host if your org uses it)  
-   - Port: `465` (SSL)  
-   - Username: the full @redreach.ae address  
-   - Password: the Zoho app password  
-   - Sender name: `RED REACH Central`  
-   - Sender email: same @redreach.ae address  
-3. Save, then try login again
+1. Central → Settings → **User management** → Add user (email + role + initial password)  
+2. They sign in with that email + password, then change it under **My password**  
+3. To reset someone’s password later: Edit user → enter a new password → Save  
 
 Optional: disable the Google provider so it cannot be used by mistake.
 
