@@ -1,5 +1,6 @@
 -- Minimal stand-in for the Supabase auth schema + roles so migrations and
 -- RLS policies can be tested on plain Postgres (CI and local).
+create extension if not exists "uuid-ossp";
 do $$ begin
   if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon nologin; end if;
   if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
