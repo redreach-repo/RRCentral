@@ -4,6 +4,7 @@ import { initLocalDb, localDb, DEFAULT_ADMINS } from './localDb'
 import { isAllowedLoginEmail, loginEmailDomainError, normalizeEmail } from './allowedLoginEmail'
 
 const LOCAL_SESSION_KEY = 'rrcentral_local_session'
+export const MIN_PASSWORD_LENGTH = 8
 
 type AuthChangeCallback = (event: string, session: Session | null) => void
 
@@ -61,8 +62,15 @@ function notifyLocal(event: string, session: Session | null) {
   }
 }
 
+function assertPassword(password: string) {
+  if (!password || password.length < MIN_PASSWORD_LENGTH) {
+    return `Password must be at least ${MIN_PASSWORD_LENGTH} characters`
+  }
+  return null
+}
+
 export const localAuth = {
-  async signInWithEmail(email: string) {
+  async signInWithPassword(email: string, _password: string) {
     const normalized = normalizeEmail(email)
     if (!normalized || !normalized.includes('@')) {
       return { data: { session: null, user: null }, error: { message: 'Enter a valid email' } }
@@ -96,7 +104,12 @@ export const localAuth = {
     writeLocalSession(normalized)
     const session = makeLocalSession(normalized)
     notifyLocal('SIGNED_IN', session)
-    return { data: { session, user: session.user, magicLinkSent: false }, error: null }
+    return { data: { session, user: session.user }, error: null }
+  },
+
+  /** Local mode has no real password store — treated as success. */
+  async updatePassword(_newPassword: string) {
+    return { error: null as { message: string } | null }
   },
 
   async getSession() {
@@ -144,18 +157,26 @@ export type AuthApi = {
     data: { subscription: { unsubscribe: () => void } }
   }
   signOut: () => Promise<{ error: unknown }>
-  /** Local: signs in immediately. Cloud: sends a magic link to Zoho mail. */
-  signInWithEmail?: (email: string) => Promise<{
-    data: { session: Session | null; user: User | null; magicLinkSent?: boolean }
+  /** Email + password sign-in (cloud and local). */
+  signInWithPassword?: (
+    email: string,
+    password: string,
+  ) => Promise<{
+    data: { session: Session | null; user: User | null }
     error: { message: string } | null
   }>
+  /** Signed-in user changes their own password. */
+  updatePassword?: (newPassword: string) => Promise<{ error: { message: string } | null }>
+  /**
+   * Admin sets / creates Auth password for a teammate (cloud: edge function).
+   * Local mode is a no-op success.
+   */
+  adminSetPassword?: (
+    email: string,
+    password: string,
+    name?: string,
+  ) => Promise<{ error: { message: string } | null }>
   listSeedEmails?: () => Promise<string[]>
-}
-
-function loginRedirectUrl(): string {
-  const base = import.meta.env.BASE_URL || '/'
-  const path = `${base.replace(/\/?$/, '/') }login`
-  return new URL(path, window.location.origin).href
 }
 
 function supabaseAuthApi(): AuthApi {
@@ -164,7 +185,7 @@ function supabaseAuthApi(): AuthApi {
     getSession: () => supabase.auth.getSession(),
     onAuthStateChange: (cb) => supabase.auth.onAuthStateChange(cb),
     signOut: () => supabase.auth.signOut(),
-    signInWithEmail: async (email) => {
+    signInWithPassword: async (email, password) => {
       const normalized = normalizeEmail(email)
       if (!normalized || !normalized.includes('@')) {
         return { data: { session: null, user: null }, error: { message: 'Enter a valid email' } }
@@ -175,24 +196,60 @@ function supabaseAuthApi(): AuthApi {
           error: { message: loginEmailDomainError(normalized) },
         }
       }
-      const { error } = await supabase.auth.signInWithOtp({
+      const pwdErr = assertPassword(password)
+      if (pwdErr) {
+        return { data: { session: null, user: null }, error: { message: pwdErr } }
+      }
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: normalized,
-        options: {
-          emailRedirectTo: loginRedirectUrl(),
-          shouldCreateUser: true,
-        },
+        password,
       })
       if (error) {
-        const message =
-          /rate limit|over_email_send_rate_limit/i.test(error.message)
-            ? 'email rate limit exceeded'
-            : error.message
-        return { data: { session: null, user: null }, error: { message } }
+        return { data: { session: null, user: null }, error: { message: error.message } }
       }
-      return {
-        data: { session: null, user: null, magicLinkSent: true },
-        error: null,
+      return { data: { session: data.session, user: data.user }, error: null }
+    },
+    updatePassword: async (newPassword) => {
+      const pwdErr = assertPassword(newPassword)
+      if (pwdErr) return { error: { message: pwdErr } }
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      return { error: error ? { message: error.message } : null }
+    },
+    adminSetPassword: async (email, password, name) => {
+      const normalized = normalizeEmail(email)
+      if (!isAllowedLoginEmail(normalized)) {
+        return { error: { message: loginEmailDomainError(normalized) } }
       }
+      const pwdErr = assertPassword(password)
+      if (pwdErr) return { error: { message: pwdErr } }
+
+      const { data, error } = await supabase.functions.invoke('manage-auth-user', {
+        body: { email: normalized, password, name: name || undefined },
+      })
+      if (error) {
+        let detail = error.message || 'Could not set password'
+        try {
+          const ctx = (error as { context?: Response }).context
+          if (ctx && typeof ctx.json === 'function') {
+            const body = (await ctx.json()) as { error?: string }
+            if (body?.error) detail = body.error
+          }
+        } catch {
+          /* ignore */
+        }
+        if (/failed to send|404|not found|FunctionsFetchError|Failed to fetch/i.test(detail)) {
+          return {
+            error: {
+              message:
+                'Deploy the manage-auth-user edge function in Supabase, then try again.',
+            },
+          }
+        }
+        return { error: { message: detail } }
+      }
+      const payload = data as { error?: string; ok?: boolean } | null
+      if (payload?.error) return { error: { message: payload.error } }
+      return { error: null }
     },
   }
 }
@@ -202,7 +259,9 @@ function localAuthApi(): AuthApi {
     getSession: () => localAuth.getSession(),
     onAuthStateChange: (cb) => localAuth.onAuthStateChange(cb),
     signOut: () => localAuth.signOut(),
-    signInWithEmail: (email) => localAuth.signInWithEmail(email),
+    signInWithPassword: (email, password) => localAuth.signInWithPassword(email, password),
+    updatePassword: (password) => localAuth.updatePassword(password),
+    adminSetPassword: async () => ({ error: null }),
     listSeedEmails: () => localAuth.listSeedEmails(),
   }
 }

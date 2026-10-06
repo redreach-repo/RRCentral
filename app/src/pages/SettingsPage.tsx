@@ -14,6 +14,7 @@ import { clearLocalData, DB_NAME, exportLocalDump } from '../lib/localDb'
 import { importCloudDumpFromFile } from '../lib/importCloudDump'
 import { testZohoConnection } from '../lib/zoho'
 import { isAllowedLoginEmail, loginEmailDomainError } from '../lib/allowedLoginEmail'
+import { authApi, MIN_PASSWORD_LENGTH } from '../lib/authApi'
 import { can, ROLE_DESCRIPTIONS, ROLE_LABELS, USER_ROLES } from '../lib/permissions'
 import {
   clearSupabaseRuntimeConfig,
@@ -166,10 +167,16 @@ const ZOHO_KEYS = [
   { key: 'zohoWorkDriveEnabled', label: 'WorkDrive auto-file (yes/no)' },
 ] as const
 
-type UserForm = { email: string; name: string; role: UserRole; active: boolean }
+type UserForm = {
+  email: string
+  name: string
+  role: UserRole
+  active: boolean
+  password: string
+}
 
 export default function SettingsPage() {
-  const { userRole, isLocalMode } = useAuth()
+  const { userRole, isLocalMode, changePassword } = useAuth()
   const { settings, updateSetting, loading: settingsLoading } = useSettings()
   const { showToast } = useToast()
   const [draft, setDraft] = useState<Record<string, string>>({})
@@ -182,12 +189,16 @@ export default function SettingsPage() {
     name: '',
     role: 'sales',
     active: true,
+    password: '',
   })
   const [deleteUser, setDeleteUser] = useState<AppUser | null>(null)
   const [busy, setBusy] = useState(false)
   const [importing, setImporting] = useState(false)
   const [backingUp, setBackingUp] = useState(false)
   const [testingZoho, setTestingZoho] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [changingPassword, setChangingPassword] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const backupRef = useRef<HTMLInputElement>(null)
   const cloudBackupRef = useRef<HTMLInputElement>(null)
@@ -340,11 +351,69 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleChangeMyPassword() {
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      showToast(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`, 'error')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      showToast('Passwords do not match', 'error')
+      return
+    }
+    setChangingPassword(true)
+    try {
+      await changePassword(newPassword)
+      setNewPassword('')
+      setConfirmPassword('')
+      showToast('Password updated', 'success')
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not change password', 'error')
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
   if (!can(userRole, 'settings.manage')) {
     return (
       <div style={pageStyle}>
-        <h1 style={pageTitleStyle}>Settings</h1>
-        <div style={{ ...cardStyle, color: colors.danger }}>Access denied — admin only.</div>
+        <h1 style={pageTitleStyle}>Account</h1>
+        <p style={pageSubtitleStyle}>Change the password you use to sign in.</p>
+        <div style={cardStyle}>
+          <h2 style={sectionTitleStyle}>My password</h2>
+          <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
+            Minimum {MIN_PASSWORD_LENGTH} characters.
+          </p>
+          <div style={{ display: 'grid', gap: 10, maxWidth: 360, marginBottom: 12 }}>
+            <div>
+              <label style={labelStyle}>New password</label>
+              <input
+                style={inputStyle}
+                type="password"
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Confirm password</label>
+              <input
+                style={inputStyle}
+                type="password"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </div>
+          </div>
+          <button
+            type="button"
+            style={buttonPrimaryStyle}
+            disabled={changingPassword || isLocalMode}
+            onClick={() => void handleChangeMyPassword()}
+          >
+            {changingPassword ? 'Updating…' : 'Update my password'}
+          </button>
+        </div>
       </div>
     )
   }
@@ -399,7 +468,7 @@ export default function SettingsPage() {
 
   function openUserCreate() {
     setEditingUser(null)
-    setUserForm({ email: '', name: '', role: 'sales', active: true })
+    setUserForm({ email: '', name: '', role: 'sales', active: true, password: '' })
     setUserOpen(true)
   }
 
@@ -410,6 +479,7 @@ export default function SettingsPage() {
       name: u.name || '',
       role: u.role,
       active: u.active,
+      password: '',
     })
     setUserOpen(true)
   }
@@ -421,6 +491,15 @@ export default function SettingsPage() {
     }
     if (!isAllowedLoginEmail(userForm.email)) {
       showToast(loginEmailDomainError(userForm.email), 'error')
+      return
+    }
+    const password = userForm.password.trim()
+    if (!editingUser && !isLocalMode && !password) {
+      showToast(`Set an initial password (min ${MIN_PASSWORD_LENGTH} characters)`, 'error')
+      return
+    }
+    if (password && password.length < MIN_PASSWORD_LENGTH) {
+      showToast(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`, 'error')
       return
     }
     setBusy(true)
@@ -438,7 +517,15 @@ export default function SettingsPage() {
         const { error } = await db.from('app_users').insert(payload)
         if (error) throw error
       }
-      showToast('User saved', 'success')
+      if (password && authApi.adminSetPassword) {
+        const { error: pwdError } = await authApi.adminSetPassword(
+          payload.email,
+          password,
+          payload.name,
+        )
+        if (pwdError) throw new Error(pwdError.message)
+      }
+      showToast(password ? 'User saved and password set' : 'User saved', 'success')
       setUserOpen(false)
       await loadUsers()
     } catch (e) {
@@ -548,14 +635,12 @@ export default function SettingsPage() {
               </li>
               <li>
                 In Supabase: <strong style={{ color: colors.text }}>Authentication → Providers → Email</strong> →
-                enable Email (magic link). Add redirect URL{' '}
+                enable Email (password sign-in). Add redirect URL{' '}
                 <code>https://redreach-repo.github.io/RRCentral/login</code>.
               </li>
               <li>
-                In Supabase: <strong style={{ color: colors.text }}>Project Settings → Authentication → SMTP</strong>{' '}
-                → enable custom SMTP with Zoho (host <code>smtp.zoho.com</code>, port <code>465</code>, a
-                @redreach.ae mailbox + app password). Built-in Supabase mail is rate-limited and often fails to
-                deliver.
+                Deploy the <code>manage-auth-user</code> edge function so admins can set teammate passwords
+                from User management (no magic-link email required).
               </li>
               <li>
                 In Supabase: <strong style={{ color: colors.text }}>Project Settings → API</strong> → copy Project
@@ -600,8 +685,8 @@ export default function SettingsPage() {
               Source:{' '}
               {runtimeCfg.source === 'env' ? 'build environment variables' : 'Settings credentials'}
               <br />
-              Business data is stored in your Supabase Postgres project. Auth uses email magic links
-              (Zoho inbox for @redreach.ae).
+              Business data is stored in your Supabase Postgres project. Auth uses @redreach.ae
+              email + password (admins set passwords in User management).
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
               <button
@@ -824,16 +909,54 @@ export default function SettingsPage() {
         </div>
       )}
 
+      <div style={{ ...cardStyle, marginBottom: 20 }}>
+        <h2 style={sectionTitleStyle}>My password</h2>
+        <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
+          Change the password you use to sign in to Central. Minimum {MIN_PASSWORD_LENGTH} characters.
+          {isLocalMode
+            ? ' Local mode does not store passwords — this only applies after you connect Supabase.'
+            : ''}
+        </p>
+        <div style={{ display: 'grid', gap: 10, maxWidth: 360, marginBottom: 12 }}>
+          <div>
+            <label style={labelStyle}>New password</label>
+            <input
+              style={inputStyle}
+              type="password"
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Confirm password</label>
+            <input
+              style={inputStyle}
+              type="password"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+          </div>
+        </div>
+        <button
+          type="button"
+          style={buttonPrimaryStyle}
+          disabled={changingPassword || isLocalMode}
+          onClick={() => void handleChangeMyPassword()}
+        >
+          {changingPassword ? 'Updating…' : 'Update my password'}
+        </button>
+      </div>
+
       <div style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
           <div>
             <h2 style={{ ...sectionTitleStyle, margin: 0 }}>User management</h2>
             <p style={{ color: colors.muted2, fontSize: 12, margin: '6px 0 0', maxWidth: 560, lineHeight: 1.5 }}>
-              Add teammates with an <strong style={{ color: colors.text }}>@redreach.ae</strong> email
-              and role <strong style={{ color: colors.text }}>admin</strong>,{' '}
-              <strong style={{ color: colors.text }}>manager</strong>, or{' '}
-              <strong style={{ color: colors.text }}>sales</strong>. They sign in with a magic link to
-              their Zoho inbox (Gmail is not allowed).
+              Add teammates with an <strong style={{ color: colors.text }}>@redreach.ae</strong> email,
+              role, and an initial password. They sign in with email + password, then can change their
+              password under <strong style={{ color: colors.text }}>My password</strong>.
             </p>
           </div>
           <button type="button" style={buttonPrimaryStyle} onClick={openUserCreate}>
@@ -913,6 +1036,24 @@ export default function SettingsPage() {
             onChange={(e) => setUserForm((f) => ({ ...f, active: e.target.checked }))}
           />
           <label htmlFor="user-active" style={{ fontSize: 13 }}>Active</label>
+        </div>
+        <div style={fieldStyle}>
+          <label style={labelStyle}>
+            {editingUser ? 'New password (optional)' : 'Initial password *'}
+          </label>
+          <input
+            style={inputStyle}
+            type="password"
+            autoComplete="new-password"
+            value={userForm.password}
+            placeholder={`Min ${MIN_PASSWORD_LENGTH} characters`}
+            onChange={(e) => setUserForm((f) => ({ ...f, password: e.target.value }))}
+          />
+          <p style={{ color: colors.muted2, fontSize: 11, margin: '6px 0 0', lineHeight: 1.4 }}>
+            {editingUser
+              ? 'Leave blank to keep the current password. Fill in to reset it.'
+              : 'Share this once with the teammate; they can change it after login.'}
+          </p>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setUserOpen(false)}>Cancel</button>

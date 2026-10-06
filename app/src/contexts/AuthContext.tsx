@@ -23,8 +23,8 @@ interface AuthContextValue {
   userRole: UserRole
   /** False when signed in but not an active member of app_users (cloud mode). */
   hasAccess: boolean
-  /** Local: session. Cloud: sends magic link to @redreach.ae (Zoho) inbox. */
-  signInWithEmail: (email: string) => Promise<{ magicLinkSent: boolean }>
+  signInWithPassword: (email: string, password: string) => Promise<void>
+  changePassword: (newPassword: string) => Promise<void>
   signOut: () => Promise<void>
   loading: boolean
   authMode: 'supabase' | 'local'
@@ -123,16 +123,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const signInWithEmail = useCallback(async (email: string) => {
-    if (!authApi.signInWithEmail) {
-      throw new Error('Email sign-in is not available')
+  const signInWithPassword = useCallback(async (email: string, password: string) => {
+    if (!authApi.signInWithPassword) {
+      throw new Error('Password sign-in is not available')
     }
     if (!isAllowedLoginEmail(email)) {
       throw new Error(loginEmailDomainError(email))
     }
-    const { data, error } = await authApi.signInWithEmail(email)
+    const { error } = await authApi.signInWithPassword(email, password)
     if (error) throw new Error(error.message)
-    return { magicLinkSent: Boolean(data?.magicLinkSent) }
+  }, [])
+
+  const changePassword = useCallback(async (newPassword: string) => {
+    if (!authApi.updatePassword) {
+      throw new Error('Change password is not available')
+    }
+    const { error } = await authApi.updatePassword(newPassword)
+    if (error) throw new Error(error.message)
   }, [])
 
   const signOut = useCallback(async () => {
@@ -146,13 +153,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       userRole: membership.role,
       hasAccess: membership.active || !isSupabaseConfigured(),
-      signInWithEmail,
+      signInWithPassword,
+      changePassword,
       signOut,
       loading,
       authMode,
       isLocalMode: !isSupabaseConfigured(),
     }),
-    [user, membership, signInWithEmail, signOut, loading],
+    [user, membership, signInWithPassword, changePassword, signOut, loading],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -19,6 +19,7 @@ import {
   BarChart3,
   Wallet,
   Settings,
+  KeyRound,
   Menu,
   X,
   LogOut,
@@ -27,6 +28,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders'
 import { useRecurringDeductionsSync } from '../hooks/useRecurringDeductionsSync'
 import { roleAtLeast } from '../lib/permissions'
+import type { UserRole } from '../lib/types'
 import BrandLogo from './BrandLogo'
 import styles from './Layout.module.css'
 
@@ -36,7 +38,9 @@ type NavItem = {
   icon: typeof LayoutDashboard
   end?: boolean
   /** Minimum role required (admin > manager > sales). */
-  minRole?: 'admin' | 'manager' | 'sales'
+  minRole?: UserRole
+  /** If set, only these roles see the item (overrides minRole). */
+  roles?: UserRole[]
 }
 
 type NavGroup = { id: string; label: string; items: NavItem[] }
@@ -84,6 +88,7 @@ const navGroups: NavGroup[] = [
     label: 'Admin',
     items: [
       { to: '/settings', label: 'Settings', icon: Settings, minRole: 'admin' },
+      { to: '/settings', label: 'Account', icon: KeyRound, roles: ['manager', 'sales'] },
       { to: '/audit-log', label: 'Audit log', icon: ShieldCheck, minRole: 'admin' },
     ],
   },
@@ -157,9 +162,11 @@ export default function Layout() {
 
         <nav className={styles.nav}>
           {navGroups.map((group) => {
-            const items = group.items.filter(
-              (item) => !item.minRole || roleAtLeast(userRole, item.minRole),
-            )
+            const items = group.items.filter((item) => {
+              if (item.roles) return item.roles.includes(userRole)
+              if (item.minRole) return roleAtLeast(userRole, item.minRole)
+              return true
+            })
             if (!items.length) return null
             return (
               <div key={group.id} className={styles.navGroup}>
