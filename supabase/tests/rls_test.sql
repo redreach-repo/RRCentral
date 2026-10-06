@@ -3,11 +3,13 @@
 \set ON_ERROR_STOP 1
 
 insert into auth.users values
-  ('00000000-0000-0000-0000-00000000000a', 'alfredsv@gmail.com', now()),
+  -- Admin JWT must be @redreach.ae: migration 20261006150000 deactivates Gmail app_users.
+  ('00000000-0000-0000-0000-00000000000a', 'alfred@redreach.ae', now()),
   ('00000000-0000-0000-0000-00000000000b', 'sales@redreach.ae', now()),
   ('00000000-0000-0000-0000-00000000000c', 'random@gmail.com', now()),
   ('00000000-0000-0000-0000-00000000000d', 'unconfirmed@redreach.ae', null),
-  ('00000000-0000-0000-0000-00000000000e', 'former@redreach.ae', now());
+  ('00000000-0000-0000-0000-00000000000e', 'former@redreach.ae', now()),
+  ('00000000-0000-0000-0000-00000000000f', 'alfredsv@gmail.com', now());
 insert into app_users (email, name, role, active) values
   ('Sales@RedReach.ae', 'Sales', 'sales', true),
   ('unconfirmed@redreach.ae', 'U', 'sales', true),
@@ -23,6 +25,16 @@ begin
   if not ok then raise exception 'RLS TEST FAILED: %', what; end if;
   raise notice 'ok - %', what;
 end $$;
+
+-- Domain lock from 20261006150000_redreach_email_login_only.sql
+select pg_temp.expect(
+  (select active from app_users where lower(email) = 'alfredsv@gmail.com') = false,
+  'gmail founding admin deactivated by domain migration'
+);
+select pg_temp.expect(
+  (select active from app_users where lower(email) = 'alfred@redreach.ae') = true,
+  'redreach.ae founding admin stays active'
+);
 
 -- Helper that returns true if the statement raised an error.
 create function pg_temp.fails(stmt text) returns boolean language plpgsql as $$
@@ -60,6 +72,9 @@ select pg_temp.expect((select count(*) from crm) = 0, 'unconfirmed email sees no
 
 set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000e';
 select pg_temp.expect((select count(*) from crm) = 0, 'deactivated user sees nothing');
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000f';
+select pg_temp.expect((select count(*) from crm) = 0, 'deactivated gmail admin sees nothing');
 reset role;
 
 ------------------------------------------------------------ sales
@@ -93,7 +108,7 @@ delete from invoices where reference_number = 'RR-1';
 select pg_temp.expect((select count(*) from invoices) = 0, 'admin can delete invoices');
 update app_settings set value = 'new-secret' where key = 'zohoClientSecret';
 select pg_temp.expect(exists (
-  select 1 from audit_log where table_name = 'invoices' and operation = 'DELETE' and actor_email = 'alfredsv@gmail.com'
+  select 1 from audit_log where table_name = 'invoices' and operation = 'DELETE' and actor_email = 'alfred@redreach.ae'
 ), 'audit log records who deleted an invoice');
 select pg_temp.expect(exists (
   select 1 from audit_log where table_name = 'crm' and operation = 'UPDATE' and actor_email = 'sales@redreach.ae' and changed_fields = '{notes}'
