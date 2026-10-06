@@ -1,0 +1,8 @@
+[functions.manage-auth-user]
+verify_jwt = false
+
+[functions.bootstrap-admin]
+verify_jwt = false
+
+[functions.zoho-proxy]
+verify_jwt = false

@@ -21,11 +21,14 @@ import {
 } from 'lucide-react'
 import { db } from '../lib/db'
 import { CRM_OUTCOME_REASONS, NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
-import type { ActivityLogEntry, AppUser, CrmContact, CrmEntry, CustomerDocument } from '../lib/types'
+import type { ActivityLogEntry, AppUser, CrmContact, CrmEntry, CustomerDocument, Invoice, Quotation } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { logActivity } from '../lib/activity'
+import { can } from '../lib/permissions'
+import { buildDealProgress } from '../lib/dealProgress'
+import DealProgressStrip from '../components/DealProgressStrip'
 import {
   communicationKindLabel,
   loadCustomerDocuments,
@@ -169,9 +172,12 @@ function followUpColor(dateStr: string | null): string {
 }
 
 export default function CrmPage() {
-  const { user } = useAuth()
+  const { user, userRole } = useAuth()
   const { settings } = useSettings()
   const { showToast } = useToast()
+  const canViewAll = can(userRole, 'crm.viewAll')
+  const canReassign = can(userRole, 'crm.reassignOwner')
+  const canDeleteCrm = can(userRole, 'crm.deleteAny')
   const [searchParams, setSearchParams] = useSearchParams()
   const [entries, setEntries] = useState<CrmEntry[]>([])
   const [owners, setOwners] = useState<AppUser[]>([])
@@ -195,6 +201,8 @@ export default function CrmPage() {
   const [savePromptTarget, setSavePromptTarget] = useState<{ entry: CrmEntry; channel: 'email' | 'whatsapp' } | null>(null)
   const [linkFileTarget, setLinkFileTarget] = useState<{ entry: CrmEntry; channel: 'email' | 'whatsapp' } | null>(null)
   const [folderDocs, setFolderDocs] = useState<CustomerDocument[]>([])
+  const [dealQuotes, setDealQuotes] = useState<Quotation[]>([])
+  const [dealInvoices, setDealInvoices] = useState<Invoice[]>([])
   const [outcomeTarget, setOutcomeTarget] = useState<CrmEntry | null>(null)
   const [outcomeStage, setOutcomeStage] = useState<'Won' | 'Lost'>('Won')
   const [outcomeReason, setOutcomeReason] = useState('')
@@ -264,14 +272,17 @@ export default function CrmPage() {
     void (async () => {
       try {
         const company = entry.company_name
-        const [actRes, actByCrmRes, fuRes, quoteRes, folderDocsList] = await Promise.all([
+        const [actRes, actByCrmRes, fuRes, quoteRes, invRes, folderDocsList] = await Promise.all([
           db.from('activity_log').select('*').order('created_at', { ascending: false }).limit(120),
           db.from('activity_log').select('*').eq('crm_id', entry.id).order('created_at', { ascending: false }).limit(40),
           db.from('follow_up_updates').select('*').eq('crm_id', entry.id).order('created_at', { ascending: false }),
-          db.from('quotations').select('*').ilike('client', company).order('created_at', { ascending: false }).limit(10),
+          db.from('quotations').select('*').ilike('client', company).order('created_at', { ascending: false }).limit(20),
+          db.from('invoices').select('*').ilike('client', company).order('created_at', { ascending: false }).limit(20),
           loadCustomerDocuments(company).catch(() => [] as CustomerDocument[]),
         ])
         setFolderDocs(folderDocsList)
+        setDealQuotes((quoteRes.data || []) as Quotation[])
+        setDealInvoices((invRes.data || []) as Invoice[])
         const byCrm = (actByCrmRes.data || []) as ActivityLogEntry[]
         const byCrmIds = new Set(byCrm.map((a) => a.id))
         const legacy = ((actRes.data || []) as ActivityLogEntry[]).filter(
@@ -377,7 +388,13 @@ export default function CrmPage() {
       setFollowFilter('Due')
       setDefaultsReady(true)
     } else if (!defaultsReady && !loading && hasFilterParams) {
+      if (!canViewAll && myOwnerName) setOwnerFilter(myOwnerName)
       setDefaultsReady(true)
+    }
+
+    // Sales cannot view all deals — pin filter to self
+    if (!loading && !canViewAll && myOwnerName && ownerFilter === 'All') {
+      setOwnerFilter(myOwnerName)
     }
 
     if (!editId || loading || !entries.length) return
@@ -394,7 +411,18 @@ export default function CrmPage() {
     setSearchParams,
     myOwnerName,
     defaultsReady,
+    canViewAll,
+    ownerFilter,
   ])
+
+  const dealProgress = useMemo(() => {
+    if (!editing) return []
+    return buildDealProgress({
+      crm: { ...editing, ...form, company_name: form.company_name || editing.company_name },
+      quotations: dealQuotes,
+      invoices: dealInvoices,
+    })
+  }, [editing, form, dealQuotes, dealInvoices])
 
   const ownerOptions = useMemo(() => {
     const names = new Set<string>()
@@ -742,9 +770,11 @@ export default function CrmPage() {
         <button type="button" style={btnGhost} onClick={() => openEdit(row)} title="Edit">
           <Pencil size={14} />
         </button>
-        <button type="button" style={btnGhost} onClick={() => setDeleteTarget(row)} title="Delete">
-          <Trash2 size={14} />
-        </button>
+        {canDeleteCrm ? (
+          <button type="button" style={btnGhost} onClick={() => setDeleteTarget(row)} title="Delete">
+            <Trash2 size={14} />
+          </button>
+        ) : null}
       </>
     )
   }
@@ -1019,13 +1049,19 @@ export default function CrmPage() {
           type="button"
           className={`${resp.dueTile} ${ownerFilter === 'All' && followFilter === 'All' && stageFilter === 'All' ? resp.dueTileActive : ''}`}
           onClick={() => {
+            if (!canViewAll) {
+              if (myOwnerName) setOwnerFilter(myOwnerName)
+              setFollowFilter('All')
+              setStageFilter('All')
+              return
+            }
             setOwnerFilter('All')
             setFollowFilter('All')
             setStageFilter('All')
           }}
         >
           <span className={resp.dueTileValue}>{entries.length}</span>
-          <span className={resp.dueTileLabel}>All deals</span>
+          <span className={resp.dueTileLabel}>{canViewAll ? 'All deals' : 'My deals'}</span>
         </button>
       </div>
 
@@ -1054,16 +1090,18 @@ export default function CrmPage() {
           onChange={(e) => setOwnerFilter(e.target.value)}
           title="Sales owner"
         >
-          <option value="All">All sales owners</option>
+          {canViewAll ? <option value="All">All sales owners</option> : null}
           {myOwnerName ? <option value={myOwnerName}>Me ({myOwnerName})</option> : null}
-          <option value="Unassigned">Unassigned</option>
-          {ownerOptions
-            .filter((o) => o !== myOwnerName)
-            .map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
+          {canViewAll ? <option value="Unassigned">Unassigned</option> : null}
+          {canViewAll
+            ? ownerOptions
+                .filter((o) => o !== myOwnerName)
+                .map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))
+            : null}
         </select>
       </div>
 
@@ -1382,6 +1420,7 @@ export default function CrmPage() {
             </div>
             <form onSubmit={(e) => void handleSave(e)}>
               <div style={modalBody}>
+                {editing ? <DealProgressStrip steps={dealProgress} /> : null}
                 {editing ? (
                   <div className={resp.sheetTabs} role="tablist">
                     {(
@@ -1523,6 +1562,7 @@ export default function CrmPage() {
                     <select
                       style={input}
                       value={form.owner}
+                      disabled={!canReassign && Boolean(editing)}
                       onChange={(e) => setForm((f) => ({ ...f, owner: e.target.value }))}
                     >
                       <option value="">—</option>
