@@ -30,6 +30,8 @@ create index if not exists idx_company_documents_expires
 
 alter table public.company_documents enable row level security;
 
+grant select, insert, update, delete on public.company_documents to authenticated;
+
 drop policy if exists "Admins manage company documents" on public.company_documents;
 create policy "Admins manage company documents" on public.company_documents
   for all to authenticated

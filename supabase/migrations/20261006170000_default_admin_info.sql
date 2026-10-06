@@ -1,5 +1,10 @@
 -- Default Central admin: info@redreach.ae (password set in auth.users below).
--- After apply, sign in with info@redreach.ae / RedReach2026# and change the password.
+-- After apply on real Supabase, sign in with info@redreach.ae / RedReach2026#
+-- and change the password.
+--
+-- Auth password bootstrap runs only on a full Supabase auth schema. The CI
+-- stub (supabase/tests/supabase_stub.sql) is minimal, so we only ensure a
+-- confirmed auth.users row there.
 
 insert into public.app_users (email, name, role, active)
 values ('info@redreach.ae', 'Red Reach', 'admin', true)
@@ -12,14 +17,40 @@ set
     else public.app_users.name
   end;
 
--- Create or reset Auth login for info@redreach.ae (bcrypt via pgcrypto).
 do $$
 declare
   v_user_id uuid;
   v_encrypted text;
   v_email text := 'info@redreach.ae';
   v_password text := 'RedReach2026#';
+  v_full_auth boolean := false;
 begin
+  begin
+    v_full_auth := to_regclass('auth.identities') is not null
+      and exists (
+        select 1
+        from information_schema.columns
+        where table_schema = 'auth'
+          and table_name = 'users'
+          and column_name = 'encrypted_password'
+      );
+  exception when others then
+    v_full_auth := false;
+  end;
+
+  if not v_full_auth then
+    -- Minimal auth schema (CI stub): confirmed user row only.
+    if not exists (select 1 from auth.users where lower(email) = v_email) then
+      insert into auth.users (id, email, email_confirmed_at)
+      values (uuid_generate_v4(), v_email, now());
+    else
+      update auth.users
+      set email_confirmed_at = coalesce(email_confirmed_at, now())
+      where lower(email) = v_email;
+    end if;
+    return;
+  end if;
+
   create extension if not exists pgcrypto;
 
   v_encrypted := crypt(v_password, gen_salt('bf'));
@@ -95,4 +126,7 @@ begin
       now()
     );
   end if;
+exception when others then
+  -- Never block schema apply if Auth bootstrap cannot run in this environment.
+  raise notice 'default admin auth bootstrap skipped: %', sqlerrm;
 end $$;

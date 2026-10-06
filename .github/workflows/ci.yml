@@ -64,4 +64,21 @@ jobs:
       PGPASSWORD: postgres
     steps:
       - uses: actions/checkout@v4
-      - run: bash supabase/tests/run.sh
+      - name: Apply migrations + RLS tests
+        run: bash supabase/tests/run.sh 2>&1 | tee /tmp/migrate-rls.log
+      - name: Surface migration failure
+        if: failure()
+        run: |
+          echo "::group::Migration / RLS log (tail)"
+          tail -n 80 /tmp/migrate-rls.log || true
+          echo "::endgroup::"
+          # Emit lines as annotations so they are readable via the Checks API
+          # even when workflow log blobs are unreachable.
+          tail -n 40 /tmp/migrate-rls.log | while IFS= read -r line; do
+            # Skip empty lines; escape % for workflow commands
+            [ -z "$line" ] && continue
+            safe=${line//'%'/'%25'}
+            safe=${safe//$'\r'/}
+            echo "::error::${safe}"
+          done
+

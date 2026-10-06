@@ -15,9 +15,22 @@ for pass in 1 2; do
     # The baseline uses plain CREATE TABLE, so only apply it on the first pass.
     if [[ $pass == 2 && $f == *baseline_schema.sql ]]; then continue; fi
     echo "pass $pass: $f"
-    "${PSQL[@]}" -d "$DB" -f "$f" >/dev/null 2>&1 || "${PSQL[@]}" -d "$DB" -f "$f"
+    if ! "${PSQL[@]}" -d "$DB" -f "$f"; then
+      echo "FAILED applying $f (pass $pass)" >&2
+      exit 1
+    fi
   done
 done
 
-"${PSQL[@]}" -d "$DB" -o /dev/null -f tests/rls_test.sql 2>&1 | sed -n "s/.*NOTICE:  //p"
+echo "Running RLS tests…"
+set +e
+"${PSQL[@]}" -d "$DB" -f tests/rls_test.sql > /tmp/rls_test_out.txt 2>&1
+rls_rc=$?
+set -e
+sed -n "s/.*NOTICE:  //p" /tmp/rls_test_out.txt || true
+if [[ $rls_rc -ne 0 ]] || grep -q "RLS TEST FAILED\|ERROR:" /tmp/rls_test_out.txt; then
+  echo "RLS tests failed — full output:" >&2
+  cat /tmp/rls_test_out.txt >&2
+  exit 1
+fi
 echo "RLS tests passed"

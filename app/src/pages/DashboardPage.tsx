@@ -4,7 +4,9 @@ import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
   FileText,
+  FolderOpen,
   Receipt,
+  Shield,
   TrendingDown,
   TrendingUp,
   Users,
@@ -13,7 +15,7 @@ import {
 import { addDays, format, isWithinInterval, parseISO, startOfDay, startOfMonth } from 'date-fns'
 import { db } from '../lib/db'
 import { PIPELINE_STAGES } from '../lib/config'
-import type { CrmEntry, Expense, IncomeEntry, Invoice, Quotation } from '../lib/types'
+import type { CompanyDocument, CrmEntry, Expense, IncomeEntry, Invoice, Quotation } from '../lib/types'
 import {
   countsTowardIncome,
   isInMonth,
@@ -25,6 +27,12 @@ import {
 import { loadDeletedInvoiceRefs, reconcileInvoiceFinance } from '../lib/invoiceFinance'
 import { displayDocumentReference } from '../lib/documents'
 import { hydrateContacts, primaryContact } from '../lib/contacts'
+import { listCompanyDocuments } from '../lib/companyDocs'
+import { companyDocAlertLabel, companyDocExpiryAlerts } from '../lib/companyDocAlerts'
+import { syncUnansweredQuoteFollowUps } from '../lib/quoteFollowUpSync'
+import { useSettings } from '../contexts/SettingsContext'
+import { useAuth } from '../contexts/AuthContext'
+import { can } from '../lib/permissions'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
 import PageHeader from '../components/PageHeader'
@@ -90,6 +98,8 @@ function KpiCard({
 }
 
 export default function DashboardPage() {
+  const { userRole } = useAuth()
+  const { settings } = useSettings()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [quotations, setQuotations] = useState<Quotation[]>([])
@@ -98,6 +108,8 @@ export default function DashboardPage() {
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [crm, setCrm] = useState<CrmEntry[]>([])
   const [deletedInvoiceRefs, setDeletedInvoiceRefs] = useState<string[]>([])
+  const [companyDocs, setCompanyDocs] = useState<CompanyDocument[]>([])
+  const [followUpSyncNote, setFollowUpSyncNote] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -105,12 +117,13 @@ export default function DashboardPage() {
     try {
       await reconcileInvoiceFinance()
       const deleted = await loadDeletedInvoiceRefs()
-      const [qRes, iRes, incRes, expRes, crmRes] = await Promise.all([
+      const [qRes, iRes, incRes, expRes, crmRes, docsRes] = await Promise.all([
         db.from('quotations').select('*'),
         db.from('invoices').select('*'),
         db.from('income').select('*'),
         db.from('expenses').select('*'),
         db.from('crm').select('*').order('follow_up_date', { ascending: true }),
+        listCompanyDocuments().catch(() => ({ rows: [] as CompanyDocument[], missingTable: true })),
       ])
 
       if (qRes.error) throw qRes.error
@@ -119,18 +132,42 @@ export default function DashboardPage() {
       if (expRes.error) throw expRes.error
       if (crmRes.error) throw crmRes.error
 
-      setQuotations(sortByDateDesc((qRes.data as Quotation[]) ?? []))
+      const quotes = sortByDateDesc((qRes.data as Quotation[]) ?? [])
+      let crmRows = (crmRes.data as CrmEntry[]) ?? []
+
+      const daysAfter = Number(settings.followUpDaysAfterQuote) || 3
+      try {
+        const sync = await syncUnansweredQuoteFollowUps({
+          quotations: quotes,
+          crm: crmRows,
+          daysAfter,
+        })
+        if (sync.updated > 0) {
+          setFollowUpSyncNote(
+            `Auto follow-up set on ${sync.updated} deal(s) with unanswered Sent quotes (${daysAfter}+ days).`,
+          )
+          const refreshed = await db.from('crm').select('*').order('follow_up_date', { ascending: true })
+          if (!refreshed.error && refreshed.data) crmRows = refreshed.data as CrmEntry[]
+        } else {
+          setFollowUpSyncNote('')
+        }
+      } catch {
+        setFollowUpSyncNote('')
+      }
+
+      setQuotations(quotes)
       setInvoices(sortByDateDesc((iRes.data as Invoice[]) ?? []))
       setIncome((incRes.data as IncomeEntry[]) ?? [])
       setExpenses((expRes.data as Expense[]) ?? [])
-      setCrm((crmRes.data as CrmEntry[]) ?? [])
+      setCrm(crmRows)
       setDeletedInvoiceRefs([...deleted])
+      setCompanyDocs(docsRes.rows || [])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load dashboard')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [settings.followUpDaysAfterQuote])
 
   useEffect(() => {
     void load()
@@ -254,6 +291,10 @@ export default function DashboardPage() {
       .slice(0, 10)
   }, [crm])
 
+  const docAlerts = useMemo(() => companyDocExpiryAlerts(companyDocs, 60), [companyDocs])
+  const companyVaultRoot = (settings.companyWorkDriveRootUrl || '').trim()
+  const showCompanyVault = can(userRole, 'settings.manage')
+
   if (loading) {
     return (
       <div className={dash.page} style={pageStyle}>
@@ -281,6 +322,24 @@ export default function DashboardPage() {
           </>
         }
       />
+
+      {followUpSyncNote ? (
+        <div
+          style={{
+            ...cardStyle,
+            marginBottom: 14,
+            borderColor: 'rgba(232, 93, 4, 0.35)',
+            color: colors.muted,
+            fontSize: 13,
+            lineHeight: 1.45,
+          }}
+        >
+          {followUpSyncNote}{' '}
+          <Link to="/crm?follow=Due" style={{ color: colors.accent }}>
+            Open due follow-ups
+          </Link>
+        </div>
+      ) : null}
 
       <div className={dash.kpiGrid}>
         <KpiCard
@@ -339,6 +398,87 @@ export default function DashboardPage() {
           delay={280}
         />
       </div>
+
+      {showCompanyVault ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginBottom: 16 }}>
+          <div style={cardStyle}>
+            <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Shield size={18} /> Company document expiry
+            </h2>
+            {docAlerts.length === 0 ? (
+              <p style={{ color: colors.muted2, fontSize: 13, margin: 0, lineHeight: 1.45 }}>
+                No trade license / VAT certificates expiring in the next 60 days.
+              </p>
+            ) : (
+              <ul style={{ margin: 0, paddingLeft: 18, color: colors.muted, fontSize: 13, lineHeight: 1.55 }}>
+                {docAlerts.map((a) => (
+                  <li key={a.id} style={{ marginBottom: 6 }}>
+                    <strong style={{ color: a.severity === 'overdue' ? colors.danger : colors.text }}>
+                      {a.title}
+                    </strong>{' '}
+                    · {a.categoryLabel} · {companyDocAlertLabel(a)}
+                    {a.driveUrl ? (
+                      <>
+                        {' '}
+                        ·{' '}
+                        <a href={a.driveUrl} target="_blank" rel="noreferrer" style={{ color: colors.accent }}>
+                          Open
+                        </a>
+                      </>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p style={{ margin: '12px 0 0', fontSize: 12 }}>
+              <Link to="/settings" style={{ color: colors.accent }}>
+                Manage in Settings
+              </Link>
+            </p>
+          </div>
+          <div style={cardStyle}>
+            <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <FolderOpen size={18} /> Company vault
+            </h2>
+            <p style={{ color: colors.muted2, fontSize: 13, margin: '0 0 10px', lineHeight: 1.45 }}>
+              Trade license, VAT certificate, and other company papers (WorkDrive links).
+            </p>
+            {companyVaultRoot ? (
+              <p style={{ margin: '0 0 10px', fontSize: 13 }}>
+                <a href={companyVaultRoot} target="_blank" rel="noreferrer" style={{ color: colors.accent }}>
+                  Open company WorkDrive folder
+                </a>
+              </p>
+            ) : (
+              <p style={{ color: colors.muted2, fontSize: 12, margin: '0 0 10px' }}>
+                Set the company WorkDrive folder URL in Settings to show a quick link here.
+              </p>
+            )}
+            {companyDocs.length === 0 ? (
+              <p style={{ color: colors.muted2, fontSize: 13, margin: 0 }}>No documents linked yet.</p>
+            ) : (
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.55 }}>
+                {companyDocs.slice(0, 8).map((d) => (
+                  <li key={d.id}>
+                    {d.drive_url ? (
+                      <a href={d.drive_url} target="_blank" rel="noreferrer" style={{ color: colors.accent }}>
+                        {d.title || d.category}
+                      </a>
+                    ) : (
+                      d.title || d.category
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p style={{ margin: '12px 0 0', fontSize: 12 }}>
+              <Link to="/settings" style={{ color: colors.accent }}>
+                Add or edit documents
+              </Link>
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <div className={dash.panel}>
         <h2 className={dash.panelTitle}>CRM pipeline</h2>

@@ -231,8 +231,18 @@ function supabaseAuthApi(): AuthApi {
         try {
           const ctx = (error as { context?: Response }).context
           if (ctx && typeof ctx.json === 'function') {
-            const body = (await ctx.json()) as { error?: string }
+            const body = (await ctx.json()) as {
+              error?: string
+              message?: string
+              code?: string
+              hint?: string
+            }
             if (body?.error) detail = body.error
+            else if (body?.message) detail = body.message
+            if (body?.code === 'INVALID_API_KEY' || /INVALID_API_KEY|sb_publishable/i.test(detail)) {
+              detail =
+                'manage-auth-user is using the wrong template. In Supabase → Edge Functions → manage-auth-user: paste the Deno.serve code from the repo, set Verify JWT = OFF, redeploy.'
+            }
           }
         } catch {
           /* ignore */
@@ -241,7 +251,7 @@ function supabaseAuthApi(): AuthApi {
           return {
             error: {
               message:
-                'Deploy the manage-auth-user edge function in Supabase, then try again.',
+                'Deploy manage-auth-user in Supabase (Verify JWT off), then try again.',
             },
           }
         }

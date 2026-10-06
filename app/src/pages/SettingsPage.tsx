@@ -10,7 +10,8 @@ import {
   importSheetsDumpFromFile,
   resetSheetsImportFlag,
 } from '../lib/migrateFromSheets'
-import { clearLocalData, DB_NAME, exportLocalDump } from '../lib/localDb'
+import { clearLocalData, DB_NAME } from '../lib/localDb'
+import { downloadCentralBackup } from '../lib/centralBackup'
 import { importCloudDumpFromFile } from '../lib/importCloudDump'
 import { testZohoConnection } from '../lib/zoho'
 import { isAllowedLoginEmail, loginEmailDomainError } from '../lib/allowedLoginEmail'
@@ -34,7 +35,6 @@ import {
   buttonSecondaryStyle,
   cardStyle,
   colors,
-  downloadJson,
   fieldStyle,
   inputStyle,
   labelStyle,
@@ -384,10 +384,13 @@ export default function SettingsPage() {
   async function handleBackupDownload() {
     setBackingUp(true)
     try {
-      const dump = await exportLocalDump()
-      const stamp = new Date().toISOString().slice(0, 10)
-      downloadJson(`rrcentral-backup-${stamp}.json`, dump)
-      showToast('Backup downloaded', 'success')
+      const result = await downloadCentralBackup()
+      showToast(
+        result.mode === 'supabase'
+          ? `Cloud backup downloaded (${result.rows} rows)`
+          : `Local backup downloaded (${result.rows} rows)`,
+        'success',
+      )
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Backup failed', 'error')
     } finally {
@@ -799,6 +802,15 @@ export default function SettingsPage() {
               <button
                 type="button"
                 style={buttonPrimaryStyle}
+                disabled={backingUp}
+                onClick={() => void handleBackupDownload()}
+              >
+                <Download size={14} />
+                {backingUp ? 'Preparing…' : 'Download cloud backup JSON'}
+              </button>
+              <button
+                type="button"
+                style={buttonSecondaryStyle}
                 disabled={importing}
                 onClick={() => cloudBackupRef.current?.click()}
               >
@@ -814,8 +826,8 @@ export default function SettingsPage() {
               />
             </div>
             <p style={{ color: colors.muted2, fontSize: 12, marginTop: 0, lineHeight: 1.5 }}>
-              Use the backup file you downloaded while in local mode. This copies CRM, quotes, invoices,
-              and related tables into Supabase.
+              Download exports every table from Supabase (CRM, quotes, invoices, company documents, and
+              more). Upload restores a previously downloaded backup into the cloud.
             </p>
             <p style={{ color: colors.muted2, fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>
               To make cloud automatic on every phone, add GitHub Actions secrets{' '}
