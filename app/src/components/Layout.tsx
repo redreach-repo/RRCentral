@@ -188,9 +188,6 @@ export default function Layout() {
 
         <div className={styles.sidebarFooter}>
           <div className={styles.divisionHint}>Multi-division CRM</div>
-          <NavLink to="/" className={styles.navItem} style={{ marginTop: 8 }}>
-            <span>Public site</span>
-          </NavLink>
         </div>
       </aside>
 

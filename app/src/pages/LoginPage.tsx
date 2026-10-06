@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, Navigate, useLocation } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { authApi } from '../lib/authApi'
 import BrandLogo from '../components/BrandLogo'
@@ -132,9 +132,9 @@ export default function LoginPage() {
           </button>
         )}
         <p className={styles.subtitle} style={{ marginTop: 22, marginBottom: 0 }}>
-          <Link to="/" style={{ color: 'rgba(255,255,255,0.55)' }}>
-            Back to the public site
-          </Link>
+          <a href="https://www.redreach.ae" style={{ color: 'rgba(255,255,255,0.55)' }}>
+            www.redreach.ae
+          </a>
         </p>
       </div>
     </div>
