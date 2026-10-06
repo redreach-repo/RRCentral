@@ -23,8 +23,8 @@ interface AuthContextValue {
   userRole: UserRole
   /** False when signed in but not an active member of app_users (cloud mode). */
   hasAccess: boolean
-  signIn: () => Promise<void>
-  signInWithEmail: (email: string) => Promise<void>
+  /** Local: session. Cloud: sends magic link to @redreach.ae (Zoho) inbox. */
+  signInWithEmail: (email: string) => Promise<{ magicLinkSent: boolean }>
   signOut: () => Promise<void>
   loading: boolean
   authMode: 'supabase' | 'local'
@@ -123,22 +123,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const signIn = useCallback(async () => {
-    if (!authApi.signInWithOAuth) {
-      throw new Error('Google sign-in is only available with Supabase')
-    }
-    await authApi.signInWithOAuth({ provider: 'google' })
-  }, [])
-
   const signInWithEmail = useCallback(async (email: string) => {
     if (!authApi.signInWithEmail) {
-      throw new Error('Email sign-in is only available in local mode')
+      throw new Error('Email sign-in is not available')
     }
     if (!isAllowedLoginEmail(email)) {
       throw new Error(loginEmailDomainError(email))
     }
-    const { error } = await authApi.signInWithEmail(email)
+    const { data, error } = await authApi.signInWithEmail(email)
     if (error) throw new Error(error.message)
+    return { magicLinkSent: Boolean(data?.magicLinkSent) }
   }, [])
 
   const signOut = useCallback(async () => {
@@ -152,14 +146,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       userRole: membership.role,
       hasAccess: membership.active || !isSupabaseConfigured(),
-      signIn,
       signInWithEmail,
       signOut,
       loading,
       authMode,
       isLocalMode: !isSupabaseConfigured(),
     }),
-    [user, membership, signIn, signInWithEmail, signOut, loading],
+    [user, membership, signInWithEmail, signOut, loading],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
