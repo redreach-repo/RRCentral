@@ -106,6 +106,28 @@ export interface CustomerDocument {
   uploaded_at: string
 }
 
+/** Red Reach company papers (trade license, VAT cert, etc.) — WorkDrive links. */
+export type CompanyDocumentCategory =
+  | 'trade_license'
+  | 'vat_certificate'
+  | 'chamber_certificate'
+  | 'insurance'
+  | 'memorandum'
+  | 'other'
+
+export interface CompanyDocument {
+  id: string
+  category: CompanyDocumentCategory
+  title: string
+  file_name: string
+  drive_url: string
+  notes: string
+  expires_on: string | null
+  storage_provider: string
+  uploaded_by: string
+  uploaded_at: string
+}
+
 export interface FollowUpUpdate {
   id: string
   crm_id: string | null

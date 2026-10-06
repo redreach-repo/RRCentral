@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Download, HardDrive, Pencil, Plus, Trash2, Upload, Plug } from 'lucide-react'
 import { db, currentAuthMode } from '../lib/db'
-import type { AppUser, UserRole } from '../lib/types'
+import type { AppUser, CompanyDocument, CompanyDocumentCategory, UserRole } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
@@ -15,6 +15,13 @@ import { importCloudDumpFromFile } from '../lib/importCloudDump'
 import { testZohoConnection } from '../lib/zoho'
 import { isAllowedLoginEmail, loginEmailDomainError } from '../lib/allowedLoginEmail'
 import { authApi, MIN_PASSWORD_LENGTH } from '../lib/authApi'
+import {
+  COMPANY_DOC_CATEGORIES,
+  companyDocCategoryLabel,
+  deleteCompanyDocument,
+  listCompanyDocuments,
+  saveCompanyDocument,
+} from '../lib/companyDocs'
 import { can, ROLE_DESCRIPTIONS, ROLE_LABELS, USER_ROLES } from '../lib/permissions'
 import {
   clearSupabaseRuntimeConfig,
@@ -117,6 +124,13 @@ const CUSTOMER_DRIVE_KEYS = [
   },
 ] as const
 
+const COMPANY_DRIVE_KEYS = [
+  {
+    key: 'companyWorkDriveRootUrl',
+    label: 'Company documents folder URL (Zoho WorkDrive)',
+  },
+] as const
+
 const WANDERS_KEYS = [
   { key: 'wandersTradingName', label: 'Trading / brand name' },
   { key: 'wandersLegalEntityName', label: 'Registered legal entity (TBC)' },
@@ -176,7 +190,7 @@ type UserForm = {
 }
 
 export default function SettingsPage() {
-  const { userRole, isLocalMode, changePassword } = useAuth()
+  const { user, userRole, isLocalMode, changePassword } = useAuth()
   const { settings, updateSetting, loading: settingsLoading } = useSettings()
   const { showToast } = useToast()
   const [draft, setDraft] = useState<Record<string, string>>({})
@@ -199,6 +213,19 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [changingPassword, setChangingPassword] = useState(false)
+  const [companyDocs, setCompanyDocs] = useState<CompanyDocument[]>([])
+  const [companyDocsMissing, setCompanyDocsMissing] = useState(false)
+  const [companyDocOpen, setCompanyDocOpen] = useState(false)
+  const [editingCompanyDoc, setEditingCompanyDoc] = useState<CompanyDocument | null>(null)
+  const [companyDocForm, setCompanyDocForm] = useState({
+    category: 'trade_license' as CompanyDocumentCategory,
+    title: '',
+    file_name: '',
+    drive_url: '',
+    notes: '',
+    expires_on: '',
+  })
+  const [deleteCompanyDoc, setDeleteCompanyDoc] = useState<CompanyDocument | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const backupRef = useRef<HTMLInputElement>(null)
   const cloudBackupRef = useRef<HTMLInputElement>(null)
@@ -253,9 +280,89 @@ export default function SettingsPage() {
     setUsers((data || []) as AppUser[])
   }, [showToast])
 
+  const loadCompanyDocs = useCallback(async () => {
+    try {
+      const { rows, missingTable } = await listCompanyDocuments()
+      setCompanyDocs(rows)
+      setCompanyDocsMissing(missingTable)
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not load company documents', 'error')
+    }
+  }, [showToast])
+
   useEffect(() => {
     if (can(userRole, 'users.manage')) void loadUsers()
   }, [userRole, loadUsers])
+
+  useEffect(() => {
+    if (can(userRole, 'settings.manage')) void loadCompanyDocs()
+  }, [userRole, loadCompanyDocs])
+
+  function openCompanyDocCreate() {
+    setEditingCompanyDoc(null)
+    setCompanyDocForm({
+      category: 'trade_license',
+      title: '',
+      file_name: '',
+      drive_url: '',
+      notes: '',
+      expires_on: '',
+    })
+    setCompanyDocOpen(true)
+  }
+
+  function openCompanyDocEdit(doc: CompanyDocument) {
+    setEditingCompanyDoc(doc)
+    setCompanyDocForm({
+      category: doc.category,
+      title: doc.title || '',
+      file_name: doc.file_name || '',
+      drive_url: doc.drive_url || '',
+      notes: doc.notes || '',
+      expires_on: doc.expires_on ? String(doc.expires_on).slice(0, 10) : '',
+    })
+    setCompanyDocOpen(true)
+  }
+
+  async function saveCompanyDoc() {
+    setBusy(true)
+    try {
+      await saveCompanyDocument(
+        {
+          category: companyDocForm.category,
+          title: companyDocForm.title,
+          file_name: companyDocForm.file_name,
+          drive_url: companyDocForm.drive_url,
+          notes: companyDocForm.notes,
+          expires_on: companyDocForm.expires_on || null,
+          uploaded_by: user?.email || '',
+        },
+        editingCompanyDoc?.id,
+      )
+      showToast(editingCompanyDoc ? 'Document updated' : 'Document added', 'success')
+      setCompanyDocOpen(false)
+      await loadCompanyDocs()
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Save failed', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function confirmDeleteCompanyDoc() {
+    if (!deleteCompanyDoc) return
+    setBusy(true)
+    try {
+      await deleteCompanyDocument(deleteCompanyDoc.id)
+      showToast('Document removed', 'success')
+      setDeleteCompanyDoc(null)
+      await loadCompanyDocs()
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Delete failed', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function handleImportFile(file: File | null) {
     if (!file) return
@@ -725,6 +832,97 @@ export default function SettingsPage() {
       </div>
 
       {renderSection('Company info', 'Company', COMPANY_KEYS)}
+
+      <div style={{ ...cardStyle, marginBottom: 20 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: 12,
+            flexWrap: 'wrap',
+            marginBottom: 12,
+          }}
+        >
+          <div>
+            <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Company documents</h2>
+            <p style={{ color: colors.muted2, fontSize: 12, margin: '6px 0 0', maxWidth: 560, lineHeight: 1.5 }}>
+              Trade license, VAT certificate, and other company papers. Upload files to Zoho WorkDrive,
+              then paste the share link here. Central stores links only — not the files.
+            </p>
+          </div>
+          <button type="button" style={buttonPrimaryStyle} onClick={openCompanyDocCreate}>
+            <Plus size={16} /> Add document
+          </button>
+        </div>
+        {companyDocsMissing ? (
+          <p style={{ color: colors.muted, fontSize: 13, lineHeight: 1.5 }}>
+            Table not created yet. Run{' '}
+            <code>supabase/migrations/20261006180000_company_documents.sql</code> in the Supabase SQL
+            Editor, then refresh.
+          </p>
+        ) : companyDocs.length === 0 ? (
+          <p style={{ color: colors.muted, fontSize: 13, lineHeight: 1.5 }}>
+            No company documents yet. Add your trade license and VAT certificate to get started.
+          </p>
+        ) : (
+          <div style={tableWrapStyle}>
+            <table style={tableStyle}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>Type</th>
+                  <th style={thStyle}>Title</th>
+                  <th style={thStyle}>Expires</th>
+                  <th style={thStyle}>Link</th>
+                  <th style={thStyle}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {companyDocs.map((doc) => (
+                  <tr key={doc.id}>
+                    <td style={tdStyle}>{companyDocCategoryLabel(doc.category)}</td>
+                    <td style={tdStyle}>{doc.title || '—'}</td>
+                    <td style={tdStyle}>
+                      {doc.expires_on ? String(doc.expires_on).slice(0, 10) : '—'}
+                    </td>
+                    <td style={tdStyle}>
+                      {doc.drive_url ? (
+                        <a
+                          href={doc.drive_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ color: colors.accent }}
+                        >
+                          Open
+                        </a>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td style={tdStyle}>
+                      <button
+                        type="button"
+                        style={buttonSecondaryStyle}
+                        onClick={() => openCompanyDocEdit(doc)}
+                      >
+                        <Pencil size={14} />
+                      </button>{' '}
+                      <button
+                        type="button"
+                        style={buttonDangerStyle}
+                        onClick={() => setDeleteCompanyDoc(doc)}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {renderSection('Bank details', 'Bank', BANK_KEYS)}
       {renderSection('Quote / Invoice settings', 'Quote settings', QUOTE_KEYS)}
       {renderSection(
@@ -742,6 +940,11 @@ export default function SettingsPage() {
         'Customer WorkDrive (files stay on Zoho WorkDrive — CRM stores links only). Enable WorkDrive auto-file and set the Customers root so Dashboard → Scan & file can archive matched emails.',
         'Customer WorkDrive',
         CUSTOMER_DRIVE_KEYS,
+      )}
+      {renderSection(
+        'Company WorkDrive folder (optional root for trade license / VAT certificate uploads)',
+        'Company WorkDrive',
+        COMPANY_DRIVE_KEYS,
       )}
 
       <div style={{ ...cardStyle, marginBottom: 20 }}>
@@ -1069,6 +1272,114 @@ export default function SettingsPage() {
           <button type="button" style={buttonSecondaryStyle} onClick={() => setDeleteUser(null)}>Cancel</button>
           <button type="button" style={buttonDangerStyle} disabled={busy} onClick={() => void confirmDeleteUser()}>
             Delete
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={companyDocOpen}
+        title={editingCompanyDoc ? 'Edit company document' : 'Add company document'}
+        onClose={() => setCompanyDocOpen(false)}
+        width={480}
+      >
+        <div style={fieldStyle}>
+          <label style={labelStyle}>Type *</label>
+          <select
+            style={selectStyle}
+            value={companyDocForm.category}
+            onChange={(e) =>
+              setCompanyDocForm((f) => ({
+                ...f,
+                category: e.target.value as CompanyDocumentCategory,
+              }))
+            }
+          >
+            {COMPANY_DOC_CATEGORIES.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div style={fieldStyle}>
+          <label style={labelStyle}>Title</label>
+          <input
+            style={inputStyle}
+            value={companyDocForm.title}
+            placeholder="e.g. Trade license 2026"
+            onChange={(e) => setCompanyDocForm((f) => ({ ...f, title: e.target.value }))}
+          />
+        </div>
+        <div style={fieldStyle}>
+          <label style={labelStyle}>WorkDrive share link *</label>
+          <input
+            style={inputStyle}
+            value={companyDocForm.drive_url}
+            placeholder="https://workdrive.zoho.com/…"
+            onChange={(e) => setCompanyDocForm((f) => ({ ...f, drive_url: e.target.value }))}
+          />
+        </div>
+        <div style={fieldStyle}>
+          <label style={labelStyle}>File name (optional)</label>
+          <input
+            style={inputStyle}
+            value={companyDocForm.file_name}
+            onChange={(e) => setCompanyDocForm((f) => ({ ...f, file_name: e.target.value }))}
+          />
+        </div>
+        <div style={fieldStyle}>
+          <label style={labelStyle}>Expires on (optional)</label>
+          <input
+            style={inputStyle}
+            type="date"
+            value={companyDocForm.expires_on}
+            onChange={(e) => setCompanyDocForm((f) => ({ ...f, expires_on: e.target.value }))}
+          />
+        </div>
+        <div style={fieldStyle}>
+          <label style={labelStyle}>Notes</label>
+          <textarea
+            style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }}
+            value={companyDocForm.notes}
+            onChange={(e) => setCompanyDocForm((f) => ({ ...f, notes: e.target.value }))}
+          />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button type="button" style={buttonSecondaryStyle} onClick={() => setCompanyDocOpen(false)}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            style={buttonPrimaryStyle}
+            disabled={busy}
+            onClick={() => void saveCompanyDoc()}
+          >
+            Save
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!deleteCompanyDoc}
+        title="Remove document?"
+        onClose={() => setDeleteCompanyDoc(null)}
+        width={400}
+      >
+        <p style={{ color: colors.muted, fontSize: 14 }}>
+          Remove <strong style={{ color: colors.text }}>{deleteCompanyDoc?.title || 'this document'}</strong>{' '}
+          from Central? The file on WorkDrive is not deleted.
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+          <button type="button" style={buttonSecondaryStyle} onClick={() => setDeleteCompanyDoc(null)}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            style={buttonDangerStyle}
+            disabled={busy}
+            onClick={() => void confirmDeleteCompanyDoc()}
+          >
+            Remove
           </button>
         </div>
       </Modal>
