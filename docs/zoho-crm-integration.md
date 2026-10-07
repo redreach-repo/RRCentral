@@ -6,6 +6,7 @@ RRCentral’s React app integrates **Zoho Calendar** and **Zoho Mail** (`app/src
 
 **Calendar (bidirectional UX):**
 - **Dashboard → Schedule** (top of page) combines CRM follow-ups and Zoho Calendar meetings in one list, with filters for All / Follow-ups / Meetings.
+- **Calendar settings** (Schedule, CRM, Follow-ups) lets staff turn sync on/off, pick which Zoho calendar, and test the connection without opening full Settings.
 - **Schedule meeting** invites selected `@redreach.ae` team members (Zoho sends email invites → phone/desktop calendar when accepted).
 - CRM follow-up dates still push to Zoho as `Follow-up: {company}` events; the sales owner is invited automatically.
 
