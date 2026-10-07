@@ -294,7 +294,12 @@ export async function testZohoConnection(settings: ZohoSettings): Promise<string
       const uid = await resolveCalendarUid(settings)
       parts.push(`Calendar: ${uid.slice(0, 12)}…`)
     } catch (e) {
-      parts.push(`Calendar: ${e instanceof Error ? e.message : 'failed'}`)
+      const msg = e instanceof Error ? e.message : 'failed'
+      const scopeHint =
+        /\b401\b/.test(msg) || /unauthorized/i.test(msg)
+          ? ' — re-generate the refresh token with ZohoCalendar.calendar.ALL and ZohoCalendar.event.ALL'
+          : ''
+      parts.push(`Calendar: ${msg}${scopeHint}`)
     }
   }
 

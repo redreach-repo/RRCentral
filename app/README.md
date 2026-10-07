@@ -66,8 +66,11 @@ CRM follow-ups can sync to Zoho Calendar; Email actions can send via Zoho Mail.
 
 1. Open [Zoho API Console](https://api-console.zoho.com/) → create a **Self Client**.
 2. Generate a refresh token with scopes:
+   - `ZohoCalendar.calendar.ALL` (required to list calendars — event alone returns 401)
    - `ZohoCalendar.event.ALL`
+   - `ZohoMail.messages.READ`
    - `ZohoMail.messages.CREATE`
+   - `ZohoMail.folders.READ`
    - `ZohoMail.accounts.READ`
 3. In the app: **Settings → Zoho Calendar & Mail** — paste Client ID, Client Secret, Refresh Token.
 4. Set **Calendar sync** / **Mail send** to `yes`.
