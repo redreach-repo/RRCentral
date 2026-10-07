@@ -152,7 +152,7 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
           >
             <option value={7}>Next 7 days</option>
             <option value={14}>Next 14 days</option>
-            <option value={31}>Next 31 days</option>
+            <option value={30}>Next 30 days</option>
           </select>
           <a
             href={zohoCalendarWebUrl(settings)}
@@ -178,14 +178,24 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
       </p>
 
       {error ? (
-        <p style={{ color: colors.danger, fontSize: 13 }}>{error}</p>
-      ) : loading && rows.length === 0 ? (
+        <div style={{ marginBottom: 12 }}>
+          <p style={{ color: colors.danger, fontSize: 13, margin: '0 0 8px' }}>{error}</p>
+          <p style={{ color: colors.muted, fontSize: 13, margin: 0 }}>
+            You can still schedule a meeting below — listing events failed, but create may work.
+          </p>
+        </div>
+      ) : null}
+      {loading && rows.length === 0 && !error ? (
         <p style={{ color: colors.muted, fontSize: 13 }}>Loading calendar…</p>
       ) : upcoming.length === 0 ? (
         <EmptyState
           icon={<CalendarClock size={22} />}
-          title="No upcoming meetings"
-          subtitle="Add events in Zoho Calendar or schedule a team meeting here."
+          title={error ? 'Calendar list unavailable' : 'No upcoming meetings'}
+          subtitle={
+            error
+              ? 'Click Schedule meeting to create an event and invite the team.'
+              : 'Add events in Zoho Calendar or schedule a team meeting here.'
+          }
           actionLabel="Schedule meeting"
           onAction={() => setScheduleOpen(true)}
         />

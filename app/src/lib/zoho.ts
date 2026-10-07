@@ -359,15 +359,15 @@ export function normalizeCalendarEventUid(uid: string): string {
   return String(uid || '').trim().split('@')[0].toLowerCase()
 }
 
-function formatZohoRange(start: Date, end: Date): string {
-  const fmt = (d: Date, endOfDay = false) => {
+/** Zoho docs sample uses date-only yyyyMMdd; range must not exceed 31 days. */
+export function formatZohoRange(start: Date, end: Date): string {
+  const fmt = (d: Date) => {
     const y = d.getFullYear()
     const m = String(d.getMonth() + 1).padStart(2, '0')
     const day = String(d.getDate()).padStart(2, '0')
-    if (endOfDay) return `${y}${m}${day}T235959`
-    return `${y}${m}${day}T000000`
+    return `${y}${m}${day}`
   }
-  return JSON.stringify({ start: fmt(start), end: fmt(end, true) })
+  return JSON.stringify({ start: fmt(start), end: fmt(end) })
 }
 
 function parseZohoEventInstant(raw: string | undefined, fallbackDate = ''): string {
@@ -417,18 +417,30 @@ export async function listZohoCalendarEvents(
 ): Promise<ZohoCalendarEvent[]> {
   if (!isZohoCalendarEnabled(settings)) return []
   const calUid = await resolveCalendarUid(settings)
-  const range = encodeURIComponent(formatZohoRange(opts.start, opts.end))
-  const res = await zohoFetch(
-    settings,
-    `${calendarDomain(settings)}/api/v1/calendars/${encodeURIComponent(calUid)}/events?range=${range}&byinstance=true`,
-  )
+  // Cap inclusive window at 30 days so we stay under Zoho's 31-day limit.
+  const maxEnd = new Date(opts.start)
+  maxEnd.setDate(maxEnd.getDate() + 30)
+  const end = opts.end.getTime() > maxEnd.getTime() ? maxEnd : opts.end
+  const range = encodeURIComponent(formatZohoRange(opts.start, end))
+  const url =
+    `${calendarDomain(settings)}/api/v1/calendars/${encodeURIComponent(calUid)}/events` +
+    `?range=${range}`
+  let res = await zohoFetch(settings, `${url}&byinstance=true`)
+  // Some orgs reject byinstance — retry without it.
+  if (res.status === 400) {
+    res = await zohoFetch(settings, url)
+  }
   const data = (await res.json().catch(() => ({}))) as {
     events?: Record<string, unknown>[]
     message?: string
-    status?: { description?: string }
+    status?: { description?: string; code?: number }
   }
   if (!res.ok) {
-    throw new Error(data.message || data.status?.description || `List events failed (${res.status})`)
+    throw new Error(
+      data.message ||
+        data.status?.description ||
+        `List events failed (${res.status})`,
+    )
   }
   return (data.events || [])
     .map((row) => mapZohoCalendarEvent(row))
