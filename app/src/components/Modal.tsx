@@ -1,4 +1,5 @@
 import { useEffect, type CSSProperties, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { colors } from '../lib/uiStyles'
 import { useCompactCrm } from '../hooks/useMediaQuery'
@@ -18,7 +19,7 @@ const overlayStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'flex-start',
   justifyContent: 'center',
-  zIndex: 1000,
+  zIndex: 10000,
   padding:
     'max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left))',
   overflowY: 'auto',
@@ -89,7 +90,7 @@ export default function Modal({ open, title, onClose, children, width = 520 }: M
     }
   }, [open, onClose])
 
-  if (!open) return null
+  if (!open || typeof document === 'undefined') return null
 
   const maxWidth =
     compact
@@ -98,7 +99,7 @@ export default function Modal({ open, title, onClose, children, width = 520 }: M
         ? `min(${width}px, 100%)`
         : width
 
-  return (
+  return createPortal(
     <div
       style={{
         ...overlayStyle,
@@ -142,6 +143,7 @@ export default function Modal({ open, title, onClose, children, width = 520 }: M
         </div>
         <div style={{ padding: compact ? 14 : 20 }}>{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
