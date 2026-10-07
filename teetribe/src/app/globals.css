@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --amber: #e8a317;
+  --teal: #0a8a7a;
+  --sunshine: #f5c842;
+  --ink: #0d0d0d;
+  --cream: #faf7f0;
+  --background: #faf7f0;
+  --foreground: #0d0d0d;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-body), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: #f5c842;
+  color: #0d0d0d;
+}
+
+:focus-visible {
+  outline: 3px solid #0a8a7a;
+  outline-offset: 2px;
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-ink px-6 py-3 text-sm font-semibold text-cream transition hover:bg-teal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal disabled:opacity-50;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border-2 border-ink bg-cream px-6 py-3 text-sm font-semibold text-ink transition hover:bg-sunshine focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal;
+  }
+  .badge-sticker {
+    @apply inline-flex items-center rounded-full border-2 border-ink bg-sunshine px-3 py-1 text-xs font-bold uppercase tracking-wide text-ink shadow-sticker;
+  }
+  .container-site {
+    @apply mx-auto w-full max-w-site px-4 sm:px-6;
+  }
+}
