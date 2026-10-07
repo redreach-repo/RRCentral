@@ -87,6 +87,15 @@ function writeTokenCache(cache: TokenCache) {
   sessionStorage.setItem(TOKEN_CACHE_KEY, JSON.stringify(cache))
 }
 
+/** Drop cached access token after credential changes or before Test connection. */
+export function clearZohoTokenCache() {
+  try {
+    sessionStorage.removeItem(TOKEN_CACHE_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
 function corsHint(status: number): string {
   if (status === 405 || status === 0) {
     return (
@@ -291,6 +300,7 @@ async function zohoFetch(
 }
 
 export async function testZohoConnection(settings: ZohoSettings): Promise<string> {
+  clearZohoTokenCache()
   await getZohoAccessToken(settings)
   const parts: string[] = ['Token OK']
 
@@ -299,7 +309,12 @@ export async function testZohoConnection(settings: ZohoSettings): Promise<string
       const uid = await resolveCalendarUid(settings)
       parts.push(`Calendar: ${uid.slice(0, 12)}…`)
     } catch (e) {
-      parts.push(`Calendar: ${e instanceof Error ? e.message : 'failed'}`)
+      const msg = e instanceof Error ? e.message : 'failed'
+      const scopeHint =
+        /\b401\b/.test(msg) || /unauthorized/i.test(msg)
+          ? ' — re-generate the refresh token with ZohoCalendar.calendar.ALL and ZohoCalendar.event.ALL'
+          : ''
+      parts.push(`Calendar: ${msg}${scopeHint}`)
     }
   }
 

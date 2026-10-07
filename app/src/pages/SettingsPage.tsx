@@ -13,7 +13,7 @@ import {
 import { clearLocalData, DB_NAME } from '../lib/localDb'
 import { downloadCentralBackup } from '../lib/centralBackup'
 import { importCloudDumpFromFile } from '../lib/importCloudDump'
-import { testZohoConnection } from '../lib/zoho'
+import { clearZohoTokenCache, testZohoConnection } from '../lib/zoho'
 import { isAllowedLoginEmail, loginEmailDomainError } from '../lib/allowedLoginEmail'
 import { authApi, MIN_PASSWORD_LENGTH } from '../lib/authApi'
 import {
@@ -1016,13 +1016,15 @@ export default function SettingsPage() {
             Zoho API Console
           </a>
           , generate a refresh token with scopes{' '}
+          <code style={{ color: '#ff9f4a' }}>ZohoCalendar.calendar.ALL</code>,{' '}
           <code style={{ color: '#ff9f4a' }}>ZohoCalendar.event.ALL</code>,{' '}
           <code style={{ color: '#ff9f4a' }}>ZohoMail.messages.READ</code>,{' '}
           <code style={{ color: '#ff9f4a' }}>ZohoMail.messages.CREATE</code>,{' '}
           <code style={{ color: '#ff9f4a' }}>ZohoMail.folders.READ</code>, and{' '}
           <code style={{ color: '#ff9f4a' }}>ZohoMail.accounts.READ</code>, then paste credentials
           below. Set Calendar sync / Mail to <strong>yes</strong> to enable. Use regional domains if
-          your org is on .eu / .in (e.g. <code>https://accounts.zoho.eu</code>).
+          your org is on .eu / .in (e.g. <code>https://accounts.zoho.eu</code>). Calendar needs both
+          calendar + event scopes — event alone returns 401 when listing calendars.
         </p>
         <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.55 }}>
           <strong style={{ color: colors.text }}>Safari tip:</strong> Zoho blocks direct browser
