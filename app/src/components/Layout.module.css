@@ -353,7 +353,202 @@
   container-name: crm-main;
 }
 
-/* Tablet + phone: drawer navigation */
+.bottomNav {
+  display: none;
+}
+
+.bottomNavItem {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  text-decoration: none;
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 52px;
+  padding: 6px 4px 4px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.15s ease;
+}
+
+.bottomNavItem:hover,
+.bottomNavItem:focus-visible {
+  color: #fff;
+  outline: none;
+}
+
+.bottomNavItemActive {
+  color: #ff9f4a;
+}
+
+.bottomNavIconWrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+}
+
+.bottomNavBadge {
+  position: absolute;
+  top: -4px;
+  right: -10px;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #e85d04;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
+.bottomNavLabel {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Phone / foldable shell (class from usePhoneShell — covers big phones & coarse tablets) */
+.shellPhone .overlay {
+  display: block;
+}
+
+.shellPhone .sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(300px, 88vw);
+  transform: translateX(-100%);
+  transition: transform 0.22s ease;
+  box-shadow: 8px 0 32px rgba(0, 0, 0, 0.45);
+}
+
+.shellPhone:has(.localBanner) .sidebar {
+  top: 34px;
+  height: calc(100% - 34px);
+}
+
+.shellPhone .sidebarOpen {
+  transform: translateX(0);
+}
+
+.shellPhone .closeBtn {
+  display: grid;
+}
+
+.shellPhone .menuBtn {
+  display: none;
+}
+
+.shellPhone .userEmail {
+  display: none;
+}
+
+.shellPhone .topbar {
+  padding: 0 16px;
+  padding-top: env(safe-area-inset-top);
+  height: calc(56px + env(safe-area-inset-top));
+  box-sizing: border-box;
+}
+
+.shellPhone .topbarEyebrow {
+  display: none;
+}
+
+.shellPhone .signOutLabel {
+  display: none;
+}
+
+.shellPhone .signOutBtn {
+  padding: 8px;
+  width: 40px;
+  height: 40px;
+  justify-content: center;
+}
+
+.shellPhone .reminderBtn {
+  width: 40px;
+  height: 40px;
+}
+
+.shellPhone .main {
+  width: 100%;
+  max-width: 100%;
+  padding-bottom: calc(64px + env(safe-area-inset-bottom));
+}
+
+.shellPhone .content {
+  padding: 18px 16px;
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+  padding-bottom: 20px;
+}
+
+.shellPhone .bottomNav {
+  display: flex;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  align-items: stretch;
+  justify-content: space-around;
+  gap: 2px;
+  min-height: 64px;
+  padding: 4px 6px calc(4px + env(safe-area-inset-bottom));
+  padding-left: max(6px, env(safe-area-inset-left));
+  padding-right: max(6px, env(safe-area-inset-right));
+  background: rgba(18, 20, 24, 0.94);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.35);
+}
+
+/* Large phone / fold open portrait: roomier bottom labels & touch targets */
+@media (min-width: 390px) {
+  .shellPhone .bottomNavItem {
+    min-height: 56px;
+  }
+
+  .shellPhone .bottomNavLabel {
+    font-size: 11.5px;
+  }
+}
+
+@media (min-width: 430px) {
+  .shellPhone .content {
+    padding: 20px 20px;
+    padding-left: max(20px, env(safe-area-inset-left));
+    padding-right: max(20px, env(safe-area-inset-right));
+  }
+
+  .shellPhone .bottomNav {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  .shellPhone .navItem {
+    padding: 11px 14px;
+    font-size: 14.5px;
+    min-height: 44px;
+  }
+}
+
+/* Tablet + phone: drawer navigation (desktop narrow / iPad) */
 @media (max-width: 1024px) {
   .overlay {
     display: block;
@@ -385,6 +580,10 @@
 
   .menuBtn {
     display: grid;
+  }
+
+  .shellPhone .menuBtn {
+    display: none;
   }
 
   .userEmail {
@@ -434,7 +633,7 @@
   }
 
   .title {
-    font-size: 14px;
+    font-size: 15px;
   }
 
   .signOutLabel {
@@ -449,6 +648,12 @@
     padding: 14px 12px;
     padding-left: max(12px, env(safe-area-inset-left));
     padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  .shellPhone .content {
+    padding: 14px 14px;
+    padding-left: max(14px, env(safe-area-inset-left));
+    padding-right: max(14px, env(safe-area-inset-right));
   }
 }
 
@@ -474,9 +679,17 @@
     width: 34px;
     height: 34px;
   }
+
+  .shellPhone .bottomNavLabel {
+    font-size: 10px;
+  }
+
+  .shellPhone .bottomNavItem {
+    padding: 4px 2px;
+  }
 }
 
-/* Foldable / tall phones in landscape: keep topbar usable */
+/* Foldable / tall phones in landscape: keep chrome usable */
 @media (max-height: 420px) and (orientation: landscape) {
   .topbar {
     height: 48px;
@@ -485,6 +698,24 @@
   .content {
     padding-top: 12px;
     padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
+  .shellPhone .main {
+    padding-bottom: calc(52px + env(safe-area-inset-bottom));
+  }
+
+  .shellPhone .bottomNav {
+    min-height: 48px;
+    padding-top: 2px;
+  }
+
+  .shellPhone .bottomNavItem {
+    min-height: 44px;
+    gap: 1px;
+  }
+
+  .shellPhone .bottomNavLabel {
+    font-size: 10px;
   }
 }
 

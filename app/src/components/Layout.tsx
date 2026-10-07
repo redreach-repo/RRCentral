@@ -21,12 +21,14 @@ import {
   Settings,
   KeyRound,
   Menu,
+  MoreHorizontal,
   X,
   LogOut,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders'
 import { useRecurringDeductionsSync } from '../hooks/useRecurringDeductionsSync'
+import { usePhoneShell } from '../hooks/useMediaQuery'
 import { roleAtLeast } from '../lib/permissions'
 import type { UserRole } from '../lib/types'
 import BrandLogo from './BrandLogo'
@@ -114,11 +116,25 @@ const titleByPath: { match: (path: string) => boolean; title: string }[] = [
   { match: (p) => p.startsWith('/audit-log'), title: 'Audit log' },
 ]
 
+/** Primary destinations for phone / foldable bottom nav (big phones included). */
+const phonePrimaryNav: { to: string; label: string; icon: typeof LayoutDashboard; end?: boolean }[] = [
+  { to: '/app', label: 'Home', icon: LayoutDashboard, end: true },
+  { to: '/crm', label: 'CRM', icon: Users },
+  { to: '/follow-ups', label: 'Follow-ups', icon: CalendarClock },
+  { to: '/quotations', label: 'Quotes', icon: FileText },
+]
+
+function isPhonePrimaryActive(pathname: string, to: string, end?: boolean): boolean {
+  if (end) return pathname === to
+  return pathname === to || pathname.startsWith(`${to}/`)
+}
+
 export default function Layout() {
   const { user, userRole, signOut, isLocalMode } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
+  const phoneShell = usePhoneShell()
   const reminders = useFollowUpReminders(user?.email)
   useRecurringDeductionsSync(Boolean(user))
 
@@ -130,8 +146,12 @@ export default function Layout() {
   const pageTitle =
     titleByPath.find((t) => t.match(location.pathname))?.title || 'RED REACH Central'
 
+  const primaryActive = phonePrimaryNav.some((item) =>
+    isPhonePrimaryActive(location.pathname, item.to, item.end),
+  )
+
   return (
-    <div className={styles.shell}>
+    <div className={`${styles.shell} ${phoneShell ? styles.shellPhone : ''}`}>
       <div className={styles.ambient} aria-hidden />
       {isLocalMode && (
         <div className={styles.localBanner} role="status">
@@ -173,7 +193,7 @@ export default function Layout() {
                 <div className={styles.navGroupLabel}>{group.label}</div>
                 {items.map(({ to, label, icon: Icon, end }) => (
                   <NavLink
-                    key={to}
+                    key={`${to}-${label}`}
                     to={to}
                     end={end}
                     className={({ isActive }) =>
@@ -250,6 +270,43 @@ export default function Layout() {
         <main className={styles.content}>
           <Outlet />
         </main>
+
+        {phoneShell ? (
+          <nav className={styles.bottomNav} aria-label="Primary">
+            {phonePrimaryNav.map(({ to, label, icon: Icon, end }) => {
+              const active = isPhonePrimaryActive(location.pathname, to, end)
+              return (
+                <NavLink
+                  key={to}
+                  to={to}
+                  end={end}
+                  className={`${styles.bottomNavItem} ${active ? styles.bottomNavItemActive : ''}`}
+                >
+                  <span className={styles.bottomNavIconWrap}>
+                    <Icon size={22} strokeWidth={active ? 2.25 : 1.75} />
+                    {to === '/follow-ups' && reminders.due > 0 ? (
+                      <span className={styles.bottomNavBadge} aria-hidden>
+                        {reminders.due > 99 ? '99+' : reminders.due}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className={styles.bottomNavLabel}>{label}</span>
+                </NavLink>
+              )
+            })}
+            <button
+              type="button"
+              className={`${styles.bottomNavItem} ${!primaryActive && sidebarOpen ? styles.bottomNavItemActive : ''}`}
+              onClick={() => setSidebarOpen(true)}
+              aria-label="More pages"
+            >
+              <span className={styles.bottomNavIconWrap}>
+                <MoreHorizontal size={22} strokeWidth={1.75} />
+              </span>
+              <span className={styles.bottomNavLabel}>More</span>
+            </button>
+          </nav>
+        ) : null}
       </div>
     </div>
   )

@@ -145,21 +145,23 @@ const emptyForm = (): CrmForm => ({
 const chip = (active: boolean): CSSProperties => ({
   ...btnGhost,
   fontSize: 12,
-  padding: '6px 10px',
+  padding: '8px 12px',
   borderRadius: 8,
   border: `1px solid ${active ? colors.accent : colors.border}`,
   background: active ? `${colors.accent}22` : 'transparent',
   color: active ? colors.text : colors.muted,
   fontWeight: active ? 700 : 500,
+  minHeight: 36,
 })
 
 const compactSelect: CSSProperties = {
   ...input,
-  padding: '4px 8px',
-  fontSize: 12,
+  padding: '8px 10px',
+  fontSize: 13,
   minWidth: 0,
   width: '100%',
-  maxWidth: 160,
+  maxWidth: '100%',
+  minHeight: 40,
 }
 
 function followUpColor(dateStr: string | null): string {
@@ -975,9 +977,20 @@ export default function CrmPage() {
     <div style={page}>
       <PageHeader
         title="Pipeline"
-        subtitle="My Day opens overdue & today by default. Log every touch. Switch to board when you need the full funnel."
+        subtitle={
+          compact
+            ? 'My Day = overdue + today. Tap a deal to log the next touch.'
+            : 'My Day opens overdue & today by default. Log every touch. Switch to board when you need the full funnel.'
+        }
         actions={
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+          <div
+            className={compact ? resp.toolbar : undefined}
+            style={
+              compact
+                ? { marginBottom: 0, width: '100%' }
+                : { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }
+            }
+          >
             <div className={resp.viewToggle} role="group" aria-label="CRM view">
               <button
                 type="button"
@@ -994,10 +1007,22 @@ export default function CrmPage() {
                 <LayoutGrid size={14} /> Board
               </button>
             </div>
-            <button type="button" style={btn} onClick={() => setCalendarSettingsOpen(true)}>
-              <Settings size={16} /> Calendar settings
+            <button
+              type="button"
+              style={{ ...btn, minHeight: compact ? 42 : undefined, flex: compact ? '1 1 auto' : undefined }}
+              onClick={() => setCalendarSettingsOpen(true)}
+            >
+              <Settings size={16} /> {compact ? 'Calendar' : 'Calendar settings'}
             </button>
-            <button type="button" style={btnPrimary} onClick={openCreate}>
+            <button
+              type="button"
+              style={{
+                ...btnPrimary,
+                minHeight: compact ? 44 : undefined,
+                flex: compact ? '1 1 140px' : undefined,
+              }}
+              onClick={openCreate}
+            >
               <Plus size={16} /> Add company
             </button>
           </div>
@@ -1120,7 +1145,7 @@ export default function CrmPage() {
         </select>
       </div>
 
-      <div className={resp.chipRow}>
+      <div className={compact ? resp.chipScroll : resp.chipRow} role="toolbar" aria-label="Pipeline stage">
         <button type="button" style={chip(stageFilter === 'All')} onClick={() => setStageFilter('All')}>
           All stages ({stageCounts.All || 0})
         </button>
@@ -1136,10 +1161,16 @@ export default function CrmPage() {
         ))}
       </div>
 
-      <div className={resp.chipRow}>
+      <div className={compact ? resp.chipScroll : resp.chipRow} role="toolbar" aria-label="Follow-up filter">
         {(['All', 'Due', 'Overdue', 'Today', 'Upcoming', 'None'] as FollowFilter[]).map((f) => (
           <button key={f} type="button" style={chip(followFilter === f)} onClick={() => setFollowFilter(f)}>
-            {f === 'All' ? 'Any follow-up' : f === 'Due' ? 'Due (overdue + today)' : f}
+            {f === 'All'
+              ? 'Any follow-up'
+              : f === 'Due'
+                ? compact
+                  ? 'Due'
+                  : 'Due (overdue + today)'
+                : f}
           </button>
         ))}
       </div>
