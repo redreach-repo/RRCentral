@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, quoteId })
   }
 
-  const { error } = await admin.from('quote_requests').insert({
+  const { error } = await admin.from('tt_quote_requests').insert({
     id: quoteId,
     name: data.name,
     email: data.email,

@@ -14,10 +14,10 @@ export default async function AdminOverviewPage() {
     const admin = createAdminClient()
     if (admin) {
       const [orders, members, waitlist, quotes] = await Promise.all([
-        admin.from('orders').select('id', { count: 'exact', head: true }),
-        admin.from('members').select('id', { count: 'exact', head: true }),
-        admin.from('drop_waitlist').select('id', { count: 'exact', head: true }),
-        admin.from('quote_requests').select('id', { count: 'exact', head: true }),
+        admin.from('tt_orders').select('id', { count: 'exact', head: true }),
+        admin.from('tt_members').select('id', { count: 'exact', head: true }),
+        admin.from('tt_drop_waitlist').select('id', { count: 'exact', head: true }),
+        admin.from('tt_quote_requests').select('id', { count: 'exact', head: true }),
       ])
       orderCount = orders.count ?? 0
       memberCount = members.count ?? 0

@@ -24,7 +24,7 @@ export async function GET() {
   }
 
   const { data, error } = await admin
-    .from('orders')
+    .from('tt_orders')
     .select('id, email, name, total_fils, status, created_at')
     .order('created_at', { ascending: false })
     .limit(100)

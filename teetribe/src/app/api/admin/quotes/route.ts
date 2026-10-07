@@ -13,7 +13,7 @@ export async function GET() {
   }
 
   const { data, error } = await admin
-    .from('quote_requests')
+    .from('tt_quote_requests')
     .select('id, name, email, product_interest, quantity, status, created_at')
     .order('created_at', { ascending: false })
     .limit(100)

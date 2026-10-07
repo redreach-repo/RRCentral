@@ -89,9 +89,9 @@ export async function POST(req: NextRequest) {
 
   // Persist pending order when Supabase available
   if (admin && !isMockMode()) {
-    await admin.from('customers').upsert({ email, name, phone }, { onConflict: 'email' })
+    await admin.from('tt_customers').upsert({ email, name, phone }, { onConflict: 'email' })
 
-    const { error: orderErr } = await admin.from('orders').insert({
+    const { error: orderErr } = await admin.from('tt_orders').insert({
       id: orderId,
       email,
       name,
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
       qty: l.qty,
       price_fils: l.priceFils,
     }))
-    await admin.from('order_items').insert(orderItems)
+    await admin.from('tt_order_items').insert(orderItems)
   }
 
   const stripe = getStripe()!
@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
     })
 
     if (admin && !isMockMode()) {
-      await admin.from('orders').update({ stripe_session_id: session.id }).eq('id', orderId)
+      await admin.from('tt_orders').update({ stripe_session_id: session.id }).eq('id', orderId)
     }
 
     return NextResponse.json({ ok: true, redirect: session.url, orderId, sessionId: session.id })

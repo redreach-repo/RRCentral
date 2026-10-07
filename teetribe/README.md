@@ -112,12 +112,17 @@ Tee Tribe can push paid orders into Red Reach Central as website inquiries / CRM
 
 Central can create a lead, attach an income note, and optionally mirror inventory when `CRM_SYNC_INVENTORY=true`.
 
-## Supabase setup
+## Supabase setup (same project as Red Reach Central)
 
-1. Create a Supabase project.
-2. Run migration: `supabase/migrations/20261007000000_teetribe_commerce.sql`
-3. Add your admin email to `public.admins` or set `app_metadata.role = 'admin'` on the auth user.
-4. `npm run seed` to upsert products from `src/data/seed.ts`.
+Tee Tribe is part of Red Reach. Use the **Central** Supabase project.
+
+1. In that project’s SQL Editor, run `supabase/migrations/20261007000000_teetribe_commerce.sql`  
+   (creates `tt_*` tables only — does not touch CRM `products` / `crm` / etc.)
+2. Put the **same** Central URL + anon + service role keys in `teetribe/.env.local`.
+3. Set `NEXT_PUBLIC_USE_MOCK=false`.
+4. `npm run seed` to upsert into `tt_collections` / `tt_products` / …
+5. Central admins (`rr_is_admin()` / `app_users` role admin) can manage shop data via RLS.
+
 
 ## Design
 

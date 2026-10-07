@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
     // Idempotency: skip if already paid or same event processed
     const { data: existing } = await admin
-      .from('orders')
+      .from('tt_orders')
       .select('id, status, stripe_event_id')
       .eq('id', orderId)
       .single()
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     const paidAt = new Date().toISOString()
 
     const { error: updateErr } = await admin
-      .from('orders')
+      .from('tt_orders')
       .update({
         status: 'paid',
         stripe_event_id: event.id,
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
 
     // Decrement stock atomically
     const { data: items } = await admin
-      .from('order_items')
+      .from('tt_order_items')
       .select('variant_id, qty, product_name, variant_label, price_fils')
       .eq('order_id', orderId)
 
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { data: order } = await admin
-      .from('orders')
+      .from('tt_orders')
       .select('*')
       .eq('id', orderId)
       .single()

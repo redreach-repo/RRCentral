@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Check existing member
-  const { data: existing } = await admin.from('members').select('discount_code').eq('email', email).single()
+  const { data: existing } = await admin.from('tt_members').select('discount_code').eq('email', email).single()
   if (existing) {
     return NextResponse.json({ ok: true, code: existing.discount_code, existing: true })
   }
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
   discountCode = generateDiscountCode()
 
   const { data: member, error: memberErr } = await admin
-    .from('members')
+    .from('tt_members')
     .insert({
       email,
       name,
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Signup failed' }, { status: 500 })
   }
 
-  await admin.from('discount_codes').insert({
+  await admin.from('tt_discount_codes').insert({
     code: discountCode,
     description: 'Tribe member first-order 10% off',
     percent_off: 10,

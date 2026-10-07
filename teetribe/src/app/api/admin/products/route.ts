@@ -25,7 +25,7 @@ export async function GET() {
   }
 
   const { data, error } = await admin
-    .from('product_variants')
+    .from('tt_product_variants')
     .select('id, size, color, stock, products(name)')
     .order('product_id')
 
@@ -72,7 +72,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Not configured' }, { status: 501 })
   }
 
-  const { error } = await admin.from('product_variants').update({ stock }).eq('id', variantId)
+  const { error } = await admin.from('tt_product_variants').update({ stock }).eq('id', variantId)
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

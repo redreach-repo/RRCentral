@@ -13,7 +13,7 @@ export async function GET() {
   }
 
   const { data, error } = await admin
-    .from('drop_waitlist')
+    .from('tt_drop_waitlist')
     .select('id, email, product_slug, created_at')
     .order('created_at', { ascending: false })
     .limit(200)

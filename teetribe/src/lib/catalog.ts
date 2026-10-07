@@ -19,7 +19,7 @@ type DbProduct = {
   drop_closes_at: string | null
   is_active: boolean
   best_seller: boolean
-  product_variants: Array<{
+  tt_product_variants?: Array<{
     id: string
     sku: string
     size: string
@@ -27,7 +27,7 @@ type DbProduct = {
     color_hex: string
     stock: number
   }>
-  product_images: Array<{
+  tt_product_images?: Array<{
     id: string
     url: string
     alt: string
@@ -45,7 +45,7 @@ type DbCollection = {
 }
 
 function mapProduct(row: DbProduct): Product {
-  const variants: ProductVariant[] = (row.product_variants || []).map((v) => ({
+  const variants: ProductVariant[] = (row.tt_product_variants || []).map((v) => ({
     id: v.id,
     sku: v.sku,
     size: v.size as ProductVariant['size'],
@@ -54,7 +54,7 @@ function mapProduct(row: DbProduct): Product {
     stock: v.stock,
   }))
 
-  const images: ProductImage[] = (row.product_images || [])
+  const images: ProductImage[] = (row.tt_product_images || [])
     .sort((a, b) => a.sort_order - b.sort_order)
     .map((img) => ({
       id: img.id,
@@ -100,11 +100,11 @@ async function fetchProductsFromDb(): Promise<Product[]> {
   if (!admin) return seed.products
 
   const { data, error } = await admin
-    .from('products')
+    .from('tt_products')
     .select(`
       *,
-      product_variants (*),
-      product_images (*)
+      tt_product_variants (*),
+      tt_product_images (*)
     `)
     .eq('is_active', true)
     .order('created_at', { ascending: true })
@@ -118,7 +118,7 @@ async function fetchCollectionsFromDb(): Promise<Collection[]> {
   if (!admin) return seed.collections
 
   const { data, error } = await admin
-    .from('collections')
+    .from('tt_collections')
     .select('*')
     .eq('is_active', true)
     .order('sort_order', { ascending: true })

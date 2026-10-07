@@ -17,7 +17,7 @@ async function seed() {
   console.log('Seeding collections…')
   for (let i = 0; i < collections.length; i++) {
     const c = collections[i]
-    const { error } = await supabase.from('collections').upsert({
+    const { error } = await supabase.from('tt_collections').upsert({
       id: c.id,
       slug: c.slug,
       name: c.name,
@@ -31,7 +31,7 @@ async function seed() {
 
   console.log('Seeding products…')
   for (const p of products) {
-    const { error: pErr } = await supabase.from('products').upsert({
+    const { error: pErr } = await supabase.from('tt_products').upsert({
       id: p.id,
       slug: p.slug,
       name: p.name,
@@ -51,7 +51,7 @@ async function seed() {
     if (pErr) console.error('Product', p.slug, pErr.message)
 
     for (const v of p.variants) {
-      const { error: vErr } = await supabase.from('product_variants').upsert({
+      const { error: vErr } = await supabase.from('tt_product_variants').upsert({
         id: v.id,
         product_id: p.id,
         sku: v.sku,
@@ -64,7 +64,7 @@ async function seed() {
     }
 
     for (const img of p.images) {
-      const { error: iErr } = await supabase.from('product_images').upsert({
+      const { error: iErr } = await supabase.from('tt_product_images').upsert({
         id: `${p.id}-img-${img.id}`,
         product_id: p.id,
         url: img.url,

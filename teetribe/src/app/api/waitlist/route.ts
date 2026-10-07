@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
-  const { error } = await admin.from('drop_waitlist').upsert(
+  const { error } = await admin.from('tt_drop_waitlist').upsert(
     { email, product_id: productId, product_slug: productSlug || 'general' },
     { onConflict: 'email,product_slug' },
   )
