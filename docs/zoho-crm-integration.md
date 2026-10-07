@@ -4,6 +4,11 @@
 
 RRCentral’s React app integrates **Zoho Calendar** and **Zoho Mail** (`app/src/lib/zoho.ts`), using Self Client credentials stored in `app_settings`.
 
+**Calendar (bidirectional UX):**
+- **Dashboard → Team calendar** lists upcoming Zoho Calendar events (including meetings created in Zoho).
+- **Schedule meeting** from the dashboard invites selected `@redreach.ae` team members (Zoho sends email invites → phone/desktop calendar when accepted).
+- CRM follow-up dates still push to Zoho as `Follow-up: {company}` events; the sales owner is invited automatically.
+
 Mail supports:
 - **Send** from CRM / documents (`sendZohoMail`)
 - **Inbox + Sent read** on the Dashboard (`listZohoInboxMessages` / `listZohoSentMessages`), matched to CRM contacts by email

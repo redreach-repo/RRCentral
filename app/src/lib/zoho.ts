@@ -4,6 +4,7 @@
  * (Safari/Chrome block direct Zoho OAuth with CORS → 405).
  */
 
+import { attendeePayload, mergeAttendeeEmails } from './calendarAttendees'
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseConfig'
 
 export type ZohoSettings = Record<string, string>
@@ -42,6 +43,10 @@ export function isZohoMailEnabled(settings: ZohoSettings): boolean {
 
 function accountsDomain(settings: ZohoSettings): string {
   return setting(settings, 'zohoAccountsDomain', 'https://accounts.zoho.com').replace(/\/$/, '')
+}
+
+export function zohoCalendarWebUrl(settings: ZohoSettings): string {
+  return `${calendarDomain(settings)}/zc/home`
 }
 
 function calendarDomain(settings: ZohoSettings): string {
@@ -339,11 +344,106 @@ export async function resolveCalendarUid(settings: ZohoSettings): Promise<string
   return def.uid
 }
 
-function eventDateTime(dateYmd: string, hour = 10, durationMinutes = 30) {
-  const start = `${dateYmd.replace(/-/g, '')}T${String(hour).padStart(2, '0')}0000`
-  const endHour = hour
-  const endMin = durationMinutes
-  const end = `${dateYmd.replace(/-/g, '')}T${String(endHour).padStart(2, '0')}${String(endMin).padStart(2, '0')}00`
+export type ZohoCalendarEvent = {
+  uid: string
+  title: string
+  startAt: string
+  endAt: string
+  isAllDay: boolean
+  organizer: string
+  attendees: { email: string; status?: string }[]
+  description: string
+}
+
+export function normalizeCalendarEventUid(uid: string): string {
+  return String(uid || '').trim().split('@')[0].toLowerCase()
+}
+
+function formatZohoRange(start: Date, end: Date): string {
+  const fmt = (d: Date, endOfDay = false) => {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    if (endOfDay) return `${y}${m}${day}T235959`
+    return `${y}${m}${day}T000000`
+  }
+  return JSON.stringify({ start: fmt(start), end: fmt(end, true) })
+}
+
+function parseZohoEventInstant(raw: string | undefined, fallbackDate = ''): string {
+  const s = String(raw || '').trim()
+  if (!s) return fallbackDate
+  if (/^\d{8}$/.test(s)) {
+    const y = s.slice(0, 4)
+    const m = s.slice(4, 6)
+    const d = s.slice(6, 8)
+    return `${y}-${m}-${d}T09:00:00`
+  }
+  const m = s.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})/)
+  if (m) {
+    return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:00`
+  }
+  return s
+}
+
+function mapZohoCalendarEvent(raw: Record<string, unknown>): ZohoCalendarEvent | null {
+  const uid = String(raw.uid || '').trim()
+  const title = String(raw.title || '').trim()
+  if (!uid || !title) return null
+  const dt = (raw.dateandtime || {}) as Record<string, unknown>
+  const startRaw = String(dt.start || raw.start || '')
+  const endRaw = String(dt.end || raw.end || '')
+  const attendees = Array.isArray(raw.attendees)
+    ? (raw.attendees as Array<{ email?: string; status?: string }>)
+        .map((a) => ({ email: String(a.email || '').trim(), status: a.status }))
+        .filter((a) => a.email)
+    : []
+  return {
+    uid,
+    title,
+    startAt: parseZohoEventInstant(startRaw),
+    endAt: parseZohoEventInstant(endRaw, parseZohoEventInstant(startRaw)),
+    isAllDay: raw.isallday === true || raw.isallday === 'true',
+    organizer: String(raw.organizer || raw.createdby || '').trim(),
+    attendees,
+    description: String(raw.description || '').trim(),
+  }
+}
+
+/** List calendar events in a date window (max 31 days per Zoho API). */
+export async function listZohoCalendarEvents(
+  settings: ZohoSettings,
+  opts: { start: Date; end: Date },
+): Promise<ZohoCalendarEvent[]> {
+  if (!isZohoCalendarEnabled(settings)) return []
+  const calUid = await resolveCalendarUid(settings)
+  const range = encodeURIComponent(formatZohoRange(opts.start, opts.end))
+  const res = await zohoFetch(
+    settings,
+    `${calendarDomain(settings)}/api/v1/calendars/${encodeURIComponent(calUid)}/events?range=${range}&byinstance=true`,
+  )
+  const data = (await res.json().catch(() => ({}))) as {
+    events?: Record<string, unknown>[]
+    message?: string
+    status?: { description?: string }
+  }
+  if (!res.ok) {
+    throw new Error(data.message || data.status?.description || `List events failed (${res.status})`)
+  }
+  return (data.events || [])
+    .map((row) => mapZohoCalendarEvent(row))
+    .filter((e): e is ZohoCalendarEvent => Boolean(e))
+    .sort((a, b) => a.startAt.localeCompare(b.startAt))
+}
+
+function eventDateTime(dateYmd: string, hour = 10, durationMinutes = 30, startMinute = 0) {
+  const date = dateYmd.replace(/-/g, '')
+  const startTotal = hour * 60 + startMinute
+  const endTotal = startTotal + durationMinutes
+  const endHour = Math.floor(endTotal / 60)
+  const endMin = endTotal % 60
+  const start = `${date}T${String(hour).padStart(2, '0')}${String(startMinute).padStart(2, '0')}00`
+  const end = `${date}T${String(endHour).padStart(2, '0')}${String(endMin).padStart(2, '0')}00`
   return {
     timezone: 'Asia/Dubai',
     start,
@@ -357,8 +457,22 @@ export type FollowUpEventInput = {
   owner?: string
   contactName?: string
   contactEmail?: string
+  /** Sales owner + tagged team — Zoho sends calendar invites to these emails. */
+  teamAttendeeEmails?: string[]
   followUpDate: string // yyyy-MM-dd
   existingEventId?: string
+}
+
+export type TeamMeetingInput = {
+  title: string
+  date: string // yyyy-MM-dd
+  startHour?: number
+  startMinute?: number
+  durationMinutes?: number
+  description?: string
+  location?: string
+  attendeeEmails: string[]
+  crmCompany?: string
 }
 
 function buildEventPayload(input: FollowUpEventInput) {
@@ -372,6 +486,10 @@ function buildEventPayload(input: FollowUpEventInput) {
     .filter(Boolean)
     .join('\n')
 
+  const attendees = attendeePayload(
+    mergeAttendeeEmails(input.teamAttendeeEmails, input.contactEmail ? [input.contactEmail] : []),
+  )
+
   const payload: Record<string, unknown> = {
     title,
     description,
@@ -379,10 +497,59 @@ function buildEventPayload(input: FollowUpEventInput) {
     isallday: false,
     reminders: [{ action: 'popup', minutes: -60 }],
   }
-  if (input.contactEmail) {
-    payload.attendees = [{ email: input.contactEmail, status: 'NEEDS-ACTION' }]
+  if (attendees.length) {
+    payload.attendees = attendees
+    payload.notify_attendee = 1
   }
   return payload
+}
+
+function buildMeetingPayload(input: TeamMeetingInput) {
+  const description = [
+    input.description || '',
+    input.crmCompany ? `CRM: ${input.crmCompany}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  const attendees = attendeePayload(input.attendeeEmails)
+  const payload: Record<string, unknown> = {
+    title: input.title.trim(),
+    description,
+    dateandtime: eventDateTime(
+      input.date,
+      input.startHour ?? 10,
+      input.durationMinutes ?? 30,
+      input.startMinute ?? 0,
+    ),
+    isallday: false,
+    reminders: [
+      { action: 'email', minutes: -24 * 60 },
+      { action: 'popup', minutes: -30 },
+    ],
+  }
+  if (input.location?.trim()) payload.location = input.location.trim()
+  if (attendees.length) {
+    payload.attendees = attendees
+    payload.notify_attendee = 1
+  }
+  return payload
+}
+
+/** Schedule a team meeting on Zoho Calendar; invites go to attendee emails. */
+export async function createTeamMeetingOnZoho(
+  settings: ZohoSettings,
+  input: TeamMeetingInput,
+): Promise<string> {
+  if (!isZohoCalendarEnabled(settings)) {
+    throw new Error('Calendar sync is disabled in Settings')
+  }
+  if (!input.title.trim()) throw new Error('Meeting title is required')
+  if (!input.date) throw new Error('Meeting date is required')
+
+  const calUid = await resolveCalendarUid(settings)
+  const eventdata = encodeURIComponent(JSON.stringify(buildMeetingPayload(input)))
+  return createCalendarEvent(settings, calUid, eventdata)
 }
 
 function extractEventUid(data: unknown): string {

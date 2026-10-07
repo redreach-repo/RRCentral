@@ -36,6 +36,7 @@ import { can } from '../lib/permissions'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
 import PageHeader from '../components/PageHeader'
+import ZohoCalendarPanel from '../components/ZohoCalendarPanel'
 import ZohoInboxPanel from '../components/ZohoInboxPanel'
 import {
   cardStyle,
@@ -725,7 +726,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div style={{ marginTop: 16 }}>
+      <div style={{ marginTop: 16, display: 'grid', gap: 16 }}>
+        <ZohoCalendarPanel crmEntries={crm} />
         <ZohoInboxPanel crmEntries={crm} />
       </div>
     </div>

@@ -62,6 +62,7 @@ import {
   isZohoMailEnabled,
   syncFollowUpToZohoCalendar,
 } from '../lib/zoho'
+import { resolveOwnerEmails } from '../lib/calendarAttendees'
 import EmailComposeModal from '../components/EmailComposeModal'
 import LinkWorkDriveModal from '../components/LinkWorkDriveModal'
 import SaveToFolderPrompt from '../components/SaveToFolderPrompt'
@@ -213,6 +214,11 @@ export default function CrmPage() {
   const myOwnerName = useMemo(
     () => resolveSalesOwnerName(user?.email, owners),
     [user?.email, owners],
+  )
+
+  const teamForCalendar = useMemo(
+    () => owners.map((o) => ({ email: o.email, name: o.name, active: o.active })),
+    [owners],
   )
 
   const load = useCallback(async () => {
@@ -498,6 +504,7 @@ export default function CrmPage() {
               owner: entry.owner,
               contactName: p?.name,
               contactEmail: p?.email,
+              teamAttendeeEmails: resolveOwnerEmails(entry.owner, teamForCalendar),
               followUpDate: String(nextFollow).slice(0, 10),
               existingEventId: entry.calendar_event_id || undefined,
             })
@@ -608,6 +615,7 @@ export default function CrmPage() {
               owner: entry.owner,
               contactName: p?.name,
               contactEmail: p?.email,
+              teamAttendeeEmails: resolveOwnerEmails(entry.owner, teamForCalendar),
               followUpDate: payload.follow_up_date,
               existingEventId: entry.calendar_event_id || undefined,
             })
@@ -904,6 +912,7 @@ export default function CrmPage() {
               owner: form.owner,
               contactName: p?.name,
               contactEmail: p?.email,
+              teamAttendeeEmails: resolveOwnerEmails(form.owner, teamForCalendar),
               followUpDate,
               existingEventId: prevEventId || undefined,
             })
