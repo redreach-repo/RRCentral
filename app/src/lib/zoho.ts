@@ -82,6 +82,15 @@ function writeTokenCache(cache: TokenCache) {
   sessionStorage.setItem(TOKEN_CACHE_KEY, JSON.stringify(cache))
 }
 
+/** Drop cached access token after credential changes or before Test connection. */
+export function clearZohoTokenCache() {
+  try {
+    sessionStorage.removeItem(TOKEN_CACHE_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
 function corsHint(status: number): string {
   if (status === 405 || status === 0) {
     return (
@@ -286,6 +295,7 @@ async function zohoFetch(
 }
 
 export async function testZohoConnection(settings: ZohoSettings): Promise<string> {
+  clearZohoTokenCache()
   await getZohoAccessToken(settings)
   const parts: string[] = ['Token OK']
 
