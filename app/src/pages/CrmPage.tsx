@@ -18,6 +18,7 @@ import {
   LayoutGrid,
   List,
   Phone,
+  Settings,
 } from 'lucide-react'
 import { db } from '../lib/db'
 import { CRM_OUTCOME_REASONS, NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
@@ -70,6 +71,7 @@ import WebsiteInquiriesPanel from '../site/components/WebsiteInquiriesPanel'
 import PageHeader from '../components/PageHeader'
 import CrmLogTouchModal, { type LogTouchPayload } from '../components/CrmLogTouchModal'
 import CrmPipelineBoard from '../components/CrmPipelineBoard'
+import CalendarSettingsModal from '../components/CalendarSettingsModal'
 import { useCompactCrm } from '../hooks/useMediaQuery'
 import resp from '../styles/crmResponsive.module.css'
 import {
@@ -209,6 +211,7 @@ export default function CrmPage() {
   const [outcomeReason, setOutcomeReason] = useState('')
   const [sheetTab, setSheetTab] = useState<SheetTab>('overview')
   const [defaultsReady, setDefaultsReady] = useState(false)
+  const [calendarSettingsOpen, setCalendarSettingsOpen] = useState(false)
   const compact = useCompactCrm()
 
   const myOwnerName = useMemo(
@@ -991,6 +994,9 @@ export default function CrmPage() {
                 <LayoutGrid size={14} /> Board
               </button>
             </div>
+            <button type="button" style={btn} onClick={() => setCalendarSettingsOpen(true)}>
+              <Settings size={16} /> Calendar settings
+            </button>
             <button type="button" style={btnPrimary} onClick={openCreate}>
               <Plus size={16} /> Add company
             </button>
@@ -1736,11 +1742,25 @@ export default function CrmPage() {
                       </div>
                     ))}
                   </div>
-                  {isZohoCalendarEnabled(settings) ? (
-                    <p style={{ margin: '8px 0 0', fontSize: 12, color: colors.muted2 }}>
-                      Follow-up date syncs to Zoho Calendar when enabled in Settings.
-                    </p>
-                  ) : null}
+                  <p style={{ margin: '8px 0 0', fontSize: 12, color: colors.muted2 }}>
+                    {isZohoCalendarEnabled(settings)
+                      ? 'Follow-up date syncs to Zoho Calendar.'
+                      : 'Calendar sync is off.'}{' '}
+                    <button
+                      type="button"
+                      onClick={() => setCalendarSettingsOpen(true)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        color: colors.accent,
+                        cursor: 'pointer',
+                        fontSize: 12,
+                      }}
+                    >
+                      Calendar settings
+                    </button>
+                  </p>
                 </div>
 
                 <div style={{ display: sheetTab === 'overview' || !editing ? 'block' : 'none' }}>
@@ -1965,6 +1985,11 @@ export default function CrmPage() {
         uploadedBy={user?.email || ''}
         mode="communication"
         defaultCategory={linkFileTarget?.channel === 'whatsapp' ? 'whatsapp' : 'email'}
+      />
+
+      <CalendarSettingsModal
+        open={calendarSettingsOpen}
+        onClose={() => setCalendarSettingsOpen(false)}
       />
     </div>
   )

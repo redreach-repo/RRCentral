@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { addDays, differenceInCalendarDays, format, parseISO, startOfDay } from 'date-fns'
-import { Bell, CalendarClock, Mail, MessageSquarePlus, MessageCircle } from 'lucide-react'
+import { Bell, CalendarClock, Mail, MessageSquarePlus, MessageCircle, Settings } from 'lucide-react'
 import { db } from '../lib/db'
 import { NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
 import type { AppUser, CrmEntry } from '../lib/types'
@@ -12,6 +12,7 @@ import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
 import EmailComposeModal from '../components/EmailComposeModal'
+import CalendarSettingsModal from '../components/CalendarSettingsModal'
 import { hydrateContacts, primaryContact } from '../lib/contacts'
 import { buildWhatsAppUrl } from '../lib/whatsapp'
 import {
@@ -71,6 +72,7 @@ export default function FollowupsPage() {
   const [updateClearDate, setUpdateClearDate] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [emailTarget, setEmailTarget] = useState<CrmEntry | null>(null)
+  const [calendarSettingsOpen, setCalendarSettingsOpen] = useState(false)
 
   async function openFollowUpWhatsApp(entry: CrmEntry) {
     const contacts = hydrateContacts(entry)
@@ -419,11 +421,18 @@ export default function FollowupsPage() {
 
   return (
     <div style={pageStyle}>
-      <h1 style={pageTitleStyle}>Follow-ups</h1>
-      <p style={pageSubtitleStyle}>
-        Overdue and upcoming CRM actions
-        {isZohoCalendarEnabled(settings) ? ' · Zoho Calendar sync on' : ''}
-      </p>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+        <div>
+          <h1 style={pageTitleStyle}>Follow-ups</h1>
+          <p style={{ ...pageSubtitleStyle, marginBottom: 0 }}>
+            Overdue and upcoming CRM actions
+            {isZohoCalendarEnabled(settings) ? ' · Zoho Calendar sync on' : ''}
+          </p>
+        </div>
+        <button type="button" style={buttonSecondaryStyle} onClick={() => setCalendarSettingsOpen(true)}>
+          <Settings size={14} /> Calendar settings
+        </button>
+      </div>
 
       {error ? (
         <div style={{ ...cardStyle, color: colors.danger, marginBottom: 16 }}>{error}</div>
@@ -572,6 +581,11 @@ export default function FollowupsPage() {
         })}
         zohoEnabled={isZohoMailEnabled(settings)}
         onClose={() => setEmailTarget(null)}
+      />
+
+      <CalendarSettingsModal
+        open={calendarSettingsOpen}
+        onClose={() => setCalendarSettingsOpen(false)}
       />
     </div>
   )

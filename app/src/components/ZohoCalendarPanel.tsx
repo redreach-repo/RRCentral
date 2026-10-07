@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { addDays, format, parseISO, startOfDay } from 'date-fns'
-import { CalendarClock, ExternalLink, Loader2, Plus, RefreshCw } from 'lucide-react'
+import { CalendarClock, ExternalLink, Loader2, Plus, RefreshCw, Settings } from 'lucide-react'
 import type { AppUser, CrmEntry } from '../lib/types'
 import { useSettings } from '../contexts/SettingsContext'
 import { db } from '../lib/db'
@@ -15,6 +15,7 @@ import {
 import { enrichCalendarEvents, type CalendarEventRow } from '../lib/zohoCalendarMatch'
 import { buildScheduleRows, type ScheduleKind, type ScheduleRow } from '../lib/scheduleBoard'
 import ScheduleMeetingModal from './ScheduleMeetingModal'
+import CalendarSettingsModal from './CalendarSettingsModal'
 import EmptyState from './EmptyState'
 import {
   buttonPrimaryStyle,
@@ -61,6 +62,7 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
   const [calendarEvents, setCalendarEvents] = useState<CalendarEventRow[]>([])
   const [team, setTeam] = useState<AppUser[]>([])
   const [scheduleOpen, setScheduleOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [daysAhead, setDaysAhead] = useState(14)
   const [filter, setFilter] = useState<Filter>('all')
 
@@ -205,6 +207,9 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
               <Plus size={14} /> Schedule meeting
             </button>
           ) : null}
+          <button type="button" style={buttonSecondaryStyle} onClick={() => setSettingsOpen(true)}>
+            <Settings size={14} /> Calendar settings
+          </button>
           <Link to="/follow-ups" style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}>
             All follow-ups
           </Link>
@@ -343,6 +348,12 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
           onCreated={() => void load()}
         />
       ) : null}
+
+      <CalendarSettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onSaved={() => void load()}
+      />
     </div>
   )
 }

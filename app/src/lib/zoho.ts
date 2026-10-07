@@ -339,10 +339,14 @@ export async function testZohoConnection(settings: ZohoSettings): Promise<string
   return parts.join(' · ')
 }
 
-export async function resolveCalendarUid(settings: ZohoSettings): Promise<string> {
-  const configured = setting(settings, 'zohoCalendarUid')
-  if (configured) return configured
+export type ZohoCalendarInfo = {
+  uid: string
+  name: string
+  isDefault: boolean
+}
 
+/** List calendars for the Zoho account behind the refresh token. */
+export async function listZohoCalendars(settings: ZohoSettings): Promise<ZohoCalendarInfo[]> {
   const res = await zohoFetch(settings, `${calendarDomain(settings)}/api/v1/calendars`)
   const data = (await res.json().catch(() => ({}))) as {
     calendars?: Array<{ uid?: string; isdefault?: boolean | string; name?: string }>
@@ -352,9 +356,21 @@ export async function resolveCalendarUid(settings: ZohoSettings): Promise<string
   if (!res.ok) {
     throw new Error(data.message || data.status?.description || `List calendars failed (${res.status})`)
   }
-  const cals = data.calendars || []
-  const def =
-    cals.find((c) => c.isdefault === true || c.isdefault === 'true') || cals[0]
+  return (data.calendars || [])
+    .map((c) => ({
+      uid: String(c.uid || '').trim(),
+      name: String(c.name || 'Calendar').trim() || 'Calendar',
+      isDefault: c.isdefault === true || c.isdefault === 'true',
+    }))
+    .filter((c) => c.uid)
+}
+
+export async function resolveCalendarUid(settings: ZohoSettings): Promise<string> {
+  const configured = setting(settings, 'zohoCalendarUid')
+  if (configured) return configured
+
+  const cals = await listZohoCalendars(settings)
+  const def = cals.find((c) => c.isDefault) || cals[0]
   if (!def?.uid) throw new Error('No Zoho calendar found for this account')
   return def.uid
 }
