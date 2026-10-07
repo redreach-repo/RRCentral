@@ -3,6 +3,7 @@ import { Archivo_Black, Inter } from 'next/font/google'
 import { AppProviders } from '@/components/providers/AppProviders'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
+import { Tayo } from '@/components/Tayo'
 import './globals.css'
 
 const archivoBlack = Archivo_Black({
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Header />
           <main className="min-h-[60vh]">{children}</main>
           <Footer />
+          <Tayo />
         </AppProviders>
       </body>
     </html>

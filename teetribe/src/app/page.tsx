@@ -1,14 +1,15 @@
 import Link from 'next/link'
-import { collections, getActiveDrop, getBestSellers } from '@/data/seed'
+import { getCollections, getActiveDrop, getBestSellers } from '@/lib/catalog'
 import { CollectionTile } from '@/components/CollectionTile'
 import { ProductCard } from '@/components/ProductCard'
 import { Countdown } from '@/components/Countdown'
 import { TribeMemberForm } from '@/components/TribeMemberForm'
 import { Badge } from '@/components/Badge'
 
-export default function HomePage() {
-  const activeDrop = getActiveDrop()
-  const bestSellers = getBestSellers(4)
+export default async function HomePage() {
+  const collections = await getCollections()
+  const activeDrop = await getActiveDrop()
+  const bestSellers = await getBestSellers(4)
 
   return (
     <>

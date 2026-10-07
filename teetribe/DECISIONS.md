@@ -22,8 +22,15 @@ Made without blocking on questions. Change later if needed.
 
 ## i18n & UX
 13. EN default; AR toggle with `dir=rtl` and placeholder Arabic strings in `/lib/i18n`.
-14. Tayo chatbot: Phase 1 scripted flows client-side; Phase 2 `/api/tayo` → Claude with rate limit. No keys in the browser.
-15. Admin at `/admin` gated by Supabase Auth + `app_metadata.role === 'admin'`.
+14. Tayo chatbot: scripted flows client-side + `/api/tayo` → Claude Haiku when `ANTHROPIC_API_KEY` set; in-memory rate limit. No keys in the browser.
+15. Admin at `/admin` gated by Supabase Auth + `app_metadata.role === 'admin'` (or `public.admins` email via `tt_is_admin()` in RLS). Mock mode allows open access with warning banner.
+
+## Phase 2–6 (implemented)
+17. **Catalog layer** (`lib/catalog.ts`): returns seed when `NEXT_PUBLIC_USE_MOCK !== 'false'` or Supabase missing; else queries Supabase via service role.
+18. **Checkout**: Zod-validated cart, pending order in Supabase, Stripe Checkout Session (AED, UAE shipping, phone), `integration_identifier` metadata, free delivery threshold from env.
+19. **Webhook**: signature verify, idempotent via `stripe_event_id` / status check, atomic stock decrement via `tt_decrement_stock`, Resend confirmation, CRM sync.
+20. **Admin**: route groups `(protected)` / `(public)/login`; client tables for products/stock, orders, waitlist, quotes, members.
+21. **SEO**: `sitemap.ts`, `robots.ts`, JSON-LD on PDP, Open Graph via `lib/seo.ts`.
 
 ## Email
 16. Resend for transactional mail. Reply-To: `alfred@redreach.ae`. From: `orders@teetribe.com` (fallback `onboarding@resend.dev` in test).
