@@ -103,6 +103,28 @@
   margin-bottom: 10px;
 }
 
+/* Horizontal scroll chips on narrow panes (big phones keep readable labels) */
+.chipScroll {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  margin-bottom: 10px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  padding-bottom: 4px;
+  margin-left: -2px;
+  margin-right: -2px;
+  padding-left: 2px;
+  padding-right: 2px;
+}
+
+.chipScroll > * {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  white-space: nowrap;
+}
+
 .lineStack {
   display: flex;
   flex-direction: column;
@@ -146,8 +168,25 @@
   .cardActions :global(button),
   .cardActions :global(a),
   .lineCardActions :global(button) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .toolbar :global(button),
+  .toolbar :global(select),
+  .toolbar :global(a),
+  .chipScroll :global(button),
+  .chipRow :global(button) {
     min-height: 40px;
-    min-width: 40px;
+  }
+
+  .dueTile {
+    min-height: 72px;
+    padding: 12px 14px;
+  }
+
+  .dueTileValue {
+    font-size: 22px;
   }
 }
 
@@ -156,9 +195,20 @@
     padding: 12px;
     border-radius: 12px;
   }
+
+  .dueStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
-/* Fold open / tablet pane: 2-col field grids when content is wide enough */
+/* Large phones (Pro Max ~430): comfortable My Day tiles */
+@container crm-main (min-width: 380px) {
+  .dueStrip {
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 10px;
+  }
+}
+
 @container crm-main (min-width: 420px) {
   .cardGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -166,6 +216,19 @@
 
   .lineCard {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dueStrip {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+}
+
+/* Big phone / fold open: 2-col deal cards sooner */
+@container crm-main (min-width: 520px) {
+  .listStack {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
   }
 }
 
@@ -178,6 +241,10 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
+  }
+
+  .toolbarSearch {
+    flex: 1 1 220px;
   }
 }
 
@@ -205,7 +272,9 @@
   color: inherit;
   font: inherit;
   min-width: 0;
+  min-height: 64px;
   transition: border-color 0.15s ease, background 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .dueTileActive {
@@ -302,14 +371,20 @@
 }
 
 .boardCol {
-  flex: 0 0 min(280px, 82vw);
-  max-width: 300px;
+  flex: 0 0 min(300px, 85vw);
+  max-width: 320px;
   background: rgba(0, 0, 0, 0.22);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
   min-height: 180px;
   display: flex;
   flex-direction: column;
+}
+
+@container crm-main (min-width: 400px) {
+  .boardCol {
+    flex-basis: min(320px, 78vw);
+  }
 }
 
 .boardColHead {

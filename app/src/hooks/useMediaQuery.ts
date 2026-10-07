@@ -20,9 +20,30 @@ export function useMediaQuery(query: string): boolean {
 }
 
 /**
- * Compact CRM chrome: phones, fold-closed, many fold-open portrait widths,
- * and coarse-pointer tablets in split-screen / narrow panes.
+ * Compact CRM chrome: phones (incl. large / Pro Max), fold-closed,
+ * fold-open portrait, and coarse-pointer tablets in narrow panes.
+ * Large phones are often 390–430 CSS px; landscape can approach 900+.
  */
 export function useCompactCrm(): boolean {
-  return useMediaQuery('(max-width: 720px), (max-width: 900px) and (pointer: coarse)')
+  return useMediaQuery(
+    [
+      '(max-width: 820px)',
+      '(max-width: 980px) and (pointer: coarse)',
+      '(max-width: 980px) and (hover: none)',
+    ].join(', '),
+  )
+}
+
+/**
+ * Phone / foldable shell: show bottom primary nav + denser mobile chrome.
+ * Covers big phones and most foldables in phone posture; tablets in portrait.
+ */
+export function usePhoneShell(): boolean {
+  return useMediaQuery(
+    [
+      '(max-width: 920px)',
+      '(max-width: 1100px) and (pointer: coarse)',
+      '(max-width: 1100px) and (hover: none)',
+    ].join(', '),
+  )
 }

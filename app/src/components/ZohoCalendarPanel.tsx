@@ -14,9 +14,11 @@ import {
 } from '../lib/zoho'
 import { enrichCalendarEvents, type CalendarEventRow } from '../lib/zohoCalendarMatch'
 import { buildScheduleRows, type ScheduleKind, type ScheduleRow } from '../lib/scheduleBoard'
+import { useCompactCrm } from '../hooks/useMediaQuery'
 import ScheduleMeetingModal from './ScheduleMeetingModal'
 import CalendarSettingsModal from './CalendarSettingsModal'
 import EmptyState from './EmptyState'
+import resp from '../styles/crmResponsive.module.css'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -57,6 +59,7 @@ function kindBadge(kind: ScheduleKind): { label: string; color: string } {
 export default function ZohoCalendarPanel({ crmEntries }: Props) {
   const navigate = useNavigate()
   const { settings } = useSettings()
+  const compact = useCompactCrm()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [calendarEvents, setCalendarEvents] = useState<CalendarEventRow[]>([])
@@ -138,8 +141,9 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
         onClick={() => setFilter(key)}
         style={{
           ...buttonSecondaryStyle,
-          padding: '5px 10px',
+          padding: compact ? '8px 12px' : '5px 10px',
           fontSize: 12,
+          minHeight: compact ? 40 : undefined,
           background: active ? 'rgba(232, 93, 4, 0.22)' : buttonSecondaryStyle.background,
           borderColor: active ? colors.accent : colors.border,
           color: active ? colors.text : colors.muted,
@@ -150,8 +154,16 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
     )
   }
 
+  const rowCrmBits = (row: ScheduleRow) => {
+    const crmEntry = row.crmId ? crmEntries.find((c) => c.id === row.crmId) : null
+    const contact = crmEntry
+      ? primaryContact(hydrateContacts(crmEntry))?.name || crmEntry.primary_contact
+      : ''
+    return { crmEntry, contact }
+  }
+
   return (
-    <div style={{ ...cardStyle, marginBottom: 16 }}>
+    <div style={{ ...cardStyle, marginBottom: 16, padding: compact ? 14 : cardStyle.padding }}>
       <div
         style={{
           display: 'flex',
@@ -165,9 +177,21 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
         <h2 style={{ ...sectionTitleStyle, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
           <CalendarClock size={18} /> Schedule
         </h2>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+        <div
+          className={compact ? resp.toolbar : undefined}
+          style={
+            compact
+              ? { marginBottom: 0, width: '100%' }
+              : { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }
+          }
+        >
           <select
-            style={{ ...buttonSecondaryStyle, padding: '6px 10px' }}
+            style={{
+              ...buttonSecondaryStyle,
+              padding: compact ? '8px 12px' : '6px 10px',
+              minHeight: compact ? 40 : undefined,
+              flex: compact ? '1 1 140px' : undefined,
+            }}
             value={daysAhead}
             onChange={(e) => setDaysAhead(Number(e.target.value))}
           >
@@ -186,15 +210,21 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 6,
+                minHeight: compact ? 40 : undefined,
+                padding: compact ? '8px 12px' : buttonSecondaryStyle.padding,
               }}
             >
-              <ExternalLink size={14} /> Zoho Calendar
+              <ExternalLink size={14} /> {compact ? 'Zoho' : 'Zoho Calendar'}
             </a>
           ) : null}
           {enabled ? (
             <button
               type="button"
-              style={buttonSecondaryStyle}
+              style={{
+                ...buttonSecondaryStyle,
+                minHeight: compact ? 40 : undefined,
+                padding: compact ? '8px 12px' : buttonSecondaryStyle.padding,
+              }}
               disabled={loading}
               onClick={() => void load()}
             >
@@ -203,15 +233,41 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
             </button>
           ) : null}
           {enabled ? (
-            <button type="button" style={buttonPrimaryStyle} onClick={() => setScheduleOpen(true)}>
-              <Plus size={14} /> Schedule meeting
+            <button
+              type="button"
+              style={{
+                ...buttonPrimaryStyle,
+                minHeight: compact ? 42 : undefined,
+                flex: compact ? '1 1 160px' : undefined,
+              }}
+              onClick={() => setScheduleOpen(true)}
+            >
+              <Plus size={14} /> {compact ? 'Meeting' : 'Schedule meeting'}
             </button>
           ) : null}
-          <button type="button" style={buttonSecondaryStyle} onClick={() => setSettingsOpen(true)}>
-            <Settings size={14} /> Calendar settings
+          <button
+            type="button"
+            style={{
+              ...buttonSecondaryStyle,
+              minHeight: compact ? 40 : undefined,
+              padding: compact ? '8px 12px' : buttonSecondaryStyle.padding,
+            }}
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Settings size={14} /> {compact ? 'Settings' : 'Calendar settings'}
           </button>
-          <Link to="/follow-ups" style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}>
-            All follow-ups
+          <Link
+            to="/follow-ups"
+            style={{
+              ...buttonSecondaryStyle,
+              textDecoration: 'none',
+              minHeight: compact ? 40 : undefined,
+              padding: compact ? '8px 12px' : buttonSecondaryStyle.padding,
+              display: 'inline-flex',
+              alignItems: 'center',
+            }}
+          >
+            {compact ? 'All FUs' : 'All follow-ups'}
           </Link>
         </div>
       </div>
@@ -223,10 +279,16 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
           : '.'}
       </p>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-        {filterBtn('all', `All (${counts.all})`)}
-        {filterBtn('follow_up', `Follow-ups (${counts.followUps})`)}
-        {filterBtn('meeting', `Meetings (${counts.meetings})`)}
+      <div className={resp.chipRow} style={{ marginBottom: 12 }}>
+        {filterBtn('all', compact ? `All · ${counts.all}` : `All (${counts.all})`)}
+        {filterBtn(
+          'follow_up',
+          compact ? `Follow-ups · ${counts.followUps}` : `Follow-ups (${counts.followUps})`,
+        )}
+        {filterBtn(
+          'meeting',
+          compact ? `Meetings · ${counts.meetings}` : `Meetings (${counts.meetings})`,
+        )}
       </div>
 
       {error ? (
@@ -248,6 +310,80 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
           actionLabel={enabled ? 'Schedule meeting' : 'Open CRM'}
           onAction={enabled ? () => setScheduleOpen(true) : () => navigate('/crm')}
         />
+      ) : compact ? (
+        <div className={resp.listStack}>
+          {visible.map((row) => {
+            const badge = kindBadge(row.kind)
+            const { contact } = rowCrmBits(row)
+            return (
+              <article key={row.id} className={resp.card}>
+                <div className={resp.cardTop}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: row.overdue ? colors.danger : colors.muted,
+                        marginBottom: 4,
+                      }}
+                    >
+                      {formatWhen(row)}
+                      {row.overdue ? ' · Overdue' : ''}
+                    </div>
+                    <div style={{ fontWeight: 650, fontSize: 15, lineHeight: 1.3 }}>{row.title}</div>
+                  </div>
+                  <span
+                    style={{
+                      flexShrink: 0,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: badge.color,
+                      background: `${badge.color}22`,
+                      padding: '4px 8px',
+                      borderRadius: 999,
+                      alignSelf: 'flex-start',
+                    }}
+                  >
+                    {badge.label}
+                  </span>
+                </div>
+                {row.detail ? <div className={resp.cardMeta}>{row.detail}</div> : null}
+                {row.attendees ? <div className={resp.cardMeta}>With {row.attendees}</div> : null}
+                <div className={resp.cardGrid}>
+                  <div className={resp.cardField}>
+                    <label>CRM</label>
+                    {row.crmId ? (
+                      <Link
+                        to={`/crm?edit=${row.crmId}`}
+                        style={{ color: colors.accent, textDecoration: 'none', fontWeight: 600 }}
+                      >
+                        {row.crmName}
+                      </Link>
+                    ) : (
+                      <span style={{ color: colors.muted2 }}>—</span>
+                    )}
+                    {contact ? <div className={resp.cardMeta}>{contact}</div> : null}
+                  </div>
+                  <div className={resp.cardField}>
+                    <label>Owner</label>
+                    <div style={{ fontSize: 13 }}>{row.owner || '—'}</div>
+                  </div>
+                  {row.quoteRef ? (
+                    <div className={resp.cardField}>
+                      <label>Quote</label>
+                      <Link
+                        to={`/quotations?ref=${encodeURIComponent(row.quoteRef)}`}
+                        style={{ color: colors.accent, textDecoration: 'none' }}
+                      >
+                        {row.quoteRef}
+                      </Link>
+                    </div>
+                  ) : null}
+                </div>
+              </article>
+            )
+          })}
+        </div>
       ) : (
         <div style={{ ...tableWrapStyle, maxHeight: 420, overflow: 'auto' }}>
           <table style={tableStyle}>
@@ -263,12 +399,7 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
             <tbody>
               {visible.map((row) => {
                 const badge = kindBadge(row.kind)
-                const crmEntry = row.crmId
-                  ? crmEntries.find((c) => c.id === row.crmId)
-                  : null
-                const contact = crmEntry
-                  ? primaryContact(hydrateContacts(crmEntry))?.name || crmEntry.primary_contact
-                  : ''
+                const { contact } = rowCrmBits(row)
                 return (
                   <tr key={row.id}>
                     <td style={tdStyle}>
