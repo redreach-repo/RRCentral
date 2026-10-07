@@ -1224,7 +1224,7 @@ export default function QuotationsPage() {
       </div>
 
       <div className={resp.toolbar} style={{ marginBottom: 16 }}>
-        <div className={resp.chipRow} style={{ marginBottom: 0, flex: 1 }}>
+        <div className={compact ? resp.chipScroll : resp.chipRow} style={{ marginBottom: 0, flex: 1 }}>
           {(['All', 'Draft', 'Finalized', 'Sent', 'Awarded'] as StatusTab[]).map((t) => (
             <button key={t} type="button" style={tabBtn(tab === t)} onClick={() => setTab(t)}>
               {t}

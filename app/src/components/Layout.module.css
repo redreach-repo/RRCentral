@@ -348,7 +348,7 @@
   padding-left: max(24px, env(safe-area-inset-left));
   padding-right: max(24px, env(safe-area-inset-right));
   padding-bottom: max(28px, env(safe-area-inset-bottom));
-  overflow-x: hidden;
+  overflow-x: clip;
   container-type: inline-size;
   container-name: crm-main;
 }

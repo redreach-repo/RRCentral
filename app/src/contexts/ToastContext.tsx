@@ -7,6 +7,8 @@ import {
   type ReactNode,
 } from 'react'
 import Toast, { type ToastType } from '../components/Toast'
+import { usePhoneShell } from '../hooks/useMediaQuery'
+import styles from '../components/ToastStack.module.css'
 
 interface ToastItem {
   id: number
@@ -24,6 +26,7 @@ let toastId = 0
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([])
+  const phoneShell = usePhoneShell()
 
   const removeToast = useCallback((id: number) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))
@@ -43,18 +46,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={value}>
       {children}
       <div
-        style={{
-          position: 'fixed',
-          top: 16,
-          right: 16,
-          zIndex: 2000,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-          maxWidth: 360,
-          width: 'calc(100% - 32px)',
-          pointerEvents: 'none',
-        }}
+        className={`${styles.stack} ${phoneShell ? styles.stackPhone : ''}`}
+        aria-live="polite"
+        aria-relevant="additions"
       >
         {toasts.map((t) => (
           <Toast

@@ -19,6 +19,7 @@ import {
   List,
   Phone,
   Settings,
+  CalendarClock,
 } from 'lucide-react'
 import { db } from '../lib/db'
 import { CRM_OUTCOME_REASONS, NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
@@ -396,7 +397,12 @@ export default function CrmPage() {
 
     if (!defaultsReady && !loading && !hasFilterParams) {
       if (myOwnerName) setOwnerFilter(myOwnerName)
-      setFollowFilter('Due')
+      // Prefer My Day (Due) only when there are due deals; else show All so empty CRM isn't stuck.
+      const scoped = myOwnerName
+        ? entries.filter((e) => (e.owner || '').trim() === myOwnerName)
+        : entries
+      const dueCount = scoped.filter((e) => matchesFollowFilter(e, 'Due')).length
+      setFollowFilter(dueCount > 0 ? 'Due' : 'All')
       setDefaultsReady(true)
     } else if (!defaultsReady && !loading && hasFilterParams) {
       if (!canViewAll && myOwnerName) setOwnerFilter(myOwnerName)
@@ -737,8 +743,67 @@ export default function CrmPage() {
     }
   }
 
-  function renderCrmRowActions(row: CrmEntry) {
+  function renderCrmRowActions(row: CrmEntry, opts?: { compactPrimary?: boolean }) {
     const phone = primaryContact(hydrateContacts(row))?.phone || row.mobile_number || row.office_number || ''
+    const compactPrimary = Boolean(opts?.compactPrimary)
+    const primaryBtn: CSSProperties = {
+      ...btnGhost,
+      minHeight: 40,
+      padding: '8px 10px',
+      fontSize: 12,
+      fontWeight: 650,
+      gap: 6,
+      display: 'inline-flex',
+      alignItems: 'center',
+      flex: '1 1 auto',
+      justifyContent: 'center',
+    }
+
+    if (compactPrimary) {
+      return (
+        <>
+          <button type="button" style={primaryBtn} onClick={() => setLogTouchTarget(row)}>
+            <MessageSquarePlus size={14} /> Log
+          </button>
+          {phone ? (
+            <a
+              href={`tel:${phone.replace(/\s+/g, '')}`}
+              style={{ ...primaryBtn, textDecoration: 'none' }}
+              onClick={() => {
+                void logActivity('call_crm', 'crm', row.company_name, phone, user?.email || '', row.id)
+              }}
+            >
+              <Phone size={14} /> Call
+            </a>
+          ) : null}
+          <button
+            type="button"
+            style={primaryBtn}
+            disabled={quickBusyId === row.id}
+            onClick={() => void openWhatsAppFollowUp(row)}
+          >
+            <MessageCircle size={14} /> WhatsApp
+          </button>
+          <button
+            type="button"
+            style={primaryBtn}
+            title="Reschedule follow-up"
+            onClick={() => setLogTouchTarget(row)}
+          >
+            <CalendarClock size={14} /> Reschedule
+          </button>
+          <button type="button" style={btnGhost} onClick={() => openEdit(row)} title="Edit">
+            <Pencil size={14} />
+          </button>
+          {canDeleteCrm ? (
+            <button type="button" style={btnGhost} onClick={() => setDeleteTarget(row)} title="Delete">
+              <Trash2 size={14} />
+            </button>
+          ) : null}
+        </>
+      )
+    }
+
     return (
       <>
         <button
@@ -1040,109 +1105,111 @@ export default function CrmPage() {
 
       {error && <div style={errorBanner}>{error}</div>}
 
-      <div className={resp.dueStrip}>
-        <button
-          type="button"
-          className={`${resp.dueTile} ${ownerFilter === myOwnerName && followFilter === 'Due' ? resp.dueTileActive : ''}`}
-          onClick={() => {
-            if (myOwnerName) setOwnerFilter(myOwnerName)
-            setFollowFilter('Due')
-            setStageFilter('All')
-          }}
-        >
-          <span className={resp.dueTileValue} style={{ color: colors.warn }}>
-            {dueCounts.overdue + dueCounts.today}
-          </span>
-          <span className={resp.dueTileLabel}>My Day</span>
-        </button>
-        <button
-          type="button"
-          className={`${resp.dueTile} ${followFilter === 'Overdue' ? resp.dueTileActive : ''}`}
-          onClick={() => setFollowFilter('Overdue')}
-        >
-          <span className={resp.dueTileValue} style={{ color: colors.danger }}>
-            {dueCounts.overdue}
-          </span>
-          <span className={resp.dueTileLabel}>Overdue</span>
-        </button>
-        <button
-          type="button"
-          className={`${resp.dueTile} ${followFilter === 'Today' ? resp.dueTileActive : ''}`}
-          onClick={() => setFollowFilter('Today')}
-        >
-          <span className={resp.dueTileValue} style={{ color: colors.warn }}>
-            {dueCounts.today}
-          </span>
-          <span className={resp.dueTileLabel}>Today</span>
-        </button>
-        <button
-          type="button"
-          className={`${resp.dueTile} ${followFilter === 'Upcoming' ? resp.dueTileActive : ''}`}
-          onClick={() => setFollowFilter('Upcoming')}
-        >
-          <span className={resp.dueTileValue} style={{ color: colors.success }}>
-            {dueCounts.upcoming}
-          </span>
-          <span className={resp.dueTileLabel}>Upcoming</span>
-        </button>
-        <button
-          type="button"
-          className={`${resp.dueTile} ${ownerFilter === 'All' && followFilter === 'All' && stageFilter === 'All' ? resp.dueTileActive : ''}`}
-          onClick={() => {
-            if (!canViewAll) {
+      <div className={resp.stickyFilters}>
+        <div className={resp.dueStrip}>
+          <button
+            type="button"
+            className={`${resp.dueTile} ${ownerFilter === myOwnerName && followFilter === 'Due' ? resp.dueTileActive : ''}`}
+            onClick={() => {
               if (myOwnerName) setOwnerFilter(myOwnerName)
+              setFollowFilter('Due')
+              setStageFilter('All')
+            }}
+          >
+            <span className={resp.dueTileValue} style={{ color: colors.warn }}>
+              {dueCounts.overdue + dueCounts.today}
+            </span>
+            <span className={resp.dueTileLabel}>My Day</span>
+          </button>
+          <button
+            type="button"
+            className={`${resp.dueTile} ${followFilter === 'Overdue' ? resp.dueTileActive : ''}`}
+            onClick={() => setFollowFilter('Overdue')}
+          >
+            <span className={resp.dueTileValue} style={{ color: colors.danger }}>
+              {dueCounts.overdue}
+            </span>
+            <span className={resp.dueTileLabel}>Overdue</span>
+          </button>
+          <button
+            type="button"
+            className={`${resp.dueTile} ${followFilter === 'Today' ? resp.dueTileActive : ''}`}
+            onClick={() => setFollowFilter('Today')}
+          >
+            <span className={resp.dueTileValue} style={{ color: colors.warn }}>
+              {dueCounts.today}
+            </span>
+            <span className={resp.dueTileLabel}>Today</span>
+          </button>
+          <button
+            type="button"
+            className={`${resp.dueTile} ${followFilter === 'Upcoming' ? resp.dueTileActive : ''}`}
+            onClick={() => setFollowFilter('Upcoming')}
+          >
+            <span className={resp.dueTileValue} style={{ color: colors.success }}>
+              {dueCounts.upcoming}
+            </span>
+            <span className={resp.dueTileLabel}>Upcoming</span>
+          </button>
+          <button
+            type="button"
+            className={`${resp.dueTile} ${ownerFilter === 'All' && followFilter === 'All' && stageFilter === 'All' ? resp.dueTileActive : ''}`}
+            onClick={() => {
+              if (!canViewAll) {
+                if (myOwnerName) setOwnerFilter(myOwnerName)
+                setFollowFilter('All')
+                setStageFilter('All')
+                return
+              }
+              setOwnerFilter('All')
               setFollowFilter('All')
               setStageFilter('All')
-              return
-            }
-            setOwnerFilter('All')
-            setFollowFilter('All')
-            setStageFilter('All')
-          }}
-        >
-          <span className={resp.dueTileValue}>{entries.length}</span>
-          <span className={resp.dueTileLabel}>{canViewAll ? 'All deals' : 'My deals'}</span>
-        </button>
-      </div>
-
-      <div className={resp.toolbar}>
-        <div className={resp.toolbarSearch}>
-          <Search
-            size={16}
-            style={{
-              position: 'absolute',
-              left: 12,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: colors.muted2,
             }}
-          />
-          <input
-            style={{ ...input, paddingLeft: 36 }}
-            placeholder="Search company, contact, owner, notes…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          >
+            <span className={resp.dueTileValue}>{entries.length}</span>
+            <span className={resp.dueTileLabel}>{canViewAll ? 'All deals' : 'My deals'}</span>
+          </button>
         </div>
-        <select
-          style={{ ...input, flex: '0 1 180px', maxWidth: compact ? '100%' : 180 }}
-          value={ownerFilter}
-          onChange={(e) => setOwnerFilter(e.target.value)}
-          title="Sales owner"
-        >
-          {canViewAll ? <option value="All">All sales owners</option> : null}
-          {myOwnerName ? <option value={myOwnerName}>Me ({myOwnerName})</option> : null}
-          {canViewAll ? <option value="Unassigned">Unassigned</option> : null}
-          {canViewAll
-            ? ownerOptions
-                .filter((o) => o !== myOwnerName)
-                .map((o) => (
-                  <option key={o} value={o}>
-                    {o}
-                  </option>
-                ))
-            : null}
-        </select>
+
+        <div className={resp.toolbar}>
+          <div className={resp.toolbarSearch}>
+            <Search
+              size={16}
+              style={{
+                position: 'absolute',
+                left: 12,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: colors.muted2,
+              }}
+            />
+            <input
+              style={{ ...input, paddingLeft: 36 }}
+              placeholder="Search company, contact, owner, notes…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <select
+            style={{ ...input, flex: '0 1 180px', maxWidth: compact ? '100%' : 180 }}
+            value={ownerFilter}
+            onChange={(e) => setOwnerFilter(e.target.value)}
+            title="Sales owner"
+          >
+            {canViewAll ? <option value="All">All sales owners</option> : null}
+            {myOwnerName ? <option value={myOwnerName}>Me ({myOwnerName})</option> : null}
+            {canViewAll ? <option value="Unassigned">Unassigned</option> : null}
+            {canViewAll
+              ? ownerOptions
+                  .filter((o) => o !== myOwnerName)
+                  .map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))
+              : null}
+          </select>
+        </div>
       </div>
 
       <div className={compact ? resp.chipScroll : resp.chipRow} role="toolbar" aria-label="Pipeline stage">
@@ -1186,20 +1253,47 @@ export default function CrmPage() {
             background: colors.card,
             borderRadius: 12,
             border: `1px solid ${colors.border}`,
+            flexDirection: 'column',
+            gap: 12,
           }}
         >
-          {search || stageFilter !== 'All' || ownerFilter !== 'All' || followFilter !== 'All'
-            ? 'No companies match your filters. Try My Day or All deals above.'
-            : 'No CRM entries yet. Add your first company.'}
+          {entries.length === 0 ? (
+            <>
+              <div>No CRM entries yet.</div>
+              <button type="button" style={btnPrimary} onClick={openCreate}>
+                <Plus size={16} /> Add your first company
+              </button>
+            </>
+          ) : search || stageFilter !== 'All' || ownerFilter !== 'All' || followFilter !== 'All' ? (
+            <>
+              <div>No companies match your filters.</div>
+              <button
+                type="button"
+                style={btn}
+                onClick={() => {
+                  if (myOwnerName) setOwnerFilter(canViewAll ? 'All' : myOwnerName)
+                  else setOwnerFilter('All')
+                  setFollowFilter('All')
+                  setStageFilter('All')
+                  setSearch('')
+                }}
+              >
+                Show all deals
+              </button>
+            </>
+          ) : (
+            'No companies match your filters. Try My Day or All deals above.'
+          )}
         </div>
       ) : viewMode === 'board' ? (
         <CrmPipelineBoard
           entries={filtered}
           busyId={quickBusyId}
+          compact={compact}
           onOpen={openEdit}
           onMoveStage={(row, stage) => void quickPatch(row, { pipeline_stage: stage })}
           onLogTouch={setLogTouchTarget}
-          renderActions={renderCrmRowActions}
+          renderActions={(row) => renderCrmRowActions(row, { compactPrimary: compact })}
         />
       ) : compact ? (
         <div className={resp.listStack}>
@@ -1303,7 +1397,7 @@ export default function CrmPage() {
                   </div>
                 </div>
                 <div className={resp.cardMeta}>Sales owner: {row.owner || 'Unassigned'}</div>
-                <div className={resp.cardActions}>{renderCrmRowActions(row)}</div>
+                <div className={resp.cardActions}>{renderCrmRowActions(row, { compactPrimary: true })}</div>
               </article>
             )
           })}
