@@ -1,11 +1,74 @@
--- Tee Tribe commerce schema
--- Prices stored as integer fils (AED 99.00 = 9900)
+-- =============================================================================
+-- TEE TRIBE — full schema (paste into Supabase SQL Editor → Run)
+-- =============================================================================
+-- IMPORTANT: Run this on a NEW Supabase project for Tee Tribe only.
+-- Do NOT run on Red Reach Central (that project already has a different
+-- public.products table and will conflict).
+-- =============================================================================
 
--- Extensions
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
+-- Refuse to run on Red Reach Central / wrong database
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'products'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'products'
+      AND column_name = 'collection_slug'
+  ) THEN
+    RAISE EXCEPTION
+      'Wrong database: public.products exists without collection_slug (looks like Red Reach Central). Create a NEW Supabase project named teetribe and paste this SQL there.';
+  END IF;
+END $$;
+
+-- Clean re-run safe: drop Tee Tribe objects only (dependency order)
+DROP POLICY IF EXISTS discount_codes_admin_all ON public.discount_codes;
+DROP POLICY IF EXISTS quotes_admin_all ON public.quote_requests;
+DROP POLICY IF EXISTS quotes_insert_public ON public.quote_requests;
+DROP POLICY IF EXISTS waitlist_admin_read ON public.drop_waitlist;
+DROP POLICY IF EXISTS waitlist_insert_public ON public.drop_waitlist;
+DROP POLICY IF EXISTS members_admin_all ON public.members;
+DROP POLICY IF EXISTS members_insert_public ON public.members;
+DROP POLICY IF EXISTS order_items_admin_write ON public.order_items;
+DROP POLICY IF EXISTS order_items_owner_read ON public.order_items;
+DROP POLICY IF EXISTS orders_admin_write ON public.orders;
+DROP POLICY IF EXISTS orders_owner_read ON public.orders;
+DROP POLICY IF EXISTS customers_admin_all ON public.customers;
+DROP POLICY IF EXISTS images_admin_write ON public.product_images;
+DROP POLICY IF EXISTS images_public_read ON public.product_images;
+DROP POLICY IF EXISTS variants_admin_write ON public.product_variants;
+DROP POLICY IF EXISTS variants_public_read ON public.product_variants;
+DROP POLICY IF EXISTS products_admin_write ON public.products;
+DROP POLICY IF EXISTS products_public_read ON public.products;
+DROP POLICY IF EXISTS collections_admin_write ON public.collections;
+DROP POLICY IF EXISTS collections_public_read ON public.collections;
+DROP POLICY IF EXISTS admins_admin_all ON public.admins;
+
+DROP FUNCTION IF EXISTS public.tt_decrement_stock(text, int);
+DROP FUNCTION IF EXISTS public.tt_is_admin();
+
+DROP TABLE IF EXISTS public.discount_codes CASCADE;
+DROP TABLE IF EXISTS public.quote_requests CASCADE;
+DROP TABLE IF EXISTS public.drop_waitlist CASCADE;
+DROP TABLE IF EXISTS public.members CASCADE;
+DROP TABLE IF EXISTS public.order_items CASCADE;
+DROP TABLE IF EXISTS public.orders CASCADE;
+DROP TABLE IF EXISTS public.customers CASCADE;
+DROP TABLE IF EXISTS public.product_images CASCADE;
+DROP TABLE IF EXISTS public.product_variants CASCADE;
+DROP TABLE IF EXISTS public.products CASCADE;
+DROP TABLE IF EXISTS public.collections CASCADE;
+DROP TABLE IF EXISTS public.admins CASCADE;
+
 -- Admin fallback table (email allowlist)
-CREATE TABLE IF NOT EXISTS public.admins (
+CREATE TABLE public.admins (
   email text PRIMARY KEY,
   created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -30,7 +93,7 @@ END;
 $$;
 
 -- Collections
-CREATE TABLE IF NOT EXISTS public.collections (
+CREATE TABLE public.collections (
   id text PRIMARY KEY,
   slug text UNIQUE NOT NULL,
   name text NOT NULL,
@@ -41,8 +104,8 @@ CREATE TABLE IF NOT EXISTS public.collections (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Products
-CREATE TABLE IF NOT EXISTS public.products (
+-- Products (prices in integer fils: AED 99 = 9900)
+CREATE TABLE public.products (
   id text PRIMARY KEY,
   slug text UNIQUE NOT NULL,
   name text NOT NULL,
@@ -61,11 +124,11 @@ CREATE TABLE IF NOT EXISTS public.products (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_products_collection ON public.products(collection_slug);
-CREATE INDEX IF NOT EXISTS idx_products_active ON public.products(is_active) WHERE is_active = true;
+CREATE INDEX idx_products_collection ON public.products(collection_slug);
+CREATE INDEX idx_products_active ON public.products(is_active) WHERE is_active = true;
 
 -- Product variants
-CREATE TABLE IF NOT EXISTS public.product_variants (
+CREATE TABLE public.product_variants (
   id text PRIMARY KEY,
   product_id text NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
   sku text UNIQUE NOT NULL,
@@ -76,10 +139,10 @@ CREATE TABLE IF NOT EXISTS public.product_variants (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_variants_product ON public.product_variants(product_id);
+CREATE INDEX idx_variants_product ON public.product_variants(product_id);
 
 -- Product images
-CREATE TABLE IF NOT EXISTS public.product_images (
+CREATE TABLE public.product_images (
   id text PRIMARY KEY,
   product_id text NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
   url text NOT NULL,
@@ -88,10 +151,10 @@ CREATE TABLE IF NOT EXISTS public.product_images (
   sort_order int NOT NULL DEFAULT 0
 );
 
-CREATE INDEX IF NOT EXISTS idx_images_product ON public.product_images(product_id);
+CREATE INDEX idx_images_product ON public.product_images(product_id);
 
 -- Customers
-CREATE TABLE IF NOT EXISTS public.customers (
+CREATE TABLE public.customers (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email text UNIQUE NOT NULL,
   name text,
@@ -100,7 +163,7 @@ CREATE TABLE IF NOT EXISTS public.customers (
 );
 
 -- Orders
-CREATE TABLE IF NOT EXISTS public.orders (
+CREATE TABLE public.orders (
   id text PRIMARY KEY,
   customer_id uuid REFERENCES public.customers(id),
   email text NOT NULL,
@@ -119,11 +182,11 @@ CREATE TABLE IF NOT EXISTS public.orders (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_orders_email ON public.orders(email);
-CREATE INDEX IF NOT EXISTS idx_orders_status ON public.orders(status);
+CREATE INDEX idx_orders_email ON public.orders(email);
+CREATE INDEX idx_orders_status ON public.orders(status);
 
 -- Order items
-CREATE TABLE IF NOT EXISTS public.order_items (
+CREATE TABLE public.order_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id text NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
   product_id text NOT NULL,
@@ -134,10 +197,10 @@ CREATE TABLE IF NOT EXISTS public.order_items (
   price_fils int NOT NULL CHECK (price_fils >= 0)
 );
 
-CREATE INDEX IF NOT EXISTS idx_order_items_order ON public.order_items(order_id);
+CREATE INDEX idx_order_items_order ON public.order_items(order_id);
 
 -- Tribe members
-CREATE TABLE IF NOT EXISTS public.members (
+CREATE TABLE public.members (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email text UNIQUE NOT NULL,
   name text,
@@ -148,7 +211,7 @@ CREATE TABLE IF NOT EXISTS public.members (
 );
 
 -- Drop waitlist
-CREATE TABLE IF NOT EXISTS public.drop_waitlist (
+CREATE TABLE public.drop_waitlist (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email text NOT NULL,
   product_id text,
@@ -158,7 +221,7 @@ CREATE TABLE IF NOT EXISTS public.drop_waitlist (
 );
 
 -- Quote requests (Tribe Made)
-CREATE TABLE IF NOT EXISTS public.quote_requests (
+CREATE TABLE public.quote_requests (
   id text PRIMARY KEY,
   name text NOT NULL,
   email text NOT NULL,
@@ -173,7 +236,7 @@ CREATE TABLE IF NOT EXISTS public.quote_requests (
 );
 
 -- Discount codes
-CREATE TABLE IF NOT EXISTS public.discount_codes (
+CREATE TABLE public.discount_codes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   code text UNIQUE NOT NULL,
   description text,
@@ -186,7 +249,7 @@ CREATE TABLE IF NOT EXISTS public.discount_codes (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Atomic stock decrement (used by webhook)
+-- Atomic stock decrement (used by Stripe webhook)
 CREATE OR REPLACE FUNCTION public.tt_decrement_stock(p_variant_id text, p_qty int)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -219,23 +282,19 @@ ALTER TABLE public.drop_waitlist ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quote_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.discount_codes ENABLE ROW LEVEL SECURITY;
 
--- Admins table: only admins can read/write
 CREATE POLICY admins_admin_all ON public.admins
   FOR ALL USING (public.tt_is_admin()) WITH CHECK (public.tt_is_admin());
 
--- Collections: public read active, admin write
 CREATE POLICY collections_public_read ON public.collections
   FOR SELECT USING (is_active = true);
 CREATE POLICY collections_admin_write ON public.collections
   FOR ALL USING (public.tt_is_admin()) WITH CHECK (public.tt_is_admin());
 
--- Products: public read active, admin write
 CREATE POLICY products_public_read ON public.products
   FOR SELECT USING (is_active = true);
 CREATE POLICY products_admin_write ON public.products
   FOR ALL USING (public.tt_is_admin()) WITH CHECK (public.tt_is_admin());
 
--- Variants: public read for active products, admin write
 CREATE POLICY variants_public_read ON public.product_variants
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM public.products p WHERE p.id = product_id AND p.is_active = true)
@@ -243,7 +302,6 @@ CREATE POLICY variants_public_read ON public.product_variants
 CREATE POLICY variants_admin_write ON public.product_variants
   FOR ALL USING (public.tt_is_admin()) WITH CHECK (public.tt_is_admin());
 
--- Images: public read for active products, admin write
 CREATE POLICY images_public_read ON public.product_images
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM public.products p WHERE p.id = product_id AND p.is_active = true)
@@ -251,11 +309,9 @@ CREATE POLICY images_public_read ON public.product_images
 CREATE POLICY images_admin_write ON public.product_images
   FOR ALL USING (public.tt_is_admin()) WITH CHECK (public.tt_is_admin());
 
--- Customers: admin only (service role bypasses RLS)
 CREATE POLICY customers_admin_all ON public.customers
   FOR ALL USING (public.tt_is_admin()) WITH CHECK (public.tt_is_admin());
 
--- Orders: owner email claim or admin
 CREATE POLICY orders_owner_read ON public.orders
   FOR SELECT USING (
     public.tt_is_admin()
@@ -264,7 +320,6 @@ CREATE POLICY orders_owner_read ON public.orders
 CREATE POLICY orders_admin_write ON public.orders
   FOR ALL USING (public.tt_is_admin()) WITH CHECK (public.tt_is_admin());
 
--- Order items: readable if parent order is readable
 CREATE POLICY order_items_owner_read ON public.order_items
   FOR SELECT USING (
     EXISTS (
@@ -279,24 +334,28 @@ CREATE POLICY order_items_owner_read ON public.order_items
 CREATE POLICY order_items_admin_write ON public.order_items
   FOR ALL USING (public.tt_is_admin()) WITH CHECK (public.tt_is_admin());
 
--- Members: admin read/write; public can insert (signup)
 CREATE POLICY members_insert_public ON public.members
   FOR INSERT WITH CHECK (true);
 CREATE POLICY members_admin_all ON public.members
   FOR ALL USING (public.tt_is_admin()) WITH CHECK (public.tt_is_admin());
 
--- Waitlist: public insert, admin read
 CREATE POLICY waitlist_insert_public ON public.drop_waitlist
   FOR INSERT WITH CHECK (true);
 CREATE POLICY waitlist_admin_read ON public.drop_waitlist
   FOR SELECT USING (public.tt_is_admin());
 
--- Quotes: public insert, admin read/update
 CREATE POLICY quotes_insert_public ON public.quote_requests
   FOR INSERT WITH CHECK (true);
 CREATE POLICY quotes_admin_all ON public.quote_requests
   FOR ALL USING (public.tt_is_admin()) WITH CHECK (public.tt_is_admin());
 
--- Discount codes: admin only
 CREATE POLICY discount_codes_admin_all ON public.discount_codes
   FOR ALL USING (public.tt_is_admin()) WITH CHECK (public.tt_is_admin());
+
+-- Optional: add your admin email so /admin works after Auth signup
+-- INSERT INTO public.admins (email) VALUES ('info@redreach.ae')
+-- ON CONFLICT (email) DO NOTHING;
+
+-- Done. Next: put this project's URL + keys in teetribe/.env.local, then:
+--   NEXT_PUBLIC_USE_MOCK=false
+--   npm run seed
