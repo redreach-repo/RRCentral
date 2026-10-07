@@ -12,7 +12,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react'
-import { addDays, format, isWithinInterval, parseISO, startOfDay, startOfMonth } from 'date-fns'
+import { format, parseISO, startOfDay, startOfMonth } from 'date-fns'
 import { db } from '../lib/db'
 import { PIPELINE_STAGES } from '../lib/config'
 import type { CompanyDocument, CrmEntry, Expense, IncomeEntry, Invoice, Quotation } from '../lib/types'
@@ -26,7 +26,6 @@ import {
 } from '../lib/finance'
 import { loadDeletedInvoiceRefs, reconcileInvoiceFinance } from '../lib/invoiceFinance'
 import { displayDocumentReference } from '../lib/documents'
-import { hydrateContacts, primaryContact } from '../lib/contacts'
 import { listCompanyDocuments } from '../lib/companyDocs'
 import { companyDocAlertLabel, companyDocExpiryAlerts } from '../lib/companyDocAlerts'
 import { syncUnansweredQuoteFollowUps } from '../lib/quoteFollowUpSync'
@@ -276,22 +275,6 @@ export default function DashboardPage() {
   const recentQuotes = quotations.slice(0, 6)
   const recentInvoices = invoices.filter((i) => i.status !== 'Cancelled').slice(0, 6)
 
-  const upcomingFollowUps = useMemo(() => {
-    const today = startOfDay(new Date())
-    const end = addDays(today, 7)
-    return crm
-      .filter((c) => {
-        if (!c.follow_up_date) return false
-        try {
-          const d = parseISO(c.follow_up_date)
-          return isWithinInterval(d, { start: today, end })
-        } catch {
-          return false
-        }
-      })
-      .slice(0, 10)
-  }, [crm])
-
   const docAlerts = useMemo(() => companyDocExpiryAlerts(companyDocs, 60), [companyDocs])
   const companyVaultRoot = (settings.companyWorkDriveRootUrl || '').trim()
   const showCompanyVault = can(userRole, 'settings.manage')
@@ -341,6 +324,8 @@ export default function DashboardPage() {
           </Link>
         </div>
       ) : null}
+
+      <ZohoCalendarPanel crmEntries={crm} />
 
       <div className={dash.kpiGrid}>
         <KpiCard
@@ -624,110 +609,44 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div style={{ ...dualPanelGridStyle, marginBottom: 24 }}>
-        <div style={cardStyle}>
-          <h2 style={sectionTitleStyle}>Sales owner workload</h2>
-          {ownerWorkload.length === 0 ? (
-            <EmptyState title="No CRM owners yet" subtitle="Assign sales owners on CRM companies." />
-          ) : (
-            <div style={tableWrapStyle}>
-              <table style={tableStyle}>
-                <thead>
-                  <tr>
-                    <th style={thStyle}>Owner</th>
-                    <th style={thStyle}>Open deals</th>
-                    <th style={thStyle}>Overdue</th>
+      <div style={{ ...cardStyle, marginBottom: 16 }}>
+        <h2 style={sectionTitleStyle}>Sales owner workload</h2>
+        {ownerWorkload.length === 0 ? (
+          <EmptyState title="No CRM owners yet" subtitle="Assign sales owners on CRM companies." />
+        ) : (
+          <div style={tableWrapStyle}>
+            <table style={tableStyle}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>Owner</th>
+                  <th style={thStyle}>Open deals</th>
+                  <th style={thStyle}>Overdue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ownerWorkload.map((r) => (
+                  <tr key={r.owner}>
+                    <td style={tdStyle}>
+                      <Link
+                        to={`/crm?owner=${encodeURIComponent(r.owner)}`}
+                        style={{ color: colors.accent, textDecoration: 'none' }}
+                      >
+                        {r.owner}
+                      </Link>
+                    </td>
+                    <td style={tdStyle}>{r.open}</td>
+                    <td style={{ ...tdStyle, color: r.overdue ? colors.danger : colors.muted }}>
+                      {r.overdue}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {ownerWorkload.map((r) => (
-                    <tr key={r.owner}>
-                      <td style={tdStyle}>
-                        <Link
-                          to={`/crm?owner=${encodeURIComponent(r.owner)}`}
-                          style={{ color: colors.accent, textDecoration: 'none' }}
-                        >
-                          {r.owner}
-                        </Link>
-                      </td>
-                      <td style={tdStyle}>{r.open}</td>
-                      <td style={{ ...tdStyle, color: r.overdue ? colors.danger : colors.muted }}>
-                        {r.overdue}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        <div style={cardStyle}>
-          <h2 style={sectionTitleStyle}>Upcoming Follow-ups (7 days)</h2>
-          {upcomingFollowUps.length === 0 ? (
-            <EmptyState
-              icon={<AlertTriangle size={22} />}
-              title="No upcoming follow-ups"
-              subtitle="CRM follow-ups due in the next 7 days will show here."
-            />
-          ) : (
-            <div style={tableWrapStyle}>
-              <table style={tableStyle}>
-                <thead>
-                  <tr>
-                    <th style={thStyle}>Date</th>
-                    <th style={thStyle}>Company</th>
-                    <th style={thStyle}>Contact</th>
-                    <th style={thStyle}>Action</th>
-                    <th style={thStyle}>Owner</th>
-                    <th style={thStyle}>Quote</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {upcomingFollowUps.map((c) => {
-                    const p = primaryContact(hydrateContacts(c))
-                    return (
-                      <tr key={c.id}>
-                        <td style={tdStyle}>
-                          {c.follow_up_date
-                            ? format(parseISO(c.follow_up_date), 'dd MMM yyyy')
-                            : '—'}
-                        </td>
-                        <td style={tdStyle}>
-                          <Link
-                            to={`/crm?edit=${c.id}`}
-                            style={{ color: colors.accent, textDecoration: 'none' }}
-                          >
-                            {c.company_name}
-                          </Link>
-                        </td>
-                        <td style={tdStyle}>{p?.name || c.primary_contact || '—'}</td>
-                        <td style={tdStyle}>{c.next_action || '—'}</td>
-                        <td style={tdStyle}>{c.owner || '—'}</td>
-                        <td style={tdStyle}>
-                          {c.quote_ref ? (
-                            <Link
-                              to={`/quotations?ref=${encodeURIComponent(c.quote_ref)}`}
-                              style={{ color: colors.accent, textDecoration: 'none' }}
-                            >
-                              {c.quote_ref}
-                            </Link>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      <div style={{ marginTop: 16, display: 'grid', gap: 16 }}>
-        <ZohoCalendarPanel crmEntries={crm} />
+      <div style={{ marginTop: 16 }}>
         <ZohoInboxPanel crmEntries={crm} />
       </div>
     </div>

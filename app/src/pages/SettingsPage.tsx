@@ -13,7 +13,7 @@ import {
 import { clearLocalData, DB_NAME } from '../lib/localDb'
 import { downloadCentralBackup } from '../lib/centralBackup'
 import { importCloudDumpFromFile } from '../lib/importCloudDump'
-import { clearZohoTokenCache, testZohoConnection } from '../lib/zoho'
+import { testZohoConnection } from '../lib/zoho'
 import { isAllowedLoginEmail, loginEmailDomainError } from '../lib/allowedLoginEmail'
 import { authApi, MIN_PASSWORD_LENGTH } from '../lib/authApi'
 import {
@@ -541,6 +541,7 @@ export default function SettingsPage() {
       setSavingSection('')
     }
   }
+
 
   function renderSection(
     title: string,

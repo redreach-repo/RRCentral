@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { addDays, format, isBefore, parseISO, startOfDay } from 'date-fns'
+import { Link, useNavigate } from 'react-router-dom'
+import { addDays, format, parseISO, startOfDay } from 'date-fns'
 import { CalendarClock, ExternalLink, Loader2, Plus, RefreshCw } from 'lucide-react'
 import type { AppUser, CrmEntry } from '../lib/types'
 import { useSettings } from '../contexts/SettingsContext'
 import { db } from '../lib/db'
+import { hydrateContacts, primaryContact } from '../lib/contacts'
 import {
   isZohoCalendarEnabled,
   isZohoConfigured,
@@ -12,6 +13,7 @@ import {
   zohoCalendarWebUrl,
 } from '../lib/zoho'
 import { enrichCalendarEvents, type CalendarEventRow } from '../lib/zohoCalendarMatch'
+import { buildScheduleRows, type ScheduleKind, type ScheduleRow } from '../lib/scheduleBoard'
 import ScheduleMeetingModal from './ScheduleMeetingModal'
 import EmptyState from './EmptyState'
 import {
@@ -30,28 +32,37 @@ type Props = {
   crmEntries: CrmEntry[]
 }
 
-function formatEventWhen(row: CalendarEventRow): string {
+type Filter = 'all' | 'follow_up' | 'meeting'
+
+function formatWhen(row: ScheduleRow): string {
   try {
-    const start = parseISO(row.startAt.slice(0, 19))
-    const end = row.endAt ? parseISO(row.endAt.slice(0, 19)) : null
-    const day = format(start, 'EEE d MMM')
-    if (row.isAllDay) return `${day} · All day`
-    const time = format(start, 'HH:mm')
-    const endTime = end ? format(end, 'HH:mm') : ''
-    return endTime ? `${day} · ${time}–${endTime}` : `${day} · ${time}`
+    if (row.kind === 'follow_up') {
+      const d = parseISO(row.whenLabel.slice(0, 10))
+      return format(d, 'EEE d MMM')
+    }
+    const start = parseISO(row.whenLabel.slice(0, 19))
+    return `${format(start, 'EEE d MMM')} · ${format(start, 'HH:mm')}`
   } catch {
-    return row.startAt || '—'
+    return row.whenLabel || '—'
   }
 }
 
+function kindBadge(kind: ScheduleKind): { label: string; color: string } {
+  if (kind === 'follow_up') return { label: 'Follow-up', color: '#fb923c' }
+  if (kind === 'meeting') return { label: 'Meeting', color: '#60a5fa' }
+  return { label: 'Calendar', color: '#a78bfa' }
+}
+
 export default function ZohoCalendarPanel({ crmEntries }: Props) {
+  const navigate = useNavigate()
   const { settings } = useSettings()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [rows, setRows] = useState<CalendarEventRow[]>([])
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEventRow[]>([])
   const [team, setTeam] = useState<AppUser[]>([])
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [daysAhead, setDaysAhead] = useState(14)
+  const [filter, setFilter] = useState<Filter>('all')
 
   const enabled = isZohoCalendarEnabled(settings)
   const configured = isZohoConfigured(settings)
@@ -66,16 +77,20 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
   }, [])
 
   const load = useCallback(async () => {
-    if (!enabled) return
+    if (!enabled) {
+      setCalendarEvents([])
+      setError('')
+      return
+    }
     setLoading(true)
     setError('')
     try {
       const start = startOfDay(new Date())
       const end = addDays(start, daysAhead)
       const events = await listZohoCalendarEvents(settings, { start, end })
-      setRows(enrichCalendarEvents(events, crmEntries))
+      setCalendarEvents(enrichCalendarEvents(events, crmEntries))
     } catch (e) {
-      setRows([])
+      setCalendarEvents([])
       setError(e instanceof Error ? e.message : 'Could not load Zoho Calendar')
     } finally {
       setLoading(false)
@@ -87,50 +102,54 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
   }, [loadTeam])
 
   useEffect(() => {
-    if (!enabled) return
     void load()
-  }, [enabled, load])
+  }, [load])
 
-  const upcoming = useMemo(() => {
-    const today = startOfDay(new Date())
-    return rows.filter((r) => {
-      try {
-        return !isBefore(parseISO(r.startAt.slice(0, 10)), today)
-      } catch {
-        return true
-      }
-    })
-  }, [rows])
+  const scheduleRows = useMemo(
+    () =>
+      buildScheduleRows({
+        crmEntries,
+        calendarEvents,
+        daysAhead,
+      }),
+    [crmEntries, calendarEvents, daysAhead],
+  )
 
-  if (!configured) {
+  const visible = useMemo(() => {
+    if (filter === 'all') return scheduleRows
+    if (filter === 'follow_up') return scheduleRows.filter((r) => r.kind === 'follow_up')
+    return scheduleRows.filter((r) => r.kind === 'meeting' || r.kind === 'calendar')
+  }, [scheduleRows, filter])
+
+  const counts = useMemo(() => {
+    const followUps = scheduleRows.filter((r) => r.kind === 'follow_up').length
+    const meetings = scheduleRows.filter((r) => r.kind !== 'follow_up').length
+    return { all: scheduleRows.length, followUps, meetings }
+  }, [scheduleRows])
+
+  const filterBtn = (key: Filter, label: string) => {
+    const active = filter === key
     return (
-      <div style={cardStyle}>
-        <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <CalendarClock size={18} /> Team calendar
-        </h2>
-        <p style={{ color: colors.muted, fontSize: 13, margin: 0 }}>
-          Add Zoho credentials in Settings to show meetings from Zoho Calendar here.
-        </p>
-      </div>
-    )
-  }
-
-  if (!enabled) {
-    return (
-      <div style={cardStyle}>
-        <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <CalendarClock size={18} /> Team calendar
-        </h2>
-        <p style={{ color: colors.muted, fontSize: 13, margin: 0 }}>
-          Set <strong style={{ color: colors.text }}>Calendar sync</strong> to <code>yes</code> in
-          Settings → Zoho to pull meetings onto the dashboard.
-        </p>
-      </div>
+      <button
+        type="button"
+        key={key}
+        onClick={() => setFilter(key)}
+        style={{
+          ...buttonSecondaryStyle,
+          padding: '5px 10px',
+          fontSize: 12,
+          background: active ? 'rgba(232, 93, 4, 0.22)' : buttonSecondaryStyle.background,
+          borderColor: active ? colors.accent : colors.border,
+          color: active ? colors.text : colors.muted,
+        }}
+      >
+        {label}
+      </button>
     )
   }
 
   return (
-    <div style={cardStyle}>
+    <div style={{ ...cardStyle, marginBottom: 16 }}>
       <div
         style={{
           display: 'flex',
@@ -138,11 +157,11 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 12,
-          marginBottom: 12,
+          marginBottom: 10,
         }}
       >
         <h2 style={{ ...sectionTitleStyle, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <CalendarClock size={18} /> Team calendar
+          <CalendarClock size={18} /> Schedule
         </h2>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
           <select
@@ -154,108 +173,176 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
             <option value={14}>Next 14 days</option>
             <option value={30}>Next 30 days</option>
           </select>
-          <a
-            href={zohoCalendarWebUrl(settings)}
-            target="_blank"
-            rel="noreferrer"
-            style={{ ...buttonSecondaryStyle, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
-          >
-            <ExternalLink size={14} /> Open Zoho Calendar
-          </a>
-          <button type="button" style={buttonSecondaryStyle} disabled={loading} onClick={() => void load()}>
-            {loading ? <Loader2 size={14} /> : <RefreshCw size={14} />}
-            Refresh
-          </button>
-          <button type="button" style={buttonPrimaryStyle} onClick={() => setScheduleOpen(true)}>
-            <Plus size={14} /> Schedule meeting
-          </button>
+          {configured && enabled ? (
+            <a
+              href={zohoCalendarWebUrl(settings)}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                ...buttonSecondaryStyle,
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <ExternalLink size={14} /> Zoho Calendar
+            </a>
+          ) : null}
+          {enabled ? (
+            <button
+              type="button"
+              style={buttonSecondaryStyle}
+              disabled={loading}
+              onClick={() => void load()}
+            >
+              {loading ? <Loader2 size={14} /> : <RefreshCw size={14} />}
+              Refresh
+            </button>
+          ) : null}
+          {enabled ? (
+            <button type="button" style={buttonPrimaryStyle} onClick={() => setScheduleOpen(true)}>
+              <Plus size={14} /> Schedule meeting
+            </button>
+          ) : null}
+          <Link to="/follow-ups" style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}>
+            All follow-ups
+          </Link>
         </div>
       </div>
 
       <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.45 }}>
-        Meetings from Zoho Calendar (including ones you add in Zoho) appear here. Schedule from CRM
-        to invite team members — Zoho emails them so it lands on their phone calendar when accepted.
+        CRM follow-ups and Zoho Calendar meetings in one place
+        {!enabled
+          ? ' — turn on Calendar sync in Settings to pull Zoho meetings and schedule team invites.'
+          : '.'}
       </p>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+        {filterBtn('all', `All (${counts.all})`)}
+        {filterBtn('follow_up', `Follow-ups (${counts.followUps})`)}
+        {filterBtn('meeting', `Meetings (${counts.meetings})`)}
+      </div>
 
       {error ? (
         <div style={{ marginBottom: 12 }}>
-          <p style={{ color: colors.danger, fontSize: 13, margin: '0 0 8px' }}>{error}</p>
-          <p style={{ color: colors.muted, fontSize: 13, margin: 0 }}>
-            You can still schedule a meeting below — listing events failed, but create may work.
+          <p style={{ color: colors.danger, fontSize: 13, margin: '0 0 4px' }}>{error}</p>
+          <p style={{ color: colors.muted, fontSize: 12, margin: 0 }}>
+            Follow-ups from CRM still show below. Scheduling may still work.
           </p>
         </div>
       ) : null}
-      {loading && rows.length === 0 && !error ? (
+
+      {loading && enabled && calendarEvents.length === 0 && !error ? (
         <p style={{ color: colors.muted, fontSize: 13 }}>Loading calendar…</p>
-      ) : upcoming.length === 0 ? (
+      ) : visible.length === 0 ? (
         <EmptyState
           icon={<CalendarClock size={22} />}
-          title={error ? 'Calendar list unavailable' : 'No upcoming meetings'}
-          subtitle={
-            error
-              ? 'Click Schedule meeting to create an event and invite the team.'
-              : 'Add events in Zoho Calendar or schedule a team meeting here.'
-          }
-          actionLabel="Schedule meeting"
-          onAction={() => setScheduleOpen(true)}
+          title="Nothing scheduled"
+          subtitle="Set a follow-up date on a CRM company, or schedule a team meeting."
+          actionLabel={enabled ? 'Schedule meeting' : 'Open CRM'}
+          onAction={enabled ? () => setScheduleOpen(true) : () => navigate('/crm')}
         />
       ) : (
-        <div style={tableWrapStyle}>
+        <div style={{ ...tableWrapStyle, maxHeight: 420, overflow: 'auto' }}>
           <table style={tableStyle}>
             <thead>
               <tr>
                 <th style={thStyle}>When</th>
-                <th style={thStyle}>Meeting</th>
-                <th style={thStyle}>CRM</th>
-                <th style={thStyle}>Attendees</th>
+                <th style={thStyle}>Type</th>
+                <th style={thStyle}>Item</th>
+                <th style={thStyle}>CRM / detail</th>
+                <th style={thStyle}>Owner</th>
               </tr>
             </thead>
             <tbody>
-              {upcoming.map((row) => (
-                <tr key={row.uid}>
-                  <td style={tdStyle}>{formatEventWhen(row)}</td>
-                  <td style={tdStyle}>
-                    <div style={{ fontWeight: 600 }}>{row.title}</div>
-                    {row.description ? (
-                      <div style={{ fontSize: 11, color: colors.muted2 }}>{row.description.slice(0, 80)}</div>
-                    ) : null}
-                  </td>
-                  <td style={tdStyle}>
-                    {row.crm ? (
-                      <Link
-                        to={`/crm?edit=${row.crm.id}`}
-                        style={{ color: colors.accent, textDecoration: 'none' }}
-                      >
-                        {row.crm.company_name}
-                      </Link>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td style={tdStyle}>
-                    {row.attendees.length ? (
-                      <span style={{ fontSize: 12 }}>
-                        {row.attendees.map((a) => a.email.split('@')[0]).join(', ')}
+              {visible.map((row) => {
+                const badge = kindBadge(row.kind)
+                const crmEntry = row.crmId
+                  ? crmEntries.find((c) => c.id === row.crmId)
+                  : null
+                const contact = crmEntry
+                  ? primaryContact(hydrateContacts(crmEntry))?.name || crmEntry.primary_contact
+                  : ''
+                return (
+                  <tr key={row.id}>
+                    <td style={tdStyle}>
+                      <span style={{ color: row.overdue ? colors.danger : colors.text }}>
+                        {formatWhen(row)}
                       </span>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                </tr>
-              ))}
+                      {row.overdue ? (
+                        <div style={{ fontSize: 11, color: colors.danger }}>Overdue</div>
+                      ) : null}
+                    </td>
+                    <td style={tdStyle}>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: badge.color,
+                          background: `${badge.color}22`,
+                          padding: '2px 8px',
+                          borderRadius: 999,
+                        }}
+                      >
+                        {badge.label}
+                      </span>
+                    </td>
+                    <td style={tdStyle}>
+                      <div style={{ fontWeight: 600 }}>{row.title}</div>
+                      {row.detail ? (
+                        <div style={{ fontSize: 11, color: colors.muted2 }}>{row.detail}</div>
+                      ) : null}
+                      {row.attendees ? (
+                        <div style={{ fontSize: 11, color: colors.muted2 }}>With {row.attendees}</div>
+                      ) : null}
+                    </td>
+                    <td style={tdStyle}>
+                      {row.crmId ? (
+                        <>
+                          <Link
+                            to={`/crm?edit=${row.crmId}`}
+                            style={{ color: colors.accent, textDecoration: 'none' }}
+                          >
+                            {row.crmName}
+                          </Link>
+                          {contact ? (
+                            <div style={{ fontSize: 11, color: colors.muted2 }}>{contact}</div>
+                          ) : null}
+                          {row.quoteRef ? (
+                            <div style={{ fontSize: 11 }}>
+                              <Link
+                                to={`/quotations?ref=${encodeURIComponent(row.quoteRef)}`}
+                                style={{ color: colors.accent, textDecoration: 'none' }}
+                              >
+                                {row.quoteRef}
+                              </Link>
+                            </div>
+                          ) : null}
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td style={tdStyle}>{row.owner}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
       )}
 
-      <ScheduleMeetingModal
-        open={scheduleOpen}
-        onClose={() => setScheduleOpen(false)}
-        settings={settings}
-        team={team}
-        crmEntries={crmEntries}
-        onCreated={() => void load()}
-      />
+      {enabled ? (
+        <ScheduleMeetingModal
+          open={scheduleOpen}
+          onClose={() => setScheduleOpen(false)}
+          settings={settings}
+          team={team}
+          crmEntries={crmEntries}
+          onCreated={() => void load()}
+        />
+      ) : null}
     </div>
   )
 }
