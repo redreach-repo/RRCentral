@@ -2,6 +2,41 @@
   animation: fadeUp 0.4s ease both;
 }
 
+/* Wide phone / fold-open: Schedule + KPIs side by side */
+.topGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 0;
+}
+
+.topSchedule {
+  min-width: 0;
+}
+
+.topKpis {
+  min-width: 0;
+}
+
+@container crm-main (min-width: 700px) {
+  .topGrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+    margin-bottom: 8px;
+  }
+
+  .topSchedule :global(> div) {
+    margin-bottom: 0 !important;
+    height: 100%;
+  }
+
+  .topKpis .kpiGrid {
+    margin-bottom: 0;
+  }
+}
+
 .kpiGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 158px), 1fr));

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { addDays, differenceInCalendarDays, format, parseISO, startOfDay } from 'date-fns'
-import { Bell, CalendarClock, Mail, MessageSquarePlus, MessageCircle, Settings } from 'lucide-react'
+import { Bell, CalendarClock, Mail, MessageSquarePlus, MessageCircle, Phone, Settings } from 'lucide-react'
+import { useCompactCrm } from '../hooks/useMediaQuery'
+import resp from '../styles/crmResponsive.module.css'
 import { db } from '../lib/db'
 import { NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
 import type { AppUser, CrmEntry } from '../lib/types'
@@ -60,6 +62,7 @@ export default function FollowupsPage() {
   const { user } = useAuth()
   const { settings } = useSettings()
   const { showToast } = useToast()
+  const compact = useCompactCrm()
   const [entries, setEntries] = useState<CrmEntry[]>([])
   const [team, setTeam] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
@@ -334,10 +337,92 @@ export default function FollowupsPage() {
     const busy = busyId === entry.id
     const contacts = hydrateContacts(entry)
     const p = primaryContact(contacts)
+    const phone = p?.phone || entry.mobile_number || entry.office_number || ''
     const contactLabel =
       contacts.length > 1
         ? `${p?.name || '—'} +${contacts.length - 1}`
         : p?.name || entry.primary_contact || '—'
+
+    const actionStyle = compact
+      ? {
+          ...buttonSecondaryStyle,
+          minHeight: 40,
+          padding: '8px 10px',
+          fontSize: 12,
+          fontWeight: 650,
+          flex: '1 1 auto',
+          justifyContent: 'center' as const,
+        }
+      : buttonSecondaryStyle
+
+    const openUpdate = () => {
+      setUpdateTarget(entry)
+      setUpdateText('')
+      setUpdateFollowDate(entry.follow_up_date ? entry.follow_up_date.slice(0, 10) : '')
+      setUpdateStage(entry.pipeline_stage || 'Lead')
+      setUpdateNextAction(entry.next_action || '')
+      setUpdateClearDate(false)
+    }
+
+    if (compact) {
+      return (
+        <article
+          key={entry.id}
+          className={resp.card}
+          style={{ borderLeft: `3px solid ${accent}` }}
+        >
+          <div className={resp.cardTop}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <Link
+                to={`/crm?edit=${entry.id}`}
+                className={resp.cardTitle}
+                style={{ textDecoration: 'none', display: 'inline-block' }}
+              >
+                {entry.company_name}
+              </Link>
+              <div className={resp.cardMeta}>
+                {contactLabel} · {entry.next_action || 'No action'}
+                {entry.owner ? ` · ${entry.owner}` : ''}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: accent }}>
+                {entry.follow_up_date
+                  ? format(parseISO(entry.follow_up_date.slice(0, 10)), 'dd MMM')
+                  : '—'}
+              </div>
+              <div className={resp.cardMeta}>
+                {entry.follow_up_date ? daysLabel(entry.follow_up_date, today) : ''}
+              </div>
+            </div>
+          </div>
+          <div className={resp.cardActions}>
+            <button type="button" style={actionStyle} disabled={busy} onClick={openUpdate}>
+              <MessageSquarePlus size={14} /> Log
+            </button>
+            {phone ? (
+              <a
+                href={`tel:${phone.replace(/\s+/g, '')}`}
+                style={{ ...actionStyle, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                <Phone size={14} /> Call
+              </a>
+            ) : null}
+            <button
+              type="button"
+              style={actionStyle}
+              disabled={busy}
+              onClick={() => void openFollowUpWhatsApp(entry)}
+            >
+              <MessageCircle size={14} /> WhatsApp
+            </button>
+            <button type="button" style={actionStyle} disabled={busy} onClick={() => void snooze(entry)}>
+              +7d
+            </button>
+          </div>
+        </article>
+      )
+    }
 
     return (
       <div
@@ -399,19 +484,7 @@ export default function FollowupsPage() {
           >
             <MessageCircle size={14} /> WhatsApp
           </button>
-          <button
-            type="button"
-            style={buttonSecondaryStyle}
-            disabled={busy}
-            onClick={() => {
-              setUpdateTarget(entry)
-              setUpdateText('')
-              setUpdateFollowDate(entry.follow_up_date ? entry.follow_up_date.slice(0, 10) : '')
-              setUpdateStage(entry.pipeline_stage || 'Lead')
-              setUpdateNextAction(entry.next_action || '')
-              setUpdateClearDate(false)
-            }}
-          >
+          <button type="button" style={buttonSecondaryStyle} disabled={busy} onClick={openUpdate}>
             <MessageSquarePlus size={14} /> Add Update
           </button>
         </div>
@@ -449,7 +522,9 @@ export default function FollowupsPage() {
             {overdue.length === 0 ? (
               <EmptyState title="No overdue follow-ups" subtitle="You're caught up on past due items." />
             ) : (
-              <div style={{ display: 'grid', gap: 12 }}>{overdue.map((e) => renderCard(e, 'overdue'))}</div>
+              <div className={compact ? resp.listStack : undefined} style={compact ? undefined : { display: 'grid', gap: 12 }}>
+                {overdue.map((e) => renderCard(e, 'overdue'))}
+              </div>
             )}
           </section>
 
@@ -460,7 +535,9 @@ export default function FollowupsPage() {
             {upcoming.length === 0 ? (
               <EmptyState title="No upcoming follow-ups" subtitle="Nothing scheduled in the next two weeks." />
             ) : (
-              <div style={{ display: 'grid', gap: 12 }}>{upcoming.map((e) => renderCard(e, 'upcoming'))}</div>
+              <div className={compact ? resp.listStack : undefined} style={compact ? undefined : { display: 'grid', gap: 12 }}>
+                {upcoming.map((e) => renderCard(e, 'upcoming'))}
+              </div>
             )}
           </section>
         </>

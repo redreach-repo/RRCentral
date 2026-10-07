@@ -89,6 +89,64 @@
   margin-bottom: 14px;
 }
 
+/* Sticky My Day + search under app topbar while scrolling deals */
+.stickyFilters {
+  position: sticky;
+  /* Sit just under Layout topbar (56–60px + safe area on phone) */
+  top: calc(-1 * env(safe-area-inset-top, 0px));
+  z-index: 12;
+  margin: 0 -4px 10px;
+  padding: 8px 4px 6px;
+  background: linear-gradient(
+    180deg,
+    rgba(14, 16, 19, 0.97) 0%,
+    rgba(14, 16, 19, 0.94) 70%,
+    rgba(14, 16, 19, 0.88) 100%
+  );
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+@media (max-width: 1024px) {
+  .stickyFilters {
+    top: 0;
+  }
+}
+
+.stickyFilters .dueStrip {
+  margin-bottom: 10px;
+}
+
+.stickyFilters .toolbar {
+  margin-bottom: 0;
+}
+
+.boardCompact {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.boardStageChip {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.65);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  min-height: 40px;
+}
+
+.boardStageChipActive {
+  color: #fff;
+  border-color: rgba(232, 93, 4, 0.55);
+  background: rgba(232, 93, 4, 0.18);
+}
+
 .toolbarSearch {
   flex: 1 1 160px;
   min-width: 0;

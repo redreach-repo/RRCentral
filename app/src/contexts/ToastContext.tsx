@@ -2,11 +2,14 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react'
 import Toast, { type ToastType } from '../components/Toast'
+import { usePhoneShell } from '../hooks/useMediaQuery'
+import styles from '../components/ToastStack.module.css'
 
 interface ToastItem {
   id: number
@@ -24,6 +27,22 @@ let toastId = 0
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([])
+  const phoneShell = usePhoneShell()
+  const [bannerH, setBannerH] = useState(0)
+
+  useEffect(() => {
+    const measure = () => {
+      const el = document.querySelector<HTMLElement>('[class*="localBanner"]')
+      setBannerH(el ? Math.ceil(el.getBoundingClientRect().height) : 0)
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    const t = window.setInterval(measure, 1500)
+    return () => {
+      window.removeEventListener('resize', measure)
+      window.clearInterval(t)
+    }
+  }, [])
 
   const removeToast = useCallback((id: number) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))
@@ -39,22 +58,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({ showToast }), [showToast])
 
+  const topbar = phoneShell ? 56 : 60
+  const stackStyle = {
+    top: `calc(${12 + bannerH}px + env(safe-area-inset-top, 0px) + ${topbar}px)`,
+  }
+
   return (
     <ToastContext.Provider value={value}>
       {children}
       <div
-        style={{
-          position: 'fixed',
-          top: 16,
-          right: 16,
-          zIndex: 2000,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-          maxWidth: 360,
-          width: 'calc(100% - 32px)',
-          pointerEvents: 'none',
-        }}
+        className={`${styles.stack} ${phoneShell ? styles.stackPhone : ''}`}
+        style={stackStyle}
+        aria-live="polite"
+        aria-relevant="additions"
       >
         {toasts.map((t) => (
           <Toast

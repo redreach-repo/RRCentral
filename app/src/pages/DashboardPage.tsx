@@ -325,64 +325,69 @@ export default function DashboardPage() {
         </div>
       ) : null}
 
-      <ZohoCalendarPanel crmEntries={crm} />
-
-      <div className={dash.kpiGrid}>
-        <KpiCard
-          label={`Income · ${monthLabel}`}
-          value={formatMoney(monthIncome)}
-          icon={<TrendingUp size={18} />}
-          accent="#22c55e"
-          hint={`YTD paid ${formatMoney(ytdIncome)}`}
-          delay={40}
-        />
-        <KpiCard
-          label={`Expenses · ${monthLabel}`}
-          value={formatMoney(monthExpenses)}
-          icon={<TrendingDown size={18} />}
-          accent="#ef4444"
-          hint={`YTD ${formatMoney(ytdExpenses)}`}
-          delay={80}
-        />
-        <KpiCard
-          label={`Net · ${monthLabel}`}
-          value={formatMoney(monthNet)}
-          icon={<Wallet size={18} />}
-          accent={monthNet >= 0 ? '#22c55e' : '#ef4444'}
-          delay={120}
-        />
-        <KpiCard
-          label="Open Quotes"
-          value={String(openQuotes)}
-          icon={<FileText size={18} />}
-          accent="#60a5fa"
-          hint="Draft / Finalized / Sent"
-          delay={160}
-        />
-        <KpiCard
-          label="Open CRM deals"
-          value={String(openPipeline)}
-          icon={<Users size={18} />}
-          accent="#fb923c"
-          hint="Not Won / Lost"
-          to="/crm"
-          delay={200}
-        />
-        <KpiCard
-          label="Pending Invoices"
-          value={String(pendingInvoices)}
-          icon={<Receipt size={18} />}
-          accent="#facc15"
-          delay={240}
-        />
-        <KpiCard
-          label="Overdue Follow-ups"
-          value={String(overdueFollowUps)}
-          icon={<AlertTriangle size={18} />}
-          accent="#f97316"
-          to="/crm?follow=Due&owner=me"
-          delay={280}
-        />
+      <div className={dash.topGrid}>
+        <div className={dash.topSchedule}>
+          <ZohoCalendarPanel crmEntries={crm} />
+        </div>
+        <div className={dash.topKpis}>
+          <div className={dash.kpiGrid}>
+            <KpiCard
+              label={`Income · ${monthLabel}`}
+              value={formatMoney(monthIncome)}
+              icon={<TrendingUp size={18} />}
+              accent="#22c55e"
+              hint={`YTD paid ${formatMoney(ytdIncome)}`}
+              delay={40}
+            />
+            <KpiCard
+              label={`Expenses · ${monthLabel}`}
+              value={formatMoney(monthExpenses)}
+              icon={<TrendingDown size={18} />}
+              accent="#ef4444"
+              hint={`YTD ${formatMoney(ytdExpenses)}`}
+              delay={80}
+            />
+            <KpiCard
+              label={`Net · ${monthLabel}`}
+              value={formatMoney(monthNet)}
+              icon={<Wallet size={18} />}
+              accent={monthNet >= 0 ? '#22c55e' : '#ef4444'}
+              delay={120}
+            />
+            <KpiCard
+              label="Open Quotes"
+              value={String(openQuotes)}
+              icon={<FileText size={18} />}
+              accent="#60a5fa"
+              hint="Draft / Finalized / Sent"
+              delay={160}
+            />
+            <KpiCard
+              label="Open CRM deals"
+              value={String(openPipeline)}
+              icon={<Users size={18} />}
+              accent="#fb923c"
+              hint="Not Won / Lost"
+              to="/crm"
+              delay={200}
+            />
+            <KpiCard
+              label="Pending Invoices"
+              value={String(pendingInvoices)}
+              icon={<Receipt size={18} />}
+              accent="#facc15"
+              delay={240}
+            />
+            <KpiCard
+              label="Overdue Follow-ups"
+              value={String(overdueFollowUps)}
+              icon={<AlertTriangle size={18} />}
+              accent="#f97316"
+              to="/crm?follow=Due&owner=me"
+              delay={280}
+            />
+          </div>
+        </div>
       </div>
 
       {showCompanyVault ? (

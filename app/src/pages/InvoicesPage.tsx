@@ -610,7 +610,7 @@ export default function InvoicesPage() {
       </div>
 
       <div className={resp.toolbar} style={{ marginBottom: 16 }}>
-        <div className={resp.chipRow} style={{ marginBottom: 0, flex: 1 }}>
+        <div className={compact ? resp.chipScroll : resp.chipRow} style={{ marginBottom: 0, flex: 1 }}>
           {(['All', 'Pending', 'Partial', 'Paid'] as const).map((t) => (
             <button
               key={t}
