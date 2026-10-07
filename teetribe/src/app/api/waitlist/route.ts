@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { useMockData } from '@/lib/mock'
+import { isMockMode } from '@/lib/mock'
 
 const schema = z.object({
   email: z.string().email(),
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
 
   const { email, productId, productSlug } = parsed.data
 
-  if (useMockData()) {
+  if (isMockMode()) {
     console.log('[waitlist stub]', email, productSlug)
     return NextResponse.json({ ok: true })
   }

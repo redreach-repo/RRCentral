@@ -1,6 +1,6 @@
 import * as seed from '@/data/seed'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { useMockData } from '@/lib/mock'
+import { isMockMode } from '@/lib/mock'
 import type { Collection, CollectionSlug, Product, ProductImage, ProductVariant } from '@/lib/types'
 
 type DbProduct = {
@@ -128,36 +128,36 @@ async function fetchCollectionsFromDb(): Promise<Collection[]> {
 }
 
 export async function getCollections(): Promise<Collection[]> {
-  if (useMockData()) return seed.collections
+  if (isMockMode()) return seed.collections
   return fetchCollectionsFromDb()
 }
 
 export async function getAllProducts(): Promise<Product[]> {
-  if (useMockData()) return seed.getAllProducts()
+  if (isMockMode()) return seed.getAllProducts()
   const products = await fetchProductsFromDb()
   return products.filter((p) => p.isActive)
 }
 
 export async function getProduct(slugOrId: string): Promise<Product | undefined> {
-  if (useMockData()) return seed.getProduct(slugOrId)
+  if (isMockMode()) return seed.getProduct(slugOrId)
   const products = await fetchProductsFromDb()
   return products.find((p) => p.slug === slugOrId || p.id === slugOrId)
 }
 
 export async function getCollection(slug: CollectionSlug): Promise<Collection | undefined> {
-  if (useMockData()) return seed.getCollection(slug)
+  if (isMockMode()) return seed.getCollection(slug)
   const collections = await fetchCollectionsFromDb()
   return collections.find((c) => c.slug === slug)
 }
 
 export async function getBestSellers(limit = 8): Promise<Product[]> {
-  if (useMockData()) return seed.getBestSellers(limit)
+  if (isMockMode()) return seed.getBestSellers(limit)
   const products = await getAllProducts()
   return products.filter((p) => p.bestSeller).slice(0, limit)
 }
 
 export async function getActiveDrop(): Promise<Product | undefined> {
-  if (useMockData()) return seed.getActiveDrop()
+  if (isMockMode()) return seed.getActiveDrop()
   const products = await getAllProducts()
   const now = Date.now()
   return products.find(
@@ -166,13 +166,13 @@ export async function getActiveDrop(): Promise<Product | undefined> {
 }
 
 export async function getProductsByCollection(slug: CollectionSlug): Promise<Product[]> {
-  if (useMockData()) return seed.getProductsByCollection(slug)
+  if (isMockMode()) return seed.getProductsByCollection(slug)
   const products = await getAllProducts()
   return products.filter((p) => p.collection === slug)
 }
 
 export async function relatedProducts(product: Product, limit = 4): Promise<Product[]> {
-  if (useMockData()) return seed.relatedProducts(product, limit)
+  if (isMockMode()) return seed.relatedProducts(product, limit)
   const products = await getAllProducts()
   return products
     .filter((p) => p.id !== product.id && (p.collection === product.collection || p.type === product.type))

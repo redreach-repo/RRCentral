@@ -1,10 +1,10 @@
 import Link from 'next/link'
 import { mockOrders } from '@/data/seed'
-import { useMockData } from '@/lib/mock'
+import { isMockMode } from '@/lib/mock'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export default async function AdminOverviewPage() {
-  const mockMode = useMockData()
+  const mockMode = isMockMode()
   let orderCount = mockOrders.length
   let memberCount = 0
   let waitlistCount = 0

@@ -4,7 +4,7 @@ import { getProduct } from '@/lib/catalog'
 import { deliveryFeeFils } from '@/lib/money'
 import { getStripe, integrationIdentifier, isStripeConfigured } from '@/lib/stripe'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { useMockData } from '@/lib/mock'
+import { isMockMode } from '@/lib/mock'
 
 const cartLineSchema = z.object({
   productId: z.string().min(1),
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient()
 
   // Persist pending order when Supabase available
-  if (admin && !useMockData()) {
+  if (admin && !isMockMode()) {
     await admin.from('customers').upsert({ email, name, phone }, { onConflict: 'email' })
 
     const { error: orderErr } = await admin.from('orders').insert({
@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    if (admin && !useMockData()) {
+    if (admin && !isMockMode()) {
       await admin.from('orders').update({ stripe_session_id: session.id }).eq('id', orderId)
     }
 

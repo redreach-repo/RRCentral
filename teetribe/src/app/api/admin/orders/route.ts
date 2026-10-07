@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import { mockOrders } from '@/data/seed'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { useMockData } from '@/lib/mock'
+import { isMockMode } from '@/lib/mock'
 
 export async function GET() {
-  if (useMockData()) {
+  if (isMockMode()) {
     return NextResponse.json({
       orders: mockOrders.map((o) => ({
         id: o.id,

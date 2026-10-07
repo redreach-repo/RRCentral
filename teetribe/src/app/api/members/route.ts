@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getStripe } from '@/lib/stripe'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { useMockData } from '@/lib/mock'
+import { isMockMode } from '@/lib/mock'
 import { sendMemberWelcome } from '@/lib/email'
 
 const schema = z.object({
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (useMockData()) {
+  if (isMockMode()) {
     await sendMemberWelcome({ email, name, discountCode })
     return NextResponse.json({ ok: true, code: discountCode })
   }

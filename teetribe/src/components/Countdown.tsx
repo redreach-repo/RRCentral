@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 type CountdownProps = {
   target: string | Date
@@ -21,13 +21,16 @@ function calcTimeLeft(target: Date): TimeLeft | null {
 }
 
 export function Countdown({ target, className }: CountdownProps) {
-  const targetDate = typeof target === 'string' ? new Date(target) : target
-  const [timeLeft, setTimeLeft] = useState<TimeLeft | null>(() => calcTimeLeft(targetDate))
+  const targetMs = useMemo(
+    () => (typeof target === 'string' ? new Date(target).getTime() : target.getTime()),
+    [target],
+  )
+  const [timeLeft, setTimeLeft] = useState<TimeLeft | null>(() => calcTimeLeft(new Date(targetMs)))
 
   useEffect(() => {
-    const id = setInterval(() => setTimeLeft(calcTimeLeft(targetDate)), 1000)
+    const id = setInterval(() => setTimeLeft(calcTimeLeft(new Date(targetMs))), 1000)
     return () => clearInterval(id)
-  }, [targetDate])
+  }, [targetMs])
 
   if (!timeLeft) {
     return <p className={className}>Drop closed</p>

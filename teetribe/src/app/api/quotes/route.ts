@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { useMockData } from '@/lib/mock'
+import { isMockMode } from '@/lib/mock'
 import { sendQuoteNotification } from '@/lib/email'
 
 const schema = z.object({
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     notes: data.notes,
   })
 
-  if (useMockData()) {
+  if (isMockMode()) {
     return NextResponse.json({ ok: true, quoteId })
   }
 

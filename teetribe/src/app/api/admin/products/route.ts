@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { products as seedProducts } from '@/data/seed'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { useMockData } from '@/lib/mock'
+import { isMockMode } from '@/lib/mock'
 
 export async function GET() {
-  const mockMode = useMockData()
+  const mockMode = isMockMode()
 
   if (mockMode) {
     const rows = seedProducts.flatMap((p) =>
@@ -63,7 +63,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid data' }, { status: 400 })
   }
 
-  if (useMockData()) {
+  if (isMockMode()) {
     return NextResponse.json({ ok: true, mock: true })
   }
 

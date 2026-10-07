@@ -1,10 +1,10 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { useMockData } from '@/lib/mock'
+import { isMockMode } from '@/lib/mock'
 
 export default async function AdminProtectedLayout({ children }: { children: React.ReactNode }) {
-  const mockMode = useMockData()
+  const mockMode = isMockMode()
 
   if (!mockMode) {
     const supabase = await createClient()
