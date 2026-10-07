@@ -4,7 +4,8 @@ import { addDays, differenceInCalendarDays, format, parseISO, startOfDay } from 
 import { Bell, CalendarClock, Mail, MessageSquarePlus, MessageCircle } from 'lucide-react'
 import { db } from '../lib/db'
 import { NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
-import type { CrmEntry } from '../lib/types'
+import type { AppUser, CrmEntry } from '../lib/types'
+import { resolveOwnerEmails } from '../lib/calendarAttendees'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
@@ -59,6 +60,7 @@ export default function FollowupsPage() {
   const { settings } = useSettings()
   const { showToast } = useToast()
   const [entries, setEntries] = useState<CrmEntry[]>([])
+  const [team, setTeam] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [updateTarget, setUpdateTarget] = useState<CrmEntry | null>(null)
@@ -112,13 +114,13 @@ export default function FollowupsPage() {
     setLoading(true)
     setError('')
     try {
-      const { data, error: err } = await db
-        .from('crm')
-        .select('*')
-        .not('follow_up_date', 'is', null)
-        .order('follow_up_date', { ascending: true })
-      if (err) throw err
-      setEntries((data || []) as CrmEntry[])
+      const [crmRes, usersRes] = await Promise.all([
+        db.from('crm').select('*').not('follow_up_date', 'is', null).order('follow_up_date', { ascending: true }),
+        db.from('app_users').select('*').eq('active', true).order('name'),
+      ])
+      if (crmRes.error) throw crmRes.error
+      setEntries((crmRes.data || []) as CrmEntry[])
+      if (!usersRes.error && usersRes.data) setTeam(usersRes.data as AppUser[])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load follow-ups')
     } finally {
@@ -170,6 +172,10 @@ export default function FollowupsPage() {
             owner: entry.owner,
             contactName: p?.name,
             contactEmail: p?.email,
+            teamAttendeeEmails: resolveOwnerEmails(
+              entry.owner,
+              team.map((u) => ({ email: u.email, name: u.name, active: u.active })),
+            ),
             followUpDate: next,
             existingEventId: entry.calendar_event_id || undefined,
           })
@@ -271,6 +277,10 @@ export default function FollowupsPage() {
               owner: updateTarget.owner,
               contactName: p?.name,
               contactEmail: p?.email,
+              teamAttendeeEmails: resolveOwnerEmails(
+                updateTarget.owner,
+                team.map((u) => ({ email: u.email, name: u.name, active: u.active })),
+              ),
               followUpDate: nextDate,
               existingEventId: updateTarget.calendar_event_id || undefined,
             })
