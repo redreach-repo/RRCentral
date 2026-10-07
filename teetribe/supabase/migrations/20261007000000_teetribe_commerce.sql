@@ -4,7 +4,6 @@
 --
 -- All shop tables use tt_ prefix so they never clash with Central's
 -- existing public.products (catalogue) or other CRM tables.
--- Admins = Central staff via public.rr_is_admin() when present.
 -- =============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -18,7 +17,6 @@ SECURITY DEFINER
 SET search_path = public, auth
 AS $$
 BEGIN
-  -- Central helper (preferred)
   IF to_regprocedure('public.rr_is_admin()') IS NOT NULL THEN
     RETURN public.rr_is_admin();
   END IF;
@@ -39,28 +37,8 @@ EXCEPTION WHEN undefined_table THEN
 END;
 $$;
 
--- Drop previous Tee Tribe objects if re-running
-DROP POLICY IF EXISTS tt_collections_public_read ON public.tt_collections;
-DROP POLICY IF EXISTS tt_collections_admin_write ON public.tt_collections;
-DROP POLICY IF EXISTS tt_products_public_read ON public.tt_products;
-DROP POLICY IF EXISTS tt_products_admin_write ON public.tt_products;
-DROP POLICY IF EXISTS tt_variants_public_read ON public.tt_product_variants;
-DROP POLICY IF EXISTS tt_variants_admin_write ON public.tt_product_variants;
-DROP POLICY IF EXISTS tt_images_public_read ON public.tt_product_images;
-DROP POLICY IF EXISTS tt_images_admin_write ON public.tt_product_images;
-DROP POLICY IF EXISTS tt_customers_admin_all ON public.tt_customers;
-DROP POLICY IF EXISTS tt_orders_owner_read ON public.tt_orders;
-DROP POLICY IF EXISTS tt_orders_admin_write ON public.tt_orders;
-DROP POLICY IF EXISTS tt_order_items_owner_read ON public.tt_order_items;
-DROP POLICY IF EXISTS tt_order_items_admin_write ON public.tt_order_items;
-DROP POLICY IF EXISTS tt_members_insert_public ON public.tt_members;
-DROP POLICY IF EXISTS tt_members_admin_all ON public.tt_members;
-DROP POLICY IF EXISTS tt_waitlist_insert_public ON public.tt_drop_waitlist;
-DROP POLICY IF EXISTS tt_waitlist_admin_read ON public.tt_drop_waitlist;
-DROP POLICY IF EXISTS tt_quotes_insert_public ON public.tt_quote_requests;
-DROP POLICY IF EXISTS tt_quotes_admin_all ON public.tt_quote_requests;
-DROP POLICY IF EXISTS tt_discount_codes_admin_all ON public.tt_discount_codes;
-
+-- Clean re-run: drop tables (CASCADE removes policies). Do NOT DROP POLICY
+-- first — that fails when the table does not exist yet.
 DROP FUNCTION IF EXISTS public.tt_decrement_stock(text, int);
 
 DROP TABLE IF EXISTS public.tt_discount_codes CASCADE;
@@ -75,7 +53,6 @@ DROP TABLE IF EXISTS public.tt_product_variants CASCADE;
 DROP TABLE IF EXISTS public.tt_products CASCADE;
 DROP TABLE IF EXISTS public.tt_collections CASCADE;
 
--- Collections
 CREATE TABLE public.tt_collections (
   id text PRIMARY KEY,
   slug text UNIQUE NOT NULL,
@@ -87,7 +64,6 @@ CREATE TABLE public.tt_collections (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Products (prices in integer fils: AED 99 = 9900)
 CREATE TABLE public.tt_products (
   id text PRIMARY KEY,
   slug text UNIQUE NOT NULL,
@@ -235,7 +211,6 @@ BEGIN
   UPDATE public.tt_product_variants
   SET stock = stock - p_qty
   WHERE id = p_variant_id AND stock >= p_qty;
-
   GET DIAGNOSTICS updated = ROW_COUNT;
   RETURN updated = 1;
 END;
@@ -319,10 +294,3 @@ CREATE POLICY tt_quotes_admin_all ON public.tt_quote_requests
 
 CREATE POLICY tt_discount_codes_admin_all ON public.tt_discount_codes
   FOR ALL USING (public.tt_is_admin()) WITH CHECK (public.tt_is_admin());
-
--- Done. Next (same Central project keys in teetribe/.env.local):
---   NEXT_PUBLIC_USE_MOCK=false
---   npm run seed
---
--- Table Editor should show: tt_collections, tt_products, tt_product_variants, …
--- Central CRM tables (crm, products, quotations, …) are untouched.
