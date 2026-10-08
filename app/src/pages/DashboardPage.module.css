@@ -2,7 +2,10 @@
   animation: fadeUp 0.4s ease both;
 }
 
-/* Wide phone / fold-open: Schedule + KPIs side by side */
+/*
+  Desktop / laptop: Schedule full-width, then KPIs spread across (stacked).
+  Fold / wide phone only (~700–1099px): Schedule + KPIs side by side.
+*/
 .topGrid {
   display: flex;
   flex-direction: column;
@@ -18,10 +21,18 @@
   min-width: 0;
 }
 
-@container crm-main (min-width: 700px) {
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+/* Mid-width fold / large phone landscape only — not desktop */
+@container crm-main (min-width: 700px) and (max-width: 1099px) {
   .topGrid {
     display: grid;
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.9fr);
     gap: 16px;
     align-items: start;
     margin-bottom: 8px;
@@ -34,14 +45,27 @@
 
   .topKpis .kpiGrid {
     margin-bottom: 0;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
+  }
+
+  .topKpis .kpiValue {
+    white-space: normal;
+    font-size: 1.1rem;
   }
 }
 
-.kpiGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 158px), 1fr));
-  gap: 14px;
-  margin-bottom: 24px;
+/* Laptops & desktops: roomy KPI strip across the full width */
+@container crm-main (min-width: 1100px) {
+  .kpiGrid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+  }
+
+  .kpiValue {
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: unset;
+  }
 }
 
 @media (max-width: 640px) {
