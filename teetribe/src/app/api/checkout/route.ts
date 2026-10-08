@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { name, email, phone, emirate, address, lines } = parsed.data
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || req.nextUrl.origin
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || req.nextUrl.origin).replace(/\/$/, '')
 
   // Validate cart against catalogue
   const validatedLines: Array<{
@@ -156,6 +156,7 @@ export async function POST(req: NextRequest) {
       phone_number_collection: { enabled: true },
       success_url: `${siteUrl}/order/success?order=${orderId}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/checkout?cancelled=1`,
+      integration_identifier: integrationId,
       metadata: {
         orderId,
         email,
