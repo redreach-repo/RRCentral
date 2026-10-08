@@ -1,19 +1,27 @@
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
-import { copyFileSync, existsSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { stripeCheckoutPlugin } from './vite-plugin-stripe-checkout.ts'
 
-/** GitHub Pages serves 404.html for missing paths — copy SPA shell so /login, /reports, etc. work on refresh. */
+/**
+ * GitHub Pages SPA helpers:
+ * - 404.html so deep links refresh into the app
+ * - directory index.html copies so /app and /login return HTTP 200
+ *   (required for reliable PWA install / start_url on Chrome)
+ */
 function spaFallback404(): Plugin {
   return {
     name: 'spa-fallback-404',
     closeBundle() {
       const outDir = join(process.cwd(), 'dist')
       const index = join(outDir, 'index.html')
-      const fallback = join(outDir, '404.html')
-      if (existsSync(index)) {
-        copyFileSync(index, fallback)
+      if (!existsSync(index)) return
+      copyFileSync(index, join(outDir, '404.html'))
+      for (const dir of ['app', 'login', 'crm', 'follow-ups', 'quotations', 'invoices']) {
+        const destDir = join(outDir, dir)
+        mkdirSync(destDir, { recursive: true })
+        copyFileSync(index, join(destDir, 'index.html'))
       }
     },
   }
@@ -67,4 +75,9 @@ function securityMetaTags(): Plugin {
 export default defineConfig({
   plugins: [react(), securityMetaTags(), spaFallback404(), stripeCheckoutPlugin()],
   base: '/RRCentral/',
+  // Broader phone/Chrome support than Vite's default (keeps modern syntax out of very old engines).
+  // React 19 still needs a relatively recent browser; this is not IE / Chrome 60 support.
+  build: {
+    target: ['es2020', 'chrome87', 'safari14', 'firefox78', 'edge88'],
+  },
 })

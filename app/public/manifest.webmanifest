@@ -1,9 +1,10 @@
 {
-  "name": "RED REACH Central",
-  "short_name": "Central",
+  "id": "/RRCentral/",
+  "name": "RR Central",
+  "short_name": "RR Central",
   "description": "Multi-division CRM & quoting for Red Reach Middle East FZE",
-  "start_url": "./app",
-  "scope": "./",
+  "start_url": "/RRCentral/app/",
+  "scope": "/RRCentral/",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#0e1013",
@@ -11,28 +12,40 @@
   "lang": "en",
   "icons": [
     {
-      "src": "./icons/icon-192.png",
+      "src": "/RRCentral/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./icons/icon-512.png",
+      "src": "/RRCentral/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./icons/icon-maskable-192.png",
+      "src": "/RRCentral/icons/icon-maskable-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "./icons/icon-maskable-512.png",
+      "src": "/RRCentral/icons/icon-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    },
+    {
+      "src": "/RRCentral/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/RRCentral/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }

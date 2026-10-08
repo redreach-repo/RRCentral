@@ -1,11 +1,18 @@
 /* Minimal service worker so Chrome can offer "Install app".
-   Network-first for navigations; cache-first for same-origin icons. */
-const CACHE = 'rrcentral-shell-v3'
+   Network-first for navigations, manifest, and icons so branding updates stick. */
+const CACHE = 'rrcentral-shell-v5'
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE).then((cache) =>
-      cache.addAll(['./', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png']),
+      cache.addAll([
+        '/RRCentral/',
+        '/RRCentral/app/',
+        '/RRCentral/manifest.webmanifest',
+        '/RRCentral/icons/icon-192.png',
+        '/RRCentral/icons/icon-512.png',
+        '/RRCentral/icons/apple-touch-icon.png',
+      ]),
     ),
   )
   self.skipWaiting()
@@ -25,21 +32,25 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return
   const url = new URL(request.url)
   if (url.origin !== self.location.origin) return
+  if (!url.pathname.startsWith('/RRCentral/')) return
 
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request).catch(() => caches.match('./') || caches.match(request)),
-    )
-    return
-  }
+  const isNav = request.mode === 'navigate'
+  const isBrandAsset =
+    url.pathname.endsWith('manifest.webmanifest') || url.pathname.includes('/icons/')
 
-  if (url.pathname.includes('/icons/') || url.pathname.endsWith('manifest.webmanifest')) {
+  if (isNav || isBrandAsset) {
     event.respondWith(
-      caches.match(request).then((hit) => hit || fetch(request).then((res) => {
-        const copy = res.clone()
-        void caches.open(CACHE).then((c) => c.put(request, copy))
-        return res
-      })),
+      fetch(request)
+        .then((res) => {
+          if (res.ok && isBrandAsset) {
+            const copy = res.clone()
+            void caches.open(CACHE).then((c) => c.put(request, copy))
+          }
+          return res
+        })
+        .catch(() =>
+          caches.match(request).then((hit) => hit || caches.match('/RRCentral/app/') || caches.match('/RRCentral/')),
+        ),
     )
   }
 })
