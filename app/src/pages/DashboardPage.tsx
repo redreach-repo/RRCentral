@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   FileText,
   FolderOpen,
+  Globe,
   Receipt,
   Shield,
   TrendingDown,
@@ -15,7 +16,15 @@ import {
 import { format, parseISO, startOfDay, startOfMonth } from 'date-fns'
 import { db } from '../lib/db'
 import { PIPELINE_STAGES } from '../lib/config'
-import type { CompanyDocument, CrmEntry, Expense, IncomeEntry, Invoice, Quotation } from '../lib/types'
+import type {
+  CompanyDocument,
+  CrmEntry,
+  Expense,
+  IncomeEntry,
+  Invoice,
+  OwnedDomain,
+  Quotation,
+} from '../lib/types'
 import {
   countsTowardIncome,
   isInMonth,
@@ -28,6 +37,8 @@ import { loadDeletedInvoiceRefs, reconcileInvoiceFinance } from '../lib/invoiceF
 import { displayDocumentReference } from '../lib/documents'
 import { listCompanyDocuments } from '../lib/companyDocs'
 import { companyDocAlertLabel, companyDocExpiryAlerts } from '../lib/companyDocAlerts'
+import { listOwnedDomains } from '../lib/domains'
+import { domainAlertLabel, domainRenewalAlerts } from '../lib/domainAlerts'
 import { syncUnansweredQuoteFollowUps } from '../lib/quoteFollowUpSync'
 import { useSettings } from '../contexts/SettingsContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -109,6 +120,7 @@ export default function DashboardPage() {
   const [crm, setCrm] = useState<CrmEntry[]>([])
   const [deletedInvoiceRefs, setDeletedInvoiceRefs] = useState<string[]>([])
   const [companyDocs, setCompanyDocs] = useState<CompanyDocument[]>([])
+  const [ownedDomains, setOwnedDomains] = useState<OwnedDomain[]>([])
   const [followUpSyncNote, setFollowUpSyncNote] = useState('')
 
   const load = useCallback(async () => {
@@ -117,13 +129,14 @@ export default function DashboardPage() {
     try {
       await reconcileInvoiceFinance()
       const deleted = await loadDeletedInvoiceRefs()
-      const [qRes, iRes, incRes, expRes, crmRes, docsRes] = await Promise.all([
+      const [qRes, iRes, incRes, expRes, crmRes, docsRes, domains] = await Promise.all([
         db.from('quotations').select('*'),
         db.from('invoices').select('*'),
         db.from('income').select('*'),
         db.from('expenses').select('*'),
         db.from('crm').select('*').order('follow_up_date', { ascending: true }),
         listCompanyDocuments().catch(() => ({ rows: [] as CompanyDocument[], missingTable: true })),
+        listOwnedDomains().catch(() => [] as OwnedDomain[]),
       ])
 
       if (qRes.error) throw qRes.error
@@ -132,6 +145,7 @@ export default function DashboardPage() {
       if (expRes.error) throw expRes.error
       if (crmRes.error) throw crmRes.error
 
+      setOwnedDomains(domains)
       const quotes = sortByDateDesc((qRes.data as Quotation[]) ?? [])
       let crmRows = (crmRes.data as CrmEntry[]) ?? []
 
@@ -276,6 +290,7 @@ export default function DashboardPage() {
   const recentInvoices = invoices.filter((i) => i.status !== 'Cancelled').slice(0, 6)
 
   const docAlerts = useMemo(() => companyDocExpiryAlerts(companyDocs, 60), [companyDocs])
+  const domainAlerts = useMemo(() => domainRenewalAlerts(ownedDomains, 90), [ownedDomains])
   const companyVaultRoot = (settings.companyWorkDriveRootUrl || '').trim()
   const showCompanyVault = can(userRole, 'settings.manage')
 
@@ -389,6 +404,38 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {domainAlerts.length > 0 || ownedDomains.length > 0 ? (
+        <div style={{ ...cardStyle, marginBottom: 16 }}>
+          <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Globe size={18} /> Domain renewals
+          </h2>
+          {domainAlerts.length === 0 ? (
+            <p style={{ color: colors.muted2, fontSize: 13, margin: 0, lineHeight: 1.45 }}>
+              {ownedDomains.length} domain{ownedDomains.length === 1 ? '' : 's'} tracked — none expiring
+              in the next 90 days.
+            </p>
+          ) : (
+            <ul style={{ margin: 0, paddingLeft: 18, color: colors.muted, fontSize: 13, lineHeight: 1.55 }}>
+              {domainAlerts.slice(0, 8).map((a) => (
+                <li key={a.id} style={{ marginBottom: 6 }}>
+                  <strong style={{ color: a.severity === 'overdue' ? colors.danger : colors.text }}>
+                    {a.domainName}
+                  </strong>{' '}
+                  · {domainAlertLabel(a)}
+                  {a.registrar ? ` · ${a.registrar}` : ''}
+                  {a.autoRenew ? ' · auto-renew' : ''}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p style={{ margin: '12px 0 0', fontSize: 12 }}>
+            <Link to="/domains" style={{ color: colors.accent }}>
+              Manage domains
+            </Link>
+          </p>
+        </div>
+      ) : null}
 
       {showCompanyVault ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginBottom: 16 }}>
