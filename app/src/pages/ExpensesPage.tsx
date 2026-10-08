@@ -12,7 +12,7 @@ import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
 import { formatAED } from '../lib/money'
 import { logActivity } from '../lib/activity'
-import { expenseVatParts } from '../lib/finance'
+import { expenseChargesVat, expenseVatParts } from '../lib/finance'
 import { round2 } from '../lib/lineItems'
 import { ensureRecurringDeductions } from '../lib/recurringDeductions'
 import {
@@ -71,6 +71,8 @@ type ExpenseForm = {
   amount: number
   amount_ex_vat: number
   vat_amount: number
+  /** When false, vendor does not charge VAT — total is saved as-is with vat_amount 0. */
+  charges_vat: boolean
   payment_method: string
   references_text: string
   notes: string
@@ -85,12 +87,18 @@ const emptyForm = (): ExpenseForm => ({
   amount: 0,
   amount_ex_vat: 0,
   vat_amount: 0,
+  charges_vat: true,
   payment_method: PAYMENT_METHODS[0],
   references_text: '',
   notes: '',
   quote_ref: '',
   supplier_invoice_no: '',
 })
+
+function applyNoVat(total: number): Pick<ExpenseForm, 'amount' | 'amount_ex_vat' | 'vat_amount'> {
+  const amount = round2(Math.max(0, total))
+  return { amount, amount_ex_vat: amount, vat_amount: 0 }
+}
 
 function applyVatInclusive(inclusive: number, rate: number): Pick<ExpenseForm, 'amount' | 'amount_ex_vat' | 'vat_amount'> {
   const amount = round2(Math.max(0, inclusive))
@@ -200,6 +208,16 @@ export default function ExpensesPage() {
 
   const profitPreview = useMemo(() => {
     if (!linkedQuote) return null
+    if (!form.charges_vat) {
+      const total = form.amount > 0 ? form.amount : form.amount_ex_vat
+      return supplierInvoiceProfit({
+        quoteAmount: Number(linkedQuote.amount) || 0,
+        quoteOffsetVat: Boolean(linkedQuote.offset_vat),
+        expenseExclusive: total,
+        expenseVat: 0,
+        vatRate,
+      })
+    }
     const exclusive = form.amount_ex_vat > 0 ? form.amount_ex_vat : expenseVatParts({
       amount: form.amount,
       amount_ex_vat: form.amount_ex_vat,
@@ -215,7 +233,7 @@ export default function ExpensesPage() {
       expenseVat: vat,
       vatRate,
     })
-  }, [linkedQuote, form.amount, form.amount_ex_vat, form.vat_amount, vatRate])
+  }, [linkedQuote, form.amount, form.amount_ex_vat, form.vat_amount, form.charges_vat, vatRate])
 
   async function loadAttachments(expenseId: string) {
     const { data } = await db
@@ -242,15 +260,30 @@ export default function ExpensesPage() {
   }
 
   function openEdit(e: Expense) {
+    const chargesVat = expenseChargesVat(e)
     const parts = expenseVatParts(e, vatRate)
+    const amount = Number(e.amount) || parts.inclusive || 0
+    const amountEx =
+      e.amount_ex_vat != null && Number.isFinite(Number(e.amount_ex_vat))
+        ? Number(e.amount_ex_vat)
+        : chargesVat
+          ? parts.exclusive
+          : amount
+    const vatAmt =
+      e.vat_amount != null && Number.isFinite(Number(e.vat_amount))
+        ? Number(e.vat_amount)
+        : chargesVat
+          ? parts.vat
+          : 0
     setEditing(e)
     setForm({
       date: e.date ? e.date.slice(0, 10) : format(new Date(), 'yyyy-MM-dd'),
       vendor: e.vendor || '',
       category: e.category || CATEGORIES[0],
-      amount: Number(e.amount) || parts.inclusive || 0,
-      amount_ex_vat: Number(e.amount_ex_vat) || parts.exclusive || 0,
-      vat_amount: Number(e.vat_amount) || parts.vat || 0,
+      amount,
+      amount_ex_vat: amountEx,
+      vat_amount: vatAmt,
+      charges_vat: chargesVat,
       payment_method: e.payment_method || PAYMENT_METHODS[0],
       references_text: e.references_text || '',
       notes: e.notes || '',
@@ -274,26 +307,35 @@ export default function ExpensesPage() {
   }
 
   function applyParsedInvoice(parsed: ParsedSupplierInvoice) {
-    setForm((f) => ({
-      ...f,
-      vendor: parsed.vendor || f.vendor,
-      date: parsed.date || f.date,
-      supplier_invoice_no: parsed.supplierInvoiceNo || f.supplier_invoice_no,
-      amount: parsed.amountInclusive ?? f.amount,
-      amount_ex_vat: parsed.amountExVat ?? f.amount_ex_vat,
-      vat_amount: parsed.vatAmount ?? f.vat_amount,
-      category: f.category === CATEGORIES[0] || !f.category ? 'Uniforms / Cost of goods' : f.category,
-      notes: [
-        f.notes.trim(),
-        parsed.trn ? `Supplier TRN ${parsed.trn}` : '',
-        parsed.rawTextSample && !parsed.amountInclusive
-          ? 'PDF text extracted — check totals manually.'
-          : '',
-      ]
-        .filter(Boolean)
-        .join('\n'),
-      references_text: f.references_text || parsed.supplierInvoiceNo || '',
-    }))
+    setForm((f) => {
+      const vatAmount = parsed.vatAmount ?? f.vat_amount
+      const charges_vat = parsed.vatAmount != null ? Number(parsed.vatAmount) > 0 : f.charges_vat
+      const amount = parsed.amountInclusive ?? f.amount
+      const amount_ex_vat = !charges_vat
+        ? amount || (parsed.amountExVat ?? f.amount_ex_vat)
+        : (parsed.amountExVat ?? f.amount_ex_vat)
+      return {
+        ...f,
+        vendor: parsed.vendor || f.vendor,
+        date: parsed.date || f.date,
+        supplier_invoice_no: parsed.supplierInvoiceNo || f.supplier_invoice_no,
+        amount,
+        amount_ex_vat,
+        vat_amount: charges_vat ? vatAmount : 0,
+        charges_vat,
+        category: f.category === CATEGORIES[0] || !f.category ? 'Uniforms / Cost of goods' : f.category,
+        notes: [
+          f.notes.trim(),
+          parsed.trn ? `Supplier TRN ${parsed.trn}` : '',
+          parsed.rawTextSample && !parsed.amountInclusive
+            ? 'PDF text extracted — check totals manually.'
+            : '',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+        references_text: f.references_text || parsed.supplierInvoiceNo || '',
+      }
+    })
     setParseHint(
       parsed.confidence === 'high'
         ? 'Filled from the PDF. Check the figures before saving.'
@@ -344,8 +386,9 @@ export default function ExpensesPage() {
     }
     setSaving(true)
     try {
-      const parts =
-        form.amount_ex_vat > 0 || form.vat_amount > 0
+      const parts = !form.charges_vat
+        ? applyNoVat(form.amount > 0 ? form.amount : form.amount_ex_vat)
+        : form.amount_ex_vat > 0 || form.vat_amount > 0
           ? {
               amount_ex_vat: round2(form.amount_ex_vat),
               vat_amount: round2(form.vat_amount),
@@ -771,49 +814,103 @@ export default function ExpensesPage() {
               ))}
             </select>
           </div>
-          <div style={fieldStyle}>
-            <label style={labelStyle}>Amount ex-VAT</label>
+          <label
+            style={{
+              ...fieldStyle,
+              gridColumn: '1 / -1',
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'flex-start',
+              gap: 8,
+              cursor: 'pointer',
+            }}
+          >
             <input
-              type="number"
-              step="0.01"
-              style={inputStyle}
-              value={form.amount_ex_vat || ''}
+              type="checkbox"
+              checked={form.charges_vat}
               onChange={(e) => {
-                const exclusive = Number(e.target.value) || 0
-                setForm((f) => ({ ...f, ...applyExVat(exclusive, vatRate) }))
+                const charges_vat = e.target.checked
+                setForm((f) => {
+                  const base = f.amount > 0 ? f.amount : f.amount_ex_vat
+                  if (!charges_vat) return { ...f, charges_vat, ...applyNoVat(base) }
+                  return {
+                    ...f,
+                    charges_vat,
+                    ...(f.amount_ex_vat > 0
+                      ? applyExVat(f.amount_ex_vat, vatRate)
+                      : applyVatInclusive(base, vatRate)),
+                  }
+                })
               }}
             />
-          </div>
-          <div style={fieldStyle}>
-            <label style={labelStyle}>VAT paid ({(vatRate * 100).toFixed(0)}%)</label>
-            <input
-              type="number"
-              step="0.01"
-              style={inputStyle}
-              value={form.vat_amount || ''}
-              onChange={(e) => {
-                const vat_amount = round2(Number(e.target.value) || 0)
-                setForm((f) => ({
-                  ...f,
-                  vat_amount,
-                  amount: round2((Number(f.amount_ex_vat) || 0) + vat_amount),
-                }))
-              }}
-            />
-          </div>
-          <div style={fieldStyle}>
-            <label style={labelStyle}>Total incl. VAT</label>
-            <input
-              type="number"
-              step="0.01"
-              style={inputStyle}
-              value={form.amount || ''}
-              onChange={(e) => {
-                const inclusive = Number(e.target.value) || 0
-                setForm((f) => ({ ...f, ...applyVatInclusive(inclusive, vatRate) }))
-              }}
-            />
-          </div>
+            <span style={{ fontSize: 13, color: colors.text, lineHeight: 1.4 }}>
+              Charge VAT on this expense
+              <span style={{ display: 'block', color: colors.muted, fontSize: 12 }}>
+                Turn off for vendors that do not charge VAT. The amount is saved as-is with AED 0 VAT.
+              </span>
+            </span>
+          </label>
+          {form.charges_vat ? (
+            <>
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Amount ex-VAT</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  style={inputStyle}
+                  value={form.amount_ex_vat || ''}
+                  onChange={(e) => {
+                    const exclusive = Number(e.target.value) || 0
+                    setForm((f) => ({ ...f, ...applyExVat(exclusive, vatRate) }))
+                  }}
+                />
+              </div>
+              <div style={fieldStyle}>
+                <label style={labelStyle}>VAT paid ({(vatRate * 100).toFixed(0)}%)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  style={inputStyle}
+                  value={form.vat_amount || ''}
+                  onChange={(e) => {
+                    const vat_amount = round2(Number(e.target.value) || 0)
+                    setForm((f) => ({
+                      ...f,
+                      vat_amount,
+                      amount: round2((Number(f.amount_ex_vat) || 0) + vat_amount),
+                    }))
+                  }}
+                />
+              </div>
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Total incl. VAT</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  style={inputStyle}
+                  value={form.amount || ''}
+                  onChange={(e) => {
+                    const inclusive = Number(e.target.value) || 0
+                    setForm((f) => ({ ...f, ...applyVatInclusive(inclusive, vatRate) }))
+                  }}
+                />
+              </div>
+            </>
+          ) : (
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Amount (no VAT)</label>
+              <input
+                type="number"
+                step="0.01"
+                style={inputStyle}
+                value={form.amount || ''}
+                onChange={(e) => {
+                  const total = Number(e.target.value) || 0
+                  setForm((f) => ({ ...f, ...applyNoVat(total) }))
+                }}
+              />
+            </div>
+          )}
           <div style={fieldStyle}>
             <label style={labelStyle}>Payment method</label>
             <select
