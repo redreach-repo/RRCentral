@@ -1,12 +1,13 @@
 /* Minimal service worker so Chrome can offer "Install app".
    Network-first for navigations, manifest, and icons so branding updates stick. */
-const CACHE = 'rrcentral-shell-v4'
+const CACHE = 'rrcentral-shell-v5'
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE).then((cache) =>
       cache.addAll([
         '/RRCentral/',
+        '/RRCentral/app/',
         '/RRCentral/manifest.webmanifest',
         '/RRCentral/icons/icon-192.png',
         '/RRCentral/icons/icon-512.png',
@@ -47,7 +48,9 @@ self.addEventListener('fetch', (event) => {
           }
           return res
         })
-        .catch(() => caches.match(request).then((hit) => hit || caches.match('/RRCentral/'))),
+        .catch(() =>
+          caches.match(request).then((hit) => hit || caches.match('/RRCentral/app/') || caches.match('/RRCentral/')),
+        ),
     )
   }
 })
