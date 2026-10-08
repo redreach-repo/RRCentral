@@ -42,6 +42,32 @@ export interface Vendor {
   updated_at: string
 }
 
+export type OwnedDomainStatus = 'active' | 'pending' | 'expired' | 'transferred' | 'parked'
+export type OwnedDomainBillingCycle = '' | 'annual' | 'biennial' | 'other'
+
+/** Domains the company owns (registrar / renewal / DNS tracker). */
+export interface OwnedDomain {
+  id: string
+  domain_name: string
+  registrar: string
+  registrar_account: string
+  status: OwnedDomainStatus
+  registered_on: string | null
+  expires_on: string | null
+  auto_renew: boolean
+  dns_provider: string
+  nameservers: string
+  hosting_provider: string
+  website_url: string
+  managed_by: string
+  cost_aed: number | null
+  billing_cycle: OwnedDomainBillingCycle
+  notes: string
+  active: boolean
+  created_at: string
+  updated_at: string
+}
+
 export interface CrmEntry {
   id: string
   company_name: string

@@ -6,13 +6,14 @@
 import { ALL_SEED_PRODUCTS } from './seedCatalog'
 
 export const DB_NAME = 'rrcentral_local'
-const DB_VERSION = 10
+const DB_VERSION = 11
 
 export const LOCAL_STORES = [
   'app_settings',
   'app_users',
   'clients',
   'vendors',
+  'owned_domains',
   'crm',
   'follow_up_updates',
   'quotations',
@@ -410,6 +411,7 @@ function withDefaults(table: string, row: Row): Row {
         'app_users',
         'clients',
         'vendors',
+        'owned_domains',
         'crm',
         'follow_up_updates',
         'quotations',
@@ -445,6 +447,7 @@ function withDefaults(table: string, row: Row): Row {
     next.updated_at == null &&
     (table === 'crm' ||
       table === 'vendors' ||
+      table === 'owned_domains' ||
       table === 'quotations' ||
       table === 'invoices' ||
       table === 'delivery_notes' ||
@@ -845,6 +848,7 @@ export type MigrationDump = {
   app_users?: Row[]
   clients?: Row[]
   vendors?: Row[]
+  owned_domains?: Row[]
   crm?: Row[]
   follow_up_updates?: Row[]
   quotations?: Row[]

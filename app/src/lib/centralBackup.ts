@@ -7,6 +7,7 @@ const CLOUD_TABLES = [
   'app_settings',
   'clients',
   'vendors',
+  'owned_domains',
   'crm',
   'follow_up_updates',
   'quotations',

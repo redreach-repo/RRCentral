@@ -18,6 +18,7 @@ import {
   LayoutTemplate,
   BarChart3,
   Wallet,
+  Globe,
   Settings,
   KeyRound,
   Menu,
@@ -73,6 +74,7 @@ const navGroups: NavGroup[] = [
       { to: '/catalog', label: 'Catalog', icon: Package },
       { to: '/inventory', label: 'Inventory', icon: Boxes },
       { to: '/templates', label: 'Templates', icon: LayoutTemplate },
+      { to: '/domains', label: 'Domains', icon: Globe },
     ],
   },
   {
@@ -112,6 +114,7 @@ const titleByPath: { match: (path: string) => boolean; title: string }[] = [
   { match: (p) => p.startsWith('/reports'), title: 'Reports' },
   { match: (p) => p.startsWith('/expenses'), title: 'Expenses' },
   { match: (p) => p.startsWith('/vendors'), title: 'Vendors' },
+  { match: (p) => p.startsWith('/domains'), title: 'Domains' },
   { match: (p) => p.startsWith('/settings'), title: 'Settings' },
   { match: (p) => p.startsWith('/audit-log'), title: 'Audit log' },
 ]
