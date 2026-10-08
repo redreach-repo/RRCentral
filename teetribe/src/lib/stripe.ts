@@ -15,7 +15,8 @@ export function isStripeConfigured(): boolean {
   return Boolean(process.env.STRIPE_SECRET_KEY)
 }
 
+export const INTEGRATION_IDENTIFIER = 'tee-tribe-web-kxmqpwrn'
+
 export function integrationIdentifier(): string {
-  const suffix = Math.random().toString(36).slice(2, 10)
-  return `tee-tribe-web-${suffix}`
+  return INTEGRATION_IDENTIFIER
 }

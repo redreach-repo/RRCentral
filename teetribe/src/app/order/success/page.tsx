@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { ClearCartOnSuccess } from '@/components/ClearCartOnSuccess'
 
 type Props = { searchParams: Promise<{ mock?: string; order?: string; email?: string }> }
 
@@ -8,6 +9,7 @@ export default async function OrderSuccessPage({ searchParams }: Props) {
 
   return (
     <div className="container-site py-16 text-center max-w-lg mx-auto">
+      <ClearCartOnSuccess />
       <div className="rounded-2xl border-2 border-ink bg-sunshine p-8 shadow-sticker">
         <h1 className="font-display text-3xl font-black uppercase">Order confirmed!</h1>
         {params.order && <p className="mt-4 font-semibold">Order #{params.order}</p>}

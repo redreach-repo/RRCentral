@@ -9,6 +9,7 @@ export default function CheckoutPage() {
   const router = useRouter()
   const { lines, subtotalFils, deliveryFils, totalFils, formatAed, clearCart } = useCart()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -28,6 +29,7 @@ export default function CheckoutPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setError('')
     setLoading(true)
     try {
       const res = await fetch('/api/checkout', {
@@ -35,12 +37,28 @@ export default function CheckoutPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, lines, totalFils }),
       })
-      const data = await res.json()
-      if (data.redirect) {
-        clearCart()
-        router.push(data.redirect.replace(/^https?:\/\/[^/]+/, ''))
+      const data = (await res.json()) as { redirect?: string; error?: string }
+      if (!res.ok || !data.redirect) {
+        setError(data.error || 'Checkout failed. Try again.')
+        setLoading(false)
+        return
       }
+      const redirect = data.redirect
+      const isAbsolute = /^https?:\/\//i.test(redirect)
+      if (isAbsolute) {
+        const url = new URL(redirect)
+        if (url.origin !== window.location.origin) {
+          window.location.assign(redirect)
+          return
+        }
+        clearCart()
+        router.push(`${url.pathname}${url.search}${url.hash}`)
+        return
+      }
+      clearCart()
+      router.push(redirect)
     } catch {
+      setError('Checkout failed. Try again.')
       setLoading(false)
     }
   }
@@ -67,10 +85,11 @@ export default function CheckoutPage() {
             </select>
           </div>
           <Field label="Address" value={form.address} onChange={(v) => setForm({ ...form, address: v })} required />
+          {error ? <p className="text-sm font-semibold text-red-700">{error}</p> : null}
           <button type="submit" disabled={loading} className="btn-primary w-full">
-            {loading ? 'Processing…' : 'Pay with Stripe (test)'}
+            {loading ? 'Redirecting to Stripe…' : 'Pay with Stripe'}
           </button>
-          <p className="text-xs text-ink/50">No Stripe key? Mock checkout redirects to success page.</p>
+          <p className="text-xs text-ink/50">Card details stay on Stripe. Without a Stripe key this host uses a demo success page.</p>
         </form>
 
         <div className="rounded-2xl border-2 border-ink p-6 h-fit">

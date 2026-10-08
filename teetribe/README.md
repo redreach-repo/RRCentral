@@ -13,6 +13,15 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Live domain
+
+Production is **https://tee-tribe.com** (Vercel project `tee-tribe`, root directory `teetribe`). The domain was bought from Buzinessware. After ICANN / registrant email verification, in cPanel **Zone Editor**:
+
+- `tee-tribe.com` **A** → `76.76.21.21`
+- `www.tee-tribe.com` **CNAME** → `cname.vercel-dns.com`
+
+Until `STRIPE_SECRET_KEY` and Supabase are set on Vercel, the shop runs in mock mode (catalog from seed, demo checkout).
+
 ## Scripts
 
 | Command | Description |

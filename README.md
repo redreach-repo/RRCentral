@@ -22,7 +22,7 @@ Each division is its own page. **RR Central** is a quiet text link to `/login` (
 |---------|------|
 | Public site | `/`, `/about`, `/insights`, `/contact`, `/businesses` |
 | Divisions | `/marketing`, `/care`, `/connect`, `/wanders`, `/threads`, `/trading`, `/upskilling` |
-| Tee Tribe shop | `/shop` (also `/teetribe`) — Christian, one-liner, minimalist and secular tees. Pay with Stripe. |
+| Tee Tribe shop | Live storefront **https://tee-tribe.com** (Next.js in [`teetribe/`](./teetribe/), Vercel). Also `/shop` on this Pages site. |
 | Wanders destinations | `/wanders/philippines`, `/wanders/kerala`, `/wanders/himalaya` |
 | Legacy aliases | `/travel` → `/wanders`, `/uniforms` → `/threads`, `/verticals` → `/businesses` |
 | Central sign-in | `/login` (linked as **Central**) |

@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 import type { Product } from '@/lib/types'
 import { formatAed } from '@/lib/money'
+import { publicSiteUrl } from '@/lib/site'
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+const siteUrl = publicSiteUrl()
 
 export function siteMetadata(overrides?: Partial<Metadata>): Metadata {
   return {

@@ -1,7 +1,8 @@
 import type { MetadataRoute } from 'next'
 import { collections, products } from '@/data/seed'
+import { publicSiteUrl } from '@/lib/site'
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+const siteUrl = publicSiteUrl()
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const staticPages = [

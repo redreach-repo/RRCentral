@@ -3,7 +3,7 @@
 Made without blocking on questions. Change later if needed.
 
 ## Architecture
-1. **Separate Next.js app** at `/teetribe` (not inside the Vite CRM SPA). Deploy to Vercel on `teetribe.com`. Red Reach Central stays the ops CRM at GitHub Pages.
+1. **Separate Next.js app** at `/teetribe` (not inside the Vite CRM SPA). Deploy to Vercel on `tee-tribe.com` (Buzinessware). Red Reach Central stays the ops CRM at GitHub Pages.
 2. **Central CRM link**: paid orders write a CRM lead + income note into Central via a server-side sync (`CRM_SYNC_URL` + service role / edge function). Inventory source of truth for Tee Tribe is the Tee Tribe Supabase project; admins can mirror stock into Central Inventory when `CRM_SYNC_INVENTORY=true`.
 3. **Mock-first**: Phase 1 reads `/data/seed.ts`. When `NEXT_PUBLIC_USE_MOCK=true` (default in dev without Supabase), the UI uses seed data. Flip off when Supabase is configured.
 

@@ -4,6 +4,7 @@ import { AppProviders } from '@/components/providers/AppProviders'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { Tayo } from '@/components/Tayo'
+import { publicSiteUrl } from '@/lib/site'
 import './globals.css'
 
 const archivoBlack = Archivo_Black({
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
     template: '%s | Tee Tribe',
   },
   description: 'Mobile-first UAE storefront for premium tees, limited drops, and custom tribe-made merch.',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
+  metadataBase: new URL(publicSiteUrl()),
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
