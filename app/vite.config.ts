@@ -9,8 +9,22 @@ import { stripeCheckoutPlugin } from './vite-plugin-stripe-checkout.ts'
  * - 404.html so deep links refresh into the app
  * - directory index.html copies so /app and /login return HTTP 200
  *   (required for reliable PWA install / start_url on Chrome)
+ * - apple-touch / favicon copies under those dirs so iOS probes that resolve
+ *   relative to /app/ or /login/ still get the R-mark (not a monogram fallback)
  */
 function spaFallback404(): Plugin {
+  const spaDirs = ['app', 'login', 'crm', 'follow-ups', 'quotations', 'invoices']
+  const iosAssets = [
+    'apple-touch-icon.png',
+    'apple-touch-icon-precomposed.png',
+    'apple-touch-icon-120x120.png',
+    'apple-touch-icon-152x152.png',
+    'apple-touch-icon-167x167.png',
+    'apple-touch-icon-180x180.png',
+    'favicon-32.png',
+    'favicon-48.png',
+  ]
+
   return {
     name: 'spa-fallback-404',
     closeBundle() {
@@ -18,10 +32,14 @@ function spaFallback404(): Plugin {
       const index = join(outDir, 'index.html')
       if (!existsSync(index)) return
       copyFileSync(index, join(outDir, '404.html'))
-      for (const dir of ['app', 'login', 'crm', 'follow-ups', 'quotations', 'invoices']) {
+      for (const dir of spaDirs) {
         const destDir = join(outDir, dir)
         mkdirSync(destDir, { recursive: true })
         copyFileSync(index, join(destDir, 'index.html'))
+        for (const asset of iosAssets) {
+          const src = join(outDir, asset)
+          if (existsSync(src)) copyFileSync(src, join(destDir, asset))
+        }
       }
     },
   }
