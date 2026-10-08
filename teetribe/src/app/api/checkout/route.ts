@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { name, email, phone, emirate, address, lines } = parsed.data
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || req.nextUrl.origin).replace(/\/$/, '')
+  const siteUrl = req.nextUrl.origin.replace(/\/$/, '')
 
   // Validate cart against catalogue
   const validatedLines: Array<{
