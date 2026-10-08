@@ -8,6 +8,7 @@ import type { Attachment, Expense, Quotation, Vendor } from '../../lib/types'
 import { logActivity } from '../../lib/activity'
 import { round2 } from '../../lib/lineItems'
 import { formatAED } from '../../lib/money'
+import { expenseChargesVat } from '../../lib/finance'
 import { supplierInvoiceProfit } from '../../lib/supplierInvoiceParse'
 import {
   clearSupplierInvoiceBlobs,
@@ -51,6 +52,7 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
     amount: 0,
     amount_ex_vat: 0,
     vat_amount: 0,
+    charges_vat: true,
     payment_method: 'Bank transfer',
     notes: '',
   })
@@ -63,14 +65,26 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
 
   const supplierInvoiceProfitPreview = useMemo(() => {
     if (!supplierInvoiceTarget) return null
+    const exclusive = supplierInvoiceForm.charges_vat
+      ? supplierInvoiceForm.amount_ex_vat
+      : supplierInvoiceForm.amount > 0
+        ? supplierInvoiceForm.amount
+        : supplierInvoiceForm.amount_ex_vat
     return supplierInvoiceProfit({
       quoteAmount: Number(supplierInvoiceTarget.amount) || 0,
       quoteOffsetVat: Boolean(supplierInvoiceTarget.offset_vat),
-      expenseExclusive: supplierInvoiceForm.amount_ex_vat,
-      expenseVat: supplierInvoiceForm.vat_amount,
+      expenseExclusive: exclusive,
+      expenseVat: supplierInvoiceForm.charges_vat ? supplierInvoiceForm.vat_amount : 0,
       vatRate,
     })
-  }, [supplierInvoiceTarget, supplierInvoiceForm.amount_ex_vat, supplierInvoiceForm.vat_amount, vatRate])
+  }, [
+    supplierInvoiceTarget,
+    supplierInvoiceForm.amount,
+    supplierInvoiceForm.amount_ex_vat,
+    supplierInvoiceForm.vat_amount,
+    supplierInvoiceForm.charges_vat,
+    vatRate,
+  ])
 
   const vendorMatches = useMemo(() => {
     const q = supplierInvoiceForm.vendor.trim().toLowerCase()
@@ -91,6 +105,7 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
       amount: 0,
       amount_ex_vat: 0,
       vat_amount: 0,
+      charges_vat: true,
       payment_method: PAYMENT_METHODS[0] || 'Bank transfer',
       notes: '',
     })
@@ -133,13 +148,26 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
           .map((l) => l.trim())
           .filter((l) => l && !/^payment to\b/i.test(l))
           .join('\n')
+        const charges_vat = expenseChargesVat(latest)
+        const amount = Number(latest.amount) || 0
+        const amount_ex_vat =
+          latest.amount_ex_vat != null && Number.isFinite(Number(latest.amount_ex_vat))
+            ? Number(latest.amount_ex_vat)
+            : charges_vat
+              ? 0
+              : amount
+        const vat_amount =
+          latest.vat_amount != null && Number.isFinite(Number(latest.vat_amount))
+            ? Number(latest.vat_amount)
+            : 0
         setSupplierInvoiceForm({
           date: latest.date ? latest.date.slice(0, 10) : format(new Date(), 'yyyy-MM-dd'),
           vendor: latest.vendor || '',
           supplier_invoice_no: latest.supplier_invoice_no || '',
-          amount: Number(latest.amount) || 0,
-          amount_ex_vat: Number(latest.amount_ex_vat) || 0,
-          vat_amount: Number(latest.vat_amount) || 0,
+          amount,
+          amount_ex_vat,
+          vat_amount,
+          charges_vat,
           payment_method: latest.payment_method || PAYMENT_METHODS[0] || 'Bank transfer',
           notes: extraNotes,
         })
@@ -168,18 +196,31 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
     }
     setSaving(true)
     try {
-      const amount_ex_vat =
-        supplierInvoiceForm.amount_ex_vat > 0
-          ? round2(supplierInvoiceForm.amount_ex_vat)
-          : round2(supplierInvoiceForm.amount / (1 + vatRate))
-      const vat_amount =
-        supplierInvoiceForm.vat_amount > 0
-          ? round2(supplierInvoiceForm.vat_amount)
-          : round2(supplierInvoiceForm.amount - amount_ex_vat)
-      const amount =
-        supplierInvoiceForm.amount > 0
-          ? round2(supplierInvoiceForm.amount)
-          : round2(amount_ex_vat + vat_amount)
+      let amount_ex_vat: number
+      let vat_amount: number
+      let amount: number
+      if (!supplierInvoiceForm.charges_vat) {
+        amount = round2(
+          supplierInvoiceForm.amount > 0
+            ? supplierInvoiceForm.amount
+            : supplierInvoiceForm.amount_ex_vat,
+        )
+        amount_ex_vat = amount
+        vat_amount = 0
+      } else {
+        amount_ex_vat =
+          supplierInvoiceForm.amount_ex_vat > 0
+            ? round2(supplierInvoiceForm.amount_ex_vat)
+            : round2(supplierInvoiceForm.amount / (1 + vatRate))
+        vat_amount =
+          supplierInvoiceForm.vat_amount > 0
+            ? round2(supplierInvoiceForm.vat_amount)
+            : round2(Math.max(0, supplierInvoiceForm.amount - amount_ex_vat))
+        amount =
+          supplierInvoiceForm.amount > 0
+            ? round2(supplierInvoiceForm.amount)
+            : round2(amount_ex_vat + vat_amount)
+      }
 
       const result = await saveSupplierInvoiceForQuote({
         quote: supplierInvoiceTarget,
@@ -212,7 +253,9 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
         who,
       )
       showToast(
-        `Supplier invoice saved on deal ${result.dealRef || result.quoteRef}. VAT paid ${formatAED(vat_amount)}; cost shared across branch quotes when they have revenue.`,
+        vat_amount > 0
+          ? `Supplier invoice saved on deal ${result.dealRef || result.quoteRef}. VAT paid ${formatAED(vat_amount)}; cost shared across branch quotes when they have revenue.`
+          : `Supplier invoice saved on deal ${result.dealRef || result.quoteRef} with no VAT; cost shared across branch quotes when they have revenue.`,
         'success',
       )
       onClose()
@@ -358,61 +401,125 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
             ))}
           </select>
         </div>
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Amount ex-VAT</label>
+        <label
+          style={{
+            ...fieldStyle,
+            gridColumn: '1 / -1',
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            gap: 8,
+            cursor: 'pointer',
+          }}
+        >
           <input
-            type="number"
-            step="0.01"
-            style={inputStyle}
-            value={supplierInvoiceForm.amount_ex_vat || ''}
+            type="checkbox"
+            checked={supplierInvoiceForm.charges_vat}
             onChange={(e) => {
-              const amount_ex_vat = round2(Number(e.target.value) || 0)
-              const vat_amount = round2(amount_ex_vat * vatRate)
-              setSupplierInvoiceForm((f) => ({
-                ...f,
-                amount_ex_vat,
-                vat_amount,
-                amount: round2(amount_ex_vat + vat_amount),
-              }))
+              const charges_vat = e.target.checked
+              setSupplierInvoiceForm((f) => {
+                const base = f.amount > 0 ? f.amount : f.amount_ex_vat
+                if (!charges_vat) {
+                  const amount = round2(base)
+                  return { ...f, charges_vat, amount, amount_ex_vat: amount, vat_amount: 0 }
+                }
+                const amount_ex_vat = f.amount_ex_vat > 0 ? round2(f.amount_ex_vat) : round2(base)
+                const vat_amount = round2(amount_ex_vat * vatRate)
+                return {
+                  ...f,
+                  charges_vat,
+                  amount_ex_vat,
+                  vat_amount,
+                  amount: round2(amount_ex_vat + vat_amount),
+                }
+              })
             }}
           />
-        </div>
-        <div style={fieldStyle}>
-          <label style={labelStyle}>VAT paid</label>
-          <input
-            type="number"
-            step="0.01"
-            style={inputStyle}
-            value={supplierInvoiceForm.vat_amount || ''}
-            onChange={(e) => {
-              const vat_amount = round2(Number(e.target.value) || 0)
-              setSupplierInvoiceForm((f) => ({
-                ...f,
-                vat_amount,
-                amount: round2((Number(f.amount_ex_vat) || 0) + vat_amount),
-              }))
-            }}
-          />
-        </div>
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Total incl. VAT</label>
-          <input
-            type="number"
-            step="0.01"
-            style={inputStyle}
-            value={supplierInvoiceForm.amount || ''}
-            onChange={(e) => {
-              const amount = round2(Number(e.target.value) || 0)
-              const amount_ex_vat = vatRate > 0 ? round2(amount / (1 + vatRate)) : amount
-              setSupplierInvoiceForm((f) => ({
-                ...f,
-                amount,
-                amount_ex_vat,
-                vat_amount: round2(amount - amount_ex_vat),
-              }))
-            }}
-          />
-        </div>
+          <span style={{ fontSize: 13, color: colors.text, lineHeight: 1.4 }}>
+            Charge VAT on this invoice
+            <span style={{ display: 'block', color: colors.muted, fontSize: 12 }}>
+              Turn off for vendors that do not charge VAT. The amount is saved as-is with AED 0 VAT.
+            </span>
+          </span>
+        </label>
+        {supplierInvoiceForm.charges_vat ? (
+          <>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Amount ex-VAT</label>
+              <input
+                type="number"
+                step="0.01"
+                style={inputStyle}
+                value={supplierInvoiceForm.amount_ex_vat || ''}
+                onChange={(e) => {
+                  const amount_ex_vat = round2(Number(e.target.value) || 0)
+                  const vat_amount = round2(amount_ex_vat * vatRate)
+                  setSupplierInvoiceForm((f) => ({
+                    ...f,
+                    amount_ex_vat,
+                    vat_amount,
+                    amount: round2(amount_ex_vat + vat_amount),
+                  }))
+                }}
+              />
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>VAT paid</label>
+              <input
+                type="number"
+                step="0.01"
+                style={inputStyle}
+                value={supplierInvoiceForm.vat_amount || ''}
+                onChange={(e) => {
+                  const vat_amount = round2(Number(e.target.value) || 0)
+                  setSupplierInvoiceForm((f) => ({
+                    ...f,
+                    vat_amount,
+                    amount: round2((Number(f.amount_ex_vat) || 0) + vat_amount),
+                  }))
+                }}
+              />
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Total incl. VAT</label>
+              <input
+                type="number"
+                step="0.01"
+                style={inputStyle}
+                value={supplierInvoiceForm.amount || ''}
+                onChange={(e) => {
+                  const amount = round2(Number(e.target.value) || 0)
+                  const amount_ex_vat = vatRate > 0 ? round2(amount / (1 + vatRate)) : amount
+                  setSupplierInvoiceForm((f) => ({
+                    ...f,
+                    amount,
+                    amount_ex_vat,
+                    vat_amount: round2(amount - amount_ex_vat),
+                  }))
+                }}
+              />
+            </div>
+          </>
+        ) : (
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Amount (no VAT)</label>
+            <input
+              type="number"
+              step="0.01"
+              style={inputStyle}
+              value={supplierInvoiceForm.amount || ''}
+              onChange={(e) => {
+                const amount = round2(Number(e.target.value) || 0)
+                setSupplierInvoiceForm((f) => ({
+                  ...f,
+                  amount,
+                  amount_ex_vat: amount,
+                  vat_amount: 0,
+                }))
+              }}
+            />
+          </div>
+        )}
       </div>
       {supplierInvoiceProfitPreview ? (
         <div style={{ ...cardStyle, padding: 12, marginTop: 8, fontSize: 13, lineHeight: 1.55 }}>

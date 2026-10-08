@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   countsTowardIncome,
   effectiveInvoicePaymentStatus,
+  expenseChargesVat,
   expenseVatParts,
   incomeVatParts,
   isOpenInvoice,
@@ -99,5 +100,18 @@ describe('finance', () => {
     expect(exp.exclusive).toBe(2400)
     expect(exp.vat).toBe(120)
     expect(exp.inclusive).toBe(2520)
+  })
+
+  it('keeps explicit zero VAT for non-VAT vendors (does not re-split at rate)', () => {
+    const exp = expenseVatParts(
+      { amount: 1000, amount_ex_vat: 1000, vat_amount: 0 } as Expense,
+      0.05,
+    )
+    expect(exp.exclusive).toBe(1000)
+    expect(exp.vat).toBe(0)
+    expect(exp.inclusive).toBe(1000)
+    expect(expenseChargesVat({ vat_amount: 0 })).toBe(false)
+    expect(expenseChargesVat({ vat_amount: 50 })).toBe(true)
+    expect(expenseChargesVat({ vat_amount: null })).toBe(true)
   })
 })

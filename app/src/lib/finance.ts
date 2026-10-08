@@ -137,6 +137,18 @@ export function incomeVatParts(row: IncomeEntry, vatRate = 0.05): { exclusive: n
   return { exclusive, vat: vatAmt, inclusive: total }
 }
 
+/**
+ * Whether an expense row charges input VAT.
+ * Explicit `vat_amount: 0` means no VAT (common for non-VAT vendors).
+ * Legacy rows without the column keep the default rate split.
+ */
+export function expenseChargesVat(row: Pick<Expense, 'vat_amount'>): boolean {
+  if (row.vat_amount != null && Number.isFinite(Number(row.vat_amount))) {
+    return Number(row.vat_amount) > 0
+  }
+  return true
+}
+
 /** Prefer explicit supplier-invoice VAT fields; else assume amount is VAT-inclusive. */
 export function expenseVatParts(row: Expense, vatRate = 0.05): { exclusive: number; vat: number; inclusive: number } {
   const inclusive = Number(row.amount || 0)
