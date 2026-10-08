@@ -1,6 +1,6 @@
 /* Minimal service worker so Chrome can offer "Install app".
    Network-first for navigations, manifest, and icons so branding updates stick. */
-const CACHE = 'rrcentral-shell-v5'
+const CACHE = 'rrcentral-shell-v6'
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -9,6 +9,8 @@ self.addEventListener('install', (event) => {
         '/RRCentral/',
         '/RRCentral/app/',
         '/RRCentral/manifest.webmanifest',
+        '/RRCentral/apple-touch-icon.png',
+        '/RRCentral/apple-touch-icon-precomposed.png',
         '/RRCentral/icons/icon-192.png',
         '/RRCentral/icons/icon-512.png',
         '/RRCentral/icons/apple-touch-icon.png',
