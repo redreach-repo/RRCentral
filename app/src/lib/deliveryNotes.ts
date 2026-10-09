@@ -183,7 +183,6 @@ export async function createDeliveryNoteFromQuote(opts: {
   let shipTo = opts.shipTo || ''
   if (!shipTo && opts.quote.client) {
     try {
-      const { findClientByCompany } = await import('./clientLookup')
       const clientRow = await findClientByCompany(opts.quote.client)
       shipTo = (clientRow?.address || '').trim()
     } catch {
