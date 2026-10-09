@@ -1,6 +1,6 @@
 /* Minimal service worker so Chrome can offer "Install app".
    Network-first for navigations, manifest, and icons so branding updates stick. */
-const CACHE = 'rrcentral-shell-v7'
+const CACHE = 'rrcentral-shell-v8'
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

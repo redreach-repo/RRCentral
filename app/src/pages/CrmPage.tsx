@@ -1017,6 +1017,11 @@ export default function CrmPage() {
 
   async function handleDelete() {
     if (!deleteTarget) return
+    if (!can(userRole, 'crm.deleteAny')) {
+      setError('Only managers and admins can delete CRM records')
+      setDeleteTarget(null)
+      return
+    }
     setSaving(true)
     setError('')
     try {

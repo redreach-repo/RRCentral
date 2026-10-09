@@ -13,7 +13,28 @@ import { stripeCheckoutPlugin } from './vite-plugin-stripe-checkout.ts'
  *   relative to /app/ or /login/ still get the R-mark (not a monogram fallback)
  */
 function spaFallback404(): Plugin {
-  const spaDirs = ['app', 'login', 'crm', 'follow-ups', 'quotations', 'invoices']
+  // CRM deep links that must HTTP 200 on hard refresh / bookmark (GitHub Pages).
+  const spaDirs = [
+    'app',
+    'login',
+    'crm',
+    'follow-ups',
+    'quotations',
+    'invoices',
+    'delivery-notes',
+    'customer-files',
+    'catalog',
+    'inventory',
+    'payments',
+    'templates',
+    'reports',
+    'expenses',
+    'vendors',
+    'domains',
+    'settings',
+    'audit-log',
+    'shop',
+  ]
   const iosAssets = [
     'apple-touch-icon.png',
     'apple-touch-icon-precomposed.png',

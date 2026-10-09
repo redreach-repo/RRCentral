@@ -1,6 +1,6 @@
 # RED REACH Central
 
-Public website + CRM + quotations + invoices for **Red Reach Middle East FZE**.
+CRM + quotations + invoices + Tee Tribe shop for **Red Reach Middle East FZE**.
 
 ## Live CRM URL (bookmark this)
 
@@ -8,28 +8,21 @@ Public website + CRM + quotations + invoices for **Red Reach Middle East FZE**.
 
 | What | URL |
 |------|-----|
-| Public site | https://redreach-repo.github.io/RRCentral/ |
 | Sign in | https://redreach-repo.github.io/RRCentral/login |
 | Dashboard | https://redreach-repo.github.io/RRCentral/app |
+| Public marketing site | https://www.redreach.ae (WordPress — not this repo) |
 
-`https://redreach-repo.github.io/` alone is **not** the CRM — GitHub shows a 404 there until you publish the org redirect in [`org-pages/`](./org-pages/). Merging a PR updates the `/RRCentral/` site after the deploy action finishes.
-
-**www.redreach.ae** is still the Hostinger WordPress site — it will not change until DNS is pointed at Pages.
-
-Each division is its own page. **RR Central** is a quiet text link to `/login` (or `/app` when signed in).
+`https://redreach-repo.github.io/` alone 404s until you publish the org redirect in [`org-pages/`](./org-pages/). Merging a PR updates `/RRCentral/` after the Pages deploy finishes.
 
 | Surface | Path |
 |---------|------|
-| Public site | `/`, `/about`, `/insights`, `/contact`, `/businesses` |
-| Divisions | `/marketing`, `/care`, `/connect`, `/wanders`, `/threads`, `/trading`, `/upskilling` |
-| Tee Tribe shop | Live storefront **https://tee-tribe.com** (Next.js in [`teetribe/`](./teetribe/), Vercel). Also `/shop` on this Pages site. |
-| Wanders destinations | `/wanders/philippines`, `/wanders/kerala`, `/wanders/himalaya` |
-| Legacy aliases | `/travel` → `/wanders`, `/uniforms` → `/threads`, `/verticals` → `/businesses` |
-| Central sign-in | `/login` (linked as **Central**) |
+| Central sign-in | `/login` |
 | CRM dashboard | `/app` after sign-in |
-| CRM modules | `/crm`, `/quotations`, `/app/wanders`, … |
+| CRM modules | `/crm`, `/quotations`, `/domains`, `/expenses`, … |
+| Tee Tribe shop | **https://tee-tribe.com** ([`teetribe/`](./teetribe/) on Vercel). Also `/shop` on Pages — trigger **Deploy GitHub Pages** (`workflow_dispatch`) after shop-only changes if `app/**` did not change. |
+| Archived in-repo marketing | [`app/src/site/`](./app/src/site/) — **not routed**; see `ARCHIVED.md` |
 
-Contact forms write **website inquiries** into Central (and create a CRM lead in local mode). On Supabase, apply the migrations in [`supabase/migrations/`](./supabase/migrations/) so `website_inquiries` exists and anonymous visitors can insert (only insert — see [`docs/SECURITY.md`](./docs/SECURITY.md)).
+Contact forms on www.redreach.ae / Central write **website inquiries** (anon insert + rate limit — see [`docs/SECURITY.md`](./docs/SECURITY.md)).
 
 ## How the team should use it
 
@@ -72,7 +65,7 @@ Team setup checklist (secrets, teammates, backup upload, custom domain): [`docs/
 | **React app (team)** | [`app/`](./app/) | Vite + React → GitHub Pages + optional Supabase |
 | Database | [`supabase/`](./supabase/) | Ordered SQL migrations, one-off scripts, Edge Functions |
 | Legacy UI | [`web/`](./web/) | Static Pages launcher for Apps Script (superseded by `app/`; not deployed) |
-| Legacy backend | [`appscript/`](./appscript/) | Google Apps Script + Sheets |
+| Legacy backend | [`appscript/`](./appscript/) | Google Apps Script + Sheets — **deprecated as CRM/finance source of truth**; Central + Supabase is master. Keep read-only archive only. |
 
 ## React app quick start
 

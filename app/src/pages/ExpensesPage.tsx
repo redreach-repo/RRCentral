@@ -22,8 +22,8 @@ import {
 import {
   expenseReportDescription,
   formatSupplierExpenseDescription,
-  saveAttachmentsToExpense,
-  saveAttachmentsToQuote,
+  saveWorkDriveLinkToExpense,
+  saveWorkDriveLinkToQuote,
   syncQuoteSupplierCostFromExpense,
 } from '../lib/supplierInvoiceStore'
 import { ensureVendor, listVendors } from '../lib/vendors'
@@ -135,7 +135,8 @@ export default function ExpensesPage() {
   const [parseHint, setParseHint] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Expense | null>(null)
   const [attachments, setAttachments] = useState<Attachment[]>([])
-  const [pendingFiles, setPendingFiles] = useState<{ name: string; dataUrl: string; mime?: string }[]>([])
+  const [workDriveUrl, setWorkDriveUrl] = useState('')
+  const [workDriveTitle, setWorkDriveTitle] = useState('')
 
   const syncRecurring = useCallback(async (quiet = false) => {
     const { inserted, removed, error } = await ensureRecurringDeductions()
@@ -249,7 +250,8 @@ export default function ExpensesPage() {
     setEditing(null)
     setForm(emptyForm())
     setAttachments([])
-    setPendingFiles([])
+    setWorkDriveUrl('')
+    setWorkDriveTitle('')
     setParseHint('')
     setOpen(true)
   }
@@ -290,20 +292,11 @@ export default function ExpensesPage() {
       quote_ref: e.quote_ref || '',
       supplier_invoice_no: e.supplier_invoice_no || '',
     })
-    setPendingFiles([])
+    setWorkDriveUrl('')
+    setWorkDriveTitle('')
     setParseHint('')
     setOpen(true)
     void loadAttachments(e.id)
-  }
-
-  async function readFileAsDataUrl(file: File): Promise<{ name: string; dataUrl: string; mime?: string }> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () =>
-        resolve({ name: file.name, dataUrl: String(reader.result || ''), mime: file.type })
-      reader.onerror = () => reject(reader.error || new Error('Read failed'))
-      reader.readAsDataURL(file)
-    })
   }
 
   function applyParsedInvoice(parsed: ParsedSupplierInvoice) {
@@ -349,17 +342,18 @@ export default function ExpensesPage() {
     if (!files?.length) return
     try {
       const list = [...files]
-      const rows = await Promise.all(list.map((f) => readFileAsDataUrl(f)))
-      setPendingFiles((prev) => [...prev, ...rows])
-
       const pdf = list.find((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name))
-      if (!pdf) return
+      if (!pdf) {
+        showToast('Choose a PDF to fill the form. Store the file on WorkDrive and paste the link below.', 'error')
+        return
+      }
       setParsing(true)
       try {
         const { parseSupplierInvoicePdf } = await import('../lib/supplierInvoicePdf')
         const parsed = await parseSupplierInvoicePdf(pdf, vatRate)
         applyParsedInvoice(parsed)
-        showToast('Supplier invoice PDF read — review the form', 'success')
+        if (!workDriveTitle.trim()) setWorkDriveTitle(pdf.name.replace(/\.pdf$/i, '') || 'Supplier invoice')
+        showToast('Supplier invoice PDF read — review the form, then paste the WorkDrive link', 'success')
       } catch (e) {
         setParseHint('Could not read text from this PDF. Fill the form manually.')
         showToast(e instanceof Error ? e.message : 'PDF parse failed', 'error')
@@ -373,9 +367,15 @@ export default function ExpensesPage() {
 
   async function saveAttachmentsFor(expenseId: string) {
     const who = user?.email || ''
-    await saveAttachmentsToExpense({ expenseId, files: pendingFiles, uploadedBy: who })
+    const url = workDriveUrl.trim()
+    if (!url) return
+    const link = {
+      url,
+      title: workDriveTitle.trim() || 'Expense attachment',
+    }
+    await saveWorkDriveLinkToExpense({ expenseId, link, uploadedBy: who })
     if (linkedQuote) {
-      await saveAttachmentsToQuote({ quote: linkedQuote, files: pendingFiles, uploadedBy: who })
+      await saveWorkDriveLinkToQuote({ quote: linkedQuote, link, uploadedBy: who })
     }
   }
 
@@ -468,7 +468,7 @@ export default function ExpensesPage() {
         expenseId = newId
       }
 
-      if (pendingFiles.length && expenseId) {
+      if (workDriveUrl.trim() && expenseId) {
         await saveAttachmentsFor(expenseId)
       }
 
@@ -679,19 +679,17 @@ export default function ExpensesPage() {
         <div style={fieldStyle}>
           <label style={labelStyle}>
             <FileUp size={12} style={{ marginRight: 4 }} />
-            Upload supplier invoice PDF
+            Read supplier invoice PDF (fills the form only)
           </label>
           <input
             type="file"
-            accept="application/pdf,image/*,.pdf"
-            multiple
+            accept="application/pdf,.pdf"
             disabled={parsing}
             onChange={(e) => void onPickFiles(e.target.files)}
           />
           <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted, lineHeight: 1.45 }}>
-            PDF text is copied into the form when possible (vendor, date, invoice no, totals, VAT). Always
-            review before saving. When a quotation is linked, the PDF is stored on that quotation as well
-            as on this expense.
+            PDF text is copied into the form when possible. The file is not stored in the database — upload
+            it to Zoho WorkDrive and paste the share link below.
           </p>
           {parsing ? (
             <p style={{ margin: '6px 0 0', fontSize: 13, color: colors.accent }}>Reading PDF…</p>
@@ -699,13 +697,29 @@ export default function ExpensesPage() {
           {parseHint ? (
             <p style={{ margin: '6px 0 0', fontSize: 13, color: colors.muted }}>{parseHint}</p>
           ) : null}
-          {pendingFiles.length > 0 ? (
-            <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 12, color: colors.muted }}>
-              {pendingFiles.map((f) => (
-                <li key={f.name + f.dataUrl.slice(0, 24)}>{f.name} (pending save)</li>
-              ))}
-            </ul>
-          ) : null}
+        </div>
+
+        <div style={fieldStyle}>
+          <label style={labelStyle}>
+            <Paperclip size={12} style={{ marginRight: 4 }} />
+            WorkDrive share link
+          </label>
+          <input
+            style={inputStyle}
+            value={workDriveUrl}
+            onChange={(e) => setWorkDriveUrl(e.target.value)}
+            placeholder="https://workdrive.zoho…/…"
+            inputMode="url"
+          />
+          <input
+            style={{ ...inputStyle, marginTop: 8 }}
+            value={workDriveTitle}
+            onChange={(e) => setWorkDriveTitle(e.target.value)}
+            placeholder="Link title (optional)"
+          />
+          <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted, lineHeight: 1.45 }}>
+            Saved on this expense (and on the linked quotation when set). https links only.
+          </p>
         </div>
 
         <div style={formGridStyle}>

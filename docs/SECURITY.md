@@ -7,10 +7,13 @@ Never commit customer data, exports, backups, tokens or keys.
 
 | Who | Can do |
 |-----|--------|
-| Anonymous visitor | Submit the website contact form (insert-only, length-limited). Shop checkout. Nothing else. |
+| Anonymous visitor | Submit the website contact form (insert-only, length-limited, burst-rate limited). Shop checkout. Nothing else. |
 | Signed in, **not** in `app_users` (any other Google account) | Nothing — sees “No access to RR Central”. |
-| `sales` (active in `app_users`) | Read/write CRM, quotes, invoices, delivery notes, vendors, expenses, Wanders. Cannot delete invoices/expenses, manage users, change company/bank/Zoho settings, or read integration secrets. |
+| `sales` (active in `app_users`) | Read/write CRM, quotes, invoices, delivery notes, vendors, expenses, Wanders. Cannot delete CRM/quotes/clients, reassign CRM owner, delete invoices/expenses, manage users, change company/bank/Zoho settings, or read integration secrets. |
+| `manager` | Sales capabilities plus delete CRM/quotes/clients and reassign owners. No Settings/secrets/audit/invoice-expense deletes. |
 | `admin` | Everything, including the audit trail (Settings → Audit log). |
+
+Manager/sales delete rules: migration `20261009140000_manager_delete_policies.sql` (`rr_is_manager_or_admin()`). UI permissions in `app/src/lib/permissions.ts` match those policies.
 
 Enforced by Postgres Row Level Security in
 [`supabase/migrations/20260926090000_security_rls.sql`](../supabase/migrations/20260926090000_security_rls.sql),

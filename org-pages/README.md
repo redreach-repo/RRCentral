@@ -2,10 +2,20 @@
 
 ## A. Org redirect (fixes empty github.io root)
 
-1. Create a **new public repo** named exactly: `redreach-repo.github.io`
-2. Upload this folder’s `index.html` as the repo root (or push this folder’s contents to `main`)
-3. Repo → **Settings → Pages** → Source: Deploy from branch → `main` / `/ (root)`
-4. Wait ~1 minute → open https://redreach-repo.github.io/ — it should redirect to Central
+Owner one-time (cannot be done from a normal RRCentral PR):
+
+```bash
+# from a machine with repo-create rights on the redreach-repo org
+gh repo create redreach-repo/redreach-repo.github.io --public --description "Redirect bare github.io to RR Central"
+git clone https://github.com/redreach-repo/redreach-repo.github.io.git
+cp org-pages/index.html redreach-repo.github.io/
+cd redreach-repo.github.io
+git add index.html && git commit -m "Redirect bare github.io to RR Central" && git push -u origin main
+```
+
+Then: repo → **Settings → Pages** → Source: Deploy from branch → `main` / `/ (root)`.
+
+Wait ~1 minute → https://redreach-repo.github.io/ should redirect to Central login.
 
 ## B. Custom domain `crm.redreach.ae` (optional)
 

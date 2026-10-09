@@ -953,9 +953,28 @@ export default function WandersPage() {
                 <div style={cardStyle}>
                   <h2 style={sectionTitleStyle}>Quotation terms</h2>
                   <p style={{ fontSize: 12, color: colors.muted }}>
-                    Legal entity / governing law remain TBC until confirmed. Incomplete legal placeholders
-                    must not be published on live customer documents.
+                    Fill Settings → Wanders legal / tax / currency before publishing customer documents.
+                    Incomplete legal placeholders (still TBC) must stay internal — do not put them on live
+                    quotes.
                   </p>
+                  {(String(settings.wandersTaxRules || '').toUpperCase().includes('TBC') ||
+                    String(settings.wandersAccountingRevenueRule || '').toUpperCase().includes('TBC') ||
+                    String(settings.wandersBaseCurrency || '').toUpperCase().includes('TBC')) && (
+                    <p
+                      style={{
+                        marginTop: 10,
+                        padding: '10px 12px',
+                        borderRadius: 8,
+                        background: 'rgba(220, 140, 40, 0.12)',
+                        color: colors.muted,
+                        fontSize: 13,
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      Customer-facing legal/tax/currency is still TBC in Settings. Hide these fields from
+                      exported quotes until an admin confirms them.
+                    </p>
+                  )}
                   <div style={formGridStyle}>
                     <Field label="Terms version">
                       <input

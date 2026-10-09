@@ -125,8 +125,9 @@ export default function InventoryPage() {
         <div>
           <h1 style={pageTitleStyle}>Inventory</h1>
           <p style={pageSubtitleStyle}>
-            Stock by SKU · available = on hand − reserved
+            Manual stock by SKU · available = on hand − reserved
             {lowCount > 0 ? ` · ${lowCount} low stock` : ''}
+            . Sync pulls catalogue SKUs; quote/catalog stock hooks are not automatic yet.
           </p>
         </div>
         <button type="button" style={buttonSecondaryStyle} disabled={busy} onClick={() => void syncSkus()}>

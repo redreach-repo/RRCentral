@@ -33,22 +33,12 @@ export async function saveSignedDeliveryNoteAttachments(opts: {
   files: PendingSignedFile[]
   uploadedBy: string
 }): Promise<string> {
-  const entityRef =
-    String(opts.note.reference_number || '').trim() || String(opts.note.id || '').trim()
-  if (!entityRef) throw new Error('Delivery note needs a reference before saving a signed copy')
-  for (const file of opts.files) {
-    const { error } = await db.from('attachments').insert({
-      entity_type: SIGNED_DELIVERY_NOTE_ENTITY,
-      entity_ref: entityRef,
-      file_name: file.name,
-      storage_path: '',
-      url: file.dataUrl,
-      uploaded_by: opts.uploadedBy,
-      uploaded_at: new Date().toISOString(),
-    })
-    if (error) throw error
-  }
-  return entityRef
+  void opts
+  // Signed DNs are WorkDrive-only via customer_documents + LinkWorkDriveModal.
+  // Never persist data: blobs (or any attachment row) from this path.
+  throw new Error(
+    'Store signed delivery notes on Zoho WorkDrive and link them from the delivery note (Customer files), not as database blobs.',
+  )
 }
 
 export async function deleteSignedDeliveryNoteAttachment(id: string): Promise<void> {
