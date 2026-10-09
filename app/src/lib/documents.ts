@@ -14,6 +14,12 @@ export function isInternalDraftId(value: string | null | undefined): boolean {
   return /^Q-\d{10,}$/i.test(String(value || '').trim())
 }
 
+/** Temporary invoice / DN ids — never show these on customer PDFs. */
+export function isTempDocumentRef(value: string | null | undefined): boolean {
+  const ref = String(value || '').trim()
+  return !ref || isInternalDraftId(ref) || /^INV-DRAFT-/i.test(ref) || /^DN-DRAFT-/i.test(ref)
+}
+
 /** Customer-facing reference: finalized number, or "DRAFT". */
 export function displayDocumentReference(opts: {
   referenceNumber?: string | null
@@ -22,11 +28,13 @@ export function displayDocumentReference(opts: {
   draftLabel?: string
 }): string {
   const ref = String(opts.referenceNumber || '').trim()
-  if (ref && !isInternalDraftId(ref) && !/^INV-DRAFT-/i.test(ref) && !/^DN-DRAFT-/i.test(ref)) return ref
-  const status = String(opts.status || '').toLowerCase()
-  if (status === 'draft' || !ref || isInternalDraftId(opts.fallbackId) || isInternalDraftId(ref)) {
+  if (ref && !isTempDocumentRef(ref)) return ref
+  // INV-DRAFT-* / DN-DRAFT-* / Q-* always display as DRAFT, even if status was marked Sent.
+  if (isTempDocumentRef(ref) || isTempDocumentRef(opts.fallbackId)) {
     return opts.draftLabel || 'DRAFT'
   }
+  const status = String(opts.status || '').toLowerCase()
+  if (status === 'draft' || !ref) return opts.draftLabel || 'DRAFT'
   return ref || opts.draftLabel || 'DRAFT'
 }
 

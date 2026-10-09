@@ -57,6 +57,12 @@ describe('documents', () => {
         status: 'Draft',
       }),
     ).toBe('DRAFT')
+    expect(
+      displayDocumentReference({
+        referenceNumber: 'INV-DRAFT-1791536651592',
+        status: 'Sent',
+      }),
+    ).toBe('DRAFT')
   })
 
   it('computes valid until and past-validity', () => {
