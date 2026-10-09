@@ -27,7 +27,6 @@ import { can, ROLE_DESCRIPTIONS, ROLE_LABELS, USER_ROLES } from '../lib/permissi
 import {
   clearSupabaseRuntimeConfig,
   getSupabaseRuntimeConfig,
-  isUnsafeBrowserSupabaseKey,
   saveSupabaseRuntimeConfig,
 } from '../lib/supabaseConfig'
 import {
