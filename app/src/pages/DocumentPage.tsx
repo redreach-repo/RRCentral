@@ -43,6 +43,7 @@ import {
   type PrintableDocType,
 } from '../lib/deliveryNotes'
 import { hydrateContacts, primaryContact } from '../lib/contacts'
+import { findClientByCompany, resolveBillToParty } from '../lib/clientLookup'
 import { isZohoMailEnabled } from '../lib/zoho'
 import EmailComposeModal from '../components/EmailComposeModal'
 import LinkWorkDriveModal from '../components/LinkWorkDriveModal'
@@ -95,26 +96,18 @@ export default function DocumentPage() {
           setEmailContacts([])
           return
         }
-        const { data: c } = await db
-          .from('clients')
-          .select('*')
-          .ilike('company_name', company)
-          .maybeSingle()
-        setClient((c as Client) || null)
-        const { data: crm } = await db
-          .from('crm')
-          .select('*')
-          .ilike('company_name', company)
-          .maybeSingle()
-        const fromCrm = crm ? hydrateContacts(crm as CrmEntry) : []
+        const c = await findClientByCompany(company)
+        setClient(c)
+        const crm = await findCrmByCompany(company)
+        const fromCrm = crm ? hydrateContacts(crm) : []
         if (fromCrm.length) setEmailContacts(fromCrm)
         else if (c) {
           setEmailContacts(
             hydrateContacts({
-              primary_contact: (c as Client).primary_contact,
-              email_phone: (c as Client).email,
-              mobile_number: (c as Client).mobile,
-              contacts: (c as Client).contacts,
+              primary_contact: c.primary_contact,
+              email_phone: c.email,
+              mobile_number: c.mobile,
+              contacts: c.contacts,
             }),
           )
         } else setEmailContacts([])
@@ -216,6 +209,10 @@ export default function DocumentPage() {
   }, [load])
 
   const doc = quote || invoice || deliveryNote
+  const billTo = useMemo(
+    () => resolveBillToParty(doc?.client || '', client, crmRecord),
+    [doc?.client, client, crmRecord],
+  )
   const isDeliveryNote = docType === 'delivery-note'
   const displayRef = displayDocumentReference({
     referenceNumber: quote?.reference_number || invoice?.reference_number || deliveryNote?.reference_number,
@@ -832,35 +829,40 @@ export default function DocumentPage() {
                   {isDeliveryNote ? 'Deliver to' : quoteFormat.sectionHeadings.billTo}
                 </h3>
                 <p style={{ margin: 0, lineHeight: 1.5, fontSize: 14 }}>
-                  <strong>{doc.client}</strong>
-                  {client?.primary_contact ? (
+                  <strong>{billTo.companyName || doc.client}</strong>
+                  {billTo.primaryContact ? (
                     <>
                       <br />
-                      {client.primary_contact}
+                      {billTo.primaryContact}
                     </>
                   ) : null}
-                  {client?.email ? (
+                  {billTo.email ? (
                     <>
                       <br />
-                      {client.email}
+                      {billTo.email}
                     </>
                   ) : null}
-                  {client?.mobile || client?.office ? (
+                  {billTo.phone ? (
                     <>
                       <br />
-                      {client.mobile || client.office}
+                      Tel: {billTo.phone}
                     </>
                   ) : null}
-                  {client?.address ? (
+                  {billTo.address ? (
                     <>
                       <br />
-                      {client.address}
+                      {billTo.address.split(/\n+/).map((line, i) => (
+                        <span key={`addr-${i}`}>
+                          {i > 0 ? <br /> : null}
+                          {line}
+                        </span>
+                      ))}
                     </>
                   ) : null}
-                  {client?.trn ? (
+                  {billTo.trn ? (
                     <>
                       <br />
-                      TRN: {client.trn}
+                      TRN: {billTo.trn}
                     </>
                   ) : null}
                 </p>

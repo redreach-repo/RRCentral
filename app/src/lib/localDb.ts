@@ -56,6 +56,24 @@ const LEGACY_COMPANY_ADDRESSES = new Set([
   'P.O. Box 6641, Dubai, U.A.E.',
 ])
 
+/** Bill-to party for Mass Allied Freighters invoices/quotes. */
+const MASS_ALLIED = {
+  company_name: 'Mass Allied Freighters L.L.C',
+  office: '+971 4 882 4433',
+  address:
+    'Grosvenor Business Tower, Office 1506,\nP.O. Box 6641, Barsha Heights, TECOM,\nDubai, UAE',
+  trn: '100286214000003',
+} as const
+
+function isMassAlliedName(name: unknown): boolean {
+  const key = String(name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return key.includes('mass allied freighter')
+}
+
 const DEFAULT_SETTINGS: { key: string; value: string }[] = [
   { key: 'companyName', value: 'Red Reach Middle East FZE' },
   { key: 'brand', value: 'RED REACH' },
@@ -344,6 +362,98 @@ async function ensureSeeded(): Promise<void> {
       store.put({ id: crypto.randomUUID(), ...p, updated_at: now })
     }
     await txDone(tx)
+  }
+
+  // Keep Mass Allied Freighters bill-to details current for invoice/quote letterheads.
+  {
+    const clients = (await reqToPromise(txStore(database, 'clients', 'readonly').getAll())) as Row[]
+    const existingClient = clients.find((r) => isMassAlliedName(r.company_name))
+    const clientTx = database.transaction('clients', 'readwrite')
+    const clientStore = clientTx.objectStore('clients')
+    if (existingClient) {
+      clientStore.put({
+        ...existingClient,
+        company_name: MASS_ALLIED.company_name,
+        office: String(existingClient.office || '').trim() || MASS_ALLIED.office,
+        address: String(existingClient.address || '').trim() || MASS_ALLIED.address,
+        trn: String(existingClient.trn || '').trim() || MASS_ALLIED.trn,
+      })
+    } else {
+      clientStore.put({
+        id: crypto.randomUUID(),
+        company_name: MASS_ALLIED.company_name,
+        primary_contact: '',
+        email: '',
+        mobile: '',
+        office: MASS_ALLIED.office,
+        address: MASS_ALLIED.address,
+        trn: MASS_ALLIED.trn,
+        website: '',
+        company_owner: '',
+        notes: 'Seeded from client letterhead details',
+        contacts: [],
+        created_at: new Date().toISOString(),
+      })
+    }
+    await txDone(clientTx)
+
+    const crmRows = (await reqToPromise(txStore(database, 'crm', 'readonly').getAll())) as Row[]
+    const existingCrm = crmRows.find((r) => isMassAlliedName(r.company_name))
+    const crmTx = database.transaction('crm', 'readwrite')
+    const crmStore = crmTx.objectStore('crm')
+    const now = new Date().toISOString()
+    if (existingCrm) {
+      crmStore.put({
+        ...existingCrm,
+        company_name: MASS_ALLIED.company_name,
+        office_number: String(existingCrm.office_number || '').trim() || MASS_ALLIED.office,
+        address: String(existingCrm.address || '').trim() || MASS_ALLIED.address,
+        trn: String(existingCrm.trn || '').trim() || MASS_ALLIED.trn,
+        updated_at: now,
+      })
+    } else {
+      crmStore.put({
+        id: crypto.randomUUID(),
+        company_name: MASS_ALLIED.company_name,
+        primary_contact: '',
+        email_phone: '',
+        mobile_number: '',
+        office_number: MASS_ALLIED.office,
+        notes: 'Seeded from client letterhead details',
+        follow_up_date: null,
+        next_action: '',
+        owner: '',
+        company_owner: '',
+        address: MASS_ALLIED.address,
+        website: '',
+        trn: MASS_ALLIED.trn,
+        pipeline_stage: 'Quoted',
+        quote_ref: '',
+        outcome_reason: '',
+        calendar_event_id: '',
+        drive_folder_url: '',
+        contacts: [],
+        created_by: '',
+        updated_by: '',
+        created_at: now,
+        updated_at: now,
+      })
+    }
+    await txDone(crmTx)
+
+    for (const table of ['invoices', 'quotations'] as const) {
+      const rows = (await reqToPromise(txStore(database, table, 'readonly').getAll())) as Row[]
+      const stale = rows.filter(
+        (r) => isMassAlliedName(r.client) && String(r.client || '').trim() !== MASS_ALLIED.company_name,
+      )
+      if (!stale.length) continue
+      const tx = database.transaction(table, 'readwrite')
+      const store = tx.objectStore(table)
+      for (const row of stale) {
+        store.put({ ...row, client: MASS_ALLIED.company_name })
+      }
+      await txDone(tx)
+    }
   }
 
   seeded = true
