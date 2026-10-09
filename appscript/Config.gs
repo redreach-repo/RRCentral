@@ -15,7 +15,7 @@ var CONFIG = {
     email: 'info@redreach.ae',
     phone: '',
     website: 'www.redreach.ae',
-    trn: '',
+    trn: '104605407600003',
     accountName: 'Red Reach Middle East FZE',
     bankName: 'Mashreq Bank',
     bankAccount: '019100599735',
