@@ -33,18 +33,16 @@ create index if not exists owned_domains_expires_idx
 alter table public.owned_domains enable row level security;
 
 grant select, insert, update, delete on public.owned_domains to authenticated;
-grant select, insert, update, delete on public.owned_domains to anon;
 
 drop policy if exists "Authenticated users full access" on public.owned_domains;
-create policy "Authenticated users full access" on public.owned_domains
-  for all to authenticated
-  using (true)
-  with check (true);
-
 drop policy if exists "Anon full access" on public.owned_domains;
-create policy "Anon full access" on public.owned_domains
-  for all to anon
-  using (true)
-  with check (true);
+drop policy if exists "Staff full access" on public.owned_domains;
+
+create policy "Staff full access" on public.owned_domains
+  for all to authenticated
+  using (public.rr_is_staff())
+  with check (public.rr_is_staff());
+
+revoke all on public.owned_domains from anon;
 
 notify pgrst, 'reload schema';

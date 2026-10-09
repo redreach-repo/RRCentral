@@ -1,6 +1,6 @@
--- Default Central admin: info@redreach.ae (password set in auth.users below).
--- After apply on real Supabase, sign in with info@redreach.ae / RedReach2026#
--- and change the password.
+-- Default Central admin: info@redreach.ae (initial Auth password set below on first apply only).
+-- After apply: sign in and change the password under Settings → My password immediately.
+-- Do not reuse passwords from documentation or git history.
 --
 -- Auth password bootstrap runs only on a full Supabase auth schema. The CI
 -- stub (supabase/tests/supabase_stub.sql) is minimal, so we only ensure a

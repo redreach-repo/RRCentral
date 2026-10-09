@@ -1,11 +1,11 @@
-// One-shot / ops helper: ensure info@redreach.ae exists with the default password.
-// Prefer the SQL migration 20261006170000_default_admin_info.sql when possible.
-// Deploy with --no-verify-jwt if calling without a user session.
+// Optional one-shot admin bootstrap. DISABLED unless Supabase secrets are set:
+//   BOOTSTRAP_ADMIN_SECRET (32+ chars) — send as header x-bootstrap-secret
+//   BOOTSTRAP_ADMIN_PASSWORD (12+ chars) — applied only when the secret matches
+// Prefer manage-auth-user (admin JWT) or the Supabase Auth dashboard for day-to-day use.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
 
 const ADMIN_EMAIL = "info@redreach.ae"
-const ADMIN_PASSWORD = "RedReach2026#"
 const ADMIN_NAME = "Red Reach"
 
 const DEFAULT_ORIGINS = [
@@ -27,7 +27,8 @@ function corsHeadersFor(req: Request): Record<string, string> {
   const allowed = allowedOrigins()
   return {
     "Access-Control-Allow-Origin": allowed.includes(origin) ? origin : allowed[0],
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type, x-bootstrap-secret",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     Vary: "Origin",
   }
@@ -45,6 +46,13 @@ function adminClient() {
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
   if (!url || !key) throw new Error("Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY")
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let out = 0
+  for (let i = 0; i < a.length; i++) out |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return out === 0
 }
 
 async function findAuthUserId(
@@ -69,13 +77,33 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors })
   if (req.method !== "POST") return json(405, { error: "POST only" }, cors)
 
+  const configuredSecret = (Deno.env.get("BOOTSTRAP_ADMIN_SECRET") || "").trim()
+  const configuredPassword = (Deno.env.get("BOOTSTRAP_ADMIN_PASSWORD") || "").trim()
+
+  if (configuredSecret.length < 32 || configuredPassword.length < 12) {
+    return json(
+      503,
+      {
+        error: "bootstrap-admin is disabled",
+        hint:
+          "Set Supabase secrets BOOTSTRAP_ADMIN_SECRET (32+ chars) and BOOTSTRAP_ADMIN_PASSWORD (12+ chars), or use manage-auth-user / Auth dashboard instead.",
+      },
+      cors,
+    )
+  }
+
+  const providedSecret = (req.headers.get("x-bootstrap-secret") || "").trim()
+  if (!providedSecret || !timingSafeEqual(providedSecret, configuredSecret)) {
+    return json(403, { error: "Forbidden" }, cors)
+  }
+
   try {
     const admin = adminClient()
     const existingId = await findAuthUserId(admin, ADMIN_EMAIL)
 
     if (existingId) {
       const { error } = await admin.auth.admin.updateUserById(existingId, {
-        password: ADMIN_PASSWORD,
+        password: configuredPassword,
         email_confirm: true,
         user_metadata: { name: ADMIN_NAME },
       })
@@ -83,7 +111,7 @@ Deno.serve(async (req: Request) => {
     } else {
       const { error } = await admin.auth.admin.createUser({
         email: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD,
+        password: configuredPassword,
         email_confirm: true,
         user_metadata: { name: ADMIN_NAME },
       })
@@ -107,7 +135,7 @@ Deno.serve(async (req: Request) => {
         ok: true,
         email: ADMIN_EMAIL,
         created: !existingId,
-        hint: "Sign in, then change this password under Settings → My password.",
+        hint: "Sign in and change the password under Settings → My password.",
       },
       cors,
     )
