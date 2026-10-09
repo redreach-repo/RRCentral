@@ -39,4 +39,12 @@ describe('resolveBillToParty', () => {
     expect(party.phone).toBe('+971 4 882 4433')
     expect(party.trn).toBe('100286214000003')
   })
+
+  it('uses known bill-to when clients and CRM are both empty', () => {
+    const party = resolveBillToParty('Mass Allied Freighters', null, null)
+    expect(party.companyName).toBe('Mass Allied Freighters L.L.C')
+    expect(party.phone).toBe('+971 4 882 4433')
+    expect(party.trn).toBe('100286214000003')
+    expect(party.address).toContain('Grosvenor Business Tower')
+  })
 })
