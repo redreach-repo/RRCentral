@@ -14,6 +14,7 @@ import { buildWandersTermsText } from '../lib/wandersTerms'
 import {
   columnLabel,
   getDivisionQuoteFormat,
+  resolveDivisionCode,
   type QuoteColumnId,
 } from '../lib/divisionQuoteFormats'
 import { CONNECT_PARTNER } from '../lib/seedDivisionCatalogues'
@@ -220,16 +221,32 @@ export default function DocumentPage() {
     fallbackId: quote?.quote_id,
     status: doc?.status,
   })
+  const docDivisionCode = resolveDivisionCode(
+    docType === 'quote'
+      ? {
+          divisionCode: quote?.division_code,
+          vertical: quote?.vertical,
+          referenceNumber: quote?.reference_number,
+        }
+      : docType === 'delivery-note'
+        ? {
+            divisionCode: deliveryNote?.division_code,
+            vertical: deliveryNote?.vertical,
+            referenceNumber: deliveryNote?.reference_number,
+          }
+        : {
+            // Invoices store brand in `vertical` (no division_code column).
+            vertical: invoice?.vertical,
+            referenceNumber: invoice?.reference_number,
+          },
+  )
   const title =
     docType === 'quote'
-      ? getDivisionQuoteFormat(quote?.division_code, settings).documentTitle
+      ? getDivisionQuoteFormat(docDivisionCode, settings).documentTitle
       : docType === 'delivery-note'
         ? 'DELIVERY NOTE'
         : 'INVOICE'
-  const quoteFormat = getDivisionQuoteFormat(
-    docType === 'quote' ? quote?.division_code : deliveryNote?.division_code || '01',
-    settings,
-  )
+  const quoteFormat = getDivisionQuoteFormat(docDivisionCode, settings)
   const lineColumns = isDeliveryNote ? DELIVERY_NOTE_COLUMNS : quoteFormat.columns
   const backTo =
     docType === 'quote' ? '/quotations' : docType === 'delivery-note' ? '/delivery-notes' : '/invoices'
@@ -241,7 +258,7 @@ export default function DocumentPage() {
         ? deliveryNote.status === 'Draft'
         : invoice?.status === 'Draft')
   const division =
-    DIVISIONS.find((d) => d.code === (quote?.division_code || deliveryNote?.division_code))?.brand ||
+    DIVISIONS.find((d) => d.code === docDivisionCode)?.brand ||
     quote?.vertical ||
     invoice?.vertical ||
     deliveryNote?.vertical ||

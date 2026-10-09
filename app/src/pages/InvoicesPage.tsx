@@ -22,6 +22,7 @@ import EmptyState from '../components/EmptyState'
 import { logActivity } from '../lib/activity'
 import { formatAED } from '../lib/money'
 import { generateReference } from '../lib/referenceNumber'
+import { getDivisionQuoteFormat } from '../lib/divisionQuoteFormats'
 import {
   calcTotals,
   deleteLineItems,
@@ -288,6 +289,7 @@ export default function InvoicesPage() {
       const payment_status = isCancelledInvoice({ status })
         ? 'Pending'
         : editing?.payment_status || 'Pending'
+      const fmt = getDivisionQuoteFormat(divisionCode, settings)
 
       const payload = {
         client: form.client.trim(),
@@ -295,8 +297,8 @@ export default function InvoicesPage() {
         reference_number: reference,
         description: form.description.trim(),
         payment_terms: form.payment_terms,
-        delivery_terms: form.delivery_terms,
-        moq: form.moq,
+        delivery_terms: fmt.showDelivery ? form.delivery_terms : '',
+        moq: fmt.showMoq ? form.moq : '',
         notes: form.notes,
         date: form.date || null,
         amount,
@@ -733,9 +735,19 @@ export default function InvoicesPage() {
               style={selectStyle}
               value={divisionCode}
               onChange={(e) => {
-                setDivisionCode(e.target.value)
-                const brand = DIVISIONS.find((d) => d.code === e.target.value)?.brand || ''
-                setForm((f) => ({ ...f, vertical: brand }))
+                const code = e.target.value
+                setDivisionCode(code)
+                const brand = DIVISIONS.find((d) => d.code === code)?.brand || ''
+                const fmt = getDivisionQuoteFormat(code, settings)
+                setForm((f) => ({
+                  ...f,
+                  vertical: brand,
+                  // Threads-style commercial lines only when the division format shows them.
+                  moq: fmt.showMoq ? f.moq || settings.moqDefault || '50' : '',
+                  delivery_terms: fmt.showDelivery
+                    ? f.delivery_terms || settings.deliveryTerms || DELIVERY_TERMS[0]
+                    : '',
+                }))
               }}
             >
               {DIVISIONS.map((d) => (
