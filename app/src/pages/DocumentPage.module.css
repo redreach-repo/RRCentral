@@ -60,7 +60,8 @@
   border-bottom: none;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /* visible so PDF capture is not clipped on the right/bottom */
+  overflow: visible;
 }
 
 .frame::before {
