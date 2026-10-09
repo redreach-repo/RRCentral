@@ -14,8 +14,8 @@ export function organizationJsonLd() {
     foundingDate: String(SITE.founded),
     address: {
       '@type': 'PostalAddress',
-      streetAddress: 'P.O. Box 6641',
-      addressLocality: 'Dubai',
+      streetAddress: 'P.O. Box 7073',
+      addressLocality: 'Umm Al Quwain',
       addressCountry: 'AE',
     },
     department: VERTICALS.map((v) => ({
