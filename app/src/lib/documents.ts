@@ -51,12 +51,17 @@ export async function elementToPdfBlob(
   element: HTMLElement,
   opts?: { filenameHint?: string },
 ): Promise<{ blob: Blob; filename: string; dataUrl: string }> {
+  // Capture the A4 letterhead sheet edge-to-edge (no browser print margins).
   const canvas = await html2canvas(element, {
     scale: 2,
     useCORS: true,
     backgroundColor: '#ffffff',
+    // Avoid capturing external preview chrome if styles leak.
+    logging: false,
+    windowWidth: element.scrollWidth,
+    windowHeight: element.scrollHeight,
   })
-  const img = canvas.toDataURL('image/jpeg', 0.95)
+  const img = canvas.toDataURL('image/jpeg', 0.96)
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageWidth = pdf.internal.pageSize.getWidth()
   const pageHeight = pdf.internal.pageSize.getHeight()
@@ -64,12 +69,12 @@ export async function elementToPdfBlob(
   const imgHeight = (canvas.height * imgWidth) / canvas.width
   let heightLeft = imgHeight
   let position = 0
-  pdf.addImage(img, 'JPEG', 0, position, imgWidth, imgHeight)
+  pdf.addImage(img, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST')
   heightLeft -= pageHeight
   while (heightLeft > 0) {
     position = heightLeft - imgHeight
     pdf.addPage()
-    pdf.addImage(img, 'JPEG', 0, position, imgWidth, imgHeight)
+    pdf.addImage(img, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST')
     heightLeft -= pageHeight
   }
   const filename = `${opts?.filenameHint || 'document'}.pdf`.replace(/\s+/g, '-')

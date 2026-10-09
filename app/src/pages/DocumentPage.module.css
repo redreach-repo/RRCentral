@@ -1,3 +1,6 @@
+/* A4 letterhead frame — standard for quotes, invoices, delivery notes.
+   Rails and bars sit on the physical page edges (full bleed in PDF/print). */
+
 .chrome {
   min-height: 100%;
   background: #121417;
@@ -27,72 +30,74 @@
   font-size: 12px;
 }
 
-.toolBtn {
-  appearance: none;
-  border: 0;
-  border-radius: 999px;
-  padding: 10px 14px;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  background: #fff;
-  color: #111;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.toolBtn:disabled {
-  opacity: 0.6;
-  cursor: wait;
-}
-
-.toolBtnWa {
-  background: #25d366;
-  color: #fff;
-}
-
-.toolBtnGhost {
-  background: transparent;
-  color: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.state {
-  padding: 48px 24px;
-  text-align: center;
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.error {
-  color: #fca5a5;
-}
-
 .preview {
-  width: min(900px, calc(100% - 24px));
-  margin: 20px auto 0;
+  width: min(210mm, calc(100% - 24px));
+  margin: 20px auto 40px;
 }
 
+/* Page sheet = one A4. Letterhead chrome is painted on the edges. */
 .frame {
+  --lh-rail: 10px;
+  --lh-top: 8px;
+  --lh-inner: 28px;
+  --lh-red: #c1121f;
+  --lh-orange: #e85d04;
+  --lh-amber: #f48c06;
+
+  position: relative;
+  width: 210mm;
+  max-width: 100%;
+  min-height: 297mm;
+  box-sizing: border-box;
   background: #fff;
   color: #111;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
-  border-left: 10px solid #e85d04;
-  border-right: 10px solid #e85d04;
   font-family: Arial, Helvetica, sans-serif;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+  /* Outer edge rails (left/right) + top hairline via borders */
+  border-left: var(--lh-rail) solid var(--lh-orange);
+  border-right: var(--lh-rail) solid var(--lh-orange);
+  border-top: var(--lh-top) solid var(--lh-red);
+  border-bottom: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.frame::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--lh-red) 0%, var(--lh-orange) 55%, var(--lh-amber) 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.frame::after {
+  /* Inner corner ticks — subtle letterhead detail inset from rails */
+  content: '';
+  position: absolute;
+  inset: 14px;
+  border: 1px solid rgba(232, 93, 4, 0.22);
+  pointer-events: none;
+  z-index: 1;
 }
 
 .sheet {
-  padding: 36px 40px 24px;
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  padding: 28px var(--lh-inner) 20px;
+  box-sizing: border-box;
 }
 
 .draftBanner {
   background: #fff3cd;
   color: #7a5b00;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: 6px;
   margin-bottom: 14px;
   font-size: 13px;
   font-weight: 600;
@@ -104,19 +109,14 @@
   gap: 24px;
   align-items: flex-start;
   padding-bottom: 18px;
-  border-bottom: 2px solid #e85d04;
+  border-bottom: 2px solid var(--lh-orange);
 }
 
 .logo {
   max-height: 72px;
   max-width: 280px;
   display: block;
-}
-
-.brandFallback {
-  font-size: 22px;
-  font-weight: 800;
-  color: #c1121f;
+  object-fit: contain;
 }
 
 .company {
@@ -124,6 +124,18 @@
   color: #555;
   font-size: 12.5px;
   line-height: 1.5;
+}
+
+.divisionPill {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--lh-red), var(--lh-orange));
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .docMeta {
@@ -135,7 +147,7 @@
   font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #c1121f;
+  color: var(--lh-red);
   font-weight: 700;
 }
 
@@ -147,142 +159,29 @@
   color: #111;
 }
 
-.divisionPill {
-  display: inline-block;
-  margin-top: 4px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #c1121f, #e85d04);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
 .metaGrid {
   display: grid;
   gap: 4px;
   font-size: 13px;
-  margin-top: 10px;
 }
 
 .metaGrid span {
   color: #555;
 }
 
-.parties {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  margin: 24px 0 16px;
-}
-
-.parties h3 {
-  margin: 0 0 8px;
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #555;
-}
-
-.parties p {
-  margin: 0;
-  line-height: 1.5;
-  font-size: 14px;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 8px;
-  font-size: 13.5px;
-}
-
-.table th,
-.table td {
-  padding: 10px 8px;
-  border-bottom: 1px solid #e2e2e2;
-  text-align: left;
-}
-
-.table th {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #555;
-  border-bottom: 2px solid #222;
-}
-
-.num {
-  text-align: right !important;
-}
-
-.totals {
-  width: 280px;
-  margin: 18px 0 0 auto;
-  font-size: 14px;
-}
-
-.totalsRow {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 6px 0;
-}
-
-.grand {
-  margin-top: 6px;
-  padding-top: 10px;
-  border-top: 2px solid #222;
-  font-weight: 800;
-  font-size: 16px;
-}
-
-.payBox,
-.termsBox,
-.notesBox {
-  margin-top: 28px;
-  font-size: 12.5px;
-  line-height: 1.55;
-  color: #333;
-}
-
-.payBox h3,
-.termsBox h3,
-.notesBox h3 {
-  margin: 0 0 8px;
-  font-size: 13px;
-  color: #c1121f;
-}
-
-.closing {
-  margin-top: 0;
-  font-size: 13px;
-}
-
-.signRow {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 40px;
-  margin: 42px 0 18px;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.signRow > div {
-  border-top: 1px solid #bbb;
-  padding-top: 10px;
-  margin-top: 48px;
-}
-
 .footerBar {
-  background: linear-gradient(90deg, #c1121f 0%, #e85d04 55%, #f48c06 100%);
+  position: relative;
+  z-index: 2;
+  margin-top: auto;
+  background: linear-gradient(90deg, var(--lh-red) 0%, var(--lh-orange) 55%, var(--lh-amber) 100%);
   color: #fff;
   text-align: center;
   font-size: 12.5px;
   font-weight: 600;
-  padding: 12px 16px;
+  padding: 14px 20px;
   letter-spacing: 0.02em;
+  /* Flush to bottom edge of the A4 sheet (no gap under the bar) */
+  border: 0;
 }
 
 @media (max-width: 900px) {
@@ -292,13 +191,18 @@
 }
 
 @media (max-width: 720px) {
-  .sheet {
-    padding: 20px 16px;
+  .frame {
+    --lh-rail: 7px;
+    --lh-top: 6px;
+    --lh-inner: 16px;
+    min-height: 0;
   }
 
-  .top,
-  .parties,
-  .signRow {
+  .sheet {
+    padding: 18px 16px 16px;
+  }
+
+  .top {
     display: grid;
     grid-template-columns: 1fr;
   }
@@ -307,8 +211,8 @@
     text-align: left;
   }
 
-  .totals {
-    width: 100%;
+  .frame::after {
+    inset: 10px;
   }
 
   .hint {
@@ -317,10 +221,16 @@
 }
 
 @media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
   .chrome {
     margin: 0;
     background: #fff !important;
     color: #111;
+    padding: 0;
   }
 
   .toolbar {
@@ -328,13 +238,14 @@
   }
 
   .preview {
-    width: 100%;
+    width: 210mm;
     margin: 0;
   }
 
   .frame {
+    width: 210mm;
+    min-height: 297mm;
     box-shadow: none !important;
-    border-left-width: 6px;
-    border-right-width: 6px;
+    page-break-inside: avoid;
   }
 }

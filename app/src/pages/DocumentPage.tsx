@@ -33,6 +33,7 @@ import {
   elementToPdfBlob,
   quoteValidUntil,
 } from '../lib/documents'
+import styles from './DocumentPage.module.css'
 import {
   DELIVERY_NOTE_COLUMNS,
   canCreateDeliveryNoteFromQuote,
@@ -733,54 +734,21 @@ export default function DocumentPage() {
         </div>
       ) : null}
 
-      <div
-        style={{
-          width: 'min(900px, calc(100% - 24px))',
-          margin: '20px auto 40px',
-        }}
-      >
-        <div
-          ref={sheetRef}
-          style={{
-            background: '#fff',
-            boxShadow: '0 18px 40px rgba(0,0,0,0.12)',
-            borderLeft: '10px solid #e85d04',
-            borderRight: '10px solid #e85d04',
-          }}
-        >
-          <div style={{ padding: '36px 40px 24px' }}>
+      <div className={styles.preview}>
+        <div ref={sheetRef} className={styles.frame}>
+          <div className={styles.sheet}>
             {isDraft && (
-              <div
-                style={{
-                  background: '#fff3cd',
-                  color: '#7a5b00',
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  marginBottom: 14,
-                  fontSize: 13,
-                  fontWeight: 600,
-                }}
-              >
-                DRAFT — reference not finalized
-              </div>
+              <div className={styles.draftBanner}>DRAFT — reference not finalized</div>
             )}
 
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: 24,
-                paddingBottom: 18,
-                borderBottom: '2px solid #e85d04',
-              }}
-            >
+            <div className={styles.top}>
               <div>
                 <img
                   src={resolveLogoUrl(settings.logoUrl)}
                   alt={settings.brand || 'RED REACH'}
-                  style={{ maxHeight: 72, maxWidth: 280, objectFit: 'contain' }}
+                  className={styles.logo}
                 />
-                <div style={{ marginTop: 10, color: '#555', fontSize: 12.5, lineHeight: 1.5 }}>
+                <div className={styles.company}>
                   <div style={{ fontWeight: 700, color: '#111' }}>
                     {settings.companyName || 'Red Reach Middle East FZE'}
                   </div>
@@ -796,38 +764,15 @@ export default function DocumentPage() {
                   ) : null}
                 </div>
                 {division ? (
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      marginTop: 8,
-                      padding: '6px 10px',
-                      borderRadius: 999,
-                      background: 'linear-gradient(90deg, #c1121f, #e85d04)',
-                      color: '#fff',
-                      fontSize: 12,
-                      fontWeight: 700,
-                    }}
-                  >
+                  <span className={styles.divisionPill}>
                     {quoteFormat.introEyebrow || division}
                   </span>
                 ) : null}
               </div>
-              <div style={{ textAlign: 'right', minWidth: 220 }}>
-                <div
-                  style={{
-                    fontSize: 12,
-                    letterSpacing: '0.14em',
-                    textTransform: 'uppercase',
-                    color: '#c1121f',
-                    fontWeight: 700,
-                  }}
-                >
-                  {title}
-                </div>
-                <h1 style={{ margin: '6px 0 12px', fontSize: 22, wordBreak: 'break-word' }}>
-                  {displayRef}
-                </h1>
-                <div style={{ display: 'grid', gap: 4, fontSize: 13 }}>
+              <div className={styles.docMeta}>
+                <div className={styles.docLabel}>{title}</div>
+                <h1>{displayRef}</h1>
+                <div className={styles.metaGrid}>
                   <div>
                     <span style={{ color: '#555' }}>Date: </span>
                     {doc.date ? format(new Date(doc.date), 'dd MMM yyyy') : '—'}
@@ -1269,16 +1214,7 @@ export default function DocumentPage() {
             </div>
           </div>
 
-          <div
-            style={{
-              background: 'linear-gradient(90deg, #c1121f 0%, #e85d04 55%, #f48c06 100%)',
-              color: '#fff',
-              textAlign: 'center',
-              fontSize: 12.5,
-              fontWeight: 600,
-              padding: '12px 16px',
-            }}
-          >
+          <div className={styles.footerBar}>
             {settings.tagline || 'Multi-division commerce · UAE'}
             {settings.website ? ` · ${settings.website}` : ''}
           </div>
@@ -1344,7 +1280,8 @@ export default function DocumentPage() {
 
       <style>{`
         @media print {
-          body { background: #fff !important; }
+          @page { size: A4; margin: 0; }
+          html, body { background: #fff !important; margin: 0 !important; }
           a, button { display: none !important; }
           .no-print { display: none !important; }
         }
