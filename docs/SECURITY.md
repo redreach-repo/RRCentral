@@ -67,6 +67,7 @@ are placed under `app/public/`.
 2. Do **not** deploy `bootstrap-admin` without `BOOTSTRAP_ADMIN_SECRET` + `BOOTSTRAP_ADMIN_PASSWORD` secrets; leave it undeployed on production when possible.
 3. Apply `20261009120000_owned_domains_rls_fix.sql` if `owned_domains` was created before this fix.
 4. In **Settings → Zoho**, regenerate Zoho client secret + refresh token, save, then click **Mark Zoho credentials rotated** (sets `zohoPostHardeningRotationAck`).
+5. **GitHub Actions `VITE_SUPABASE_ANON_KEY` must be the anon key.** If `service_role` was ever used, rotate `service_role` in Supabase → API, fix the secret, redeploy Pages. The build fails if `service_role` is supplied again.
 
 ## Other protections
 

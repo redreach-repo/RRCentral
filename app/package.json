@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "assert:supabase-key": "node scripts/assert-client-supabase-key.mjs",
+    "build": "npm run assert:supabase-key && tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
