@@ -54,6 +54,15 @@ export function isQuotePastValidity(validUntil: string | null | undefined, today
   }
 }
 
+export type A4Placement = {
+  /** Image Y offset in mm (negative for page 2+) */
+  y: number
+  width: number
+  height: number
+  /** Stretch image to fill the whole A4 page (near-A4 single page). */
+  fillPage?: boolean
+}
+
 /**
  * How to place a captured bitmap onto A4 pages.
  * - Near-A4 captures fit on one page (full-bleed width).
@@ -62,26 +71,30 @@ export function isQuotePastValidity(validUntil: string | null | undefined, today
 export function planA4ImagePlacement(
   canvasWidth: number,
   canvasHeight: number,
-): { pageWidth: number; pageHeight: number; placements: { y: number; width: number; height: number }[] } {
+): { pageWidth: number; pageHeight: number; placements: A4Placement[] } {
   const pageWidth = A4_WIDTH_MM
   const pageHeight = A4_HEIGHT_MM
   if (canvasWidth <= 0 || canvasHeight <= 0) {
-    return { pageWidth, pageHeight, placements: [{ y: 0, width: pageWidth, height: pageHeight }] }
+    return {
+      pageWidth,
+      pageHeight,
+      placements: [{ y: 0, width: pageWidth, height: pageHeight, fillPage: true }],
+    }
   }
 
   const heightAtFullWidth = (canvasHeight * pageWidth) / canvasWidth
 
-  // Slight overshoot (borders/subpixels): squash onto one A4 page, full bleed.
+  // Within ~A4 (+ small tolerance): one full-bleed page.
   if (heightAtFullWidth <= pageHeight * 1.08) {
     return {
       pageWidth,
       pageHeight,
-      placements: [{ y: 0, width: pageWidth, height: Math.min(heightAtFullWidth, pageHeight) }],
+      placements: [{ y: 0, width: pageWidth, height: Math.min(heightAtFullWidth, pageHeight), fillPage: true }],
     }
   }
 
   // True multi-page: slice the image across A4 pages at full width.
-  const placements: { y: number; width: number; height: number }[] = []
+  const placements: A4Placement[] = []
   let heightLeft = heightAtFullWidth
   let position = 0
   placements.push({ y: position, width: pageWidth, height: heightAtFullWidth })
@@ -94,31 +107,28 @@ export function planA4ImagePlacement(
   return { pageWidth, pageHeight, placements }
 }
 
-function applyA4SheetStyles(element: HTMLElement): () => void {
-  const prev = {
-    width: element.style.width,
-    maxWidth: element.style.maxWidth,
-    minWidth: element.style.minWidth,
-    height: element.style.height,
-    minHeight: element.style.minHeight,
-    boxSizing: element.style.boxSizing,
-  }
-  const wPx = Math.round(A4_WIDTH_MM * PX_PER_MM)
-  const hPx = Math.round(A4_HEIGHT_MM * PX_PER_MM)
-  element.style.boxSizing = 'border-box'
-  element.style.width = `${wPx}px`
-  element.style.maxWidth = `${wPx}px`
-  element.style.minWidth = `${wPx}px`
-  // At least one A4 tall so the letterhead frame fills the page; allow growth for long docs.
-  element.style.minHeight = `${hPx}px`
-  element.style.height = ''
-  return () => {
-    element.style.width = prev.width
-    element.style.maxWidth = prev.maxWidth
-    element.style.minWidth = prev.minWidth
-    element.style.height = prev.height
-    element.style.minHeight = prev.minHeight
-    element.style.boxSizing = prev.boxSizing
+function prepareCloneForA4Capture(cloned: HTMLElement) {
+  const a4Wpx = Math.round(A4_WIDTH_MM * PX_PER_MM)
+  const a4Hpx = Math.round(A4_HEIGHT_MM * PX_PER_MM)
+
+  cloned.style.boxSizing = 'border-box'
+  cloned.style.width = `${a4Wpx}px`
+  cloned.style.maxWidth = `${a4Wpx}px`
+  cloned.style.minWidth = `${a4Wpx}px`
+  cloned.style.minHeight = `${a4Hpx}px`
+  cloned.style.height = 'auto'
+  cloned.style.overflow = 'visible'
+  cloned.style.transform = 'none'
+  cloned.style.zoom = '1'
+
+  // Ancestors often clip (preview max-width / overflow). Open them on the clone only.
+  let parent: HTMLElement | null = cloned.parentElement
+  while (parent) {
+    parent.style.overflow = 'visible'
+    parent.style.maxWidth = 'none'
+    parent.style.width = 'auto'
+    parent.style.transform = 'none'
+    parent = parent.parentElement
   }
 }
 
@@ -126,24 +136,16 @@ export async function elementToPdfBlob(
   element: HTMLElement,
   opts?: { filenameHint?: string },
 ): Promise<{ blob: Blob; filename: string; dataUrl: string }> {
-  const restore = applyA4SheetStyles(element)
-  let canvas: HTMLCanvasElement
-  try {
-    // Force layout at A4 CSS pixels before capture.
-    void element.offsetHeight
-    canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      logging: false,
-      width: element.offsetWidth,
-      height: Math.max(element.offsetHeight, element.scrollHeight),
-      windowWidth: element.offsetWidth,
-      windowHeight: Math.max(element.offsetHeight, element.scrollHeight),
-    })
-  } finally {
-    restore()
-  }
+  const canvas = await html2canvas(element, {
+    scale: 2,
+    useCORS: true,
+    backgroundColor: '#ffffff',
+    logging: false,
+    // Style the clone — never shrink the live preview, never clip rails/totals.
+    onclone(_doc, cloned) {
+      prepareCloneForA4Capture(cloned)
+    },
+  })
 
   // Explicit A4 size in mm — do not rely on named 'a4' (avoids Letter surprises).
   const pdf = new jsPDF({
@@ -158,8 +160,8 @@ export async function elementToPdfBlob(
 
   plan.placements.forEach((p, index) => {
     if (index > 0) pdf.addPage([A4_WIDTH_MM, A4_HEIGHT_MM], 'portrait')
-    // First page near-A4: fill the page so letterhead rails stay edge-to-edge.
-    if (plan.placements.length === 1) {
+    if (p.fillPage) {
+      // Full-bleed A4 so letterhead rails sit on the paper edges.
       pdf.addImage(img, 'JPEG', 0, 0, A4_WIDTH_MM, A4_HEIGHT_MM, undefined, 'FAST')
     } else {
       pdf.addImage(img, 'JPEG', 0, p.y, p.width, p.height, undefined, 'FAST')
