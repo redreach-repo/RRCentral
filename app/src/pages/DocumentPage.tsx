@@ -1189,24 +1189,45 @@ export default function DocumentPage() {
               (!isDeliveryNote && quoteFormat.defaultScopeNotes) ||
               (!isDeliveryNote && !isWandersQuote && settings.quoteTerms) ||
               (isWandersQuote && wandersTermsBlock)) && (
-              <div style={{ marginTop: 22, fontSize: 12.5, lineHeight: 1.55, color: '#333' }}>
-                <h3 style={{ margin: '0 0 8px', fontSize: 13, color: '#c1121f' }}>
+              <div style={{ marginTop: 14, fontSize: 12.5, lineHeight: 1.45, color: '#333' }}>
+                <h3 style={{ margin: '0 0 6px', fontSize: 13, color: '#c1121f' }}>
                   {quoteFormat.sectionHeadings.terms}
                 </h3>
-                <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                  {isDeliveryNote
-                    ? doc.notes
-                    : isWandersQuote
-                    ? [doc.notes, wandersTermsBlock].filter(Boolean).join('\n\n')
-                    : [doc.notes, quoteFormat.defaultScopeNotes || settings.quoteTerms]
-                        .filter(Boolean)
-                        .join('\n\n')}
-                </p>
+                {(() => {
+                  const blocks = (
+                    isDeliveryNote
+                      ? [doc.notes]
+                      : isWandersQuote
+                        ? [doc.notes, wandersTermsBlock]
+                        : [doc.notes, quoteFormat.defaultScopeNotes || settings.quoteTerms]
+                  )
+                    .map((part) =>
+                      String(part || '')
+                        .replace(/\n{2,}/g, '\n')
+                        .trim(),
+                    )
+                    .filter(Boolean)
+                  return (
+                    <div>
+                      {blocks.map((block, i) => (
+                        <p
+                          key={`note-block-${i}`}
+                          style={{
+                            margin: i === 0 ? 0 : '4px 0 0',
+                            whiteSpace: 'pre-wrap',
+                          }}
+                        >
+                          {block}
+                        </p>
+                      ))}
+                    </div>
+                  )
+                })()}
               </div>
             )}
 
             {docType === 'quote' ? (
-              <p style={{ marginTop: 18, fontSize: 13 }}>
+              <p style={{ marginTop: 12, fontSize: 13 }}>
                 {isWandersQuote
                   ? null
                   : quoteFormat.closingNote || settings.quoteClosing || null}
@@ -1217,26 +1238,26 @@ export default function DocumentPage() {
               style={{
                 display: 'grid',
                 gridTemplateColumns: '1fr 1fr',
-                gap: 40,
-                margin: '42px 0 18px',
+                gap: 24,
+                margin: '18px 0 10px',
                 fontSize: 13,
                 fontWeight: 700,
               }}
             >
-              <div style={{ borderTop: '1px solid #bbb', paddingTop: 10, marginTop: 48 }}>
+              <div style={{ borderTop: '1px solid #bbb', paddingTop: 8, marginTop: 12 }}>
                 {isDeliveryNote
                   ? `Delivered by ${settings.companyName || 'Red Reach Middle East FZE'}`
                   : `For ${settings.companyName || 'Red Reach Middle East FZE'}`}
                 {isDeliveryNote ? (
-                  <div style={{ fontWeight: 400, marginTop: 28, color: '#555', fontSize: 12 }}>
+                  <div style={{ fontWeight: 400, marginTop: 20, color: '#555', fontSize: 12 }}>
                     Name / date
                   </div>
                 ) : null}
               </div>
-              <div style={{ borderTop: '1px solid #bbb', paddingTop: 10, marginTop: 48 }}>
+              <div style={{ borderTop: '1px solid #bbb', paddingTop: 8, marginTop: 12 }}>
                 {isDeliveryNote ? 'Received by (goods in good order)' : 'Client acceptance'}
                 {isDeliveryNote ? (
-                  <div style={{ fontWeight: 400, marginTop: 28, color: '#555', fontSize: 12 }}>
+                  <div style={{ fontWeight: 400, marginTop: 20, color: '#555', fontSize: 12 }}>
                     {deliveryNote?.received_by || 'Name / signature / date'}
                   </div>
                 ) : null}
