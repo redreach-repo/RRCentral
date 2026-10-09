@@ -1,0 +1,38 @@
+# Emergency: redeploy the last known Pages artifact that still connected to Supabase.
+# Source run: Deploy GitHub Pages after #92 (ad7be0f) — before cutover stripped the client key.
+name: Rollback Pages (restore cloud)
+on:
+  workflow_dispatch:
+jobs:
+  rollback:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      actions: read
+    steps:
+      - name: Download last cloud-connected Pages artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 37933283990
+          path: pages-artifact
+      - name: Prepare artifact for deploy-pages
+        run: |
+          set -euo pipefail
+          cd pages-artifact
+          if [ -f artifact.tar ]; then
+            tar -xf artifact.tar
+            rm -f artifact.tar
+          fi
+          # upload-pages-artifact expects a directory of static files
+          ls -la | head
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages-artifact
+      - id: deployment
+        uses: actions/deploy-pages@v4

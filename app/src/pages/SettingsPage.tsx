@@ -230,7 +230,11 @@ export default function SettingsPage() {
   const backupRef = useRef<HTMLInputElement>(null)
   const cloudBackupRef = useRef<HTMLInputElement>(null)
   const runtimeCfg = getSupabaseRuntimeConfig()
-  const [supabaseUrl, setSupabaseUrl] = useState(runtimeCfg.source === 'runtime' ? runtimeCfg.url : '')
+  const [supabaseUrl, setSupabaseUrl] = useState(
+    runtimeCfg.source === 'runtime'
+      ? runtimeCfg.url
+      : runtimeCfg.url || 'https://pszjylxrpvlumldtptrr.supabase.co',
+  )
   const [supabaseKey, setSupabaseKey] = useState(
     runtimeCfg.source === 'runtime' ? runtimeCfg.anonKey : '',
   )

@@ -157,8 +157,11 @@ export default function Layout() {
     <div className={`${styles.shell} ${phoneShell ? styles.shellPhone : ''}`}>
       <div className={styles.ambient} aria-hidden />
       {isLocalMode && (
-        <div className={styles.localBanner} role="status">
-          Local mode — data stays in this browser until you connect Supabase in Settings
+        <div className={styles.localBanner} role="alert">
+          <strong>Cloud disconnected — your CRM data is safe in Supabase.</strong> This browser is in
+          Local mode (empty). Go to <strong>Settings → Connect Supabase</strong>: URL{' '}
+          <code>https://pszjylxrpvlumldtptrr.supabase.co</code> + the <strong>anon</strong> key from
+          Supabase → Project Settings → API, then Connect &amp; reload.
         </div>
       )}
       {sidebarOpen && (
