@@ -1,13 +1,36 @@
 import { describe, expect, it } from 'vitest'
 import {
+  A4_HEIGHT_MM,
+  A4_WIDTH_MM,
   displayDocumentReference,
   isInternalDraftId,
   isQuotePastValidity,
+  planA4ImagePlacement,
   quoteValidUntil,
 } from './documents'
 import { applyMessageTemplate } from './templates'
 
 describe('documents', () => {
+  it('plans near-A4 captures as a single A4 page (not US Letter)', () => {
+    // Exact A4 pixel ratio
+    const plan = planA4ImagePlacement(794, 1123)
+    expect(plan.pageWidth).toBe(A4_WIDTH_MM)
+    expect(plan.pageHeight).toBe(A4_HEIGHT_MM)
+    expect(plan.pageWidth).not.toBe(215.9) // US Letter width
+    expect(plan.placements).toHaveLength(1)
+  })
+
+  it('fits slight overshoot onto one A4 page', () => {
+    const plan = planA4ImagePlacement(800, 1200) // taller than A4 ratio but within 8%
+    expect(plan.placements).toHaveLength(1)
+  })
+
+  it('paginates clearly taller captures on A4', () => {
+    const plan = planA4ImagePlacement(800, 2000)
+    expect(plan.pageHeight).toBe(A4_HEIGHT_MM)
+    expect(plan.placements.length).toBeGreaterThan(1)
+  })
+
   it('detects internal draft ids', () => {
     expect(isInternalDraftId('Q-1785391827656')).toBe(true)
     expect(isInternalDraftId('RR-01-26001')).toBe(false)
