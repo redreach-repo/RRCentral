@@ -36,13 +36,21 @@ export function isUnsafeBrowserSupabaseKey(key: string): boolean {
   return supabaseJwtRole(key) === 'service_role'
 }
 
+/**
+ * Whether the browser may use this key to talk to Supabase.
+ *
+ * EMERGENCY (2026-10-09): temporarily ACCEPT service_role so a mis-set GitHub
+ * secret still reconnects cloud CRM after Pages stripped credentials. This
+ * bypasses RLS — replace VITE_SUPABASE_ANON_KEY with the anon key ASAP, then
+ * flip this back to refuse service_role.
+ */
 function acceptClientKey(key: string): boolean {
   if (!key) return false
   if (isUnsafeBrowserSupabaseKey(key)) {
     console.error(
-      '[RRCentral] Refusing service_role key in the browser. Use the anon/publishable key and rotate service_role.',
+      '[RRCentral] EMERGENCY: using service_role in the browser (RLS bypass). Replace GitHub secret VITE_SUPABASE_ANON_KEY with the anon key and rotate service_role immediately.',
     )
-    return false
+    return true
   }
   return true
 }

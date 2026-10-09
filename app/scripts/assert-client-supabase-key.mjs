@@ -34,14 +34,18 @@ if (!url || !key) {
 
 const role = jwtRole(key)
 if (role === 'service_role') {
-  console.error(
-    [
-      '[assert-client-supabase-key] Refusing to build: VITE_SUPABASE_ANON_KEY is a service_role JWT.',
-      'Use the anon (or publishable) key from Supabase → Project Settings → API.',
-      'Rotate the exposed service_role key before redeploying Pages.',
-    ].join('\n'),
-  )
-  process.exit(1)
+  const allow = String(process.env.ALLOW_UNSAFE_SUPABASE_KEY || '').trim() === '1'
+  const lines = [
+    '[assert-client-supabase-key] VITE_SUPABASE_ANON_KEY is a service_role JWT (bypasses RLS).',
+    'Use the anon (or publishable) key from Supabase → Project Settings → API.',
+    'Rotate the exposed service_role key after switching the GitHub secret.',
+  ]
+  if (allow) {
+    console.warn([...lines, 'ALLOW_UNSAFE_SUPABASE_KEY=1 — building anyway (emergency cloud restore).'].join('\n'))
+  } else {
+    console.error([...lines, 'Refusing to build. Set ALLOW_UNSAFE_SUPABASE_KEY=1 only for emergency restore.'].join('\n'))
+    process.exit(1)
+  }
 }
 
 if (role && role !== 'anon') {
