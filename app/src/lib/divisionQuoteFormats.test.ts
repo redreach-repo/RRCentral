@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { DIVISION_QUOTE_FORMATS, getDivisionQuoteFormat } from './divisionQuoteFormats'
+import {
+  DIVISION_QUOTE_FORMATS,
+  getDivisionQuoteFormat,
+  resolveDivisionCode,
+} from './divisionQuoteFormats'
 import { CONNECT_PARTNER, buildConnectCatalogue, buildMarketingCatalogue } from './seedDivisionCatalogues'
 
 describe('division quote formats', () => {
@@ -45,5 +49,18 @@ describe('division quote formats', () => {
   it('seeds Marketing and Connect catalogues under correct divisions', () => {
     expect(buildMarketingCatalogue().every((p) => p.division_code === '03')).toBe(true)
     expect(buildConnectCatalogue().every((p) => p.division_code === '04')).toBe(true)
+  })
+
+  it('resolves invoice division from vertical brand (no division_code column)', () => {
+    expect(resolveDivisionCode({ vertical: 'RR Marketing' })).toBe('03')
+    expect(resolveDivisionCode({ vertical: 'RR Threads' })).toBe('01')
+    expect(resolveDivisionCode({ referenceNumber: 'INV-03-26001' })).toBe('03')
+    expect(resolveDivisionCode({ divisionCode: '04' })).toBe('04')
+    expect(getDivisionQuoteFormat(resolveDivisionCode({ vertical: 'RR Marketing' })).showMoq).toBe(
+      false,
+    )
+    expect(
+      getDivisionQuoteFormat(resolveDivisionCode({ vertical: 'RR Marketing' })).showDelivery,
+    ).toBe(false)
   })
 })

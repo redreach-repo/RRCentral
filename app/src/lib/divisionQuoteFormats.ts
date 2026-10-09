@@ -4,7 +4,37 @@
  * `quoteFormat_XX_*` when present.
  */
 
+import { DIVISIONS } from './config'
+
 export type DivisionCode = '01' | '02' | '03' | '04' | '05' | '06'
+
+const DIVISION_CODES = new Set<string>(['01', '02', '03', '04', '05', '06'])
+
+/** Map brand name (e.g. invoices.vertical) or ref like INV-03-… / RR-03-… to a division code. */
+export function resolveDivisionCode(opts: {
+  divisionCode?: string | null
+  vertical?: string | null
+  referenceNumber?: string | null
+}): DivisionCode {
+  const direct = String(opts.divisionCode || '').trim()
+  if (DIVISION_CODES.has(direct)) return direct as DivisionCode
+
+  const brand = String(opts.vertical || '').trim().toLowerCase()
+  if (brand) {
+    const byBrand = DIVISIONS.find((d) => d.brand.toLowerCase() === brand)
+    if (byBrand) return byBrand.code as DivisionCode
+    const byPartial = DIVISIONS.find(
+      (d) => brand.includes(d.brand.toLowerCase()) || d.brand.toLowerCase().includes(brand),
+    )
+    if (byPartial) return byPartial.code as DivisionCode
+  }
+
+  const ref = String(opts.referenceNumber || '').trim()
+  const m = ref.match(/(?:^|[-_])(\d{2})(?:[-_]|$)/)
+  if (m && DIVISION_CODES.has(m[1])) return m[1] as DivisionCode
+
+  return '01'
+}
 
 export type QuoteColumnId =
   | 'line'
