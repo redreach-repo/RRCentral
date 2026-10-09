@@ -1,15 +1,22 @@
-# Bootstraps the default admin Auth user (service role).
+# bootstrap-admin (optional, disabled by default)
 
-Creates or resets `info@redreach.ae` with password `RedReach2026#` and
-`email_confirm: true`. Prefer applying the SQL migration
-`20261006170000_default_admin_info.sql` in the Supabase SQL Editor — that does
-the same without needing this function.
+Creates or resets `info@redreach.ae` in Auth + `app_users`. **Disabled** until you set Supabase secrets:
 
-## Optional deploy
+| Secret | Requirement |
+|--------|-------------|
+| `BOOTSTRAP_ADMIN_SECRET` | 32+ random characters |
+| `BOOTSTRAP_ADMIN_PASSWORD` | 12+ character password (not stored in this repo) |
+
+Call with header `x-bootstrap-secret: <BOOTSTRAP_ADMIN_SECRET>`.
+
+**Preferred:** apply `20261006170000_default_admin_info.sql` once, then set the password in **Supabase → Authentication → Users**, or use **`manage-auth-user`** from Settings (admin).
+
+Do **not** deploy this function on production unless you need a one-time bootstrap and you rotate/remove it afterward.
 
 ```bash
-supabase functions deploy bootstrap-admin --project-ref pszjylxrpvlumldtptrr --no-verify-jwt
-curl -X POST "https://pszjylxrpvlumldtptrr.supabase.co/functions/v1/bootstrap-admin" \
-  -H "Authorization: Bearer <ANON_KEY>" \
-  -H "apikey: <ANON_KEY>"
+supabase secrets set BOOTSTRAP_ADMIN_SECRET='…' BOOTSTRAP_ADMIN_PASSWORD='…'
+supabase functions deploy bootstrap-admin --no-verify-jwt
+curl -X POST "$SUPABASE_URL/functions/v1/bootstrap-admin" \
+  -H "apikey: $ANON_KEY" \
+  -H "x-bootstrap-secret: $BOOTSTRAP_ADMIN_SECRET"
 ```

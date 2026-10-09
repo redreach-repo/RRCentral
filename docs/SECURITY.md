@@ -44,7 +44,7 @@ Deactivate someone by unticking **Active** in Settings → Users — they lose a
    Authentication → URL configuration: only
    `https://redreach-repo.github.io/RRCentral/login` (and localhost for dev) as redirect URLs.
 
-## Data that was public
+## Data that was public (urgent owner action)
 
 Until this change, `app/public/migration-data.json` (a full CRM/finance export) and a
 customer invoice PDF were deployed to GitHub Pages and are still present in **git
@@ -52,10 +52,21 @@ history** of this public repository. Removing them from the branch stops new dep
 serving them, but anyone can still read old commits. Options (owner decision):
 
 - Make the repository private (GitHub Pages on a private repo needs a paid plan), and/or
-- Rewrite history to purge the files (`git filter-repo --path app/public/migration-data.json --invert-paths`),
-  force-push, and ask GitHub Support to clear cached views.
+- Run [`scripts/purge-sensitive-git-history.sh`](../scripts/purge-sensitive-git-history.sh)
+  (`git filter-repo`), force-push all branches/tags, and ask GitHub Support to clear cached views.
 - Treat the exposed data as disclosed: consider notifying affected customers as required
   by UAE PDPL.
+
+The app **no longer auto-imports** `migration-data.json` in local mode unless an operator
+sets `localStorage.rrcentral_allow_sheets_dump_import = '1'`. CI still fails if dumps
+are placed under `app/public/`.
+
+## Post-hardening checklist (admin)
+
+1. Change `info@redreach.ae` password if it was ever the documented default.
+2. Do **not** deploy `bootstrap-admin` without `BOOTSTRAP_ADMIN_SECRET` + `BOOTSTRAP_ADMIN_PASSWORD` secrets; leave it undeployed on production when possible.
+3. Apply `20261009120000_owned_domains_rls_fix.sql` if `owned_domains` was created before this fix.
+4. In **Settings → Zoho**, regenerate Zoho client secret + refresh token, save, then click **Mark Zoho credentials rotated** (sets `zohoPostHardeningRotationAck`).
 
 ## Other protections
 

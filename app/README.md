@@ -83,12 +83,7 @@ Tokens are stored in local settings (browser IndexedDB in local mode). Browser C
 
 Admins (seeded): `info@redreach.ae`, `alfred@redreach.ae`, `jacob@redreach.ae`.
 
-After applying `supabase/migrations/20261006170000_default_admin_info.sql`:
-
-- Email: `info@redreach.ae`
-- Temporary password: `RedReach2026#`
-
-Change it immediately under Settings → My password.
+After applying `supabase/migrations/20261006170000_default_admin_info.sql`, set the password in **Supabase Auth** or **Settings → User management**, then sign in as `info@redreach.ae` and change it under **Settings → My password**. Do not reuse passwords from documentation or git history.
 
 
 ## Roles

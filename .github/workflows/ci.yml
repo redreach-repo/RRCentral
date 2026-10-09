@@ -45,7 +45,7 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - run: deno check supabase/functions/zoho-proxy/index.ts supabase/functions/create-checkout-session/index.ts
+      - run: deno check supabase/functions/zoho-proxy/index.ts supabase/functions/create-checkout-session/index.ts supabase/functions/bootstrap-admin/index.ts
 
   migrations:
     name: Apply migrations + RLS tests

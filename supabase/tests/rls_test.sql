@@ -19,6 +19,7 @@ insert into vendors (company_name) values ('Acme Supplier');
 insert into crm (company_name) values ('Lead Co');
 insert into invoices (client, reference_number) values ('Client A', 'RR-1');
 insert into expenses (vendor) values ('Fuel');
+insert into owned_domains (domain_name, registrar) values ('example.ae', 'Registrar Co');
 
 create function pg_temp.expect(ok boolean, what text) returns void language plpgsql as $$
 begin
@@ -50,6 +51,7 @@ grant execute on all functions in schema pg_temp to anon, authenticated;
 ------------------------------------------------------------ anonymous visitor
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from vendors'), 'anon cannot read vendors');
+select pg_temp.expect(pg_temp.fails('select 1 from owned_domains'), 'anon cannot read owned_domains');
 select pg_temp.expect(pg_temp.fails('select 1 from customer_documents'), 'anon cannot read customer_documents');
 select pg_temp.expect(pg_temp.fails('select 1 from crm'), 'anon cannot read crm');
 select pg_temp.expect(pg_temp.fails('select 1 from website_inquiries'), 'anon cannot read inquiries');
@@ -81,6 +83,9 @@ reset role;
 set role authenticated;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
 select pg_temp.expect((select count(*) from crm) = 1, 'sales reads CRM (email match is case-insensitive)');
+select pg_temp.expect((select count(*) from owned_domains) = 1, 'sales reads owned domains');
+update owned_domains set registrar = 'Updated' where domain_name = 'example.ae';
+select pg_temp.expect((select registrar from owned_domains where domain_name = 'example.ae') = 'Updated', 'sales can update owned domains');
 select pg_temp.expect((select count(*) from app_settings where key in ('zohoClientSecret', 'zohoRefreshToken')) = 0, 'sales cannot read Zoho secrets');
 select pg_temp.expect((select count(*) from app_settings where key = 'zohoClientId') = 1, 'sales can read Zoho client id');
 update crm set notes = 'called' where company_name = 'Lead Co';

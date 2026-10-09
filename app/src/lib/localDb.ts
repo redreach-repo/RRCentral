@@ -99,6 +99,7 @@ const DEFAULT_SETTINGS: { key: string; value: string }[] = [
   { key: 'zohoMailAccountId', value: '' },
   { key: 'zohoCalendarEnabled', value: 'no' },
   { key: 'zohoMailEnabled', value: 'no' },
+  { key: 'zohoPostHardeningRotationAck', value: 'no' },
   { key: 'wandersLegalEntityName', value: 'TBC' },
   { key: 'wandersTradingName', value: 'RR Wanders' },
   { key: 'wandersRegisteredCountry', value: 'TBC' },

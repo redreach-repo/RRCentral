@@ -1003,6 +1003,47 @@ export default function SettingsPage() {
         <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
           <Plug size={18} /> Zoho Calendar &amp; Mail
         </h2>
+        {can(userRole, 'settings.manage') &&
+        (draft.zohoPostHardeningRotationAck ?? settings.zohoPostHardeningRotationAck ?? 'no') !==
+          'yes' &&
+        ((draft.zohoClientSecret ?? settings.zohoClientSecret)?.trim() ||
+          (draft.zohoRefreshToken ?? settings.zohoRefreshToken)?.trim()) ? (
+          <div
+            style={{
+              marginBottom: 14,
+              padding: 12,
+              borderRadius: 8,
+              border: '1px solid rgba(245, 158, 11, 0.45)',
+              background: 'rgba(245, 158, 11, 0.08)',
+              fontSize: 13,
+              lineHeight: 1.5,
+              color: colors.muted,
+            }}
+          >
+            <strong style={{ color: colors.warn }}>Rotate Zoho credentials</strong> — before RLS
+            hardening, any signed-in user could read client secret and refresh token. Regenerate them
+            in the Zoho API Console, paste the new values below, save, then confirm here.
+            <div style={{ marginTop: 10 }}>
+              <button
+                type="button"
+                style={buttonSecondaryStyle}
+                onClick={() =>
+                  void (async () => {
+                    try {
+                      await updateSetting('zohoPostHardeningRotationAck', 'yes')
+                      setDraft((d) => ({ ...d, zohoPostHardeningRotationAck: 'yes' }))
+                      showToast('Marked Zoho credentials as rotated', 'success')
+                    } catch (e) {
+                      showToast(e instanceof Error ? e.message : 'Could not save', 'error')
+                    }
+                  })()
+                }
+              >
+                Mark Zoho credentials rotated
+              </button>
+            </div>
+          </div>
+        ) : null}
         <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.55 }}>
           Connect Zoho so CRM follow-ups sync to Calendar, you can send mail from CRM, and your{' '}
           <strong>Zoho mail</strong> (Inbox + Sent) appears on the Dashboard matched to CRM companies.

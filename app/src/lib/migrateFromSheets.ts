@@ -23,6 +23,9 @@ function rememberImportVersion(version: number) {
   localStorage.removeItem('rrcentral_sheets_import_v1')
 }
 
+/** Explicit opt-in only — never auto-load customer dumps from public/ (security). */
+const SHEETS_DUMP_OPT_IN = 'rrcentral_allow_sheets_dump_import'
+
 export async function tryAutoImportSheetsDump(): Promise<{
   imported: boolean
   counts?: Record<string, number>
@@ -30,6 +33,9 @@ export async function tryAutoImportSheetsDump(): Promise<{
 }> {
   if (authMode !== 'local') return { imported: false }
   if (typeof window === 'undefined') return { imported: false }
+  if (localStorage.getItem(SHEETS_DUMP_OPT_IN) !== '1') {
+    return { imported: false }
+  }
 
   try {
     const url = `${import.meta.env.BASE_URL}migration-data.json`
