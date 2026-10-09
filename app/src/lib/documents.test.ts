@@ -6,7 +6,9 @@ import {
   isInternalDraftId,
   isQuotePastValidity,
   planA4ImagePlacement,
+  planFitPageCount,
   quoteValidUntil,
+  splitCanvasVertically,
 } from './documents'
 import { applyMessageTemplate } from './templates'
 
@@ -29,6 +31,18 @@ describe('documents', () => {
     const plan = planA4ImagePlacement(800, 2000)
     expect(plan.pageHeight).toBe(A4_HEIGHT_MM)
     expect(plan.placements.length).toBeGreaterThan(1)
+  })
+
+  it('fit mode prefers one page, else uniform two', () => {
+    expect(planFitPageCount(A4_HEIGHT_MM)).toBe(1)
+    expect(planFitPageCount(A4_HEIGHT_MM * 1.01)).toBe(1)
+    expect(planFitPageCount(A4_HEIGHT_MM * 1.2)).toBe(2)
+  })
+
+  it('splitCanvasVertically no-ops for a single part', () => {
+    // jsdom may not provide canvas; exercise the parts<=1 guard without DOM.
+    const fake = { width: 100, height: 400 } as HTMLCanvasElement
+    expect(splitCanvasVertically(fake, 1)).toEqual([fake])
   })
 
   it('detects internal draft ids', () => {

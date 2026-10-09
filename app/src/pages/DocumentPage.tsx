@@ -77,6 +77,8 @@ export default function DocumentPage() {
   const [client, setClient] = useState<Client | null>(null)
   const [emailContacts, setEmailContacts] = useState<CrmContact[]>([])
   const [pdfBusy, setPdfBusy] = useState(false)
+  /** Compress blank vertical space so PDFs prefer one A4; else uniform 2-page split. */
+  const [fitToPage, setFitToPage] = useState(true)
   const [dnBusy, setDnBusy] = useState(false)
   const [emailOpen, setEmailOpen] = useState(false)
   const [signedAttachments, setSignedAttachments] = useState<Attachment[]>([])
@@ -348,9 +350,10 @@ export default function DocumentPage() {
     try {
       const { blob, filename } = await elementToPdfBlob(sheetRef.current, {
         filenameHint: `${title.toLowerCase()}-${displayRef}`,
+        fitToPage,
       })
       downloadBlob(blob, filename)
-      showToast('PDF downloaded', 'success')
+      showToast(fitToPage ? 'PDF downloaded (fit to page)' : 'PDF downloaded', 'success')
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'PDF failed', 'error')
     } finally {
@@ -404,6 +407,7 @@ export default function DocumentPage() {
     try {
       const { blob, filename } = await elementToPdfBlob(sheetRef.current, {
         filenameHint: `${title.toLowerCase()}-${displayRef}`,
+        fitToPage,
       })
       downloadBlob(blob, filename)
       showToast('PDF downloaded — attach it to the email if needed', 'success')
@@ -565,6 +569,30 @@ export default function DocumentPage() {
         <ToolbarBtn onClick={() => window.print()}>
           <Printer size={14} /> Print
         </ToolbarBtn>
+        <label
+          title="Compress blank space to fit one A4. Long docs split evenly across two pages. Fonts stay the same size."
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 12px',
+            borderRadius: 999,
+            background: fitToPage ? 'rgba(232, 93, 4, 0.22)' : 'rgba(255,255,255,0.08)',
+            color: '#fff',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+            userSelect: 'none',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={fitToPage}
+            onChange={(e) => setFitToPage(e.target.checked)}
+            style={{ margin: 0, accentColor: '#e85d04' }}
+          />
+          Fit on one page
+        </label>
         <ToolbarBtn onClick={() => void downloadPdf()} disabled={pdfBusy}>
           <Download size={14} /> {pdfBusy ? 'Preparing…' : 'Download PDF'}
         </ToolbarBtn>
@@ -732,7 +760,7 @@ export default function DocumentPage() {
       ) : null}
 
       <div className={styles.preview}>
-        <div ref={sheetRef} className={styles.frame}>
+        <div ref={sheetRef} className={styles.frame} data-pdf-root>
           <div className={styles.sheet}>
             {isDraft && (
               <div className={styles.draftBanner}>DRAFT — reference not finalized</div>
@@ -1216,7 +1244,7 @@ export default function DocumentPage() {
             </div>
           </div>
 
-          <div className={styles.footerBar}>
+          <div className={styles.footerBar} data-pdf-footer>
             {settings.tagline || 'Multi-division commerce · UAE'}
             {settings.website ? ` · ${settings.website}` : ''}
           </div>
