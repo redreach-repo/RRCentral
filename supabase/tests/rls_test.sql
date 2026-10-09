@@ -90,6 +90,15 @@ select pg_temp.expect((select count(*) from app_settings where key in ('zohoClie
 select pg_temp.expect((select count(*) from app_settings where key = 'zohoClientId') = 1, 'sales can read Zoho client id');
 update crm set notes = 'called' where company_name = 'Lead Co';
 select pg_temp.expect((select notes from crm where company_name = 'Lead Co') = 'called', 'sales can update CRM');
+select pg_temp.expect(
+  pg_temp.fails($q$update crm set owner = 'other@redreach.ae' where company_name = 'Lead Co'$q$),
+  'sales cannot reassign CRM owner'
+);
+delete from crm where company_name = 'Lead Co';
+select pg_temp.expect((select count(*) from crm where company_name = 'Lead Co') = 1, 'sales cannot delete CRM');
+insert into quotations (client, quote_id, reference_number) values ('Lead Co', 'Q-TEST-1', 'Q-TEST-1');
+delete from quotations where quote_id = 'Q-TEST-1';
+select pg_temp.expect((select count(*) from quotations where quote_id = 'Q-TEST-1') = 1, 'sales cannot delete quotations');
 insert into app_settings values ('delivery_notes_store', '[]');
 update app_settings set value = 'HACK' where key = 'iban';
 delete from invoices where reference_number = 'RR-1';

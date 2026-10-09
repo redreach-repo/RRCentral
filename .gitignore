@@ -18,3 +18,4 @@ rrcentral-backup-*.json
 *.dump
 *.sql.gz
 app/public/invoices/
+supabase/.temp/

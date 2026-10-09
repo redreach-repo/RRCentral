@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   deliveryNoteAttachmentRefs,
+  saveSignedDeliveryNoteAttachments,
   SIGNED_DELIVERY_NOTE_ENTITY,
 } from './signedDeliveryNotes'
 
@@ -16,5 +17,15 @@ describe('signedDeliveryNotes', () => {
         id: 'uuid-1',
       }),
     ).toEqual(['DN-01-26001', 'uuid-1'])
+  })
+
+  it('refuses to persist signed copies as database blobs', async () => {
+    await expect(
+      saveSignedDeliveryNoteAttachments({
+        note: { reference_number: 'DN-1', id: 'id-1' },
+        files: [{ name: 'scan.pdf', dataUrl: 'data:application/pdf;base64,AAA' }],
+        uploadedBy: 'ops@redreach.ae',
+      }),
+    ).rejects.toThrow(/WorkDrive/)
   })
 })

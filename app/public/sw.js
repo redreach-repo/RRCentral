@@ -1,6 +1,6 @@
 /* Minimal service worker so Chrome can offer "Install app".
    Network-first for navigations, manifest, and icons so branding updates stick. */
-const CACHE = 'rrcentral-shell-v6'
+const CACHE = 'rrcentral-shell-v8'
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -11,6 +11,9 @@ self.addEventListener('install', (event) => {
         '/RRCentral/manifest.webmanifest',
         '/RRCentral/apple-touch-icon.png',
         '/RRCentral/apple-touch-icon-precomposed.png',
+        '/RRCentral/apple-touch-icon-180x180.png',
+        '/RRCentral/app/apple-touch-icon.png',
+        '/RRCentral/login/apple-touch-icon.png',
         '/RRCentral/icons/icon-192.png',
         '/RRCentral/icons/icon-512.png',
         '/RRCentral/icons/apple-touch-icon.png',
@@ -37,8 +40,12 @@ self.addEventListener('fetch', (event) => {
   if (!url.pathname.startsWith('/RRCentral/')) return
 
   const isNav = request.mode === 'navigate'
+  const path = url.pathname
   const isBrandAsset =
-    url.pathname.endsWith('manifest.webmanifest') || url.pathname.includes('/icons/')
+    path.endsWith('manifest.webmanifest') ||
+    path.includes('/icons/') ||
+    path.includes('apple-touch-icon') ||
+    /favicon-\d+\.png$/.test(path)
 
   if (isNav || isBrandAsset) {
     event.respondWith(

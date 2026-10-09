@@ -24,6 +24,7 @@ import {
 } from '../lib/config'
 import type { Client, Product, Quotation, QuoteTemplate, Vendor } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
+import { can } from '../lib/permissions'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
@@ -173,11 +174,12 @@ const tabBtn = (active: boolean): CSSProperties => ({
 })
 
 export default function QuotationsPage() {
-  const { user } = useAuth()
+  const { user, userRole } = useAuth()
   const { settings, updateSetting } = useSettings()
   const { showToast } = useToast()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const canDeleteQuote = can(userRole, 'quote.deleteAny')
 
   const [quotes, setQuotes] = useState<Quotation[]>([])
   const [clients, setClients] = useState<Client[]>([])
@@ -892,6 +894,11 @@ export default function QuotationsPage() {
 
   async function confirmDelete() {
     if (!deleteTarget) return
+    if (!canDeleteQuote) {
+      showToast('Only managers and admins can delete quotations', 'error')
+      setDeleteTarget(null)
+      return
+    }
     setSaving(true)
     try {
       await deleteLineItems('Quote', [deleteTarget.quote_id])
@@ -1204,9 +1211,11 @@ export default function QuotationsPage() {
         <button type="button" style={buttonSecondaryStyle} disabled={saving} onClick={() => void duplicate(q)} title="Duplicate">
           <Copy size={14} />
         </button>
-        <button type="button" style={buttonDangerStyle} onClick={() => setDeleteTarget(q)} title="Delete">
-          <Trash2 size={14} />
-        </button>
+        {canDeleteQuote ? (
+          <button type="button" style={buttonDangerStyle} onClick={() => setDeleteTarget(q)} title="Delete">
+            <Trash2 size={14} />
+          </button>
+        ) : null}
       </div>
     )
   }

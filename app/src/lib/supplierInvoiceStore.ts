@@ -120,7 +120,7 @@ function isDataUrlBlob(url: string): boolean {
   return String(url || '').trim().toLowerCase().startsWith('data:')
 }
 
-/** Delete bulky PDF data-URLs previously stored on quotations / mirrored expenses. Keeps expense metadata. */
+/** Delete bulky data-URL blobs from attachments (quotes, expenses, signed DNs). Keeps metadata rows with https links. */
 export async function clearSupplierInvoiceBlobs(): Promise<{ quoteAttachments: number; expenseAttachments: number }> {
   const { data, error } = await db.from('attachments').select('*')
   if (error) throw error
@@ -130,15 +130,10 @@ export async function clearSupplierInvoiceBlobs(): Promise<{ quoteAttachments: n
   for (const row of rows) {
     if (!isDataUrlBlob(row.url)) continue
     const type = String(row.entity_type || '')
-    if (type !== QUOTE_SUPPLIER_INVOICE_ENTITY && type !== 'expense') continue
-    // Only clear expense blobs that look like invoice PDFs (avoid wiping unrelated expense receipts unless data URL).
-    if (type === 'expense' && !/\.pdf$/i.test(row.file_name || '') && !/invoice/i.test(row.file_name || '')) {
-      continue
-    }
     const { error: delErr } = await db.from('attachments').delete().eq('id', row.id)
     if (delErr) throw delErr
     if (type === QUOTE_SUPPLIER_INVOICE_ENTITY) quoteAttachments += 1
-    else expenseAttachments += 1
+    else if (type === 'expense') expenseAttachments += 1
   }
   return { quoteAttachments, expenseAttachments }
 }
@@ -219,18 +214,42 @@ export async function saveAttachmentsToExpense(opts: {
   uploadedBy: string
 }) {
   for (const file of opts.files) {
-    if (isDataUrlBlob(file.dataUrl)) continue
+    if (isDataUrlBlob(file.dataUrl)) {
+      throw new Error(
+        'Upload the file to Zoho WorkDrive and paste the share link instead of storing the file in the database',
+      )
+    }
+    const url = String(file.dataUrl || '').trim()
+    if (!url.startsWith('https://')) {
+      throw new Error('Expense attachments must be https WorkDrive (or other) share links')
+    }
     const { error } = await db.from('attachments').insert({
       entity_type: 'expense',
       entity_ref: opts.expenseId,
       file_name: file.name,
       storage_path: 'zoho_workdrive',
-      url: file.dataUrl,
+      url,
       uploaded_by: opts.uploadedBy,
       uploaded_at: new Date().toISOString(),
     })
     if (error) throw error
   }
+}
+
+/** Save a WorkDrive https link against an expense (no binary upload). */
+export async function saveWorkDriveLinkToExpense(opts: {
+  expenseId: string
+  link: PendingWorkDriveLink
+  uploadedBy: string
+}) {
+  const url = opts.link.url.trim()
+  const title = opts.link.title.trim() || 'Expense attachment'
+  if (!url.startsWith('https://')) throw new Error('Paste a Zoho WorkDrive https share link')
+  await saveAttachmentsToExpense({
+    expenseId: opts.expenseId,
+    files: [{ name: title, dataUrl: url }],
+    uploadedBy: opts.uploadedBy,
+  })
 }
 
 export async function upsertSupplierInvoiceExpense(opts: {
