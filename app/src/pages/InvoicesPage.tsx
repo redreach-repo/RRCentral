@@ -270,7 +270,14 @@ export default function InvoicesPage() {
     setSaving(true)
     try {
       let reference = form.reference_number.trim()
-      if (finalize && !reference) {
+      const isTempRef = !reference || /^INV-DRAFT-/i.test(reference)
+      const amount = totals.total
+      const vertical =
+        DIVISIONS.find((d) => d.code === divisionCode)?.brand || form.vertical
+      const status = finalize ? (form.status === 'Draft' ? 'Sent' : form.status) : form.status
+      // Assign a real RR-XX-YYNNN ref when finalizing (or leaving Draft) — do not keep INV-DRAFT-*.
+      const leavingDraft = String(status).toLowerCase() !== 'draft'
+      if ((finalize || leavingDraft) && isTempRef) {
         const { data: allRefs } = await db.from('invoices').select('reference_number')
         const refs = ((allRefs || []) as { reference_number: string }[]).map((r) => r.reference_number)
         const { data: quoteRefs } = await db.from('quotations').select('reference_number')
@@ -280,11 +287,6 @@ export default function InvoicesPage() {
       if (!reference) {
         reference = `INV-DRAFT-${Date.now()}`
       }
-
-      const amount = totals.total
-      const vertical =
-        DIVISIONS.find((d) => d.code === divisionCode)?.brand || form.vertical
-      const status = finalize ? (form.status === 'Draft' ? 'Sent' : form.status) : form.status
       // Cancelled invoices are not paid — clear any mistaken Paid mark
       const payment_status = isCancelledInvoice({ status })
         ? 'Pending'
