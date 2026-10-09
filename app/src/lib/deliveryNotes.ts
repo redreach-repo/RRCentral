@@ -1,6 +1,6 @@
 import { format } from 'date-fns'
-import { db } from './db'
 import { logActivity } from './activity'
+import { findClientByCompany } from './clientLookup'
 import { isInternalDraftId } from './documents'
 import { generateReference } from './referenceNumber'
 import { loadLineItems, newDraftLine, toDraftItems, type DraftLineItem } from './lineItems'
