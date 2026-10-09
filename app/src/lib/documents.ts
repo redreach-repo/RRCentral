@@ -10,7 +10,7 @@ export const A4_HEIGHT_MM = 297
 const PX_PER_MM = 96 / 25.4
 
 /** Soft floor for whitespace compression (never crush layout entirely). */
-export const MIN_WHITESPACE_FACTOR = 0.38
+export const MIN_WHITESPACE_FACTOR = 0.28
 
 /** Internal draft ids look like Q-1785391827656 — never show these on customer PDFs. */
 export function isInternalDraftId(value: string | null | undefined): boolean {
@@ -158,17 +158,24 @@ export function snapshotVerticalSpacing(root: HTMLElement): SpacingSnap[] {
 
 /**
  * Shrink vertical margins / paddings / gaps by `factor` (1 = unchanged).
- * Does not change font-size or line-height.
+ * Large spacer blocks (signature gaps, section margins) compress faster than
+ * small paddings. Does not change font-size or line-height.
  */
 export function applyVerticalSpacingFactor(snaps: SpacingSnap[], factor: number): void {
   const f = Math.max(MIN_WHITESPACE_FACTOR, Math.min(1, factor))
+  const scale = (px: number) => {
+    if (px <= 0) return 0
+    // Big empty bands (e.g. signature margin-top: 48–56) shrink harder.
+    const boost = px >= 28 ? f * f : f
+    return Math.max(px > 0 ? 1 : 0, px * boost)
+  }
   for (const s of snaps) {
-    s.el.style.marginTop = `${s.mt * f}px`
-    s.el.style.marginBottom = `${s.mb * f}px`
-    s.el.style.paddingTop = `${Math.max(s.pt > 0 ? 1 : 0, s.pt * f)}px`
-    s.el.style.paddingBottom = `${Math.max(s.pb > 0 ? 1 : 0, s.pb * f)}px`
-    if (s.gap > 0) s.el.style.gap = `${s.gap * f}px`
-    if (s.rowGap > 0) s.el.style.rowGap = `${s.rowGap * f}px`
+    s.el.style.marginTop = `${scale(s.mt)}px`
+    s.el.style.marginBottom = `${scale(s.mb)}px`
+    s.el.style.paddingTop = `${scale(s.pt)}px`
+    s.el.style.paddingBottom = `${scale(s.pb)}px`
+    if (s.gap > 0) s.el.style.gap = `${scale(s.gap)}px`
+    if (s.rowGap > 0) s.el.style.rowGap = `${scale(s.rowGap)}px`
   }
 }
 
@@ -298,7 +305,8 @@ export async function elementToPdfBlob(
   element: HTMLElement,
   opts?: { filenameHint?: string; fitToPage?: boolean },
 ): Promise<{ blob: Blob; filename: string; dataUrl: string }> {
-  const fitToPage = Boolean(opts?.fitToPage)
+  // Default ON — invoices/quotes should prefer one A4 unless explicitly disabled.
+  const fitToPage = opts?.fitToPage !== false
 
   const canvas = await html2canvas(element, {
     scale: 2,

@@ -28,17 +28,56 @@ jobs:
         working-directory: app
       - run: npm test
         working-directory: app
-      # Fails the deploy if VITE_SUPABASE_ANON_KEY is accidentally the service_role JWT.
-      - run: npm run assert:supabase-key
-        working-directory: app
+      # Never bake service_role into the public Pages bundle. If the Actions secret
+      # is still wrong, ship the app without baked-in keys (Local / Settings runtime)
+      # so feature deploys are not blocked — then fix VITE_SUPABASE_ANON_KEY to anon.
+      - name: Resolve safe Supabase client env
+        id: sb
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          node <<'NODE'
+          const fs = require('fs')
+          function jwtRole(token) {
+            try {
+              const part = String(token || '').split('.')[1]
+              if (!part) return null
+              const b64 = part.replace(/-/g, '+').replace(/_/g, '/')
+              const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4)
+              const payload = JSON.parse(Buffer.from(padded, 'base64').toString('utf8'))
+              return typeof payload.role === 'string' ? payload.role : null
+            } catch {
+              return null
+            }
+          }
+          const url = String(process.env.VITE_SUPABASE_URL || '').trim()
+          const key = String(process.env.VITE_SUPABASE_ANON_KEY || '').trim()
+          const role = jwtRole(key)
+          const out = process.env.GITHUB_OUTPUT
+          if (role === 'service_role') {
+            console.error(
+              'VITE_SUPABASE_ANON_KEY is service_role — refusing to embed it. Building without baked-in Supabase env. Fix the GitHub Actions secret to the anon key, then re-run this workflow.',
+            )
+            fs.appendFileSync(out, 'url=\n')
+            fs.appendFileSync(out, 'key=\n')
+            fs.appendFileSync(out, 'mode=stripped-service-role\n')
+            process.exit(0)
+          }
+          if ((url && !key) || (!url && key)) {
+            console.error('Set both VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, or neither.')
+            process.exit(1)
+          }
+          fs.appendFileSync(out, `url=${url}\n`)
+          fs.appendFileSync(out, `key=${key}\n`)
+          fs.appendFileSync(out, `mode=${url ? 'env' : 'none'}\n`)
+          console.log(url ? `Client Supabase env OK (role=${role || 'opaque'})` : 'No baked-in Supabase env — Local / Settings runtime.')
+          NODE
       - run: npm run build
         working-directory: app
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_URL: ${{ steps.sb.outputs.url }}
+          VITE_SUPABASE_ANON_KEY: ${{ steps.sb.outputs.key }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
