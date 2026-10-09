@@ -49,6 +49,7 @@ export const LOCAL_STORES = [
 export type LocalStoreName = (typeof LOCAL_STORES)[number]
 
 const COMPANY_ADDRESS = 'P.O. Box 7073, Umm Al Quwain, UAE'
+const COMPANY_TRN = '104605407600003'
 const LEGACY_COMPANY_ADDRESSES = new Set([
   'P.O. Box 6641, Dubai, UAE',
   'PO Box 6641, Dubai, UAE',
@@ -63,7 +64,7 @@ const DEFAULT_SETTINGS: { key: string; value: string }[] = [
   { key: 'email', value: 'info@redreach.ae' },
   { key: 'phone', value: '' },
   { key: 'website', value: 'www.redreach.ae' },
-  { key: 'trn', value: '' },
+  { key: 'trn', value: COMPANY_TRN },
   { key: 'accountName', value: 'Red Reach Middle East FZE' },
   { key: 'bankName', value: 'Mashreq Bank' },
   { key: 'bankAccount', value: '019100599735' },
@@ -302,14 +303,24 @@ async function ensureSeeded(): Promise<void> {
     }
     await txDone(tx)
   } else {
-    // Keep letterhead address current for existing local DBs (quotes/invoices).
-    const existing = (await reqToPromise(
+    // Keep letterhead address/TRN current for existing local DBs (quotes/invoices).
+    const existingAddress = (await reqToPromise(
       txStore(database, 'app_settings', 'readonly').get('address'),
     )) as { key?: string; value?: string } | undefined
-    const current = String(existing?.value || '').trim()
-    if (!current || LEGACY_COMPANY_ADDRESSES.has(current)) {
+    const currentAddress = String(existingAddress?.value || '').trim()
+    if (!currentAddress || LEGACY_COMPANY_ADDRESSES.has(currentAddress)) {
       const tx = database.transaction('app_settings', 'readwrite')
       tx.objectStore('app_settings').put({ key: 'address', value: COMPANY_ADDRESS })
+      await txDone(tx)
+    }
+
+    const existingTrn = (await reqToPromise(
+      txStore(database, 'app_settings', 'readonly').get('trn'),
+    )) as { key?: string; value?: string } | undefined
+    const currentTrn = String(existingTrn?.value || '').trim()
+    if (!currentTrn) {
+      const tx = database.transaction('app_settings', 'readwrite')
+      tx.objectStore('app_settings').put({ key: 'trn', value: COMPANY_TRN })
       await txDone(tx)
     }
   }
