@@ -11,7 +11,7 @@ var CONFIG = {
     name: 'Red Reach Middle East FZE',
     brand: 'RED REACH',
     tagline: 'Multi-division commerce · UAE',
-    address: 'P.O. Box 6641, Dubai, UAE',
+    address: 'P.O. Box 7073, Umm Al Quwain, UAE',
     email: 'info@redreach.ae',
     phone: '',
     website: 'www.redreach.ae',

@@ -405,7 +405,7 @@ export const SITE = {
   phoneHref: 'tel:+971507008977',
   email: 'info@redreach.ae',
   whatsapp: 'https://wa.me/971507008977',
-  addressLines: ['Red Reach, Middle East', 'P.O. Box 6641', 'Dubai, U.A.E.'],
+  addressLines: ['Red Reach, Middle East', 'P.O. Box 7073', 'Umm Al Quwain, U.A.E.'],
   location: 'Dubai, United Arab Emirates',
   hours: 'Monday – Saturday, 10am – 6pm',
   publicOrigin: 'https://redreach-repo.github.io/RRCentral',
@@ -455,7 +455,7 @@ export const APPROACH = [
 export const WHY_RED_REACH = [
   {
     title: 'A Dubai company since 2018',
-    body: 'Red Reach Middle East FZE. P.O. Box 6641. A desk you can call.',
+    body: 'Red Reach Middle East FZE. P.O. Box 7073, Umm Al Quwain. A desk you can call.',
   },
   {
     title: 'Seven operating divisions',

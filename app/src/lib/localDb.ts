@@ -48,11 +48,18 @@ export const LOCAL_STORES = [
 
 export type LocalStoreName = (typeof LOCAL_STORES)[number]
 
+const COMPANY_ADDRESS = 'P.O. Box 7073, Umm Al Quwain, UAE'
+const LEGACY_COMPANY_ADDRESSES = new Set([
+  'P.O. Box 6641, Dubai, UAE',
+  'PO Box 6641, Dubai, UAE',
+  'P.O. Box 6641, Dubai, U.A.E.',
+])
+
 const DEFAULT_SETTINGS: { key: string; value: string }[] = [
   { key: 'companyName', value: 'Red Reach Middle East FZE' },
   { key: 'brand', value: 'RED REACH' },
   { key: 'tagline', value: 'Multi-division commerce · UAE' },
-  { key: 'address', value: 'P.O. Box 6641, Dubai, UAE' },
+  { key: 'address', value: COMPANY_ADDRESS },
   { key: 'email', value: 'info@redreach.ae' },
   { key: 'phone', value: '' },
   { key: 'website', value: 'www.redreach.ae' },
@@ -294,6 +301,17 @@ async function ensureSeeded(): Promise<void> {
       store.put(row)
     }
     await txDone(tx)
+  } else {
+    // Keep letterhead address current for existing local DBs (quotes/invoices).
+    const existing = (await reqToPromise(
+      txStore(database, 'app_settings', 'readonly').get('address'),
+    )) as { key?: string; value?: string } | undefined
+    const current = String(existing?.value || '').trim()
+    if (!current || LEGACY_COMPANY_ADDRESSES.has(current)) {
+      const tx = database.transaction('app_settings', 'readwrite')
+      tx.objectStore('app_settings').put({ key: 'address', value: COMPANY_ADDRESS })
+      await txDone(tx)
+    }
   }
 
   const usersCount = await reqToPromise(txStore(database, 'app_users', 'readonly').count())
