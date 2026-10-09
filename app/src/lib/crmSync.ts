@@ -1,5 +1,6 @@
 import { db } from './db'
 import { logActivity } from './activity'
+import { companiesMatch, normalizeCompanyKey } from './customerFiles'
 import type { CrmEntry } from './types'
 
 /** Map quote status → suggested CRM pipeline stage. */
@@ -33,10 +34,18 @@ export async function findCrmByCompany(company: string): Promise<CrmEntry | null
   const name = company.trim()
   if (!name) return null
   const { data, error } = await db.from('crm').select('*').ilike('company_name', name).limit(5)
-  if (error || !data?.length) return null
-  const rows = data as CrmEntry[]
-  const exact = rows.find((r) => r.company_name.trim().toLowerCase() === name.toLowerCase())
-  return exact || rows[0] || null
+  if (!error && data?.length) {
+    const rows = data as CrmEntry[]
+    const exact = rows.find((r) => r.company_name.trim().toLowerCase() === name.toLowerCase())
+    if (exact) return exact
+    const fuzzy = rows.find((r) => companiesMatch(r.company_name, name))
+    if (fuzzy) return fuzzy
+  }
+
+  const token = normalizeCompanyKey(name).split(' ').filter((t) => t.length >= 3)[0] || name
+  const loose = await db.from('crm').select('*').ilike('company_name', `%${token}%`).limit(25)
+  if (loose.error || !loose.data?.length) return null
+  return (loose.data as CrmEntry[]).find((r) => companiesMatch(r.company_name, name)) || null
 }
 
 export type SyncCrmFromQuoteOpts = {

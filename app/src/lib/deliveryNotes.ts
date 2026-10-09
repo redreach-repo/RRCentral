@@ -9,7 +9,7 @@ import {
   listDeliveryNoteRefs,
   saveDeliveryNoteLineItems,
 } from './deliveryNoteStore'
-import type { Client, DeliveryNote, LineItem, Quotation } from './types'
+import type { DeliveryNote, LineItem, Quotation } from './types'
 import type { QuoteColumnId } from './divisionQuoteFormats'
 
 export const DELIVERY_NOTE_COLUMNS: QuoteColumnId[] = [
@@ -183,12 +183,9 @@ export async function createDeliveryNoteFromQuote(opts: {
   let shipTo = opts.shipTo || ''
   if (!shipTo && opts.quote.client) {
     try {
-      const { data: clientRow } = await db
-        .from('clients')
-        .select('address')
-        .ilike('company_name', opts.quote.client)
-        .maybeSingle()
-      shipTo = ((clientRow as Client | null)?.address || '').trim()
+      const { findClientByCompany } = await import('./clientLookup')
+      const clientRow = await findClientByCompany(opts.quote.client)
+      shipTo = (clientRow?.address || '').trim()
     } catch {
       shipTo = ''
     }
