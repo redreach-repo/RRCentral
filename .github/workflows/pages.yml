@@ -28,6 +28,12 @@ jobs:
         working-directory: app
       - run: npm test
         working-directory: app
+      # Fails the deploy if VITE_SUPABASE_ANON_KEY is accidentally the service_role JWT.
+      - run: npm run assert:supabase-key
+        working-directory: app
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       - run: npm run build
         working-directory: app
         env:

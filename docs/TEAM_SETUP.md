@@ -3,9 +3,12 @@
 ## Cloud for every device
 1. GitHub → RRCentral → Settings → Secrets → Actions  
    - `VITE_SUPABASE_URL` = `https://pszjylxrpvlumldtptrr.supabase.co`  
-   - `VITE_SUPABASE_ANON_KEY` = anon key  
-2. Redeploy Pages  
+   - `VITE_SUPABASE_ANON_KEY` = **anon / public** key only (JWT `role` = `anon`)  
+   - Never paste **`service_role`** — it is embedded in the public Pages JS and bypasses RLS  
+2. Redeploy Pages (Actions → Deploy GitHub Pages → Run workflow)  
 3. Confirm phones show **no** orange Local mode banner  
+
+Full cutover checklist (migrations + Edge Functions): [`PRODUCTION_CUTOVER.md`](./PRODUCTION_CUTOVER.md).
 
 ## Data in Supabase
 Settings → **Upload backup JSON to cloud** (once), after connecting.
