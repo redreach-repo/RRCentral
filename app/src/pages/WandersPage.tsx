@@ -59,6 +59,7 @@ import {
   sectionTitleStyle,
 } from '../lib/uiStyles'
 import { buildWhatsAppUrl } from '../lib/whatsapp'
+import { errorMessage } from '../lib/errors'
 
 type Tab = 'trip' | 'passengers' | 'commercial' | 'terms' | 'packages'
 type Mode = 'leads' | 'tourops'
@@ -92,7 +93,7 @@ export default function WandersPage() {
       setDeals(d)
       setPackages(pkgs)
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to load Wanders CRM', 'error')
+      showToast(errorMessage(e, 'Failed to load Wanders CRM'), 'error')
     } finally {
       setLoading(false)
     }
@@ -112,7 +113,7 @@ export default function WandersPage() {
     setForm(d ? { ...d } : null)
     void loadPassengers(selectedId)
       .then(setPassengers)
-      .catch((e) => showToast(e instanceof Error ? e.message : 'Passenger load failed', 'error'))
+      .catch((e) => showToast(errorMessage(e, 'Passenger load failed'), 'error'))
   }, [selectedId, deals, showToast])
 
   const filtered = useMemo(() => {
@@ -162,7 +163,7 @@ export default function WandersPage() {
       setSelectedId(saved.id)
       showToast('Wanders deal saved', 'success')
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Save failed', 'error')
+      showToast(errorMessage(e, 'Save failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -190,7 +191,7 @@ export default function WandersPage() {
       setDeals((prev) => prev.map((d) => (d.id === deal.id ? deal : d)))
       showToast('Terms acceptance recorded (immutable copy stored)', 'success')
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Acceptance failed', 'error')
+      showToast(errorMessage(e, 'Acceptance failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -257,7 +258,7 @@ export default function WandersPage() {
       setPaxOpen(false)
       showToast('Passenger saved (private record)', 'success')
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Passenger save failed', 'error')
+      showToast(errorMessage(e, 'Passenger save failed'), 'error')
     } finally {
       setSaving(false)
     }

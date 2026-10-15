@@ -30,6 +30,7 @@ import {
   tdStyle,
   thStyle,
 } from '../lib/uiStyles'
+import { errorMessage } from '../lib/errors'
 
 type Props = {
   crmEntries: CrmEntry[]
@@ -96,7 +97,7 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
       setCalendarEvents(enrichCalendarEvents(events, crmEntries))
     } catch (e) {
       setCalendarEvents([])
-      setError(e instanceof Error ? e.message : 'Could not load Zoho Calendar')
+      setError(errorMessage(e, 'Could not load Zoho Calendar'))
     } finally {
       setLoading(false)
     }

@@ -48,6 +48,7 @@ import {
   tdStyle,
   thStyle,
 } from '../lib/uiStyles'
+import { errorMessage } from '../lib/errors'
 
 const COMPANY_KEYS = [
   { key: 'companyName', label: 'Company name' },
@@ -290,7 +291,7 @@ export default function SettingsPage() {
       setCompanyDocs(rows)
       setCompanyDocsMissing(missingTable)
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not load company documents', 'error')
+      showToast(errorMessage(e, 'Could not load company documents'), 'error')
     }
   }, [showToast])
 
@@ -347,7 +348,7 @@ export default function SettingsPage() {
       setCompanyDocOpen(false)
       await loadCompanyDocs()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Save failed', 'error')
+      showToast(errorMessage(e, 'Save failed'), 'error')
     } finally {
       setBusy(false)
     }
@@ -362,7 +363,7 @@ export default function SettingsPage() {
       setDeleteCompanyDoc(null)
       await loadCompanyDocs()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Delete failed', 'error')
+      showToast(errorMessage(e, 'Delete failed'), 'error')
     } finally {
       setBusy(false)
     }
@@ -379,7 +380,7 @@ export default function SettingsPage() {
       )
       window.location.reload()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Import failed', 'error')
+      showToast(errorMessage(e, 'Import failed'), 'error')
     } finally {
       setImporting(false)
     }
@@ -396,7 +397,7 @@ export default function SettingsPage() {
         'success',
       )
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Backup failed', 'error')
+      showToast(errorMessage(e, 'Backup failed'), 'error')
     } finally {
       setBackingUp(false)
     }
@@ -414,7 +415,7 @@ export default function SettingsPage() {
       )
       window.location.reload()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Restore failed', 'error')
+      showToast(errorMessage(e, 'Restore failed'), 'error')
     } finally {
       setImporting(false)
     }
@@ -438,7 +439,7 @@ export default function SettingsPage() {
       )
       window.setTimeout(() => window.location.reload(), 700)
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Cloud upload failed', 'error')
+      showToast(errorMessage(e, 'Cloud upload failed'), 'error')
     } finally {
       setImporting(false)
     }
@@ -459,7 +460,7 @@ export default function SettingsPage() {
       showToast('Local data cleared — defaults restored', 'success')
       window.location.reload()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Clear failed', 'error')
+      showToast(errorMessage(e, 'Clear failed'), 'error')
     } finally {
       setBusy(false)
     }
@@ -481,7 +482,7 @@ export default function SettingsPage() {
       setConfirmPassword('')
       showToast('Password updated', 'success')
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not change password', 'error')
+      showToast(errorMessage(e, 'Could not change password'), 'error')
     } finally {
       setChangingPassword(false)
     }
@@ -540,7 +541,7 @@ export default function SettingsPage() {
       }
       showToast(`${section} saved`, 'success')
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Save failed', 'error')
+      showToast(errorMessage(e, 'Save failed'), 'error')
     } finally {
       setSavingSection('')
     }
@@ -644,7 +645,7 @@ export default function SettingsPage() {
       setUserOpen(false)
       await loadUsers()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Save failed', 'error')
+      showToast(errorMessage(e, 'Save failed'), 'error')
     } finally {
       setBusy(false)
     }
@@ -660,7 +661,7 @@ export default function SettingsPage() {
       setDeleteUser(null)
       await loadUsers()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Delete failed', 'error')
+      showToast(errorMessage(e, 'Delete failed'), 'error')
     } finally {
       setBusy(false)
     }
@@ -679,7 +680,7 @@ export default function SettingsPage() {
       const result = await testZohoConnection({ ...settings, ...draft })
       showToast(result, 'success')
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Zoho test failed', 'error')
+      showToast(errorMessage(e, 'Zoho test failed'), 'error')
     } finally {
       setTestingZoho(false)
     }
@@ -1038,7 +1039,7 @@ export default function SettingsPage() {
                       setDraft((d) => ({ ...d, zohoPostHardeningRotationAck: 'yes' }))
                       showToast('Marked Zoho credentials as rotated', 'success')
                     } catch (e) {
-                      showToast(e instanceof Error ? e.message : 'Could not save', 'error')
+                      showToast(errorMessage(e, 'Could not save'), 'error')
                     }
                   })()
                 }

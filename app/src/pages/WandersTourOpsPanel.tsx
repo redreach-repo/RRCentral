@@ -40,6 +40,7 @@ import {
   tdStyle,
   thStyle,
 } from '../lib/uiStyles'
+import { errorMessage } from '../lib/errors'
 
 type OpsTab = 'packages' | 'partners' | 'costs' | 'prices' | 'departures' | 'bookings'
 
@@ -71,7 +72,7 @@ export default function WandersTourOpsPanel({ deals }: { deals: WandersDeal[] })
         setPackageId(seeded.packages[0].id)
       }
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Tour ops load failed', 'error')
+      showToast(errorMessage(e, 'Tour ops load failed'), 'error')
     } finally {
       setLoading(false)
     }
@@ -96,7 +97,7 @@ export default function WandersTourOpsPanel({ deals }: { deals: WandersDeal[] })
         setDepartures(d)
         setBookings(b)
       } catch (e) {
-        showToast(e instanceof Error ? e.message : 'Failed to load package detail', 'error')
+        showToast(errorMessage(e, 'Failed to load package detail'), 'error')
       }
     })()
   }, [packageId, showToast])
@@ -115,7 +116,7 @@ export default function WandersTourOpsPanel({ deals }: { deals: WandersDeal[] })
       setComponents((prev) => prev.map((x) => (x.id === saved.id ? saved : x)))
       showToast('Cost component saved', 'success')
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Save failed', 'error')
+      showToast(errorMessage(e, 'Save failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -128,7 +129,7 @@ export default function WandersTourOpsPanel({ deals }: { deals: WandersDeal[] })
       setPrices((prev) => prev.map((x) => (x.id === saved.id ? saved : x)))
       showToast('Selling price saved', 'success')
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Save failed', 'error')
+      showToast(errorMessage(e, 'Save failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -141,7 +142,7 @@ export default function WandersTourOpsPanel({ deals }: { deals: WandersDeal[] })
       setDepartures((prev) => prev.map((x) => (x.id === saved.id ? saved : x)))
       showToast('Departure saved', 'success')
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Save failed', 'error')
+      showToast(errorMessage(e, 'Save failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -201,7 +202,7 @@ export default function WandersTourOpsPanel({ deals }: { deals: WandersDeal[] })
       setDepartures(d)
       showToast('Booking linked to package + departure + partners', 'success')
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Link failed', 'error')
+      showToast(errorMessage(e, 'Link failed'), 'error')
     } finally {
       setSaving(false)
     }

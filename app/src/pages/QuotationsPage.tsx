@@ -289,7 +289,7 @@ export default function QuotationsPage() {
       setQuotes(rows)
       setClients((cRes.data || []) as Client[])
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to load quotations', 'error')
+      showToast(errorMessage(e, 'Failed to load quotations'), 'error')
     } finally {
       setLoading(false)
     }
@@ -478,7 +478,7 @@ export default function QuotationsPage() {
       })
       setEditorOpen(true)
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to load line items', 'error')
+      showToast(errorMessage(e, 'Failed to load line items'), 'error')
     }
   }
 
@@ -495,6 +495,8 @@ export default function QuotationsPage() {
       return
     }
     setSaving(true)
+    // Which step failed is shown in the error, so problems can be diagnosed from a screenshot.
+    let step = 'preparing the quote'
     try {
       const amount = totals.total
       const vertical = divisionBrand(form.division_code)
@@ -548,6 +550,7 @@ export default function QuotationsPage() {
       }
 
       if (form.quotation_currency !== BASE_CURRENCY || fxRate !== 1) {
+        step = 'saving the FX rate'
         await approveFxRate({
           from: form.quotation_currency,
           rate: fxRate,
@@ -557,6 +560,7 @@ export default function QuotationsPage() {
         })
       }
 
+      step = 'saving the quotation'
       if (editing) {
         const { error } = await db.from('quotations').update(payload).eq('id', editing.id)
         if (error && isUndefinedColumnError(error)) {
@@ -591,6 +595,7 @@ export default function QuotationsPage() {
         } else if (error) throw error
       }
 
+      step = 'saving line items'
       await saveLineItems('Quote', quoteId, form.items, vatRate)
       const flagIds = [quoteId, editing?.id, editing?.reference_number].filter(
         (v): v is string => Boolean(v),
@@ -600,13 +605,16 @@ export default function QuotationsPage() {
         flagIds,
         form.offset_vat,
       )
+      step = 'saving the VAT setting'
       await updateSetting(OFFSET_VAT_SETTING_KEY, JSON.stringify(nextFlags))
+      step = 'logging activity'
       await logActivity('save_quote', 'quotation', 'DRAFT', `${payload.client} · Draft`, who)
       showToast('Draft saved', 'success')
       setEditorOpen(false)
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Save failed', 'error')
+      console.error(`[quotations] save failed while ${step}`, e)
+      showToast(`Save failed while ${step}: ${errorMessage(e, 'unknown error')}`, 'error')
     } finally {
       setSaving(false)
     }
@@ -662,7 +670,7 @@ export default function QuotationsPage() {
       showToast(`Finalized as ${reference}`, 'success')
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Finalize failed', 'error')
+      showToast(errorMessage(e, 'Finalize failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -696,7 +704,7 @@ export default function QuotationsPage() {
       showToast('Reverted to Draft', 'success')
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Undo failed', 'error')
+      showToast(errorMessage(e, 'Undo failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -757,7 +765,7 @@ export default function QuotationsPage() {
       showToast(`Created revision ${newRef}`, 'success')
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Revise failed', 'error')
+      showToast(errorMessage(e, 'Revise failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -793,7 +801,7 @@ export default function QuotationsPage() {
       showToast('Duplicated as new Draft', 'success')
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Duplicate failed', 'error')
+      showToast(errorMessage(e, 'Duplicate failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -886,7 +894,7 @@ export default function QuotationsPage() {
         .maybeSingle()
       if (fresh) await openEdit(fresh as Quotation)
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Branch failed', 'error')
+      showToast(errorMessage(e, 'Branch failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -909,7 +917,7 @@ export default function QuotationsPage() {
       setDeleteTarget(null)
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Delete failed', 'error')
+      showToast(errorMessage(e, 'Delete failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -967,7 +975,7 @@ export default function QuotationsPage() {
       setOutcomeTarget(null)
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to set outcome', 'error')
+      showToast(errorMessage(e, 'Failed to set outcome'), 'error')
     } finally {
       setSaving(false)
     }
@@ -1095,7 +1103,7 @@ export default function QuotationsPage() {
       setConvertTarget(null)
       navigate('/invoices')
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Convert failed', 'error')
+      showToast(errorMessage(e, 'Convert failed'), 'error')
     } finally {
       setSaving(false)
     }

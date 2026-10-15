@@ -30,6 +30,7 @@ import {
 } from '../lib/uiStyles'
 import { useCompactCrm } from '../hooks/useMediaQuery'
 import resp from '../styles/crmResponsive.module.css'
+import { errorMessage } from '../lib/errors'
 
 type Props = {
   crmEntries: CrmEntry[]
@@ -69,7 +70,7 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
       setRows(attachCrmMatches(messages, crmEntries))
     } catch (e) {
       setRows([])
-      setError(e instanceof Error ? e.message : 'Could not load Zoho mail')
+      setError(errorMessage(e, 'Could not load Zoho mail'))
     } finally {
       setLoading(false)
     }

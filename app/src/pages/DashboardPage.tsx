@@ -61,6 +61,7 @@ import {
   thStyle,
 } from '../lib/uiStyles'
 import dash from './DashboardPage.module.css'
+import { errorMessage } from '../lib/errors'
 
 interface KpiCardProps {
   label: string
@@ -177,7 +178,7 @@ export default function DashboardPage() {
       setDeletedInvoiceRefs([...deleted])
       setCompanyDocs(docsRes.rows || [])
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load dashboard')
+      setError(errorMessage(e, 'Failed to load dashboard'))
     } finally {
       setLoading(false)
     }

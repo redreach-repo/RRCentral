@@ -65,6 +65,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Apply migrations + RLS tests
+        # shell: bash adds pipefail — without it `| tee` hid every failure and CI stayed green.
+        shell: bash
         run: bash supabase/tests/run.sh 2>&1 | tee /tmp/migrate-rls.log
       - name: Surface migration failure
         if: failure()

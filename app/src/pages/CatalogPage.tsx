@@ -31,6 +31,7 @@ import {
   formGridStyle,
   sectionTitleStyle,
 } from '../lib/uiStyles'
+import { errorMessage } from '../lib/errors'
 
 type ProductForm = {
   sku: string
@@ -87,7 +88,7 @@ export default function CatalogPage() {
       if (error) throw error
       setProducts((data || []) as Product[])
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to load catalog', 'error')
+      showToast(errorMessage(e, 'Failed to load catalog'), 'error')
     } finally {
       setLoading(false)
     }
@@ -162,7 +163,7 @@ export default function CatalogPage() {
       setOpen(false)
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Save failed', 'error')
+      showToast(errorMessage(e, 'Save failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -190,7 +191,7 @@ export default function CatalogPage() {
       setDeleteTarget(null)
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Delete failed', 'error')
+      showToast(errorMessage(e, 'Delete failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -206,7 +207,7 @@ export default function CatalogPage() {
       )
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'SKU sync failed', 'error')
+      showToast(errorMessage(e, 'SKU sync failed'), 'error')
     } finally {
       setSyncing(false)
     }
@@ -222,7 +223,7 @@ export default function CatalogPage() {
       )
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Service catalog sync failed', 'error')
+      showToast(errorMessage(e, 'Service catalog sync failed'), 'error')
     } finally {
       setSyncing(false)
     }

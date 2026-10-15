@@ -82,7 +82,8 @@ reset role;
 ------------------------------------------------------------ sales
 set role authenticated;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
-select pg_temp.expect((select count(*) from crm) = 1, 'sales reads CRM (email match is case-insensitive)');
+-- Count only the fixture row: migrations may seed other CRM rows (e.g. Mass Allied Freighters).
+select pg_temp.expect((select count(*) from crm where company_name = 'Lead Co') = 1, 'sales reads CRM (email match is case-insensitive)');
 select pg_temp.expect((select count(*) from owned_domains) = 1, 'sales reads owned domains');
 update owned_domains set registrar = 'Updated' where domain_name = 'example.ae';
 select pg_temp.expect((select registrar from owned_domains where domain_name = 'example.ae') = 'Updated', 'sales can update owned domains');
@@ -108,8 +109,8 @@ select pg_temp.expect((select count(*) from audit_log) = 0, 'sales cannot read a
 select pg_temp.expect(pg_temp.fails($q$insert into audit_log (table_name, operation) values ('crm', 'DELETE')$q$), 'sales cannot forge audit rows');
 reset role;
 select pg_temp.expect((select value from app_settings where key = 'iban') <> 'HACK', 'sales cannot change bank details');
-select pg_temp.expect((select count(*) from invoices) = 1, 'sales cannot delete invoices');
-select pg_temp.expect((select count(*) from expenses) = 1, 'sales cannot delete expenses');
+select pg_temp.expect((select count(*) from invoices where reference_number = 'RR-1') = 1, 'sales cannot delete invoices');
+select pg_temp.expect((select count(*) from expenses where vendor = 'Fuel') = 1, 'sales cannot delete expenses');
 select pg_temp.expect((select role from app_users where lower(email) = 'sales@redreach.ae') = 'sales', 'sales cannot promote self');
 select pg_temp.expect(exists (select 1 from app_settings where key = 'delivery_notes_store'), 'sales can write ordinary settings');
 
@@ -119,7 +120,7 @@ set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
 select pg_temp.expect((select value from app_settings where key = 'zohoClientSecret') = 's3cret', 'admin reads secrets');
 update app_settings set value = 'AE00' where key = 'iban';
 delete from invoices where reference_number = 'RR-1';
-select pg_temp.expect((select count(*) from invoices) = 0, 'admin can delete invoices');
+select pg_temp.expect((select count(*) from invoices where reference_number = 'RR-1') = 0, 'admin can delete invoices');
 update app_settings set value = 'new-secret' where key = 'zohoClientSecret';
 select pg_temp.expect(exists (
   select 1 from audit_log where table_name = 'invoices' and operation = 'DELETE' and actor_email = 'alfred@redreach.ae'

@@ -48,6 +48,7 @@ import {
   sectionTitleStyle,
 } from '../lib/uiStyles'
 import { logActivity } from '../lib/activity'
+import { errorMessage } from '../lib/errors'
 
 function daysLabel(dateStr: string, today: Date): string {
   const d = startOfDay(parseISO(dateStr.slice(0, 10)))
@@ -109,7 +110,7 @@ export default function FollowupsPage() {
         )
       }
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not prepare WhatsApp message', 'error')
+      showToast(errorMessage(e, 'Could not prepare WhatsApp message'), 'error')
     } finally {
       setBusyId(null)
     }
@@ -127,7 +128,7 @@ export default function FollowupsPage() {
       setEntries((crmRes.data || []) as CrmEntry[])
       if (!usersRes.error && usersRes.data) setTeam(usersRes.data as AppUser[])
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load follow-ups')
+      setError(errorMessage(e, 'Failed to load follow-ups'))
     } finally {
       setLoading(false)
     }
@@ -201,7 +202,7 @@ export default function FollowupsPage() {
       showToast('Follow-up snoozed +7 days', 'success')
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Snooze failed', 'error')
+      showToast(errorMessage(e, 'Snooze failed'), 'error')
     } finally {
       setBusyId(null)
     }
@@ -237,7 +238,7 @@ export default function FollowupsPage() {
       showToast('Follow-up cleared', 'success')
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Clear failed', 'error')
+      showToast(errorMessage(e, 'Clear failed'), 'error')
     } finally {
       setBusyId(null)
     }
@@ -326,7 +327,7 @@ export default function FollowupsPage() {
       setUpdateClearDate(false)
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to save update', 'error')
+      showToast(errorMessage(e, 'Failed to save update'), 'error')
     } finally {
       setBusyId(null)
     }

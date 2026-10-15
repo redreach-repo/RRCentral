@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
 import { btnGhost, btnPrimary, colors } from '../../lib/pageStyles'
 import { resolveSalesOwnerName } from '../../lib/crmWorkQueue'
+import { errorMessage } from '../../lib/errors'
 
 export default function WebsiteInquiriesPanel({
   onConverted,
@@ -55,7 +56,7 @@ export default function WebsiteInquiriesPanel({
       onConverted?.(lead.id)
       await load()
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Could not convert enquiry', 'error')
+      showToast(errorMessage(err, 'Could not convert enquiry'), 'error')
     } finally {
       setBusy(null)
     }
@@ -72,7 +73,7 @@ export default function WebsiteInquiriesPanel({
       showToast('Enquiry dismissed', 'success')
       await load()
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Could not dismiss enquiry', 'error')
+      showToast(errorMessage(err, 'Could not dismiss enquiry'), 'error')
     } finally {
       setBusy(null)
     }

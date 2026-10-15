@@ -7,6 +7,7 @@ import { startCheckout } from '../startCheckout'
 import { useShop } from '../ShopContext'
 import ProductCard, { Stars } from '../components/ProductCard'
 import TeeMockup from '../components/TeeMockup'
+import { errorMessage } from '../../lib/errors'
 
 export default function ProductPage() {
   const { slug } = useParams()
@@ -40,7 +41,7 @@ export default function ProductPage() {
     try {
       await startCheckout([{ productId: selected.id, colorId, size, qty }])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Checkout failed')
+      setError(errorMessage(err, 'Checkout failed'))
       setPending(false)
     }
   }

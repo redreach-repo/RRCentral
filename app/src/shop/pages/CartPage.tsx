@@ -7,6 +7,7 @@ import { formatAed, filsUntilFreeShipping } from '../format'
 import { startCheckout } from '../startCheckout'
 import { useShop } from '../ShopContext'
 import TeeMockup from '../components/TeeMockup'
+import { errorMessage } from '../../lib/errors'
 
 export default function CartPage() {
   const { lines, setQty, remove } = useShop()
@@ -21,7 +22,7 @@ export default function CartPage() {
     try {
       await startCheckout(lines)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Checkout failed')
+      setError(errorMessage(err, 'Checkout failed'))
       setPending(false)
     }
   }

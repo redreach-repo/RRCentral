@@ -26,6 +26,7 @@ import {
   thStyle,
   toolbarStyle,
 } from '../lib/uiStyles'
+import { errorMessage } from '../lib/errors'
 
 export default function InventoryPage() {
   const { user } = useAuth()
@@ -46,7 +47,7 @@ export default function InventoryPage() {
       if (error) throw error
       setProducts((data || []) as Product[])
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to load inventory', 'error')
+      showToast(errorMessage(e, 'Failed to load inventory'), 'error')
     } finally {
       setLoading(false)
     }
@@ -85,7 +86,7 @@ export default function InventoryPage() {
       showToast(`SKUs synced · ${r.inserted} new · ${r.updated} updated`, 'success')
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Sync failed', 'error')
+      showToast(errorMessage(e, 'Sync failed'), 'error')
     } finally {
       setBusy(false)
     }
@@ -111,7 +112,7 @@ export default function InventoryPage() {
       setDelta('0')
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Adjust failed', 'error')
+      showToast(errorMessage(e, 'Adjust failed'), 'error')
     } finally {
       setBusy(false)
     }

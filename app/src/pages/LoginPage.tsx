@@ -4,6 +4,7 @@ import { useAuth, LOGIN_DOMAIN_REJECT_KEY } from '../contexts/AuthContext'
 import { authApi, MIN_PASSWORD_LENGTH } from '../lib/authApi'
 import BrandLogo from '../components/BrandLogo'
 import styles from './LoginPage.module.css'
+import { errorMessage } from '../lib/errors'
 
 function friendlyAuthError(raw: string): string {
   const msg = raw.toLowerCase()
@@ -63,7 +64,7 @@ export default function LoginPage() {
     try {
       await signInWithPassword(email, password)
     } catch (err) {
-      const raw = err instanceof Error ? err.message : 'Sign-in failed'
+      const raw = errorMessage(err, 'Sign-in failed')
       setError(friendlyAuthError(raw))
     } finally {
       setSubmitting(false)

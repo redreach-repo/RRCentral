@@ -14,6 +14,7 @@ import {
   labelStyle,
   colors,
 } from '../lib/uiStyles'
+import { errorMessage } from '../lib/errors'
 
 type Props = {
   open: boolean
@@ -79,7 +80,7 @@ export default function EmailComposeModal({
         onClose()
       }
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Send failed', 'error')
+      showToast(errorMessage(e, 'Send failed'), 'error')
     } finally {
       setSending(false)
     }

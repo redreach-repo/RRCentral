@@ -355,7 +355,7 @@ export default function DocumentPage() {
       downloadBlob(blob, filename)
       showToast(fitToPage ? 'PDF downloaded (fit to page)' : 'PDF downloaded', 'success')
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'PDF failed', 'error')
+      showToast(errorMessage(e, 'PDF failed'), 'error')
     } finally {
       setPdfBusy(false)
     }
@@ -413,7 +413,7 @@ export default function DocumentPage() {
       showToast('PDF downloaded — attach it to the email if needed', 'success')
       setEmailOpen(true)
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'PDF failed', 'error')
+      showToast(errorMessage(e, 'PDF failed'), 'error')
       setEmailOpen(true)
     } finally {
       setPdfBusy(false)

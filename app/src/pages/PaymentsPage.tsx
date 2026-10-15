@@ -47,6 +47,7 @@ import {
   sectionTitleStyle,
 } from '../lib/uiStyles'
 import { PAYMENT_METHODS } from '../lib/config'
+import { errorMessage } from '../lib/errors'
 
 type PayForm = {
   booking_id: string
@@ -163,7 +164,7 @@ export default function PaymentsPage() {
       try {
         await loadQuotes()
       } catch (e) {
-        showToast(e instanceof Error ? e.message : 'Failed to load bookings', 'error')
+        showToast(errorMessage(e, 'Failed to load bookings'), 'error')
       } finally {
         setLoading(false)
       }
@@ -212,7 +213,7 @@ export default function PaymentsPage() {
       setPayOpen(false)
       await loadLedger(selected.id)
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Save failed', 'error')
+      showToast(errorMessage(e, 'Save failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -252,7 +253,7 @@ export default function PaymentsPage() {
       setRefundPayment(null)
       await loadLedger(selected.id)
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Refund failed', 'error')
+      showToast(errorMessage(e, 'Refund failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -290,7 +291,7 @@ export default function PaymentsPage() {
       setSupplierOpen(false)
       await loadLedger(selected.id)
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Supplier save failed', 'error')
+      showToast(errorMessage(e, 'Supplier save failed'), 'error')
     } finally {
       setSaving(false)
     }
