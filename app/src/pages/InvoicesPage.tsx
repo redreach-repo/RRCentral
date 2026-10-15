@@ -23,6 +23,7 @@ import { logActivity } from '../lib/activity'
 import { formatAED } from '../lib/money'
 import { generateReference } from '../lib/referenceNumber'
 import { getDivisionQuoteFormat } from '../lib/divisionQuoteFormats'
+import { registerLineItemSkus } from '../lib/skuRegistry'
 import {
   calcTotals,
   deleteLineItems,
@@ -330,7 +331,9 @@ export default function InvoicesPage() {
         await deleteFinanceForInvoiceRef(reference)
       }
 
-      await saveLineItems('Invoice', reference, form.items, vatRate)
+      // Every line gets an SKU and a catalog / inventory record so it can be recalled later.
+      const registered = await registerLineItemSkus(form.items, divisionCode, `invoice ${reference}`)
+      await saveLineItems('Invoice', reference, registered.items, vatRate)
       await syncIncome(
         {
           client: payload.client,

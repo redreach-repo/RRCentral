@@ -68,6 +68,7 @@ import {
   matchQuoteForDeliveryNote,
 } from '../lib/deliveryNotes'
 import { resolveDealRef } from '../lib/dealQuotes'
+import { registerLineItemSkus } from '../lib/skuRegistry'
 import { listVendors } from '../lib/vendors'
 import {
   BASE_CURRENCY,
@@ -589,8 +590,15 @@ export default function QuotationsPage() {
         } else if (error) throw error
       }
 
+      // Every line gets an SKU and a catalog / inventory record so it can be recalled later.
+      step = 'registering SKUs in the catalog'
+      const registered = await registerLineItemSkus(
+        form.items,
+        form.division_code,
+        `quotation ${editing?.reference_number || quoteId}`,
+      )
       step = 'saving line items'
-      await saveLineItems('Quote', quoteId, form.items, vatRate)
+      await saveLineItems('Quote', quoteId, registered.items, vatRate)
       const flagIds = [quoteId, editing?.id, editing?.reference_number].filter(
         (v): v is string => Boolean(v),
       )
@@ -603,7 +611,12 @@ export default function QuotationsPage() {
       await updateSetting(OFFSET_VAT_SETTING_KEY, JSON.stringify(nextFlags))
       step = 'logging activity'
       await logActivity('save_quote', 'quotation', 'DRAFT', `${payload.client} · Draft`, who)
-      showToast('Draft saved', 'success')
+      showToast(
+        registered.added
+          ? `Draft saved · ${registered.added} new item${registered.added === 1 ? '' : 's'} added to the catalog`
+          : 'Draft saved',
+        'success',
+      )
       setEditorOpen(false)
       await load()
     } catch (e) {
