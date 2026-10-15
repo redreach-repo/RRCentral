@@ -12,6 +12,51 @@ const PX_PER_MM = 96 / 25.4
 /** Soft floor for whitespace compression (never crush layout entirely). */
 export const MIN_WHITESPACE_FACTOR = 0.28
 
+/** How a quotation / invoice / delivery note is laid out in the PDF. */
+export type PdfPageLayout = 'fit' | 'split' | 'flow'
+
+export const PDF_PAGE_LAYOUTS: { value: PdfPageLayout; label: string; hint: string }[] = [
+  {
+    value: 'fit',
+    label: 'Fit on one page',
+    hint: 'Compress blank space to fit one A4. Long documents split evenly across two pages.',
+  },
+  {
+    value: 'split',
+    label: 'Two pages (terms on page 2)',
+    hint: 'Items and totals on page 1; payment, delivery, notes and signatures on page 2. Both pages keep the header and footer.',
+  },
+  {
+    value: 'flow',
+    label: 'Natural length',
+    hint: 'No compression — long documents continue onto extra A4 pages.',
+  },
+]
+
+const PDF_PAGE_LAYOUT_KEY = 'rrcentral_pdf_page_layout'
+
+export function isPdfPageLayout(value: unknown): value is PdfPageLayout {
+  return value === 'fit' || value === 'split' || value === 'flow'
+}
+
+/** Last layout this browser used (defaults to one page). */
+export function readPdfPageLayout(): PdfPageLayout {
+  try {
+    const saved = localStorage.getItem(PDF_PAGE_LAYOUT_KEY)
+    return isPdfPageLayout(saved) ? saved : 'fit'
+  } catch {
+    return 'fit'
+  }
+}
+
+export function savePdfPageLayout(layout: PdfPageLayout): void {
+  try {
+    localStorage.setItem(PDF_PAGE_LAYOUT_KEY, layout)
+  } catch {
+    // Private mode — the choice just isn't remembered.
+  }
+}
+
 /** Internal draft ids look like Q-1785391827656 — never show these on customer PDFs. */
 export function isInternalDraftId(value: string | null | undefined): boolean {
   return /^Q-\d{10,}$/i.test(String(value || '').trim())
@@ -301,10 +346,47 @@ function addCanvasPage(
   }
 }
 
+/**
+ * Pre-split layouts render one letterhead sheet per page (`[data-pdf-page]`).
+ * Each sheet becomes exactly one A4 page so every page keeps its own header and
+ * footer; a sheet that is too tall has its blank space compressed to fit.
+ */
+async function pagesToPdf(pages: HTMLElement[]): Promise<jsPDF> {
+  const pdf = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: [A4_WIDTH_MM, A4_HEIGHT_MM],
+    compress: true,
+  })
+  for (const [index, page] of pages.entries()) {
+    const canvas = await html2canvas(page, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      onclone(_doc, cloned) {
+        prepareCloneForA4Capture(cloned)
+        fitCloneToA4ByCompressingWhitespace(cloned)
+      },
+    })
+    if (index > 0) pdf.addPage([A4_WIDTH_MM, A4_HEIGHT_MM], 'portrait')
+    addCanvasPage(pdf, canvas, { fillPage: true })
+  }
+  return pdf
+}
+
 export async function elementToPdfBlob(
   element: HTMLElement,
   opts?: { filenameHint?: string; fitToPage?: boolean },
 ): Promise<{ blob: Blob; filename: string; dataUrl: string }> {
+  const filename = `${opts?.filenameHint || 'document'}.pdf`.replace(/\s+/g, '-')
+
+  const presetPages = Array.from(element.querySelectorAll<HTMLElement>('[data-pdf-page]'))
+  if (presetPages.length > 0) {
+    const pdf = await pagesToPdf(presetPages)
+    return { blob: pdf.output('blob'), filename, dataUrl: pdf.output('datauristring') }
+  }
+
   // Default ON — invoices/quotes should prefer one A4 unless explicitly disabled.
   const fitToPage = opts?.fitToPage !== false
 
@@ -372,7 +454,6 @@ export async function elementToPdfBlob(
     })
   }
 
-  const filename = `${opts?.filenameHint || 'document'}.pdf`.replace(/\s+/g, '-')
   const blob = pdf.output('blob')
   const dataUrl = pdf.output('datauristring')
   return { blob, filename, dataUrl }

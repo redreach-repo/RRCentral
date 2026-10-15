@@ -31,6 +31,10 @@ import {
   displayDocumentReference,
   downloadBlob,
   elementToPdfBlob,
+  PDF_PAGE_LAYOUTS,
+  readPdfPageLayout,
+  savePdfPageLayout,
+  type PdfPageLayout,
   quoteValidUntil,
 } from '../lib/documents'
 import styles from './DocumentPage.module.css'
@@ -78,7 +82,12 @@ export default function DocumentPage() {
   const [emailContacts, setEmailContacts] = useState<CrmContact[]>([])
   const [pdfBusy, setPdfBusy] = useState(false)
   /** Compress blank vertical space so PDFs prefer one A4; else uniform 2-page split. */
-  const [fitToPage, setFitToPage] = useState(true)
+  const [pageLayout, setPageLayoutState] = useState<PdfPageLayout>(readPdfPageLayout)
+  const fitToPage = pageLayout === 'fit'
+  const setPageLayout = (layout: PdfPageLayout) => {
+    setPageLayoutState(layout)
+    savePdfPageLayout(layout)
+  }
   const [dnBusy, setDnBusy] = useState(false)
   const [emailOpen, setEmailOpen] = useState(false)
   const [signedAttachments, setSignedAttachments] = useState<Attachment[]>([])
@@ -353,7 +362,14 @@ export default function DocumentPage() {
         fitToPage,
       })
       downloadBlob(blob, filename)
-      showToast(fitToPage ? 'PDF downloaded (fit to page)' : 'PDF downloaded', 'success')
+      showToast(
+        pageLayout === 'split'
+          ? 'PDF downloaded (2 pages)'
+          : fitToPage
+            ? 'PDF downloaded (fit to page)'
+            : 'PDF downloaded',
+        'success',
+      )
     } catch (e) {
       showToast(errorMessage(e, 'PDF failed'), 'error')
     } finally {
@@ -537,6 +553,528 @@ export default function DocumentPage() {
     )
   }
 
+  // Letterhead pieces, shared by the one-sheet and two-page (terms on page 2) layouts.
+  const letterheadHeader = (
+    <>
+      {isDraft && (
+        <div className={styles.draftBanner}>DRAFT — reference not finalized</div>
+      )}
+
+      <div className={styles.top}>
+        <div>
+          <img
+            src={resolveLogoUrl(settings.logoUrl)}
+            alt={settings.brand || 'RED REACH'}
+            className={styles.logo}
+          />
+          <div className={styles.company}>
+            <div style={{ fontWeight: 700, color: '#111' }}>
+              {settings.companyName || 'Red Reach Middle East FZE'}
+            </div>
+            {settings.address}
+            <br />
+            {settings.email}
+            {settings.phone ? ` · ${settings.phone}` : ''}
+            {settings.trn ? (
+              <>
+                <br />
+                TRN: {settings.trn}
+              </>
+            ) : null}
+          </div>
+          {division ? (
+            <span className={styles.divisionPill}>
+              {quoteFormat.introEyebrow || division}
+            </span>
+          ) : null}
+        </div>
+        <div className={styles.docMeta}>
+          <div className={styles.docLabel}>{title}</div>
+          <h1>{displayRef}</h1>
+          <div className={styles.metaGrid}>
+            <div>
+              <span style={{ color: '#555' }}>Date: </span>
+              {doc.date ? format(new Date(doc.date), 'dd MMM yyyy') : '—'}
+            </div>
+            {docType === 'quote' && validUntil ? (
+              <div>
+                <span style={{ color: '#555' }}>Valid until: </span>
+                {format(new Date(validUntil), 'dd MMM yyyy')}
+              </div>
+            ) : null}
+            {isDeliveryNote && deliveryNote?.quote_ref ? (
+              <div>
+                <span style={{ color: '#555' }}>Quotation: </span>
+                {deliveryNote.quote_ref}
+              </div>
+            ) : null}
+            {isDeliveryNote && deliveryNote?.delivery_date ? (
+              <div>
+                <span style={{ color: '#555' }}>Delivery: </span>
+                {format(new Date(deliveryNote.delivery_date), 'dd MMM yyyy')}
+              </div>
+            ) : null}
+            {'payment_status' in doc && (
+              <div>
+                <span style={{ color: '#555' }}>Payment: </span>
+                {doc.payment_status}
+              </div>
+            )}
+            {'status' in doc && (
+              <div>
+                <span style={{ color: '#555' }}>Status: </span>
+                {doc.status}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  )
+
+  const pageOneBody = (
+    <>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 24,
+          margin: '24px 0 16px',
+        }}
+      >
+        <div>
+          <h3
+            style={{
+              margin: '0 0 8px',
+              fontSize: 11,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: '#555',
+            }}
+          >
+            {isDeliveryNote ? 'Deliver to' : quoteFormat.sectionHeadings.billTo}
+          </h3>
+          <p style={{ margin: 0, lineHeight: 1.5, fontSize: 14 }}>
+            <strong>{billTo.companyName || doc.client}</strong>
+            {billTo.primaryContact ? (
+              <>
+                <br />
+                {billTo.primaryContact}
+              </>
+            ) : null}
+            {billTo.email ? (
+              <>
+                <br />
+                {billTo.email}
+              </>
+            ) : null}
+            {billTo.phone ? (
+              <>
+                <br />
+                Tel: {billTo.phone}
+              </>
+            ) : null}
+            {billTo.address ? (
+              <>
+                <br />
+                {billTo.address.split(/\n+/).map((line, i) => (
+                  <span key={`addr-${i}`}>
+                    {i > 0 ? <br /> : null}
+                    {line}
+                  </span>
+                ))}
+              </>
+            ) : null}
+            {billTo.trn ? (
+              <>
+                <br />
+                TRN: {billTo.trn}
+              </>
+            ) : null}
+          </p>
+        </div>
+        <div>
+          <h3
+            style={{
+              margin: '0 0 8px',
+              fontSize: 11,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: '#555',
+            }}
+          >
+            {isDeliveryNote ? 'Against quotation' : quoteFormat.sectionHeadings.scope}
+          </h3>
+          <p style={{ margin: 0, lineHeight: 1.5, fontSize: 14 }}>{doc.description || '—'}</p>
+          {isDeliveryNote && deliveryNote?.quote_ref ? (
+            <p style={{ margin: '10px 0 0', fontSize: 12.5, color: '#444', lineHeight: 1.45 }}>
+              <strong>Quotation:</strong> {deliveryNote.quote_ref}
+              {deliveryNote.ship_to ? (
+                <>
+                  <br />
+                  <strong>Ship to:</strong> {deliveryNote.ship_to}
+                </>
+              ) : null}
+            </p>
+          ) : null}
+          {docType === 'quote' && quoteFormat.showPartnerFulfillment ? (
+            <p style={{ margin: '10px 0 0', fontSize: 12.5, color: '#444', lineHeight: 1.45 }}>
+              <strong>Fulfilment partner:</strong> {quoteFormat.partnerName || CONNECT_PARTNER.name}{' '}
+              ({CONNECT_PARTNER.location}). {CONNECT_PARTNER.billingNote}
+            </p>
+          ) : null}
+          {docType === 'quote' && quoteFormat.showTripSummary && quote ? (
+            <p style={{ margin: '10px 0 0', fontSize: 12.5, color: '#444', lineHeight: 1.45 }}>
+              Travel proposal format — passenger counts, dates and inclusions as listed below.
+              Flights and visa assistance only when stated.
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      <h3
+        style={{
+          margin: '18px 0 8px',
+          fontSize: 11,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: '#555',
+        }}
+      >
+        {isDeliveryNote ? 'Goods delivered' : quoteFormat.sectionHeadings.lines}
+      </h3>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8, fontSize: 13.5 }}>
+        <thead>
+          <tr>
+            {lineColumns.map((h) => (
+              <th
+                key={h}
+                style={{
+                  padding: '10px 8px',
+                  borderBottom: '2px solid #222',
+                  textAlign:
+                    h === 'line' || h === 'sku' || h === 'description' || h === 'sizes'
+                      ? 'left'
+                      : 'right',
+                  fontSize: 11,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  color: '#555',
+                }}
+              >
+                {columnLabel(h)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {items.length === 0 ? (
+            <tr>
+              <td
+                colSpan={lineColumns.length}
+                style={{ padding: 12, color: '#555' }}
+              >
+                No line items
+              </td>
+            </tr>
+          ) : (
+            items.map((it) => (
+              <tr key={it.id}>
+                {lineColumns.map((col) => (
+                  <td
+                    key={col}
+                    style={{
+                      ...cell,
+                      textAlign:
+                        col === 'line' ||
+                        col === 'sku' ||
+                        col === 'description' ||
+                        col === 'sizes'
+                          ? 'left'
+                          : 'right',
+                    }}
+                  >
+                    {renderLineCell(col, it, quoteFormat.showInventorySku)}
+                  </td>
+                ))}
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+
+      {isDeliveryNote ? (
+        <div style={{ width: 280, margin: '18px 0 0 auto', fontSize: 14 }}>
+          <div
+            style={{
+              ...totalRow,
+              marginTop: 6,
+              paddingTop: 10,
+              borderTop: '2px solid #222',
+              fontWeight: 800,
+              fontSize: 16,
+            }}
+          >
+            <span>Total qty</span>
+            <span>{deliveryNoteTotalQty(items)}</span>
+          </div>
+        </div>
+      ) : (
+      <div style={{ width: 280, margin: '18px 0 0 auto', fontSize: 14 }}>
+        <div style={totalRow}>
+          <span>Subtotal</span>
+          <span>{money(summary.subtotal)}</span>
+        </div>
+        {summary.offsetVat ? (
+          <>
+            <div style={totalRow}>
+              <span>VAT ({(effectiveVatRate * 100).toFixed(0)}%)</span>
+              <span>{money(summary.vat)}</span>
+            </div>
+            {summary.discount > 0 ? (
+              <div style={totalRow}>
+                <span>Discount (VAT)</span>
+                <span>−{money(summary.discount)}</span>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <>
+            {summary.discount > 0 ? (
+              <div style={totalRow}>
+                <span>
+                  Discount
+                  {docType === 'quote' && Number((doc as Quotation).discount_percent) > 0
+                    ? ` (${Number((doc as Quotation).discount_percent)}%)`
+                    : ''}
+                  {docType === 'quote' &&
+                  Number((doc as Quotation).discount_amount) > 0 &&
+                  !(Number((doc as Quotation).discount_percent) > 0)
+                    ? ' (fixed)'
+                    : ''}
+                </span>
+                <span>−{money(summary.discount)}</span>
+              </div>
+            ) : null}
+            <div style={totalRow}>
+              <span>VAT ({(effectiveVatRate * 100).toFixed(0)}%)</span>
+              <span>{money(summary.vat)}</span>
+            </div>
+          </>
+        )}
+        <div
+          style={{
+            ...totalRow,
+            marginTop: 6,
+            paddingTop: 10,
+            borderTop: '2px solid #222',
+            fontWeight: 800,
+            fontSize: 16,
+          }}
+        >
+          <span>Total ({docType === 'quote' ? docCurrency : 'AED'})</span>
+          <span>{money(summary.total)}</span>
+        </div>
+      </div>
+      )}
+    </>
+  )
+
+  const pageTwoBody = (
+    <>
+      <div style={{ marginTop: 28, fontSize: 12.5, lineHeight: 1.55, color: '#333' }}>
+        <h3 style={{ margin: '0 0 8px', fontSize: 13, color: '#c1121f' }}>
+          {isDeliveryNote ? 'Delivery' : quoteFormat.sectionHeadings.commercial}
+        </h3>
+        {isDeliveryNote ? (
+          <>
+            <div>This document is a delivery note, not a tax invoice.</div>
+            <div>Delivery: {doc.delivery_terms || settings.deliveryTerms || '—'}</div>
+            {deliveryNote?.vehicle_notes ? (
+              <div>Vehicle / driver: {deliveryNote.vehicle_notes}</div>
+            ) : null}
+            {deliveryNote?.received_by ? (
+              <div>Received by: {deliveryNote.received_by}</div>
+            ) : null}
+          </>
+        ) : (
+          <>
+        <div>
+          Payment terms:{' '}
+          {'payment_terms' in doc
+            ? doc.payment_terms || quoteFormat.defaultPaymentTerms || settings.paymentTerms || '—'
+            : quoteFormat.defaultPaymentTerms || settings.paymentTerms || '—'}
+        </div>
+        {quoteFormat.showDelivery ? (
+          <div>Delivery: {doc.delivery_terms || settings.deliveryTerms || '—'}</div>
+        ) : null}
+        {quoteFormat.showMoq && 'moq' in doc ? (
+          <div>MOQ: {doc.moq || settings.moqDefault || '—'}</div>
+        ) : null}
+        {docType === 'quote' && quoteFormat.showHoursBilling ? (
+          <div style={{ marginTop: 8 }}>
+            Hours and rates are as listed. Unused hours policy is editable per client engagement.
+          </div>
+        ) : null}
+        {docType === 'quote' && quote ? (
+          <div style={{ marginTop: 10 }}>
+            <strong>Quotation currency:</strong> {docCurrency}
+            <br />
+            <strong>Other payment currencies accepted:</strong>{' '}
+            {quote.accept_other_payment_currency === false ? 'No' : 'Yes'}
+            {quote.payment_currency && quote.payment_currency !== docCurrency
+              ? ` (preferred: ${quote.payment_currency})`
+              : ''}
+            <br />
+            {quote.fx_rate && quote.fx_rate !== 1 ? (
+              <>
+                <strong>Exchange rate used:</strong> 1 {docCurrency} = {quote.fx_rate}{' '}
+                {quote.booking_currency || BASE_CURRENCY}
+                {quote.fx_rate_date ? ` (as of ${quote.fx_rate_date})` : ''}
+                <br />
+              </>
+            ) : null}
+            {quote.rate_valid_until ? (
+              <>
+                <strong>Rate valid until:</strong> {quote.rate_valid_until}
+                <br />
+              </>
+            ) : null}
+            <strong>Bank / conversion charges borne by:</strong>{' '}
+            {quote.charges_borne_by || 'Customer'}
+            <br />
+            {quote.net_amount_required ? (
+              <>
+                <strong>Net amount required:</strong> {quote.net_amount_required}
+                <br />
+              </>
+            ) : null}
+            {quote.payment_instructions ? (
+              <div style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>
+                <strong>Payment instructions ({quote.payment_currency || docCurrency}):</strong>
+                <br />
+                {quote.payment_instructions}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {settings.accountName && (
+          <div style={{ marginTop: 10 }}>
+            <strong>Bank:</strong> {settings.bankName} · {settings.accountName}
+            <br />
+            A/C {settings.bankAccount} · IBAN {settings.iban}
+          </div>
+        )}
+          </>
+        )}
+      </div>
+
+      {isWandersQuote && (
+        <div style={{ marginTop: 18, fontSize: 12.5, lineHeight: 1.55, color: '#333' }}>
+          {wandersLegalReady ? (
+            <div style={{ marginBottom: 10 }}>
+              <strong>Contracting entity:</strong> {settings.wandersLegalEntityName}
+              <br />
+              {settings.wandersRegisteredAddress}
+            </div>
+          ) : (
+            <div style={{ marginBottom: 10, fontStyle: 'italic', color: '#666' }}>
+              Contracting legal-entity details will appear here once confirmed (currently TBC —
+              not published as UAE or any assumed jurisdiction).
+            </div>
+          )}
+        </div>
+      )}
+
+      {(doc.notes ||
+        (!isDeliveryNote && quoteFormat.defaultScopeNotes) ||
+        (!isDeliveryNote && !isWandersQuote && settings.quoteTerms) ||
+        (isWandersQuote && wandersTermsBlock)) && (
+        <div style={{ marginTop: 14, fontSize: 12.5, lineHeight: 1.45, color: '#333' }}>
+          <h3 style={{ margin: '0 0 6px', fontSize: 13, color: '#c1121f' }}>
+            {quoteFormat.sectionHeadings.terms}
+          </h3>
+          {(() => {
+            const blocks = (
+              isDeliveryNote
+                ? [doc.notes]
+                : isWandersQuote
+                  ? [doc.notes, wandersTermsBlock]
+                  : [doc.notes, quoteFormat.defaultScopeNotes || settings.quoteTerms]
+            )
+              .map((part) =>
+                String(part || '')
+                  .replace(/\n{2,}/g, '\n')
+                  .trim(),
+              )
+              .filter(Boolean)
+            return (
+              <div>
+                {blocks.map((block, i) => (
+                  <p
+                    key={`note-block-${i}`}
+                    style={{
+                      margin: i === 0 ? 0 : '4px 0 0',
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    {block}
+                  </p>
+                ))}
+              </div>
+            )
+          })()}
+        </div>
+      )}
+
+      {docType === 'quote' ? (
+        <p style={{ marginTop: 12, fontSize: 13 }}>
+          {isWandersQuote
+            ? null
+            : quoteFormat.closingNote || settings.quoteClosing || null}
+        </p>
+      ) : null}
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 24,
+          margin: '18px 0 10px',
+          fontSize: 13,
+          fontWeight: 700,
+        }}
+      >
+        <div style={{ borderTop: '1px solid #bbb', paddingTop: 8, marginTop: 12 }}>
+          {isDeliveryNote
+            ? `Delivered by ${settings.companyName || 'Red Reach Middle East FZE'}`
+            : `For ${settings.companyName || 'Red Reach Middle East FZE'}`}
+          {isDeliveryNote ? (
+            <div style={{ fontWeight: 400, marginTop: 20, color: '#555', fontSize: 12 }}>
+              Name / date
+            </div>
+          ) : null}
+        </div>
+        <div style={{ borderTop: '1px solid #bbb', paddingTop: 8, marginTop: 12 }}>
+          {isDeliveryNote ? 'Received by (goods in good order)' : 'Client acceptance'}
+          {isDeliveryNote ? (
+            <div style={{ fontWeight: 400, marginTop: 20, color: '#555', fontSize: 12 }}>
+              {deliveryNote?.received_by || 'Name / signature / date'}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </>
+  )
+
+  const letterheadFooter = (
+    <div className={styles.footerBar} data-pdf-footer>
+      {settings.tagline || 'Multi-division commerce · UAE'}
+      {settings.website ? ` · ${settings.website}` : ''}
+    </div>
+  )
+
   return (
     <div style={{ minHeight: '100vh', background: '#f0f0f0', color: '#111' }}>
       <div
@@ -570,28 +1108,41 @@ export default function DocumentPage() {
           <Printer size={14} /> Print
         </ToolbarBtn>
         <label
-          title="Compress blank space to fit one A4. Long docs split evenly across two pages. Fonts stay the same size."
+          title="Choose how the PDF is laid out. Every page keeps the letterhead header and footer."
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: 8,
-            padding: '8px 12px',
+            padding: '6px 6px 6px 12px',
             borderRadius: 999,
-            background: fitToPage ? 'rgba(232, 93, 4, 0.22)' : 'rgba(255,255,255,0.08)',
+            background: 'rgba(232, 93, 4, 0.22)',
             color: '#fff',
             fontSize: 13,
             fontWeight: 600,
-            cursor: 'pointer',
-            userSelect: 'none',
           }}
         >
-          <input
-            type="checkbox"
-            checked={fitToPage}
-            onChange={(e) => setFitToPage(e.target.checked)}
-            style={{ margin: 0, accentColor: '#e85d04' }}
-          />
-          Fit on one page
+          Pages
+          <select
+            value={pageLayout}
+            onChange={(e) => setPageLayout(e.target.value as PdfPageLayout)}
+            aria-label="PDF page layout"
+            style={{
+              border: 0,
+              borderRadius: 999,
+              padding: '4px 8px',
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#111',
+              background: '#fff',
+              cursor: 'pointer',
+            }}
+          >
+            {PDF_PAGE_LAYOUTS.map((option) => (
+              <option key={option.value} value={option.value} title={option.hint}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </label>
         <ToolbarBtn onClick={() => void downloadPdf()} disabled={pdfBusy}>
           <Download size={14} /> {pdfBusy ? 'Preparing…' : 'Download PDF'}
@@ -760,516 +1311,33 @@ export default function DocumentPage() {
       ) : null}
 
       <div className={styles.preview}>
-        <div ref={sheetRef} className={styles.frame} data-pdf-root>
-          <div className={styles.sheet}>
-            {isDraft && (
-              <div className={styles.draftBanner}>DRAFT — reference not finalized</div>
-            )}
-
-            <div className={styles.top}>
-              <div>
-                <img
-                  src={resolveLogoUrl(settings.logoUrl)}
-                  alt={settings.brand || 'RED REACH'}
-                  className={styles.logo}
-                />
-                <div className={styles.company}>
-                  <div style={{ fontWeight: 700, color: '#111' }}>
-                    {settings.companyName || 'Red Reach Middle East FZE'}
-                  </div>
-                  {settings.address}
-                  <br />
-                  {settings.email}
-                  {settings.phone ? ` · ${settings.phone}` : ''}
-                  {settings.trn ? (
-                    <>
-                      <br />
-                      TRN: {settings.trn}
-                    </>
-                  ) : null}
-                </div>
-                {division ? (
-                  <span className={styles.divisionPill}>
-                    {quoteFormat.introEyebrow || division}
-                  </span>
-                ) : null}
+        {pageLayout === 'split' ? (
+          <div ref={sheetRef} className={styles.pageStack} data-pdf-split>
+            <div className={`${styles.frame} ${styles.splitPage}`} data-pdf-page>
+              <div className={styles.sheet}>
+                {letterheadHeader}
+                {pageOneBody}
               </div>
-              <div className={styles.docMeta}>
-                <div className={styles.docLabel}>{title}</div>
-                <h1>{displayRef}</h1>
-                <div className={styles.metaGrid}>
-                  <div>
-                    <span style={{ color: '#555' }}>Date: </span>
-                    {doc.date ? format(new Date(doc.date), 'dd MMM yyyy') : '—'}
-                  </div>
-                  {docType === 'quote' && validUntil ? (
-                    <div>
-                      <span style={{ color: '#555' }}>Valid until: </span>
-                      {format(new Date(validUntil), 'dd MMM yyyy')}
-                    </div>
-                  ) : null}
-                  {isDeliveryNote && deliveryNote?.quote_ref ? (
-                    <div>
-                      <span style={{ color: '#555' }}>Quotation: </span>
-                      {deliveryNote.quote_ref}
-                    </div>
-                  ) : null}
-                  {isDeliveryNote && deliveryNote?.delivery_date ? (
-                    <div>
-                      <span style={{ color: '#555' }}>Delivery: </span>
-                      {format(new Date(deliveryNote.delivery_date), 'dd MMM yyyy')}
-                    </div>
-                  ) : null}
-                  {'payment_status' in doc && (
-                    <div>
-                      <span style={{ color: '#555' }}>Payment: </span>
-                      {doc.payment_status}
-                    </div>
-                  )}
-                  {'status' in doc && (
-                    <div>
-                      <span style={{ color: '#555' }}>Status: </span>
-                      {doc.status}
-                    </div>
-                  )}
-                </div>
-              </div>
+              {letterheadFooter}
             </div>
-
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: 24,
-                margin: '24px 0 16px',
-              }}
-            >
-              <div>
-                <h3
-                  style={{
-                    margin: '0 0 8px',
-                    fontSize: 11,
-                    letterSpacing: '0.12em',
-                    textTransform: 'uppercase',
-                    color: '#555',
-                  }}
-                >
-                  {isDeliveryNote ? 'Deliver to' : quoteFormat.sectionHeadings.billTo}
-                </h3>
-                <p style={{ margin: 0, lineHeight: 1.5, fontSize: 14 }}>
-                  <strong>{billTo.companyName || doc.client}</strong>
-                  {billTo.primaryContact ? (
-                    <>
-                      <br />
-                      {billTo.primaryContact}
-                    </>
-                  ) : null}
-                  {billTo.email ? (
-                    <>
-                      <br />
-                      {billTo.email}
-                    </>
-                  ) : null}
-                  {billTo.phone ? (
-                    <>
-                      <br />
-                      Tel: {billTo.phone}
-                    </>
-                  ) : null}
-                  {billTo.address ? (
-                    <>
-                      <br />
-                      {billTo.address.split(/\n+/).map((line, i) => (
-                        <span key={`addr-${i}`}>
-                          {i > 0 ? <br /> : null}
-                          {line}
-                        </span>
-                      ))}
-                    </>
-                  ) : null}
-                  {billTo.trn ? (
-                    <>
-                      <br />
-                      TRN: {billTo.trn}
-                    </>
-                  ) : null}
-                </p>
+            <div className={`${styles.frame} ${styles.splitPage}`} data-pdf-page>
+              <div className={styles.sheet}>
+                {letterheadHeader}
+                <div className={styles.continuedBody}>{pageTwoBody}</div>
               </div>
-              <div>
-                <h3
-                  style={{
-                    margin: '0 0 8px',
-                    fontSize: 11,
-                    letterSpacing: '0.12em',
-                    textTransform: 'uppercase',
-                    color: '#555',
-                  }}
-                >
-                  {isDeliveryNote ? 'Against quotation' : quoteFormat.sectionHeadings.scope}
-                </h3>
-                <p style={{ margin: 0, lineHeight: 1.5, fontSize: 14 }}>{doc.description || '—'}</p>
-                {isDeliveryNote && deliveryNote?.quote_ref ? (
-                  <p style={{ margin: '10px 0 0', fontSize: 12.5, color: '#444', lineHeight: 1.45 }}>
-                    <strong>Quotation:</strong> {deliveryNote.quote_ref}
-                    {deliveryNote.ship_to ? (
-                      <>
-                        <br />
-                        <strong>Ship to:</strong> {deliveryNote.ship_to}
-                      </>
-                    ) : null}
-                  </p>
-                ) : null}
-                {docType === 'quote' && quoteFormat.showPartnerFulfillment ? (
-                  <p style={{ margin: '10px 0 0', fontSize: 12.5, color: '#444', lineHeight: 1.45 }}>
-                    <strong>Fulfilment partner:</strong> {quoteFormat.partnerName || CONNECT_PARTNER.name}{' '}
-                    ({CONNECT_PARTNER.location}). {CONNECT_PARTNER.billingNote}
-                  </p>
-                ) : null}
-                {docType === 'quote' && quoteFormat.showTripSummary && quote ? (
-                  <p style={{ margin: '10px 0 0', fontSize: 12.5, color: '#444', lineHeight: 1.45 }}>
-                    Travel proposal format — passenger counts, dates and inclusions as listed below.
-                    Flights and visa assistance only when stated.
-                  </p>
-                ) : null}
-              </div>
-            </div>
-
-            <h3
-              style={{
-                margin: '18px 0 8px',
-                fontSize: 11,
-                letterSpacing: '0.12em',
-                textTransform: 'uppercase',
-                color: '#555',
-              }}
-            >
-              {isDeliveryNote ? 'Goods delivered' : quoteFormat.sectionHeadings.lines}
-            </h3>
-
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8, fontSize: 13.5 }}>
-              <thead>
-                <tr>
-                  {lineColumns.map((h) => (
-                    <th
-                      key={h}
-                      style={{
-                        padding: '10px 8px',
-                        borderBottom: '2px solid #222',
-                        textAlign:
-                          h === 'line' || h === 'sku' || h === 'description' || h === 'sizes'
-                            ? 'left'
-                            : 'right',
-                        fontSize: 11,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.08em',
-                        color: '#555',
-                      }}
-                    >
-                      {columnLabel(h)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {items.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={lineColumns.length}
-                      style={{ padding: 12, color: '#555' }}
-                    >
-                      No line items
-                    </td>
-                  </tr>
-                ) : (
-                  items.map((it) => (
-                    <tr key={it.id}>
-                      {lineColumns.map((col) => (
-                        <td
-                          key={col}
-                          style={{
-                            ...cell,
-                            textAlign:
-                              col === 'line' ||
-                              col === 'sku' ||
-                              col === 'description' ||
-                              col === 'sizes'
-                                ? 'left'
-                                : 'right',
-                          }}
-                        >
-                          {renderLineCell(col, it, quoteFormat.showInventorySku)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-
-            {isDeliveryNote ? (
-              <div style={{ width: 280, margin: '18px 0 0 auto', fontSize: 14 }}>
-                <div
-                  style={{
-                    ...totalRow,
-                    marginTop: 6,
-                    paddingTop: 10,
-                    borderTop: '2px solid #222',
-                    fontWeight: 800,
-                    fontSize: 16,
-                  }}
-                >
-                  <span>Total qty</span>
-                  <span>{deliveryNoteTotalQty(items)}</span>
-                </div>
-              </div>
-            ) : (
-            <div style={{ width: 280, margin: '18px 0 0 auto', fontSize: 14 }}>
-              <div style={totalRow}>
-                <span>Subtotal</span>
-                <span>{money(summary.subtotal)}</span>
-              </div>
-              {summary.offsetVat ? (
-                <>
-                  <div style={totalRow}>
-                    <span>VAT ({(effectiveVatRate * 100).toFixed(0)}%)</span>
-                    <span>{money(summary.vat)}</span>
-                  </div>
-                  {summary.discount > 0 ? (
-                    <div style={totalRow}>
-                      <span>Discount (VAT)</span>
-                      <span>−{money(summary.discount)}</span>
-                    </div>
-                  ) : null}
-                </>
-              ) : (
-                <>
-                  {summary.discount > 0 ? (
-                    <div style={totalRow}>
-                      <span>
-                        Discount
-                        {docType === 'quote' && Number((doc as Quotation).discount_percent) > 0
-                          ? ` (${Number((doc as Quotation).discount_percent)}%)`
-                          : ''}
-                        {docType === 'quote' &&
-                        Number((doc as Quotation).discount_amount) > 0 &&
-                        !(Number((doc as Quotation).discount_percent) > 0)
-                          ? ' (fixed)'
-                          : ''}
-                      </span>
-                      <span>−{money(summary.discount)}</span>
-                    </div>
-                  ) : null}
-                  <div style={totalRow}>
-                    <span>VAT ({(effectiveVatRate * 100).toFixed(0)}%)</span>
-                    <span>{money(summary.vat)}</span>
-                  </div>
-                </>
-              )}
-              <div
-                style={{
-                  ...totalRow,
-                  marginTop: 6,
-                  paddingTop: 10,
-                  borderTop: '2px solid #222',
-                  fontWeight: 800,
-                  fontSize: 16,
-                }}
-              >
-                <span>Total ({docType === 'quote' ? docCurrency : 'AED'})</span>
-                <span>{money(summary.total)}</span>
-              </div>
-            </div>
-            )}
-
-            <div style={{ marginTop: 28, fontSize: 12.5, lineHeight: 1.55, color: '#333' }}>
-              <h3 style={{ margin: '0 0 8px', fontSize: 13, color: '#c1121f' }}>
-                {isDeliveryNote ? 'Delivery' : quoteFormat.sectionHeadings.commercial}
-              </h3>
-              {isDeliveryNote ? (
-                <>
-                  <div>This document is a delivery note, not a tax invoice.</div>
-                  <div>Delivery: {doc.delivery_terms || settings.deliveryTerms || '—'}</div>
-                  {deliveryNote?.vehicle_notes ? (
-                    <div>Vehicle / driver: {deliveryNote.vehicle_notes}</div>
-                  ) : null}
-                  {deliveryNote?.received_by ? (
-                    <div>Received by: {deliveryNote.received_by}</div>
-                  ) : null}
-                </>
-              ) : (
-                <>
-              <div>
-                Payment terms:{' '}
-                {'payment_terms' in doc
-                  ? doc.payment_terms || quoteFormat.defaultPaymentTerms || settings.paymentTerms || '—'
-                  : quoteFormat.defaultPaymentTerms || settings.paymentTerms || '—'}
-              </div>
-              {quoteFormat.showDelivery ? (
-                <div>Delivery: {doc.delivery_terms || settings.deliveryTerms || '—'}</div>
-              ) : null}
-              {quoteFormat.showMoq && 'moq' in doc ? (
-                <div>MOQ: {doc.moq || settings.moqDefault || '—'}</div>
-              ) : null}
-              {docType === 'quote' && quoteFormat.showHoursBilling ? (
-                <div style={{ marginTop: 8 }}>
-                  Hours and rates are as listed. Unused hours policy is editable per client engagement.
-                </div>
-              ) : null}
-              {docType === 'quote' && quote ? (
-                <div style={{ marginTop: 10 }}>
-                  <strong>Quotation currency:</strong> {docCurrency}
-                  <br />
-                  <strong>Other payment currencies accepted:</strong>{' '}
-                  {quote.accept_other_payment_currency === false ? 'No' : 'Yes'}
-                  {quote.payment_currency && quote.payment_currency !== docCurrency
-                    ? ` (preferred: ${quote.payment_currency})`
-                    : ''}
-                  <br />
-                  {quote.fx_rate && quote.fx_rate !== 1 ? (
-                    <>
-                      <strong>Exchange rate used:</strong> 1 {docCurrency} = {quote.fx_rate}{' '}
-                      {quote.booking_currency || BASE_CURRENCY}
-                      {quote.fx_rate_date ? ` (as of ${quote.fx_rate_date})` : ''}
-                      <br />
-                    </>
-                  ) : null}
-                  {quote.rate_valid_until ? (
-                    <>
-                      <strong>Rate valid until:</strong> {quote.rate_valid_until}
-                      <br />
-                    </>
-                  ) : null}
-                  <strong>Bank / conversion charges borne by:</strong>{' '}
-                  {quote.charges_borne_by || 'Customer'}
-                  <br />
-                  {quote.net_amount_required ? (
-                    <>
-                      <strong>Net amount required:</strong> {quote.net_amount_required}
-                      <br />
-                    </>
-                  ) : null}
-                  {quote.payment_instructions ? (
-                    <div style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>
-                      <strong>Payment instructions ({quote.payment_currency || docCurrency}):</strong>
-                      <br />
-                      {quote.payment_instructions}
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-              {settings.accountName && (
-                <div style={{ marginTop: 10 }}>
-                  <strong>Bank:</strong> {settings.bankName} · {settings.accountName}
-                  <br />
-                  A/C {settings.bankAccount} · IBAN {settings.iban}
-                </div>
-              )}
-                </>
-              )}
-            </div>
-
-            {isWandersQuote && (
-              <div style={{ marginTop: 18, fontSize: 12.5, lineHeight: 1.55, color: '#333' }}>
-                {wandersLegalReady ? (
-                  <div style={{ marginBottom: 10 }}>
-                    <strong>Contracting entity:</strong> {settings.wandersLegalEntityName}
-                    <br />
-                    {settings.wandersRegisteredAddress}
-                  </div>
-                ) : (
-                  <div style={{ marginBottom: 10, fontStyle: 'italic', color: '#666' }}>
-                    Contracting legal-entity details will appear here once confirmed (currently TBC —
-                    not published as UAE or any assumed jurisdiction).
-                  </div>
-                )}
-              </div>
-            )}
-
-            {(doc.notes ||
-              (!isDeliveryNote && quoteFormat.defaultScopeNotes) ||
-              (!isDeliveryNote && !isWandersQuote && settings.quoteTerms) ||
-              (isWandersQuote && wandersTermsBlock)) && (
-              <div style={{ marginTop: 14, fontSize: 12.5, lineHeight: 1.45, color: '#333' }}>
-                <h3 style={{ margin: '0 0 6px', fontSize: 13, color: '#c1121f' }}>
-                  {quoteFormat.sectionHeadings.terms}
-                </h3>
-                {(() => {
-                  const blocks = (
-                    isDeliveryNote
-                      ? [doc.notes]
-                      : isWandersQuote
-                        ? [doc.notes, wandersTermsBlock]
-                        : [doc.notes, quoteFormat.defaultScopeNotes || settings.quoteTerms]
-                  )
-                    .map((part) =>
-                      String(part || '')
-                        .replace(/\n{2,}/g, '\n')
-                        .trim(),
-                    )
-                    .filter(Boolean)
-                  return (
-                    <div>
-                      {blocks.map((block, i) => (
-                        <p
-                          key={`note-block-${i}`}
-                          style={{
-                            margin: i === 0 ? 0 : '4px 0 0',
-                            whiteSpace: 'pre-wrap',
-                          }}
-                        >
-                          {block}
-                        </p>
-                      ))}
-                    </div>
-                  )
-                })()}
-              </div>
-            )}
-
-            {docType === 'quote' ? (
-              <p style={{ marginTop: 12, fontSize: 13 }}>
-                {isWandersQuote
-                  ? null
-                  : quoteFormat.closingNote || settings.quoteClosing || null}
-              </p>
-            ) : null}
-
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: 24,
-                margin: '18px 0 10px',
-                fontSize: 13,
-                fontWeight: 700,
-              }}
-            >
-              <div style={{ borderTop: '1px solid #bbb', paddingTop: 8, marginTop: 12 }}>
-                {isDeliveryNote
-                  ? `Delivered by ${settings.companyName || 'Red Reach Middle East FZE'}`
-                  : `For ${settings.companyName || 'Red Reach Middle East FZE'}`}
-                {isDeliveryNote ? (
-                  <div style={{ fontWeight: 400, marginTop: 20, color: '#555', fontSize: 12 }}>
-                    Name / date
-                  </div>
-                ) : null}
-              </div>
-              <div style={{ borderTop: '1px solid #bbb', paddingTop: 8, marginTop: 12 }}>
-                {isDeliveryNote ? 'Received by (goods in good order)' : 'Client acceptance'}
-                {isDeliveryNote ? (
-                  <div style={{ fontWeight: 400, marginTop: 20, color: '#555', fontSize: 12 }}>
-                    {deliveryNote?.received_by || 'Name / signature / date'}
-                  </div>
-                ) : null}
-              </div>
+              {letterheadFooter}
             </div>
           </div>
-
-          <div className={styles.footerBar} data-pdf-footer>
-            {settings.tagline || 'Multi-division commerce · UAE'}
-            {settings.website ? ` · ${settings.website}` : ''}
+        ) : (
+          <div ref={sheetRef} className={styles.frame} data-pdf-root>
+            <div className={styles.sheet}>
+              {letterheadHeader}
+              {pageOneBody}
+              {pageTwoBody}
+            </div>
+            {letterheadFooter}
           </div>
-        </div>
+        )}
       </div>
 
       <EmailComposeModal
