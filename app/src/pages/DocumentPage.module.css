@@ -35,6 +35,23 @@
   margin: 20px auto 40px;
 }
 
+/* Two-page layout: one letterhead sheet per page, stacked like paper. */
+.pageStack {
+  display: grid;
+  gap: 24px;
+}
+
+.splitPage {
+  /* min-height (from .frame) keeps the footer at the bottom of each sheet;
+     an over-long sheet grows here and is compressed onto one A4 in the PDF. */
+  min-height: 297mm;
+}
+
+/* Page 2 starts with a little air under the letterhead rule. */
+.continuedBody {
+  margin-top: 8px;
+}
+
 /* Page sheet = one A4. Letterhead chrome is painted on the edges. */
 .frame {
   --lh-rail: 10px;
@@ -248,5 +265,19 @@
     min-height: 297mm;
     box-shadow: none !important;
     page-break-inside: avoid;
+  }
+
+  .pageStack {
+    display: block;
+  }
+
+  .splitPage {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .splitPage:last-child {
+    break-after: auto;
+    page-break-after: auto;
   }
 }
