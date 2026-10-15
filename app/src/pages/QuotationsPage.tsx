@@ -569,7 +569,7 @@ export default function QuotationsPage() {
           if (retry.error) throw retry.error
         } else if (error) throw error
       } else {
-        const { error } = await db.from('quotations').insert({
+        const insertRow = {
           ...payload,
           ...quotationCurrencyDefaults(),
           ...currencyFields,
@@ -578,19 +578,13 @@ export default function QuotationsPage() {
           base_reference: '',
           revision: 0,
           created_by: who,
-        })
+        }
+        const { error } = await db.from('quotations').insert(insertRow)
         if (error && isUndefinedColumnError(error)) {
-          const { offset_vat: _omit, ...withoutFlag } = payload
-          const retry = await db.from('quotations').insert({
-            ...withoutFlag,
-            ...quotationCurrencyDefaults(),
-            ...currencyFields,
-            status: 'Draft',
-            reference_number: '',
-            base_reference: '',
-            revision: 0,
-            created_by: who,
-          })
+          // Databases without the offset_vat column (migration 20260924180942) — the
+          // flag is also kept in app_settings, so save the quote without it.
+          const { offset_vat: _omit, ...withoutFlag } = insertRow
+          const retry = await db.from('quotations').insert(withoutFlag)
           if (retry.error) throw retry.error
         } else if (error) throw error
       }
