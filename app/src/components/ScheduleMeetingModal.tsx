@@ -13,6 +13,7 @@ import {
   inputStyle,
   labelStyle,
 } from '../lib/uiStyles'
+import { errorMessage } from '../lib/errors'
 
 type Props = {
   open: boolean
@@ -102,7 +103,7 @@ export default function ScheduleMeetingModal({
       setNotes('')
       setSelectedTeam([])
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not create meeting')
+      setError(errorMessage(e, 'Could not create meeting'))
     } finally {
       setSaving(false)
     }

@@ -49,6 +49,7 @@ import {
   tdStyle,
   thStyle,
 } from '../lib/uiStyles'
+import { errorMessage } from '../lib/errors'
 
 type Tab = 'winrate' | 'aging' | 'pnl' | 'vat' | 'funnel' | 'fx'
 
@@ -111,7 +112,7 @@ export default function ReportsPage() {
       setSuppliers((sup.data || []) as SupplierCommitment[])
       setDeletedInvoiceRefs([...deleted])
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to load reports', 'error')
+      showToast(errorMessage(e, 'Failed to load reports'), 'error')
     } finally {
       setLoading(false)
     }

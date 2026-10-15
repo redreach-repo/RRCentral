@@ -4,6 +4,7 @@
  */
 
 import { ALL_SEED_PRODUCTS } from './seedCatalog'
+import { errorMessage } from './errors'
 
 export const DB_NAME = 'rrcentral_local'
 const DB_VERSION = 11
@@ -967,7 +968,7 @@ class QueryBuilder implements PromiseLike<QueryResult> {
     } catch (e) {
       return {
         data: null,
-        error: { message: e instanceof Error ? e.message : 'Local DB error' },
+        error: { message: errorMessage(e, 'Local DB error') },
       }
     }
   }

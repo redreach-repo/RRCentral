@@ -7,6 +7,7 @@ import { formatAed } from '../format'
 import { startCheckout } from '../startCheckout'
 import { useShop } from '../ShopContext'
 import TeeMockup from './TeeMockup'
+import { errorMessage } from '../../lib/errors'
 
 export default function CartDrawer() {
   const { lines, drawerOpen, closeCart, setQty, remove } = useShop()
@@ -22,7 +23,7 @@ export default function CartDrawer() {
     try {
       await startCheckout(lines)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not start checkout')
+      setError(errorMessage(err, 'Could not start checkout'))
       setPending(false)
     }
   }

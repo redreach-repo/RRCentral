@@ -27,7 +27,7 @@ import {
   syncQuoteSupplierCostFromExpense,
 } from '../lib/supplierInvoiceStore'
 import { ensureVendor, listVendors } from '../lib/vendors'
-import { isUndefinedColumnError } from '../lib/errors'
+import { isUndefinedColumnError, errorMessage } from '../lib/errors'
 import { Link } from 'react-router-dom'
 import {
   buttonDangerStyle,
@@ -169,7 +169,7 @@ export default function ExpensesPage() {
       if (!quoteRes.error) setQuotes((quoteRes.data || []) as Quotation[])
       setVendors(vendorRows)
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to load expenses', 'error')
+      showToast(errorMessage(e, 'Failed to load expenses'), 'error')
     } finally {
       setLoading(false)
     }
@@ -356,12 +356,12 @@ export default function ExpensesPage() {
         showToast('Supplier invoice PDF read — review the form, then paste the WorkDrive link', 'success')
       } catch (e) {
         setParseHint('Could not read text from this PDF. Fill the form manually.')
-        showToast(e instanceof Error ? e.message : 'PDF parse failed', 'error')
+        showToast(errorMessage(e, 'PDF parse failed'), 'error')
       } finally {
         setParsing(false)
       }
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not read file', 'error')
+      showToast(errorMessage(e, 'Could not read file'), 'error')
     }
   }
 
@@ -511,7 +511,7 @@ export default function ExpensesPage() {
       setOpen(false)
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Save failed', 'error')
+      showToast(errorMessage(e, 'Save failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -540,7 +540,7 @@ export default function ExpensesPage() {
       setDeleteTarget(null)
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Delete failed', 'error')
+      showToast(errorMessage(e, 'Delete failed'), 'error')
     } finally {
       setSaving(false)
     }

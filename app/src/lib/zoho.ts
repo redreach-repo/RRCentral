@@ -6,6 +6,7 @@
 
 import { attendeePayload, mergeAttendeeEmails } from './calendarAttendees'
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseConfig'
+import { errorMessage } from './errors'
 
 export type ZohoSettings = Record<string, string>
 
@@ -309,7 +310,7 @@ export async function testZohoConnection(settings: ZohoSettings): Promise<string
       const uid = await resolveCalendarUid(settings)
       parts.push(`Calendar: ${uid.slice(0, 12)}…`)
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'failed'
+      const msg = errorMessage(e, 'failed')
       const scopeHint =
         /\b401\b/.test(msg) || /unauthorized/i.test(msg)
           ? ' — re-generate the refresh token with ZohoCalendar.calendar.ALL and ZohoCalendar.event.ALL'
@@ -332,7 +333,7 @@ export async function testZohoConnection(settings: ZohoSettings): Promise<string
         )
       }
     } catch (e) {
-      parts.push(`Mail: ${e instanceof Error ? e.message : 'failed'}`)
+      parts.push(`Mail: ${errorMessage(e, 'failed')}`)
     }
   }
 

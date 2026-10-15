@@ -59,6 +59,7 @@ import {
   thStyle,
   toolbarStyle,
 } from '../lib/uiStyles'
+import { errorMessage } from '../lib/errors'
 
 interface InvoiceForm {
   client: string
@@ -188,7 +189,7 @@ export default function InvoicesPage() {
       setInvoices(sortByDateDesc(invoicesFixed))
       setClients((cRes.data || []) as Client[])
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to load invoices', 'error')
+      showToast(errorMessage(e, 'Failed to load invoices'), 'error')
     } finally {
       setLoading(false)
     }
@@ -251,7 +252,7 @@ export default function InvoicesPage() {
       })
       setEditorOpen(true)
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to load line items', 'error')
+      showToast(errorMessage(e, 'Failed to load line items'), 'error')
     }
   }
 
@@ -348,7 +349,7 @@ export default function InvoicesPage() {
       setEditorOpen(false)
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Save failed', 'error')
+      showToast(errorMessage(e, 'Save failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -440,7 +441,7 @@ export default function InvoicesPage() {
       setPayTarget(null)
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Payment failed', 'error')
+      showToast(errorMessage(e, 'Payment failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -498,7 +499,7 @@ export default function InvoicesPage() {
       showToast('Marked as Paid', 'success')
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to mark paid', 'error')
+      showToast(errorMessage(e, 'Failed to mark paid'), 'error')
     } finally {
       setSaving(false)
     }
@@ -530,7 +531,7 @@ export default function InvoicesPage() {
       showToast('Duplicated as draft', 'success')
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Duplicate failed', 'error')
+      showToast(errorMessage(e, 'Duplicate failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -554,7 +555,7 @@ export default function InvoicesPage() {
       setDeleteTarget(null)
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Delete failed', 'error')
+      showToast(errorMessage(e, 'Delete failed'), 'error')
     } finally {
       setSaving(false)
     }

@@ -30,6 +30,7 @@ import {
   toolbarStyle,
   formGridStyle,
 } from '../lib/uiStyles'
+import { errorMessage } from '../lib/errors'
 
 type TemplateForm = {
   name: string
@@ -87,7 +88,7 @@ export default function TemplatesPage() {
       if (error) throw error
       setTemplates((data || []) as QuoteTemplate[])
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to load templates', 'error')
+      showToast(errorMessage(e, 'Failed to load templates'), 'error')
     } finally {
       setLoading(false)
     }
@@ -147,7 +148,7 @@ export default function TemplatesPage() {
       setOpen(false)
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Save failed', 'error')
+      showToast(errorMessage(e, 'Save failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -163,7 +164,7 @@ export default function TemplatesPage() {
       setDeleteTarget(null)
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Delete failed', 'error')
+      showToast(errorMessage(e, 'Delete failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -176,7 +177,7 @@ export default function TemplatesPage() {
       showToast(`Templates synced · ${r.inserted} new · ${r.updated} updated`, 'success')
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Template sync failed', 'error')
+      showToast(errorMessage(e, 'Template sync failed'), 'error')
     } finally {
       setSyncing(false)
     }

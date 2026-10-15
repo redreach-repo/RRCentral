@@ -106,6 +106,7 @@ import {
   errorBanner,
   colors,
 } from '../lib/pageStyles'
+import { errorMessage } from '../lib/errors'
 
 type CrmForm = {
   company_name: string
@@ -250,7 +251,7 @@ export default function CrmPage() {
       )
       setOwners((usersRes.data || []) as AppUser[])
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load CRM')
+      setError(errorMessage(e, 'Failed to load CRM'))
     } finally {
       setLoading(false)
     }
@@ -545,7 +546,7 @@ export default function CrmPage() {
       )
       await load()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Quick update failed')
+      setError(errorMessage(e, 'Quick update failed'))
     } finally {
       setQuickBusyId(null)
     }
@@ -582,7 +583,7 @@ export default function CrmPage() {
       setOutcomeReason('')
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not close deal', 'error')
+      showToast(errorMessage(e, 'Could not close deal'), 'error')
     } finally {
       setQuickBusyId(null)
     }
@@ -657,7 +658,7 @@ export default function CrmPage() {
       setLogTouchTarget(null)
       await load()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to save touch', 'error')
+      showToast(errorMessage(e, 'Failed to save touch'), 'error')
     } finally {
       setQuickBusyId(null)
     }
@@ -737,7 +738,7 @@ export default function CrmPage() {
       }
       setSavePromptTarget({ entry: row, channel: 'whatsapp' })
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not prepare WhatsApp message', 'error')
+      showToast(errorMessage(e, 'Could not prepare WhatsApp message'), 'error')
     } finally {
       setQuickBusyId(null)
     }
@@ -1009,7 +1010,7 @@ export default function CrmPage() {
       closeModal()
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed')
+      setError(errorMessage(err, 'Save failed'))
     } finally {
       setSaving(false)
     }
@@ -1037,7 +1038,7 @@ export default function CrmPage() {
       setDeleteTarget(null)
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Delete failed')
+      setError(errorMessage(err, 'Delete failed'))
     } finally {
       setSaving(false)
     }

@@ -1,5 +1,6 @@
 import { authMode } from './db'
 import { importMigrationDump, localDb, type MigrationDump } from './localDb'
+import { errorMessage } from './errors'
 
 /** Bump when bundled migration-data.json is cleaned so browsers re-import. */
 const FLAG = 'rrcentral_sheets_import_version'
@@ -66,7 +67,7 @@ export async function tryAutoImportSheetsDump(): Promise<{
   } catch (e) {
     return {
       imported: false,
-      error: e instanceof Error ? e.message : 'Import failed',
+      error: errorMessage(e, 'Import failed'),
     }
   }
 }

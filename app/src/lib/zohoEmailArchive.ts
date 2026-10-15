@@ -29,7 +29,7 @@ import {
   updateCrmDriveFolderUrl,
 } from './customerFiles'
 import { logActivity } from './activity'
-import { isMissingRelationError } from './errors'
+import { isMissingRelationError, errorMessage } from './errors'
 
 export const ZOHO_MSG_REF_PREFIX = 'zoho-msg:'
 
@@ -298,7 +298,7 @@ async function fileOneMatchedEmail(opts: {
       messageId: row.messageId,
       company,
       status: 'error',
-      detail: e instanceof Error ? e.message : 'File failed',
+      detail: errorMessage(e, 'File failed'),
     }
   }
 }

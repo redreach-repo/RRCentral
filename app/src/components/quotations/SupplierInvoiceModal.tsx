@@ -29,6 +29,7 @@ import {
   labelStyle,
   selectStyle,
 } from '../../lib/uiStyles'
+import { errorMessage } from '../../lib/errors'
 
 type Props = {
   /** Quotation to record a supplier invoice for; null keeps the dialog closed. */
@@ -173,7 +174,7 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
         })
       }
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not load supplier invoices', 'error')
+      showToast(errorMessage(e, 'Could not load supplier invoices'), 'error')
       setSupplierInvoiceAttachments([])
       setSupplierInvoiceExpenses([])
     }
@@ -261,7 +262,7 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
       onClose()
       await onSaved()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not save supplier invoice', 'error')
+      showToast(errorMessage(e, 'Could not save supplier invoice'), 'error')
     } finally {
       setSaving(false)
     }
