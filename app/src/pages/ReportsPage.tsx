@@ -53,6 +53,7 @@ import {
 import { errorMessage } from '../lib/errors'
 import { buildStatement, entriesLabel, quarterRange, signedAmount, signedVat, statementCsv, statementPdf } from '../lib/statementReport'
 import { downloadBlob } from '../lib/documents'
+import { statementXlsx, XLSX_MIME } from '../lib/statementXlsx'
 
 type Tab = 'winrate' | 'aging' | 'pnl' | 'vat' | 'statement' | 'funnel' | 'fx'
 
@@ -336,6 +337,16 @@ export default function ReportsPage() {
       showToast('Statement PDF downloaded', 'success')
     } catch (e) {
       showToast(errorMessage(e, 'Could not create the PDF'), 'error')
+    }
+  }
+
+  function downloadStatementExcel() {
+    try {
+      const bytes = statementXlsx(statement, settings.companyName || 'RED REACH')
+      downloadBlob(new Blob([bytes as BlobPart], { type: XLSX_MIME }), `${statementName}.xlsx`)
+      showToast('Statement Excel downloaded', 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not create the Excel file'), 'error')
     }
   }
 
@@ -656,6 +667,9 @@ export default function ReportsPage() {
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button type="button" style={buttonPrimaryStyle} onClick={downloadStatementPdf}>
                 <Download size={16} /> Download PDF
+              </button>
+              <button type="button" style={buttonPrimaryStyle} onClick={downloadStatementExcel}>
+                <Download size={16} /> Download Excel
               </button>
               <button type="button" style={buttonSecondaryStyle} onClick={exportCsv}>
                 <Download size={16} /> CSV

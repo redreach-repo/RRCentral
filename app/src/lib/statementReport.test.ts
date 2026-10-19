@@ -82,7 +82,8 @@ describe('statementReport', () => {
       ['2026-09-18', 2870.31, 136.68, 2733.63],
       ['2026-09-30', 2629.4, 125.21, 2504.19],
     ])
-    expect(st.rows[0].description).toBe('Uniforms · payment 1 of 2')
+    expect(st.rows[0].description).toBe('Invoice RR-01-26003 · Uniforms · payment 1 of 2')
+    expect(st.rows[1].description).toBe('Invoice RR-01-26003 · Uniforms · payment 2 of 2')
     expect(st.totals).toMatchObject({ income: 5499.71, outputVat: 261.89, incomeCount: 2 })
   })
 
@@ -104,7 +105,7 @@ describe('statementReport', () => {
     const st = buildStatement([income({})], [expense({})], '2026-07-01', '2026-09-30')
     const csv = statementCsv(st, 'RED REACH')
     expect(csv).toContain('2026-08-04,Expense (-),Cursor,,,Office,-78.01,-0.08,-78.09')
-    expect(csv).toContain('2026-09-18,Income (+),Maxtherm,Uniforms,RR-01-26003,RR Threads,5237.82,261.89,5499.71')
+    expect(csv).toContain('2026-09-18,Income (+),Maxtherm,Invoice RR-01-26003 · Uniforms,RR-01-26003,RR Threads,5237.82,261.89,5499.71')
     expect(csv).toContain('Net,,,,,,,261.81,5421.62')
   })
 

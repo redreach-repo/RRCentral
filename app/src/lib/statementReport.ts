@@ -77,7 +77,13 @@ export function buildStatement(
     const base = {
       kind: 'income' as const,
       party: r.client_source || '',
-      description: r.description || r.category || '',
+      // Lead with the invoice number so every income line names its invoice.
+      description: [
+        ref ? `Invoice ${ref}` : '',
+        r.description && r.description !== r.category ? r.description : '',
+      ]
+        .filter(Boolean)
+        .join(' · ') || r.category || '',
       reference: ref,
       category: r.category || '',
     }
@@ -321,7 +327,8 @@ export function statementPdf(st: Statement, companyName = 'RED REACH'): jsPDF {
 
   for (const r of st.rows) {
     const title = [r.party, r.description].filter(Boolean).join(' – ') || (r.kind === 'income' ? 'Income' : 'Expense')
-    const meta = [r.reference, r.category].filter(Boolean).join(' · ')
+    // Income lines already name their invoice in the title.
+    const meta = [r.kind === 'income' ? '' : r.reference, r.category].filter(Boolean).join(' · ')
     pdf.setFontSize(9)
     const lines = pdf.splitTextToSize(title, descWidth).slice(0, 2) as string[]
     const rowH = 4.2 * lines.length + (meta ? 3.6 : 0) + 2.6
