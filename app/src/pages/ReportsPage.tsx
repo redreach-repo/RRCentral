@@ -50,8 +50,10 @@ import {
   thStyle,
 } from '../lib/uiStyles'
 import { errorMessage } from '../lib/errors'
+import { buildStatement, entriesLabel, quarterRange, signedAmount, signedVat, statementCsv, statementPdf } from '../lib/statementReport'
+import { downloadBlob } from '../lib/documents'
 
-type Tab = 'winrate' | 'aging' | 'pnl' | 'vat' | 'funnel' | 'fx'
+type Tab = 'winrate' | 'aging' | 'pnl' | 'vat' | 'statement' | 'funnel' | 'fx'
 
 const tabStyle = (active: boolean): CSSProperties => ({
   ...buttonSecondaryStyle,
@@ -78,6 +80,8 @@ export default function ReportsPage() {
   const nowQ = currentVatQuarter()
   const [vatYear, setVatYear] = useState(nowQ.year)
   const [vatQuarter, setVatQuarter] = useState<VatQuarter>(nowQ.quarter)
+  const [stmtFrom, setStmtFrom] = useState(() => quarterRange(nowQ.year, nowQ.quarter).from)
+  const [stmtTo, setStmtTo] = useState(() => quarterRange(nowQ.year, nowQ.quarter).to)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -314,10 +318,34 @@ export default function ReportsPage() {
     return { incomeRows, expenseRows, byMonth, totals }
   }, [recognizedIncome, expenses, vatMonths, vatRate])
 
+  const statement = useMemo(
+    () => buildStatement(recognizedIncome, expenses, stmtFrom, stmtTo, vatRate),
+    [recognizedIncome, expenses, stmtFrom, stmtTo, vatRate],
+  )
+  const statementName = `income-expenses-${stmtFrom}-to-${stmtTo}`
+
+  function downloadStatementPdf() {
+    try {
+      const pdf = statementPdf(statement, settings.companyName || 'RED REACH')
+      downloadBlob(pdf.output('blob'), `${statementName}.pdf`)
+      showToast('Statement PDF downloaded', 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not create the PDF'), 'error')
+    }
+  }
+
+  function setStatementQuarter(year: number, quarter: VatQuarter) {
+    const r = quarterRange(year, quarter)
+    setStmtFrom(r.from)
+    setStmtTo(r.to)
+  }
+
   const maxPnl = Math.max(1, ...monthlyPnl.map((m) => Math.max(m.income, m.expenses)))
 
   function exportCsv() {
-    if (tab === 'fx') {
+    if (tab === 'statement') {
+      downloadCsv(`${statementName}.csv`, statementCsv(statement, settings.companyName || ''))
+    } else if (tab === 'fx') {
       const lines = [
         'MULTI-CURRENCY REPORT',
         `Bookings,${fxReport.bookingCount}`,
@@ -458,6 +486,9 @@ export default function ReportsPage() {
         <button type="button" style={tabStyle(tab === 'vat')} onClick={() => setTab('vat')}>
           VAT report
         </button>
+        <button type="button" style={tabStyle(tab === 'statement')} onClick={() => setTab('statement')}>
+          Income &amp; expenses
+        </button>
         <button type="button" style={tabStyle(tab === 'fx')} onClick={() => setTab('fx')}>
           Multi-currency
         </button>
@@ -583,6 +614,126 @@ export default function ReportsPage() {
                         <td style={tdStyle}>{r.count}</td>
                       </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : tab === 'statement' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ ...cardStyle, display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'end' }}>
+            <div>
+              <label style={labelStyle}>From</label>
+              <input type="date" style={inputStyle} value={stmtFrom} onChange={(e) => setStmtFrom(e.target.value)} aria-label="Statement from" />
+            </div>
+            <div>
+              <label style={labelStyle}>To</label>
+              <input type="date" style={inputStyle} value={stmtTo} onChange={(e) => setStmtTo(e.target.value)} aria-label="Statement to" />
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {([1, 2, 3, 4] as VatQuarter[]).map((q) => (
+                <button key={q} type="button" style={buttonSecondaryStyle} onClick={() => setStatementQuarter(vatYear, q)}>
+                  Q{q} {vatYear}
+                </button>
+              ))}
+              <button
+                type="button"
+                style={buttonSecondaryStyle}
+                onClick={() => {
+                  setStmtFrom(`${vatYear}-01-01`)
+                  setStmtTo(`${vatYear}-12-31`)
+                }}
+              >
+                Year {vatYear}
+              </button>
+            </div>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button type="button" style={buttonPrimaryStyle} onClick={downloadStatementPdf}>
+                <Download size={16} /> Download PDF
+              </button>
+              <button type="button" style={buttonSecondaryStyle} onClick={exportCsv}>
+                <Download size={16} /> CSV
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 12 }}>
+            <StatementKpi
+              label="Income"
+              value={signedAmount(statement.totals.income, 'income')}
+              color={colors.success}
+              sub={`${entriesLabel(statement.totals.incomeCount)} · VAT ${formatAED(statement.totals.outputVat)}`}
+            />
+            <StatementKpi
+              label="Expenses"
+              value={signedAmount(statement.totals.expenses, 'expense')}
+              color={colors.danger}
+              sub={`${entriesLabel(statement.totals.expenseCount)} · VAT ${formatAED(statement.totals.inputVat)}`}
+            />
+            <StatementKpi
+              label="Net"
+              value={signedAmount(statement.totals.net, 'net')}
+              color={statement.totals.net < 0 ? colors.danger : colors.success}
+              sub={`Net VAT ${formatAED(statement.totals.netVat)} ${statement.totals.netVat < 0 ? '(refundable)' : '(payable)'}`}
+            />
+          </div>
+
+          <div style={cardStyle}>
+            <h2 style={{ margin: '0 0 12px', fontSize: 16 }}>Income &amp; expenses</h2>
+            {statement.rows.length === 0 ? (
+              <EmptyState title="Nothing in this period" subtitle="Pick another date range." />
+            ) : (
+              <div style={tableWrapStyle}>
+                <table style={tableStyle}>
+                  <thead>
+                    <tr>
+                      <th style={thStyle}>Date</th>
+                      <th style={thStyle}>Party</th>
+                      <th style={thStyle}>Description</th>
+                      <th style={thStyle}>Reference</th>
+                      <th style={{ ...thStyle, textAlign: 'right' }}>VAT</th>
+                      <th style={{ ...thStyle, textAlign: 'right' }}>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {statement.rows.map((r) => {
+                      const color = r.kind === 'income' ? colors.success : colors.danger
+                      const sign = r.kind === 'income' ? '+' : '−'
+                      return (
+                        <tr key={r.id}>
+                          <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{format(parseISO(r.date), 'dd MMM yyyy')}</td>
+                          <td style={tdStyle}>{r.party || '—'}</td>
+                          <td style={tdStyle}>{r.description || r.category || '—'}</td>
+                          <td style={tdStyle}>{r.reference || '—'}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right', color, whiteSpace: 'nowrap' }}>
+                            {signedVat(r.vat, r.kind).replace('-', '−')}
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: 'right', color, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                            {sign}{formatAED(r.inclusive)}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    <tr>
+                      <td style={{ ...tdStyle, fontWeight: 700 }} colSpan={4}>Total income</td>
+                      <td style={{ ...tdStyle, textAlign: 'right', color: colors.success }}>+{formatAED(statement.totals.outputVat)}</td>
+                      <td style={{ ...tdStyle, textAlign: 'right', color: colors.success, fontWeight: 700 }}>+{formatAED(statement.totals.income)}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ ...tdStyle, fontWeight: 700 }} colSpan={4}>Total expenses</td>
+                      <td style={{ ...tdStyle, textAlign: 'right', color: colors.danger }}>−{formatAED(statement.totals.inputVat)}</td>
+                      <td style={{ ...tdStyle, textAlign: 'right', color: colors.danger, fontWeight: 700 }}>−{formatAED(statement.totals.expenses)}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ ...tdStyle, fontWeight: 700 }} colSpan={4}>Net</td>
+                      <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: statement.totals.netVat < 0 ? colors.danger : colors.success }}>
+                        {formatAED(statement.totals.netVat)}
+                      </td>
+                      <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 800, color: statement.totals.net < 0 ? colors.danger : colors.success }}>
+                        {signedAmount(statement.totals.net, 'net').replace('-', '−')}
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -824,6 +975,16 @@ export default function ReportsPage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function StatementKpi({ label, value, color, sub }: { label: string; value: string; color: string; sub: string }) {
+  return (
+    <div style={cardStyle}>
+      <div style={{ fontSize: 12, color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.6 }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 800, color, margin: '6px 0 4px' }}>{value}</div>
+      <div style={{ fontSize: 12, color: colors.muted }}>{sub}</div>
     </div>
   )
 }

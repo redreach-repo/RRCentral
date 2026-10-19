@@ -4,10 +4,11 @@ import { errorMessage, isUndefinedColumnError } from './errors'
 import type { Expense } from './types'
 
 /** Monthly deductions that must exist from Aug 2026 onward (append-only). */
+/** `vat` is the VAT included in `amount` (Cursor and Zoom charge AED 0.08). */
 export const RECURRING_DEDUCTIONS = [
-  { day: 1, vendor: 'Bank Service Charge', amount: 210, notes: 'Monthly bank deduction' },
-  { day: 4, vendor: 'Cursor', amount: 78.09, notes: 'Monthly Cursor subscription' },
-  { day: 8, vendor: 'Zoom Account', amount: 54.14, notes: 'Monthly Zoom subscription' },
+  { day: 1, vendor: 'Bank Service Charge', amount: 210, vat: 0, notes: 'Monthly bank deduction' },
+  { day: 4, vendor: 'Cursor', amount: 78.09, vat: 0.08, notes: 'Monthly Cursor subscription' },
+  { day: 6, vendor: 'Zoom Account', amount: 54.14, vat: 0.08, notes: 'Monthly Zoom subscription' },
 ] as const
 
 export const RECURRING_REF = 'Recurring monthly deduction'
@@ -92,8 +93,8 @@ export function buildMissingRecurringDeductions(
         vendor: rule.vendor,
         category: 'Other',
         amount: rule.amount,
-        amount_ex_vat: rule.amount,
-        vat_amount: 0,
+        amount_ex_vat: Math.round((rule.amount - rule.vat) * 100) / 100,
+        vat_amount: rule.vat,
         payment_method: 'Bank Transfer',
         references_text: RECURRING_REF,
         notes: rule.notes,
