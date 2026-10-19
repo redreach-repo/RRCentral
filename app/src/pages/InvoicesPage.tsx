@@ -32,6 +32,8 @@ import {
   saveLineItems,
   savedVatRate,
   toDraftItems,
+  vatPercentToRate,
+  vatRateToPercent,
   type DraftLineItem,
 } from '../lib/lineItems'
 import {
@@ -74,8 +76,9 @@ interface InvoiceForm {
   notes: string
   date: string
   status: string
-  /** Off for customers outside the UAE: the invoice is issued with 0% VAT. */
-  charge_vat: boolean
+  /** VAT for this invoice: the standard rate, none (e.g. companies outside the UAE) or a custom %. */
+  vat_mode: 'standard' | 'zero' | 'custom'
+  vat_percent: string
   items: DraftLineItem[]
 }
 
@@ -90,7 +93,8 @@ const emptyForm = (defaults?: Partial<InvoiceForm>): InvoiceForm => ({
   notes: '',
   date: format(new Date(), 'yyyy-MM-dd'),
   status: 'Draft',
-  charge_vat: true,
+  vat_mode: 'standard',
+  vat_percent: '',
   items: [newDraftLine()],
   ...defaults,
 })
@@ -156,6 +160,12 @@ export default function InvoicesPage() {
   const [payNotes, setPayNotes] = useState('')
   const [payHistory, setPayHistory] = useState<PaymentLogEntry[]>([])
   const [divisionCode, setDivisionCode] = useState('01')
+  const vatFormFields = (rate: number, standard: number): Pick<InvoiceForm, 'vat_mode' | 'vat_percent'> =>
+    rate === 0
+      ? { vat_mode: 'zero', vat_percent: '0' }
+      : Math.abs(rate - standard) < 1e-9
+        ? { vat_mode: 'standard', vat_percent: vatRateToPercent(standard) }
+        : { vat_mode: 'custom', vat_percent: vatRateToPercent(rate) }
   const [payTab, setPayTab] = useState<'All' | 'Pending' | 'Partial' | 'Paid'>('All')
   const compact = useCompactCrm()
 
@@ -220,7 +230,8 @@ export default function InvoicesPage() {
     })
   }, [invoices, search, payTab])
 
-  const formVatRate = form.charge_vat ? vatRate : 0
+  const formVatRate =
+    form.vat_mode === 'zero' ? 0 : form.vat_mode === 'custom' ? vatPercentToRate(form.vat_percent, vatRate) : vatRate
   const totals = useMemo(() => calcTotals(form.items, formVatRate), [form.items, formVatRate])
 
   function openCreate() {
@@ -254,7 +265,7 @@ export default function InvoicesPage() {
         notes: inv.notes || '',
         date: inv.date ? inv.date.slice(0, 10) : format(new Date(), 'yyyy-MM-dd'),
         status: inv.status || 'Draft',
-        charge_vat: savedVatRate(items, vatRate) > 0,
+        ...vatFormFields(savedVatRate(items, vatRate), vatRate),
         items: toDraftItems(items),
       })
       setEditorOpen(true)
@@ -944,24 +955,48 @@ export default function InvoicesPage() {
           )}
         </div>
 
-        <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', margin: '10px 0 0', fontSize: 14 }}>
-          <input
-            type="checkbox"
-            checked={form.charge_vat}
-            onChange={(e) => setForm((f) => ({ ...f, charge_vat: e.target.checked }))}
-            style={{ marginTop: 3 }}
-          />
-          <span>
-            Charge VAT ({(vatRate * 100).toFixed(0)}%)
-            <span style={{ display: 'block', fontSize: 12, color: colors.muted }}>
-              Turn off for companies outside the UAE. Prices are entered without VAT and the invoice shows VAT 0%.
-            </span>
-          </span>
-        </label>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 10 }}>
+          <div style={{ ...fieldStyle, minWidth: 220 }}>
+            <label style={labelStyle}>VAT on this invoice</label>
+            <select
+              style={selectStyle}
+              aria-label="VAT on this invoice"
+              value={form.vat_mode}
+              onChange={(e) => {
+                const vat_mode = e.target.value as InvoiceForm['vat_mode']
+                setForm((f) => ({
+                  ...f,
+                  vat_mode,
+                  vat_percent:
+                    vat_mode === 'zero' ? '0' : vat_mode === 'standard' ? vatRateToPercent(vatRate) : f.vat_percent,
+                }))
+              }}
+            >
+              <option value="standard">Standard {vatRateToPercent(vatRate)}%</option>
+              <option value="zero">No VAT (0%) — e.g. outside the UAE</option>
+              <option value="custom">Custom rate…</option>
+            </select>
+          </div>
+          {form.vat_mode === 'custom' ? (
+            <div style={{ ...fieldStyle, width: 120 }}>
+              <label style={labelStyle}>VAT %</label>
+              <input
+                type="number"
+                min={0}
+                max={99}
+                step="0.01"
+                style={inputStyle}
+                aria-label="Custom VAT percent"
+                value={form.vat_percent}
+                onChange={(e) => setForm((f) => ({ ...f, vat_percent: e.target.value }))}
+              />
+            </div>
+          ) : null}
+        </div>
 
         <div className={resp.totalsRow}>
           <span>Subtotal: <strong>{formatAED(totals.subtotal)}</strong></span>
-          <span>VAT{form.charge_vat ? '' : ' (0%)'}: <strong>{formatAED(totals.vat)}</strong></span>
+          <span>VAT ({vatRateToPercent(formVatRate)}%): <strong>{formatAED(totals.vat)}</strong></span>
           <span>Total: <strong style={{ color: colors.accent }}>{formatAED(totals.total)}</strong></span>
         </div>
 
