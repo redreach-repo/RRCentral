@@ -38,11 +38,13 @@ describe('statementXlsx', () => {
     const styles = strFromU8(files['xl/styles.xml'])
     expect(styles).toContain('FF15803D') // green
     expect(styles).toContain('FFB91C1C') // red
-    expect(styles).toContain('+#,##0.00;-#,##0.00;0.00')
+    expect(styles).toContain('+#,##0.00_);-#,##0.00_);0.00_)')
     // Expense is negative with the red style (10/11); income payments positive with green (8/9).
-    expect(sheet).toMatch(/<c r="I\d+" s="11"><v>-78.09<\/v><\/c>/)
-    expect(sheet).toMatch(/<c r="I\d+" s="9"><v>2870.31<\/v><\/c>/)
-    expect(sheet).toMatch(/<c r="H\d+" s="8"><v>136.68<\/v><\/c>/)
+    // Amount incl. VAT sits in column E, right after Description; VAT in F.
+    expect(sheet).toMatch(/<c r="E\d+" s="11"><v>-78.09<\/v><\/c>/)
+    expect(sheet).toMatch(/<c r="E\d+" s="9"><v>2870.31<\/v><\/c>/)
+    expect(sheet).toMatch(/<c r="F\d+" s="8"><v>136.68<\/v><\/c>/)
+    expect(sheet).toMatch(/<c r="E\d+" s="9"><v>5499.71<\/v><\/c>/) // total income incl. VAT
     expect(sheet).toContain('Invoice RR-01-26003 · payment 1 of 2')
     expect(sheet).toContain('Cursor &lt;AI&gt; &amp; Co')
     // Date as a real Excel date
