@@ -259,6 +259,31 @@ export function foldVatIntoUnitPrices(
   return snapshot(next, changed)
 }
 
+/**
+ * VAT rate a saved document was issued with, read back from its line items
+ * (e.g. 0 for a company outside the UAE, or a custom rate). Falls back when
+ * there are no lines or the lines disagree.
+ */
+export function savedVatRate(rows: Pick<LineItem, 'vat_rate'>[], fallback = VAT_RATE): number {
+  if (!rows.length) return fallback
+  const rates = rows.map((r) => (r.vat_rate == null ? NaN : Number(r.vat_rate)))
+  const first = rates[0]
+  const valid = Number.isFinite(first) && first >= 0 && first < 1
+  return valid && rates.every((r) => Math.abs(r - first) < 1e-9) ? first : fallback
+}
+
+/** "5" → 0.05; blank, negative or ≥100 → fallback. */
+export function vatPercentToRate(percent: string | number, fallback = VAT_RATE): number {
+  const n = Number(percent)
+  if (String(percent).trim() === '' || !Number.isFinite(n) || n < 0 || n >= 100) return fallback
+  return Math.round(n * 1000) / 100000
+}
+
+/** 0.05 → "5" (trailing zeros trimmed). */
+export function vatRateToPercent(rate: number): string {
+  return String(Math.round(rate * 100000) / 1000)
+}
+
 export function toDraftItems(rows: LineItem[]): DraftLineItem[] {
   if (!rows.length) return [newDraftLine()]
   return rows.map((r) => {
