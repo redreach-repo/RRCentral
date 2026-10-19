@@ -43,7 +43,24 @@ describe('recurringDeductions', () => {
     expect(missing).toHaveLength(RECURRING_DEDUCTIONS.length)
     expect(missing.find((m) => m.vendor === 'Bank Service Charge')?.date).toBe('2026-08-01')
     expect(missing.find((m) => m.vendor === 'Cursor')?.date).toBe('2026-08-04')
-    expect(missing.find((m) => m.vendor === 'Zoom Account')?.date).toBe('2026-08-08')
+    expect(missing.find((m) => m.vendor === 'Zoom Account')?.date).toBe('2026-08-06')
+  })
+
+  it('records the VAT Cursor and Zoom charge (0.08, included in the amount)', () => {
+    const missing = buildMissingRecurringDeductions([], new Date('2026-08-01'))
+    const cursor = missing.find((m) => m.vendor === 'Cursor')
+    const zoom = missing.find((m) => m.vendor === 'Zoom Account')
+    expect(cursor).toMatchObject({ amount: 78.09, vat_amount: 0.08, amount_ex_vat: 78.01 })
+    expect(zoom).toMatchObject({ amount: 54.14, vat_amount: 0.08, amount_ex_vat: 54.06 })
+    expect(missing.find((m) => m.vendor === 'Bank Service Charge')?.vat_amount).toBe(0)
+  })
+
+  it('treats a Zoom charge of 54.13 as the same monthly deduction', () => {
+    const missing = buildMissingRecurringDeductions(
+      [{ date: '2026-08-06', vendor: 'Zoom Account', amount: 54.13 }],
+      new Date('2026-08-01'),
+    )
+    expect(missing.find((m) => m.vendor === 'Zoom Account')).toBeUndefined()
   })
 
   it('flags duplicate recurring rows for the same vendor+month+amount', () => {
