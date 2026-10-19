@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf'
 import { expenseVatParts, incomeVatParts } from './finance'
 import { expenseReportDescription } from './supplierInvoiceStore'
-import type { Expense, IncomeEntry } from './types'
+import type { Expense, IncomeEntry, PaymentLogEntry } from './types'
 
 /** One line of the income & expenses statement. Income is money in (+), expenses money out (−). */
 export interface StatementRow {
@@ -52,7 +52,8 @@ export function quarterRange(year: number, quarter: 1 | 2 | 3 | 4): { from: stri
 
 /**
  * Merge recognised income and expenses between `from` and `to` (inclusive, yyyy-MM-dd)
- * into one date-ordered statement with totals and VAT.
+ * into one date-ordered statement with totals and VAT. Invoices with recorded
+ * payments appear once per payment, on the day each was received.
  */
 export function buildStatement(
   income: IncomeEntry[],
@@ -60,22 +61,66 @@ export function buildStatement(
   from: string,
   to: string,
   vatRate = 0.05,
+  payments: Pick<PaymentLogEntry, 'id' | 'invoice_ref' | 'amount' | 'created_at'>[] = [],
 ): Statement {
   const rows: StatementRow[] = []
+  // Payments recorded against each invoice: income is shown per payment, on the day received.
+  const paymentsByRef = new Map<string, Pick<PaymentLogEntry, 'id' | 'amount' | 'created_at'>[]>()
+  for (const p of payments) {
+    const ref = String(p.invoice_ref || '').trim()
+    if (!ref || !(Number(p.amount) > 0)) continue
+    paymentsByRef.set(ref, [...(paymentsByRef.get(ref) || []), p])
+  }
   for (const r of income) {
-    if (!inRange(r.date, from, to)) continue
     const parts = incomeVatParts(r, vatRate)
-    rows.push({
-      id: `i-${r.id}`,
-      date: String(r.date).slice(0, 10),
-      kind: 'income',
+    const ref = String(r.reference_number || '').trim()
+    const base = {
+      kind: 'income' as const,
       party: r.client_source || '',
       description: r.description || r.category || '',
-      reference: r.reference_number || '',
+      reference: ref,
       category: r.category || '',
-      exclusive: round2(parts.exclusive),
-      vat: round2(parts.vat),
-      inclusive: round2(parts.inclusive),
+    }
+    const paid = (ref && paymentsByRef.get(ref)) || []
+    if (!paid.length) {
+      if (!inRange(r.date, from, to)) continue
+      rows.push({
+        ...base,
+        id: `i-${r.id}`,
+        date: String(r.date).slice(0, 10),
+        exclusive: round2(parts.exclusive),
+        vat: round2(parts.vat),
+        inclusive: round2(parts.inclusive),
+      })
+      continue
+    }
+    // Split the invoice VAT across its payments in proportion to each amount;
+    // when the payments add up to the invoice, the last one takes the rounding.
+    const sorted = [...paid].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+    const total = parts.inclusive > 0 ? parts.inclusive : sorted.reduce((s, p) => s + Number(p.amount), 0)
+    const paidTotal = round2(sorted.reduce((s, p) => s + Number(p.amount), 0))
+    const fullyPaid = Math.abs(paidTotal - total) < 0.01
+    let vatSoFar = 0
+    sorted.forEach((p, i) => {
+      const amount = round2(Number(p.amount))
+      const vat =
+        fullyPaid && i === sorted.length - 1
+          ? round2(parts.vat - vatSoFar)
+          : round2(total > 0 ? (parts.vat * amount) / total : 0)
+      vatSoFar = round2(vatSoFar + vat)
+      const date = String(p.created_at || '').slice(0, 10)
+      if (!inRange(date, from, to)) return
+      rows.push({
+        ...base,
+        id: `p-${p.id}`,
+        date,
+        description: [base.description, sorted.length > 1 ? `payment ${i + 1} of ${sorted.length}` : 'payment received']
+          .filter(Boolean)
+          .join(' · '),
+        exclusive: round2(amount - vat),
+        vat,
+        inclusive: amount,
+      })
     })
   }
   for (const r of expenses) {

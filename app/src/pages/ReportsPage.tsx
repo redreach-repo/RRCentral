@@ -10,6 +10,7 @@ import type {
   Expense,
   IncomeEntry,
   Invoice,
+  PaymentLogEntry,
   Quotation,
   SupplierCommitment,
 } from '../lib/types'
@@ -75,6 +76,7 @@ export default function ReportsPage() {
   const [payments, setPayments] = useState<CustomerPayment[]>([])
   const [refunds, setRefunds] = useState<CustomerRefund[]>([])
   const [suppliers, setSuppliers] = useState<SupplierCommitment[]>([])
+  const [paymentLog, setPaymentLog] = useState<PaymentLogEntry[]>([])
   const [deletedInvoiceRefs, setDeletedInvoiceRefs] = useState<string[]>([])
 
   const nowQ = currentVatQuarter()
@@ -88,7 +90,7 @@ export default function ReportsPage() {
     try {
       await reconcileInvoiceFinance()
       const deleted = await loadDeletedInvoiceRefs()
-      const [q, i, inc, exp, c, pay, ref, sup] = await Promise.all([
+      const [q, i, inc, exp, c, pay, ref, sup, plog] = await Promise.all([
         db.from('quotations').select('*'),
         db.from('invoices').select('*'),
         db.from('income').select('*'),
@@ -97,6 +99,7 @@ export default function ReportsPage() {
         db.from('customer_payments').select('*'),
         db.from('customer_refunds').select('*'),
         db.from('supplier_commitments').select('*'),
+        db.from('payment_log').select('id, invoice_ref, amount, created_at'),
       ])
       if (q.error) throw q.error
       if (i.error) throw i.error
@@ -106,6 +109,7 @@ export default function ReportsPage() {
       if (pay.error) throw pay.error
       if (ref.error) throw ref.error
       if (sup.error) throw sup.error
+      if (plog.error) throw plog.error
       setQuotes((q.data || []) as Quotation[])
       setInvoices((i.data || []) as Invoice[])
       setIncome((inc.data || []) as IncomeEntry[])
@@ -114,6 +118,7 @@ export default function ReportsPage() {
       setPayments((pay.data || []) as CustomerPayment[])
       setRefunds((ref.data || []) as CustomerRefund[])
       setSuppliers((sup.data || []) as SupplierCommitment[])
+      setPaymentLog((plog.data || []) as PaymentLogEntry[])
       setDeletedInvoiceRefs([...deleted])
     } catch (e) {
       showToast(errorMessage(e, 'Failed to load reports'), 'error')
@@ -319,8 +324,8 @@ export default function ReportsPage() {
   }, [recognizedIncome, expenses, vatMonths, vatRate])
 
   const statement = useMemo(
-    () => buildStatement(recognizedIncome, expenses, stmtFrom, stmtTo, vatRate),
-    [recognizedIncome, expenses, stmtFrom, stmtTo, vatRate],
+    () => buildStatement(recognizedIncome, expenses, stmtFrom, stmtTo, vatRate, paymentLog),
+    [recognizedIncome, expenses, stmtFrom, stmtTo, vatRate, paymentLog],
   )
   const statementName = `income-expenses-${stmtFrom}-to-${stmtTo}`
 

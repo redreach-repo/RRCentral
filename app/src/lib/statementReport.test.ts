@@ -65,6 +65,35 @@ describe('statementReport', () => {
     })
   })
 
+  it('shows each payment on the day it was received, splitting the invoice VAT', () => {
+    const st = buildStatement(
+      [income({ date: '2026-08-20' })],
+      [],
+      '2026-07-01',
+      '2026-09-30',
+      0.05,
+      [
+        { id: 'p2', invoice_ref: 'RR-01-26003', amount: 2629.4, created_at: '2026-09-30T08:00:00+00:00' },
+        { id: 'p1', invoice_ref: 'RR-01-26003', amount: 2870.31, created_at: '2026-09-18T08:00:00+00:00' },
+        { id: 'px', invoice_ref: 'RR-99', amount: 10, created_at: '2026-09-01T08:00:00+00:00' },
+      ],
+    )
+    expect(st.rows.map((r) => [r.date, r.inclusive, r.vat, r.exclusive])).toEqual([
+      ['2026-09-18', 2870.31, 136.68, 2733.63],
+      ['2026-09-30', 2629.4, 125.21, 2504.19],
+    ])
+    expect(st.rows[0].description).toBe('Uniforms · payment 1 of 2')
+    expect(st.totals).toMatchObject({ income: 5499.71, outputVat: 261.89, incomeCount: 2 })
+  })
+
+  it('only counts payments that fall inside the period', () => {
+    const st = buildStatement([income({})], [], '2026-10-01', '2026-12-31', 0.05, [
+      { id: 'p1', invoice_ref: 'RR-01-26003', amount: 2870.31, created_at: '2026-09-18T08:00:00+00:00' },
+      { id: 'p2', invoice_ref: 'RR-01-26003', amount: 2629.4, created_at: '2026-10-02T08:00:00+00:00' },
+    ])
+    expect(st.rows.map((r) => [r.date, r.vat])).toEqual([['2026-10-02', 125.21]])
+  })
+
   it('signs income + and expenses -', () => {
     expect(signedAmount(1050, 'income')).toBe('+AED 1,050.00')
     expect(signedAmount(78.09, 'expense')).toBe('-AED 78.09')

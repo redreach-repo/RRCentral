@@ -158,6 +158,7 @@ export default function InvoicesPage() {
   const [payAmount, setPayAmount] = useState('')
   const [payMethod, setPayMethod] = useState<string>(PAYMENT_METHODS[0])
   const [payNotes, setPayNotes] = useState('')
+  const [payDate, setPayDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
   const [payHistory, setPayHistory] = useState<PaymentLogEntry[]>([])
   const [divisionCode, setDivisionCode] = useState('01')
   const vatFormFields = (rate: number, standard: number): Pick<InvoiceForm, 'vat_mode' | 'vat_percent'> =>
@@ -384,6 +385,7 @@ export default function InvoicesPage() {
     setPayAmount('')
     setPayMethod(settings.paymentMethod || PAYMENT_METHODS[0])
     setPayNotes('')
+    setPayDate(format(new Date(), 'yyyy-MM-dd'))
     const { data } = await db
       .from('payment_log')
       .select('*')
@@ -421,6 +423,8 @@ export default function InvoicesPage() {
         notes: payNotes,
         user_email: who,
         balance_after: balanceAfter,
+        // The day the money was received (noon UAE time so the date never shifts).
+        ...(payDate ? { created_at: `${payDate}T12:00:00+04:00` } : {}),
       })
       if (pErr) throw pErr
 
@@ -1021,6 +1025,10 @@ export default function InvoicesPage() {
       </Modal>
 
       <Modal open={!!payTarget} title={`Record payment — ${payTarget?.reference_number || ''}`} onClose={() => setPayTarget(null)} width={480}>
+        <div style={fieldStyle}>
+          <label style={labelStyle}>Date received</label>
+          <input type="date" style={inputStyle} value={payDate} onChange={(e) => setPayDate(e.target.value)} aria-label="Date received" />
+        </div>
         <div style={fieldStyle}>
           <label style={labelStyle}>Amount (AED)</label>
           <input type="number" style={inputStyle} value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
