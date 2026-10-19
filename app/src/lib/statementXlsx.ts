@@ -37,7 +37,7 @@ const S = {
 const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <numFmts count="2">
-<numFmt numFmtId="164" formatCode="+#,##0.00;-#,##0.00;0.00"/>
+<numFmt numFmtId="164" formatCode="+#,##0.00_);-#,##0.00_);0.00_)"/>
 <numFmt numFmtId="165" formatCode="dd mmm yyyy"/>
 </numFmts>
 <fonts count="9">
@@ -67,10 +67,10 @@ const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1"/>
 <xf numFmtId="0" fontId="8" fillId="0" borderId="0" xfId="0" applyFont="1"/>
 <xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1"/>
-<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>
+<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" indent="1"/></xf>
 <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right"/></xf>
 <xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="left" vertical="top"/></xf>
-<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="left" wrapText="1" vertical="top" indent="1"/></xf>
 <xf numFmtId="164" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment vertical="top"/></xf>
 <xf numFmtId="164" fontId="3" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment vertical="top"/></xf>
 <xf numFmtId="164" fontId="4" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment vertical="top"/></xf>
@@ -149,11 +149,12 @@ export function statementXlsx(st: Statement, companyName = 'RED REACH'): Uint8Ar
     str('Type', S.header),
     str('Party', S.header),
     str('Description', S.header),
+    // The amount paid/received comes first so it stays visible on narrow screens.
+    str('Amount (AED)', S.headerRight),
+    str('VAT (AED)', S.headerRight),
+    str('Amount ex-VAT (AED)', S.headerRight),
     str('Reference', S.header),
     str('Category', S.header),
-    str('Amount ex-VAT (AED)', S.headerRight),
-    str('VAT (AED)', S.headerRight),
-    str('Amount (AED)', S.headerRight),
   ])
   for (const r of st.rows) {
     const income = r.kind === 'income'
@@ -163,29 +164,30 @@ export function statementXlsx(st: Statement, companyName = 'RED REACH'): Uint8Ar
       str(income ? 'Income (+)' : 'Expense (−)', income ? S.greenText : S.redText),
       str(r.party, S.text),
       str(r.description, S.text),
+      num(sign * r.inclusive, income ? S.greenNumBold : S.redNumBold),
+      num(sign * r.vat, income ? S.greenNum : S.redNum),
+      num(sign * r.exclusive, income ? S.greenNum : S.redNum),
       str(r.reference, S.text),
       str(r.category, S.text),
-      num(sign * r.exclusive, income ? S.greenNum : S.redNum),
-      num(sign * r.vat, income ? S.greenNum : S.redNum),
-      num(sign * r.inclusive, income ? S.greenNumBold : S.redNumBold),
     ])
   }
   const lastDataRow = rows.length
   rows.push([])
   rows.push([
-    str('Total income', S.bold), null, null, null, null, null,
-    num(t.income - t.outputVat, S.greenNum), num(t.outputVat, S.greenNum), num(t.income, S.greenNumBold),
+    str('Total income', S.bold), null, null, null,
+    num(t.income, S.greenNumBold), num(t.outputVat, S.greenNum), num(t.income - t.outputVat, S.greenNum),
   ])
   rows.push([
-    str('Total expenses', S.bold), null, null, null, null, null,
-    num(-(t.expenses - t.inputVat), S.redNum), num(-t.inputVat, S.redNum), num(-t.expenses, S.redNumBold),
+    str('Total expenses', S.bold), null, null, null,
+    num(-t.expenses, S.redNumBold), num(-t.inputVat, S.redNum), num(-(t.expenses - t.inputVat), S.redNum),
   ])
   const netEx = t.net - t.netVat
   rows.push([
-    str('Net', S.boldTop), str('', S.mutedTop), str('', S.mutedTop), str('', S.mutedTop), str('', S.mutedTop), str('', S.mutedTop),
-    num(netEx, netEx < 0 ? S.redNumBoldTop : S.greenNumBoldTop),
-    num(t.netVat, t.netVat < 0 ? S.redNumBoldTop : S.greenNumBoldTop),
+    str('Net', S.boldTop), str('', S.mutedTop), str('', S.mutedTop), str('', S.mutedTop),
     num(t.net, t.net < 0 ? S.redNumBoldTop : S.greenNumBoldTop),
+    num(t.netVat, t.netVat < 0 ? S.redNumBoldTop : S.greenNumBoldTop),
+    num(netEx, netEx < 0 ? S.redNumBoldTop : S.greenNumBoldTop),
+    str('', S.mutedTop), str('', S.mutedTop),
   ])
   rows.push([])
   rows.push([str('Income shown in green (+), expenses in red (−). Amounts in AED; amounts include VAT.', S.muted)])
@@ -198,7 +200,7 @@ export function statementXlsx(st: Statement, companyName = 'RED REACH'): Uint8Ar
     })
     .join('')
 
-  const widths = [14, 13, 26, 46, 26, 18, 20, 12, 18]
+  const widths = [14, 13, 26, 46, 16, 12, 20, 26, 18]
   const cols = widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')
   const filter = st.rows.length ? `<autoFilter ref="A${headerRow}:I${lastDataRow}"/>` : ''
   const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
