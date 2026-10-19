@@ -18,7 +18,7 @@ import {
   type QuoteColumnId,
 } from '../lib/divisionQuoteFormats'
 import { CONNECT_PARTNER } from '../lib/seedDivisionCatalogues'
-import { loadLineItems, applyDiscount, calcTotals, toDraftItems, quoteOffsetsVat } from '../lib/lineItems'
+import { loadLineItems, applyDiscount, calcTotals, toDraftItems, quoteOffsetsVat, savedVatRate } from '../lib/lineItems'
 import { getDeliveryNote, loadDeliveryNoteLineItems } from '../lib/deliveryNoteStore'
 import {
   deleteSignedDeliveryNoteAttachment,
@@ -290,7 +290,9 @@ export default function DocumentPage() {
       ? 0
       : isWandersQuote && settings.wandersVatRate && settings.wandersVatRate !== 'TBC'
         ? Number(settings.wandersVatRate) || 0
-        : vatRate
+        : docType === 'invoice'
+          ? savedVatRate(items, vatRate)
+          : vatRate
   const docCurrency = (
     (quote && (quote.quotation_currency || quote.currency)) ||
     BASE_CURRENCY

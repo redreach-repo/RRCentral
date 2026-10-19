@@ -259,6 +259,16 @@ export function foldVatIntoUnitPrices(
   return snapshot(next, changed)
 }
 
+/**
+ * VAT rate a saved document was issued with: 0 when every saved line has a 0% rate
+ * (e.g. an invoice to a company outside the UAE), otherwise the fallback rate.
+ */
+export function savedVatRate(rows: Pick<LineItem, 'vat_rate'>[], fallback = VAT_RATE): number {
+  if (!rows.length) return fallback
+  const zeroRated = rows.every((r) => r.vat_rate != null && Number(r.vat_rate) === 0)
+  return zeroRated ? 0 : fallback
+}
+
 export function toDraftItems(rows: LineItem[]): DraftLineItem[] {
   if (!rows.length) return [newDraftLine()]
   return rows.map((r) => {

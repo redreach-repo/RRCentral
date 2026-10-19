@@ -30,6 +30,7 @@ import {
   loadLineItems,
   newDraftLine,
   saveLineItems,
+  savedVatRate,
   toDraftItems,
   type DraftLineItem,
 } from '../lib/lineItems'
@@ -73,6 +74,8 @@ interface InvoiceForm {
   notes: string
   date: string
   status: string
+  /** Off for customers outside the UAE: the invoice is issued with 0% VAT. */
+  charge_vat: boolean
   items: DraftLineItem[]
 }
 
@@ -87,6 +90,7 @@ const emptyForm = (defaults?: Partial<InvoiceForm>): InvoiceForm => ({
   notes: '',
   date: format(new Date(), 'yyyy-MM-dd'),
   status: 'Draft',
+  charge_vat: true,
   items: [newDraftLine()],
   ...defaults,
 })
@@ -216,7 +220,8 @@ export default function InvoicesPage() {
     })
   }, [invoices, search, payTab])
 
-  const totals = useMemo(() => calcTotals(form.items, vatRate), [form.items, vatRate])
+  const formVatRate = form.charge_vat ? vatRate : 0
+  const totals = useMemo(() => calcTotals(form.items, formVatRate), [form.items, formVatRate])
 
   function openCreate() {
     setEditing(null)
@@ -249,6 +254,7 @@ export default function InvoicesPage() {
         notes: inv.notes || '',
         date: inv.date ? inv.date.slice(0, 10) : format(new Date(), 'yyyy-MM-dd'),
         status: inv.status || 'Draft',
+        charge_vat: savedVatRate(items, vatRate) > 0,
         items: toDraftItems(items),
       })
       setEditorOpen(true)
@@ -333,7 +339,7 @@ export default function InvoicesPage() {
 
       // Every line gets an SKU and a catalog / inventory record so it can be recalled later.
       const registered = await registerLineItemSkus(form.items, divisionCode, `invoice ${reference}`)
-      await saveLineItems('Invoice', reference, registered.items, vatRate)
+      await saveLineItems('Invoice', reference, registered.items, formVatRate)
       await syncIncome(
         {
           client: payload.client,
@@ -418,7 +424,8 @@ export default function InvoicesPage() {
       if (error) throw error
 
       const items = await loadLineItems('Invoice', payTarget.reference_number)
-      const t = calcTotals(toDraftItems(items), vatRate)
+      const invRate = savedVatRate(items, vatRate)
+      const t = calcTotals(toDraftItems(items), invRate)
       await syncIncome(
         {
           client: payTarget.client,
@@ -430,7 +437,7 @@ export default function InvoicesPage() {
           payment_method: payMethod,
           invoice_status: payTarget.status,
         },
-        { subtotal: t.subtotal || payTarget.amount / (1 + vatRate), vat: t.vat, total: t.total || payTarget.amount },
+        { subtotal: t.subtotal || payTarget.amount / (1 + invRate), vat: t.vat, total: t.total || payTarget.amount },
       )
 
       await logActivity(
@@ -484,7 +491,8 @@ export default function InvoicesPage() {
         .eq('id', inv.id)
 
       const items = await loadLineItems('Invoice', inv.reference_number)
-      const t = calcTotals(toDraftItems(items), vatRate)
+      const invRate = savedVatRate(items, vatRate)
+      const t = calcTotals(toDraftItems(items), invRate)
       await syncIncome(
         {
           client: inv.client,
@@ -496,7 +504,7 @@ export default function InvoicesPage() {
           payment_method: settings.paymentMethod || '',
           invoice_status: inv.status,
         },
-        { subtotal: t.subtotal || inv.amount / (1 + vatRate), vat: t.vat, total: t.total || inv.amount },
+        { subtotal: t.subtotal || inv.amount / (1 + invRate), vat: t.vat, total: t.total || inv.amount },
       )
       await logActivity('mark_paid', 'invoice', inv.reference_number, inv.client, who)
       showToast('Marked as Paid', 'success')
@@ -530,7 +538,7 @@ export default function InvoicesPage() {
         updated_by: who,
       })
       if (error) throw error
-      await saveLineItems('Invoice', draftRef, toDraftItems(items), vatRate)
+      await saveLineItems('Invoice', draftRef, toDraftItems(items), savedVatRate(items, vatRate))
       showToast('Duplicated as draft', 'success')
       await load()
     } catch (e) {
@@ -830,7 +838,7 @@ export default function InvoicesPage() {
           {compact ? (
             <div className={resp.lineStack}>
               {form.items.map((it) => {
-                const line = (Number(it.qty) || 0) * (Number(it.unit_price) || 0) * (1 + vatRate)
+                const line = (Number(it.qty) || 0) * (Number(it.unit_price) || 0) * (1 + formVatRate)
                 return (
                   <div key={it.key} className={resp.lineCard}>
                     <div className={`${resp.cardField} ${resp.lineCardFull}`}>
@@ -889,7 +897,7 @@ export default function InvoicesPage() {
             </thead>
             <tbody>
               {form.items.map((it) => {
-                const line = (Number(it.qty) || 0) * (Number(it.unit_price) || 0) * (1 + vatRate)
+                const line = (Number(it.qty) || 0) * (Number(it.unit_price) || 0) * (1 + formVatRate)
                 return (
                   <tr key={it.key}>
                     <td style={tdStyle}>
@@ -936,9 +944,24 @@ export default function InvoicesPage() {
           )}
         </div>
 
+        <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', margin: '10px 0 0', fontSize: 14 }}>
+          <input
+            type="checkbox"
+            checked={form.charge_vat}
+            onChange={(e) => setForm((f) => ({ ...f, charge_vat: e.target.checked }))}
+            style={{ marginTop: 3 }}
+          />
+          <span>
+            Charge VAT ({(vatRate * 100).toFixed(0)}%)
+            <span style={{ display: 'block', fontSize: 12, color: colors.muted }}>
+              Turn off for companies outside the UAE. Prices are entered without VAT and the invoice shows VAT 0%.
+            </span>
+          </span>
+        </label>
+
         <div className={resp.totalsRow}>
           <span>Subtotal: <strong>{formatAED(totals.subtotal)}</strong></span>
-          <span>VAT: <strong>{formatAED(totals.vat)}</strong></span>
+          <span>VAT{form.charge_vat ? '' : ' (0%)'}: <strong>{formatAED(totals.vat)}</strong></span>
           <span>Total: <strong style={{ color: colors.accent }}>{formatAED(totals.total)}</strong></span>
         </div>
 

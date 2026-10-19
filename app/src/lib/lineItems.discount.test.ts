@@ -3,6 +3,7 @@ import {
   applyDiscount,
   calcTotals,
   foldVatIntoUnitPrices,
+  savedVatRate,
   newDraftLine,
   parseMoneyInput,
 } from './lineItems'
@@ -129,5 +130,14 @@ describe('quotation discount', () => {
     expect(twice.changed).toBe(false)
     expect(twice.total).toBe(4535)
     expect(twice.vat).toBe(215.95)
+  })
+})
+
+describe('savedVatRate', () => {
+  it('treats a document whose lines were all saved at 0% as VAT-free', () => {
+    expect(savedVatRate([{ vat_rate: 0 }, { vat_rate: 0 }], 0.05)).toBe(0)
+    expect(savedVatRate([{ vat_rate: 0.05 }, { vat_rate: 0 }], 0.05)).toBe(0.05)
+    expect(savedVatRate([], 0.05)).toBe(0.05)
+    expect(savedVatRate([{ vat_rate: null as unknown as number }], 0.05)).toBe(0.05)
   })
 })
