@@ -12,6 +12,10 @@ Never commit customer data, exports, backups, tokens or keys.
 | `sales` (active in `app_users`) | Read/write CRM, quotes, invoices, delivery notes, vendors, expenses, Wanders. Cannot delete CRM/quotes/clients, reassign CRM owner, delete invoices/expenses, manage users, change company/bank/Zoho settings, or read integration secrets. |
 | `manager` | Sales capabilities plus delete CRM/quotes/clients and reassign owners. No Settings/secrets/audit/invoice-expense deletes. |
 | `admin` | Everything, including the audit trail (Settings → Audit log). |
+| `staff` (VA, freelancers) | Only the accounts they own (`accounts.owner_user_id`), with their contacts and timeline. Can add a new account only as its owner. No access to CRM, quotes, invoices, finance or any other older module. |
+| `viewer` | Read only. Sees accounts and the operational tables. Cannot read secrets, the audit log or the company document vault, and cannot write anything. |
+
+Staff and viewer rules: migration `20261023090000_accounts_foundation.sql`. It narrows `rr_is_staff()` to admin, manager and sales so the restricted roles never inherit the older blanket policies. If `20260926090000_security_rls.sql` is ever re-run, re-run the accounts migration after it.
 
 Manager/sales delete rules: migration `20261009140000_manager_delete_policies.sql` (`rr_is_manager_or_admin()`). UI permissions in `app/src/lib/permissions.ts` match those policies.
 

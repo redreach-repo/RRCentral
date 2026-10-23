@@ -149,3 +149,96 @@ select pg_temp.expect((select count(*) from company_documents) = 1, 'admin can r
 update company_documents set notes = 'renew' where title = 'Trade license';
 select pg_temp.expect((select notes from company_documents where title = 'Trade license') = 'renew', 'admin can update company documents');
 reset role;
+
+------------------------------------------------------------ accounts (Phase 1 modules)
+insert into auth.users values
+  ('00000000-0000-0000-0000-000000000011', 'va@redreach.ae', now()),
+  ('00000000-0000-0000-0000-000000000012', 'viewer@redreach.ae', now()),
+  ('00000000-0000-0000-0000-000000000013', 'manager@redreach.ae', now());
+insert into app_users (email, name, role, active) values
+  ('va@redreach.ae', 'VA', 'staff', true),
+  ('viewer@redreach.ae', 'Viewer', 'viewer', true),
+  ('manager@redreach.ae', 'Manager', 'manager', true);
+insert into accounts (type, name, reference, owner_user_id) values
+  ('ai_crm_client', 'Assigned Clinic LLC', 'AC-07-26001', (select id from app_users where email = 'va@redreach.ae')),
+  ('worship_church', 'Unassigned Church', 'AC-08-26001', null),
+  ('ctrm_prospect', 'Other Trading House', 'AC-09-26001', (select id from app_users where email = 'alfred@redreach.ae'));
+insert into account_contacts (account_id, name) select id, 'Hidden Contact' from accounts where name = 'Unassigned Church';
+insert into account_activities (account_id, kind, body) select id, 'note', 'secret note' from accounts where name = 'Unassigned Church';
+insert into clients (company_name) values ('Assigned Clinic L.L.C.');
+insert into invoices (client, reference_number) values ('Assigned Clinic', 'RR-03-26001');
+
+-- staff (VA): only the account they own
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from accounts) = 1, 'staff sees only assigned accounts');
+select pg_temp.expect((select name from accounts) = 'Assigned Clinic LLC', 'staff sees the right account');
+select pg_temp.expect((select count(*) from account_contacts) = 0, 'staff cannot see contacts on unassigned accounts');
+select pg_temp.expect((select count(*) from account_activities) = 0, 'staff cannot see timeline on unassigned accounts');
+select pg_temp.expect((select count(*) from crm) = 0, 'staff cannot read the old CRM');
+select pg_temp.expect((select count(*) from invoices) = 0, 'staff cannot read invoices');
+select pg_temp.expect((select count(*) from app_users) > 0, 'staff can read the team list');
+select pg_temp.expect((select count(*) from app_settings where key = 'zohoClientSecret') = 0, 'staff cannot read secrets');
+select pg_temp.expect(not pg_temp.fails($q$insert into account_activities (account_id, kind, body) select id, 'call', 'rang them' from accounts where name = 'Assigned Clinic LLC'$q$), 'staff can add to timeline on own account');
+select pg_temp.expect(pg_temp.fails($q$insert into account_activities (account_id, kind, body) values ((select id from accounts limit 1), 'note', 'x'), ('00000000-0000-0000-0000-0000000000ff', 'note', 'y')$q$), 'staff cannot write timeline on unknown accounts');
+select pg_temp.expect(pg_temp.fails($q$insert into accounts (type, name) values ('ctrm_prospect', 'Not mine')$q$), 'staff cannot create an account owned by nobody');
+select pg_temp.expect(not pg_temp.fails($q$insert into accounts (type, name, owner_user_id) values ('ctrm_prospect', 'VA Prospect', public.rr_current_user_id())$q$), 'staff can create an account they own');
+select pg_temp.expect(pg_temp.fails($q$update accounts set owner_user_id = null where name = 'VA Prospect'$q$), 'staff cannot hand an account away');
+reset role;
+select pg_temp.expect((select count(*) from account_activities where body = 'x') = 0, 'blocked timeline insert left no row');
+
+-- viewer: reads everything, writes nothing
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from accounts) = 4, 'viewer reads all accounts');
+select pg_temp.expect((select count(*) from account_contacts) = 1, 'viewer reads contacts');
+select pg_temp.expect((select count(*) from invoices where reference_number = 'RR-03-26001') = 1, 'viewer reads invoices');
+select pg_temp.expect(pg_temp.fails($q$insert into accounts (type, name) values ('ctrm_prospect', 'Viewer made')$q$), 'viewer cannot create accounts');
+update accounts set name = 'Hacked' where name = 'Unassigned Church';
+select pg_temp.expect(pg_temp.fails($q$insert into account_activities (account_id, kind, body) select id, 'note', 'v' from accounts limit 1$q$), 'viewer cannot write timeline');
+select pg_temp.expect(pg_temp.fails($q$insert into crm (company_name) values ('v')$q$), 'viewer cannot write CRM');
+select pg_temp.expect((select count(*) from audit_log) = 0, 'viewer cannot read audit log');
+reset role;
+select pg_temp.expect(exists (select 1 from accounts where name = 'Unassigned Church'), 'viewer update changed nothing');
+
+-- sales: sees all accounts, cannot reassign or delete
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from accounts) = 4, 'sales sees all accounts');
+select pg_temp.expect(pg_temp.fails($q$update accounts set owner_user_id = null where name = 'Assigned Clinic LLC'$q$), 'sales cannot reassign accounts');
+delete from accounts where name = 'Unassigned Church';
+reset role;
+select pg_temp.expect(exists (select 1 from accounts where name = 'Unassigned Church'), 'sales cannot delete accounts');
+
+-- manager: can reassign
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+update accounts set owner_user_id = null where name = 'VA Prospect';
+reset role;
+select pg_temp.expect((select owner_user_id from accounts where name = 'VA Prospect') is null, 'manager can reassign accounts');
+
+-- anon: nothing
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from accounts'), 'anon cannot read accounts');
+reset role;
+
+-- linking: dry run changes nothing, apply links, undo restores
+select pg_temp.expect(
+  (select count(*) from rr_link_accounts() where kind = 'match' and account_name = 'Assigned Clinic LLC') = 2,
+  'dry run finds the client and the invoice for an account'
+);
+select pg_temp.expect((select account_id from invoices where reference_number = 'RR-03-26001') is null, 'dry run changes nothing');
+create temp table link_run as select * from rr_link_accounts(p_dry_run => false);
+select pg_temp.expect(
+  (select a.name from invoices i join accounts a on a.id = i.account_id where i.reference_number = 'RR-03-26001') = 'Assigned Clinic LLC',
+  'apply links the invoice to the account'
+);
+select pg_temp.expect((select client from invoices where reference_number = 'RR-03-26001') = 'Assigned Clinic', 'linking leaves the invoice client name as it was');
+select pg_temp.expect(rr_unlink_accounts((select batch_id from link_run limit 1)) = 2, 'undo clears exactly the applied batch');
+select pg_temp.expect((select account_id from invoices where reference_number = 'RR-03-26001') is null, 'undo restores the invoice');
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select pg_temp.expect(pg_temp.fails('select * from rr_link_accounts()'), 'app users cannot run the link script');
+reset role;
+select pg_temp.expect(rr_normalize_company_name('Al Noor Trading L.L.C.') = 'al noor', 'company names drop legal suffixes');
+select pg_temp.expect(rr_normalize_company_name('The Coffee Co') = 'coffee', 'company names drop leading the and co');

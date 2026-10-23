@@ -46,3 +46,32 @@ describe('permissions hierarchy', () => {
     expect(roleAtLeast('manager', 'admin')).toBe(false)
   })
 })
+
+describe('restricted roles', () => {
+  it('keeps staff and viewer roles instead of widening them to sales', () => {
+    expect(normalizeUserRole('staff')).toBe('staff')
+    expect(normalizeUserRole('viewer')).toBe('viewer')
+  })
+
+  it('limits staff to their own accounts', () => {
+    expect(can('staff', 'accounts.write')).toBe(true)
+    expect(can('staff', 'accounts.viewAll')).toBe(false)
+    expect(can('staff', 'legacy.access')).toBe(false)
+    expect(can('staff', 'finance.reports')).toBe(false)
+    expect(roleAtLeast('staff', 'sales')).toBe(false)
+  })
+
+  it('lets viewers read but not write', () => {
+    expect(can('viewer', 'accounts.viewAll')).toBe(true)
+    expect(can('viewer', 'legacy.access')).toBe(true)
+    expect(can('viewer', 'accounts.write')).toBe(false)
+    expect(can('viewer', 'settings.manage')).toBe(false)
+  })
+
+  it('only lets managers and admins reassign or delete accounts', () => {
+    expect(can('sales', 'accounts.reassign')).toBe(false)
+    expect(can('manager', 'accounts.reassign')).toBe(true)
+    expect(can('admin', 'accounts.delete')).toBe(true)
+    expect(can('sales', 'accounts.delete')).toBe(false)
+  })
+})

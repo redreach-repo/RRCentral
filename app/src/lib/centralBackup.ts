@@ -30,6 +30,9 @@ const CLOUD_TABLES = [
   'fx_rates',
   'wanders_deals',
   'website_inquiries',
+  'accounts',
+  'account_contacts',
+  'account_activities',
 ] as const
 
 /** Download a JSON backup of local IndexedDB or cloud Postgres tables. */
