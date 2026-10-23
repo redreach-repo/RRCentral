@@ -1,11 +1,13 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { AuthProvider } from './contexts/AuthContext'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { SettingsProvider } from './contexts/SettingsContext'
 import { ToastProvider } from './contexts/ToastContext'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
+import AccountsPage from './pages/AccountsPage'
+import AccountDetailPage from './pages/AccountDetailPage'
 import CrmPage from './pages/CrmPage'
 import FollowupsPage from './pages/FollowupsPage'
 import QuotationsPage from './pages/QuotationsPage'
@@ -32,6 +34,13 @@ import CartPage from './shop/pages/CartPage'
 import WishlistPage from './shop/pages/WishlistPage'
 import OrderSuccessPage from './shop/pages/OrderSuccessPage'
 import OrderCancelPage from './shop/pages/OrderCancelPage'
+
+/** Staff (VA, freelancers) only work on their accounts, so their home is the account list. */
+function HomeRoute() {
+  const { userRole } = useAuth()
+  if (userRole === 'staff') return <Navigate to="/accounts" replace />
+  return <DashboardPage />
+}
 
 /**
  * Central is CRM-first. Marketing pages live on www.redreach.ae (WordPress),
@@ -72,7 +81,9 @@ export default function App() {
                 </ProtectedRoute>
               }
             >
-              <Route path="app" element={<DashboardPage />} />
+              <Route path="app" element={<HomeRoute />} />
+              <Route path="accounts" element={<AccountsPage />} />
+              <Route path="accounts/:id" element={<AccountDetailPage />} />
               <Route path="app/wanders" element={<WandersPage />} />
               <Route path="crm" element={<CrmPage />} />
               <Route path="follow-ups" element={<FollowupsPage />} />

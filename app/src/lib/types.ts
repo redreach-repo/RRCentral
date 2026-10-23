@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'manager' | 'sales'
+export type UserRole = 'admin' | 'manager' | 'sales' | 'staff' | 'viewer'
 
 export interface CrmContact {
   id: string
@@ -10,6 +10,8 @@ export interface CrmContact {
 
 export interface Client {
   id: string
+  /** Linked account (RR Central modules). Null until linked. */
+  account_id?: string | null
   company_name: string
   primary_contact: string
   email: string
@@ -165,6 +167,8 @@ export interface FollowUpUpdate {
 
 export interface Quotation {
   id: string
+  /** Linked account (RR Central modules). Null until linked. */
+  account_id?: string | null
   client: string
   vertical: string
   reference_number: string
@@ -323,6 +327,8 @@ export interface FxRateEntry {
 
 export interface Invoice {
   id: string
+  /** Linked account (RR Central modules). Null until linked. */
+  account_id?: string | null
   client: string
   vertical: string
   reference_number: string
@@ -814,5 +820,51 @@ export interface WebsiteInquiry {
   message: string
   status: 'new' | 'converted' | 'closed'
   crm_id: string
+  created_at: string
+}
+
+/** Organisation Red Reach works with (RR Central modules). */
+export type AccountType = 'ai_crm_client' | 'worship_church' | 'ctrm_prospect'
+
+export interface Account {
+  id: string
+  type: AccountType
+  name: string
+  /** `AC-[code]-[YY][seq]`, e.g. AC-07-26001. */
+  reference: string
+  industry: string
+  country: string
+  city: string
+  website: string
+  status: string
+  owner_user_id: string | null
+  source: string
+  notes: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AccountContact {
+  id: string
+  account_id: string
+  name: string
+  role: string
+  email: string
+  phone: string
+  whatsapp: string
+  is_primary: boolean
+  created_at: string
+}
+
+export type AccountActivityKind = 'note' | 'call' | 'email' | 'meeting' | 'system'
+
+export interface AccountActivity {
+  id: string
+  account_id: string
+  user_id: string | null
+  user_email: string
+  kind: AccountActivityKind
+  body: string
   created_at: string
 }

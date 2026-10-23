@@ -4,6 +4,7 @@ import {
   Bell,
   ShieldCheck,
   Building2,
+  Contact,
   LayoutDashboard,
   Banknote,
   Users,
@@ -44,6 +45,8 @@ type NavItem = {
   minRole?: UserRole
   /** If set, only these roles see the item (overrides minRole). */
   roles?: UserRole[]
+  /** Shown to the restricted `staff` role (VA, freelancers). Everything else is hidden from them. */
+  forStaff?: boolean
 }
 
 type NavGroup = { id: string; label: string; items: NavItem[] }
@@ -53,6 +56,11 @@ const navGroups: NavGroup[] = [
     id: 'overview',
     label: 'Overview',
     items: [{ to: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true }],
+  },
+  {
+    id: 'accounts',
+    label: 'Clients and partners',
+    items: [{ to: '/accounts', label: 'Accounts', icon: Contact, forStaff: true }],
   },
   {
     id: 'sales',
@@ -92,7 +100,13 @@ const navGroups: NavGroup[] = [
     label: 'Admin',
     items: [
       { to: '/settings', label: 'Settings', icon: Settings, minRole: 'admin' },
-      { to: '/settings', label: 'Account', icon: KeyRound, roles: ['manager', 'sales'] },
+      {
+        to: '/settings',
+        label: 'Account',
+        icon: KeyRound,
+        roles: ['manager', 'sales', 'staff', 'viewer'],
+        forStaff: true,
+      },
       { to: '/audit-log', label: 'Audit log', icon: ShieldCheck, minRole: 'admin' },
     ],
   },
@@ -100,6 +114,7 @@ const navGroups: NavGroup[] = [
 
 const titleByPath: { match: (path: string) => boolean; title: string }[] = [
   { match: (p) => p === '/app', title: 'Dashboard' },
+  { match: (p) => p.startsWith('/accounts'), title: 'Accounts' },
   { match: (p) => p.startsWith('/crm'), title: 'CRM' },
   { match: (p) => p.startsWith('/follow-ups'), title: 'Follow-ups' },
   { match: (p) => p.startsWith('/quotations'), title: 'Quotations' },
@@ -127,6 +142,10 @@ const phonePrimaryNav: { to: string; label: string; icon: typeof LayoutDashboard
   { to: '/quotations', label: 'Quotes', icon: FileText },
 ]
 
+const staffPhoneNav: typeof phonePrimaryNav = [
+  { to: '/accounts', label: 'Accounts', icon: Contact },
+]
+
 function isPhonePrimaryActive(pathname: string, to: string, end?: boolean): boolean {
   if (end) return pathname === to
   return pathname === to || pathname.startsWith(`${to}/`)
@@ -139,7 +158,9 @@ export default function Layout() {
   const navigate = useNavigate()
   const phoneShell = usePhoneShell()
   const reminders = useFollowUpReminders(user?.email)
-  useRecurringDeductionsSync(Boolean(user))
+  // Only roles that write to Finance should top up monthly deductions.
+  useRecurringDeductionsSync(Boolean(user) && roleAtLeast(userRole, 'sales'))
+  const phoneNav = userRole === 'staff' ? staffPhoneNav : phonePrimaryNav
 
   function openReminders() {
     if (reminders.permission === 'default') void reminders.enableNotifications()
@@ -149,7 +170,7 @@ export default function Layout() {
   const pageTitle =
     titleByPath.find((t) => t.match(location.pathname))?.title || 'RED REACH Central'
 
-  const primaryActive = phonePrimaryNav.some((item) =>
+  const primaryActive = phoneNav.some((item) =>
     isPhonePrimaryActive(location.pathname, item.to, item.end),
   )
 
@@ -189,6 +210,7 @@ export default function Layout() {
         <nav className={styles.nav}>
           {navGroups.map((group) => {
             const items = group.items.filter((item) => {
+              if (userRole === 'staff' && !item.forStaff) return false
               if (item.roles) return item.roles.includes(userRole)
               if (item.minRole) return roleAtLeast(userRole, item.minRole)
               return true
@@ -279,7 +301,7 @@ export default function Layout() {
 
         {phoneShell ? (
           <nav className={styles.bottomNav} aria-label="Primary">
-            {phonePrimaryNav.map(({ to, label, icon: Icon, end }) => {
+            {phoneNav.map(({ to, label, icon: Icon, end }) => {
               const active = isPhonePrimaryActive(location.pathname, to, end)
               return (
                 <NavLink

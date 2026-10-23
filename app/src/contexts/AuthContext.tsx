@@ -21,6 +21,8 @@ export const LOGIN_DOMAIN_REJECT_KEY = 'rrcentral_login_domain_reject'
 interface AuthContextValue {
   user: User | null
   userRole: UserRole
+  /** app_users.id of the signed-in person (owner of accounts). Null in local mode or before lookup. */
+  appUserId: string | null
   /** False when signed in but not an active member of app_users (cloud mode). */
   hasAccess: boolean
   signInWithPassword: (email: string, password: string) => Promise<void>
@@ -33,9 +35,9 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
-type Membership = { role: UserRole; active: boolean }
+type Membership = { role: UserRole; active: boolean; id: string | null }
 
-const NO_MEMBERSHIP: Membership = { role: 'sales', active: false }
+const NO_MEMBERSHIP: Membership = { role: 'sales', active: false, id: null }
 
 /**
  * Look up the signed-in user in app_users. In cloud mode RLS only returns the
@@ -46,12 +48,16 @@ async function lookupMembership(email: string | undefined): Promise<Membership> 
 
   const { data, error } = await db
     .from('app_users')
-    .select('role, active')
+    .select('id, role, active')
     .ilike('email', email.replace(/[\\%_]/g, '\\$&'))
     .maybeSingle()
 
   if (error || !data) return NO_MEMBERSHIP
-  return { role: normalizeUserRole(data.role), active: data.active !== false }
+  return {
+    role: normalizeUserRole(data.role),
+    active: data.active !== false,
+    id: data.id ? String(data.id) : null,
+  }
 }
 
 async function rejectIfDisallowedDomain(user: User | null): Promise<User | null> {
@@ -91,8 +97,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!mounted) return
         const currentUser = await rejectIfDisallowedDomain(session?.user ?? null)
         if (!mounted) return
+        const nextMembership = await lookupMembership(currentUser?.email)
+        if (!mounted) return
+        setMembership(nextMembership)
         setUser(currentUser)
-        setMembership(await lookupMembership(currentUser?.email))
       } catch {
         if (!mounted) return
         setUser(null)
@@ -109,8 +117,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           const currentUser = await rejectIfDisallowedDomain(session?.user ?? null)
           if (!mounted) return
+          const nextMembership = await lookupMembership(currentUser?.email)
+          if (!mounted) return
+          setMembership(nextMembership)
           setUser(currentUser)
-          setMembership(await lookupMembership(currentUser?.email))
         } finally {
           if (mounted) setLoading(false)
         }
@@ -152,6 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       userRole: membership.role,
+      appUserId: membership.id,
       hasAccess: membership.active || !isSupabaseConfigured(),
       signInWithPassword,
       changePassword,

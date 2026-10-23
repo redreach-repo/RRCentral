@@ -17,7 +17,7 @@ export function asError(err: unknown, fallback?: string): Error {
   return new Error(errorMessage(err, fallback))
 }
 
-function errorCode(err: unknown): string {
+export function errorCode(err: unknown): string {
   if (err && typeof err === 'object' && 'code' in err) {
     return String((err as { code?: unknown }).code || '')
   }
