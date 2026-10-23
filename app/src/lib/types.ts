@@ -998,6 +998,30 @@ export interface UsageRecord {
   ai_cost_usd: number
   lead_credits_cost_usd: number
   updated_at: string
+  /** When the usage import last wrote this row. */
+  imported_at?: string | null
+}
+
+/** Where a client's usage comes from, for the daily import. */
+export interface UsageSourceRow {
+  id: string
+  account_id: string
+  whatsapp_phones: string[]
+  ai_workspace_id: string
+  updated_by: string
+  updated_at: string
+}
+
+export interface UsageImportRun {
+  id: string
+  started_at: string
+  finished_at: string | null
+  trigger: 'manual' | 'schedule'
+  requested_by: string
+  whatsapp_status: string
+  ai_status: string
+  rows_written: number
+  message: string
 }
 
 export type TicketChannel = 'email' | 'whatsapp' | 'phone' | 'in_person' | 'internal'

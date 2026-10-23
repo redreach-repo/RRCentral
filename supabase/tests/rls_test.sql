@@ -486,3 +486,29 @@ set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
 select pg_temp.expect((select count(*) from invoice_reminders) = 2, 'viewer reads payment reminders');
 select pg_temp.expect(pg_temp.fails(format('insert into invoice_reminders (invoice_id, stage) values (%L, 14)', :'reminder_invoice')), 'viewer cannot record reminders');
 reset role;
+
+------------------------------------------------------------ Usage import (roadmap item 3)
+insert into usage_sources (account_id, whatsapp_phones, ai_workspace_id)
+  select id, '{971501234567}', 'wrkspc_clinic' from accounts where name = 'Assigned Clinic LLC';
+insert into usage_sources (account_id, ai_workspace_id) select id, 'wrkspc_church' from accounts where name = 'Unassigned Church';
+insert into usage_import_runs (trigger, rows_written) values ('schedule', 3);
+select pg_temp.expect(pg_temp.fails($q$insert into usage_sources (account_id) select account_id from usage_sources limit 1$q$), 'one usage source row per client');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from usage_sources) = 1, 'staff sees usage sources only on their accounts');
+select pg_temp.expect(pg_temp.fails($q$update usage_sources set ai_workspace_id = 'x' returning 1$q$) or (select ai_workspace_id from usage_sources) = 'wrkspc_clinic', 'staff cannot change usage sources');
+select pg_temp.expect((select count(*) from usage_import_runs) = 0, 'staff cannot see import runs');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect((select count(*) from usage_import_runs) = 1, 'manager sees import runs');
+select pg_temp.expect(pg_temp.fails($q$insert into usage_import_runs (trigger) values ('manual')$q$), 'only the import function logs runs');
+select pg_temp.expect(not pg_temp.fails($q$update usage_sources set ai_workspace_id = 'wrkspc_new' where ai_workspace_id = 'wrkspc_church'$q$), 'manager sets usage sources');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect(pg_temp.fails($q$insert into usage_sources (account_id) select id from accounts where name = 'Other Trading House'$q$), 'sales cannot set usage sources');
+reset role;

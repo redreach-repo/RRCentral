@@ -119,6 +119,13 @@ in `app/src/lib/contractBilling.ts` and `contractBillingStore.ts`, with tests.
 - Division and payment terms for these invoices are on Packages and rates
   (default 03 RR Marketing, Net 7 days).
 
+### Usage import (roadmap item 3, `20261031090000_usage_import.sql`)
+
+Adds `usage_sources` (per client WhatsApp numbers and Anthropic workspace),
+`usage_records.imported_at` and `usage_import_runs`. The `usage-import` Edge
+Function pulls WhatsApp counts from Meta and AI spend from Anthropic. Setup,
+secrets and the daily schedule: [usage-import.md](usage-import.md).
+
 ## Roles
 
 Roles live on `app_users.role`. RLS in the database and `app/src/lib/permissions.ts`

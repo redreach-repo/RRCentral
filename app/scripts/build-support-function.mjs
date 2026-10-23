@@ -4,6 +4,8 @@
 //   so tickets opened by email get the same due time as tickets opened in the app.
 // * worshiphub-read gets the WorshipHub field filter (src/lib/worshiphub.ts),
 //   so only the agreed account level fields ever leave the function.
+// * usage-import gets the usage parsing and update rules (src/lib/usageImport.ts),
+//   so the import and the app agree on what is imported and what is left alone.
 //
 //   npm run build:support-fn              # regenerate
 //   npm run build:support-fn -- --check   # CI: fail if a bundle is stale
@@ -16,6 +18,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 const bundles = [
   { entry: 'src/lib/sla.ts', out: '../supabase/functions/support-email-in/sla.bundle.js' },
   { entry: 'src/lib/worshiphub.ts', out: '../supabase/functions/worshiphub-read/worshiphub.bundle.js' },
+  { entry: 'src/lib/usageImport.ts', out: '../supabase/functions/usage-import/usageImport.bundle.js' },
 ]
 
 let stale = false

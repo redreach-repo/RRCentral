@@ -48,6 +48,7 @@ const CLOUD_TABLES = [
   'worship_church_profiles',
   'contract_invoices',
   'invoice_reminders',
+  'usage_sources',
 ] as const
 
 /** Download a JSON backup of local IndexedDB or cloud Postgres tables. */

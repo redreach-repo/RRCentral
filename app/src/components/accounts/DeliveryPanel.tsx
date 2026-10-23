@@ -50,6 +50,8 @@ import {
 } from '../../lib/deliveryStore'
 import { logAccountEvent } from '../../lib/accountsStore'
 import { listContractInvoices, runContractBilling, skipSetupInvoice } from '../../lib/contractBillingStore'
+import { editedByHand } from '../../lib/usageImport'
+import { getUsageSource, saveUsageSource } from '../../lib/usageImportStore'
 import { can } from '../../lib/permissions'
 import { errorMessage } from '../../lib/errors'
 import { formatAED } from '../../lib/money'
@@ -67,6 +69,7 @@ import type {
   TimeCategory,
   TimeEntry,
   UsageRecord,
+  UsageSourceRow,
   UserRole,
 } from '../../lib/types'
 import {
@@ -162,6 +165,8 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
   const [entries, setEntries] = useState<TimeEntry[]>([])
   const [usage, setUsage] = useState<UsageRecord[]>([])
   const [raisedInvoices, setRaisedInvoices] = useState<ContractInvoice[]>([])
+  const [usageSource, setUsageSource] = useState<UsageSourceRow | null>(null)
+  const [sourceForm, setSourceForm] = useState<{ phones: string; workspace: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [contractForm, setContractForm] = useState<{ id?: string; form: ContractInput } | null>(null)
@@ -184,7 +189,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
 
   const load = useCallback(async () => {
     try {
-      const [p, c, s, r, t, u, ci] = await Promise.all([
+      const [p, c, s, r, t, u, ci, src] = await Promise.all([
         listPackages(),
         listContracts(account.id),
         listStages(account.id),
@@ -192,7 +197,9 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
         listTimeEntries(account.id),
         listUsage(account.id),
         can(userRole, 'delivery.contracts') ? listContractInvoices(account.id) : Promise.resolve([]),
+        getUsageSource(account.id).catch(() => null),
       ])
+      setUsageSource(src)
       setRaisedInvoices(ci.filter((x) => x.invoice_id))
       setPackages(p)
       setContracts(c)
@@ -428,6 +435,15 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
       setHoursForm((f) => ({ ...f, note: '' }))
       showToast(`${hoursLabel(hours)} logged from the timer`, 'success')
     }, 'Could not log the timer hours')
+  }
+
+  async function submitSource() {
+    if (!sourceForm) return
+    await run(async () => {
+      await saveUsageSource(account.id, sourceForm, usageSource, author.email)
+      setSourceForm(null)
+      showToast('Usage import links saved', 'success')
+    }, 'Could not save the usage links')
   }
 
   async function submitUsage() {
@@ -907,6 +923,78 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
             <button type="button" style={{ ...buttonPrimaryStyle, marginTop: 12 }} disabled={busy} onClick={() => void submitUsage()}>
               Save {monthLabel(usageMonth)}
             </button>
+          ) : null}
+          <p style={{ ...mutedNote, fontSize: 12, marginTop: 10 }}>
+            {usageRow?.imported_at && !editedByHand(usageRow)
+              ? `Imported automatically on ${day(usageRow.imported_at)}.`
+              : usageRow
+                ? 'Entered by hand, so the daily import leaves this month alone.'
+                : usageSource && (usageSource.whatsapp_phones.length || usageSource.ai_workspace_id)
+                  ? 'Filled in by the daily import.'
+                  : 'Entered by hand. Link the WhatsApp number and AI workspace below to import it.'}
+          </p>
+          {can(userRole, 'delivery.packages') ? (
+            sourceForm ? (
+              <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
+                <div style={fieldStyle}>
+                  <label style={labelStyle} htmlFor="src-phones">
+                    WhatsApp numbers for this client
+                  </label>
+                  <input
+                    id="src-phones"
+                    style={inputStyle}
+                    placeholder="971501234567, more separated by commas"
+                    value={sourceForm.phones}
+                    onChange={(e) => setSourceForm((f) => f && { ...f, phones: e.target.value })}
+                  />
+                </div>
+                <div style={fieldStyle}>
+                  <label style={labelStyle} htmlFor="src-ws">
+                    Anthropic workspace ID
+                  </label>
+                  <input
+                    id="src-ws"
+                    style={inputStyle}
+                    placeholder="wrkspc_..."
+                    value={sourceForm.workspace}
+                    onChange={(e) => setSourceForm((f) => f && { ...f, workspace: e.target.value })}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" style={buttonPrimaryStyle} disabled={busy} onClick={() => void submitSource()}>
+                    Save links
+                  </button>
+                  <button type="button" style={smallBtn} onClick={() => setSourceForm(null)}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', fontSize: 12, marginTop: 4 }}>
+                <span style={{ color: colors.muted }}>
+                  {usageSource && (usageSource.whatsapp_phones.length || usageSource.ai_workspace_id)
+                    ? `Import links: ${[
+                        usageSource.whatsapp_phones.length ? `WhatsApp ${usageSource.whatsapp_phones.join(', ')}` : '',
+                        usageSource.ai_workspace_id ? `AI workspace ${usageSource.ai_workspace_id}` : '',
+                      ]
+                        .filter(Boolean)
+                        .join(', ')}`
+                    : 'No import links yet.'}
+                </span>
+                <button
+                  type="button"
+                  style={smallBtn}
+                  onClick={() =>
+                    setSourceForm({
+                      phones: usageSource?.whatsapp_phones.join(', ') ?? '',
+                      workspace: usageSource?.ai_workspace_id ?? '',
+                    })
+                  }
+                >
+                  <Pencil size={12} /> Links
+                </button>
+              </div>
+            )
           ) : null}
         </section>
       </div>
