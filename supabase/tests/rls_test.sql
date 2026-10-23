@@ -745,3 +745,22 @@ reset role;
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from report_calls'), 'anon cannot read report calls');
 reset role;
+
+------------------------------------------------------------ Audit log on contracts, prices and commission (roadmap item 11)
+update contracts set monthly_fee = monthly_fee + 1 where account_id = :'assigned_clinic';
+select pg_temp.expect(exists (
+  select 1 from audit_log where table_name = 'contracts' and operation = 'UPDATE'
+    and 'monthly_fee' = any(changed_fields) and account_id = :'assigned_clinic'
+), 'a contract fee change is logged against its account');
+select pg_temp.expect(exists (
+  select 1 from pg_trigger where tgname = 'rr_audit' and tgrelid = 'public.line_items'::regclass
+), 'quote and invoice lines are audited');
+select pg_temp.expect(exists (
+  select 1 from pg_trigger where tgname = 'rr_audit' and tgrelid = 'public.ctrm_deal_commissions'::regclass
+), 'commission is audited');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect((select count(*) from audit_log) = 0, 'manager cannot read the audit log');
+select pg_temp.expect(pg_temp.fails($q$update audit_log set actor_email = 'someone@else'$q$) or not exists (select 1 from audit_log), 'manager cannot change the audit log');
+reset role;
