@@ -584,3 +584,30 @@ reset role;
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from sales_deals'), 'anon cannot read sales deals');
 reset role;
+
+------------------------------------------------------------ Client portal (roadmap item 6)
+insert into portal_access (account_id, label, token_hash)
+  select id, 'Dr Prospect', md5('prospect') || md5('prospect-2') from accounts where name = 'Prospect Dental';
+insert into portal_access (account_id, label, token_hash)
+  select id, 'Clinic team', md5('clinic') || md5('clinic-2') from accounts where name = 'Assigned Clinic LLC';
+select id as assigned_clinic from accounts where name = 'Assigned Clinic LLC' \gset
+select pg_temp.expect(pg_temp.fails(format('insert into portal_access (account_id, token_hash) values (%L, %L)', :'prospect_dental', 'not-a-hash')), 'portal links keep only a hash');
+select pg_temp.expect(pg_temp.fails(format('insert into portal_access (account_id, token_hash) values (%L, %L)', :'prospect_dental', md5('prospect') || md5('prospect-2'))), 'each portal link is unique');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from portal_access) = 1, 'staff sees portal links only on their accounts');
+select pg_temp.expect(not pg_temp.fails(format('insert into portal_access (account_id, label, token_hash) values (%L, %L, %L)', :'assigned_clinic', 'Front desk', md5('desk') || md5('desk-2'))), 'staff makes a portal link on their account');
+select pg_temp.expect(not pg_temp.fails($q$update portal_access set revoked_at = now() where label = 'Front desk'$q$), 'staff turns off a portal link');
+select pg_temp.expect(pg_temp.fails(format('insert into portal_access (account_id, token_hash) values (%L, %L)', :'prospect_dental', md5('x') || md5('y'))), 'staff cannot make links on other accounts');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from portal_access) = 3, 'viewer reads portal links');
+select pg_temp.expect(pg_temp.fails(format('insert into portal_access (account_id, token_hash) values (%L, %L)', :'assigned_clinic', md5('v') || md5('w'))), 'viewer cannot make portal links');
+reset role;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from portal_access'), 'anon cannot read portal links');
+reset role;

@@ -1060,6 +1060,20 @@ export interface SalesDeal {
   updated_at: string
 }
 
+/** A private client portal link. Only the token's hash is stored. */
+export interface PortalAccess {
+  id: string
+  account_id: string
+  contact_id: string | null
+  label: string
+  token_hash: string
+  created_by: string
+  created_at: string
+  expires_at: string | null
+  revoked_at: string | null
+  last_used_at: string | null
+}
+
 /** Someone on the daily digest list. */
 export interface DigestRecipientRow {
   id: string

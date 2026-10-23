@@ -8,6 +8,7 @@ import Modal from '../components/Modal'
 import StatusPill from '../components/StatusPill'
 import AccountFormModal from '../components/accounts/AccountFormModal'
 import DeliveryPanel from '../components/accounts/DeliveryPanel'
+import PortalLinksCard from '../components/accounts/PortalLinksCard'
 import AccountTicketsCard from '../components/support/AccountTicketsCard'
 import AccountDealsCard from '../components/ctrm/AccountDealsCard'
 import AccountSalesDealCard from '../components/sales/AccountSalesDealCard'
@@ -541,6 +542,10 @@ export default function AccountDetailPage() {
 
       {account.type === 'ai_crm_client' ? (
         <DeliveryPanel key={deliveryKey} account={account} editable={editable} userRole={userRole} team={team} author={author} />
+      ) : null}
+
+      {account.type === 'ai_crm_client' ? (
+        <PortalLinksCard account={account} contacts={sortedContacts} editable={editable} author={author} />
       ) : null}
 
       {account.type === 'worship_church' ? (
