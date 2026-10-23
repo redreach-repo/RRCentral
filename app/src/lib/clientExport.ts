@@ -8,7 +8,7 @@
  */
 import { format } from 'date-fns'
 import type { Account } from './types'
-import { makeZip } from './zip'
+import { strToU8, zipSync } from 'fflate'
 
 export type ExportMode = 'client' | 'full'
 
@@ -124,7 +124,7 @@ export function buildExportZip(
 ): { zip: Uint8Array; counts: { spec: ExportTable; count: number }[] } {
   const prepared = data.map((d) => ({ spec: d.spec, rows: prepareRows(d.spec, d.rows, mode) }))
   const counts = prepared.map((p) => ({ spec: p.spec, count: p.rows.length }))
-  const files = [
+  const files: { name: string; data: string }[] = [
     { name: 'README.txt', data: exportReadme(account, mode, counts.filter((c) => c.count > 0), meta) },
     ...prepared.filter((p) => p.rows.length).map((p) => ({ name: `${slug(p.spec.label).toLowerCase()}.csv`, data: toCsv(p.rows) })),
     {
@@ -140,5 +140,7 @@ export function buildExportZip(
       ),
     },
   ]
-  return { zip: makeZip(files, meta.when), counts }
+  const mtime = meta.when
+  const zip = zipSync(Object.fromEntries(files.map((f) => [f.name, [strToU8(f.data), { mtime }]])), { level: 6 })
+  return { zip, counts }
 }
