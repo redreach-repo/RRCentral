@@ -11,7 +11,9 @@ import { listAccounts, listContacts, listTeam } from '../lib/accountsStore'
 import { TICKET_CHANNELS, TICKET_PRIORITIES, TICKET_STATUSES, optionLabel } from '../lib/support'
 import { LOGGED_FOR_CLIENT, addTicketMessage, getTicket, listMessages, updateTicket } from '../lib/supportStore'
 import { errorMessage } from '../lib/errors'
-import type { Account, AccountContact, AppUser, Ticket, TicketMessage, TicketPriority, TicketStatus } from '../lib/types'
+import { addTimeEntry, listTicketTime } from '../lib/deliveryStore'
+import { TICKET_TIME_OPTIONS, hoursLabel } from '../lib/timeTracking'
+import type { Account, AccountContact, AppUser, Ticket, TicketMessage, TicketPriority, TicketStatus, TimeEntry } from '../lib/types'
 import {
   buttonPrimaryStyle,
   cardStyle,
@@ -37,19 +39,23 @@ export default function TicketPage() {
   const [loading, setLoading] = useState(true)
   const [reply, setReply] = useState('')
   const [internal, setInternal] = useState(false)
+  const [timeSpent, setTimeSpent] = useState(0)
+  const [ticketTime, setTicketTime] = useState<TimeEntry[]>([])
   const [busy, setBusy] = useState(false)
 
   const author = useMemo(() => ({ appUserId, email: user?.email || '' }), [appUserId, user?.email])
 
   const load = useCallback(async () => {
     try {
-      const [t, m, { rows }, people, allContacts] = await Promise.all([
+      const [t, m, { rows }, people, allContacts, time] = await Promise.all([
         getTicket(id),
         listMessages(id),
         listAccounts(),
         listTeam(),
         listContacts(),
+        listTicketTime(id),
       ])
+      setTicketTime(time)
       setTicket(t)
       setMessages(m)
       setAccounts(rows)
@@ -91,6 +97,8 @@ export default function TicketPage() {
     : userRole === 'admin' || userRole === 'manager' || userRole === 'sales'
   const contact = ticket.contact_id ? contacts.find((c) => c.id === ticket.contact_id) : undefined
   const accountContacts = contacts.filter((c) => c.account_id === ticket.account_id)
+  const canLogTime = Boolean(account) && editable && userRole !== 'viewer'
+  const ticketHours = ticketTime.reduce((sum, e) => sum + (Number(e.hours) || 0), 0)
 
   async function change(patch: Partial<Pick<Ticket, 'status' | 'priority' | 'assignee_user_id' | 'account_id' | 'contact_id'>>) {
     if (!ticket) return
@@ -111,7 +119,27 @@ export default function TicketPage() {
     try {
       await addTicketMessage(ticket, reply.trim(), internal, author)
       setReply('')
-      showToast(internal ? 'Note added' : 'Reply logged', 'success')
+      let logged = ''
+      if (timeSpent > 0 && ticket.account_id && canLogTime) {
+        try {
+          await addTimeEntry(
+            ticket.account_id,
+            {
+              date: format(new Date(), 'yyyy-MM-dd'),
+              hours: timeSpent,
+              category: 'support',
+              note: `Ticket: ${ticket.subject || 'no subject'}`.slice(0, 200),
+              ticket_id: ticket.id,
+            },
+            author,
+          )
+          logged = `, ${hoursLabel(timeSpent)} logged`
+          setTimeSpent(0)
+        } catch (e) {
+          showToast(errorMessage(e, 'The reply was saved but the time was not logged'), 'error')
+        }
+      }
+      showToast(`${internal ? 'Note added' : 'Reply logged'}${logged}`, 'success')
       await load()
     } catch (e) {
       showToast(errorMessage(e, 'Could not save the reply'), 'error')
@@ -311,10 +339,35 @@ export default function TicketPage() {
               <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} />
               Internal note, the client does not see it
             </label>
+            {canLogTime ? (
+              <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13, color: colors.muted }}>
+                Log time
+                <select
+                  aria-label="Time spent"
+                  style={{ ...selectStyle, width: 'auto', padding: '6px 10px', fontSize: 13 }}
+                  value={timeSpent}
+                  onChange={(e) => setTimeSpent(Number(e.target.value))}
+                >
+                  {TICKET_TIME_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             <button type="button" style={buttonPrimaryStyle} disabled={busy || !reply.trim()} onClick={() => void send()}>
               {internal ? 'Add note' : 'Log reply'}
             </button>
           </div>
+          {canLogTime ? (
+            <p style={{ color: colors.muted2, fontSize: 12, margin: '10px 0 0' }}>
+              {ticketHours > 0
+                ? `${hoursLabel(ticketHours)} logged on this ticket so far. `
+                : 'No time logged on this ticket yet. '}
+              Time goes on the client's hours as support.
+            </p>
+          ) : null}
           {!internal ? (
             <p style={{ color: colors.muted2, fontSize: 12, margin: '10px 0 0' }}>
               Replies are logged here and on the account timeline. Send the message itself by email or WhatsApp as usual.

@@ -1,5 +1,5 @@
 import { currentAuthMode, db } from './db'
-import { isMissingRelationError } from './errors'
+import { isMissingRelationError, isUndefinedColumnError } from './errors'
 import { BUILD_STAGES, DEFAULT_PACKAGES, monthKey } from './delivery'
 import type {
   BuildStage,
@@ -167,21 +167,37 @@ export async function listTimeEntries(accountId?: string, sinceDate?: string): P
   return rows<TimeEntry>(q.order('date', { ascending: false }))
 }
 
+export async function listTicketTime(ticketId: string): Promise<TimeEntry[]> {
+  const { data, error } = await db.from('time_entries').select('*').eq('ticket_id', ticketId)
+  // Before the ticket time migration runs the column is missing: show nothing.
+  if (error) {
+    if (isMissingRelationError(error) || isUndefinedColumnError(error)) return []
+    throw error
+  }
+  return (data || []) as TimeEntry[]
+}
+
 export async function addTimeEntry(
   accountId: string,
-  input: Pick<TimeEntry, 'date' | 'hours' | 'category' | 'note'>,
+  input: Pick<TimeEntry, 'date' | 'hours' | 'category' | 'note'> & { ticket_id?: string | null },
   author: Author,
 ): Promise<void> {
-  check(
-    await db.from('time_entries').insert({
-      ...input,
-      id: crypto.randomUUID(),
-      account_id: accountId,
-      user_id: author.appUserId,
-      user_email: author.email,
-      created_at: new Date().toISOString(),
-    }),
-  )
+  const row = {
+    ...input,
+    id: crypto.randomUUID(),
+    account_id: accountId,
+    user_id: author.appUserId,
+    user_email: author.email,
+    created_at: new Date().toISOString(),
+  }
+  const result = await db.from('time_entries').insert(row)
+  if (result.error && row.ticket_id && isUndefinedColumnError(result.error)) {
+    // The ticket link column is not there yet: still log the hours.
+    const { ticket_id: _ticket, ...rest } = row
+    check(await db.from('time_entries').insert(rest))
+    return
+  }
+  check(result)
 }
 
 export async function deleteTimeEntry(id: string): Promise<void> {

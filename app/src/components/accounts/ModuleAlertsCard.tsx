@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { format, parseISO, startOfMonth, subMonths } from 'date-fns'
-import { Briefcase, Church, Handshake, LifeBuoy, Scale } from 'lucide-react'
+import { Briefcase, Church, Clock, Handshake, LifeBuoy, Scale } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useSettings } from '../../contexts/SettingsContext'
 import { listAccounts } from '../../lib/accountsStore'
@@ -14,6 +14,7 @@ import { currentContract, listContracts, listPackages, listTimeEntries, listUsag
 import { formatAED } from '../../lib/money'
 import { can } from '../../lib/permissions'
 import { slaState } from '../../lib/sla'
+import { clientsWithoutHoursThisWeek, isHoursReminderDay } from '../../lib/timeTracking'
 import { isOpenTicket } from '../../lib/support'
 import { listTickets } from '../../lib/supportStore'
 import { billingLabel, churchView, hasBillingIssue, renewalSoon } from '../../lib/worshiphub'
@@ -29,10 +30,12 @@ type Data = {
   overdueDeals: Line[]
   staleDeals: Line[]
   churches: Line[]
+  /** Only filled from Friday to Sunday: clients with no hours since Monday. */
+  noHours: Line[] | null
   costs: MonthCosts | null
 }
 
-const EMPTY: Data = { clients: [], tickets: [], overdueDeals: [], staleDeals: [], churches: [], costs: null }
+const EMPTY: Data = { clients: [], tickets: [], overdueDeals: [], staleDeals: [], churches: [], noHours: null, costs: null }
 
 /**
  * Dashboard view across the RR Central modules: AI CRM clients, support SLA,
@@ -85,6 +88,16 @@ export default function ModuleAlertsCard() {
             tone: overHours || renewal?.kind === 'ended' ? colors.danger : colors.warn,
           })
         }
+
+        const noHours: Line[] | null = isHoursReminderDay(now)
+          ? clientsWithoutHoursThisWeek({ accounts, contracts, entries, today: now }).map((a) => ({
+              key: a.id,
+              to: `/accounts/${a.id}`,
+              name: a.name,
+              detail: 'no hours logged since Monday',
+              tone: colors.warn,
+            }))
+          : null
 
         const ticketLines: Line[] = tickets
           .filter(isOpenTicket)
@@ -156,7 +169,7 @@ export default function ModuleAlertsCard() {
             })
           : null
 
-        if (alive) setData({ clients, tickets: ticketLines, overdueDeals, staleDeals, churches, costs })
+        if (alive) setData({ clients, tickets: ticketLines, overdueDeals, staleDeals, churches, noHours, costs })
       } catch {
         if (alive) setData(EMPTY)
       }
@@ -179,6 +192,10 @@ export default function ModuleAlertsCard() {
     >
       <Panel icon={<Briefcase size={18} />} title="AI CRM clients" link="/accounts?type=ai_crm_client" lines={data.clients}
         empty="No client is over hours or due for renewal in the next 60 days." />
+      {data.noHours ? (
+        <Panel icon={<Clock size={18} />} title="Friday check: hours this week" link="/accounts?type=ai_crm_client"
+          lines={data.noHours} empty="Every client on a running contract has hours logged this week." />
+      ) : null}
       <Panel icon={<LifeBuoy size={18} />} title="Tickets near or past their reply time" link="/support" lines={data.tickets}
         empty="Every open ticket is on time." />
       <Panel icon={<Handshake size={18} />} title="CTRM Next" link="/ctrm" lines={[]} empty="">

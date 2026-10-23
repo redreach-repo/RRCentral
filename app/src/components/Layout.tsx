@@ -29,9 +29,13 @@ import {
   LifeBuoy,
   Handshake,
   Church,
+  Timer,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders'
+import { useFridayHoursReminder } from '../hooks/useFridayHoursReminder'
+import { useRunningTimer } from '../hooks/useRunningTimer'
+import { elapsedLabel } from '../lib/timeTracking'
 import { useRecurringDeductionsSync } from '../hooks/useRecurringDeductionsSync'
 import { usePhoneShell } from '../hooks/useMediaQuery'
 import { roleAtLeast } from '../lib/permissions'
@@ -172,6 +176,8 @@ export default function Layout() {
   const navigate = useNavigate()
   const phoneShell = usePhoneShell()
   const reminders = useFollowUpReminders(user?.email)
+  const { timer, now } = useRunningTimer(user?.email)
+  useFridayHoursReminder(Boolean(user) && userRole !== 'viewer', reminders.permission)
   // Only roles that write to Finance should top up monthly deductions.
   useRecurringDeductionsSync(Boolean(user) && roleAtLeast(userRole, 'sales'))
   const phoneNav = userRole === 'staff' ? staffPhoneNav : phonePrimaryNav
@@ -279,6 +285,18 @@ export default function Layout() {
           </div>
 
           <div className={styles.topbarRight}>
+            {timer ? (
+              <NavLink
+                to={`/accounts/${timer.accountId}`}
+                className={styles.timerChip}
+                title={`Timer running on ${timer.accountName}. Open the client to stop it.`}
+                aria-label={`Timer running on ${timer.accountName}, ${elapsedLabel(timer.startedAt, now)}`}
+              >
+                <Timer size={15} />
+                <span className={styles.timerChipName}>{timer.accountName}</span>
+                <span>{elapsedLabel(timer.startedAt, now)}</span>
+              </NavLink>
+            ) : null}
             <button
               type="button"
               className={styles.reminderBtn}

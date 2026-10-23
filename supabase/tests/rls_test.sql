@@ -322,6 +322,7 @@ select pg_temp.expect(not pg_temp.fails($q$insert into tickets (account_id, subj
 select pg_temp.expect(pg_temp.fails(format('insert into tickets (account_id, subject) values (%L, %L)', :'church_id', 'Sneaky')), 'staff cannot open a ticket on another account');
 select pg_temp.expect(pg_temp.fails($q$insert into tickets (account_id, subject) values (null, 'No account')$q$), 'staff cannot open an unfiled ticket');
 select pg_temp.expect(not pg_temp.fails($q$insert into ticket_messages (ticket_id, author_kind, author_user_id, body) select id, 'user', public.rr_current_user_id(), 'On it' from tickets where subject = 'Clinic bot down'$q$), 'staff replies on own ticket');
+select pg_temp.expect(not pg_temp.fails($q$insert into time_entries (account_id, user_id, hours, category, ticket_id) select account_id, public.rr_current_user_id(), 0.25, 'support', id from tickets where subject = 'Clinic bot down'$q$), 'staff logs ticket time on own ticket');
 select pg_temp.expect(pg_temp.fails($q$insert into ticket_messages (ticket_id, author_kind, body) select id, 'contact', 'Fake client words' from tickets where subject = 'Clinic bot down'$q$), 'staff cannot post as the client');
 select pg_temp.expect(pg_temp.fails($q$insert into ticket_messages (ticket_id, author_kind, author_user_id, body) select id, 'user', (select id from app_users where email = 'alfred@redreach.ae'), 'x' from tickets where subject = 'Clinic bot down'$q$), 'staff cannot reply as someone else');
 update tickets set status = 'closed';
