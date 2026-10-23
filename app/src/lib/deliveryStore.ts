@@ -1,6 +1,6 @@
 import { currentAuthMode, db } from './db'
 import { isMissingRelationError, isUndefinedColumnError } from './errors'
-import { BUILD_STAGES, DEFAULT_PACKAGES, monthKey } from './delivery'
+import { BUILD_STAGES, DEFAULT_PACKAGES, currentContract, monthKey } from './delivery'
 import type {
   BuildStage,
   Contract,
@@ -69,11 +69,8 @@ export async function listContracts(accountId?: string): Promise<Contract[]> {
   return rows<Contract>(q.order('created_at', { ascending: false }))
 }
 
-/** The contract that counts for a client: the newest active one, else the newest. */
-export function currentContract(contracts: Contract[]): Contract | null {
-  const sorted = [...contracts].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
-  return sorted.find((c) => c.status === 'active') ?? sorted[0] ?? null
-}
+// Kept here for existing imports; the rule lives in delivery.ts.
+export { currentContract }
 
 export type ContractInput = Omit<Contract, 'id' | 'account_id' | 'created_at' | 'updated_at'>
 

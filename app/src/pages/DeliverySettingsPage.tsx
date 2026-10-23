@@ -7,6 +7,7 @@ import EmptyState from '../components/EmptyState'
 import SupportSettingsCard from '../components/support/SupportSettingsCard'
 import ContractInvoiceSettingsCard from '../components/invoices/ContractInvoiceSettingsCard'
 import UsageImportCard from '../components/accounts/UsageImportCard'
+import DailyDigestCard from '../components/accounts/DailyDigestCard'
 import { DEFAULT_DELIVERY_RATES, DELIVERY_RATE_KEYS, type DeliveryRates, ratesFromSettings } from '../lib/delivery'
 import { listPackages, updatePackage } from '../lib/deliveryStore'
 import { can } from '../lib/permissions'
@@ -181,6 +182,8 @@ export default function DeliverySettingsPage() {
       <ContractInvoiceSettingsCard />
 
       <UsageImportCard />
+
+      {canPackages ? <DailyDigestCard /> : null}
 
       <SupportSettingsCard canPolicies={can(userRole, 'support.policies')} canWeek={can(userRole, 'support.workingWeek')} />
 

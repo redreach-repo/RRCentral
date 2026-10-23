@@ -512,3 +512,37 @@ set role authenticated;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
 select pg_temp.expect(pg_temp.fails($q$insert into usage_sources (account_id) select id from accounts where name = 'Other Trading House'$q$), 'sales cannot set usage sources');
 reset role;
+
+------------------------------------------------------------ Daily digest (roadmap item 4)
+insert into digest_recipients (name, email, by_email) values ('Alfred', 'alfred@redreach.ae', true);
+insert into digest_runs (run_date, trigger, item_count) values ('2026-11-02', 'schedule', 4);
+select pg_temp.expect(pg_temp.fails($q$insert into digest_runs (run_date, trigger) values ('2026-11-02', 'schedule')$q$), 'the schedule sends one digest a day');
+select pg_temp.expect(not pg_temp.fails($q$insert into digest_runs (run_date, trigger) values ('2026-11-02', 'manual')$q$), 'send now works on a day the schedule already ran');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from digest_recipients) = 0, 'staff cannot see the digest list');
+select pg_temp.expect(pg_temp.fails($q$insert into digest_recipients (email) values ('someone@example.com')$q$), 'staff cannot join the digest list');
+select pg_temp.expect((select count(*) from digest_runs) = 0, 'staff cannot see digest runs');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from digest_recipients) = 0, 'sales cannot see the digest list');
+select pg_temp.expect(pg_temp.fails($q$insert into digest_recipients (email) values ('someone@example.com')$q$), 'sales cannot change the digest list');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from digest_recipients) = 0, 'viewer cannot see the digest list');
+select pg_temp.expect((select count(*) from digest_runs) = 0, 'viewer cannot see digest runs');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect((select count(*) from digest_recipients) = 1, 'manager sees the digest list');
+select pg_temp.expect(not pg_temp.fails($q$insert into digest_recipients (name, whatsapp_phone, by_email, by_whatsapp) values ('Ops', '971501234567', false, true)$q$), 'manager adds to the digest list');
+select pg_temp.expect(not pg_temp.fails($q$delete from digest_recipients where name = 'Ops'$q$), 'manager removes from the digest list');
+select pg_temp.expect((select count(*) from digest_runs) = 2, 'manager sees digest runs');
+select pg_temp.expect(pg_temp.fails($q$insert into digest_runs (run_date) values ('2026-11-03')$q$), 'only the digest function logs runs');
+reset role;

@@ -6,6 +6,8 @@
 //   so only the agreed account level fields ever leave the function.
 // * usage-import gets the usage parsing and update rules (src/lib/usageImport.ts),
 //   so the import and the app agree on what is imported and what is left alone.
+// * daily-digest gets the digest rules (src/lib/dailyDigest.ts), so the
+//   morning message matches the preview and the dashboard.
 //
 //   npm run build:support-fn              # regenerate
 //   npm run build:support-fn -- --check   # CI: fail if a bundle is stale
@@ -19,6 +21,7 @@ const bundles = [
   { entry: 'src/lib/sla.ts', out: '../supabase/functions/support-email-in/sla.bundle.js' },
   { entry: 'src/lib/worshiphub.ts', out: '../supabase/functions/worshiphub-read/worshiphub.bundle.js' },
   { entry: 'src/lib/usageImport.ts', out: '../supabase/functions/usage-import/usageImport.bundle.js' },
+  { entry: 'src/lib/dailyDigest.ts', out: '../supabase/functions/daily-digest/dailyDigest.bundle.js' },
 ]
 
 let stale = false

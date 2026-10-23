@@ -126,6 +126,13 @@ Adds `usage_sources` (per client WhatsApp numbers and Anthropic workspace),
 Function pulls WhatsApp counts from Meta and AI spend from Anthropic. Setup,
 secrets and the daily schedule: [usage-import.md](usage-import.md).
 
+### Daily digest (roadmap item 4, `20261101090000_daily_digest.sql`)
+
+Adds `digest_recipients` (who gets the digest, by email and/or WhatsApp) and
+`digest_runs`. The `daily-digest` Edge Function sends tickets near breach,
+renewals in 60 days, overdue CTRM next actions and clients over hours each
+morning. Setup, WhatsApp template and schedule: [daily-digest.md](daily-digest.md).
+
 ## Roles
 
 Roles live on `app_users.role`. RLS in the database and `app/src/lib/permissions.ts`
