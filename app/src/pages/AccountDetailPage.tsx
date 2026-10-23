@@ -7,6 +7,7 @@ import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import StatusPill from '../components/StatusPill'
 import AccountFormModal from '../components/accounts/AccountFormModal'
+import DeliveryPanel from '../components/accounts/DeliveryPanel'
 import { db } from '../lib/db'
 import {
   ACTIVITY_KINDS,
@@ -517,6 +518,10 @@ export default function AccountDetailPage() {
           )}
         </section>
       </div>
+
+      {account.type === 'ai_crm_client' ? (
+        <DeliveryPanel account={account} editable={editable} userRole={userRole} team={team} author={author} />
+      ) : null}
 
       {seesMoney ? (
         <section style={{ ...cardStyle, marginTop: 16 }}>

@@ -18,6 +18,10 @@ export type Permission =
   | 'accounts.write'
   | 'accounts.reassign'
   | 'accounts.delete'
+  | 'delivery.contracts'
+  | 'delivery.packages'
+  | 'delivery.rates'
+  | 'delivery.profitability'
 
 /**
  * Hierarchy: admin > manager > sales, plus two restricted roles
@@ -48,6 +52,10 @@ const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     'accounts.write',
     'accounts.reassign',
     'accounts.delete',
+    'delivery.contracts',
+    'delivery.packages',
+    'delivery.rates',
+    'delivery.profitability',
   ]),
   manager: new Set<Permission>([
     'crm.reassignOwner',
@@ -60,12 +68,16 @@ const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     'accounts.write',
     'accounts.reassign',
     'accounts.delete',
+    'delivery.contracts',
+    'delivery.packages',
+    'delivery.profitability',
   ]),
   sales: new Set<Permission>([
     'finance.reports',
     'legacy.access',
     'accounts.viewAll',
     'accounts.write',
+    'delivery.contracts',
   ]),
   staff: new Set<Permission>(['accounts.write']),
   viewer: new Set<Permission>(['legacy.access', 'accounts.viewAll']),

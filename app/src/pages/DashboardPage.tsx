@@ -38,6 +38,7 @@ import { displayDocumentReference } from '../lib/documents'
 import { listCompanyDocuments } from '../lib/companyDocs'
 import { companyDocAlertLabel, companyDocExpiryAlerts } from '../lib/companyDocAlerts'
 import { listOwnedDomains } from '../lib/domains'
+import DeliveryAlertsCard from '../components/accounts/DeliveryAlertsCard'
 import { domainAlertLabel, domainRenewalAlerts } from '../lib/domainAlerts'
 import { syncUnansweredQuoteFollowUps } from '../lib/quoteFollowUpSync'
 import { useSettings } from '../contexts/SettingsContext'
@@ -405,6 +406,8 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      <DeliveryAlertsCard />
 
       {domainAlerts.length > 0 || ownedDomains.length > 0 ? (
         <div style={{ ...cardStyle, marginBottom: 16 }}>

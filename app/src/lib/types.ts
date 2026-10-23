@@ -868,3 +868,107 @@ export interface AccountActivity {
   body: string
   created_at: string
 }
+
+/** AI CRM package catalogue row (editable in Packages and rates). */
+export interface DeliveryPackage {
+  id: string
+  code: string
+  name: string
+  monthly_fee_a: number
+  setup_fee_b: number
+  monthly_fee_b: number
+  target_hours: number
+  build_hours_target: number
+  included_whatsapp: number
+  support_response: string
+  support_response_days: number
+  ai_cap_usd: number | null
+  included_lead_credits_usd: number | null
+  tool_cost_aed: number
+  sort: number
+  active: boolean
+  updated_at: string
+}
+
+export type ContractStatus = 'draft' | 'active' | 'ended' | 'cancelled'
+
+export interface Contract {
+  id: string
+  account_id: string
+  package_id: string | null
+  option: 'A' | 'B'
+  monthly_fee: number
+  setup_fee: number
+  setup_fee_paid: number
+  term_start: string | null
+  term_end: string | null
+  discount_percent: number
+  discount_months_left: number
+  annual_prepay: boolean
+  status: ContractStatus
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
+export type BuildStageKey =
+  | 'discovery'
+  | 'requirements_signed_off'
+  | 'build'
+  | 'whatsapp_setup'
+  | 'testing'
+  | 'live'
+
+export type BuildStageStatus = 'not_started' | 'in_progress' | 'blocked' | 'done'
+
+export interface BuildStage {
+  id: string
+  account_id: string
+  stage: BuildStageKey
+  status: BuildStageStatus
+  owner_user_id: string | null
+  due_date: string | null
+  blocker_note: string
+  completed_at: string | null
+  created_at: string
+}
+
+export type RequirementStatus = 'open' | 'agreed' | 'built' | 'changed'
+
+export interface Requirement {
+  id: string
+  account_id: string
+  title: string
+  detail: string
+  status: RequirementStatus
+  source: string
+  is_change_request: boolean
+  created_by: string
+  created_at: string
+}
+
+export type TimeCategory = 'build' | 'support' | 'reporting' | 'leads' | 'content' | 'admin'
+
+export interface TimeEntry {
+  id: string
+  account_id: string
+  user_id: string | null
+  user_email: string
+  date: string
+  hours: number
+  category: TimeCategory
+  note: string
+  created_at: string
+}
+
+export interface UsageRecord {
+  id: string
+  account_id: string
+  /** First day of the month, YYYY-MM-01. */
+  month: string
+  whatsapp_marketing_count: number
+  whatsapp_service_count: number
+  ai_cost_usd: number
+  lead_credits_cost_usd: number
+  updated_at: string
+}

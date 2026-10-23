@@ -1,0 +1,121 @@
+.page {
+  min-height: 100vh;
+  background: #e9eaec;
+  padding: 24px 16px 48px;
+  font-family: 'DM Sans', system-ui, sans-serif;
+}
+
+.toolbar {
+  max-width: 820px;
+  margin: 0 auto 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toolbar a,
+.toolbar button,
+.toolbar input {
+  font: inherit;
+  font-size: 14px;
+}
+
+.sheet {
+  max-width: 820px;
+  margin: 0 auto;
+  background: #fff;
+  color: #1c1f24;
+  padding: 40px 44px;
+  border-radius: 6px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  line-height: 1.5;
+}
+
+.sheet h1 {
+  font-size: 24px;
+  margin: 0 0 4px;
+}
+
+.sheet h2 {
+  font-size: 15px;
+  margin: 28px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid #e85d04;
+}
+
+.muted {
+  color: #5c6370;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid #e3e5e8;
+}
+
+.table td.num,
+.table th.num {
+  text-align: right;
+}
+
+.plan {
+  width: 100%;
+  min-height: 80px;
+  font: inherit;
+  font-size: 13px;
+  border: 1px dashed #c7cbd1;
+  border-radius: 6px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.planPrint {
+  display: none;
+  white-space: pre-wrap;
+  font-size: 13px;
+}
+
+@media (max-width: 600px) {
+  .sheet {
+    padding: 24px 18px;
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  .page {
+    background: #fff;
+    padding: 0;
+  }
+
+  .toolbar {
+    display: none;
+  }
+
+  .sheet {
+    box-shadow: none;
+    padding: 0;
+    max-width: none;
+  }
+
+  .plan {
+    display: none;
+  }
+
+  .planPrint {
+    display: block;
+  }
+}
