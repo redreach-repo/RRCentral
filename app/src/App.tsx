@@ -34,6 +34,7 @@ import CustomerFilesPage from './pages/CustomerFilesPage'
 import SettingsPage from './pages/SettingsPage'
 import AuditLogPage from './pages/AuditLogPage'
 import DocumentPage from './pages/DocumentPage'
+import ClientPortalPage from './pages/ClientPortalPage'
 import ShopLayout from './shop/ShopLayout'
 import ShopHomePage from './shop/pages/ShopHomePage'
 import ShopListingPage from './shop/pages/ShopListingPage'
@@ -74,6 +75,8 @@ export default function App() {
             </Route>
             <Route path="teetribe" element={<Navigate to="/shop" replace />} />
             <Route path="/login" element={<LoginPage />} />
+            {/* Clients open this from a private link; no sign in. */}
+            <Route path="/portal" element={<ClientPortalPage />} />
             <Route
               path="/ctrm/summary"
               element={
