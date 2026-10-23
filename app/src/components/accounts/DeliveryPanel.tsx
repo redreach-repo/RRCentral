@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { format, parseISO } from 'date-fns'
+import { addMonths, format, parseISO } from 'date-fns'
 import { AlertTriangle, CalendarClock, Clock, FileText, Pencil, Play, Plus, Square, Trash2 } from 'lucide-react'
 import Modal from '../Modal'
 import { useCompactCrm } from '../../hooks/useMediaQuery'
@@ -49,6 +49,7 @@ import {
   updateStage,
 } from '../../lib/deliveryStore'
 import { logAccountEvent } from '../../lib/accountsStore'
+import { listContractInvoices, runContractBilling, skipSetupInvoice } from '../../lib/contractBillingStore'
 import { can } from '../../lib/permissions'
 import { errorMessage } from '../../lib/errors'
 import { formatAED } from '../../lib/money'
@@ -59,6 +60,7 @@ import type {
   BuildStage,
   BuildStageStatus,
   Contract,
+  ContractInvoice,
   DeliveryPackage,
   Requirement,
   RequirementStatus,
@@ -144,6 +146,8 @@ function emptyContract(pkg: DeliveryPackage | undefined): ContractInput {
     annual_prepay: false,
     status: 'active',
     notes: '',
+    auto_invoice: true,
+    billing_from: null,
   }
 }
 
@@ -157,6 +161,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
   const [requirements, setRequirements] = useState<Requirement[]>([])
   const [entries, setEntries] = useState<TimeEntry[]>([])
   const [usage, setUsage] = useState<UsageRecord[]>([])
+  const [raisedInvoices, setRaisedInvoices] = useState<ContractInvoice[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [contractForm, setContractForm] = useState<{ id?: string; form: ContractInput } | null>(null)
@@ -179,14 +184,16 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
 
   const load = useCallback(async () => {
     try {
-      const [p, c, s, r, t, u] = await Promise.all([
+      const [p, c, s, r, t, u, ci] = await Promise.all([
         listPackages(),
         listContracts(account.id),
         listStages(account.id),
         listRequirements(account.id),
         listTimeEntries(account.id),
         listUsage(account.id),
+        can(userRole, 'delivery.contracts') ? listContractInvoices(account.id) : Promise.resolve([]),
       ])
+      setRaisedInvoices(ci.filter((x) => x.invoice_id))
       setPackages(p)
       setContracts(c)
       setRequirements(r)
@@ -203,7 +210,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
     } finally {
       setLoading(false)
     }
-  }, [account.id, editable, showToast])
+  }, [account.id, editable, showToast, userRole])
 
   useEffect(() => {
     void load()
@@ -284,6 +291,8 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
               annual_prepay: contract.annual_prepay,
               status: contract.status,
               notes: contract.notes,
+              auto_invoice: Boolean(contract.auto_invoice),
+              billing_from: contract.billing_from ?? null,
             },
           }
         : { form: emptyContract(growth) },
@@ -308,8 +317,11 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
     if (!contractForm) return
     const f = contractForm.form
     const isNew = !contractForm.id
+    const before = contracts.find((c) => c.id === contractForm.id)
+    const switchedOn = Boolean(f.auto_invoice) && !isNew && !before?.auto_invoice
+    let raised = 0
     await run(async () => {
-      await saveContract(
+      const contractId = await saveContract(
         account.id,
         {
           ...f,
@@ -320,9 +332,20 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
           discount_months_left: Math.max(0, Math.floor(Number(f.discount_months_left) || 0)),
           term_start: f.term_start || null,
           term_end: f.term_end || null,
+          billing_from: f.auto_invoice ? f.billing_from || null : null,
         },
         contractForm.id,
       )
+      if (f.auto_invoice) {
+        // A running contract switched on later starts with monthly invoices;
+        // its setup fee was already handled by hand.
+        if (switchedOn && before) await skipSetupInvoice(before)
+        try {
+          raised = (await runContractBilling({ rates, settings, author, contractId })).raised
+        } catch (e) {
+          showToast(errorMessage(e, 'Contract saved, but its invoice could not be raised. It will be tried again next time.'), 'error')
+        }
+      }
       const name = packages.find((p) => p.id === f.package_id)?.name ?? 'custom'
       await logAccountEvent(
         account.id,
@@ -332,6 +355,9 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
         author,
       )
       setContractForm(null)
+      if (raised > 0) {
+        showToast(`Contract saved. ${raised} draft invoice${raised === 1 ? '' : 's'} raised on Invoices.`, 'success')
+      }
     }, 'Could not save the contract')
   }
 
@@ -566,6 +592,25 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
               </dd>
               <dt style={{ color: colors.muted }}>Early exit</dt>
               <dd style={{ margin: 0 }}>{formatAED(earlyExitFee(contract))}</dd>
+              {canContracts ? (
+                <>
+                  <dt style={{ color: colors.muted }}>Invoices</dt>
+                  <dd style={{ margin: 0 }}>
+                    {contract.auto_invoice ? 'Raised automatically' : 'Raised by hand'}
+                    {contract.auto_invoice && contract.billing_from
+                      ? `, monthly from ${monthLabel(contract.billing_from)}`
+                      : ''}
+                    {raisedInvoices.length ? (
+                      <>
+                        .{' '}
+                        <Link to={`/invoices?account=${account.id}`} style={{ color: colors.text }}>
+                          {raisedInvoices.length} raised so far
+                        </Link>
+                      </>
+                    ) : null}
+                  </dd>
+                </>
+              ) : null}
               {pkg ? (
                 <>
                   <dt style={{ color: colors.muted }}>Support</dt>
@@ -1094,6 +1139,40 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
               />
               Paid a year in advance
             </label>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginBottom: 8 }}>
+              <input
+                type="checkbox"
+                checked={Boolean(contractForm.form.auto_invoice)}
+                onChange={(e) => {
+                  const on = e.target.checked
+                  setContractField('auto_invoice', on)
+                  // Switching on for a running contract: start next month, so this month is not billed twice.
+                  if (on && contractForm.id && !contractForm.form.billing_from) {
+                    setContractField('billing_from', monthKey(addMonths(new Date(), 1)))
+                  }
+                }}
+              />
+              Raise invoices automatically
+            </label>
+            {contractForm.form.auto_invoice ? (
+              <div style={{ ...fieldStyle, marginBottom: 8 }}>
+                <label style={labelStyle} htmlFor="c-billing-from">
+                  First monthly invoice
+                </label>
+                <input
+                  id="c-billing-from"
+                  type="month"
+                  style={{ ...inputStyle, maxWidth: 200 }}
+                  value={(contractForm.form.billing_from || contractForm.form.term_start || '').slice(0, 7)}
+                  onChange={(e) => setContractField('billing_from', e.target.value ? `${e.target.value}-01` : null)}
+                />
+              </div>
+            ) : null}
+            <p style={{ ...mutedNote, fontSize: 12, marginBottom: 14 }}>
+              {contractForm.form.auto_invoice
+                ? `${contractForm.id ? '' : 'When you save, the setup fee (if any) and the first month are invoiced. '}Each month a draft invoice is raised with that month's fee and last month's WhatsApp, AI and lead credit use over the plan. Drafts wait on Invoices for you to check and send.`
+                : 'Turn this on to have the setup fee and monthly invoices raised as drafts for you.'}
+            </p>
             <p style={{ ...mutedNote, fontSize: 12, marginBottom: 14 }}>
               Prices exclude 5% VAT. Early exit fee with these numbers:{' '}
               {formatAED(

@@ -33,12 +33,13 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders'
+import { useContractBillingSync } from '../hooks/useContractBillingSync'
 import { useFridayHoursReminder } from '../hooks/useFridayHoursReminder'
 import { useRunningTimer } from '../hooks/useRunningTimer'
 import { elapsedLabel } from '../lib/timeTracking'
 import { useRecurringDeductionsSync } from '../hooks/useRecurringDeductionsSync'
 import { usePhoneShell } from '../hooks/useMediaQuery'
-import { roleAtLeast } from '../lib/permissions'
+import { can, roleAtLeast } from '../lib/permissions'
 import type { UserRole } from '../lib/types'
 import BrandLogo from './BrandLogo'
 import styles from './Layout.module.css'
@@ -178,6 +179,7 @@ export default function Layout() {
   const reminders = useFollowUpReminders(user?.email)
   const { timer, now } = useRunningTimer(user?.email)
   useFridayHoursReminder(Boolean(user) && userRole !== 'viewer', reminders.permission)
+  useContractBillingSync(Boolean(user) && can(userRole, 'delivery.contracts'))
   // Only roles that write to Finance should top up monthly deductions.
   useRecurringDeductionsSync(Boolean(user) && roleAtLeast(userRole, 'sales'))
   const phoneNav = userRole === 'staff' ? staffPhoneNav : phonePrimaryNav

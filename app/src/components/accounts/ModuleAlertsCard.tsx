@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { format, parseISO, startOfMonth, subMonths } from 'date-fns'
-import { Briefcase, Church, Clock, Handshake, LifeBuoy, Scale } from 'lucide-react'
+import { BellRing, Briefcase, Church, Clock, Handshake, LifeBuoy, Scale } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useSettings } from '../../contexts/SettingsContext'
 import { listAccounts } from '../../lib/accountsStore'
@@ -12,7 +12,8 @@ import { db } from '../../lib/db'
 import { HOURS_ALERT_MESSAGE, hoursAlert, monthLabel, ratesFromSettings, renewalFlag, renewalLabel } from '../../lib/delivery'
 import { currentContract, listContracts, listPackages, listTimeEntries, listUsage } from '../../lib/deliveryStore'
 import { formatAED } from '../../lib/money'
-import { can } from '../../lib/permissions'
+import { can, roleAtLeast } from '../../lib/permissions'
+import { listDueReminders } from '../../lib/contractBillingStore'
 import { slaState } from '../../lib/sla'
 import { clientsWithoutHoursThisWeek, isHoursReminderDay } from '../../lib/timeTracking'
 import { isOpenTicket } from '../../lib/support'
@@ -32,10 +33,12 @@ type Data = {
   churches: Line[]
   /** Only filled from Friday to Sunday: clients with no hours since Monday. */
   noHours: Line[] | null
+  /** Late invoices with a 3, 7 or 14 day reminder due. Null when not shown. */
+  reminders: Line[] | null
   costs: MonthCosts | null
 }
 
-const EMPTY: Data = { clients: [], tickets: [], overdueDeals: [], staleDeals: [], churches: [], noHours: null, costs: null }
+const EMPTY: Data = { clients: [], tickets: [], overdueDeals: [], staleDeals: [], churches: [], noHours: null, reminders: null, costs: null }
 
 /**
  * Dashboard view across the RR Central modules: AI CRM clients, support SLA,
@@ -46,6 +49,7 @@ export default function ModuleAlertsCard() {
   const { settings } = useSettings()
   const rates = useMemo(() => ratesFromSettings(settings), [settings])
   const seesMoney = can(userRole, 'delivery.profitability')
+  const chasesPayments = roleAtLeast(userRole, 'sales')
   const [data, setData] = useState<Data | null>(null)
 
   useEffect(() => {
@@ -67,6 +71,16 @@ export default function ModuleAlertsCard() {
             fetchLiveTenants(),
             seesMoney ? db.from('invoices').select('*') : Promise.resolve({ data: [] }),
           ])
+        const dueReminders = chasesPayments ? await listDueReminders(now).catch(() => []) : null
+        const reminders: Line[] | null = dueReminders
+          ? dueReminders.map((r) => ({
+              key: r.invoice.id,
+              to: '/invoices',
+              name: r.invoice.client || r.invoice.reference_number,
+              detail: `${r.invoice.reference_number}, ${formatAED(r.balance)}, ${r.due.daysLate} days late`,
+              tone: r.due.stage === 14 ? colors.danger : colors.warn,
+            }))
+          : null
         const nameOf = new Map(accounts.map((a) => [a.id, a.name]))
 
         const clients: Line[] = []
@@ -169,7 +183,7 @@ export default function ModuleAlertsCard() {
             })
           : null
 
-        if (alive) setData({ clients, tickets: ticketLines, overdueDeals, staleDeals, churches, noHours, costs })
+        if (alive) setData({ clients, tickets: ticketLines, overdueDeals, staleDeals, churches, noHours, reminders, costs })
       } catch {
         if (alive) setData(EMPTY)
       }
@@ -177,7 +191,7 @@ export default function ModuleAlertsCard() {
     return () => {
       alive = false
     }
-  }, [rates, seesMoney])
+  }, [rates, seesMoney, chasesPayments])
 
   if (!data) return null
 
@@ -195,6 +209,10 @@ export default function ModuleAlertsCard() {
       {data.noHours ? (
         <Panel icon={<Clock size={18} />} title="Friday check: hours this week" link="/accounts?type=ai_crm_client"
           lines={data.noHours} empty="Every client on a running contract has hours logged this week." />
+      ) : null}
+      {data.reminders ? (
+        <Panel icon={<BellRing size={18} />} title="Payment reminders due" link="/invoices" lines={data.reminders}
+          empty="No invoice is 3, 7 or 14 days late without a reminder." />
       ) : null}
       <Panel icon={<LifeBuoy size={18} />} title="Tickets near or past their reply time" link="/support" lines={data.tickets}
         empty="Every open ticket is on time." />

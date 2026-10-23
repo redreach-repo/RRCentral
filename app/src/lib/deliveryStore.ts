@@ -77,21 +77,23 @@ export function currentContract(contracts: Contract[]): Contract | null {
 
 export type ContractInput = Omit<Contract, 'id' | 'account_id' | 'created_at' | 'updated_at'>
 
-export async function saveContract(accountId: string, input: ContractInput, id?: string): Promise<void> {
+/** Save a contract and return its id. */
+export async function saveContract(accountId: string, input: ContractInput, id?: string): Promise<string> {
   const now = new Date().toISOString()
-  if (id) {
-    check(await db.from('contracts').update({ ...input, updated_at: now }).eq('id', id))
-    return
+  const newId = id ?? crypto.randomUUID()
+  const write = (row: Partial<ContractInput>) =>
+    id
+      ? db.from('contracts').update({ ...row, updated_at: now }).eq('id', id)
+      : db.from('contracts').insert({ ...row, id: newId, account_id: accountId, created_at: now, updated_at: now })
+  const result = await write(input)
+  if (result.error && isUndefinedColumnError(result.error)) {
+    // Before the contract billing migration runs, save without its two columns.
+    const { auto_invoice: _auto, billing_from: _from, ...rest } = input
+    check(await write(rest))
+    return newId
   }
-  check(
-    await db.from('contracts').insert({
-      ...input,
-      id: crypto.randomUUID(),
-      account_id: accountId,
-      created_at: now,
-      updated_at: now,
-    }),
-  )
+  check(result)
+  return newId
 }
 
 export async function listStages(accountId: string): Promise<BuildStage[]> {
