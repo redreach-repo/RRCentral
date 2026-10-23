@@ -649,3 +649,44 @@ set role authenticated;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
 select pg_temp.expect((select count(*) from tickets where requester_phone = '971501234567') = 1, 'staff sees WhatsApp tickets on their accounts');
 reset role;
+
+------------------------------------------------------------ Build templates (roadmap item 9)
+select pg_temp.expect((select count(*) from build_templates) = 3, 'three starter build templates');
+select pg_temp.expect((select count(*) from build_templates t join delivery_packages p on p.id = t.package_id) = 3, 'each starter template is linked to its package');
+select pg_temp.expect((select sum(est_hours) from build_template_items i join build_templates t on t.id = i.template_id where t.code = 'starter' and i.kind = 'task') between 10 and 14, 'starter build is about 12 hours');
+select pg_temp.expect(pg_temp.fails($q$insert into build_template_items (template_id, kind, title) select id, 'task', 'No stage' from build_templates where code = 'starter'$q$), 'a template task needs a build stage');
+insert into build_tasks (account_id, stage, title, est_hours) values (:'assigned_clinic', 'build', 'Import contacts', 1.5);
+insert into build_tasks (account_id, stage, title, est_hours) values (:'prospect_dental', 'discovery', 'Kick-off call', 1);
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from build_templates) = 3, 'staff reads build templates');
+select pg_temp.expect(pg_temp.fails($q$insert into build_templates (code, name) values ('va', 'VA build')$q$), 'staff cannot add build templates');
+select pg_temp.expect((select count(*) from build_tasks) = 1, 'staff sees the build checklist only on their accounts');
+select pg_temp.expect(not pg_temp.fails($q$update build_tasks set done = true, done_at = now() where title = 'Import contacts'$q$), 'staff ticks off a build task');
+select pg_temp.expect(not pg_temp.fails(format('insert into build_tasks (account_id, stage, title) values (%L, %L, %L)', :'assigned_clinic', 'testing', 'Test the form')), 'staff adds a build task on their account');
+select pg_temp.expect(pg_temp.fails(format('insert into build_tasks (account_id, stage, title) values (%L, %L, %L)', :'prospect_dental', 'testing', 'x')), 'staff cannot add build tasks on other accounts');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect(pg_temp.fails($q$update build_templates set name = 'Changed' where code = 'starter'$q$) or (select name from build_templates where code = 'starter') = 'Starter build', 'sales cannot change build templates');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from build_tasks) = 3, 'viewer reads build checklists');
+select pg_temp.expect(pg_temp.fails(format('insert into build_tasks (account_id, stage, title) values (%L, %L, %L)', :'assigned_clinic', 'live', 'x')), 'viewer cannot add build tasks');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect(not pg_temp.fails($q$insert into build_templates (code, name) values ('clinic', 'Clinic build')$q$), 'manager adds a build template');
+select pg_temp.expect(not pg_temp.fails($q$insert into build_template_items (template_id, kind, stage, title, est_hours) select id, 'task', 'build', 'Booking calendar', 2 from build_templates where code = 'clinic'$q$), 'manager adds a template line');
+select pg_temp.expect(not pg_temp.fails($q$delete from build_templates where code = 'clinic'$q$), 'manager removes a build template');
+reset role;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from build_templates'), 'anon cannot read build templates');
+select pg_temp.expect(pg_temp.fails('select 1 from build_tasks'), 'anon cannot read build checklists');
+reset role;

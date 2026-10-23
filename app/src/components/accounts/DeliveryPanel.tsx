@@ -4,6 +4,7 @@ import { addMonths, format, parseISO } from 'date-fns'
 import { AlertTriangle, CalendarClock, Clock, FileText, Pencil, Play, Plus, Sparkles, Square, Trash2 } from 'lucide-react'
 import Modal from '../Modal'
 import CallNotesModal from './CallNotesModal'
+import BuildChecklistCard from './BuildChecklistCard'
 import { useCompactCrm } from '../../hooks/useMediaQuery'
 import { useRunningTimer } from '../../hooks/useRunningTimer'
 import { useToast } from '../../contexts/ToastContext'
@@ -50,6 +51,7 @@ import {
   updateStage,
 } from '../../lib/deliveryStore'
 import { logAccountEvent } from '../../lib/accountsStore'
+import { buildHoursLogged } from '../../lib/buildTemplates'
 import { assistCostInMonth, type ProposedRequirement } from '../../lib/aiAssist'
 import { listAiUsage } from '../../lib/aiAssistStore'
 import { listContractInvoices, runContractBilling, skipSetupInvoice } from '../../lib/contractBillingStore'
@@ -1028,6 +1030,16 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
           ) : null}
         </section>
       </div>
+
+      <BuildChecklistCard
+        accountId={account.id}
+        canEdit={canLog}
+        pkg={pkg}
+        buildHours={buildHoursLogged(entries)}
+        requirements={requirements}
+        authorEmail={author.email}
+        onRequirementsAdded={() => void load()}
+      />
 
       <section style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>

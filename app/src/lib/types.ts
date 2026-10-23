@@ -958,6 +958,50 @@ export interface BuildStage {
   created_at: string
 }
 
+export type BuildTemplateItemKind = 'task' | 'config'
+
+/** A cloneable build checklist and starter configuration, usually one per package. */
+export interface BuildTemplate {
+  id: string
+  code: string
+  name: string
+  description: string
+  /** The package this template is for. Null = any package. */
+  package_id: string | null
+  active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface BuildTemplateItem {
+  id: string
+  template_id: string
+  /** task = a build checklist step; config = a starter configuration line, copied in as a requirement. */
+  kind: BuildTemplateItemKind
+  /** Build stage for tasks. Null for config lines. */
+  stage: BuildStageKey | null
+  title: string
+  detail: string
+  est_hours: number
+  sort: number
+}
+
+/** One build checklist step on a client, copied from a template or added by hand. */
+export interface BuildTask {
+  id: string
+  account_id: string
+  template_id: string | null
+  stage: BuildStageKey
+  title: string
+  detail: string
+  est_hours: number
+  done: boolean
+  done_at: string | null
+  done_by: string
+  sort: number
+  created_at: string
+}
+
 export type RequirementStatus = 'open' | 'agreed' | 'built' | 'changed'
 
 export interface Requirement {
