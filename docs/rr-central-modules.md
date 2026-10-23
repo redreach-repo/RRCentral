@@ -79,6 +79,22 @@ over hours or near renewal, tickets near or past their reply time, overdue and
 stale CTRM deals, churches with billing problems or renewals in 60 days, and
 this month's revenue against costs (`app/src/lib/attention.ts`).
 
+### Time logging (roadmap item 1, `20261029090000_ticket_time.sql`)
+
+Adds an optional `time_entries.ticket_id`. Three ways to keep hours honest,
+all in `app/src/lib/timeTracking.ts` with tests:
+
+- **Timer on the client page.** Start it, stop it, and the hours log
+  themselves, rounded to the nearest quarter hour (15 minutes at least). One
+  timer per person, kept in the browser so it survives a reload; the top bar
+  shows it while it runs. A timer left on for more than 10 hours is not
+  logged; the person enters the real hours instead.
+- **Log time on a ticket reply.** Pick 15 minutes to 3 hours next to the reply.
+  It goes on the client's hours as support and is linked to the ticket.
+- **Friday check.** From Friday to Sunday the dashboard lists AI CRM clients on
+  a running contract with no hours since Monday, and people who allowed
+  desktop reminders get one notification a week with the same list.
+
 ## Roles
 
 Roles live on `app_users.role`. RLS in the database and `app/src/lib/permissions.ts`

@@ -958,6 +958,8 @@ export interface TimeEntry {
   hours: number
   category: TimeCategory
   note: string
+  /** Set when the hours were logged with a ticket reply. */
+  ticket_id?: string | null
   created_at: string
 }
 

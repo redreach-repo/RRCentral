@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { AlertTriangle, CalendarClock, Clock, FileText, Pencil, Plus, Trash2 } from 'lucide-react'
+import { AlertTriangle, CalendarClock, Clock, FileText, Pencil, Play, Plus, Square, Trash2 } from 'lucide-react'
 import Modal from '../Modal'
 import { useCompactCrm } from '../../hooks/useMediaQuery'
+import { useRunningTimer } from '../../hooks/useRunningTimer'
 import { useToast } from '../../contexts/ToastContext'
 import { useSettings } from '../../contexts/SettingsContext'
 import {
@@ -51,6 +52,7 @@ import { logAccountEvent } from '../../lib/accountsStore'
 import { can } from '../../lib/permissions'
 import { errorMessage } from '../../lib/errors'
 import { formatAED } from '../../lib/money'
+import { FORGOTTEN_TIMER_HOURS, elapsedHours, elapsedLabel, hoursLabel, timerHours } from '../../lib/timeTracking'
 import type {
   Account,
   AppUser,
@@ -172,6 +174,8 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
   const canContracts = can(userRole, 'delivery.contracts')
   const compact = useCompactCrm()
   const seesProfit = can(userRole, 'delivery.profitability')
+  const { timer, now, start: startTimer, clear: clearTimer } = useRunningTimer(author.email)
+  const timerHere = timer?.accountId === account.id
 
   const load = useCallback(async () => {
     try {
@@ -347,6 +351,57 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
       setHoursForm((f) => ({ ...f, hours: '', note: '' }))
       showToast(`${hours}h logged`, 'success')
     }, 'Could not log the hours')
+  }
+
+  function startTimerHere() {
+    if (timer && !timerHere) {
+      const forgotten = elapsedHours(timer.startedAt) > FORGOTTEN_TIMER_HOURS
+      const ok = window.confirm(
+        forgotten
+          ? `Your timer on ${timer.accountName} has run for ${elapsedLabel(timer.startedAt)}, so it was probably left on. Throw it away and start a new one here?`
+          : `Your timer on ${timer.accountName} is still running. Log ${hoursLabel(timerHours(timer.startedAt))} there and start a new one here?`,
+      )
+      if (!ok) return
+      if (!forgotten) {
+        const other = timer
+        void run(async () => {
+          await addTimeEntry(
+            other.accountId,
+            { date: format(parseISO(other.startedAt), 'yyyy-MM-dd'), hours: timerHours(other.startedAt), category: other.category, note: 'Timer' },
+            author,
+          )
+          showToast(`${hoursLabel(timerHours(other.startedAt))} logged on ${other.accountName}`, 'success')
+          startTimer({ accountId: account.id, accountName: account.name, category: hoursForm.category })
+        }, `Could not log the hours on ${other.accountName}`)
+        return
+      }
+    }
+    startTimer({ accountId: account.id, accountName: account.name, category: hoursForm.category })
+  }
+
+  async function stopTimer() {
+    if (!timer || !timerHere) return
+    const started = timer.startedAt
+    const date = format(parseISO(started), 'yyyy-MM-dd')
+    if (elapsedHours(started) > FORGOTTEN_TIMER_HOURS) {
+      // Probably left running: let the person enter the real hours instead.
+      clearTimer()
+      setHoursForm((f) => ({ ...f, date, hours: '', category: timer.category }))
+      showToast(`The timer ran for ${elapsedLabel(started)}, so nothing was logged. Enter the real hours below.`, 'error')
+      document.getElementById('log-hours-input')?.focus()
+      return
+    }
+    const hours = timerHours(started)
+    await run(async () => {
+      await addTimeEntry(
+        account.id,
+        { date, hours, category: timer.category, note: hoursForm.note.trim() || 'Timer' },
+        author,
+      )
+      clearTimer()
+      setHoursForm((f) => ({ ...f, note: '' }))
+      showToast(`${hoursLabel(hours)} logged from the timer`, 'success')
+    }, 'Could not log the timer hours')
   }
 
   async function submitUsage() {
@@ -577,6 +632,64 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
             ) : null}
           </div>
           <Bar value={monthHours} max={pkg?.target_hours ?? 0} warn={Boolean(pkg && monthHours > pkg.target_hours * 0.8)} />
+          {canLog ? (
+            <div
+              aria-label="Timer"
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 8,
+                alignItems: 'center',
+                marginTop: 12,
+                padding: '10px 12px',
+                borderRadius: 10,
+                border: `1px solid ${timerHere ? 'rgba(232,93,4,0.5)' : colors.border}`,
+                background: timerHere ? 'rgba(232,93,4,0.08)' : 'transparent',
+              }}
+            >
+              {timerHere && timer ? (
+                <>
+                  <span style={{ flex: '1 1 160px', fontSize: 13 }}>
+                    <strong style={{ fontSize: 16, fontVariantNumeric: 'tabular-nums' }}>{elapsedLabel(timer.startedAt, now)}</strong>{' '}
+                    <span style={{ color: colors.muted }}>
+                      {TIME_CATEGORIES.find((c) => c.value === timer.category)?.label.toLowerCase()}, logs as{' '}
+                      {hoursLabel(timerHours(timer.startedAt, now))}
+                    </span>
+                  </span>
+                  <button type="button" style={buttonPrimaryStyle} disabled={busy} onClick={() => void stopTimer()}>
+                    <Square size={14} /> Stop and log
+                  </button>
+                  <button
+                    type="button"
+                    style={smallBtn}
+                    disabled={busy}
+                    onClick={() => window.confirm('Throw this timer away without logging it?') && clearTimer()}
+                  >
+                    Discard
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span style={{ flex: '1 1 160px', fontSize: 13, color: colors.muted }}>
+                    {timer ? (
+                      <>
+                        Your timer is running on{' '}
+                        <Link to={`/accounts/${timer.accountId}`} style={{ color: colors.text, fontWeight: 600 }}>
+                          {timer.accountName}
+                        </Link>
+                        .
+                      </>
+                    ) : (
+                      'Start the timer when you begin work. Stop it and the hours log themselves.'
+                    )}
+                  </span>
+                  <button type="button" style={buttonSecondaryStyle} disabled={busy} onClick={startTimerHere}>
+                    <Play size={14} /> {timer ? 'Start here instead' : 'Start timer'}
+                  </button>
+                </>
+              )}
+            </div>
+          ) : null}
           {canLog ? (
             <form onSubmit={(e) => void submitHours(e)} style={{ display: 'grid', gap: 8, marginTop: 12 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 8 }}>

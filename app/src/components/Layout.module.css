@@ -307,6 +307,33 @@
   background: rgba(232, 93, 4, 0.15);
 }
 
+.timerChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(232, 93, 4, 0.55);
+  background: rgba(232, 93, 4, 0.15);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.timerChipName {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shellPhone .timerChipName {
+  display: none;
+}
+
 .reminderCount {
   position: absolute;
   top: -6px;
