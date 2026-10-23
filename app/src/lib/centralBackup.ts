@@ -57,6 +57,7 @@ const CLOUD_TABLES = [
   'build_template_items',
   'build_tasks',
   'agreement_templates',
+  'report_calls',
 ] as const
 
 /** Download a JSON backup of local IndexedDB or cloud Postgres tables. */

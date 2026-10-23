@@ -38,6 +38,7 @@ export const EXPORT_TABLES: ExportTable[] = [
   { table: 'tickets', label: 'Support tickets', by: 'account_id', client: true, hideForClient: ['assignee_user_id'] },
   { table: 'ticket_messages', label: 'Support messages', by: 'ticket_id', client: true, hideForClient: ['author_user_id'] },
   { table: 'time_entries', label: 'Hours logged', by: 'account_id', client: false },
+  { table: 'report_calls', label: 'Report calls', by: 'account_id', client: false },
   { table: 'account_activities', label: 'Activity and notes', by: 'account_id', client: false },
   { table: 'sales_deals', label: 'Sales deal', by: 'account_id', client: false },
   { table: 'ctrm_deals', label: 'CTRM deals', by: 'account_id', client: false },

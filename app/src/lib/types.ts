@@ -933,6 +933,19 @@ export interface AgreementTemplate {
   updated_at: string
 }
 
+/** Whether the client joined the monthly report call (feeds the health score). */
+export interface ReportCall {
+  id: string
+  account_id: string
+  /** First day of the month, YYYY-MM-01. */
+  month: string
+  status: 'attended' | 'missed' | 'rescheduled'
+  notes: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
 export interface ContractInvoice {
   id: string
   contract_id: string

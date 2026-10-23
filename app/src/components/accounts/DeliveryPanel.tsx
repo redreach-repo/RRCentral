@@ -6,6 +6,7 @@ import Modal from '../Modal'
 import CallNotesModal from './CallNotesModal'
 import BuildChecklistCard from './BuildChecklistCard'
 import ServiceAgreementButton from './ServiceAgreementButton'
+import ClientHealthCard from './ClientHealthCard'
 import { useCompactCrm } from '../../hooks/useMediaQuery'
 import { useRunningTimer } from '../../hooks/useRunningTimer'
 import { useToast } from '../../contexts/ToastContext'
@@ -674,6 +675,8 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
             </dl>
           )}
         </section>
+
+        <ClientHealthCard account={account} editable={editable} author={author.email} />
 
         <section style={cardStyle}>
           <h2 style={sectionTitleStyle}>Build progress</h2>

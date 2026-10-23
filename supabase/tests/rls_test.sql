@@ -723,3 +723,25 @@ reset role;
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from agreement_templates'), 'anon cannot read agreement templates');
 reset role;
+
+------------------------------------------------------------ Report calls (Tier 4 health score)
+insert into report_calls (account_id, month, status) values (:'prospect_dental', '2026-10-01', 'attended');
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect(not pg_temp.fails(format('insert into report_calls (account_id, month, status) values (%L, %L, %L)', :'assigned_clinic', '2026-10-01', 'missed')), 'staff records a report call on their account');
+select pg_temp.expect(not pg_temp.fails(format('update report_calls set status = %L where account_id = %L', 'attended', :'assigned_clinic')), 'staff changes it');
+select pg_temp.expect(pg_temp.fails(format('insert into report_calls (account_id, month, status) values (%L, %L, %L)', :'assigned_clinic', '2026-10-01', 'missed')), 'one report call per client per month');
+select pg_temp.expect(pg_temp.fails(format('insert into report_calls (account_id, month, status) values (%L, %L, %L)', :'assigned_clinic', '2026-09-15', 'missed')), 'month is the first of the month');
+select pg_temp.expect(pg_temp.fails(format('insert into report_calls (account_id, month, status) values (%L, %L, %L)', :'prospect_dental', '2026-09-01', 'missed')), 'staff cannot record on other accounts');
+select pg_temp.expect((select count(*) from report_calls) = 1, 'staff sees report calls only on their accounts');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from report_calls) = 2, 'viewer reads report calls');
+select pg_temp.expect(pg_temp.fails(format('insert into report_calls (account_id, month, status) values (%L, %L, %L)', :'assigned_clinic', '2026-08-01', 'missed')), 'viewer cannot record report calls');
+reset role;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from report_calls'), 'anon cannot read report calls');
+reset role;

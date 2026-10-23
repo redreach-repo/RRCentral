@@ -198,6 +198,14 @@ check. A staging copy with its own Supabase project is published at
 `/RRCentral/staging/` once its secrets are set ([STAGING.md](STAGING.md)),
 and the **Update staging database** workflow applies the migrations to it.
 
+### Client health score (Tier 4, `20261110090000_report_calls.sql`)
+
+Adds `report_calls` (attended, missed or moved, per client per month). The
+score out of 100 adds usage against the plan, support tickets, report calls
+attended and overdue invoices, with a churn warning. Client health page
+(`/client-health`) and a Health card on each client. Guide:
+[client-health.md](client-health.md).
+
 ## Roles
 
 Roles live on `app_users.role`. RLS in the database and `app/src/lib/permissions.ts`
