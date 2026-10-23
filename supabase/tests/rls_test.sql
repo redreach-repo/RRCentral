@@ -242,3 +242,57 @@ select pg_temp.expect(pg_temp.fails('select * from rr_link_accounts()'), 'app us
 reset role;
 select pg_temp.expect(rr_normalize_company_name('Al Noor Trading L.L.C.') = 'al noor', 'company names drop legal suffixes');
 select pg_temp.expect(rr_normalize_company_name('The Coffee Co') = 'coffee', 'company names drop leading the and co');
+
+------------------------------------------------------------ client delivery (Phase 2)
+insert into contracts (account_id, package_id, monthly_fee, term_start, term_end)
+  select a.id, p.id, 4500, '2026-01-01', '2026-12-31'
+  from accounts a, delivery_packages p where a.name = 'Assigned Clinic LLC' and p.code = 'growth';
+insert into contracts (account_id, package_id, monthly_fee)
+  select a.id, p.id, 9000 from accounts a, delivery_packages p
+  where a.name = 'Unassigned Church' and p.code = 'done_for_you';
+insert into time_entries (account_id, hours, category) select id, 3, 'build' from accounts where name = 'Unassigned Church';
+insert into usage_records (account_id, month, whatsapp_marketing_count) select id, '2026-10-01', 5000 from accounts where name = 'Unassigned Church';
+
+select pg_temp.expect((select count(*) from delivery_packages) = 3, 'package catalogue seeded');
+select pg_temp.expect(
+  (select monthly_fee_a from delivery_packages where code = 'growth') = 4500,
+  'growth package price from the brief'
+);
+select pg_temp.expect(pg_temp.fails($q$insert into usage_records (account_id, month) select id, '2026-10-15' from accounts limit 1$q$), 'usage month must be the first of the month');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from contracts) = 1, 'staff sees only the contract on their account');
+select pg_temp.expect((select count(*) from time_entries) = 0, 'staff cannot see hours on other accounts');
+select pg_temp.expect((select count(*) from usage_records) = 0, 'staff cannot see usage on other accounts');
+select pg_temp.expect(not pg_temp.fails($q$insert into time_entries (account_id, user_id, hours, category) select id, public.rr_current_user_id(), 1.5, 'support' from accounts where name = 'Assigned Clinic LLC'$q$), 'staff logs own hours on own account');
+select pg_temp.expect(pg_temp.fails($q$insert into time_entries (account_id, user_id, hours) select id, (select id from app_users where email = 'alfred@redreach.ae'), 1 from accounts where name = 'Assigned Clinic LLC'$q$), 'staff cannot log hours as someone else');
+select pg_temp.expect(pg_temp.fails($q$insert into time_entries (account_id, user_id, hours) values ((select id from accounts where name = 'Assigned Clinic LLC'), public.rr_current_user_id(), 30)$q$), 'hours capped at 24 a day');
+select pg_temp.expect(not pg_temp.fails($q$insert into usage_records (account_id, month, whatsapp_service_count) select id, '2026-10-01', 120 from accounts where name = 'Assigned Clinic LLC'$q$), 'staff records usage on own account');
+select pg_temp.expect(pg_temp.fails($q$update contracts set monthly_fee = 1 where true$q$) or (select monthly_fee from contracts) = 4500, 'staff cannot change contract fees');
+select pg_temp.expect(pg_temp.fails($q$insert into contracts (account_id, monthly_fee) select id, 1 from accounts where name = 'Assigned Clinic LLC'$q$), 'staff cannot create contracts');
+select pg_temp.expect(pg_temp.fails($q$update delivery_packages set monthly_fee_a = 1$q$) or (select monthly_fee_a from delivery_packages where code = 'starter') = 1900, 'staff cannot edit packages');
+select pg_temp.expect((select value from app_settings where key = 'deliveryMarketingRateAed') = '0.30', 'staff can read overage rates');
+reset role;
+select pg_temp.expect((select monthly_fee from contracts c join accounts a on a.id = c.account_id where a.name = 'Assigned Clinic LLC') = 4500, 'contract fee unchanged after staff attempt');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+update app_settings set value = '0.01' where key = 'deliveryMarketingRateAed';
+update delivery_packages set monthly_fee_a = 1 where code = 'starter';
+select pg_temp.expect(not pg_temp.fails($q$insert into contracts (account_id, monthly_fee) select id, 1900 from accounts where name = 'VA Prospect'$q$), 'sales can create contracts');
+reset role;
+select pg_temp.expect((select value from app_settings where key = 'deliveryMarketingRateAed') = '0.30', 'sales cannot change overage rates');
+select pg_temp.expect((select monthly_fee_a from delivery_packages where code = 'starter') = 1900, 'sales cannot edit packages');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+update delivery_packages set ai_cap_usd = 40 where code = 'growth';
+reset role;
+select pg_temp.expect((select ai_cap_usd from delivery_packages where code = 'growth') = 40, 'manager can edit packages');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from contracts) >= 2, 'viewer reads contracts');
+select pg_temp.expect(pg_temp.fails($q$insert into time_entries (account_id, hours) select id, 1 from accounts limit 1$q$), 'viewer cannot log hours');
+reset role;

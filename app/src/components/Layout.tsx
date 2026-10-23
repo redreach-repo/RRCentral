@@ -60,7 +60,10 @@ const navGroups: NavGroup[] = [
   {
     id: 'accounts',
     label: 'Clients and partners',
-    items: [{ to: '/accounts', label: 'Accounts', icon: Contact, forStaff: true }],
+    items: [
+      { to: '/accounts', label: 'Accounts', icon: Contact, forStaff: true },
+      { to: '/delivery-settings', label: 'Packages and rates', icon: Package, minRole: 'manager' },
+    ],
   },
   {
     id: 'sales',
@@ -115,6 +118,7 @@ const navGroups: NavGroup[] = [
 const titleByPath: { match: (path: string) => boolean; title: string }[] = [
   { match: (p) => p === '/app', title: 'Dashboard' },
   { match: (p) => p.startsWith('/accounts'), title: 'Accounts' },
+  { match: (p) => p.startsWith('/delivery-settings'), title: 'Packages and rates' },
   { match: (p) => p.startsWith('/crm'), title: 'CRM' },
   { match: (p) => p.startsWith('/follow-ups'), title: 'Follow-ups' },
   { match: (p) => p.startsWith('/quotations'), title: 'Quotations' },

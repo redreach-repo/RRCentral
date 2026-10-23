@@ -75,3 +75,21 @@ describe('restricted roles', () => {
     expect(can('sales', 'accounts.delete')).toBe(false)
   })
 })
+
+describe('client delivery permissions', () => {
+  it('shows profitability to admin and manager only', () => {
+    expect(can('admin', 'delivery.profitability')).toBe(true)
+    expect(can('manager', 'delivery.profitability')).toBe(true)
+    expect(can('sales', 'delivery.profitability')).toBe(false)
+    expect(can('staff', 'delivery.profitability')).toBe(false)
+    expect(can('viewer', 'delivery.profitability')).toBe(false)
+  })
+
+  it('lets only admins change overage rates', () => {
+    expect(can('admin', 'delivery.rates')).toBe(true)
+    expect(can('manager', 'delivery.rates')).toBe(false)
+    expect(can('manager', 'delivery.packages')).toBe(true)
+    expect(can('sales', 'delivery.packages')).toBe(false)
+    expect(can('staff', 'delivery.contracts')).toBe(false)
+  })
+})

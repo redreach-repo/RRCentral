@@ -8,6 +8,8 @@ import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import AccountsPage from './pages/AccountsPage'
 import AccountDetailPage from './pages/AccountDetailPage'
+import ClientReportPage from './pages/ClientReportPage'
+import DeliverySettingsPage from './pages/DeliverySettingsPage'
 import CrmPage from './pages/CrmPage'
 import FollowupsPage from './pages/FollowupsPage'
 import QuotationsPage from './pages/QuotationsPage'
@@ -67,6 +69,14 @@ export default function App() {
             <Route path="teetribe" element={<Navigate to="/shop" replace />} />
             <Route path="/login" element={<LoginPage />} />
             <Route
+              path="/accounts/:id/report"
+              element={
+                <ProtectedRoute>
+                  <ClientReportPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/document/:type/:id"
               element={
                 <ProtectedRoute>
@@ -84,6 +94,7 @@ export default function App() {
               <Route path="app" element={<HomeRoute />} />
               <Route path="accounts" element={<AccountsPage />} />
               <Route path="accounts/:id" element={<AccountDetailPage />} />
+              <Route path="delivery-settings" element={<DeliverySettingsPage />} />
               <Route path="app/wanders" element={<WandersPage />} />
               <Route path="crm" element={<CrmPage />} />
               <Route path="follow-ups" element={<FollowupsPage />} />
