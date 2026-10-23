@@ -49,6 +49,7 @@ const CLOUD_TABLES = [
   'contract_invoices',
   'invoice_reminders',
   'usage_sources',
+  'digest_recipients',
 ] as const
 
 /** Download a JSON backup of local IndexedDB or cloud Postgres tables. */

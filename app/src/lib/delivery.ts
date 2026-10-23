@@ -219,6 +219,12 @@ export function hoursAlert(
   return { flagged, threshold, months, message: flagged ? HOURS_ALERT_MESSAGE : '' }
 }
 
+/** The contract that counts for a client: the newest active one, else the newest. */
+export function currentContract<T extends Pick<Contract, 'status' | 'created_at'>>(contracts: T[]): T | null {
+  const sorted = [...contracts].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+  return sorted.find((c) => c.status === 'active') ?? sorted[0] ?? null
+}
+
 export type RenewalFlag = { kind: 'due' | 'ended'; days: number; termEnd: string }
 
 /** Renewal flag from 60 days before term end. Only for active contracts. */

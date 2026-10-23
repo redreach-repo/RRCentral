@@ -1024,6 +1024,36 @@ export interface UsageImportRun {
   message: string
 }
 
+/** Someone on the daily digest list. */
+export interface DigestRecipientRow {
+  id: string
+  name: string
+  email: string
+  /** Digits only, e.g. 971501234567. */
+  whatsapp_phone: string
+  by_email: boolean
+  by_whatsapp: boolean
+  active: boolean
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface DigestRun {
+  id: string
+  run_date: string
+  started_at: string
+  finished_at: string | null
+  trigger: 'manual' | 'schedule'
+  requested_by: string
+  item_count: number
+  emails_sent: number
+  whatsapp_sent: number
+  email_status: string
+  whatsapp_status: string
+  message: string
+}
+
 export type TicketChannel = 'email' | 'whatsapp' | 'phone' | 'in_person' | 'internal'
 export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent'
 export type TicketStatus = 'new' | 'open' | 'waiting_on_client' | 'resolved' | 'closed'
