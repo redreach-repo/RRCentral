@@ -10,6 +10,7 @@ import AccountsPage from './pages/AccountsPage'
 import AccountDetailPage from './pages/AccountDetailPage'
 import ClientReportPage from './pages/ClientReportPage'
 import DeliverySettingsPage from './pages/DeliverySettingsPage'
+import BuildTemplatesPage from './pages/BuildTemplatesPage'
 import SupportPage from './pages/SupportPage'
 import TicketPage from './pages/TicketPage'
 import CtrmPage from './pages/CtrmPage'
@@ -112,6 +113,7 @@ export default function App() {
               <Route path="accounts" element={<AccountsPage />} />
               <Route path="accounts/:id" element={<AccountDetailPage />} />
               <Route path="delivery-settings" element={<DeliverySettingsPage />} />
+              <Route path="build-templates" element={<BuildTemplatesPage />} />
               <Route path="support" element={<SupportPage />} />
               <Route path="support/:id" element={<TicketPage />} />
               <Route path="ctrm" element={<CtrmPage />} />
