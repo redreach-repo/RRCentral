@@ -10,6 +10,8 @@
 //   morning message matches the preview and the dashboard.
 // * client-portal gets the portal view (src/lib/clientPortal.ts), so a
 //   client only ever sees the fields chosen there.
+// * ai-assist gets the AI prompts, model and cost sum (src/lib/aiAssist.ts),
+//   so the app and the function agree on what is asked and what it cost.
 //
 //   npm run build:support-fn              # regenerate
 //   npm run build:support-fn -- --check   # CI: fail if a bundle is stale
@@ -25,6 +27,7 @@ const bundles = [
   { entry: 'src/lib/usageImport.ts', out: '../supabase/functions/usage-import/usageImport.bundle.js' },
   { entry: 'src/lib/dailyDigest.ts', out: '../supabase/functions/daily-digest/dailyDigest.bundle.js' },
   { entry: 'src/lib/clientPortal.ts', out: '../supabase/functions/client-portal/clientPortal.bundle.js' },
+  { entry: 'src/lib/aiAssist.ts', out: '../supabase/functions/ai-assist/aiAssist.bundle.js' },
 ]
 
 let stale = false

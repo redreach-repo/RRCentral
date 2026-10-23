@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { addMonths, format, parseISO } from 'date-fns'
-import { AlertTriangle, CalendarClock, Clock, FileText, Pencil, Play, Plus, Square, Trash2 } from 'lucide-react'
+import { AlertTriangle, CalendarClock, Clock, FileText, Pencil, Play, Plus, Sparkles, Square, Trash2 } from 'lucide-react'
 import Modal from '../Modal'
+import CallNotesModal from './CallNotesModal'
 import { useCompactCrm } from '../../hooks/useMediaQuery'
 import { useRunningTimer } from '../../hooks/useRunningTimer'
 import { useToast } from '../../contexts/ToastContext'
@@ -49,6 +50,8 @@ import {
   updateStage,
 } from '../../lib/deliveryStore'
 import { logAccountEvent } from '../../lib/accountsStore'
+import { assistCostInMonth, type ProposedRequirement } from '../../lib/aiAssist'
+import { listAiUsage } from '../../lib/aiAssistStore'
 import { listContractInvoices, runContractBilling, skipSetupInvoice } from '../../lib/contractBillingStore'
 import { editedByHand } from '../../lib/usageImport'
 import { getUsageSource, saveUsageSource } from '../../lib/usageImportStore'
@@ -180,6 +183,8 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
   const [usageMonth, setUsageMonth] = useState(thisMonth)
   const [usageForm, setUsageForm] = useState({ marketing: '', service: '', ai: '', leads: '' })
   const [reqForm, setReqForm] = useState({ title: '', detail: '' })
+  const [callNotesOpen, setCallNotesOpen] = useState(false)
+  const [assistUsd, setAssistUsd] = useState(0)
 
   const canContracts = can(userRole, 'delivery.contracts')
   const compact = useCompactCrm()
@@ -200,6 +205,11 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
         getUsageSource(account.id).catch(() => null),
       ])
       setUsageSource(src)
+      if (can(userRole, 'delivery.profitability')) {
+        const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+        const ai = await listAiUsage(account.id, monthStart.toISOString()).catch(() => [])
+        setAssistUsd(assistCostInMonth(ai, account.id, monthKey(new Date())))
+      }
       setRaisedInvoices(ci.filter((x) => x.invoice_id))
       setPackages(p)
       setContracts(c)
@@ -259,6 +269,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
           overageAed: thisMonthOverage,
           hours: monthHours,
           rates,
+          assistUsd,
         })
       : null
 
@@ -493,6 +504,25 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
       }
       setReqForm({ title: '', detail: '' })
     }, 'Could not add the requirement')
+  }
+
+  async function addFromCallNotes(items: ProposedRequirement[]) {
+    for (const item of items) {
+      await saveRequirement(
+        account.id,
+        { title: item.title, detail: item.detail, status: 'open', source: 'call notes', is_change_request: signedOff },
+        author.email,
+      )
+    }
+    if (items.length) {
+      await logAccountEvent(
+        account.id,
+        `${items.length} ${signedOff ? 'change requests' : 'requirements'} added from call notes`,
+        author,
+      )
+    }
+    await load()
+    showToast(`${items.length} added`, 'success')
   }
 
   async function changeRequirement(r: Requirement, status: RequirementStatus) {
@@ -1002,10 +1032,26 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
       <section style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
           <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Requirements</h2>
-          <span style={{ fontSize: 12, color: signedOff ? colors.warn : colors.muted2 }}>
-            {signedOff ? 'Signed off. New items count as change requests.' : 'Not signed off yet'}
+          <span style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <span style={{ fontSize: 12, color: signedOff ? colors.warn : colors.muted2 }}>
+              {signedOff ? 'Signed off. New items count as change requests.' : 'Not signed off yet'}
+            </span>
+            {canLog ? (
+              <button type="button" style={smallBtn} onClick={() => setCallNotesOpen(true)}>
+                <Sparkles size={12} /> From call notes
+              </button>
+            ) : null}
           </span>
         </div>
+        <CallNotesModal
+          open={callNotesOpen}
+          accountId={account.id}
+          accountName={account.name}
+          existing={requirements.map((r) => r.title)}
+          asChangeRequests={signedOff}
+          onClose={() => setCallNotesOpen(false)}
+          onAdd={addFromCallNotes}
+        />
         {requirements.length === 0 ? (
           <p style={{ ...mutedNote, marginTop: 12 }}>
             Nothing captured yet. List what the client asked for, then mark the stage signed off when they agree.
@@ -1120,8 +1166,9 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
             ))}
           </div>
           <p style={{ ...mutedNote, fontSize: 12, marginTop: 10 }}>
-            Excludes VAT. Tool cost is the package estimate plus AI and lead credit spend for the month. Only admins and
-            managers see this.
+            Excludes VAT. Tool cost is the package estimate plus AI and lead credit spend for the month
+            {assistUsd > 0 ? `, and $${assistUsd.toFixed(2)} of AI help used in RR Central` : ''}. Only admins and managers
+            see this.
           </p>
         </section>
       ) : null}

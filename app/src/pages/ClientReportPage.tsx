@@ -25,6 +25,8 @@ import {
   listUsage,
 } from '../lib/deliveryStore'
 import { errorMessage } from '../lib/errors'
+import { reportFacts } from '../lib/aiAssist'
+import { runAi } from '../lib/aiAssistStore'
 import { resolvedInMonth } from '../lib/support'
 import { listTickets } from '../lib/supportStore'
 import { formatAED } from '../lib/money'
@@ -56,6 +58,9 @@ export default function ClientReportPage() {
   const [requirements, setRequirements] = useState<Requirement[]>([])
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [planEdits, setPlanEdits] = useState<Record<string, string>>({})
+  const [summaries, setSummaries] = useState<Record<string, string>>({})
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiError, setAiError] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -128,6 +133,47 @@ export default function ClientReportPage() {
     ...c,
     hours: Math.round(monthEntries.filter((e) => e.category === c.value).reduce((s, e) => s + Number(e.hours), 0) * 100) / 100,
   })).filter((c) => c.hours > 0)
+  const summary = summaries[month] ?? ''
+
+  async function writeSummary() {
+    if (!account) return
+    if (summary.trim() && !window.confirm('Replace the summary with a new AI draft?')) return
+    const resolved = resolvedInMonth(tickets, month)
+    const answered = resolved.filter((t) => t.first_response_at && t.sla_due_at)
+    setAiBusy(true)
+    setAiError('')
+    try {
+      const r = await runAi(account.id, {
+        feature: 'report_summary',
+        accountName: account.name,
+        monthLabel: monthLabel(month),
+        facts: reportFacts({
+          hours: totalHours,
+          targetHours: pkg ? pkg.target_hours : null,
+          hoursByWork: byCategory.map((c) => ({ label: c.label, hours: c.hours })),
+          ticketsResolved: resolved.length,
+          ticketsOpened: tickets.filter((t) => monthKey(t.created_at) === month).length,
+          answered: answered.length,
+          answeredOnTime: answered.filter((t) => String(t.first_response_at) <= String(t.sla_due_at)).length,
+          whatsappUsed: usageRow ? usageRow.whatsapp_marketing_count + usageRow.whatsapp_service_count : null,
+          whatsappIncluded: overage ? overage.includedWhatsapp : null,
+          aboveAed: overage ? overage.totalAed : null,
+          buildDone: progress.done,
+          buildTotal: progress.total,
+          buildCurrent: progress.current,
+          comingNext: plan
+            .split('\n')
+            .map((l) => l.replace(/^[-*]\s*/, '').trim())
+            .filter(Boolean),
+        }),
+      })
+      setSummaries((p) => ({ ...p, [month]: r.text }))
+    } catch (e) {
+      setAiError(errorMessage(e, 'AI help is not available right now.'))
+    } finally {
+      setAiBusy(false)
+    }
+  }
 
   return (
     <div className={styles.page}>
@@ -140,6 +186,9 @@ export default function ClientReportPage() {
             value={month.slice(0, 7)}
             onChange={(e) => e.target.value && setSearchParams({ month: e.target.value }, { replace: true })}
           />
+          <button type="button" disabled={aiBusy} onClick={() => void writeSummary()}>
+            {aiBusy ? 'Writing…' : 'Write summary with AI'}
+          </button>
           <button type="button" onClick={() => window.print()}>
             Print or save as PDF
           </button>
@@ -156,6 +205,21 @@ export default function ClientReportPage() {
           {pkg ? `, ${pkg.name} package` : ''}
           {account.reference ? `, ${account.reference}` : ''}
         </div>
+
+        {aiError ? <p className={styles.screenOnly} style={{ color: '#b42318', fontSize: 13 }}>{aiError}</p> : null}
+        {summary || aiBusy ? (
+          <>
+            <h2>Summary</h2>
+            <textarea
+              className={styles.plan}
+              aria-label="Summary"
+              value={summary}
+              placeholder={aiBusy ? 'Writing the summary…' : ''}
+              onChange={(e) => setSummaries((p) => ({ ...p, [month]: e.target.value }))}
+            />
+            <div className={styles.planPrint}>{summary}</div>
+          </>
+        ) : null}
 
         <h2>Hours</h2>
         <p style={{ margin: '0 0 8px' }}>

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { ArrowLeft, LifeBuoy, Lock } from 'lucide-react'
+import { ArrowLeft, LifeBuoy, Lock, Sparkles } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
+import { useSettings } from '../contexts/SettingsContext'
 import EmptyState from '../components/EmptyState'
 import SlaBadge from '../components/support/SlaBadge'
 import { accountTypeLabel, canEditAccount } from '../lib/accounts'
@@ -11,11 +12,14 @@ import { listAccounts, listContacts, listTeam } from '../lib/accountsStore'
 import { TICKET_CHANNELS, TICKET_PRIORITIES, TICKET_STATUSES, optionLabel } from '../lib/support'
 import { LOGGED_FOR_CLIENT, addTicketMessage, getTicket, listMessages, updateTicket } from '../lib/supportStore'
 import { errorMessage } from '../lib/errors'
+import { signOffFor, type AiThreadMessage } from '../lib/aiAssist'
+import { runAi } from '../lib/aiAssistStore'
 import { addTimeEntry, listTicketTime } from '../lib/deliveryStore'
 import { TICKET_TIME_OPTIONS, hoursLabel } from '../lib/timeTracking'
 import type { Account, AccountContact, AppUser, Ticket, TicketMessage, TicketPriority, TicketStatus, TimeEntry } from '../lib/types'
 import {
   buttonPrimaryStyle,
+  buttonSecondaryStyle,
   cardStyle,
   colors,
   fieldStyle,
@@ -26,6 +30,15 @@ import {
   sectionTitleStyle,
   selectStyle,
 } from '../lib/uiStyles'
+
+const aiButton: CSSProperties = {
+  ...buttonSecondaryStyle,
+  padding: '6px 10px',
+  fontSize: 12,
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+}
 
 export default function TicketPage() {
   const { id = '' } = useParams<{ id: string }>()
@@ -42,6 +55,9 @@ export default function TicketPage() {
   const [timeSpent, setTimeSpent] = useState(0)
   const [ticketTime, setTicketTime] = useState<TimeEntry[]>([])
   const [busy, setBusy] = useState(false)
+  const [aiBusy, setAiBusy] = useState<'' | 'summary' | 'reply'>('')
+  const [summary, setSummary] = useState('')
+  const { settings } = useSettings()
 
   const author = useMemo(() => ({ appUserId, email: user?.email || '' }), [appUserId, user?.email])
 
@@ -143,6 +159,75 @@ export default function TicketPage() {
       await load()
     } catch (e) {
       showToast(errorMessage(e, 'Could not save the reply'), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const aiThread = (): AiThreadMessage[] =>
+    messages.map((m) => ({
+      who: m.is_internal_note
+        ? m.author_label
+        : m.author_kind === 'contact' || m.author_label.endsWith(LOGGED_FOR_CLIENT)
+          ? `the client${contact?.name ? ` (${contact.name})` : ''}`
+          : `${m.author_label} (Red Reach)`,
+      when: format(parseISO(m.created_at), 'd MMM yyyy, HH:mm'),
+      body: m.body,
+      internal: m.is_internal_note,
+    }))
+
+  async function aiSummary() {
+    if (!ticket?.account_id || !account) return
+    setAiBusy('summary')
+    try {
+      const r = await runAi(ticket.account_id, {
+        feature: 'ticket_summary',
+        accountName: account.name,
+        subject: ticket.subject,
+        messages: aiThread(),
+      })
+      setSummary(r.text)
+    } catch (e) {
+      showToast(errorMessage(e, 'AI help is not available right now.'), 'error')
+    } finally {
+      setAiBusy('')
+    }
+  }
+
+  async function aiReply() {
+    if (!ticket?.account_id || !account) return
+    if (reply.trim() && !window.confirm('Replace what you have written with an AI draft?')) return
+    setAiBusy('reply')
+    try {
+      const me = team.find((u) => u.id === appUserId)
+      const r = await runAi(ticket.account_id, {
+        feature: 'ticket_reply',
+        accountName: account.name,
+        subject: ticket.subject,
+        messages: aiThread(),
+        companyName: settings.companyName || 'Red Reach Middle East FZE',
+        signOff: signOffFor(me?.name || '', settings.companyName || ''),
+      })
+      setInternal(false)
+      setReply(r.text)
+      showToast('Draft ready. Check it before you send it.', 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'AI help is not available right now.'), 'error')
+    } finally {
+      setAiBusy('')
+    }
+  }
+
+  async function saveSummaryAsNote() {
+    if (!ticket || !summary.trim()) return
+    setBusy(true)
+    try {
+      await addTicketMessage(ticket, `Summary (AI help):\n${summary.trim()}`, true, author)
+      setSummary('')
+      showToast('Summary saved as an internal note', 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not save the note'), 'error')
     } finally {
       setBusy(false)
     }
@@ -284,7 +369,36 @@ export default function TicketPage() {
       </div>
 
       <section style={{ ...cardStyle, marginBottom: 16 }}>
-        <h2 style={sectionTitleStyle}>Conversation</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+          <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Conversation</h2>
+          {editable && account && messages.length ? (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button type="button" style={aiButton} disabled={Boolean(aiBusy)} onClick={() => void aiSummary()}>
+                <Sparkles size={13} /> {aiBusy === 'summary' ? 'Summarising…' : 'Summarise'}
+              </button>
+              <button type="button" style={aiButton} disabled={Boolean(aiBusy)} onClick={() => void aiReply()}>
+                <Sparkles size={13} /> {aiBusy === 'reply' ? 'Drafting…' : 'Draft a reply'}
+              </button>
+            </div>
+          ) : null}
+        </div>
+        {summary ? (
+          <div
+            aria-label="AI summary"
+            style={{ border: `1px solid ${colors.accent}`, borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}
+          >
+            <div style={{ fontSize: 12, color: colors.muted2, marginBottom: 6 }}>Summary by AI help. Check it against the thread.</div>
+            <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>{summary}</div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <button type="button" style={aiButton} disabled={busy} onClick={() => void saveSummaryAsNote()}>
+                Save as internal note
+              </button>
+              <button type="button" style={aiButton} onClick={() => setSummary('')}>
+                Close
+              </button>
+            </div>
+          </div>
+        ) : null}
         {messages.length === 0 ? (
           <p style={{ color: colors.muted, margin: 0 }}>Nothing written yet. Add the first reply below.</p>
         ) : (

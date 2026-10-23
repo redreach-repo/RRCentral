@@ -611,3 +611,26 @@ reset role;
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from portal_access'), 'anon cannot read portal links');
 reset role;
+
+------------------------------------------------------------ AI help (roadmap item 7)
+insert into ai_usage_log (account_id, feature, model, input_tokens, output_tokens, cost_usd)
+  values (:'assigned_clinic', 'ticket_summary', 'claude-haiku-5-5', 1200, 200, 0.00022),
+         (:'prospect_dental', 'call_notes', 'claude-haiku-5-5', 900, 300, 0.00024);
+select pg_temp.expect(pg_temp.fails(format('insert into ai_usage_log (account_id, feature) values (%L, %L)', :'prospect_dental', 'write_poems')), 'AI use is logged only for known features');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from ai_usage_log) = 1, 'staff sees AI use only on their accounts');
+select pg_temp.expect(pg_temp.fails(format('insert into ai_usage_log (account_id, feature) values (%L, %L)', :'assigned_clinic', 'ticket_reply')), 'staff cannot write the AI log');
+select pg_temp.expect(pg_temp.fails($q$update ai_usage_log set cost_usd = 0$q$) or (select sum(cost_usd) from ai_usage_log) > 0, 'staff cannot change AI cost');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect((select count(*) from ai_usage_log) = 2, 'manager sees all AI use');
+select pg_temp.expect(pg_temp.fails($q$delete from ai_usage_log$q$) or (select count(*) from ai_usage_log) = 2, 'manager cannot delete the AI log');
+reset role;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from ai_usage_log'), 'anon cannot read AI use');
+reset role;

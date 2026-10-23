@@ -168,6 +168,20 @@ describe('contract money', () => {
     expect(p.marginAed).toBe(2061.55)
     expect(p.marginPercent).toBe(45.5)
   })
+
+  it('counts AI help used in RR Central as tool cost', () => {
+    const base = {
+      contract: { monthly_fee: 4500, discount_percent: 0, discount_months_left: 0 },
+      pkg: { tool_cost_aed: 300 },
+      usage: { ai_cost_usd: 20, lead_credits_cost_usd: 0 },
+      overageAed: 0,
+      hours: 0,
+      rates: DEFAULT_DELIVERY_RATES,
+    }
+    const without = profitability(base)
+    const withAssist = profitability({ ...base, assistUsd: 10 })
+    expect(withAssist.toolCostAed).toBeCloseTo(without.toolCostAed + 10 * DEFAULT_DELIVERY_RATES.usdToAed, 2)
+  })
 })
 
 describe('build progress', () => {
