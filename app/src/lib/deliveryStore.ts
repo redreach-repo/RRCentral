@@ -25,19 +25,33 @@ function check(result: { error: unknown }) {
   if (result.error) throw result.error
 }
 
+let seedingPackages: Promise<void> | null = null
+
 /** The catalogue, seeded in local mode the first time it is read. */
 export async function listPackages(): Promise<DeliveryPackage[]> {
+  if (seedingPackages) await seedingPackages
   let list = await rows<DeliveryPackage>(db.from('delivery_packages').select('*').order('sort'))
   if (list.length === 0 && currentAuthMode() === 'local') {
+    // Several panels read the catalogue at once; seed it only once.
+    seedingPackages ??= seedPackages().finally(() => {
+      seedingPackages = null
+    })
+    await seedingPackages
+    list = await rows<DeliveryPackage>(db.from('delivery_packages').select('*').order('sort'))
+  }
+  return [...list].sort((a, b) => a.sort - b.sort)
+}
+
+async function seedPackages(): Promise<void> {
+  const existing = await rows<DeliveryPackage>(db.from('delivery_packages').select('id'))
+  if (existing.length === 0) {
     const now = new Date().toISOString()
     check(
       await db
         .from('delivery_packages')
         .insert(DEFAULT_PACKAGES.map((p) => ({ ...p, id: crypto.randomUUID(), updated_at: now }))),
     )
-    list = await rows<DeliveryPackage>(db.from('delivery_packages').select('*').order('sort'))
   }
-  return [...list].sort((a, b) => a.sort - b.sort)
 }
 
 export async function updatePackage(id: string, patch: Partial<DeliveryPackage>): Promise<void> {

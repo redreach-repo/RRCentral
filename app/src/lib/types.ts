@@ -972,3 +972,52 @@ export interface UsageRecord {
   lead_credits_cost_usd: number
   updated_at: string
 }
+
+export type TicketChannel = 'email' | 'whatsapp' | 'phone' | 'in_person' | 'internal'
+export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent'
+export type TicketStatus = 'new' | 'open' | 'waiting_on_client' | 'resolved' | 'closed'
+
+export interface Ticket {
+  id: string
+  /** Null for email from an unknown sender until someone files it on an account. */
+  account_id: string | null
+  contact_id: string | null
+  requester_email: string
+  subject: string
+  channel: TicketChannel
+  priority: TicketPriority
+  status: TicketStatus
+  assignee_user_id: string | null
+  /** Working hours allowed for the first reply, copied from the policy at creation. */
+  sla_hours: number
+  sla_due_at: string | null
+  first_response_at: string | null
+  resolved_at: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface TicketMessage {
+  id: string
+  ticket_id: string
+  author_kind: 'user' | 'contact'
+  author_user_id: string | null
+  author_label: string
+  body: string
+  is_internal_note: boolean
+  /** Email Message-ID for threading inbound replies. */
+  external_id: string
+  created_at: string
+}
+
+/** First response time in working hours, per package or per account type. */
+export interface SlaPolicy {
+  id: string
+  applies_to: 'package' | 'account_type'
+  package_id: string | null
+  account_type: AccountType | null
+  label: string
+  first_response_hours: number
+  updated_at: string
+}

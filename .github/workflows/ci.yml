@@ -28,6 +28,8 @@ jobs:
       - run: npm test
       - name: Checkout Edge Function bundle is up to date
         run: npm run build:checkout-fn -- --check
+      - name: Support email Edge Function bundle is up to date
+        run: npm run build:support-fn -- --check
       - run: npm run build
       - name: No customer data in the published folder
         run: |
@@ -45,7 +47,7 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - run: deno check supabase/functions/zoho-proxy/index.ts supabase/functions/create-checkout-session/index.ts supabase/functions/bootstrap-admin/index.ts
+      - run: deno check supabase/functions/zoho-proxy/index.ts supabase/functions/create-checkout-session/index.ts supabase/functions/bootstrap-admin/index.ts supabase/functions/support-email-in/index.ts
 
   migrations:
     name: Apply migrations + RLS tests

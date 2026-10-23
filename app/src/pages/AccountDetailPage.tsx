@@ -8,6 +8,7 @@ import Modal from '../components/Modal'
 import StatusPill from '../components/StatusPill'
 import AccountFormModal from '../components/accounts/AccountFormModal'
 import DeliveryPanel from '../components/accounts/DeliveryPanel'
+import AccountTicketsCard from '../components/support/AccountTicketsCard'
 import { db } from '../lib/db'
 import {
   ACTIVITY_KINDS,
@@ -521,6 +522,10 @@ export default function AccountDetailPage() {
 
       {account.type === 'ai_crm_client' ? (
         <DeliveryPanel account={account} editable={editable} userRole={userRole} team={team} author={author} />
+      ) : null}
+
+      {account.type !== 'ctrm_prospect' ? (
+        <AccountTicketsCard account={account} contacts={contacts} team={team} editable={editable} author={author} />
       ) : null}
 
       {seesMoney ? (

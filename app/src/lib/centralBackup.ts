@@ -39,6 +39,9 @@ const CLOUD_TABLES = [
   'requirements',
   'time_entries',
   'usage_records',
+  'sla_policies',
+  'tickets',
+  'ticket_messages',
 ] as const
 
 /** Download a JSON backup of local IndexedDB or cloud Postgres tables. */
