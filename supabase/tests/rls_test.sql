@@ -454,3 +454,35 @@ set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
 update app_settings set value = '99999' where key = 'deliveryFixedMonthlyCostAed';
 reset role;
 select pg_temp.expect((select value from app_settings where key = 'deliveryFixedMonthlyCostAed') = '0', 'manager cannot change the fixed cost estimate');
+
+------------------------------------------------------------ Contract billing (roadmap item 2)
+select pg_temp.expect((select bool_and(not auto_invoice) from contracts), 'existing contracts start with auto invoicing off');
+insert into contract_invoices (contract_id, account_id, kind, period)
+  select id, account_id, 'monthly', '2026-11-01' from contracts where account_id = (select id from accounts where name = 'Assigned Clinic LLC') limit 1;
+select pg_temp.expect(pg_temp.fails($q$insert into contract_invoices (contract_id, account_id, kind, period) select contract_id, account_id, 'monthly', '2026-11-01' from contract_invoices limit 1$q$), 'a contract month is only invoiced once');
+select pg_temp.expect(pg_temp.fails($q$insert into contract_invoices (contract_id, account_id, kind, period) select contract_id, account_id, 'monthly', '2026-11-15' from contract_invoices limit 1$q$), 'invoice period is the first of the month');
+insert into invoice_reminders (invoice_id, stage) select id, 3 from invoices where reference_number = 'RR-03-26001';
+select pg_temp.expect(pg_temp.fails($q$insert into invoice_reminders (invoice_id, stage) select id, 3 from invoices where reference_number = 'RR-03-26001'$q$), 'each reminder stage is recorded once');
+select pg_temp.expect(pg_temp.fails($q$insert into invoice_reminders (invoice_id, stage) select id, 5 from invoices where reference_number = 'RR-03-26001'$q$), 'reminders only at 3, 7 and 14 days');
+
+select id as reminder_invoice from invoices where reference_number = 'RR-03-26001' \gset
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from contract_invoices) = 0, 'staff cannot see contract invoices');
+select pg_temp.expect((select count(*) from invoice_reminders) = 0, 'staff cannot see payment reminders');
+select pg_temp.expect(pg_temp.fails(format('insert into invoice_reminders (invoice_id, stage) values (%L, 7)', :'reminder_invoice')), 'staff cannot record reminders');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from contract_invoices) = 1, 'sales sees contract invoices');
+select pg_temp.expect(not pg_temp.fails($q$insert into invoice_reminders (invoice_id, stage, channel) select id, 7, 'whatsapp' from invoices where reference_number = 'RR-03-26001'$q$), 'sales records a reminder');
+delete from invoice_reminders;
+select pg_temp.expect((select count(*) from invoice_reminders) = 2, 'only admins delete reminders');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from invoice_reminders) = 2, 'viewer reads payment reminders');
+select pg_temp.expect(pg_temp.fails(format('insert into invoice_reminders (invoice_id, stage) values (%L, 14)', :'reminder_invoice')), 'viewer cannot record reminders');
+reset role;

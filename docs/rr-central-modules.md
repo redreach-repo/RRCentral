@@ -95,6 +95,30 @@ all in `app/src/lib/timeTracking.ts` with tests:
   a running contract with no hours since Monday, and people who allowed
   desktop reminders get one notification a week with the same list.
 
+### Contract invoicing (roadmap item 2, `20261030090000_contract_billing.sql`)
+
+Adds `contracts.auto_invoice` (off for existing contracts) and
+`contracts.billing_from`, plus `contract_invoices` (one row per contract,
+kind and month, so nothing is raised twice) and `invoice_reminders`. Logic is
+in `app/src/lib/contractBilling.ts` and `contractBillingStore.ts`, with tests.
+
+- **Setup fee** is raised when a contract with automatic invoicing is saved as
+  active, for any unpaid part. Switching it on for a running contract skips
+  the setup fee and starts monthly invoices next month.
+- **Monthly invoice** carries that month's fee (in advance, with any discount
+  month used up) and the previous month's WhatsApp, AI and lead credit use
+  over the plan. After the term ends, one last invoice bills the final
+  month's usage. Contracts paid yearly get usage lines only.
+- Everything is raised as a **draft** on Invoices. While a draft is unedited it
+  follows usage entered later. Finalising it gives it its RR reference.
+- There is no server job: the run happens in the browser whenever an admin,
+  manager or sales user opens the app (and on saving a contract).
+- **Payment reminders** show on Invoices and the dashboard 3, 7 and 14 days
+  after the due date (invoice date plus "Net N days"), with the message ready
+  to send by email (Zoho Mail when connected) or WhatsApp.
+- Division and payment terms for these invoices are on Packages and rates
+  (default 03 RR Marketing, Net 7 days).
+
 ## Roles
 
 Roles live on `app_users.role`. RLS in the database and `app/src/lib/permissions.ts`

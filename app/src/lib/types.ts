@@ -907,8 +907,33 @@ export interface Contract {
   annual_prepay: boolean
   status: ContractStatus
   notes: string
+  /** Raise the setup and monthly invoices automatically (as drafts). */
+  auto_invoice?: boolean
+  /** First month billed monthly (`YYYY-MM-01`). Null means the term start. */
+  billing_from?: string | null
   created_at: string
   updated_at: string
+}
+
+export interface ContractInvoice {
+  id: string
+  contract_id: string
+  account_id: string
+  kind: 'setup' | 'monthly'
+  period: string
+  invoice_id: string | null
+  generated_amount: number
+  discount_applied: boolean
+  created_at: string
+}
+
+export interface InvoiceReminder {
+  id: string
+  invoice_id: string
+  stage: 3 | 7 | 14
+  channel: 'email' | 'whatsapp' | 'other'
+  sent_by: string
+  sent_at: string
 }
 
 export type BuildStageKey =

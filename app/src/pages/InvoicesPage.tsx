@@ -15,7 +15,8 @@ import type { Account, Client, Invoice, PaymentLogEntry } from '../lib/types'
 import { accountTypeLabel } from '../lib/accounts'
 import { listAccounts } from '../lib/accountsStore'
 import { useAuth } from '../contexts/AuthContext'
-import { can } from '../lib/permissions'
+import { can, roleAtLeast } from '../lib/permissions'
+import PaymentRemindersCard from '../components/invoices/PaymentRemindersCard'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
@@ -664,6 +665,8 @@ export default function InvoicesPage() {
           <Plus size={16} /> New invoice
         </button>
       </div>
+
+      {roleAtLeast(userRole, 'sales') ? <PaymentRemindersCard /> : null}
 
       {accountFilter ? (
         <p style={{ fontSize: 13, color: colors.muted, margin: '0 0 12px' }}>
