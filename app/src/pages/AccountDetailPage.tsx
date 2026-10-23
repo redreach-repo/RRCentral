@@ -9,6 +9,7 @@ import StatusPill from '../components/StatusPill'
 import AccountFormModal from '../components/accounts/AccountFormModal'
 import DeliveryPanel from '../components/accounts/DeliveryPanel'
 import AccountTicketsCard from '../components/support/AccountTicketsCard'
+import AccountDealsCard from '../components/ctrm/AccountDealsCard'
 import { db } from '../lib/db'
 import {
   ACTIVITY_KINDS,
@@ -526,7 +527,17 @@ export default function AccountDetailPage() {
 
       {account.type !== 'ctrm_prospect' ? (
         <AccountTicketsCard account={account} contacts={contacts} team={team} editable={editable} author={author} />
-      ) : null}
+      ) : (
+        <AccountDealsCard
+          account={account}
+          contacts={contacts}
+          team={team}
+          editable={editable}
+          showCommission={can(userRole, 'ctrm.commission')}
+          author={author}
+          onChanged={() => void load()}
+        />
+      )}
 
       {seesMoney ? (
         <section style={{ ...cardStyle, marginTop: 16 }}>

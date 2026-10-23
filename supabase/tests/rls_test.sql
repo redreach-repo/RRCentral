@@ -352,3 +352,50 @@ reset role;
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from tickets'), 'anon cannot read tickets');
 reset role;
+
+------------------------------------------------------------ CTRM Next pipeline (Phase 4)
+insert into accounts (type, name, reference, owner_user_id) values
+  ('ctrm_prospect', 'VA Energy Lead', 'AC-09-26002', (select id from app_users where email = 'va@redreach.ae'));
+insert into ctrm_deals (account_id, stage, region, next_action, next_action_date)
+  select id, 'contacted', 'middle_east', 'Send deck', '2026-11-01' from accounts where name = 'Other Trading House';
+insert into ctrm_deals (account_id, stage, region, next_action, next_action_date)
+  select id, 'identified', 'india', 'First call', '2026-11-02' from accounts where name = 'VA Energy Lead';
+insert into ctrm_deal_commissions (deal_id, expected_commission)
+  select d.id, 25000 from ctrm_deals d join accounts a on a.id = d.account_id;
+select id as other_deal from ctrm_deals where account_id = (select id from accounts where name = 'Other Trading House') \gset
+
+select pg_temp.expect(pg_temp.fails($q$update ctrm_deals set stage = 'lost' where region = 'india'$q$), 'lost needs a reason');
+select pg_temp.expect(not pg_temp.fails($q$update ctrm_deals set stage = 'lost', lost_reason = 'Chose another vendor' where region = 'india'$q$), 'lost with a reason is fine');
+update ctrm_deals set stage = 'identified', lost_reason = '' where region = 'india';
+select pg_temp.expect(pg_temp.fails($q$update ctrm_deals set next_action = '' where region = 'india'$q$), 'open deals need a next action');
+select pg_temp.expect(pg_temp.fails($q$update ctrm_deals set next_action_date = null where region = 'india'$q$), 'open deals need a next action date');
+select pg_temp.expect(not pg_temp.fails($q$update ctrm_deals set stage = 'signed', next_action = '', next_action_date = null where region = 'middle_east'$q$), 'signed deals need no next action');
+update ctrm_deals set stage = 'contacted', next_action = 'Send deck', next_action_date = '2026-11-01' where region = 'middle_east';
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from ctrm_deals) = 1, 'staff sees only deals on their accounts');
+select pg_temp.expect((select count(*) from ctrm_deal_commissions) = 0, 'staff never sees commission figures');
+select pg_temp.expect(not pg_temp.fails($q$update ctrm_deals set stage = 'contacted' where region = 'india'$q$), 'staff moves their own deal');
+select pg_temp.expect(not pg_temp.fails($q$insert into ctrm_deal_stage_changes (deal_id, from_stage, to_stage) select id, 'identified', 'contacted' from ctrm_deals where region = 'india'$q$), 'staff records the stage move');
+select pg_temp.expect(pg_temp.fails(format('insert into ctrm_deal_stage_changes (deal_id, to_stage) values (%L, %L)', :'other_deal', 'signed')), 'staff cannot write history on other deals');
+update ctrm_deal_commissions set commission_received = 1 where deal_id = :'other_deal';
+reset role;
+select pg_temp.expect((select commission_received from ctrm_deal_commissions where deal_id = :'other_deal') = 0, 'commission unchanged after staff attempt');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from ctrm_deal_commissions) = 2, 'sales reads Red Reach commission');
+select pg_temp.expect(pg_temp.fails($q$update ctrm_deal_stage_changes set to_stage = 'signed'$q$) or (select count(*) from ctrm_deal_stage_changes where to_stage = 'signed') = 0, 'stage history cannot be rewritten');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from ctrm_deals) = 2, 'viewer reads deals');
+select pg_temp.expect((select count(*) from ctrm_deal_commissions) = 0, 'viewer never sees commission figures');
+select pg_temp.expect(pg_temp.fails($q$insert into ctrm_deals (account_id, next_action, next_action_date) select id, 'x', '2026-12-01' from accounts where name = 'Other Trading House'$q$), 'viewer cannot add deals');
+reset role;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from ctrm_deals'), 'anon cannot read deals');
+reset role;

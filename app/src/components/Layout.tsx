@@ -27,6 +27,7 @@ import {
   X,
   LogOut,
   LifeBuoy,
+  Handshake,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders'
@@ -64,6 +65,7 @@ const navGroups: NavGroup[] = [
     items: [
       { to: '/accounts', label: 'Accounts', icon: Contact, forStaff: true },
       { to: '/support', label: 'Support', icon: LifeBuoy, forStaff: true },
+      { to: '/ctrm', label: 'CTRM Next', icon: Handshake, forStaff: true },
       { to: '/delivery-settings', label: 'Packages and rates', icon: Package, minRole: 'manager' },
     ],
   },
@@ -122,6 +124,7 @@ const titleByPath: { match: (path: string) => boolean; title: string }[] = [
   { match: (p) => p.startsWith('/accounts'), title: 'Accounts' },
   { match: (p) => p.startsWith('/delivery-settings'), title: 'Packages and rates' },
   { match: (p) => p.startsWith('/support'), title: 'Support' },
+  { match: (p) => p.startsWith('/ctrm'), title: 'CTRM Next pipeline' },
   { match: (p) => p.startsWith('/crm'), title: 'CRM' },
   { match: (p) => p.startsWith('/follow-ups'), title: 'Follow-ups' },
   { match: (p) => p.startsWith('/quotations'), title: 'Quotations' },

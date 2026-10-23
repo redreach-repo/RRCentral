@@ -103,3 +103,13 @@ describe('support desk permissions', () => {
     expect(can('manager', 'support.workingWeek')).toBe(false)
   })
 })
+
+describe('CTRM Next permissions', () => {
+  it('keeps Red Reach commission from staff and viewers', () => {
+    expect(can('admin', 'ctrm.commission')).toBe(true)
+    expect(can('manager', 'ctrm.commission')).toBe(true)
+    expect(can('sales', 'ctrm.commission')).toBe(true)
+    expect(can('staff', 'ctrm.commission')).toBe(false)
+    expect(can('viewer', 'ctrm.commission')).toBe(false)
+  })
+})

@@ -24,6 +24,7 @@ export type Permission =
   | 'delivery.profitability'
   | 'support.policies'
   | 'support.workingWeek'
+  | 'ctrm.commission'
 
 /**
  * Hierarchy: admin > manager > sales, plus two restricted roles
@@ -60,6 +61,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     'delivery.profitability',
     'support.policies',
     'support.workingWeek',
+    'ctrm.commission',
   ]),
   manager: new Set<Permission>([
     'crm.reassignOwner',
@@ -76,6 +78,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     'delivery.packages',
     'delivery.profitability',
     'support.policies',
+    'ctrm.commission',
   ]),
   sales: new Set<Permission>([
     'finance.reports',
@@ -83,6 +86,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     'accounts.viewAll',
     'accounts.write',
     'delivery.contracts',
+    'ctrm.commission',
   ]),
   staff: new Set<Permission>(['accounts.write']),
   viewer: new Set<Permission>(['legacy.access', 'accounts.viewAll']),

@@ -42,6 +42,9 @@ const CLOUD_TABLES = [
   'sla_policies',
   'tickets',
   'ticket_messages',
+  'ctrm_deals',
+  'ctrm_deal_stage_changes',
+  'ctrm_deal_commissions',
 ] as const
 
 /** Download a JSON backup of local IndexedDB or cloud Postgres tables. */
