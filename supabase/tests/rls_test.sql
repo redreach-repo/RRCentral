@@ -446,3 +446,10 @@ reset role;
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from worship_church_profiles'), 'anon cannot read church details');
 reset role;
+
+------------------------------------------------------------ Dashboard costs (Phase 6)
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+update app_settings set value = '99999' where key = 'deliveryFixedMonthlyCostAed';
+reset role;
+select pg_temp.expect((select value from app_settings where key = 'deliveryFixedMonthlyCostAed') = '0', 'manager cannot change the fixed cost estimate');

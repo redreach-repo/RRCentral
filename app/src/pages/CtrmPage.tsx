@@ -5,6 +5,7 @@ import { Handshake, Plus } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
+import { useCompactCrm } from '../hooks/useMediaQuery'
 import Modal from '../components/Modal'
 import DealFormModal, { type DealFormValues } from '../components/ctrm/DealFormModal'
 import { canEditAccount, visibleAccounts } from '../lib/accounts'
@@ -57,6 +58,7 @@ const chip = (bg: string, color: string): CSSProperties => ({
 
 export default function CtrmPage() {
   const { user, userRole, appUserId } = useAuth()
+  const compact = useCompactCrm()
   const { showToast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const [deals, setDeals] = useState<CtrmDeal[]>([])
@@ -395,10 +397,26 @@ export default function CtrmPage() {
           onAction={() => setEditing({ deal: null })}
         />
       ) : view === 'board' ? (
-        <div style={{ overflowX: 'auto', paddingBottom: 8 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${CTRM_STAGES.length}, minmax(200px, 1fr))`, gap: 10, minWidth: CTRM_STAGES.length * 210 }}>
+        <div style={compact ? undefined : { overflowX: 'auto', paddingBottom: 8 }}>
+          {/* On a phone the stages stack, and empty ones fold into one line. Cards move with their Move select. */}
+          {compact ? (
+            <p style={{ fontSize: 12, color: colors.muted2, margin: '0 0 8px' }}>
+              No deals in:{' '}
+              {CTRM_STAGES.filter((s) => !filtered.some((d) => d.stage === s.value))
+                .map((s) => s.label)
+                .join(', ') || 'none, every stage has a deal'}
+            </p>
+          ) : null}
+          <div
+            style={
+              compact
+                ? { display: 'grid', gap: 10 }
+                : { display: 'grid', gridTemplateColumns: `repeat(${CTRM_STAGES.length}, minmax(200px, 1fr))`, gap: 10, minWidth: CTRM_STAGES.length * 210 }
+            }
+          >
             {CTRM_STAGES.map((s) => {
               const inStage = filtered.filter((d) => d.stage === s.value)
+              if (compact && inStage.length === 0) return null
               return (
                 <div
                   key={s.value}
@@ -409,7 +427,7 @@ export default function CtrmPage() {
                     setDragId(null)
                     if (d) void move(d, s.value)
                   }}
-                  style={{ ...cardStyle, padding: 10, minHeight: 160, display: 'flex', flexDirection: 'column', gap: 8 }}
+                  style={{ ...cardStyle, padding: 10, minHeight: compact ? 0 : 160, display: 'flex', flexDirection: 'column', gap: 8 }}
                 >
                   <div style={{ fontSize: 12, fontWeight: 700, color: s.value === 'lost' ? colors.muted2 : colors.text }}>
                     {s.label} <span style={{ color: colors.muted2, fontWeight: 400 }}>{inStage.length}</span>
