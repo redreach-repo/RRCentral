@@ -49,6 +49,7 @@ const RATE_FIELDS: { key: keyof DeliveryRates; label: string }[] = [
   { key: 'leadMarkupPercent', label: 'Extra lead credits, markup %' },
   { key: 'internalHourlyRateAed', label: 'Internal hourly rate, AED' },
   { key: 'usdToAed', label: 'USD to AED rate' },
+  { key: 'fixedMonthlyCostAed', label: 'Fixed costs a month, AED (estimate, for the dashboard)' },
 ]
 
 type PackageDraft = Record<string, string>

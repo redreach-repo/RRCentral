@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { AlertTriangle, CalendarClock, FileText, Pencil, Plus, Trash2 } from 'lucide-react'
+import { AlertTriangle, CalendarClock, Clock, FileText, Pencil, Plus, Trash2 } from 'lucide-react'
 import Modal from '../Modal'
+import { useCompactCrm } from '../../hooks/useMediaQuery'
 import { useToast } from '../../contexts/ToastContext'
 import { useSettings } from '../../contexts/SettingsContext'
 import {
@@ -169,6 +170,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
   const [reqForm, setReqForm] = useState({ title: '', detail: '' })
 
   const canContracts = can(userRole, 'delivery.contracts')
+  const compact = useCompactCrm()
   const seesProfit = can(userRole, 'delivery.profitability')
 
   const load = useCallback(async () => {
@@ -423,6 +425,18 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
 
   return (
     <div style={{ marginTop: 16, display: 'grid', gap: 16 }}>
+      {canLog && compact ? (
+        <button
+          type="button"
+          style={buttonPrimaryStyle}
+          onClick={() => {
+            document.getElementById('log-hours')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            document.getElementById('log-hours-input')?.focus({ preventScroll: true })
+          }}
+        >
+          <Clock size={16} /> Log hours
+        </button>
+      ) : null}
       {alert?.flagged || renewal ? (
         <div style={{ display: 'grid', gap: 8 }}>
           {alert?.flagged ? (
@@ -552,7 +566,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
           </ol>
         </section>
 
-        <section style={cardStyle}>
+        <section style={cardStyle} id="log-hours">
           <h2 style={sectionTitleStyle}>Hours this month</h2>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
             <span>
@@ -567,6 +581,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
             <form onSubmit={(e) => void submitHours(e)} style={{ display: 'grid', gap: 8, marginTop: 12 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 8 }}>
                 <input
+                  id="log-hours-input"
                   style={inputStyle}
                   inputMode="decimal"
                   placeholder="Hours"

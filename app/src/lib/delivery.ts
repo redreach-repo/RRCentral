@@ -59,6 +59,8 @@ export type DeliveryRates = {
   leadMarkupPercent: number
   internalHourlyRateAed: number
   usdToAed: number
+  /** Salaries, rent, subscriptions. Only used on the dashboard. */
+  fixedMonthlyCostAed: number
 }
 
 export const DEFAULT_DELIVERY_RATES: DeliveryRates = {
@@ -68,6 +70,7 @@ export const DEFAULT_DELIVERY_RATES: DeliveryRates = {
   leadMarkupPercent: 30,
   internalHourlyRateAed: 150,
   usdToAed: 3.6725,
+  fixedMonthlyCostAed: 0,
 }
 
 export const DELIVERY_RATE_KEYS: Record<keyof DeliveryRates, string> = {
@@ -77,6 +80,7 @@ export const DELIVERY_RATE_KEYS: Record<keyof DeliveryRates, string> = {
   leadMarkupPercent: 'deliveryLeadMarkupPercent',
   internalHourlyRateAed: 'deliveryInternalHourlyRateAed',
   usdToAed: 'deliveryUsdToAed',
+  fixedMonthlyCostAed: 'deliveryFixedMonthlyCostAed',
 }
 
 export function ratesFromSettings(settings: Record<string, string | undefined>): DeliveryRates {

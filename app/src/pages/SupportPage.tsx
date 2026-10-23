@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { LifeBuoy, Plus } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
+import { useCompactCrm } from '../hooks/useMediaQuery'
+import resp from '../styles/crmResponsive.module.css'
 import EmptyState from '../components/EmptyState'
 import StatusPill from '../components/StatusPill'
 import SlaBadge from '../components/support/SlaBadge'
@@ -47,6 +49,7 @@ export default function SupportPage() {
   const { user, userRole, appUserId } = useAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
+  const compact = useCompactCrm()
   const [searchParams, setSearchParams] = useSearchParams()
   const { calendar, policies } = useSupportConfig()
   const [tickets, setTickets] = useState<Ticket[]>([])
@@ -301,6 +304,35 @@ export default function SupportPage() {
           actionLabel={canWrite && visible.length === 0 && writableAccounts.length ? 'Open a ticket' : undefined}
           onAction={() => setModalOpen(true)}
         />
+      ) : compact ? (
+        <div className={resp.listStack}>
+          {filtered.map((t) => {
+            const acc = t.account_id ? accountById.get(t.account_id) : undefined
+            return (
+              <article key={t.id} className={resp.card} onClick={() => navigate(`/support/${t.id}`)} style={{ cursor: 'pointer' }}>
+                <div className={resp.cardTop}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div className={resp.cardTitle}>{t.subject || '(no subject)'}</div>
+                    <div className={resp.cardMeta}>
+                      {acc ? `${acc.name}, ${accountTypeLabel(acc.type)}` : `Unknown sender ${t.requester_email}`}
+                    </div>
+                  </div>
+                  <StatusPill status={optionLabel(TICKET_STATUSES, t.status)} />
+                </div>
+                <div style={{ display: 'flex' }}>
+                  <SlaBadge ticket={t} now={now} />
+                </div>
+                <div className={resp.cardMeta}>
+                  <span style={{ color: PRIORITY_COLORS[t.priority], fontWeight: t.priority === 'urgent' ? 700 : 400 }}>
+                    {optionLabel(TICKET_PRIORITIES, t.priority)}
+                  </span>
+                  {', '}
+                  {personName(t.assignee_user_id)}
+                </div>
+              </article>
+            )
+          })}
+        </div>
       ) : (
         <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
           <div style={tableWrapStyle}>

@@ -102,6 +102,12 @@ export default function CtrmSummaryPage() {
         </p>
       ) : null}
 
+      {summary.byStage.every((b) => b.count === 0) ? (
+        <p className={styles.toolbar} style={{ fontSize: 13 }}>
+          There are no deals yet, so this summary is empty. <Link to="/ctrm">Add the first deal on the pipeline.</Link>
+        </p>
+      ) : null}
+
       <article className={styles.sheet}>
         <div className={styles.muted} style={{ fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
           Red Reach for CTRM Next, weekly pipeline
