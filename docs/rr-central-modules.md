@@ -111,8 +111,8 @@ in `app/src/lib/contractBilling.ts` and `contractBillingStore.ts`, with tests.
   month's usage. Contracts paid yearly get usage lines only.
 - Everything is raised as a **draft** on Invoices. While a draft is unedited it
   follows usage entered later. Finalising it gives it its RR reference.
-- There is no server job: the run happens in the browser of the first admin,
-  manager or sales user to open the app each day (and on saving a contract).
+- There is no server job: the run happens in the browser whenever an admin,
+  manager or sales user opens the app (and on saving a contract).
 - **Payment reminders** show on Invoices and the dashboard 3, 7 and 14 days
   after the due date (invoice date plus "Net N days"), with the message ready
   to send by email (Zoho Mail when connected) or WhatsApp.
