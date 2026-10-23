@@ -546,3 +546,41 @@ select pg_temp.expect(not pg_temp.fails($q$delete from digest_recipients where n
 select pg_temp.expect((select count(*) from digest_runs) = 2, 'manager sees digest runs');
 select pg_temp.expect(pg_temp.fails($q$insert into digest_runs (run_date) values ('2026-11-03')$q$), 'only the digest function logs runs');
 reset role;
+
+------------------------------------------------------------ Pre-sale pipeline (roadmap item 5)
+insert into accounts (type, name, reference, status) values ('ai_crm_client', 'Prospect Dental', 'AC-07-26090', 'prospect');
+insert into sales_deals (account_id, stage, next_action, next_action_date)
+  select id, 'lead', 'Book the discovery call', '2026-11-03' from accounts where name = 'Prospect Dental';
+insert into sales_deals (account_id, stage, next_action, next_action_date)
+  select id, 'discovery_call', 'Send the quote', '2026-11-04' from accounts where name = 'Assigned Clinic LLC';
+select pg_temp.expect(pg_temp.fails($q$update sales_deals set stage = 'lost' where next_action = 'Book the discovery call'$q$), 'a lost sales deal needs a reason');
+select pg_temp.expect(pg_temp.fails($q$update sales_deals set next_action = '' where next_action = 'Book the discovery call'$q$), 'an open sales deal needs a next action');
+select pg_temp.expect(pg_temp.fails($q$update sales_deals set discount_months = 13 where next_action = 'Book the discovery call'$q$), 'discount months stay within a year');
+select pg_temp.expect(not pg_temp.fails($q$update sales_deals set stage = 'quote_sent', package_id = (select id from delivery_packages where code = 'growth'), monthly_fee = 4500 where next_action = 'Book the discovery call'$q$), 'a quote goes on the deal');
+select id as sales_contract from contracts where account_id = (select id from accounts where name = 'Assigned Clinic LLC') limit 1 \gset
+update sales_deals set contract_id = :'sales_contract', stage = 'signed' where next_action = 'Send the quote';
+select id as prospect_dental from accounts where name = 'Prospect Dental' \gset
+select pg_temp.expect(pg_temp.fails(format('update sales_deals set contract_id = %L where next_action = %L', :'sales_contract', 'Book the discovery call')), 'one sales deal per contract');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from sales_deals) = 1, 'staff sees sales deals only on their accounts');
+select pg_temp.expect(not pg_temp.fails($q$update sales_deals set notes = 'met them' where next_action = 'Send the quote'$q$), 'staff updates their own sales deal');
+select pg_temp.expect(pg_temp.fails(format('insert into sales_deals (account_id, next_action, next_action_date) values (%L, %L, %L)', :'prospect_dental', 'x', '2026-12-01')), 'staff cannot add deals on other accounts');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from sales_deals) = 2, 'sales sees every sales deal');
+select pg_temp.expect(not pg_temp.fails($q$update sales_deals set next_action = 'Chase the signature' where next_action = 'Book the discovery call'$q$), 'sales moves sales deals');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from sales_deals) = 2, 'viewer reads sales deals');
+select pg_temp.expect(pg_temp.fails(format('insert into sales_deals (account_id, next_action, next_action_date) values (%L, %L, %L)', :'prospect_dental', 'x', '2026-12-01')), 'viewer cannot add sales deals');
+reset role;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from sales_deals'), 'anon cannot read sales deals');
+reset role;

@@ -28,6 +28,7 @@ import {
   LogOut,
   LifeBuoy,
   Handshake,
+  Target,
   Church,
   Timer,
 } from 'lucide-react'
@@ -71,6 +72,7 @@ const navGroups: NavGroup[] = [
     items: [
       { to: '/accounts', label: 'Accounts', icon: Contact, forStaff: true },
       { to: '/support', label: 'Support', icon: LifeBuoy, forStaff: true },
+      { to: '/sales', label: 'AI CRM sales', icon: Target, forStaff: true },
       { to: '/ctrm', label: 'CTRM Next', icon: Handshake, forStaff: true },
       { to: '/products', label: 'Products', icon: Church, forStaff: true },
       { to: '/delivery-settings', label: 'Packages and rates', icon: Package, minRole: 'manager' },
@@ -132,6 +134,7 @@ const titleByPath: { match: (path: string) => boolean; title: string }[] = [
   { match: (p) => p.startsWith('/delivery-settings'), title: 'Packages and rates' },
   { match: (p) => p.startsWith('/support'), title: 'Support' },
   { match: (p) => p.startsWith('/ctrm'), title: 'CTRM Next pipeline' },
+  { match: (p) => p.startsWith('/sales'), title: 'AI CRM sales pipeline' },
   { match: (p) => p.startsWith('/products'), title: 'Products' },
   { match: (p) => p.startsWith('/crm'), title: 'CRM' },
   { match: (p) => p.startsWith('/follow-ups'), title: 'Follow-ups' },

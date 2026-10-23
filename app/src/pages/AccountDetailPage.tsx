@@ -10,6 +10,7 @@ import AccountFormModal from '../components/accounts/AccountFormModal'
 import DeliveryPanel from '../components/accounts/DeliveryPanel'
 import AccountTicketsCard from '../components/support/AccountTicketsCard'
 import AccountDealsCard from '../components/ctrm/AccountDealsCard'
+import AccountSalesDealCard from '../components/sales/AccountSalesDealCard'
 import ChurchProductCard from '../components/worshiphub/ChurchProductCard'
 import { db } from '../lib/db'
 import {
@@ -108,6 +109,8 @@ export default function AccountDetailPage() {
   const { user, userRole, appUserId } = useAuth()
   const { showToast } = useToast()
   const [account, setAccount] = useState<Account | null>(null)
+  // Bumped when Make contract adds a contract, so the delivery panel reloads.
+  const [deliveryKey, setDeliveryKey] = useState(0)
   const [contacts, setContacts] = useState<AccountContact[]>([])
   const [timeline, setTimeline] = useState<AccountActivity[]>([])
   const [team, setTeam] = useState<AppUser[]>([])
@@ -523,7 +526,21 @@ export default function AccountDetailPage() {
       </div>
 
       {account.type === 'ai_crm_client' ? (
-        <DeliveryPanel account={account} editable={editable} userRole={userRole} team={team} author={author} />
+        <AccountSalesDealCard
+          account={account}
+          team={team}
+          editable={editable}
+          canContract={can(userRole, 'delivery.contracts')}
+          author={author}
+          onChanged={() => {
+            void load()
+            setDeliveryKey((k) => k + 1)
+          }}
+        />
+      ) : null}
+
+      {account.type === 'ai_crm_client' ? (
+        <DeliveryPanel key={deliveryKey} account={account} editable={editable} userRole={userRole} team={team} author={author} />
       ) : null}
 
       {account.type === 'worship_church' ? (
