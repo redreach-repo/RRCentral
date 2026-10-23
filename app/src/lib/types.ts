@@ -1021,3 +1021,55 @@ export interface SlaPolicy {
   first_response_hours: number
   updated_at: string
 }
+
+export type CtrmStage =
+  | 'identified'
+  | 'contacted'
+  | 'intro_call_booked'
+  | 'demo_done'
+  | 'evaluating'
+  | 'decision_pending'
+  | 'signed'
+  | 'lost'
+
+export type CtrmRegion = 'middle_east' | 'india'
+export type CtrmCompanyType = 'trading_house' | 'energy' | 'other'
+
+/** A prospect being introduced to CTRM Next. Commission lives in CtrmCommission. */
+export interface CtrmDeal {
+  id: string
+  account_id: string
+  stage: CtrmStage
+  region: CtrmRegion
+  company_type: CtrmCompanyType
+  primary_contact_id: string | null
+  source: string
+  owner_user_id: string | null
+  last_touch_at: string
+  next_action: string
+  next_action_date: string | null
+  lost_reason: string
+  notes: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CtrmStageChange {
+  id: string
+  deal_id: string
+  from_stage: string
+  to_stage: CtrmStage
+  changed_by: string
+  changed_at: string
+}
+
+/** Commission owed to Red Reach (the company) for a deal. Admin, manager and sales only. */
+export interface CtrmCommission {
+  id: string
+  deal_id: string
+  expected_commission: number
+  commission_received: number
+  currency: string
+  updated_at: string
+}

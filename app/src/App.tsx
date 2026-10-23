@@ -12,6 +12,8 @@ import ClientReportPage from './pages/ClientReportPage'
 import DeliverySettingsPage from './pages/DeliverySettingsPage'
 import SupportPage from './pages/SupportPage'
 import TicketPage from './pages/TicketPage'
+import CtrmPage from './pages/CtrmPage'
+import CtrmSummaryPage from './pages/CtrmSummaryPage'
 import CrmPage from './pages/CrmPage'
 import FollowupsPage from './pages/FollowupsPage'
 import QuotationsPage from './pages/QuotationsPage'
@@ -71,6 +73,14 @@ export default function App() {
             <Route path="teetribe" element={<Navigate to="/shop" replace />} />
             <Route path="/login" element={<LoginPage />} />
             <Route
+              path="/ctrm/summary"
+              element={
+                <ProtectedRoute>
+                  <CtrmSummaryPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/accounts/:id/report"
               element={
                 <ProtectedRoute>
@@ -99,6 +109,7 @@ export default function App() {
               <Route path="delivery-settings" element={<DeliverySettingsPage />} />
               <Route path="support" element={<SupportPage />} />
               <Route path="support/:id" element={<TicketPage />} />
+              <Route path="ctrm" element={<CtrmPage />} />
               <Route path="app/wanders" element={<WandersPage />} />
               <Route path="crm" element={<CrmPage />} />
               <Route path="follow-ups" element={<FollowupsPage />} />
