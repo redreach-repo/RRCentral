@@ -322,7 +322,8 @@ export type Profitability = {
 
 /**
  * One month for one client. Tool cost is the package's fixed estimate plus
- * the AI and lead credit spend recorded for the month.
+ * the AI and lead credit spend recorded for the month, plus the AI help the
+ * team used on this client inside RR Central (ai_usage_log).
  */
 export function profitability(input: {
   contract: Pick<Contract, 'monthly_fee' | 'discount_percent' | 'discount_months_left'>
@@ -331,11 +332,13 @@ export function profitability(input: {
   overageAed: number
   hours: number
   rates: DeliveryRates
+  /** RR Central AI help spent on this client this month, USD. */
+  assistUsd?: number
 }): Profitability {
   const feeAed = effectiveMonthlyFee(input.contract)
   const overageAed = round2(num(input.overageAed))
   const revenueAed = round2(feeAed + overageAed)
-  const usageUsd = num(input.usage?.ai_cost_usd) + num(input.usage?.lead_credits_cost_usd)
+  const usageUsd = num(input.usage?.ai_cost_usd) + num(input.usage?.lead_credits_cost_usd) + num(input.assistUsd)
   const toolCostAed = round2(num(input.pkg?.tool_cost_aed) + usageUsd * input.rates.usdToAed)
   const labourAed = round2(num(input.hours) * input.rates.internalHourlyRateAed)
   const marginAed = round2(revenueAed - toolCostAed - labourAed)

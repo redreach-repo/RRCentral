@@ -1060,6 +1060,19 @@ export interface SalesDeal {
   updated_at: string
 }
 
+/** One AI request made from RR Central, logged against the account (ai_usage_log). */
+export interface AiUsageLog {
+  id: string
+  account_id: string
+  feature: 'ticket_summary' | 'ticket_reply' | 'report_summary' | 'call_notes'
+  model: string
+  input_tokens: number
+  output_tokens: number
+  cost_usd: number
+  created_by: string
+  created_at: string
+}
+
 /** A private client portal link. Only the token's hash is stored. */
 export interface PortalAccess {
   id: string

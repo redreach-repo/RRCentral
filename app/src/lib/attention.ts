@@ -1,3 +1,4 @@
+import { assistCostInMonth, type AiUsageRow } from './aiAssist'
 import { isCancelledInvoice } from './finance'
 import { calculateOverage, monthKey, profitability, VAT_RATE, type DeliveryRates } from './delivery'
 import type { Contract, DeliveryPackage, Invoice, TimeEntry, UsageRecord } from './types'
@@ -31,6 +32,8 @@ export function monthCosts(input: {
   invoices: Pick<Invoice, 'account_id' | 'date' | 'amount' | 'status'>[]
   churchAccountIds: Set<string>
   rates: DeliveryRates
+  /** RR Central AI help logged this month (ai_usage_log). */
+  assist?: AiUsageRow[]
 }): MonthCosts {
   const month = monthKey(input.now)
   let aiCrmRevenueAed = 0
@@ -55,6 +58,7 @@ export function monthCosts(input: {
       overageAed: pkg && usage ? calculateOverage(usage, pkg, input.rates).totalAed : 0,
       hours,
       rates: input.rates,
+      assistUsd: assistCostInMonth(input.assist ?? [], c.account_id, month),
     })
     aiCrmRevenueAed += p.revenueAed
     toolCostAed += p.toolCostAed

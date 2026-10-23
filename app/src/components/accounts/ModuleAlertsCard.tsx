@@ -10,6 +10,7 @@ import { isOverdue, isStale } from '../../lib/ctrm'
 import { listDeals } from '../../lib/ctrmStore'
 import { db } from '../../lib/db'
 import { HOURS_ALERT_MESSAGE, hoursAlert, monthLabel, ratesFromSettings, renewalFlag, renewalLabel } from '../../lib/delivery'
+import { listAiUsage } from '../../lib/aiAssistStore'
 import { currentContract, listContracts, listPackages, listTimeEntries, listUsage } from '../../lib/deliveryStore'
 import { formatAED } from '../../lib/money'
 import { can, roleAtLeast } from '../../lib/permissions'
@@ -71,6 +72,7 @@ export default function ModuleAlertsCard() {
             fetchLiveTenants(),
             seesMoney ? db.from('invoices').select('*') : Promise.resolve({ data: [] }),
           ])
+        const assist = seesMoney ? await listAiUsage(null, startOfMonth(now).toISOString()).catch(() => []) : []
         const dueReminders = chasesPayments ? await listDueReminders(now).catch(() => []) : null
         const reminders: Line[] | null = dueReminders
           ? dueReminders.map((r) => ({
@@ -180,6 +182,7 @@ export default function ModuleAlertsCard() {
               invoices: ((inv as { data: unknown }).data || []) as Invoice[],
               churchAccountIds: new Set(accounts.filter((a) => a.type === 'worship_church').map((a) => a.id)),
               rates,
+              assist,
             })
           : null
 

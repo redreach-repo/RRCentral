@@ -111,7 +111,8 @@
     max-width: none;
   }
 
-  .plan {
+  .plan,
+  .screenOnly {
     display: none;
   }
 
