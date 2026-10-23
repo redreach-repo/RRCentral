@@ -24,7 +24,7 @@ export const ACCOUNT_TYPES: {
     label: 'AI CRM client',
     plural: 'AI CRM clients',
     code: '07',
-    statuses: ['onboarding', 'active', 'paused', 'ended'],
+    statuses: ['onboarding', 'active', 'paused', 'ended', 'prospect'],
   },
   {
     value: 'worship_church',

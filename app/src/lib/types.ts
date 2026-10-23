@@ -1024,6 +1024,42 @@ export interface UsageImportRun {
   message: string
 }
 
+export type SalesStage = 'lead' | 'discovery_call' | 'quote_sent' | 'signed' | 'lost'
+
+/** An AI CRM prospect in the pre-sale pipeline, with the quote on it. */
+export interface SalesDeal {
+  id: string
+  account_id: string
+  stage: SalesStage
+  source: string
+  owner_user_id: string | null
+  next_action: string
+  next_action_date: string | null
+  lost_reason: string
+  notes: string
+  /** Date of the discovery call, booked or held. */
+  discovery_call_date: string | null
+  /** The quote: package, option and fees, excluding VAT. */
+  package_id: string | null
+  option: 'A' | 'B'
+  monthly_fee: number
+  setup_fee: number
+  discount_percent: number
+  discount_months: number
+  /** Agreed contract start. Null means the first of next month. */
+  start_date: string | null
+  /** An RR quotation number, if a formal quotation was sent. */
+  quote_reference: string
+  quote_sent_at: string | null
+  /** Set when Make contract created the client's contract. */
+  contract_id: string | null
+  signed_at: string | null
+  last_touch_at: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
 /** Someone on the daily digest list. */
 export interface DigestRecipientRow {
   id: string

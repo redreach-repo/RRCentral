@@ -133,6 +133,16 @@ Adds `digest_recipients` (who gets the digest, by email and/or WhatsApp) and
 renewals in 60 days, overdue CTRM next actions and clients over hours each
 morning. Setup, WhatsApp template and schedule: [daily-digest.md](daily-digest.md).
 
+### Pre-sale pipeline (roadmap item 5, `20261102090000_sales_pipeline.sql`)
+
+Adds `sales_deals`: AI CRM prospects moving Lead, Discovery call, Quote sent,
+Signed (or Lost), on **AI CRM sales** (`/sales`). New prospects are AI CRM
+accounts with the status `prospect`. The quote (package, option, fees,
+discount, start date) lives on the deal. **Make contract** (admin, manager,
+sales) creates the contract from it with a 12 month term, links it to the
+deal, moves the deal to Signed and the account to onboarding. Automatic
+invoices start off. Rules and tests: `app/src/lib/salesPipeline.ts`.
+
 ## Roles
 
 Roles live on `app_users.role`. RLS in the database and `app/src/lib/permissions.ts`

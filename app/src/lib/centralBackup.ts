@@ -50,6 +50,7 @@ const CLOUD_TABLES = [
   'invoice_reminders',
   'usage_sources',
   'digest_recipients',
+  'sales_deals',
 ] as const
 
 /** Download a JSON backup of local IndexedDB or cloud Postgres tables. */
