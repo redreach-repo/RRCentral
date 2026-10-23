@@ -10,6 +10,7 @@ import AccountFormModal from '../components/accounts/AccountFormModal'
 import DeliveryPanel from '../components/accounts/DeliveryPanel'
 import AccountTicketsCard from '../components/support/AccountTicketsCard'
 import AccountDealsCard from '../components/ctrm/AccountDealsCard'
+import ChurchProductCard from '../components/worshiphub/ChurchProductCard'
 import { db } from '../lib/db'
 import {
   ACTIVITY_KINDS,
@@ -525,6 +526,10 @@ export default function AccountDetailPage() {
         <DeliveryPanel account={account} editable={editable} userRole={userRole} team={team} author={author} />
       ) : null}
 
+      {account.type === 'worship_church' ? (
+        <ChurchProductCard account={account} editable={editable} author={author} onChanged={() => void load()} />
+      ) : null}
+
       {account.type !== 'ctrm_prospect' ? (
         <AccountTicketsCard account={account} contacts={contacts} team={team} editable={editable} author={author} />
       ) : (
@@ -541,7 +546,12 @@ export default function AccountDetailPage() {
 
       {seesMoney ? (
         <section style={{ ...cardStyle, marginTop: 16 }}>
-          <h2 style={sectionTitleStyle}>Quotations and invoices</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+            <h2 style={sectionTitleStyle}>Quotations and invoices</h2>
+            <Link to={`/invoices?account=${account.id}`} style={{ color: colors.muted, fontSize: 12 }}>
+              See them in Invoices
+            </Link>
+          </div>
           <MoneyList
             title="Invoices"
             kind="invoice"
