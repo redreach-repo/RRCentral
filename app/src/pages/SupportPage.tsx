@@ -314,7 +314,7 @@ export default function SupportPage() {
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div className={resp.cardTitle}>{t.subject || '(no subject)'}</div>
                     <div className={resp.cardMeta}>
-                      {acc ? `${acc.name}, ${accountTypeLabel(acc.type)}` : `Unknown sender ${t.requester_email}`}
+                      {acc ? `${acc.name}, ${accountTypeLabel(acc.type)}` : `Unknown sender ${t.requester_phone ? `+${t.requester_phone} on WhatsApp` : t.requester_email}`}
                     </div>
                   </div>
                   <StatusPill status={optionLabel(TICKET_STATUSES, t.status)} />
@@ -354,7 +354,7 @@ export default function SupportPage() {
                       <td style={tdStyle}>
                         <div style={{ fontWeight: 600 }}>{t.subject || '(no subject)'}</div>
                         <div style={{ fontSize: 11, color: colors.muted2 }}>
-                          {acc ? `${acc.name}, ${accountTypeLabel(acc.type)}` : `Unknown sender ${t.requester_email}`}
+                          {acc ? `${acc.name}, ${accountTypeLabel(acc.type)}` : `Unknown sender ${t.requester_phone ? `+${t.requester_phone} on WhatsApp` : t.requester_email}`}
                         </div>
                       </td>
                       <td style={tdStyle}>

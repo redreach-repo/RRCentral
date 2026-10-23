@@ -1,5 +1,6 @@
 import { currentAuthMode, db } from './db'
 import { isMissingRelationError } from './errors'
+import { getSupabaseClient, isSupabaseConfigured } from './supabaseConfig'
 import { logAccountEvent } from './accountsStore'
 import { currentContract, listContracts, listPackages } from './deliveryStore'
 import { DEFAULT_ACCOUNT_TYPE_HOURS, addWorkingHours, slaHoursFor, type WorkingCalendar } from './sla'
@@ -223,4 +224,21 @@ export async function slaPackageFor(accountId: string, accountType: AccountType)
   if (accountType !== 'ai_crm_client') return null
   const contract = currentContract(await listContracts(accountId))
   return contract && contract.status !== 'ended' && contract.status !== 'cancelled' ? contract.package_id : null
+}
+
+export const WHATSAPP_LOCAL_MODE = 'Sending on WhatsApp works once RR Central is connected to Supabase.'
+
+/** Sends a reply on a WhatsApp ticket through the whatsapp-send function, which also logs it on the ticket. */
+export async function sendWhatsAppReply(ticketId: string, body: string): Promise<void> {
+  if (!isSupabaseConfigured()) throw new Error(WHATSAPP_LOCAL_MODE)
+  const { error } = await getSupabaseClient().functions.invoke('whatsapp-send', { body: { ticket_id: ticketId, body } })
+  if (!error) return
+  let message = 'The WhatsApp message was not sent. Please try again.'
+  try {
+    const res = await (error as { context?: Response }).context?.json()
+    if (res?.error) message = String(res.error)
+  } catch {
+    // keep the plain message
+  }
+  throw new Error(message)
 }
