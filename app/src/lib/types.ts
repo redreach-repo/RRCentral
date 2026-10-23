@@ -915,6 +915,24 @@ export interface Contract {
   updated_at: string
 }
 
+export type AgreementTemplateStatus = 'draft' | 'approved' | 'retired'
+
+/** Service agreement wording. Approved once by a lawyer, then locked; changes start a new draft version. */
+export interface AgreementTemplate {
+  id: string
+  version: number
+  title: string
+  body: string
+  status: AgreementTemplateStatus
+  /** The lawyer who approved this version. */
+  approved_by: string
+  approved_at: string | null
+  approval_note: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
 export interface ContractInvoice {
   id: string
   contract_id: string

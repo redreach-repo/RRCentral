@@ -32,6 +32,7 @@ import {
   Church,
   Timer,
   ClipboardList,
+  FileSignature,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders'
@@ -78,6 +79,7 @@ const navGroups: NavGroup[] = [
       { to: '/products', label: 'Products', icon: Church, forStaff: true },
       { to: '/delivery-settings', label: 'Packages and rates', icon: Package, minRole: 'manager' },
       { to: '/build-templates', label: 'Build templates', icon: ClipboardList, forStaff: true },
+      { to: '/agreement-template', label: 'Agreement template', icon: FileSignature, forStaff: true },
     ],
   },
   {
@@ -135,6 +137,7 @@ const titleByPath: { match: (path: string) => boolean; title: string }[] = [
   { match: (p) => p.startsWith('/accounts'), title: 'Accounts' },
   { match: (p) => p.startsWith('/delivery-settings'), title: 'Packages and rates' },
   { match: (p) => p.startsWith('/build-templates'), title: 'Build templates' },
+  { match: (p) => p.startsWith('/agreement-template'), title: 'Agreement template' },
   { match: (p) => p.startsWith('/support'), title: 'Support' },
   { match: (p) => p.startsWith('/ctrm'), title: 'CTRM Next pipeline' },
   { match: (p) => p.startsWith('/sales'), title: 'AI CRM sales pipeline' },

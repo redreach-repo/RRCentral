@@ -172,6 +172,17 @@ or continues tickets from client messages; `whatsapp-send` sends replies
 typed on the ticket, within WhatsApp's 24 hour reply window, and logs them.
 Setup: [whatsapp-tickets.md](whatsapp-tickets.md).
 
+### Service agreements (roadmap item 10, `20261107100000_agreement_templates.sql`)
+
+Adds `agreement_templates`: versions of the service agreement wording with
+`{{placeholders}}`. Service agreement on a client's Contract card fills the
+approved version from the contract, package and rates (fees, term, usage
+caps, overage prices, early exit fee, data protection terms) and downloads a
+text PDF. A version is approved once by the lawyer (name and date recorded),
+then locked by a trigger; changes start a new draft. Until a version is
+approved, PDFs are marked DRAFT. Edit on Agreement template
+(`/agreement-template`). Guide: [service-agreement.md](service-agreement.md).
+
 ## Roles
 
 Roles live on `app_users.role`. RLS in the database and `app/src/lib/permissions.ts`

@@ -690,3 +690,36 @@ set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from build_templates'), 'anon cannot read build templates');
 select pg_temp.expect(pg_temp.fails('select 1 from build_tasks'), 'anon cannot read build checklists');
 reset role;
+
+------------------------------------------------------------ Agreement templates (roadmap item 10)
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect(not pg_temp.fails($q$insert into agreement_templates (version, body) values (1, '# Agreement {{client_name}}')$q$), 'manager saves a draft agreement template');
+select pg_temp.expect(not pg_temp.fails($q$update agreement_templates set body = '# Agreement for {{client_name}}' where version = 1$q$), 'manager edits a draft');
+select pg_temp.expect(pg_temp.fails($q$update agreement_templates set status = 'approved' where version = 1$q$), 'approval needs the lawyer name and date');
+select pg_temp.expect(not pg_temp.fails($q$update agreement_templates set status = 'approved', approved_by = 'Layla Haddad', approved_at = now() where version = 1$q$), 'manager records the lawyer approval');
+select pg_temp.expect(pg_temp.fails($q$update agreement_templates set body = 'changed' where version = 1$q$), 'approved wording is locked');
+select pg_temp.expect(pg_temp.fails($q$delete from agreement_templates where version = 1$q$), 'approved template cannot be deleted');
+select pg_temp.expect(not pg_temp.fails($q$insert into agreement_templates (version, body) values (2, '# Agreement v2')$q$), 'manager starts a new draft');
+select pg_temp.expect(pg_temp.fails($q$update agreement_templates set status = 'approved', approved_by = 'L', approved_at = now() where version = 2$q$), 'only one approved version at a time');
+select pg_temp.expect(not pg_temp.fails($q$update agreement_templates set status = 'retired' where version = 1$q$), 'old version is retired');
+select pg_temp.expect(not pg_temp.fails($q$update agreement_templates set status = 'approved', approved_by = 'L', approved_at = now() where version = 2$q$), 'new version approved after the old one is retired');
+select pg_temp.expect(pg_temp.fails($q$update agreement_templates set status = 'approved' where version = 1$q$), 'a retired version cannot come back');
+select pg_temp.expect(not pg_temp.fails($q$insert into agreement_templates (version, body) values (3, 'draft 3')$q$) and not pg_temp.fails($q$delete from agreement_templates where version = 3$q$), 'manager deletes a draft');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from agreement_templates) = 2, 'staff reads agreement templates');
+select pg_temp.expect(pg_temp.fails($q$insert into agreement_templates (version, body) values (9, 'x')$q$), 'staff cannot add agreement templates');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from agreement_templates) = 2, 'sales reads agreement templates');
+select pg_temp.expect(pg_temp.fails($q$insert into agreement_templates (version, body) values (9, 'x')$q$), 'sales cannot add agreement templates');
+reset role;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from agreement_templates'), 'anon cannot read agreement templates');
+reset role;
