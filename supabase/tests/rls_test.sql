@@ -399,3 +399,50 @@ reset role;
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from ctrm_deals'), 'anon cannot read deals');
 reset role;
+
+------------------------------------------------------------ WorshipHub products (Phase 5)
+insert into accounts (type, name, reference, owner_user_id) values
+  ('worship_church', 'VA Church', 'AC-08-26002', (select id from app_users where email = 'va@redreach.ae'));
+insert into worship_church_profiles (account_id, tenant_slug, plan)
+  select id, 'other-church', 'Standard' from accounts where name = 'Unassigned Church';
+select id as unassigned_church from accounts where name = 'Unassigned Church' \gset
+select id as va_church from accounts where name = 'VA Church' \gset
+
+select pg_temp.expect(pg_temp.fails($q$insert into worship_church_profiles (account_id, tenant_slug) select id, 'Bad Slug' from accounts where name = 'VA Church'$q$), 'slug must be lowercase letters, digits and hyphens');
+select pg_temp.expect(pg_temp.fails($q$insert into worship_church_profiles (account_id, admin_url) select id, 'http://x.test' from accounts where name = 'VA Church'$q$), 'admin link must be https');
+
+-- Setup script: dry run changes nothing, apply creates and links, undo reverses.
+select pg_temp.expect((select count(*) from rr_add_worshiphub_churches()) = 2, 'setup dry run lists both tenants');
+select pg_temp.expect((select count(*) from accounts where type = 'worship_church') = 2, 'setup dry run changes nothing');
+insert into accounts (type, name, reference) values ('worship_church', 'ICOC UAE', 'AC-08-26003');
+select pg_temp.expect(
+  (select string_agg(action, ',' order by slug) from rr_add_worshiphub_churches()) = 'create church account,add slug to existing account',
+  'setup matches ICOC UAE by name and creates Abu Dhabi');
+select distinct batch_id as wh_batch from rr_add_worshiphub_churches(p_dry_run => false) \gset
+select pg_temp.expect((select reference from accounts where name = 'ICOC Abu Dhabi') = 'AC-08-' || to_char(now(), 'YY') || (case when to_char(now(), 'YY') = '26' then '004' else '001' end), 'new church gets the next AC-08 reference');
+select pg_temp.expect((select count(*) from worship_church_profiles where tenant_slug in ('icoc-uae', 'icoc-abu-dhabi')) = 2, 'setup links both tenants');
+select pg_temp.expect((select string_agg(action, ',') from rr_add_worshiphub_churches()) = 'already set up,already set up', 'setup is safe to re-run');
+select pg_temp.expect(rr_undo_worshiphub_churches(:'wh_batch') = 2, 'setup undo reverses both rows');
+select pg_temp.expect((select count(*) from accounts where name = 'ICOC Abu Dhabi') = 0 and (select count(*) from accounts where name = 'ICOC UAE') = 1, 'undo removes only what setup created');
+delete from accounts where name = 'ICOC UAE';
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect(pg_temp.fails('select rr_add_worshiphub_churches()'), 'app users cannot run the setup');
+select pg_temp.expect((select count(*) from worship_church_profiles) = 0, 'staff cannot see other churches');
+select pg_temp.expect(not pg_temp.fails($q$insert into worship_church_profiles (account_id, tenant_slug) select id, 'va-church' from accounts where name = 'VA Church'$q$), 'staff adds details to their own church');
+select pg_temp.expect(pg_temp.fails(format('insert into worship_church_profiles (account_id) values (%L)', :'unassigned_church')), 'staff cannot add details to other churches');
+update worship_church_profiles set plan = 'Hacked' where account_id = :'unassigned_church';
+select pg_temp.expect(pg_temp.fails($q$insert into worship_church_profiles (account_id) select id from accounts where name = 'VA Energy Lead'$q$), 'church details only on church accounts');
+reset role;
+select pg_temp.expect((select plan from worship_church_profiles where account_id = :'unassigned_church') = 'Standard', 'other church unchanged after staff attempt');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from worship_church_profiles) = 2, 'viewer reads church details');
+select pg_temp.expect(pg_temp.fails(format('update worship_church_profiles set plan = %L where account_id = %L returning 1', 'x', :'va_church')) or (select plan from worship_church_profiles where account_id = :'va_church') = '', 'viewer cannot edit church details');
+reset role;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from worship_church_profiles'), 'anon cannot read church details');
+reset role;

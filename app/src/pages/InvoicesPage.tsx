@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { Copy, ExternalLink, Pencil, Plus, Trash2, Wallet } from 'lucide-react'
 import { db } from '../lib/db'
@@ -11,7 +11,9 @@ import {
   PAYMENT_TERMS,
   VAT_RATE,
 } from '../lib/config'
-import type { Client, Invoice, PaymentLogEntry } from '../lib/types'
+import type { Account, Client, Invoice, PaymentLogEntry } from '../lib/types'
+import { accountTypeLabel } from '../lib/accounts'
+import { listAccounts } from '../lib/accountsStore'
 import { useAuth } from '../contexts/AuthContext'
 import { can } from '../lib/permissions'
 import { useSettings } from '../contexts/SettingsContext'
@@ -169,15 +171,21 @@ export default function InvoicesPage() {
         : { vat_mode: 'custom', vat_percent: vatRateToPercent(rate) }
   const [payTab, setPayTab] = useState<'All' | 'Pending' | 'Partial' | 'Paid'>('All')
   const compact = useCompactCrm()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const accountFilter = searchParams.get('account') || ''
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const accountById = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       await reconcileInvoiceFinance()
-      const [iRes, cRes] = await Promise.all([
+      const [iRes, cRes, acc] = await Promise.all([
         db.from('invoices').select('*').order('created_at', { ascending: false }),
         db.from('clients').select('*').order('company_name'),
+        listAccounts().catch(() => ({ rows: [] as Account[] })),
       ])
+      setAccounts(acc.rows)
       if (iRes.error) throw iRes.error
       const raw = (iRes.data || []) as Invoice[]
       // Repair stale Paid marks on cancelled invoices (e.g. wrong Ello payment applied then cancelled)
@@ -218,6 +226,7 @@ export default function InvoicesPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return invoices.filter((i) => {
+      if (accountFilter && i.account_id !== accountFilter) return false
       if (payTab !== 'All') {
         const pay = effectiveInvoicePaymentStatus(i)
         if (pay !== payTab) return false
@@ -229,7 +238,7 @@ export default function InvoicesPage() {
         i.description.toLowerCase().includes(q)
       )
     })
-  }, [invoices, search, payTab])
+  }, [invoices, search, payTab, accountFilter])
 
   const formVatRate =
     form.vat_mode === 'zero' ? 0 : form.vat_mode === 'custom' ? vatPercentToRate(form.vat_percent, vatRate) : vatRate
@@ -628,6 +637,22 @@ export default function InvoicesPage() {
     )
   }
 
+  /** Client name, linked to its account when the invoice is linked to one. */
+  function clientCell(inv: Invoice) {
+    const account = inv.account_id ? accountById.get(inv.account_id) : undefined
+    if (!account) return inv.client || '—'
+    return (
+      <>
+        <Link to={`/accounts/${account.id}`} style={{ color: 'inherit' }}>
+          {inv.client || account.name}
+        </Link>
+        <span style={{ display: 'block', fontSize: 11, color: colors.muted2 }}>{accountTypeLabel(account.type)}</span>
+      </>
+    )
+  }
+
+  const filterAccount = accountFilter ? accountById.get(accountFilter) : undefined
+
   return (
     <div style={pageStyle}>
       <div style={toolbarStyle}>
@@ -639,6 +664,23 @@ export default function InvoicesPage() {
           <Plus size={16} /> New invoice
         </button>
       </div>
+
+      {accountFilter ? (
+        <p style={{ fontSize: 13, color: colors.muted, margin: '0 0 12px' }}>
+          Showing invoices for {filterAccount?.name ?? 'one account'}.{' '}
+          <button
+            type="button"
+            style={{ all: 'unset', cursor: 'pointer', color: colors.accent }}
+            onClick={() => {
+              const next = new URLSearchParams(window.location.search)
+              next.delete('account')
+              setSearchParams(next, { replace: true })
+            }}
+          >
+            Show all
+          </button>
+        </p>
+      ) : null}
 
       <div className={resp.toolbar} style={{ marginBottom: 16 }}>
         <div className={compact ? resp.chipScroll : resp.chipRow} style={{ marginBottom: 0, flex: 1 }}>
@@ -685,7 +727,7 @@ export default function InvoicesPage() {
                     {inv.reference_number || '—'}
                   </div>
                   <div className={resp.cardMeta}>
-                    {inv.client || '—'}
+                    {clientCell(inv)}
                     {inv.date ? ` · ${format(new Date(inv.date), 'dd MMM yyyy')}` : ''}
                   </div>
                 </div>
@@ -722,7 +764,7 @@ export default function InvoicesPage() {
                     <td style={tdStyle}>
                       <strong>{inv.reference_number || '—'}</strong>
                     </td>
-                    <td style={tdStyle}>{inv.client || '—'}</td>
+                    <td style={tdStyle}>{clientCell(inv)}</td>
                     <td style={tdStyle}>
                       {inv.date ? format(new Date(inv.date), 'dd MMM yyyy') : '—'}
                     </td>

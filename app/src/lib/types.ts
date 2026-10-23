@@ -1073,3 +1073,40 @@ export interface CtrmCommission {
   currency: string
   updated_at: string
 }
+
+/** WorshipHub billing state for a church, as WorshipHub reports it. */
+export type WorshipBillingStatus = '' | 'trial' | 'active' | 'past_due' | 'paused' | 'cancelled'
+
+/** Account level details for a WorshipHub church, entered by hand in RR Central. */
+export interface WorshipChurchProfile {
+  id: string
+  account_id: string
+  tenant_slug: string
+  plan: string
+  modules: string[]
+  /** YYYY-MM */
+  whatsapp_month: string
+  whatsapp_conversations: number | null
+  billing_status: WorshipBillingStatus
+  renewal_date: string | null
+  admin_url: string
+  notes: string
+  updated_by: string
+  created_at: string
+  updated_at: string
+}
+
+/** One tenant as read live from WorshipHub. Only these fields ever reach RR Central. */
+export interface WorshipTenant {
+  slug: string
+  name: string
+  plan: string
+  modules: string[]
+  whatsapp_month: string
+  whatsapp_marketing: number
+  whatsapp_service: number
+  whatsapp_utility: number
+  billing_status: WorshipBillingStatus
+  renewal_date: string | null
+  admin_url: string
+}

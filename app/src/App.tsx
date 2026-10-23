@@ -14,6 +14,7 @@ import SupportPage from './pages/SupportPage'
 import TicketPage from './pages/TicketPage'
 import CtrmPage from './pages/CtrmPage'
 import CtrmSummaryPage from './pages/CtrmSummaryPage'
+import ProductsPage from './pages/ProductsPage'
 import CrmPage from './pages/CrmPage'
 import FollowupsPage from './pages/FollowupsPage'
 import QuotationsPage from './pages/QuotationsPage'
@@ -110,6 +111,7 @@ export default function App() {
               <Route path="support" element={<SupportPage />} />
               <Route path="support/:id" element={<TicketPage />} />
               <Route path="ctrm" element={<CtrmPage />} />
+              <Route path="products" element={<ProductsPage />} />
               <Route path="app/wanders" element={<WandersPage />} />
               <Route path="crm" element={<CrmPage />} />
               <Route path="follow-ups" element={<FollowupsPage />} />
