@@ -190,6 +190,14 @@ file and a README. "Copy for the client" leaves out internal notes and costs;
 "Full copy" (managers and admins) has everything. Guide:
 [client-data-export.md](client-data-export.md).
 
+### Backups and staging (roadmap item 13, no migration)
+
+The nightly backup now test-restores itself into a throwaway Postgres and
+compares row counts with live ([BACKUPS.md](BACKUPS.md)); CI runs the same
+check. A staging copy with its own Supabase project is published at
+`/RRCentral/staging/` once its secrets are set ([STAGING.md](STAGING.md)),
+and the **Update staging database** workflow applies the migrations to it.
+
 ## Roles
 
 Roles live on `app_users.role`. RLS in the database and `app/src/lib/permissions.ts`

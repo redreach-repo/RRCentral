@@ -1,7 +1,7 @@
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { stripeCheckoutPlugin } from './vite-plugin-stripe-checkout.ts'
 
 /**
@@ -46,10 +46,13 @@ function spaFallback404(): Plugin {
     'favicon-48.png',
   ]
 
+  let outDir = join(process.cwd(), 'dist')
   return {
     name: 'spa-fallback-404',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir)
+    },
     closeBundle() {
-      const outDir = join(process.cwd(), 'dist')
       const index = join(outDir, 'index.html')
       if (!existsSync(index)) return
       copyFileSync(index, join(outDir, '404.html'))
@@ -105,6 +108,10 @@ function securityMetaTags(): Plugin {
           attrs: { name: 'referrer', content: 'strict-origin-when-cross-origin' },
           injectTo: 'head-prepend',
         },
+        // Keep the staging copy out of search results.
+        ...(process.env.VITE_APP_ENV === 'staging'
+          ? [{ tag: 'meta', attrs: { name: 'robots', content: 'noindex, nofollow' }, injectTo: 'head-prepend' as const }]
+          : []),
       ]
     },
   }
@@ -113,7 +120,8 @@ function securityMetaTags(): Plugin {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), securityMetaTags(), spaFallback404(), stripeCheckoutPlugin()],
-  base: '/RRCentral/',
+  // VITE_BASE=/RRCentral/staging/ builds the staging copy (see docs/STAGING.md).
+  base: process.env.VITE_BASE || '/RRCentral/',
   // Broader phone/Chrome support than Vite's default (keeps modern syntax out of very old engines).
   // React 19 still needs a relatively recent browser; this is not IE / Chrome 60 support.
   build: {

@@ -23,6 +23,7 @@ jobs:
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
     steps:
+      - uses: actions/checkout@v4
       - name: Check secrets
         id: check
         run: |
@@ -33,7 +34,7 @@ jobs:
             echo "::error::BACKUP_PASSPHRASE must be set (20+ chars). Refusing to upload an unencrypted dump from a public repo."; exit 1
           fi
           echo "run=true" >> "$GITHUB_OUTPUT"
-      - name: Dump and encrypt
+      - name: Dump
         if: steps.check.outputs.run == 'true'
         run: |
           set -euo pipefail
@@ -44,12 +45,42 @@ jobs:
             sh -c 'pg_dump "$DB_URL" --format=custom --no-owner --no-privileges --schema=public --schema=auth' \
             > rrcentral.dump
           test -s rrcentral.dump
+          # Row counts straight after the dump, for the restore check.
+          docker run --rm -e DB_URL="$SUPABASE_DB_URL" -v "$PWD/scripts/db:/db:ro" postgres:17 \
+            sh -c 'psql -X -q "$DB_URL" -AtF "$(printf "\t")" -f /db/table-counts.sql' > live-counts.tsv
+          echo "$(wc -l < live-counts.tsv) tables counted"
+      # Proves the backup restores: loads it into an empty throwaway Postgres
+      # and checks every table comes back with its rows. A failure here fails
+      # the run, and GitHub emails the repository owner.
+      - name: Test restoring the backup
+        id: restore
+        if: steps.check.outputs.run == 'true'
+        run: |
+          set -euo pipefail
+          docker network create restore-net
+          docker run -d --name scratch --network restore-net -e POSTGRES_PASSWORD=scratch postgres:17
+          for i in $(seq 1 30); do docker exec scratch pg_isready -U postgres -q && break; sleep 2; done
+          docker run --rm --network restore-net -v "$PWD:/work" -w /work \
+            --user "$(id -u):$(id -g)" -e HOME=/tmp -e GITHUB_STEP_SUMMARY=/work/restore-summary.md postgres:17 \
+            bash scripts/db/restore-check.sh rrcentral.dump postgresql://postgres:scratch@scratch/postgres live-counts.tsv
+      - name: Restore check summary
+        if: always() && steps.check.outputs.run == 'true'
+        run: |
+          [ -f restore-summary.md ] && cat restore-summary.md >> "$GITHUB_STEP_SUMMARY" || true
+          docker rm -f scratch >/dev/null 2>&1 || true
+      - name: Encrypt
+        if: always() && steps.check.outputs.run == 'true'
+        run: |
+          set -euo pipefail
+          umask 077
+          test -s rrcentral.dump
           gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" \
-            --symmetric --cipher-algo AES256 -o "rrcentral-$stamp.dump.gpg" rrcentral.dump
+            --symmetric --cipher-algo AES256 -o "rrcentral-$STAMP.dump.gpg" rrcentral.dump
           shred -u rrcentral.dump
+          rm -f live-counts.tsv restored-counts.tsv restore-errors.log restore-summary.md || true
           ls -lh rrcentral-*.dump.gpg
       - uses: actions/upload-artifact@v4
-        if: steps.check.outputs.run == 'true'
+        if: always() && steps.check.outputs.run == 'true'
         with:
           name: rrcentral-db-${{ env.STAMP }}
           path: rrcentral-*.dump.gpg
