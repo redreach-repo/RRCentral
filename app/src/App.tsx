@@ -15,6 +15,7 @@ import AgreementTemplatePage from './pages/AgreementTemplatePage'
 import ClientHealthPage from './pages/ClientHealthPage'
 import MrrPage from './pages/MrrPage'
 import AppErrorsPage from './pages/AppErrorsPage'
+import InsightsPage from './pages/InsightsPage'
 import SupportPage from './pages/SupportPage'
 import TicketPage from './pages/TicketPage'
 import CtrmPage from './pages/CtrmPage'
@@ -121,6 +122,7 @@ export default function App() {
               <Route path="agreement-template" element={<AgreementTemplatePage />} />
               <Route path="client-health" element={<ClientHealthPage />} />
               <Route path="mrr" element={<MrrPage />} />
+              <Route path="insights" element={<InsightsPage />} />
               <Route path="support" element={<SupportPage />} />
               <Route path="support/:id" element={<TicketPage />} />
               <Route path="ctrm" element={<CtrmPage />} />
