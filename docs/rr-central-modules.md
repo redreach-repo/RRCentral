@@ -183,6 +183,13 @@ then locked by a trigger; changes start a new draft. Until a version is
 approved, PDFs are marked DRAFT. Edit on Agreement template
 (`/agreement-template`). Guide: [service-agreement.md](service-agreement.md).
 
+### Client data export (roadmap item 12, no migration)
+
+Export data on a client's page downloads a ZIP: a CSV per table, one JSON
+file and a README. "Copy for the client" leaves out internal notes and costs;
+"Full copy" (managers and admins) has everything. Guide:
+[client-data-export.md](client-data-export.md).
+
 ## Roles
 
 Roles live on `app_users.role`. RLS in the database and `app/src/lib/permissions.ts`
