@@ -1127,6 +1127,8 @@ export interface Ticket {
   account_id: string | null
   contact_id: string | null
   requester_email: string
+  /** WhatsApp number the ticket came from, digits with country code. Empty for other channels. */
+  requester_phone?: string
   subject: string
   channel: TicketChannel
   priority: TicketPriority
@@ -1150,8 +1152,10 @@ export interface TicketMessage {
   author_label: string
   body: string
   is_internal_note: boolean
-  /** Email Message-ID for threading inbound replies. */
+  /** Email Message-ID for threading inbound replies, or the WhatsApp message id. */
   external_id: string
+  /** For replies sent on WhatsApp: sent, delivered, read or failed. */
+  delivery_status?: string
   created_at: string
 }
 

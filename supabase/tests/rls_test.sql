@@ -634,3 +634,18 @@ reset role;
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from ai_usage_log'), 'anon cannot read AI use');
 reset role;
+
+------------------------------------------------------------ WhatsApp to tickets (roadmap item 8)
+insert into tickets (account_id, requester_phone, subject, channel, sla_hours)
+  values (:'assigned_clinic', '971501234567', 'Reminders stopped', 'whatsapp', 8);
+select id as wa_ticket from tickets where requester_phone = '971501234567' \gset
+insert into ticket_messages (ticket_id, author_kind, author_label, body, external_id)
+  values (:'wa_ticket', 'contact', 'Sara (WhatsApp +971501234567)', 'Reminders stopped', 'wamid.TEST1');
+select pg_temp.expect(pg_temp.fails(format('insert into ticket_messages (ticket_id, author_kind, author_label, body, external_id) values (%L, %L, %L, %L, %L)', :'wa_ticket', 'contact', 'Sara', 'again', 'wamid.TEST1')), 'a WhatsApp message is saved once');
+select pg_temp.expect(not pg_temp.fails(format('insert into ticket_messages (ticket_id, author_kind, author_label, body) values (%L, %L, %L, %L)', :'wa_ticket', 'user', 'alfred', 'note one')) and not pg_temp.fails(format('insert into ticket_messages (ticket_id, author_kind, author_label, body) values (%L, %L, %L, %L)', :'wa_ticket', 'user', 'alfred', 'note two')), 'messages without a WhatsApp id are not limited');
+select pg_temp.expect(pg_temp.fails($q$update ticket_messages set delivery_status = 'bounced' where external_id = 'wamid.TEST1'$q$), 'delivery status is one of the WhatsApp states');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from tickets where requester_phone = '971501234567') = 1, 'staff sees WhatsApp tickets on their accounts');
+reset role;

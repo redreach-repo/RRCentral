@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { ArrowLeft, LifeBuoy, Lock, Sparkles } from 'lucide-react'
+import { ArrowLeft, LifeBuoy, Lock, MessageCircle, Sparkles } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { useSettings } from '../contexts/SettingsContext'
@@ -10,7 +10,8 @@ import SlaBadge from '../components/support/SlaBadge'
 import { accountTypeLabel, canEditAccount } from '../lib/accounts'
 import { listAccounts, listContacts, listTeam } from '../lib/accountsStore'
 import { TICKET_CHANNELS, TICKET_PRIORITIES, TICKET_STATUSES, optionLabel } from '../lib/support'
-import { LOGGED_FOR_CLIENT, addTicketMessage, getTicket, listMessages, updateTicket } from '../lib/supportStore'
+import { LOGGED_FOR_CLIENT, addTicketMessage, getTicket, listMessages, sendWhatsAppReply, updateTicket } from '../lib/supportStore'
+import { DELIVERY_LABELS, serviceWindow, type DeliveryStatus } from '../lib/whatsappTickets'
 import { errorMessage } from '../lib/errors'
 import { signOffFor, type AiThreadMessage } from '../lib/aiAssist'
 import { runAi } from '../lib/aiAssistStore'
@@ -115,6 +116,10 @@ export default function TicketPage() {
   const accountContacts = contacts.filter((c) => c.account_id === ticket.account_id)
   const canLogTime = Boolean(account) && editable && userRole !== 'viewer'
   const ticketHours = ticketTime.reduce((sum, e) => sum + (Number(e.hours) || 0), 0)
+  const waPhone = ticket.channel === 'whatsapp' ? ticket.requester_phone || '' : ''
+  const lastClientAt =
+    [...messages].reverse().find((m) => m.author_kind === 'contact' && m.external_id.startsWith('wamid.'))?.created_at ?? null
+  const waWindow = serviceWindow(lastClientAt)
 
   async function change(patch: Partial<Pick<Ticket, 'status' | 'priority' | 'assignee_user_id' | 'account_id' | 'contact_id'>>) {
     if (!ticket) return
@@ -129,11 +134,12 @@ export default function TicketPage() {
     }
   }
 
-  async function send() {
+  async function send(viaWhatsApp = false) {
     if (!ticket || !reply.trim()) return
     setBusy(true)
     try {
-      await addTicketMessage(ticket, reply.trim(), internal, author)
+      if (viaWhatsApp) await sendWhatsAppReply(ticket.id, reply.trim())
+      else await addTicketMessage(ticket, reply.trim(), internal, author)
       setReply('')
       let logged = ''
       if (timeSpent > 0 && ticket.account_id && canLogTime) {
@@ -155,10 +161,10 @@ export default function TicketPage() {
           showToast(errorMessage(e, 'The reply was saved but the time was not logged'), 'error')
         }
       }
-      showToast(`${internal ? 'Note added' : 'Reply logged'}${logged}`, 'success')
+      showToast(`${internal ? 'Note added' : viaWhatsApp ? 'Sent on WhatsApp' : 'Reply logged'}${logged}`, 'success')
       await load()
     } catch (e) {
-      showToast(errorMessage(e, 'Could not save the reply'), 'error')
+      showToast(errorMessage(e, viaWhatsApp ? 'The WhatsApp message was not sent' : 'Could not save the reply'), 'error')
     } finally {
       setBusy(false)
     }
@@ -260,7 +266,10 @@ export default function TicketPage() {
               {contact ? `, asked by ${contact.name || contact.email}` : ''}
             </>
           ) : (
-            <>Unknown sender {ticket.requester_email}. File it on an account to start tracking it properly.</>
+            <>
+              Unknown sender {ticket.requester_phone ? `+${ticket.requester_phone} on WhatsApp` : ticket.requester_email}. File it
+              on an account to start tracking it properly.
+            </>
           )}
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-end' }}>
@@ -429,6 +438,7 @@ export default function TicketPage() {
                           ? `From the client, logged by ${m.author_label.slice(0, -LOGGED_FOR_CLIENT.length)}`
                           : `Reply, ${m.author_label}`}
                     , {format(parseISO(m.created_at), 'd MMM, HH:mm')}
+                    {m.delivery_status ? `, ${DELIVERY_LABELS[m.delivery_status as DeliveryStatus] ?? m.delivery_status}` : ''}
                   </span>
                 </div>
                 <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>{m.body}</div>
@@ -470,9 +480,26 @@ export default function TicketPage() {
                 </select>
               </label>
             ) : null}
-            <button type="button" style={buttonPrimaryStyle} disabled={busy || !reply.trim()} onClick={() => void send()}>
-              {internal ? 'Add note' : 'Log reply'}
-            </button>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {waPhone && !internal ? (
+                <button
+                  type="button"
+                  style={buttonPrimaryStyle}
+                  disabled={busy || !reply.trim() || !waWindow.open}
+                  onClick={() => void send(true)}
+                >
+                  <MessageCircle size={14} /> Send on WhatsApp
+                </button>
+              ) : null}
+              <button
+                type="button"
+                style={waPhone && !internal ? buttonSecondaryStyle : buttonPrimaryStyle}
+                disabled={busy || !reply.trim()}
+                onClick={() => void send()}
+              >
+                {internal ? 'Add note' : 'Log reply'}
+              </button>
+            </div>
           </div>
           {canLogTime ? (
             <p style={{ color: colors.muted2, fontSize: 12, margin: '10px 0 0' }}>
@@ -482,7 +509,13 @@ export default function TicketPage() {
               Time goes on the client's hours as support.
             </p>
           ) : null}
-          {!internal ? (
+          {!internal && waPhone ? (
+            <p style={{ color: waWindow.open ? colors.muted2 : colors.warn, fontSize: 12, margin: '10px 0 0' }}>
+              {waWindow.open && waWindow.closesAt
+                ? `Send on WhatsApp goes to +${waPhone} and is logged here. WhatsApp allows replies until ${format(parseISO(waWindow.closesAt), 'd MMM, HH:mm')}, 24 hours after their last message.`
+                : `It is more than 24 hours since +${waPhone} last wrote, so WhatsApp will not take a normal reply. Call them, or log what you told them another way.`}
+            </p>
+          ) : !internal ? (
             <p style={{ color: colors.muted2, fontSize: 12, margin: '10px 0 0' }}>
               Replies are logged here and on the account timeline. Send the message itself by email or WhatsApp as usual.
             </p>
