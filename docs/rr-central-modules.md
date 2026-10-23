@@ -206,6 +206,12 @@ attended and overdue invoices, with a churn warning. Client health page
 (`/client-health`) and a Health card on each client. Guide:
 [client-health.md](client-health.md).
 
+### MRR view (Tier 4, no migration)
+
+The MRR page (`/mrr`, managers and admins) shows this month's MRR, new and
+lost, MRR with a churn warning, a 3 month forecast (contracts plus weighted
+sales deals) and the last 12 months. Guide: [mrr.md](mrr.md).
+
 ## Roles
 
 Roles live on `app_users.role`. RLS in the database and `app/src/lib/permissions.ts`
