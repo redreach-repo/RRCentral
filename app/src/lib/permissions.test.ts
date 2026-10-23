@@ -93,3 +93,13 @@ describe('client delivery permissions', () => {
     expect(can('staff', 'delivery.contracts')).toBe(false)
   })
 })
+
+describe('support desk permissions', () => {
+  it('lets managers edit SLA policies but only admins change the working week', () => {
+    expect(can('admin', 'support.policies')).toBe(true)
+    expect(can('manager', 'support.policies')).toBe(true)
+    expect(can('sales', 'support.policies')).toBe(false)
+    expect(can('admin', 'support.workingWeek')).toBe(true)
+    expect(can('manager', 'support.workingWeek')).toBe(false)
+  })
+})

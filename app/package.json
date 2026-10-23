@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "build:checkout-fn": "node scripts/build-checkout-function.mjs",
+    "build:support-fn": "node scripts/build-support-function.mjs",
     "typecheck": "tsc -b"
   },
   "dependencies": {

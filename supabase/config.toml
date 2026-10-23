@@ -9,3 +9,6 @@ verify_jwt = false
 
 [functions.teetribe-order-sync]
 verify_jwt = false
+
+[functions.support-email-in]
+verify_jwt = false

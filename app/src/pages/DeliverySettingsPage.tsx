@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
+import SupportSettingsCard from '../components/support/SupportSettingsCard'
 import { DEFAULT_DELIVERY_RATES, DELIVERY_RATE_KEYS, type DeliveryRates, ratesFromSettings } from '../lib/delivery'
 import { listPackages, updatePackage } from '../lib/deliveryStore'
 import { can } from '../lib/permissions'
@@ -144,7 +145,7 @@ export default function DeliverySettingsPage() {
     <div style={pageStyle}>
       <h1 style={pageTitleStyle}>Packages and rates</h1>
       <p style={pageSubtitleStyle}>
-        The AI CRM package catalogue and the rates used for overage and profitability. Prices exclude 5% VAT.
+        The AI CRM package catalogue, the rates used for overage and profitability, and support response times. Prices exclude 5% VAT.
         Changes apply to new contracts; existing contracts keep the fees saved on them.
       </p>
 
@@ -173,6 +174,8 @@ export default function DeliverySettingsPage() {
           <p style={{ color: colors.muted, fontSize: 13, margin: 0 }}>Only admins can change rates.</p>
         )}
       </section>
+
+      <SupportSettingsCard canPolicies={can(userRole, 'support.policies')} canWeek={can(userRole, 'support.workingWeek')} />
 
       {packages.length === 0 ? (
         <EmptyState

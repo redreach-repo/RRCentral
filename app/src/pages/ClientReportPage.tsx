@@ -25,6 +25,8 @@ import {
   listUsage,
 } from '../lib/deliveryStore'
 import { errorMessage } from '../lib/errors'
+import { resolvedInMonth } from '../lib/support'
+import { listTickets } from '../lib/supportStore'
 import { formatAED } from '../lib/money'
 import type {
   Account,
@@ -32,6 +34,7 @@ import type {
   Contract,
   DeliveryPackage,
   Requirement,
+  Ticket,
   TimeEntry,
   UsageRecord,
 } from '../lib/types'
@@ -51,6 +54,7 @@ export default function ClientReportPage() {
   const [usage, setUsage] = useState<UsageRecord[]>([])
   const [stages, setStages] = useState<BuildStage[]>([])
   const [requirements, setRequirements] = useState<Requirement[]>([])
+  const [tickets, setTickets] = useState<Ticket[]>([])
   const [planEdits, setPlanEdits] = useState<Record<string, string>>({})
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -63,13 +67,14 @@ export default function ClientReportPage() {
         if (!alive) return
         setAccount(acc)
         if (!acc) return
-        const [c, p, t, u, s, r] = await Promise.all([
+        const [c, p, t, u, s, r, tk] = await Promise.all([
           listContracts(id),
           listPackages(),
           listTimeEntries(id),
           listUsage(id),
           listStages(id),
           listRequirements(id),
+          listTickets(id),
         ])
         if (!alive) return
         const cur = currentContract(c)
@@ -79,6 +84,7 @@ export default function ClientReportPage() {
         setUsage(u)
         setStages(s)
         setRequirements(r)
+        setTickets(tk)
       } catch (e) {
         setError(errorMessage(e, 'Could not load the report'))
       } finally {
@@ -212,7 +218,35 @@ export default function ClientReportPage() {
         )}
 
         <h2>Support</h2>
-        <p className={styles.muted}>Tickets resolved: not tracked yet. This will fill in once the support desk is live.</p>
+        {(() => {
+          const resolved = resolvedInMonth(tickets, month)
+          const opened = tickets.filter((t) => monthKey(t.created_at) === month).length
+          const answered = resolved.filter((t) => t.first_response_at && t.sla_due_at)
+          const onTime = answered.filter((t) => String(t.first_response_at) <= String(t.sla_due_at)).length
+          return resolved.length || opened ? (
+            <>
+              <p style={{ margin: '0 0 8px' }}>
+                <strong>{resolved.length}</strong> {resolved.length === 1 ? 'request' : 'requests'} resolved this month,{' '}
+                {opened} opened.
+                {answered.length ? ` ${onTime} of ${answered.length} answered within the agreed response time.` : ''}
+              </p>
+              {resolved.length ? (
+                <table className={styles.table}>
+                  <tbody>
+                    {resolved.map((t) => (
+                      <tr key={t.id}>
+                        <td>{t.subject}</td>
+                        <td className={styles.num}>{t.resolved_at ? format(parseISO(t.resolved_at), 'd MMM') : ''}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : null}
+            </>
+          ) : (
+            <p className={styles.muted}>No support requests this month.</p>
+          )
+        })()}
 
         <h2>Build status</h2>
         <p style={{ margin: '0 0 8px' }}>

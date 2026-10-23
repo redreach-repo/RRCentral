@@ -296,3 +296,59 @@ set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
 select pg_temp.expect((select count(*) from contracts) >= 2, 'viewer reads contracts');
 select pg_temp.expect(pg_temp.fails($q$insert into time_entries (account_id, hours) select id, 1 from accounts limit 1$q$), 'viewer cannot log hours');
 reset role;
+
+------------------------------------------------------------ support desk (Phase 3)
+select pg_temp.expect((select count(*) from sla_policies where applies_to = 'package') = 3, 'an SLA policy for each package');
+select pg_temp.expect(
+  (select first_response_hours from sla_policies s join delivery_packages p on p.id = s.package_id where p.code = 'growth') = 9,
+  'growth answers within one working day'
+);
+select pg_temp.expect(
+  (select first_response_hours from sla_policies where account_type = 'worship_church') = 18,
+  'churches default to two working days'
+);
+insert into tickets (account_id, subject) select id, 'Clinic bot down' from accounts where name = 'Assigned Clinic LLC';
+insert into tickets (account_id, subject) select id, 'Church app login' from accounts where name = 'Unassigned Church';
+insert into tickets (account_id, requester_email, subject) values (null, 'someone@example.com', 'Unknown sender');
+insert into ticket_messages (ticket_id, author_kind, author_label, body)
+  select id, 'contact', 'pastor@church.example', 'Cannot log in' from tickets where subject = 'Church app login';
+select id as church_id from accounts where name = 'Unassigned Church' \gset
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from tickets) = 1, 'staff sees only tickets on their accounts');
+select pg_temp.expect((select count(*) from ticket_messages) = 0, 'staff cannot read messages on other tickets');
+select pg_temp.expect(not pg_temp.fails($q$insert into tickets (account_id, subject) select id, 'Follow up' from accounts where name = 'Assigned Clinic LLC'$q$), 'staff opens a ticket on own account');
+select pg_temp.expect(pg_temp.fails(format('insert into tickets (account_id, subject) values (%L, %L)', :'church_id', 'Sneaky')), 'staff cannot open a ticket on another account');
+select pg_temp.expect(pg_temp.fails($q$insert into tickets (account_id, subject) values (null, 'No account')$q$), 'staff cannot open an unfiled ticket');
+select pg_temp.expect(not pg_temp.fails($q$insert into ticket_messages (ticket_id, author_kind, author_user_id, body) select id, 'user', public.rr_current_user_id(), 'On it' from tickets where subject = 'Clinic bot down'$q$), 'staff replies on own ticket');
+select pg_temp.expect(pg_temp.fails($q$insert into ticket_messages (ticket_id, author_kind, body) select id, 'contact', 'Fake client words' from tickets where subject = 'Clinic bot down'$q$), 'staff cannot post as the client');
+select pg_temp.expect(pg_temp.fails($q$insert into ticket_messages (ticket_id, author_kind, author_user_id, body) select id, 'user', (select id from app_users where email = 'alfred@redreach.ae'), 'x' from tickets where subject = 'Clinic bot down'$q$), 'staff cannot reply as someone else');
+update tickets set status = 'closed';
+select pg_temp.expect(pg_temp.fails($q$update sla_policies set first_response_hours = 1$q$) or (select min(first_response_hours) from sla_policies) >= 4, 'staff cannot edit SLA policies');
+reset role;
+select pg_temp.expect((select status from tickets where subject = 'Church app login') = 'new', 'staff update did not touch other tickets');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from tickets where account_id is null) = 1, 'sales sees unfiled email tickets');
+select pg_temp.expect(not pg_temp.fails($q$update tickets set account_id = (select id from accounts where name = 'VA Prospect') where account_id is null$q$), 'sales files an unknown sender on an account');
+update app_settings set value = '1,2,3,4,5,6' where key = 'supportWorkingDays';
+reset role;
+select pg_temp.expect((select value from app_settings where key = 'supportWorkingDays') = '1,2,3,4,5', 'sales cannot change the working week');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+update sla_policies set first_response_hours = 20 where account_type = 'worship_church';
+reset role;
+select pg_temp.expect((select first_response_hours from sla_policies where account_type = 'worship_church') = 20, 'manager edits SLA policies');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from tickets) >= 3, 'viewer reads tickets');
+select pg_temp.expect(pg_temp.fails($q$insert into tickets (account_id, subject) select id, 'x' from accounts limit 1$q$), 'viewer cannot open tickets');
+reset role;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from tickets'), 'anon cannot read tickets');
+reset role;
