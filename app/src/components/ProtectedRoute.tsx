@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import TwoStepGate from './security/TwoStepGate'
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, hasAccess, signOut } = useAuth()
@@ -65,5 +66,5 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     )
   }
 
-  return <>{children}</>
+  return <TwoStepGate>{children}</TwoStepGate>
 }

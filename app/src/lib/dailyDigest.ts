@@ -37,6 +37,8 @@ export type Digest = {
   overHours: DigestItem[]
   /** Fridays only: clients with no hours since Monday. Null on other days. */
   noHours: DigestItem[] | null
+  /** App errors reported in the last 24 hours, one line per distinct message. */
+  appErrors: DigestItem[]
 }
 
 export type DigestInput = {
@@ -48,6 +50,8 @@ export type DigestInput = {
   entries: Pick<TimeEntry, 'account_id' | 'date' | 'hours'>[]
   tickets: Pick<Ticket, 'id' | 'subject' | 'account_id' | 'status' | 'created_at' | 'sla_due_at' | 'first_response_at'>[]
   deals: Pick<CtrmDeal, 'id' | 'account_id' | 'stage' | 'next_action' | 'next_action_date'>[]
+  /** app_errors rows from the last 24 hours (optional). */
+  errors?: { message: string; created_at: string }[]
 }
 
 const day = (iso: string) => format(parseISO(iso.slice(0, 10)), 'd MMM')
@@ -130,7 +134,21 @@ export function buildDigest(input: DigestInput): Digest {
     overdueActions,
     overHours,
     noHours,
+    appErrors: digestErrors(input.errors || []),
   }
+}
+
+/** One line per distinct error message, most frequent first, at most 5. */
+function digestErrors(errors: { message: string }[]): DigestItem[] {
+  const counts = new Map<string, number>()
+  for (const e of errors) {
+    const m = e.message.trim().slice(0, 140)
+    if (m) counts.set(m, (counts.get(m) || 0) + 1)
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([message, n]) => ({ name: message, detail: `${n} ${n === 1 ? 'time' : 'times'}`, path: '/app-errors', urgent: true }))
 }
 
 export type DigestSection = { key: keyof Omit<Digest, 'date'>; title: string; empty: string; items: DigestItem[] }
@@ -143,6 +161,9 @@ export function digestSections(d: Digest): DigestSection[] {
     { key: 'overdueActions', title: 'Overdue CTRM next actions', empty: 'No overdue next actions.', items: d.overdueActions },
     { key: 'overHours', title: 'Clients over their hours', empty: 'No client is over hours two months running.', items: d.overHours },
   ]
+  if (d.appErrors?.length) {
+    sections.push({ key: 'appErrors', title: 'App errors in the last day', empty: '', items: d.appErrors })
+  }
   if (d.noHours) {
     sections.push({ key: 'noHours', title: 'Friday check: no hours this week', empty: 'Every client has hours logged this week.', items: d.noHours })
   }

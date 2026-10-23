@@ -1963,8 +1963,17 @@ function buildDigest(input) {
     renewals: renewals.sort((x, y) => x.days - y.days).map((r) => r.item),
     overdueActions,
     overHours,
-    noHours
+    noHours,
+    appErrors: digestErrors(input.errors || [])
   };
+}
+function digestErrors(errors) {
+  const counts = /* @__PURE__ */ new Map();
+  for (const e of errors) {
+    const m = e.message.trim().slice(0, 140);
+    if (m) counts.set(m, (counts.get(m) || 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([message2, n]) => ({ name: message2, detail: `${n} ${n === 1 ? "time" : "times"}`, path: "/app-errors", urgent: true }));
 }
 function digestSections(d) {
   const sections = [
@@ -1973,6 +1982,9 @@ function digestSections(d) {
     { key: "overdueActions", title: "Overdue CTRM next actions", empty: "No overdue next actions.", items: d.overdueActions },
     { key: "overHours", title: "Clients over their hours", empty: "No client is over hours two months running.", items: d.overHours }
   ];
+  if (d.appErrors?.length) {
+    sections.push({ key: "appErrors", title: "App errors in the last day", empty: "", items: d.appErrors });
+  }
   if (d.noHours) {
     sections.push({ key: "noHours", title: "Friday check: no hours this week", empty: "Every client has hours logged this week.", items: d.noHours });
   }

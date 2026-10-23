@@ -35,6 +35,7 @@ import {
   FileSignature,
   HeartPulse,
   TrendingUp,
+  Bug,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders'
@@ -47,6 +48,7 @@ import { usePhoneShell } from '../hooks/useMediaQuery'
 import { can, roleAtLeast } from '../lib/permissions'
 import type { UserRole } from '../lib/types'
 import BrandLogo from './BrandLogo'
+import ErrorBoundary from './ErrorBoundary'
 import styles from './Layout.module.css'
 
 type NavItem = {
@@ -132,6 +134,7 @@ const navGroups: NavGroup[] = [
         forStaff: true,
       },
       { to: '/audit-log', label: 'Audit log', icon: ShieldCheck, minRole: 'admin' },
+      { to: '/app-errors', label: 'App errors', icon: Bug, minRole: 'admin' },
     ],
   },
 ]
@@ -165,6 +168,7 @@ const titleByPath: { match: (path: string) => boolean; title: string }[] = [
   { match: (p) => p.startsWith('/domains'), title: 'Domains' },
   { match: (p) => p.startsWith('/settings'), title: 'Settings' },
   { match: (p) => p.startsWith('/audit-log'), title: 'Audit log' },
+  { match: (p) => p.startsWith('/app-errors'), title: 'App errors' },
 ]
 
 /** Primary destinations for phone / foldable bottom nav (big phones included). */
@@ -345,7 +349,9 @@ export default function Layout() {
         </header>
 
         <main className={styles.content}>
-          <Outlet />
+          <ErrorBoundary key={location.pathname}>
+            <Outlet />
+          </ErrorBoundary>
         </main>
 
         {phoneShell ? (
