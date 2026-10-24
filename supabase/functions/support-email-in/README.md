@@ -65,6 +65,31 @@ Postmark's inbound JSON works as is. Anything else should send:
 
 Only `from` is required. Bodies are cut at 20,000 characters.
 
+## WorshipHub tickets
+
+worship-hub.com's `/support` form and "Need help?" chat widget post the same
+payload with three extra fields:
+
+```json
+{
+  "channel": "web_form",
+  "church_slug": "icoc-uae",
+  "church_name": "ICOC UAE"
+}
+```
+
+* `channel` is `web_form` or `chatbot` and is stored on the ticket (anything
+  else counts as email).
+* When the sender is not a known contact, the ticket goes on the church
+  account whose WorshipHub slug (Products page, church details) is
+  `church_slug`. If no account has that slug yet, the ticket has no account
+  and its message ends with the church name, so it can be filed by hand.
+* New tickets show on the Dashboard under "New support tickets".
+
+On the WorshipHub side, set `RRCENTRAL_SUPPORT_INBOUND_URL` to this function's
+URL and `RRCENTRAL_SUPPORT_INBOUND_SECRET` to the same value as
+`SUPPORT_INBOUND_SECRET` here.
+
 ## Replies
 
 Replies written in RR Central are logged on the ticket and the account

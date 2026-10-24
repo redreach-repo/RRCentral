@@ -1192,7 +1192,7 @@ export interface DigestRun {
   message: string
 }
 
-export type TicketChannel = 'email' | 'whatsapp' | 'phone' | 'in_person' | 'internal'
+export type TicketChannel = 'email' | 'whatsapp' | 'phone' | 'in_person' | 'internal' | 'web_form' | 'chatbot'
 export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent'
 export type TicketStatus = 'new' | 'open' | 'waiting_on_client' | 'resolved' | 'closed'
 

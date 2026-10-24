@@ -7,6 +7,10 @@
 // A reply to an earlier message (In-Reply-To / References) is added to that
 // ticket. Otherwise the sender's email is matched to an account contact and a
 // new ticket opens with its SLA clock from app/src/lib/sla.ts (bundled).
+//
+// WorshipHub's /support form and chat widget also post here, adding
+// `channel` (web_form or chatbot) and the church's `church_slug`. An unknown
+// sender is then filed on the church account with that WorshipHub slug.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
@@ -22,6 +26,9 @@ type Inbound = {
   text: string
   messageId: string
   inReplyTo: string[]
+  channel: 'email' | 'web_form' | 'chatbot'
+  churchSlug: string
+  churchName: string
 }
 
 /** Accepts the simple shape in README.md, or Postmark's inbound JSON as is. */
@@ -44,6 +51,9 @@ function normalise(raw: Record<string, unknown>): Inbound | null {
     text: (str(raw.text) || str(raw.TextBody) || str(raw.StrippedTextReply)).slice(0, 20000),
     messageId: (str(raw.messageId) || str(raw.MessageID) || header('message-id')).slice(0, 500),
     inReplyTo: ids,
+    channel: str(raw.channel) === 'web_form' || str(raw.channel) === 'chatbot' ? (str(raw.channel) as 'web_form' | 'chatbot') : 'email',
+    churchSlug: /^[a-z0-9-]{1,80}$/.test(str(raw.church_slug)) ? str(raw.church_slug) : '',
+    churchName: str(raw.church_name).trim().slice(0, 200),
   }
 }
 
@@ -92,6 +102,24 @@ Deno.serve(async (req) => {
     .ilike('email', mail.from)
     .limit(1)
     .maybeSingle()
+  // From WorshipHub with no matching contact: file it on that church's account.
+  let churchAccountId: string | null = null
+  if (!contact && mail.churchSlug) {
+    const { data: profile } = await sb
+      .from('worship_church_profiles')
+      .select('account_id')
+      .eq('tenant_slug', mail.churchSlug)
+      .maybeSingle()
+    churchAccountId = profile?.account_id ?? null
+  }
+  const accountId: string | null = contact?.account_id ?? churchAccountId
+  const fromWorshipHub = mail.channel !== 'email'
+  const source = mail.channel === 'chatbot' ? 'WorshipHub chat' : mail.channel === 'web_form' ? 'WorshipHub form' : 'Email in'
+  // Keep the church on the ticket even when it is not an RR Central account yet.
+  const body =
+    mail.churchSlug && !accountId
+      ? `${mail.text}\n\nWorshipHub church: ${mail.churchName || mail.churchSlug} (${mail.churchSlug}), not an RR Central account yet.`
+      : mail.text
   const label = contact?.name ? `${contact.name} <${mail.from}>` : mail.fromName ? `${mail.fromName} <${mail.from}>` : mail.from
 
   // A reply on an existing thread goes onto that ticket.
@@ -107,7 +135,7 @@ Deno.serve(async (req) => {
         ticket_id: prior.ticket_id,
         author_kind: 'contact',
         author_label: label,
-        body: mail.text,
+        body,
         external_id: mail.messageId,
       })
       if (error) return json({ error: error.message }, 500)
@@ -122,14 +150,14 @@ Deno.serve(async (req) => {
   // New ticket. Work out the SLA from the account's package or type.
   let accountType: string | null = null
   let packageId: string | null = null
-  if (contact?.account_id) {
-    const { data: account } = await sb.from('accounts').select('type').eq('id', contact.account_id).maybeSingle()
+  if (accountId) {
+    const { data: account } = await sb.from('accounts').select('type').eq('id', accountId).maybeSingle()
     accountType = account?.type ?? null
     if (accountType === 'ai_crm_client') {
       const { data: contracts } = await sb
         .from('contracts')
         .select('package_id, status, created_at')
-        .eq('account_id', contact.account_id)
+        .eq('account_id', accountId)
         .order('created_at', { ascending: false })
       const current = (contracts || []).find((c) => c.status === 'active') ?? (contracts || [])[0]
       if (current && current.status !== 'ended' && current.status !== 'cancelled') packageId = current.package_id
@@ -146,16 +174,16 @@ Deno.serve(async (req) => {
   const { data: ticket, error: ticketErr } = await sb
     .from('tickets')
     .insert({
-      account_id: contact?.account_id ?? null,
+      account_id: accountId,
       contact_id: contact?.id ?? null,
       requester_email: mail.from,
       subject: mail.subject,
-      channel: 'email',
+      channel: mail.channel,
       priority: 'normal',
       status: 'new',
       sla_hours: slaHours,
       sla_due_at: due.toISOString(),
-      created_by: 'Email in',
+      created_by: source,
     })
     .select('id')
     .single()
@@ -165,19 +193,19 @@ Deno.serve(async (req) => {
     ticket_id: ticket.id,
     author_kind: 'contact',
     author_label: label,
-    body: mail.text,
+    body,
     external_id: mail.messageId,
   })
   if (msgErr) return json({ error: msgErr.message }, 500)
 
-  if (contact?.account_id) {
+  if (accountId) {
     await sb.from('account_activities').insert({
-      account_id: contact.account_id,
+      account_id: accountId,
       kind: 'email',
-      body: `Ticket opened by email: ${mail.subject}`,
-      user_email: 'Email in',
+      body: fromWorshipHub ? `Ticket opened from ${source}: ${mail.subject}` : `Ticket opened by email: ${mail.subject}`,
+      user_email: source,
     })
   }
 
-  return json({ ok: true, ticket_id: ticket.id, matched: Boolean(contact) })
+  return json({ ok: true, ticket_id: ticket.id, matched: Boolean(accountId) })
 })
