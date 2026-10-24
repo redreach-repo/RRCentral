@@ -172,6 +172,46 @@ or continues tickets from client messages; `whatsapp-send` sends replies
 typed on the ticket, within WhatsApp's 24 hour reply window, and logs them.
 Setup: [whatsapp-tickets.md](whatsapp-tickets.md).
 
+### Service agreements (roadmap item 10, `20261107100000_agreement_templates.sql`)
+
+Adds `agreement_templates`: versions of the service agreement wording with
+`{{placeholders}}`. Service agreement on a client's Contract card fills the
+approved version from the contract, package and rates (fees, term, usage
+caps, overage prices, early exit fee, data protection terms) and downloads a
+text PDF. A version is approved once by the lawyer (name and date recorded),
+then locked by a trigger; changes start a new draft. Until a version is
+approved, PDFs are marked DRAFT. Edit on Agreement template
+(`/agreement-template`). Guide: [service-agreement.md](service-agreement.md).
+
+### Client data export (roadmap item 12, no migration)
+
+Export data on a client's page downloads a ZIP: a CSV per table, one JSON
+file and a README. "Copy for the client" leaves out internal notes and costs;
+"Full copy" (managers and admins) has everything. Guide:
+[client-data-export.md](client-data-export.md).
+
+### Backups and staging (roadmap item 13, no migration)
+
+The nightly backup now test-restores itself into a throwaway Postgres and
+compares row counts with live ([BACKUPS.md](BACKUPS.md)); CI runs the same
+check. A staging copy with its own Supabase project is published at
+`/RRCentral/staging/` once its secrets are set ([STAGING.md](STAGING.md)),
+and the **Update staging database** workflow applies the migrations to it.
+
+### Client health score (Tier 4, `20261110090000_report_calls.sql`)
+
+Adds `report_calls` (attended, missed or moved, per client per month). The
+score out of 100 adds usage against the plan, support tickets, report calls
+attended and overdue invoices, with a churn warning. Client health page
+(`/client-health`) and a Health card on each client. Guide:
+[client-health.md](client-health.md).
+
+### MRR view (Tier 4, no migration)
+
+The MRR page (`/mrr`, managers and admins) shows this month's MRR, new and
+lost, MRR with a churn warning, a 3 month forecast (contracts plus weighted
+sales deals) and the last 12 months. Guide: [mrr.md](mrr.md).
+
 ## Roles
 
 Roles live on `app_users.role`. RLS in the database and `app/src/lib/permissions.ts`

@@ -70,6 +70,14 @@ jobs:
         # shell: bash adds pipefail — without it `| tee` hid every failure and CI stayed green.
         shell: bash
         run: bash supabase/tests/run.sh 2>&1 | tee /tmp/migrate-rls.log
+      - name: Backup restore check
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg_dump -d rr_rls_test --format=custom --no-owner --no-privileges --schema=public --schema=auth > /tmp/t.dump
+          psql -X -q -d rr_rls_test -AtF $'\t' -f scripts/db/table-counts.sql > /tmp/expected.tsv
+          psql -X -q -d postgres -c "create database rr_restore_check"
+          cd /tmp && bash "$GITHUB_WORKSPACE/scripts/db/restore-check.sh" t.dump postgresql://postgres:postgres@localhost/rr_restore_check expected.tsv
       - name: Surface migration failure
         if: failure()
         run: |

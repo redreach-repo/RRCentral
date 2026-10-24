@@ -8,6 +8,7 @@ import Modal from '../components/Modal'
 import StatusPill from '../components/StatusPill'
 import AccountFormModal from '../components/accounts/AccountFormModal'
 import DeliveryPanel from '../components/accounts/DeliveryPanel'
+import ClientExportButton from '../components/accounts/ClientExportButton'
 import PortalLinksCard from '../components/accounts/PortalLinksCard'
 import AccountTicketsCard from '../components/support/AccountTicketsCard'
 import AccountDealsCard from '../components/ctrm/AccountDealsCard'
@@ -344,7 +345,10 @@ export default function AccountDetailPage() {
               ) : null}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {editable ? (
+              <ClientExportButton account={account} canFull={can(userRole, 'delivery.packages')} author={author} />
+            ) : null}
             {editable ? (
               <button type="button" style={buttonSecondaryStyle} onClick={() => setEditOpen(true)}>
                 <Pencil size={14} /> Edit

@@ -43,6 +43,26 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           ALLOW_UNSAFE_SUPABASE_KEY: '1'
+      # Staging copy at /RRCentral/staging/, built only once its own Supabase
+      # project is set up (docs/STAGING.md). Never with the live project.
+      - name: Build staging copy
+        working-directory: app
+        env:
+          LIVE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          STAGING_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          STAGING_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$STAGING_URL" ] || [ -z "$STAGING_KEY" ]; then
+            echo "Staging is not set up yet, skipping."; exit 0
+          fi
+          if [ "${STAGING_URL%/}" = "${LIVE_URL%/}" ]; then
+            echo "::error::STAGING_SUPABASE_URL is the live project. Staging needs its own Supabase project."; exit 1
+          fi
+          export VITE_SUPABASE_URL="$STAGING_URL" VITE_SUPABASE_ANON_KEY="$STAGING_KEY"
+          npm run assert:supabase-key
+          VITE_APP_ENV=staging VITE_BASE=/RRCentral/staging/ npx vite build --outDir dist-staging
+          mv dist-staging dist/staging
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

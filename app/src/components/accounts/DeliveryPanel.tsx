@@ -5,6 +5,8 @@ import { AlertTriangle, CalendarClock, Clock, FileText, Pencil, Play, Plus, Spar
 import Modal from '../Modal'
 import CallNotesModal from './CallNotesModal'
 import BuildChecklistCard from './BuildChecklistCard'
+import ServiceAgreementButton from './ServiceAgreementButton'
+import ClientHealthCard from './ClientHealthCard'
 import { useCompactCrm } from '../../hooks/useMediaQuery'
 import { useRunningTimer } from '../../hooks/useRunningTimer'
 import { useToast } from '../../contexts/ToastContext'
@@ -599,11 +601,16 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
         <section style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
             <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Contract</h2>
-            {canContracts && editable ? (
-              <button type="button" style={smallBtn} onClick={openContract}>
-                {contract ? <Pencil size={12} /> : <Plus size={12} />} {contract ? 'Edit' : 'Add'}
-              </button>
-            ) : null}
+            <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              {contract && canContracts ? (
+                <ServiceAgreementButton account={account} contract={contract} pkg={pkg} author={author} style={smallBtn} />
+              ) : null}
+              {canContracts && editable ? (
+                <button type="button" style={smallBtn} onClick={openContract}>
+                  {contract ? <Pencil size={12} /> : <Plus size={12} />} {contract ? 'Edit' : 'Add'}
+                </button>
+              ) : null}
+            </span>
           </div>
           {!contract ? (
             <p style={{ ...mutedNote, marginTop: 12 }}>
@@ -668,6 +675,8 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
             </dl>
           )}
         </section>
+
+        <ClientHealthCard account={account} editable={editable} author={author.email} />
 
         <section style={cardStyle}>
           <h2 style={sectionTitleStyle}>Build progress</h2>
