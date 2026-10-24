@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { format, parseISO, startOfMonth, subMonths } from 'date-fns'
-import { BellRing, Briefcase, Church, Clock, Handshake, LifeBuoy, Scale, UserPlus } from 'lucide-react'
+import { BellRing, Briefcase, Church, Clock, Handshake, Inbox, LifeBuoy, Scale, UserPlus } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useSettings } from '../../contexts/SettingsContext'
 import { listAccounts } from '../../lib/accountsStore'
@@ -17,7 +17,7 @@ import { can, roleAtLeast } from '../../lib/permissions'
 import { listDueReminders } from '../../lib/contractBillingStore'
 import { slaState } from '../../lib/sla'
 import { clientsWithoutHoursThisWeek, isHoursReminderDay } from '../../lib/timeTracking'
-import { isOpenTicket } from '../../lib/support'
+import { TICKET_CHANNELS, isOpenTicket, optionLabel } from '../../lib/support'
 import { listTickets } from '../../lib/supportStore'
 import { billingLabel, churchView, hasBillingIssue, joinRequests, renewalSoon } from '../../lib/worshiphub'
 import { fetchLiveTenants, listChurchProfiles } from '../../lib/worshiphubStore'
@@ -28,6 +28,8 @@ type Line = { key: string; to: string; name: string; detail: string; tone: strin
 
 type Data = {
   clients: Line[]
+  /** Tickets nobody has picked up yet, newest first. */
+  newTickets: Line[]
   tickets: Line[]
   overdueDeals: Line[]
   staleDeals: Line[]
@@ -41,7 +43,7 @@ type Data = {
   costs: MonthCosts | null
 }
 
-const EMPTY: Data = { clients: [], tickets: [], overdueDeals: [], staleDeals: [], churches: [], joins: null, noHours: null, reminders: null, costs: null }
+const EMPTY: Data = { clients: [], newTickets: [], tickets: [], overdueDeals: [], staleDeals: [], churches: [], joins: null, noHours: null, reminders: null, costs: null }
 
 /**
  * Dashboard view across the RR Central modules: AI CRM clients, support SLA,
@@ -117,6 +119,20 @@ export default function ModuleAlertsCard() {
               tone: colors.warn,
             }))
           : null
+
+        const newTickets: Line[] = tickets
+          .filter((t) => t.status === 'new')
+          .sort((x, y) => y.created_at.localeCompare(x.created_at))
+          .map((t) => ({
+            key: t.id,
+            to: `/support/${t.id}`,
+            name: t.subject,
+            detail: `${t.account_id ? nameOf.get(t.account_id) ?? 'Account' : t.requester_email || 'Unknown sender'}, ${optionLabel(
+              TICKET_CHANNELS,
+              t.channel,
+            )}, ${format(parseISO(t.created_at), 'd MMM HH:mm')}`,
+            tone: t.channel === 'web_form' || t.channel === 'chatbot' ? colors.warn : colors.muted,
+          }))
 
         const ticketLines: Line[] = tickets
           .filter(isOpenTicket)
@@ -205,7 +221,7 @@ export default function ModuleAlertsCard() {
             })
           : null
 
-        if (alive) setData({ clients, tickets: ticketLines, overdueDeals, staleDeals, churches, joins, noHours, reminders, costs })
+        if (alive) setData({ clients, newTickets, tickets: ticketLines, overdueDeals, staleDeals, churches, joins, noHours, reminders, costs })
       } catch {
         if (alive) setData(EMPTY)
       }
@@ -236,6 +252,8 @@ export default function ModuleAlertsCard() {
         <Panel icon={<BellRing size={18} />} title="Payment reminders due" link="/invoices" lines={data.reminders}
           empty="No invoice is 3, 7 or 14 days late without a reminder." />
       ) : null}
+      <Panel icon={<Inbox size={18} />} title="New support tickets" link="/support" lines={data.newTickets}
+        empty="No new tickets waiting to be picked up." />
       <Panel icon={<LifeBuoy size={18} />} title="Tickets near or past their reply time" link="/support" lines={data.tickets}
         empty="Every open ticket is on time." />
       <Panel icon={<Handshake size={18} />} title="CTRM Next" link="/ctrm" lines={[]} empty="">

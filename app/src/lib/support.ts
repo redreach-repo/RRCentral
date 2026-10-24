@@ -7,6 +7,8 @@ export const TICKET_CHANNELS: { value: TicketChannel; label: string }[] = [
   { value: 'phone', label: 'Phone' },
   { value: 'in_person', label: 'In person' },
   { value: 'internal', label: 'Internal' },
+  { value: 'web_form', label: 'WorshipHub form' },
+  { value: 'chatbot', label: 'WorshipHub chat' },
 ]
 
 export const TICKET_PRIORITIES: { value: TicketPriority; label: string }[] = [
