@@ -18,6 +18,7 @@ function hasBillingIssue(status) {
 var SLUG_RE = /^[a-z0-9-]{1,80}$/;
 var MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 var DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+var EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 function text(v, max = 120) {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
 }
@@ -41,6 +42,9 @@ function sanitiseTenant(raw) {
   const billing = text(r.billing_status, 20);
   const month = text(r.whatsapp_month, 7);
   const renewal = text(r.renewal_date, 10);
+  const review = text(r.review_status, 20);
+  const registered = text(r.registered_at, 40);
+  const email = text(r.contact_email, 200).toLowerCase();
   return {
     slug,
     name: text(r.name, 200),
@@ -52,8 +56,16 @@ function sanitiseTenant(raw) {
     whatsapp_utility: count(r.whatsapp_utility),
     billing_status: BILLING_STATUSES.some((s) => s.value === billing) ? billing : "",
     renewal_date: DATE_RE.test(renewal) && !Number.isNaN(Date.parse(renewal)) ? renewal : null,
-    admin_url: httpsUrl(r.admin_url)
+    admin_url: httpsUrl(r.admin_url),
+    review_status: review === "pending" || review === "approved" ? review : "",
+    registered_at: registered && !Number.isNaN(Date.parse(registered)) ? new Date(registered).toISOString() : null,
+    contact_name: text(r.contact_name, 120),
+    contact_email: EMAIL_RE.test(email) ? email : "",
+    user_count: r.user_count == null ? null : count(r.user_count)
   };
+}
+function joinRequests(tenants) {
+  return tenants.filter((t) => t.review_status === "pending").sort((a, b) => String(b.registered_at ?? "").localeCompare(String(a.registered_at ?? "")));
 }
 function sanitiseTenants(body) {
   const list = Array.isArray(body) ? body : body && typeof body === "object" && Array.isArray(body.tenants) ? body.tenants : [];
@@ -70,17 +82,18 @@ function sanitiseTenants(body) {
 }
 function churchView(profile, live) {
   if (live) {
+    const liveWhatsapp = live.whatsapp_month !== "";
     return {
       source: "live",
       plan: live.plan,
       modules: live.modules,
-      whatsappMonth: live.whatsapp_month,
-      whatsappTotal: live.whatsapp_marketing + live.whatsapp_service + live.whatsapp_utility,
-      whatsappSplit: {
+      whatsappMonth: liveWhatsapp ? live.whatsapp_month : profile?.whatsapp_month ?? "",
+      whatsappTotal: liveWhatsapp ? live.whatsapp_marketing + live.whatsapp_service + live.whatsapp_utility : profile?.whatsapp_conversations ?? null,
+      whatsappSplit: liveWhatsapp ? {
         marketing: live.whatsapp_marketing,
         service: live.whatsapp_service,
         utility: live.whatsapp_utility
-      },
+      } : null,
       billingStatus: live.billing_status,
       renewalDate: live.renewal_date,
       adminUrl: live.admin_url || profile?.admin_url || ""
@@ -126,6 +139,7 @@ export {
   churchDetailsProblem,
   churchView,
   hasBillingIssue,
+  joinRequests,
   monthLabel,
   renewalSoon,
   sanitiseTenant,
