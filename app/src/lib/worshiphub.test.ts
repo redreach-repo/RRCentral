@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { churchDetailsProblem, churchView, hasBillingIssue, renewalSoon, sanitiseTenant, sanitiseTenants } from './worshiphub'
+import { churchDetailsProblem, churchView, hasBillingIssue, joinRequests, renewalSoon, sanitiseTenant, sanitiseTenants } from './worshiphub'
 import type { WorshipChurchProfile } from './types'
 
 const row = {
@@ -21,7 +21,8 @@ describe('sanitiseTenant', () => {
     const t = sanitiseTenant({ ...row, members: [{ name: 'Someone' }], visitors: 4, email: 'x@y.z' })
     expect(Object.keys(t!).sort()).toEqual(
       [
-        'admin_url', 'billing_status', 'modules', 'name', 'plan', 'renewal_date', 'slug',
+        'admin_url', 'billing_status', 'contact_email', 'contact_name', 'modules', 'name', 'plan',
+        'registered_at', 'renewal_date', 'review_status', 'slug', 'user_count',
         'whatsapp_marketing', 'whatsapp_month', 'whatsapp_service', 'whatsapp_utility',
       ].sort(),
     )
@@ -100,5 +101,41 @@ describe('churchDetailsProblem', () => {
     expect(churchDetailsProblem({ ...ok, tenant_slug: 'ICOC UAE' })).toMatch(/slug/)
     expect(churchDetailsProblem({ ...ok, admin_url: 'http://x' })).toMatch(/https/)
     expect(churchDetailsProblem({ ...ok, whatsapp_conversations: '12.5' })).toMatch(/whole number/)
+  })
+})
+
+describe('join requests', () => {
+  it('reads the review fields and blanks bad ones', () => {
+    const t = sanitiseTenant({
+      ...row,
+      review_status: 'pending',
+      registered_at: '2026-10-20T10:00:00Z',
+      contact_name: 'Sam Lee',
+      contact_email: 'Pastor@Grace.example',
+      user_count: 4,
+    })
+    expect(t).toMatchObject({
+      review_status: 'pending',
+      registered_at: '2026-10-20T10:00:00.000Z',
+      contact_email: 'pastor@grace.example',
+      user_count: 4,
+    })
+    const bad = sanitiseTenant({ ...row, review_status: 'maybe', registered_at: 'yesterday', contact_email: 'not an email' })
+    expect(bad).toMatchObject({ review_status: '', registered_at: null, contact_email: '', user_count: null })
+  })
+
+  it('lists only pending churches, newest first', () => {
+    const list = sanitiseTenants([
+      { ...row, slug: 'old', review_status: 'pending', registered_at: '2026-10-01T00:00:00Z' },
+      { ...row, slug: 'done', review_status: 'approved', registered_at: '2026-10-22T00:00:00Z' },
+      { ...row, slug: 'new', review_status: 'pending', registered_at: '2026-10-21T00:00:00Z' },
+    ])
+    expect(joinRequests(list).map((t) => t.slug)).toEqual(['new', 'old'])
+  })
+
+  it('keeps WhatsApp counts entered by hand when WorshipHub sends none', () => {
+    const live = sanitiseTenant({ ...row, whatsapp_month: '', whatsapp_marketing: 0 })!
+    const profile = { whatsapp_month: '2026-09', whatsapp_conversations: 80 } as WorshipChurchProfile
+    expect(churchView(profile, live)).toMatchObject({ source: 'live', whatsappMonth: '2026-09', whatsappTotal: 80, whatsappSplit: null })
   })
 })

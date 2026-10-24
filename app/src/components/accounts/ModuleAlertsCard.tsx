@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { format, parseISO, startOfMonth, subMonths } from 'date-fns'
-import { BellRing, Briefcase, Church, Clock, Handshake, LifeBuoy, Scale } from 'lucide-react'
+import { BellRing, Briefcase, Church, Clock, Handshake, LifeBuoy, Scale, UserPlus } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useSettings } from '../../contexts/SettingsContext'
 import { listAccounts } from '../../lib/accountsStore'
@@ -19,7 +19,7 @@ import { slaState } from '../../lib/sla'
 import { clientsWithoutHoursThisWeek, isHoursReminderDay } from '../../lib/timeTracking'
 import { isOpenTicket } from '../../lib/support'
 import { listTickets } from '../../lib/supportStore'
-import { billingLabel, churchView, hasBillingIssue, renewalSoon } from '../../lib/worshiphub'
+import { billingLabel, churchView, hasBillingIssue, joinRequests, renewalSoon } from '../../lib/worshiphub'
 import { fetchLiveTenants, listChurchProfiles } from '../../lib/worshiphubStore'
 import type { Invoice } from '../../lib/types'
 import { cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
@@ -32,6 +32,8 @@ type Data = {
   overdueDeals: Line[]
   staleDeals: Line[]
   churches: Line[]
+  /** Churches waiting for review on WorshipHub. Null when not shown. */
+  joins: Line[] | null
   /** Only filled from Friday to Sunday: clients with no hours since Monday. */
   noHours: Line[] | null
   /** Late invoices with a 3, 7 or 14 day reminder due. Null when not shown. */
@@ -39,7 +41,7 @@ type Data = {
   costs: MonthCosts | null
 }
 
-const EMPTY: Data = { clients: [], tickets: [], overdueDeals: [], staleDeals: [], churches: [], noHours: null, reminders: null, costs: null }
+const EMPTY: Data = { clients: [], tickets: [], overdueDeals: [], staleDeals: [], churches: [], joins: null, noHours: null, reminders: null, costs: null }
 
 /**
  * Dashboard view across the RR Central modules: AI CRM clients, support SLA,
@@ -51,6 +53,7 @@ export default function ModuleAlertsCard() {
   const rates = useMemo(() => ratesFromSettings(settings), [settings])
   const seesMoney = can(userRole, 'delivery.profitability')
   const chasesPayments = roleAtLeast(userRole, 'sales')
+  const reviewsChurches = userRole === 'admin' || userRole === 'manager'
   const [data, setData] = useState<Data | null>(null)
 
   useEffect(() => {
@@ -172,6 +175,22 @@ export default function ModuleAlertsCard() {
           })
         }
 
+        const joins: Line[] | null =
+          reviewsChurches && live.connected
+            ? joinRequests(live.tenants).map((t) => ({
+                key: t.slug,
+                to: '/products',
+                name: t.name || t.slug,
+                detail: [
+                  t.registered_at ? `signed up ${format(parseISO(t.registered_at), 'd MMM')}` : 'signed up',
+                  t.contact_email,
+                ]
+                  .filter(Boolean)
+                  .join(', '),
+                tone: colors.warn,
+              }))
+            : null
+
         const costs = seesMoney
           ? monthCosts({
               now,
@@ -186,7 +205,7 @@ export default function ModuleAlertsCard() {
             })
           : null
 
-        if (alive) setData({ clients, tickets: ticketLines, overdueDeals, staleDeals, churches, noHours, reminders, costs })
+        if (alive) setData({ clients, tickets: ticketLines, overdueDeals, staleDeals, churches, joins, noHours, reminders, costs })
       } catch {
         if (alive) setData(EMPTY)
       }
@@ -194,7 +213,7 @@ export default function ModuleAlertsCard() {
     return () => {
       alive = false
     }
-  }, [rates, seesMoney, chasesPayments])
+  }, [rates, seesMoney, chasesPayments, reviewsChurches])
 
   if (!data) return null
 
@@ -223,6 +242,10 @@ export default function ModuleAlertsCard() {
         <SubList label="Next action overdue" lines={data.overdueDeals} empty="No overdue next actions." />
         <SubList label="No touch in 14 days" lines={data.staleDeals} empty="No stale deals." />
       </Panel>
+      {data.joins ? (
+        <Panel icon={<UserPlus size={18} />} title="Churches asking to join WorshipHub" link="/products" lines={data.joins}
+          empty="No church is waiting for review." />
+      ) : null}
       <Panel icon={<Church size={18} />} title="WorshipHub churches" link="/products" lines={data.churches}
         empty="No church has a billing problem or a renewal in the next 60 days." />
       {data.costs ? <CostsPanel costs={data.costs} /> : null}

@@ -28,9 +28,34 @@ One row per tenant, account level only.
 | `billing_status` | text | `active` | One of `trial`, `active`, `past_due`, `paused`, `cancelled`. |
 | `renewal_date` | date | `2027-01-15` | `YYYY-MM-DD`. |
 | `admin_url` | text | `https://…/admin/icoc-uae` | WorshipHub admin page for this church. Must be https. |
+| `review_status` | text | `pending` | `pending` while a new sign up waits for Red Reach to review it, else `approved`. |
+| `registered_at` | timestamp | `2026-10-20T10:00:00Z` | When the church signed up. |
+| `contact_name` | text | `Sam Lee` | The church owner's name, for follow up. |
+| `contact_email` | text | `pastor@church.org` | The church's primary contact email. |
+| `user_count` | integer | `12` | Active WorshipHub users at the church. A count only. |
+
+WorshipHub does not send the WhatsApp fields yet, so RR Central keeps the
+WhatsApp counts entered by hand on each church until it does.
+
+## Join requests
+
+Every tenant with `review_status` `pending` shows to admins and managers on
+the dashboard ("Churches asking to join WorshipHub") and at the top of the
+Products page, with a link to review it in WorshipHub app admin and an
+"Add as church account" button. The Products page also lists every church on
+WorshipHub with plan, billing, renewal, users, contact and its RR Central account.
 
 Anything that does not match is blanked, not trusted: an unknown billing
 status shows as "Not set", a bad date as no date, a negative count as 0.
+
+## The WorshipHub endpoint
+
+Built in the WorshipHub repo as `GET /api/integrations/rr-central/tenants`
+(`lib/rrCentralTenants.ts` holds its field list). It answers only with
+`Authorization: Bearer <RR_CENTRAL_API_TOKEN>`, a Vercel environment variable
+on the `worshiphub` project. Use that same value as `WORSHIPHUB_API_TOKEN`
+here, and set `WORSHIPHUB_API_URL` to
+`https://www.worship-hub.com/api/integrations/rr-central/tenants`.
 
 ## What WorshipHub needs to provide
 

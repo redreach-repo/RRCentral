@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Church, Plus, RefreshCw } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
+import { BellRing, Church, ExternalLink, Plus, RefreshCw } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import ChurchFacts from '../components/worshiphub/ChurchFacts'
 import { visibleAccounts } from '../lib/accounts'
 import { createAccount, listAccounts } from '../lib/accountsStore'
-import { churchView, hasBillingIssue, renewalSoon } from '../lib/worshiphub'
+import { billingLabel, churchView, hasBillingIssue, joinRequests, renewalSoon } from '../lib/worshiphub'
 import { fetchLiveTenants, listChurchProfiles, saveChurchProfile, type LiveResult } from '../lib/worshiphubStore'
 import { errorMessage } from '../lib/errors'
 import type { Account, WorshipChurchProfile, WorshipTenant } from '../lib/types'
@@ -72,6 +73,12 @@ export default function ProductsPage() {
   const linkedSlugs = useMemo(() => new Set(profiles.map((p) => p.tenant_slug).filter(Boolean)), [profiles])
   const canAdd = userRole === 'admin' || userRole === 'manager'
   const unlinked = live?.connected && canAdd ? live.tenants.filter((t) => !linkedSlugs.has(t.slug)) : []
+  const requests = live?.connected && canAdd ? joinRequests(live.tenants) : []
+  const allTenants = live?.connected ? [...live.tenants].sort((a, b) => (a.name || a.slug).localeCompare(b.name || b.slug)) : []
+  const accountBySlug = useMemo(
+    () => new Map(profiles.filter((p) => p.tenant_slug).map((p) => [p.tenant_slug, p.account_id])),
+    [profiles],
+  )
 
   async function addTenant(t: WorshipTenant) {
     setAdding(t.slug)
@@ -87,7 +94,12 @@ export default function ProductsPage() {
           status: t.billing_status === 'trial' ? 'trial' : 'active',
           owner_user_id: null,
           source: 'WorshipHub',
-          notes: '',
+          notes: [
+            t.registered_at ? `Signed up on WorshipHub ${format(parseISO(t.registered_at), 'd MMM yyyy')}.` : '',
+            t.contact_name || t.contact_email ? `Contact: ${[t.contact_name, t.contact_email].filter(Boolean).join(', ')}.` : '',
+          ]
+            .filter(Boolean)
+            .join(' '),
         },
         author.email,
         accounts.map((a) => a.reference),
@@ -159,6 +171,57 @@ export default function ProductsPage() {
         ) : null}
       </section>
 
+      {requests.length ? (
+        <section style={{ ...cardStyle, marginBottom: 16, borderColor: colors.warn }} aria-label="Churches asking to join WorshipHub">
+          <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <BellRing size={16} /> Asking to join WorshipHub ({requests.length})
+          </h2>
+          <p style={{ margin: '0 0 10px', fontSize: 12, color: colors.muted2 }}>
+            These churches signed up and are waiting for Red Reach to review them. Review them in WorshipHub app admin.
+          </p>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {requests.map((t) => (
+              <div key={t.slug} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span>
+                  <strong>{t.name || t.slug}</strong>
+                  <span style={{ display: 'block', fontSize: 12, color: colors.muted2 }}>
+                    {[
+                      t.registered_at ? `signed up ${format(parseISO(t.registered_at), 'd MMM yyyy')}` : '',
+                      t.contact_name,
+                      t.contact_email,
+                    ]
+                      .filter(Boolean)
+                      .join(', ')}
+                  </span>
+                </span>
+                <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {t.admin_url ? (
+                    <a
+                      href={t.admin_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12, textDecoration: 'none' }}
+                    >
+                      Review in WorshipHub <ExternalLink size={12} />
+                    </a>
+                  ) : null}
+                  {!linkedSlugs.has(t.slug) ? (
+                    <button
+                      type="button"
+                      style={{ ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }}
+                      disabled={adding === t.slug}
+                      onClick={() => void addTenant(t)}
+                    >
+                      {adding === t.slug ? 'Adding…' : 'Add as church account'}
+                    </button>
+                  ) : null}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {unlinked.length ? (
         <section style={{ ...cardStyle, marginBottom: 16 }} aria-label="Churches not in RR Central">
           <h2 style={sectionTitleStyle}>In WorshipHub, not in RR Central yet ({unlinked.length})</h2>
@@ -220,6 +283,54 @@ export default function ProductsPage() {
           })}
         </div>
       )}
+
+      {allTenants.length ? (
+        <section style={{ ...cardStyle, marginTop: 16, overflowX: 'auto' }} aria-label="All churches on WorshipHub">
+          <h2 style={sectionTitleStyle}>All churches on WorshipHub ({allTenants.length})</h2>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ textAlign: 'left', color: colors.muted }}>
+                {['Church', 'Plan', 'Billing', 'Renewal', 'Users', 'Contact', 'RR Central'].map((h) => (
+                  <th key={h} style={{ padding: '6px 8px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {allTenants.map((t) => {
+                const accountId = accountBySlug.get(t.slug)
+                return (
+                  <tr key={t.slug} style={{ borderTop: `1px solid ${colors.border}` }}>
+                    <td style={{ padding: '6px 8px' }}>
+                      <strong>{t.name || t.slug}</strong>
+                      {t.review_status === 'pending' ? (
+                        <span style={{ marginLeft: 6, fontSize: 11, color: colors.warn }}>waiting for review</span>
+                      ) : null}
+                      <span style={{ display: 'block', fontSize: 11, color: colors.muted2 }}>{t.slug}</span>
+                    </td>
+                    <td style={{ padding: '6px 8px' }}>{t.plan || 'Not set'}</td>
+                    <td style={{ padding: '6px 8px', color: hasBillingIssue(t.billing_status) ? colors.danger : undefined }}>
+                      {billingLabel(t.billing_status)}
+                    </td>
+                    <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>
+                      {t.renewal_date ? format(parseISO(t.renewal_date), 'd MMM yyyy') : 'Not set'}
+                    </td>
+                    <td style={{ padding: '6px 8px' }}>{t.user_count ?? ''}</td>
+                    <td style={{ padding: '6px 8px' }}>
+                      {t.contact_name}
+                      {t.contact_email ? <span style={{ display: 'block', fontSize: 11, color: colors.muted2 }}>{t.contact_email}</span> : null}
+                    </td>
+                    <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>
+                      {accountId ? <Link to={`/accounts/${accountId}`}>Open account</Link> : <span style={{ color: colors.muted2 }}>Not added</span>}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
     </div>
   )
 }

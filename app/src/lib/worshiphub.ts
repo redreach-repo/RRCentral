@@ -29,6 +29,7 @@ export function hasBillingIssue(status: string): boolean {
 const SLUG_RE = /^[a-z0-9-]{1,80}$/
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+const EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/
 
 function text(v: unknown, max = 120): string {
   return typeof v === 'string' ? v.trim().slice(0, max) : ''
@@ -57,6 +58,9 @@ export function sanitiseTenant(raw: unknown): WorshipTenant | null {
   const billing = text(r.billing_status, 20) as WorshipBillingStatus
   const month = text(r.whatsapp_month, 7)
   const renewal = text(r.renewal_date, 10)
+  const review = text(r.review_status, 20)
+  const registered = text(r.registered_at, 40)
+  const email = text(r.contact_email, 200).toLowerCase()
   return {
     slug,
     name: text(r.name, 200),
@@ -71,7 +75,19 @@ export function sanitiseTenant(raw: unknown): WorshipTenant | null {
     billing_status: BILLING_STATUSES.some((s) => s.value === billing) ? billing : '',
     renewal_date: DATE_RE.test(renewal) && !Number.isNaN(Date.parse(renewal)) ? renewal : null,
     admin_url: httpsUrl(r.admin_url),
+    review_status: review === 'pending' || review === 'approved' ? review : '',
+    registered_at: registered && !Number.isNaN(Date.parse(registered)) ? new Date(registered).toISOString() : null,
+    contact_name: text(r.contact_name, 120),
+    contact_email: EMAIL_RE.test(email) ? email : '',
+    user_count: r.user_count == null ? null : count(r.user_count),
   }
+}
+
+/** Churches that signed up on WorshipHub and are waiting for review, newest first. */
+export function joinRequests(tenants: WorshipTenant[]): WorshipTenant[] {
+  return tenants
+    .filter((t) => t.review_status === 'pending')
+    .sort((a, b) => String(b.registered_at ?? '').localeCompare(String(a.registered_at ?? '')))
 }
 
 /** Accepts `{ tenants: [...] }` or a bare array (a database view over REST). */
@@ -109,17 +125,23 @@ export type ChurchView = {
 /** Live values when WorshipHub answered for this slug, otherwise what was entered by hand. */
 export function churchView(profile: WorshipChurchProfile | null, live: WorshipTenant | null): ChurchView {
   if (live) {
+    // WorshipHub does not send WhatsApp counts yet: keep the ones typed in by hand.
+    const liveWhatsapp = live.whatsapp_month !== ''
     return {
       source: 'live',
       plan: live.plan,
       modules: live.modules,
-      whatsappMonth: live.whatsapp_month,
-      whatsappTotal: live.whatsapp_marketing + live.whatsapp_service + live.whatsapp_utility,
-      whatsappSplit: {
-        marketing: live.whatsapp_marketing,
-        service: live.whatsapp_service,
-        utility: live.whatsapp_utility,
-      },
+      whatsappMonth: liveWhatsapp ? live.whatsapp_month : (profile?.whatsapp_month ?? ''),
+      whatsappTotal: liveWhatsapp
+        ? live.whatsapp_marketing + live.whatsapp_service + live.whatsapp_utility
+        : (profile?.whatsapp_conversations ?? null),
+      whatsappSplit: liveWhatsapp
+        ? {
+            marketing: live.whatsapp_marketing,
+            service: live.whatsapp_service,
+            utility: live.whatsapp_utility,
+          }
+        : null,
       billingStatus: live.billing_status,
       renewalDate: live.renewal_date,
       adminUrl: live.admin_url || profile?.admin_url || '',
