@@ -57,3 +57,39 @@ describe('auditLog', () => {
     ])
   })
 })
+
+describe('audit focus', () => {
+  it('puts contracts, prices and commission in their groups', async () => {
+    const { auditFocusOf } = await import('./auditLog')
+    expect(auditFocusOf({ table_name: 'contracts', row_id: 'x' })).toBe('contracts')
+    expect(auditFocusOf({ table_name: 'delivery_packages', row_id: 'x' })).toBe('prices')
+    expect(auditFocusOf({ table_name: 'ctrm_deal_commissions', row_id: 'x' })).toBe('commission')
+    expect(auditFocusOf({ table_name: 'app_settings', row_id: 'deliveryMarketingRateAed' })).toBe('prices')
+    expect(auditFocusOf({ table_name: 'app_settings', row_id: 'vatRate' })).toBe('prices')
+    expect(auditFocusOf({ table_name: 'app_settings', row_id: 'deliveryInvoiceDivision' })).toBeNull()
+    expect(auditFocusOf({ table_name: 'tickets', row_id: 'x' })).toBeNull()
+  })
+
+  it('names fields in plain words', async () => {
+    const { auditFieldLabel } = await import('./auditLog')
+    expect(auditFieldLabel('monthly_fee')).toBe('Monthly fee')
+    expect(auditFieldLabel('expected_commission')).toBe('Expected commission')
+    expect(auditFieldLabel('owner_user_id')).toBe('Owner user')
+  })
+
+  it('exports one CSV row per changed field', async () => {
+    const { auditCsvRows } = await import('./auditLog')
+    const rows = auditCsvRows([
+      entry({
+        table_name: 'contracts',
+        changed_fields: ['monthly_fee', 'notes'],
+        old_data: { monthly_fee: 4500, notes: '' },
+        new_data: { monthly_fee: 4200, notes: 'Discount agreed' },
+      }),
+      entry({ operation: 'INSERT', table_name: 'crm', new_data: { company_name: 'Lead Co' } }),
+    ])
+    expect(rows).toHaveLength(4)
+    expect(rows[1].slice(3)).toEqual(['Contracts', '9b2f1c3e', 'Monthly fee', '4500', '4200'])
+    expect(rows[3].slice(2, 5)).toEqual(['INSERT', 'CRM', 'Lead Co'])
+  })
+})

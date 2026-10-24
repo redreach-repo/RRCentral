@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Download, HardDrive, Pencil, Plus, Trash2, Upload, Plug } from 'lucide-react'
 import { db, currentAuthMode } from '../lib/db'
 import type { AppUser, CompanyDocument, CompanyDocumentCategory, UserRole } from '../lib/types'
+import TwoStepCard from '../components/security/TwoStepCard'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
@@ -493,6 +494,7 @@ export default function SettingsPage() {
       <div style={pageStyle}>
         <h1 style={pageTitleStyle}>Account</h1>
         <p style={pageSubtitleStyle}>Change the password you use to sign in.</p>
+        <TwoStepCard />
         <div style={cardStyle}>
           <h2 style={sectionTitleStyle}>My password</h2>
           <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
@@ -1172,6 +1174,8 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+
+      <TwoStepCard />
 
       <div style={{ ...cardStyle, marginBottom: 20 }}>
         <h2 style={sectionTitleStyle}>My password</h2>

@@ -182,3 +182,24 @@ describe('digestTargets', () => {
     ).toEqual({ emails: ['alfred@redreach.ae'], phones: ['971501234567', '971509999999'] })
   })
 })
+
+describe('digest app errors', () => {
+  it('lists distinct errors from the last day, most frequent first', () => {
+    const d = buildDigest({
+      ...input(),
+      errors: [
+        { message: 'Save failed', created_at: '2026-11-02T01:00:00Z' },
+        { message: 'Save failed', created_at: '2026-11-02T02:00:00Z' },
+        { message: 'Crash', created_at: '2026-11-02T03:00:00Z' },
+      ],
+    })
+    expect(d.appErrors.map((e) => `${e.name}: ${e.detail}`)).toEqual(['Save failed: 2 times', 'Crash: 1 time'])
+    expect(digestSections(d).some((s) => s.key === 'appErrors')).toBe(true)
+  })
+
+  it('leaves the section out when there are none', () => {
+    const d = buildDigest(input())
+    expect(d.appErrors).toEqual([])
+    expect(digestSections(d).some((s) => s.key === 'appErrors')).toBe(false)
+  })
+})

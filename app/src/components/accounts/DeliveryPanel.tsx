@@ -602,6 +602,11 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
             <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Contract</h2>
             <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              {can(userRole, 'audit.read') && contract ? (
+                <Link to={`/audit-log?account=${account.id}`} style={{ ...smallBtn, textDecoration: 'none' }}>
+                  History
+                </Link>
+              ) : null}
               {contract && canContracts ? (
                 <ServiceAgreementButton account={account} contract={contract} pkg={pkg} author={author} style={smallBtn} />
               ) : null}

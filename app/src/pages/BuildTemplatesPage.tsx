@@ -64,7 +64,9 @@ export default function BuildTemplatesPage() {
 
   const load = useCallback(async () => {
     try {
-      const [t, p, i] = await Promise.all([listBuildTemplates(), listPackages(), listTemplateItems()])
+      // Templates first: in local mode reading them seeds the lines too.
+      const [t, p] = await Promise.all([listBuildTemplates(), listPackages()])
+      const i = await listTemplateItems()
       setTemplates(t)
       setPackages(p)
       setItems(i)

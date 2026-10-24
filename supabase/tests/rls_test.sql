@@ -745,3 +745,53 @@ reset role;
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from report_calls'), 'anon cannot read report calls');
 reset role;
+
+------------------------------------------------------------ Audit log on contracts, prices and commission (roadmap item 11)
+update contracts set monthly_fee = monthly_fee + 1 where account_id = :'assigned_clinic';
+select pg_temp.expect(exists (
+  select 1 from audit_log where table_name = 'contracts' and operation = 'UPDATE'
+    and 'monthly_fee' = any(changed_fields) and account_id = :'assigned_clinic'
+), 'a contract fee change is logged against its account');
+select pg_temp.expect(exists (
+  select 1 from pg_trigger where tgname = 'rr_audit' and tgrelid = 'public.line_items'::regclass
+), 'quote and invoice lines are audited');
+select pg_temp.expect(exists (
+  select 1 from pg_trigger where tgname = 'rr_audit' and tgrelid = 'public.ctrm_deal_commissions'::regclass
+), 'commission is audited');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect((select count(*) from audit_log) = 0, 'manager cannot read the audit log');
+select pg_temp.expect(pg_temp.fails($q$update audit_log set actor_email = 'someone@else'$q$) or not exists (select 1 from audit_log), 'manager cannot change the audit log');
+reset role;
+
+------------------------------------------------------------ Two step sign in and error monitoring (roadmap item 14)
+insert into auth.mfa_factors (user_id, status) values ('00000000-0000-0000-0000-00000000000a', 'verified');
+insert into auth.mfa_factors (user_id, status) values ('00000000-0000-0000-0000-000000000013', 'unverified');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select pg_temp.expect((select has_two_step from rr_team_two_step() where email = 'alfred@redreach.ae'), 'admin sees their own two step sign in');
+select pg_temp.expect(not (select has_two_step from rr_team_two_step() where email = 'manager@redreach.ae'), 'an unfinished set up does not count');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from rr_team_two_step()) = 0, 'staff cannot see who has two step sign in');
+select pg_temp.expect(not pg_temp.fails($q$insert into app_errors (message, user_email) values ('Save failed', 'someone@else.com')$q$), 'a team member reports an error');
+select pg_temp.expect((select count(*) from app_errors) = 0, 'staff cannot read errors');
+select pg_temp.expect(pg_temp.fails($q$insert into app_errors (message, kind) values ('x', 'nonsense')$q$), 'error kinds are fixed');
+reset role;
+
+select pg_temp.expect((select user_email from app_errors where message = 'Save failed') = 'va@redreach.ae', 'the error is stamped with who hit it, not what the browser said');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select pg_temp.expect((select count(*) from app_errors) = 1, 'admin reads errors');
+select pg_temp.expect(pg_temp.fails($q$update app_errors set message = 'edited'$q$) or (select message from app_errors limit 1) = 'Save failed', 'nobody edits a reported error');
+select pg_temp.expect(not pg_temp.fails($q$delete from app_errors$q$), 'admin clears errors');
+reset role;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails($q$insert into app_errors (message) values ('spam')$q$), 'anon cannot report errors');
+reset role;

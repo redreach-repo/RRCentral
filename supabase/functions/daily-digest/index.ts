@@ -252,7 +252,10 @@ Deno.serve(async (req) => {
       selectAll(sb, "ctrm_deals", "id, account_id, stage, next_action, next_action_date", (q) =>
         q.not("stage", "in", "(signed,lost)")),
     ])
-    digest = buildDigest({ now, accounts, contracts, packages, entries, tickets, deals }) as Digest
+    // Error monitoring (item 14): skip quietly if its SQL has not been run yet.
+    const since = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
+    const errors = await selectAll(sb, "app_errors", "message, created_at", (q) => q.gte("created_at", since)).catch(() => [])
+    digest = buildDigest({ now, accounts, contracts, packages, entries, tickets, deals, errors }) as Digest
   } catch (e) {
     return json({ error: `Could not build the digest: ${(e as Error).message}`.slice(0, 300) }, 500)
   }

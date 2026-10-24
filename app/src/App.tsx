@@ -14,6 +14,8 @@ import BuildTemplatesPage from './pages/BuildTemplatesPage'
 import AgreementTemplatePage from './pages/AgreementTemplatePage'
 import ClientHealthPage from './pages/ClientHealthPage'
 import MrrPage from './pages/MrrPage'
+import AppErrorsPage from './pages/AppErrorsPage'
+import InsightsPage from './pages/InsightsPage'
 import SupportPage from './pages/SupportPage'
 import TicketPage from './pages/TicketPage'
 import CtrmPage from './pages/CtrmPage'
@@ -120,6 +122,7 @@ export default function App() {
               <Route path="agreement-template" element={<AgreementTemplatePage />} />
               <Route path="client-health" element={<ClientHealthPage />} />
               <Route path="mrr" element={<MrrPage />} />
+              <Route path="insights" element={<InsightsPage />} />
               <Route path="support" element={<SupportPage />} />
               <Route path="support/:id" element={<TicketPage />} />
               <Route path="ctrm" element={<CtrmPage />} />
@@ -142,6 +145,7 @@ export default function App() {
               <Route path="domains" element={<DomainsPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="audit-log" element={<AuditLogPage />} />
+              <Route path="app-errors" element={<AppErrorsPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>

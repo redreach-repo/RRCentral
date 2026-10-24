@@ -5,6 +5,9 @@ import App from './App'
 import StagingBanner from './components/StagingBanner'
 import { handoffTarget, isStagingBuild, routerBasename, stagingHandoff } from './lib/appEnv'
 import './index.css'
+import { installErrorReporting } from './lib/errorReporting'
+
+installErrorReporting()
 
 const staging = isStagingBuild()
 const handoff = stagingHandoff(window.location, staging)
