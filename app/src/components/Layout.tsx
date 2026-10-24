@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, type ComponentType } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { WorshipHubIcon } from './worshiphub/WorshipHubIcon'
 import {
   Bell,
   ShieldCheck,
@@ -29,7 +30,6 @@ import {
   LifeBuoy,
   Handshake,
   Target,
-  Church,
   Timer,
   ClipboardList,
   FileSignature,
@@ -55,7 +55,7 @@ import styles from './Layout.module.css'
 type NavItem = {
   to: string
   label: string
-  icon: typeof LayoutDashboard
+  icon: ComponentType<{ size?: number; strokeWidth?: number }>
   end?: boolean
   /** Minimum role required (admin > manager > sales). */
   minRole?: UserRole
@@ -83,7 +83,7 @@ const navGroups: NavGroup[] = [
       { to: '/support', label: 'Support', icon: LifeBuoy, forStaff: true },
       { to: '/sales', label: 'AI CRM sales', icon: Target, forStaff: true },
       { to: '/ctrm', label: 'CTRM Next', icon: Handshake, forStaff: true },
-      { to: '/products', label: 'Products', icon: Church, forStaff: true },
+      { to: '/products', label: 'WorshipHub', icon: WorshipHubIcon, forStaff: true },
       { to: '/delivery-settings', label: 'Packages and rates', icon: Package, minRole: 'manager' },
       { to: '/build-templates', label: 'Build templates', icon: ClipboardList, forStaff: true },
       { to: '/agreement-template', label: 'Agreement template', icon: FileSignature, forStaff: true },
@@ -153,7 +153,7 @@ const titleByPath: { match: (path: string) => boolean; title: string }[] = [
   { match: (p) => p.startsWith('/support'), title: 'Support' },
   { match: (p) => p.startsWith('/ctrm'), title: 'CTRM Next pipeline' },
   { match: (p) => p.startsWith('/sales'), title: 'AI CRM sales pipeline' },
-  { match: (p) => p.startsWith('/products'), title: 'Products' },
+  { match: (p) => p.startsWith('/products'), title: 'WorshipHub' },
   { match: (p) => p.startsWith('/crm'), title: 'CRM' },
   { match: (p) => p.startsWith('/follow-ups'), title: 'Follow-ups' },
   { match: (p) => p.startsWith('/quotations'), title: 'Quotations' },

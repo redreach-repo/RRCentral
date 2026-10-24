@@ -147,7 +147,7 @@ export default function ProductsPage() {
     <div style={pageStyle}>
       <div style={toolbarStyle}>
         <div>
-          <h1 style={pageTitleStyle}>Products</h1>
+          <h1 style={pageTitleStyle}>WorshipHub</h1>
           <p style={pageSubtitleStyle}>
             WorshipHub churches that Red Reach runs and supports. Member and visitor data stays in WorshipHub.
           </p>
