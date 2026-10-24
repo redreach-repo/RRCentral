@@ -1333,7 +1333,9 @@ export interface WorshipTenant {
   renewal_date: string | null
   admin_url: string
   /** pending = signed up on WorshipHub and waiting for Red Reach to review. */
-  review_status: '' | 'pending' | 'approved'
+  review_status: '' | 'pending' | 'approved' | 'rejected'
+  /** WorshipHub's public search badge: verified churches have been checked by Red Reach. */
+  verification_status: '' | 'unverified' | 'pending' | 'verified' | 'rejected'
   /** When the church signed up, ISO timestamp. */
   registered_at: string | null
   /** The church's own contact for follow up. Never members or visitors. */

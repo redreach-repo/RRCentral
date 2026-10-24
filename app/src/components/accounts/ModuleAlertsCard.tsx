@@ -21,10 +21,11 @@ import { TICKET_CHANNELS, isOpenTicket, optionLabel } from '../../lib/support'
 import { listTickets } from '../../lib/supportStore'
 import { billingLabel, churchView, hasBillingIssue, joinRequests, renewalSoon } from '../../lib/worshiphub'
 import { fetchLiveTenants, listChurchProfiles } from '../../lib/worshiphubStore'
-import type { Invoice } from '../../lib/types'
+import type { Invoice, WorshipTenant } from '../../lib/types'
+import ChurchActionButtons from '../worshiphub/ChurchActionButtons'
 import { cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
 
-type Line = { key: string; to: string; name: string; detail: string; tone: string }
+type Line = { key: string; to: string; name: string; detail: string; tone: string; tenant?: WorshipTenant }
 
 type Data = {
   clients: Line[]
@@ -57,6 +58,7 @@ export default function ModuleAlertsCard() {
   const chasesPayments = roleAtLeast(userRole, 'sales')
   const reviewsChurches = userRole === 'admin' || userRole === 'manager'
   const [data, setData] = useState<Data | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let alive = true
@@ -204,6 +206,7 @@ export default function ModuleAlertsCard() {
                   .filter(Boolean)
                   .join(', '),
                 tone: colors.warn,
+                tenant: t,
               }))
             : null
 
@@ -229,7 +232,7 @@ export default function ModuleAlertsCard() {
     return () => {
       alive = false
     }
-  }, [rates, seesMoney, chasesPayments, reviewsChurches])
+  }, [rates, seesMoney, chasesPayments, reviewsChurches, reloadKey])
 
   if (!data) return null
 
@@ -262,7 +265,7 @@ export default function ModuleAlertsCard() {
       </Panel>
       {data.joins ? (
         <Panel icon={<UserPlus size={18} />} title="Churches asking to join WorshipHub" link="/products" lines={data.joins}
-          empty="No church is waiting for review." />
+          empty="No church is waiting for review." onChurchChanged={() => setReloadKey((k) => k + 1)} />
       ) : null}
       <Panel icon={<Church size={18} />} title="WorshipHub churches" link="/products" lines={data.churches}
         empty="No church has a billing problem or a renewal in the next 60 days." />
@@ -278,6 +281,7 @@ function Panel({
   lines,
   empty,
   children,
+  onChurchChanged,
 }: {
   icon: ReactNode
   title: string
@@ -285,6 +289,8 @@ function Panel({
   lines: Line[]
   empty: string
   children?: ReactNode
+  /** Lines with a WorshipHub church get its review buttons; called after one is used. */
+  onChurchChanged?: () => void
 }) {
   return (
     <section style={{ ...cardStyle, margin: 0 }} aria-label={title}>
@@ -296,7 +302,7 @@ function Panel({
           Open
         </Link>
       </div>
-      {children ?? <Lines lines={lines} empty={empty} />}
+      {children ?? <Lines lines={lines} empty={empty} onChurchChanged={onChurchChanged} />}
     </section>
   )
 }
@@ -312,7 +318,7 @@ function SubList({ label, lines, empty }: { label: string; lines: Line[]; empty:
   )
 }
 
-function Lines({ lines, empty }: { lines: Line[]; empty: string }) {
+function Lines({ lines, empty, onChurchChanged }: { lines: Line[]; empty: string; onChurchChanged?: () => void }) {
   if (lines.length === 0) return <p style={{ color: colors.muted, fontSize: 13, margin: 0 }}>{empty}</p>
   return (
     <ul style={{ margin: 0, paddingLeft: 18, color: colors.muted, fontSize: 13, lineHeight: 1.55 }}>
@@ -322,6 +328,11 @@ function Lines({ lines, empty }: { lines: Line[]; empty: string }) {
             {l.name}
           </Link>
           <span style={{ color: l.tone }}>, {l.detail}</span>
+          {l.tenant && onChurchChanged ? (
+            <div style={{ marginTop: 4 }}>
+              <ChurchActionButtons tenant={l.tenant} onDone={onChurchChanged} />
+            </div>
+          ) : null}
         </li>
       ))}
       {lines.length > 6 ? <li style={{ listStyle: 'none' }}>and {lines.length - 6} more</li> : null}

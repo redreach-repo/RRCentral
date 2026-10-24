@@ -28,7 +28,8 @@ One row per tenant, account level only.
 | `billing_status` | text | `active` | One of `trial`, `active`, `past_due`, `paused`, `cancelled`. |
 | `renewal_date` | date | `2027-01-15` | `YYYY-MM-DD`. |
 | `admin_url` | text | `https://…/admin/icoc-uae` | WorshipHub admin page for this church. Must be https. |
-| `review_status` | text | `pending` | `pending` while a new sign up waits for Red Reach to review it, else `approved`. |
+| `review_status` | text | `pending` | `pending` while a new sign up waits for Red Reach to review it, `rejected` once rejected, else `approved`. |
+| `verification_status` | text | `verified` | WorshipHub's search badge: `unverified`, `pending`, `verified` or `rejected`. |
 | `registered_at` | timestamp | `2026-10-20T10:00:00Z` | When the church signed up. |
 | `contact_name` | text | `Sam Lee` | The church owner's name, for follow up. |
 | `contact_email` | text | `pastor@church.org` | The church's primary contact email. |
@@ -41,9 +42,30 @@ WhatsApp counts entered by hand on each church until it does.
 
 Every tenant with `review_status` `pending` shows to admins and managers on
 the dashboard ("Churches asking to join WorshipHub") and at the top of the
-Products page, with a link to review it in WorshipHub app admin and an
-"Add as church account" button. The Products page also lists every church on
+Products page, with the review buttons below (admins), a link to review it in
+WorshipHub app admin and an "Add as church account" button. The Products page also lists every church on
 WorshipHub with plan, billing, renewal, users, contact and its RR Central account.
+
+## Accept, reject, verify and delete
+
+RR Central admins (role `admin` only) get Accept, Verify, Reject and Delete
+buttons on each join request (dashboard and WorshipHub page) and on every row
+of "All churches on WorshipHub". They run the same code as the WorshipHub App
+admin buttons (`lib/churchReview.ts` in the WorshipHub repo):
+
+| Button | On WorshipHub |
+| --- | --- |
+| Accept | Marks the sign up reviewed. A church waiting for verification becomes `unverified` (still in public search, no badge). |
+| Verify | `verification_status` `verified` and reviewed: shows in public search with the badge. |
+| Reject | `verification_status` `rejected`: hidden from public search. Asks first. Accept undoes it. |
+| Delete | Deletes the church for good. Asks first. WorshipHub refuses a church with songs, setlists or more than its owner as a member, and the two seeded ICOC churches. |
+
+The app calls the `worshiphub-manage` Edge Function, which checks
+`rr_is_admin()`, calls `POST /api/integrations/rr-central/tenants` on
+WorshipHub with `{ action, slug, actor_email }` and the same token as reads,
+and writes every attempt (done or refused) to the audit log as
+`worshiphub_review` ("WorshipHub review actions" on the Audit log page).
+WorshipHub logs each action with the RR Central user's email too.
 
 Anything that does not match is blanked, not trusted: an unknown billing
 status shows as "Not set", a bad date as no date, a negative count as 0.
@@ -113,6 +135,8 @@ Two ways to build it:
    page with an "Add as church account" button.
 
 ## Who sees what
+
+* Only RR Central admins can accept, reject, verify or delete a church.
 
 * The function only answers signed in RR Central users.
 * Staff only get the churches assigned to them. Admins and managers also get

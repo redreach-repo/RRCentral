@@ -59,6 +59,7 @@ export function sanitiseTenant(raw: unknown): WorshipTenant | null {
   const month = text(r.whatsapp_month, 7)
   const renewal = text(r.renewal_date, 10)
   const review = text(r.review_status, 20)
+  const verification = text(r.verification_status, 20)
   const registered = text(r.registered_at, 40)
   const email = text(r.contact_email, 200).toLowerCase()
   return {
@@ -75,7 +76,8 @@ export function sanitiseTenant(raw: unknown): WorshipTenant | null {
     billing_status: BILLING_STATUSES.some((s) => s.value === billing) ? billing : '',
     renewal_date: DATE_RE.test(renewal) && !Number.isNaN(Date.parse(renewal)) ? renewal : null,
     admin_url: httpsUrl(r.admin_url),
-    review_status: review === 'pending' || review === 'approved' ? review : '',
+    review_status: review === 'pending' || review === 'approved' || review === 'rejected' ? review : '',
+    verification_status: (['unverified', 'pending', 'verified', 'rejected'] as const).find((v) => v === verification) ?? '',
     registered_at: registered && !Number.isNaN(Date.parse(registered)) ? new Date(registered).toISOString() : null,
     contact_name: text(r.contact_name, 120),
     contact_email: EMAIL_RE.test(email) ? email : '',
@@ -88,6 +90,34 @@ export function joinRequests(tenants: WorshipTenant[]): WorshipTenant[] {
   return tenants
     .filter((t) => t.review_status === 'pending')
     .sort((a, b) => String(b.registered_at ?? '').localeCompare(String(a.registered_at ?? '')))
+}
+
+export type ChurchAction = 'accept' | 'reject' | 'verify' | 'delete'
+
+export const CHURCH_ACTIONS: Record<ChurchAction, { label: string; done: string; confirm: ((name: string) => string) | null }> = {
+  accept: { label: 'Accept', done: 'accepted', confirm: null },
+  verify: { label: 'Verify', done: 'verified', confirm: null },
+  reject: {
+    label: 'Reject',
+    done: 'rejected',
+    confirm: (name) => `Reject ${name} on WorshipHub? It is hidden from church search. You can accept it later.`,
+  },
+  delete: {
+    label: 'Delete',
+    done: 'deleted',
+    confirm: (name) =>
+      `Delete ${name} from WorshipHub for good? This cannot be undone. WorshipHub only deletes empty test or duplicate churches and refuses one with songs, setlists or other members.`,
+  },
+}
+
+/** Review actions that make sense for this church right now, in button order. */
+export function churchActions(t: Pick<WorshipTenant, 'review_status' | 'verification_status'>): ChurchAction[] {
+  const out: ChurchAction[] = []
+  if (t.review_status === 'pending' || t.review_status === 'rejected') out.push('accept')
+  if (t.verification_status !== 'verified') out.push('verify')
+  if (t.review_status !== 'rejected') out.push('reject')
+  out.push('delete')
+  return out
 }
 
 /** Accepts `{ tenants: [...] }` or a bare array (a database view over REST). */

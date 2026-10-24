@@ -72,6 +72,7 @@ export const AUDIT_TABLE_LABELS: Record<string, string> = {
   ctrm_deal_stage_changes: 'CTRM stage changes',
   ctrm_deal_commissions: 'CTRM commission',
   worship_church_profiles: 'WorshipHub churches',
+  worshiphub_review: 'WorshipHub review actions',
   contract_invoices: 'Contract invoices',
   invoice_reminders: 'Payment reminders',
   usage_sources: 'Usage import sources',

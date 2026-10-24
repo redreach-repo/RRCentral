@@ -8,7 +8,7 @@ vi.mock('./supabaseConfig', () => ({
 }))
 vi.mock('./db', () => ({ db: {} }))
 
-const { fetchLiveTenants } = await import('./worshiphubStore')
+const { fetchLiveTenants, runChurchAction } = await import('./worshiphubStore')
 
 describe('fetchLiveTenants', () => {
   beforeEach(() => {
@@ -43,5 +43,34 @@ describe('fetchLiveTenants', () => {
       expect(r.tenants).toHaveLength(1)
       expect(r.tenants[0]).not.toHaveProperty('members')
     }
+  })
+})
+
+describe('runChurchAction', () => {
+  beforeEach(() => {
+    invoke.mockReset()
+    configured = true
+  })
+
+  it('sends the action and church to worshiphub-manage', async () => {
+    invoke.mockResolvedValue({ data: { ok: true }, error: null })
+    await runChurchAction('accept', { slug: 'grace', name: 'Grace' })
+    expect(invoke).toHaveBeenCalledWith('worshiphub-manage', { body: { action: 'accept', slug: 'grace', name: 'Grace' } })
+  })
+
+  it("shows WorshipHub's reason when it refuses", async () => {
+    invoke.mockResolvedValue({ data: { ok: false, error: '"Grace" has real data' }, error: null })
+    await expect(runChurchAction('delete', { slug: 'grace', name: 'Grace' })).rejects.toThrow('has real data')
+  })
+
+  it('reads the reason from a refused call', async () => {
+    const context = { status: 403, json: async () => ({ error: 'Only RR Central admins can change churches on WorshipHub' }) }
+    invoke.mockResolvedValue({ data: null, error: Object.assign(new Error('non-2xx'), { context }) })
+    await expect(runChurchAction('verify', { slug: 'grace', name: 'Grace' })).rejects.toThrow('Only RR Central admins')
+  })
+
+  it('says when the function is not deployed', async () => {
+    invoke.mockResolvedValue({ data: null, error: Object.assign(new Error('non-2xx'), { context: { status: 404 } }) })
+    await expect(runChurchAction('verify', { slug: 'grace', name: 'Grace' })).rejects.toThrow('not deployed')
   })
 })
