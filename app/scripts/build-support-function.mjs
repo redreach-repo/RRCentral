@@ -26,6 +26,8 @@
 //   link, the draft contract and the client's view match the app.
 // * fireflies-fetch gets the Fireflies rules (src/lib/fireflies.ts), so the
 //   link parsing and the meeting fields match the app.
+// * invoice-pay-link and stripe-invoice-webhook get the card payment rules
+//   (src/lib/invoicePayLink.ts), so the link and the payment agree.
 //
 //   npm run build:support-fn              # regenerate
 //   npm run build:support-fn -- --check   # CI: fail if a bundle is stale
@@ -50,6 +52,8 @@ const bundles = [
   { entry: 'src/lib/leadIntake.ts', out: '../supabase/functions/lead-intake/leadIntake.bundle.js' },
   { entry: 'src/lib/quoteAccept.ts', out: '../supabase/functions/quote-accept/quoteAccept.bundle.js' },
   { entry: 'src/lib/fireflies.ts', out: '../supabase/functions/fireflies-fetch/fireflies.bundle.js' },
+  { entry: 'src/lib/invoicePayLink.ts', out: '../supabase/functions/invoice-pay-link/invoicePayLink.bundle.js' },
+  { entry: 'src/lib/invoicePayLink.ts', out: '../supabase/functions/stripe-invoice-webhook/invoicePayLink.bundle.js' },
 ]
 
 let stale = false

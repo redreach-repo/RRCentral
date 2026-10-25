@@ -1072,3 +1072,41 @@ reset role;
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from account_activities'), 'anon cannot read the timeline');
 reset role;
+
+------------------------------------------------------------ Card payments (Wave 3, PR N)
+insert into quotations (client, reference_number, status, quotation_currency) values ('Dollar Co', 'RR-06-26950', 'Awarded', 'USD');
+insert into invoices (client, reference_number, amount, status) values ('Dollar Co', 'RR-06-26950', 1200, 'Sent');
+insert into payment_log (invoice_ref, client, amount) values ('RR-06-26950', 'Dollar Co', 200);
+-- Run the card payments migration again: the backfill must be safe to repeat.
+\i migrations/20261119090000_invoice_pay_link.sql
+select pg_temp.expect((select currency from invoices where reference_number = 'RR-06-26950') = 'USD', 'an invoice from a USD quote is in USD');
+select pg_temp.expect((select currency from payment_log where invoice_ref = 'RR-06-26950') = 'USD', 'earlier payments take the invoice currency');
+select pg_temp.expect((select currency from invoices where reference_number = 'RR-1') = 'AED', 'other invoices stay AED');
+insert into payment_log (invoice_ref, client, amount, currency, external_ref) values ('RR-06-26950', 'Dollar Co', 1000, 'USD', 'cs_test_1');
+select pg_temp.expect(pg_temp.fails($q$insert into payment_log (invoice_ref, client, amount, external_ref) values ('RR-06-26950', 'Dollar Co', 1000, 'cs_test_1')$q$), 'the same Stripe payment is recorded once');
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from payment_log'), 'anon cannot read payments');
+select pg_temp.expect(pg_temp.fails('select pay_link_url from invoices'), 'anon cannot read payment links');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select pg_temp.expect((select count(*) from payment_log where external_ref = 'cs_test_1') = 1, 'admin sees card payments');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from payment_log where currency = 'USD') = 2, 'sales sees payments with their currency');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from payment_log) = 0, 'staff (VA) does not see payments');
+select pg_temp.expect((select count(*) from invoices where reference_number = 'RR-06-26950') = 0, 'staff (VA) does not see the invoice or its link');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect(pg_temp.fails($q$insert into payment_log (invoice_ref, amount, external_ref) values ('RR-06-26950', 1, 'cs_forged')$q$), 'viewer cannot record a payment');
+reset role;

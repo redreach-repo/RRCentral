@@ -35,6 +35,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 16 | Quote accept links | `quote-accept` |
 | 17 | Quote follow up templates and nudges | `daily-digest` |
 | 18 | Fireflies calls on the timeline | `fireflies-fetch` |
+| 19 | Card payment links on invoices | `invoice-pay-link`, `stripe-invoice-webhook` |
 
 ---
 
@@ -318,4 +319,30 @@ timeline". On a church or CTRM account the call is only added to the timeline.
 
 **If it fails.** "Fireflies is not set up yet" means `FIREFLIES_API_KEY` is not set. "Fireflies refused the API
 key" means the key is wrong. System check row "Fireflies calls on the timeline"; App errors under `fireflies-fetch`.
+
+---
+
+## 19. Card payment links on invoices
+
+**Setup (once).** Use the RR Central Stripe account, not the Tee Tribe one.
+1. Stripe → Developers → API keys: copy the secret key. Supabase → Edge Functions → Secrets → add
+   `RR_STRIPE_SECRET_KEY`.
+2. Stripe → Developers → Webhooks → **Add endpoint**:
+   `https://pszjylxrpvlumldtptrr.supabase.co/functions/v1/stripe-invoice-webhook`, events
+   `checkout.session.completed` and `checkout.session.async_payment_succeeded`. Copy its signing secret into
+   the Supabase secret `RR_STRIPE_WEBHOOK_SECRET`.
+3. Deploy `invoice-pay-link` and `stripe-invoice-webhook`.
+
+**Trigger.** With Stripe in test mode, make a small test invoice to your own company and finalise it. On
+**Invoices**, press **Card link**: "Card payment link for AED … copied". Open it and pay with the test card
+4242 4242 4242 4242.
+
+**You should see.** Within a minute the invoice is **Paid**, its payment history has "Card (Stripe)" with the
+amount and currency, the income row is Paid and the invoice drops off **Payment reminders due** and the
+watchdog list. Pressing **Card link** again says it is already paid. Pay half by **Pay** (bank transfer) first and
+the card link asks only for the rest.
+
+**If it fails.** "Card payments are not set up yet" means `RR_STRIPE_SECRET_KEY` is missing. If the payment goes
+through in Stripe but the invoice stays unpaid, check Stripe → Webhooks for the delivery error and the System
+check row "Card payments mark invoices paid".
 

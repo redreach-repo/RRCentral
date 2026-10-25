@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import { Copy, ExternalLink, Pencil, Plus, Trash2, Wallet } from 'lucide-react'
+import { Copy, CreditCard, ExternalLink, Pencil, Plus, Trash2, Wallet } from 'lucide-react'
+import { canMakePayLink } from '../lib/invoicePayLink'
+import { getInvoicePayLink } from '../lib/invoicePayLinkStore'
 import { db } from '../lib/db'
 import {
   DELIVERY_TERMS,
@@ -429,6 +431,8 @@ export default function InvoicesPage() {
         invoice_ref: payTarget.reference_number,
         client: payTarget.client,
         amount,
+        // Only once the "Card payments" SQL added the column; until then everything is AED.
+        ...(payTarget.currency && payTarget.currency !== 'AED' ? { currency: payTarget.currency } : {}),
         method: payMethod,
         notes: payNotes,
         user_email: who,
@@ -504,6 +508,7 @@ export default function InvoicesPage() {
           invoice_ref: inv.reference_number,
           client: inv.client,
           amount: balance,
+          ...(inv.currency && inv.currency !== 'AED' ? { currency: inv.currency } : {}),
           method: settings.paymentMethod || 'Bank Transfer',
           notes: 'Marked paid (full remaining balance)',
           user_email: who,
@@ -553,6 +558,7 @@ export default function InvoicesPage() {
         date: format(new Date(), 'yyyy-MM-dd'),
         description: inv.description,
         amount: inv.amount,
+        ...(inv.currency && inv.currency !== 'AED' ? { currency: inv.currency } : {}),
         status: 'Draft',
         payment_status: 'Pending',
         payment_terms: inv.payment_terms,
@@ -597,6 +603,24 @@ export default function InvoicesPage() {
     }
   }
 
+  async function copyPayLink(inv: Invoice) {
+    setSaving(true)
+    try {
+      const link = await getInvoicePayLink(inv.id)
+      try {
+        await navigator.clipboard.writeText(link.url)
+        showToast(`Card payment link for ${link.currency} ${link.amount.toFixed(2)} copied. Send it to the client.`, 'success')
+      } catch {
+        window.prompt('Card payment link. Copy it and send it to the client:', link.url)
+      }
+      await logActivity('pay_link', 'invoice', inv.reference_number, `${link.currency} ${link.amount}`, who)
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not make the payment link'), 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   function renderInvoiceActions(inv: Invoice) {
     return (
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -614,6 +638,21 @@ export default function InvoicesPage() {
             Pay
           </button>
         )}
+        {canMakePayLink(userRole) &&
+          inv.reference_number &&
+          !isCancelledInvoice(inv) &&
+          String(inv.status).toLowerCase() !== 'draft' &&
+          effectiveInvoicePaymentStatus(inv) !== 'Paid' && (
+            <button
+              type="button"
+              style={buttonSecondaryStyle}
+              disabled={saving}
+              title="Card payment link for what is still owed"
+              onClick={() => void copyPayLink(inv)}
+            >
+              <CreditCard size={14} /> Card link
+            </button>
+          )}
         {can(userRole, 'invoice.markPaid') &&
           !isCancelledInvoice(inv) &&
           effectiveInvoicePaymentStatus(inv) !== 'Paid' && (

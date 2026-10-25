@@ -39,6 +39,8 @@ on:
           - lead-intake
           - quote-accept
           - fireflies-fetch
+          - invoice-pay-link
+          - stripe-invoice-webhook
 
 permissions:
   contents: read
