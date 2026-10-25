@@ -44,6 +44,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 25 | Duplicates and Quick add | none (SQL only) |
 | 26 | CTRM Next fit sheet | none (SQL only) |
 | 27 | CTRM Next client issues | `daily-digest` (redeploy) |
+| 28 | CTRM Next sessions | none (SQL only) |
 
 ---
 
@@ -498,3 +499,17 @@ issues, oldest first". Changing the vendor side is noted on the account timeline
 
 **If it fails.** No CTRM Next channel, or an error saving the vendor fields, means the SQL has not run. No digest
 section means `daily-digest` was not redeployed.
+
+## 28. CTRM Next sessions
+
+**Trigger.** Run the Wave 5 sessions SQL. Open a CTRM Next account and press **Log a session** on the **Sessions**
+card.
+
+**You should see.** Type (Demo, Training, Workshop, Review), date, attendees, topics covered and topics left (from
+Settings → CTRM Next lists), recording link and follow up due. After saving, the card shows **Left to cover**
+(a topic marked left that no later session covered) and the topics nobody has touched yet, and the session is on
+the timeline. When the follow up date arrives it shows in **CRM → My Day** under "CTRM Next follow ups due" with a
+**Done** button, and in red on the card.
+
+**If it fails.** "Run the sessions SQL first" means the SQL has not run. A recording link that does not start with
+https:// is refused.

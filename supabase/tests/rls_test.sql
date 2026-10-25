@@ -1457,3 +1457,44 @@ reset role;
 set role anon;
 select pg_temp.expect(pg_temp.fails($q$select vendor_ticket_ref from tickets$q$), 'anon cannot read CTRM issues');
 reset role;
+
+------------------------------------------------------------ Training and demo sessions (Wave 5, PR X)
+select pg_temp.expect(pg_temp.fails($q$insert into ctrm_sessions (account_id, kind, session_date) select id, 'party', '2026-10-01' from accounts where name = 'VA Fit Prospect'$q$), 'only listed session types are allowed');
+select pg_temp.expect(pg_temp.fails($q$insert into ctrm_sessions (account_id, session_date, recording_url) select id, '2026-10-01', 'javascript:alert(1)' from accounts where name = 'VA Fit Prospect'$q$), 'a recording link must be http or https');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect(not pg_temp.fails($q$insert into ctrm_sessions (account_id, kind, session_date, topics_covered, topics_left, follow_up_due, created_by) select id, 'demo', '2026-10-20', '{Trade capture}', '{Credit}', '2026-10-22', 'va@redreach.ae' from accounts where name = 'VA Fit Prospect'$q$), 'staff (VA) logs a session on their account');
+select pg_temp.expect(pg_temp.fails(format('insert into ctrm_sessions (account_id, session_date) values (%L, %L)', :'other_house', '2026-10-20')), 'staff (VA) cannot log a session on an account that is not theirs');
+select pg_temp.expect(not pg_temp.fails($q$update ctrm_sessions set follow_up_done = true, created_by = 'someone@else' where kind = 'demo'$q$), 'staff (VA) marks the follow up done');
+delete from ctrm_sessions;
+reset role;
+select pg_temp.expect((select created_by from ctrm_sessions where kind = 'demo') = 'va@redreach.ae', 'who logged a session cannot be changed');
+select pg_temp.expect((select count(*) from ctrm_sessions) = 1, 'staff (VA) cannot delete sessions');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from ctrm_sessions) = 1, 'sales reads sessions');
+select pg_temp.expect(not pg_temp.fails($q$insert into ctrm_sessions (account_id, kind, session_date) select id, 'training', '2026-10-21' from accounts where name = 'Other Trading House'$q$), 'sales logs a session');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from ctrm_sessions) = 2, 'viewer reads sessions');
+select pg_temp.expect(pg_temp.fails($q$insert into ctrm_sessions (account_id, session_date) select id, '2026-10-22' from accounts where name = 'Other Trading House'$q$), 'viewer cannot log sessions');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect(not pg_temp.fails($q$delete from ctrm_sessions where kind = 'training'$q$), 'manager deletes a session');
+reset role;
+select pg_temp.expect((select count(*) from ctrm_sessions) = 1, 'the deleted session is gone');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000c';
+select pg_temp.expect((select count(*) from ctrm_sessions) = 0, 'a stranger sees no sessions');
+reset role;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from ctrm_sessions'), 'anon cannot read sessions');
+reset role;

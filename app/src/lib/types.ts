@@ -1357,6 +1357,26 @@ export interface CtrmFitSheet {
   updated_at: string
 }
 
+export type CtrmSessionKind = 'demo' | 'training' | 'workshop' | 'review'
+
+/** A demo, training, workshop or review with a CTRM Next account (Wave 5, PR X). */
+export interface CtrmSession {
+  id: string
+  account_id: string
+  kind: CtrmSessionKind
+  session_date: string
+  attendees: string
+  topics_covered: string[]
+  topics_left: string[]
+  recording_url: string
+  follow_up_due: string | null
+  follow_up_done: boolean
+  notes: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
 /** A prospect being introduced to CTRM Next. Commission lives in CtrmCommission. */
 export interface CtrmDeal {
   id: string
