@@ -30,6 +30,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 11 | Daily watchdog | `watchdog` |
 | 12 | One tap payment reminders | `payment-reminder` |
 | 13 | My deals | none (app and SQL only) |
+| 14 | Next step and lost reason | none (app and SQL only) |
 
 ---
 
@@ -219,3 +220,18 @@ hidden), and staff see no CRM deals.
 
 **If it fails.** "Could not load the deals" names the table. Days in stage that never reset means the
 SQL has not been run. Nothing goes to App errors unless the page itself crashes.
+
+---
+
+## 14. Next step and lost reason
+
+**Trigger.** Run the "Wave 3: Next step and lost reason" SQL from the copy page once. Take a test deal in
+each of CRM, AI CRM sales and CTRM Next.
+
+**You should see.** Moving a deal to an open stage without a next action or date stops with "Every open
+deal needs a next action" (or "Give the next action a date") and opens the deal to add it. Moving to Lost
+asks for a reason from the list and a note; both are needed, and the timeline shows them. The dashboard
+has a **No next step** card listing open deals with no next action or date.
+
+**If it fails.** A move that saves without a next step means the SQL has not been run. "column lost_note
+does not exist" (or lost_reason_code) means the same.

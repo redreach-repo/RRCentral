@@ -6,12 +6,14 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import Modal from '../components/Modal'
+import LostReasonFields from '../components/deals/LostReasonFields'
 import MakeContractModal from '../components/sales/MakeContractModal'
 import SalesDealFormModal, { type SalesDealFormValues } from '../components/sales/SalesDealFormModal'
 import { useCompactCrm } from '../hooks/useMediaQuery'
 import { canEditAccount, visibleAccounts } from '../lib/accounts'
 import { listAccounts, listTeam } from '../lib/accountsStore'
 import { listPackages } from '../lib/deliveryStore'
+import { lostText, stageMoveProblem } from '../lib/dealRules'
 import { errorMessage } from '../lib/errors'
 import { formatAED } from '../lib/money'
 import { can } from '../lib/permissions'
@@ -32,7 +34,6 @@ import {
   buttonSecondaryStyle,
   cardStyle,
   colors,
-  inputStyle,
   pageStyle,
   pageSubtitleStyle,
   pageTitleStyle,
@@ -64,7 +65,7 @@ export default function SalesPipelinePage() {
   const [team, setTeam] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<{ deal: SalesDeal | null; stage?: SalesStage } | null>(null)
-  const [losing, setLosing] = useState<{ deal: SalesDeal; reason: string } | null>(null)
+  const [losing, setLosing] = useState<{ deal: SalesDeal; reason: string; code: string } | null>(null)
   const [contractFor, setContractFor] = useState<SalesDeal | null>(null)
   const [saving, setSaving] = useState(false)
   const [dragId, setDragId] = useState<string | null>(null)
@@ -125,7 +126,7 @@ export default function SalesPipelinePage() {
   async function move(deal: SalesDeal, stage: SalesStage) {
     if (stage === deal.stage || !canEdit(deal)) return
     if (stage === 'lost') {
-      setLosing({ deal, reason: '' })
+      setLosing({ deal, reason: '', code: '' })
       return
     }
     if (stage === 'signed') {
@@ -150,13 +151,21 @@ export default function SalesPipelinePage() {
 
   async function confirmLost() {
     if (!losing) return
-    if (!losing.reason.trim()) {
-      showToast('Say why the deal was lost', 'error')
+    const problem = stageMoveProblem({
+      open: false,
+      lost: true,
+      next_action: '',
+      next_action_date: null,
+      lost_reason_code: losing.code,
+      lost_note: losing.reason,
+    })
+    if (problem) {
+      showToast(problem, 'error')
       return
     }
     setSaving(true)
     try {
-      await updateSalesDeal(losing.deal, { stage: 'lost', lost_reason: losing.reason.trim() }, author)
+      await updateSalesDeal(losing.deal, { stage: 'lost', lost_reason_code: losing.code, lost_reason: losing.reason.trim() }, author)
       setLosing(null)
       await load()
     } catch (e) {
@@ -209,7 +218,7 @@ export default function SalesPipelinePage() {
   const editingDeal = editing?.deal ?? null
 
   function nextLine(d: SalesDeal) {
-    if (!isOpenSalesDeal(d)) return d.stage === 'lost' ? `Lost: ${d.lost_reason}` : `Signed ${d.signed_at ? format(parseISO(d.signed_at), 'd MMM') : ''}`
+    if (!isOpenSalesDeal(d)) return d.stage === 'lost' ? `Lost: ${lostText(d.lost_reason_code || '', d.lost_reason)}` : `Signed ${d.signed_at ? format(parseISO(d.signed_at), 'd MMM') : ''}`
     const late = isSalesDealOverdue(d, now)
     return (
       <span style={{ color: late ? colors.danger : colors.muted }}>
@@ -426,15 +435,15 @@ export default function SalesPipelinePage() {
             void confirmLost()
           }}
         >
-          <label htmlFor="sales-lost-reason" style={{ display: 'block', fontSize: 13, color: colors.muted, marginBottom: 6 }}>
-            Why was {losing ? nameOf(losing.deal) : ''} lost?
-          </label>
-          <input
-            id="sales-lost-reason"
-            style={{ ...inputStyle, marginBottom: 12 }}
-            value={losing?.reason ?? ''}
-            placeholder="Went with another agency, no budget this year"
-            onChange={(e) => setLosing((l) => (l ? { ...l, reason: e.target.value } : l))}
+          <p style={{ fontSize: 13, color: colors.muted, margin: '0 0 10px' }}>
+            {losing ? nameOf(losing.deal) : ''} moves to Lost.
+          </p>
+          <LostReasonFields
+            idPrefix="sales-lost"
+            code={losing?.code ?? ''}
+            note={losing?.reason ?? ''}
+            notePlaceholder="Went with another agency, no budget this year"
+            onChange={({ code, note }) => setLosing((l) => (l ? { ...l, code, reason: note } : l))}
           />
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <button type="button" style={buttonSecondaryStyle} onClick={() => setLosing(null)}>

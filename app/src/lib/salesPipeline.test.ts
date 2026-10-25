@@ -54,8 +54,16 @@ describe('deal rules', () => {
   })
 
   it('needs a reason when lost', () => {
-    expect(salesDealProblem(deal({ stage: 'lost', next_action: '' }))).toBe('Say why the deal was lost')
-    expect(salesDealProblem(deal({ stage: 'lost', lost_reason: 'Went with HubSpot', next_action: '' }))).toBeNull()
+    expect(salesDealProblem(deal({ stage: 'lost', next_action: '' }))).toBe('Pick why the deal was lost')
+    expect(salesDealProblem(deal({ stage: 'lost', lost_reason_code: 'Competitor won', next_action: '' }))).toBe(
+      'Add a note on why the deal was lost',
+    )
+    expect(salesDealProblem(deal({ stage: 'lost', lost_reason_code: 'Made up', lost_reason: 'x', next_action: '' }))).toBe(
+      'Pick why the deal was lost',
+    )
+    expect(
+      salesDealProblem(deal({ stage: 'lost', lost_reason_code: 'Competitor won', lost_reason: 'Went with HubSpot', next_action: '' })),
+    ).toBeNull()
   })
 
   it('needs the quote before Quote sent', () => {

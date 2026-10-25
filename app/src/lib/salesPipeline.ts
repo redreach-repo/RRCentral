@@ -1,5 +1,6 @@
 import { addMonths, format, parseISO } from 'date-fns'
 import { packageFees, termEndFromStart } from './delivery'
+import { isLostReason } from './dealRules'
 import type { ContractInput } from './deliveryStore'
 import type { DeliveryPackage, SalesDeal, SalesStage } from './types'
 
@@ -36,12 +37,16 @@ export function hasQuote(d: QuoteFields): boolean {
   return Boolean(d.package_id) && Number(d.monthly_fee) > 0
 }
 
-export type SalesDealDraft = Pick<SalesDeal, 'stage' | 'next_action' | 'next_action_date' | 'lost_reason' | 'contract_id'> &
-  QuoteFields
+export type SalesDealDraft = Pick<SalesDeal, 'stage' | 'next_action' | 'next_action_date' | 'lost_reason' | 'contract_id'> & {
+  lost_reason_code?: string
+} & QuoteFields
 
 /** The rules a deal must meet before it is saved. Returns a message, or null when it is fine. */
 export function salesDealProblem(d: SalesDealDraft): string | null {
-  if (d.stage === 'lost' && !d.lost_reason.trim()) return 'Say why the deal was lost'
+  if (d.stage === 'lost') {
+    if (!isLostReason(d.lost_reason_code)) return 'Pick why the deal was lost'
+    if (!d.lost_reason.trim()) return 'Add a note on why the deal was lost'
+  }
   if (d.stage === 'quote_sent' && !hasQuote(d)) return 'Pick the package and fees that were quoted'
   if (d.stage === 'signed' && !d.contract_id) return 'Use Make contract to sign a deal, so the contract is created from the quote'
   if (isOpenSalesDeal(d)) {

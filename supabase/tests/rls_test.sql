@@ -366,7 +366,7 @@ insert into ctrm_deal_commissions (deal_id, expected_commission)
 select id as other_deal from ctrm_deals where account_id = (select id from accounts where name = 'Other Trading House') \gset
 
 select pg_temp.expect(pg_temp.fails($q$update ctrm_deals set stage = 'lost' where region = 'india'$q$), 'lost needs a reason');
-select pg_temp.expect(not pg_temp.fails($q$update ctrm_deals set stage = 'lost', lost_reason = 'Chose another vendor' where region = 'india'$q$), 'lost with a reason is fine');
+select pg_temp.expect(not pg_temp.fails($q$update ctrm_deals set stage = 'lost', lost_reason_code = 'Competitor won', lost_reason = 'Chose another vendor' where region = 'india'$q$), 'lost with a reason is fine');
 update ctrm_deals set stage = 'identified', lost_reason = '' where region = 'india';
 select pg_temp.expect(pg_temp.fails($q$update ctrm_deals set next_action = '' where region = 'india'$q$), 'open deals need a next action');
 select pg_temp.expect(pg_temp.fails($q$update ctrm_deals set next_action_date = null where region = 'india'$q$), 'open deals need a next action date');
@@ -863,7 +863,7 @@ reset role;
 
 set role authenticated;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
-update crm set pipeline_stage = 'Contacted' where company_name = 'Stage Clock Co';
+update crm set pipeline_stage = 'Contacted', next_action = 'Call', follow_up_date = '2026-11-03' where company_name = 'Stage Clock Co';
 reset role;
 select pg_temp.expect((select pipeline_stage from crm where company_name = 'Stage Clock Co') = 'Contacted', 'sales moves a CRM lead');
 select pg_temp.expect((select count(*) from crm where stage_changed_at > '2020-01-01') = 1, 'only the moved CRM lead restarts its stage clock');
@@ -875,3 +875,31 @@ select pg_temp.expect((select count(*) from ctrm_deal_commissions) = 0, 'viewer 
 update ctrm_deals set stage = 'lost', lost_reason = 'x';
 reset role;
 select pg_temp.expect((select count(*) from ctrm_deals where stage = 'lost') = 0, 'viewer cannot move deals');
+------------------------------------------------------------ Next step and lost reason on every move (Wave 3, PR I)
+insert into crm (company_name, pipeline_stage) values ('No Step Co', 'Lead');
+select pg_temp.expect(not pg_temp.fails($q$update crm set notes = 'still no next step' where company_name = 'No Step Co'$q$), 'a deal without a next step can still be edited');
+select pg_temp.expect(pg_temp.fails($q$update crm set pipeline_stage = 'Contacted' where company_name = 'No Step Co'$q$), 'CRM move to an open stage needs a next action');
+select pg_temp.expect(pg_temp.fails($q$update crm set pipeline_stage = 'Contacted', next_action = 'Call' where company_name = 'No Step Co'$q$), 'CRM move to an open stage needs a date');
+select pg_temp.expect(pg_temp.fails($q$update crm set pipeline_stage = 'Lost', outcome_reason = 'They went quiet', lost_note = 'x' where company_name = 'No Step Co'$q$), 'CRM lost reason must come from the list');
+select pg_temp.expect(pg_temp.fails($q$update crm set pipeline_stage = 'Lost', outcome_reason = 'Price' where company_name = 'No Step Co'$q$), 'CRM lost needs a note');
+select pg_temp.expect(not pg_temp.fails($q$update crm set pipeline_stage = 'Won', outcome_reason = 'Relationship' where company_name = 'No Step Co'$q$), 'CRM won needs no next step');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect(not pg_temp.fails($q$update crm set pipeline_stage = 'Lost', outcome_reason = 'Price', lost_note = 'Too dear for them this year' where company_name = 'No Step Co'$q$), 'sales marks a CRM deal lost with a reason and note');
+select pg_temp.expect(pg_temp.fails($q$update ctrm_deals set stage = 'lost', lost_reason = 'Chose another vendor', lost_reason_code = '' where region = 'middle_east'$q$), 'sales cannot lose a CTRM deal without a listed reason');
+select pg_temp.expect(not pg_temp.fails($q$update ctrm_deals set stage = 'demo_done', next_action = 'Send proposal', next_action_date = '2026-11-20' where region = 'middle_east'$q$), 'sales moves a CTRM deal with a next step');
+reset role;
+select pg_temp.expect((select pipeline_stage from crm where company_name = 'No Step Co') = 'Lost', 'the CRM deal is lost');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect(pg_temp.fails($q$update ctrm_deals set stage = 'lost', lost_reason = 'Gone', lost_reason_code = 'Nope' where region = 'india'$q$), 'staff cannot lose their deal with an unlisted reason');
+select pg_temp.expect(not pg_temp.fails($q$update ctrm_deals set stage = 'lost', lost_reason = 'Chose an in-house tool', lost_reason_code = 'Competitor won' where region = 'india'$q$), 'staff loses their own deal with a reason and note');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+update crm set pipeline_stage = 'Lead', next_action = 'x', follow_up_date = '2026-12-01' where company_name = 'No Step Co';
+reset role;
+select pg_temp.expect((select pipeline_stage from crm where company_name = 'No Step Co') = 'Lost', 'viewer cannot reopen a deal');

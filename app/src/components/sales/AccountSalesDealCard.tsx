@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { lostText } from '../../lib/dealRules'
 import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { FileSignature, Plus } from 'lucide-react'
@@ -132,7 +133,7 @@ export default function AccountSalesDealCard({ account, team, editable, canContr
                   <div style={{ fontSize: 13, color: colors.muted }}>No quote yet.</div>
                 )}
                 {d.stage === 'lost' ? (
-                  <div style={{ fontSize: 13 }}>Lost: {d.lost_reason}</div>
+                  <div style={{ fontSize: 13 }}>Lost: {lostText(d.lost_reason_code || '', d.lost_reason)}</div>
                 ) : d.stage === 'signed' ? (
                   <div style={{ fontSize: 13 }}>Signed {d.signed_at ? format(parseISO(d.signed_at), 'd MMM yyyy') : ''}. The contract is in the Contract section below.</div>
                 ) : d.next_action ? (

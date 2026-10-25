@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import Modal from '../Modal'
+import LostReasonFields from '../deals/LostReasonFields'
 import { CTRM_COMPANY_TYPES, CTRM_REGIONS, CTRM_STAGES, dealProblem } from '../../lib/ctrm'
 import type {
   Account,
@@ -36,6 +37,7 @@ export type DealFormValues = {
   next_action: string
   next_action_date: string | null
   lost_reason: string
+  lost_reason_code: string
   notes: string
   /** Null when the person cannot see commission. */
   commission: { expected: number; received: number } | null
@@ -91,6 +93,7 @@ export default function DealFormModal({
       next_action: deal?.next_action ?? '',
       next_action_date: deal?.next_action_date ?? today(),
       lost_reason: deal?.lost_reason ?? '',
+      lost_reason_code: deal?.lost_reason_code ?? '',
       notes: deal?.notes ?? '',
       commission: showCommission
         ? { expected: Number(commission?.expected_commission ?? 0), received: Number(commission?.commission_received ?? 0) }
@@ -254,18 +257,13 @@ export default function DealFormModal({
         </div>
 
         {v.stage === 'lost' ? (
-          <div style={{ ...fieldStyle, marginBottom: 12 }}>
-            <label style={labelStyle} htmlFor="deal-lost">
-              Why was it lost?
-            </label>
-            <input
-              id="deal-lost"
-              style={inputStyle}
-              value={v.lost_reason}
-              placeholder="Chose another system, no budget this year"
-              onChange={(e) => set({ lost_reason: e.target.value })}
-            />
-          </div>
+          <LostReasonFields
+            idPrefix="deal-lost"
+            code={v.lost_reason_code}
+            note={v.lost_reason}
+            notePlaceholder="Chose another system, no budget this year"
+            onChange={({ code, note }) => set({ lost_reason_code: code, lost_reason: note })}
+          />
         ) : null}
 
         <div style={formGridStyle}>

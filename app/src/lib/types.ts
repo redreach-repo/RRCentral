@@ -92,8 +92,10 @@ export interface CrmEntry {
   /** When pipeline_stage last changed (set by the database). Null on rows saved before it existed. */
   stage_changed_at?: string | null
   quote_ref: string
-  /** Why the deal was Won or Lost (company-level). */
+  /** Why the deal was Won or Lost (company-level). Lost uses the LOST_REASONS list. */
   outcome_reason: string
+  /** The note in words when the deal was lost. */
+  lost_note?: string
   calendar_event_id: string
   /** Zoho WorkDrive folder URL for this customer's files (files stay on WorkDrive). */
   drive_folder_url?: string
@@ -1112,7 +1114,10 @@ export interface SalesDeal {
   owner_user_id: string | null
   next_action: string
   next_action_date: string | null
+  /** The note in words on why it was lost. */
   lost_reason: string
+  /** Why it was lost, from LOST_REASONS. */
+  lost_reason_code?: string
   notes: string
   /** Date of the discovery call, booked or held. */
   discovery_call_date: string | null
@@ -1277,7 +1282,10 @@ export interface CtrmDeal {
   stage_changed_at?: string | null
   next_action: string
   next_action_date: string | null
+  /** The note in words on why it was lost. */
   lost_reason: string
+  /** Why it was lost, from LOST_REASONS. */
+  lost_reason_code?: string
   notes: string
   created_by: string
   created_at: string

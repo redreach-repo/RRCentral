@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { lostText } from '../../lib/dealRules'
 import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { Plus } from 'lucide-react'
@@ -95,7 +96,7 @@ export default function AccountDealsCard({ account, contacts, team, editable, sh
                   {d.source ? `, from ${d.source}` : ''}
                 </div>
                 {d.stage === 'lost' ? (
-                  <div style={{ fontSize: 13 }}>Lost: {d.lost_reason}</div>
+                  <div style={{ fontSize: 13 }}>Lost: {lostText(d.lost_reason_code || '', d.lost_reason)}</div>
                 ) : d.next_action ? (
                   <div style={{ fontSize: 13, color: isOverdue(d, now) ? colors.danger : colors.text }}>
                     Next: {d.next_action}
