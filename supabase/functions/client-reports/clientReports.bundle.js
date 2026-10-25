@@ -1901,6 +1901,16 @@ ${input.facts.map((f) => `- ${f}`).join("\n")}`,
         maxTokens: 600,
         schema: QUESTIONS_SCHEMA
       };
+    case "update_tidy":
+      return {
+        system: "You tidy the wording of a short weekly update that Red Reach sends to a client about their CTRM Next work. Fix grammar and make it read smoothly, keeping the same layout (greeting, short lists, sign off). Change the wording only: keep every issue, status, reference, date and name exactly as given, and never add a fact, number, date, promise or detail that is not in the text. Do not remove anything. Reply with the tidied text only. " + STYLE,
+        user: `Client: ${input.accountName}
+
+Update:
+${clip(input.text, 4e3)}`,
+        maxTokens: 1500,
+        schema: null
+      };
     case "call_notes":
       return {
         system: 'You turn notes from a call with a client into requirements for their AI CRM build at Red Reach. Each requirement is one thing the client wants the system to do or have. Title: a short action, at most 10 words (for example "Send a WhatsApp reminder the day before each appointment"). Detail: one or two sentences with the specifics from the notes, or an empty string. Leave out small talk, pricing and anything already in the existing list. Return an empty list if the notes contain no requirements. ' + STYLE,

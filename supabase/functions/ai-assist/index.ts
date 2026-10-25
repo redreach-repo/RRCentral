@@ -1,6 +1,7 @@
 // AI help inside RR Central: summarise a ticket thread, draft a reply, write
-// the monthly report summary, turn call notes into requirements, or suggest
-// three questions before a call (read only: nothing is saved). Uses
+// the monthly report summary, turn call notes into requirements, suggest
+// three questions before a call (read only: nothing is saved), or tidy the
+// wording of a weekly client update (refused if it adds a number). Uses
 // Claude Haiku and logs the cost of every request against the account in
 // ai_usage_log, so it counts in that client's profitability.
 //
@@ -19,6 +20,7 @@ import {
   AI_MODEL,
   aiCostUsd,
   buildAiRequest,
+  newNumbers,
   normaliseAiInput,
   parseQuestions,
   parseRequirements,
@@ -141,5 +143,10 @@ Deno.serve(withErrorLog("ai-assist", async (req) => {
   }
   text = tidyAiText(text)
   if (!text) return json({ error: "AI help came back empty. Please try again." }, 502)
+  if (input.feature === "update_tidy") {
+    // Tidy the wording only: a number (date, count, reference) the draft did not have means it added a fact.
+    const added = newNumbers(input.text, text)
+    if (added.length) return json({ error: `AI help added something that is not in the draft (${added.join(", ")}). Keep your wording.` }, 422)
+  }
   return json({ text, requirements: [], costUsd })
 }, { secrets: ["ANTHROPIC_API_KEY"] }))

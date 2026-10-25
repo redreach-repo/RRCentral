@@ -1234,6 +1234,25 @@ export interface ClientReportDraft {
   sent_whatsapp_to: string
 }
 
+/** A weekly CTRM Next client update waiting for approval, or sent (Wave 5, PR Z). */
+export interface ClientUpdateDraft {
+  id: string
+  account_id: string
+  /** The Monday of the week it covers. */
+  week_start: string
+  status: 'draft' | 'sent' | 'skipped'
+  body: string
+  facts: string[]
+  error: string
+  created_by: string
+  created_at: string
+  updated_at: string
+  sent_by: string
+  sent_at: string | null
+  sent_via: '' | 'email' | 'whatsapp'
+  sent_to: string
+}
+
 /** Someone on the daily digest list. */
 export interface DigestRecipientRow {
   id: string

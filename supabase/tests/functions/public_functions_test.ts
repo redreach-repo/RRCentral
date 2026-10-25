@@ -31,6 +31,7 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "manage-auth-user": { kind: "admin JWT", pattern: /admin\.auth\.getUser\(jwt\)/ },
   "zoho-proxy": { kind: "team member JWT", pattern: /admin\.auth\.getUser\(jwt\)[\s\S]*member\?\.active/ },
   "client-reports": { kind: "cron secret, manager JWT to build, team JWT to send", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret[\s\S]*auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_manager_or_admin[\s\S]*rr_is_staff[\s\S]*rr_can_write_account/ },
+  "client-updates": { kind: "cron secret, manager JWT to build, team JWT to send", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret[\s\S]*auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_manager_or_admin[\s\S]*rr_is_staff[\s\S]*rr_can_write_account/ },
   "lead-intake": { kind: "shared secret or signed form token", pattern: /if \(!secret\)[\s\S]*=== secret[\s\S]*formTokenProblem\(/ },
 }
 
@@ -81,6 +82,7 @@ const ENV: Record<string, string> = {
   RR_STRIPE_SECRET_KEY: "sk_test_for_tests",
   RR_STRIPE_WEBHOOK_SECRET: "whsec_for_tests",
   CLIENT_REPORT_CRON_SECRET: "report-secret-for-tests",
+  CLIENT_UPDATE_CRON_SECRET: "update-secret-for-tests",
 }
 
 async function load(fn: string): Promise<Handler> {
@@ -127,7 +129,7 @@ async function metaSignature(raw: string, secret: string): Promise<string> {
 
 const opts = { sanitizeOps: false, sanitizeResources: false }
 
-for (const fn of ["usage-import", "daily-digest", "contract-invoices", "watchdog", "client-reports"]) {
+for (const fn of ["usage-import", "daily-digest", "contract-invoices", "watchdog", "client-reports", "client-updates"]) {
   Deno.test({ name: `${fn} refuses no secret and a wrong secret`, ...opts, fn: async () => {
     assertEquals(await call(fn, post(fn, {})), 401)
     assertEquals(await call(fn, post(fn, {}, { "x-cron-secret": "wrong" })), 401)
@@ -165,6 +167,21 @@ Deno.test({ name: "client-reports refuses an unknown sign in and lets the schedu
     assertEquals(await call("client-reports", post("client-reports", {}, { "x-cron-secret": ENV.CLIENT_REPORT_CRON_SECRET })), 401)
   } finally {
     Deno.env.set("CLIENT_REPORT_CRON_SECRET", ENV.CLIENT_REPORT_CRON_SECRET)
+  }
+} })
+
+Deno.test({ name: "client-updates refuses an unknown sign in and lets the schedule only build", ...opts, fn: async () => {
+  assertEquals(await call("client-updates", post("client-updates", { action: "send", draft_id: "00000000-0000-0000-0000-000000000001" })), 401)
+  assertEquals(await call("client-updates", post("client-updates", { action: "send" }, { Authorization: "Bearer someone" })), 401)
+  assertEquals(
+    await call("client-updates", post("client-updates", { action: "send" }, { "x-cron-secret": ENV.CLIENT_UPDATE_CRON_SECRET })),
+    403,
+  )
+  Deno.env.delete("CLIENT_UPDATE_CRON_SECRET")
+  try {
+    assertEquals(await call("client-updates", post("client-updates", {}, { "x-cron-secret": ENV.CLIENT_UPDATE_CRON_SECRET })), 401)
+  } finally {
+    Deno.env.set("CLIENT_UPDATE_CRON_SECRET", ENV.CLIENT_UPDATE_CRON_SECRET)
   }
 } })
 

@@ -28,7 +28,7 @@ export const AI_PRICES = {
 /** Longest text sent in one request. Long threads keep the first message and the latest ones. */
 export const AI_MAX_INPUT_CHARS = 60_000
 
-export type AiFeature = 'ticket_summary' | 'ticket_reply' | 'report_summary' | 'call_notes' | 'call_brief'
+export type AiFeature = 'ticket_summary' | 'ticket_reply' | 'report_summary' | 'call_notes' | 'call_brief' | 'update_tidy'
 
 export const AI_FEATURES: { value: AiFeature; label: string }[] = [
   { value: 'ticket_summary', label: 'Ticket summary' },
@@ -36,6 +36,7 @@ export const AI_FEATURES: { value: AiFeature; label: string }[] = [
   { value: 'report_summary', label: 'Report summary' },
   { value: 'call_notes', label: 'Requirements from call notes' },
   { value: 'call_brief', label: 'Before the call questions' },
+  { value: 'update_tidy', label: 'Weekly update wording' },
 ]
 
 export function isAiFeature(v: unknown): v is AiFeature {
@@ -57,6 +58,7 @@ export type AiInput =
   | { feature: 'report_summary'; accountName: string; monthLabel: string; facts: string[] }
   | { feature: 'call_brief'; accountName: string; accountKind: string; facts: string[] }
   | { feature: 'call_notes'; accountName: string; notes: string; existing: string[] }
+  | { feature: 'update_tidy'; accountName: string; text: string }
 
 export type AiRequest = {
   system: string
@@ -211,6 +213,19 @@ export function buildAiRequest(input: AiInput): AiRequest {
         maxTokens: 600,
         schema: QUESTIONS_SCHEMA as unknown as Record<string, unknown>,
       }
+    case 'update_tidy':
+      return {
+        system:
+          'You tidy the wording of a short weekly update that Red Reach sends to a client about their CTRM Next work. ' +
+          'Fix grammar and make it read smoothly, keeping the same layout (greeting, short lists, sign off). ' +
+          'Change the wording only: keep every issue, status, reference, date and name exactly as given, ' +
+          'and never add a fact, number, date, promise or detail that is not in the text. Do not remove anything. ' +
+          'Reply with the tidied text only. ' +
+          STYLE,
+        user: `Client: ${input.accountName}\n\nUpdate:\n${clip(input.text, 4000)}`,
+        maxTokens: 1500,
+        schema: null,
+      }
     case 'call_notes':
       return {
         system:
@@ -254,6 +269,16 @@ export function parseRequirements(text: string): ProposedRequirement[] {
     out.push({ title, detail })
   }
   return out
+}
+
+/**
+ * Numbers in `after` that are not in `before` (dates, counts, references).
+ * Tidied wording may not bring in a number the draft did not have.
+ */
+export function newNumbers(before: string, after: string): string[] {
+  const nums = (t: string) => t.match(/\d+(?:[.,:]\d+)*/g) || []
+  const had = new Set(nums(before))
+  return [...new Set(nums(after).filter((n) => !had.has(n)))]
 }
 
 /** Swaps any dash the model still used for a comma, as house style asks. */
@@ -370,6 +395,11 @@ export function normaliseAiInput(raw: unknown): AiInput | null {
       const facts = strList(r.facts, 40, 600).filter((f) => f.trim())
       if (!facts.length) return null
       return { feature: 'call_brief', accountName, accountKind: str(r.accountKind, 60), facts }
+    }
+    case 'update_tidy': {
+      const text = str(r.text, 4000)
+      if (text.trim().length < 20) return null
+      return { feature: 'update_tidy', accountName, text }
     }
     case 'call_notes': {
       const notes = str(r.notes, AI_MAX_INPUT_CHARS)

@@ -41,6 +41,7 @@ import {
   Activity,
   Gauge,
   MessageSquareWarning,
+  Send,
   CopyCheck,
   PhoneCall,
 } from 'lucide-react'
@@ -93,6 +94,7 @@ const navGroups: NavGroup[] = [
       { to: '/sales', label: 'AI CRM sales', icon: Target, forStaff: true },
       { to: '/ctrm', label: 'CTRM Next', icon: Handshake, forStaff: true },
       { to: '/ctrm-issues', label: 'CTRM issues', icon: MessageSquareWarning, forStaff: true },
+      { to: '/client-updates', label: 'Weekly updates', icon: Send, forStaff: true },
       { to: '/products', label: 'WorshipHub', icon: WorshipHubIcon, forStaff: true },
       { to: '/delivery-settings', label: 'Packages and rates', icon: Package, minRole: 'manager' },
       { to: '/build-templates', label: 'Build templates', icon: ClipboardList, forStaff: true },
@@ -164,6 +166,7 @@ const titleByPath: { match: (path: string) => boolean; title: string }[] = [
   { match: (p) => p.startsWith('/mrr'), title: 'Monthly recurring revenue' },
   { match: (p) => p.startsWith('/duplicates'), title: 'Duplicates' },
   { match: (p) => p.startsWith('/ctrm-issues'), title: 'CTRM issues' },
+  { match: (p) => p.startsWith('/client-updates'), title: 'Weekly updates' },
   { match: (p) => p.startsWith('/quick-add'), title: 'Quick add' },
   { match: (p) => p.startsWith('/insights'), title: 'Utilisation and profit' },
   { match: (p) => p.startsWith('/support'), title: 'Support' },
