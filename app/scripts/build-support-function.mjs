@@ -14,6 +14,8 @@
 //   so the app and the function agree on what is asked and what it cost.
 // * whatsapp-in and whatsapp-send get the WhatsApp ticket rules
 //   (src/lib/whatsappTickets.ts, which carries the SLA rules too).
+// * watchdog gets the watchdog rules (src/lib/watchdog.ts), so the morning
+//   list matches what the app shows.
 //
 //   npm run build:support-fn              # regenerate
 //   npm run build:support-fn -- --check   # CI: fail if a bundle is stale
@@ -32,6 +34,7 @@ const bundles = [
   { entry: 'src/lib/aiAssist.ts', out: '../supabase/functions/ai-assist/aiAssist.bundle.js' },
   { entry: 'src/lib/whatsappTickets.ts', out: '../supabase/functions/whatsapp-in/whatsappTickets.bundle.js' },
   { entry: 'src/lib/whatsappTickets.ts', out: '../supabase/functions/whatsapp-send/whatsappTickets.bundle.js' },
+  { entry: 'src/lib/watchdog.ts', out: '../supabase/functions/watchdog/watchdog.bundle.js' },
 ]
 
 let stale = false

@@ -39,6 +39,7 @@ import { listCompanyDocuments } from '../lib/companyDocs'
 import { companyDocAlertLabel, companyDocExpiryAlerts } from '../lib/companyDocAlerts'
 import { listOwnedDomains } from '../lib/domains'
 import ModuleAlertsCard from '../components/accounts/ModuleAlertsCard'
+import WatchdogCard from '../components/watchdog/WatchdogCard'
 import { domainAlertLabel, domainRenewalAlerts } from '../lib/domainAlerts'
 import { syncUnansweredQuoteFollowUps } from '../lib/quoteFollowUpSync'
 import { useSettings } from '../contexts/SettingsContext'
@@ -406,6 +407,8 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      <WatchdogCard />
 
       <ModuleAlertsCard />
 

@@ -21,7 +21,11 @@ export async function loadDigestPreview(now: Date = new Date()): Promise<Digest>
     listTickets(),
     listDeals(),
   ])
-  return buildDigest({ now, accounts, contracts, packages, entries, tickets, deals })
+  const { data: watch } = await db
+    .from('watch_items')
+    .select('kind, severity, title, reason, link, owner_label')
+    .is('cleared_at', null)
+  return buildDigest({ now, accounts, contracts, packages, entries, tickets, deals, watch: watch || [] })
 }
 
 export async function listRecipients(): Promise<{ rows: DigestRecipientRow[]; missingTable: boolean }> {

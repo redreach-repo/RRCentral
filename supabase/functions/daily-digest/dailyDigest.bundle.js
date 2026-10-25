@@ -1964,8 +1964,18 @@ function buildDigest(input) {
     overdueActions,
     overHours,
     noHours,
-    appErrors: digestErrors(input.errors || [])
+    appErrors: digestErrors(input.errors || []),
+    staleDeals: watchLines(input.watch || [], "stale_deal"),
+    lateInvoices: watchLines(input.watch || [], "invoice_overdue")
   };
+}
+function watchLines(watch, kind) {
+  return watch.filter((w) => w.kind === kind).sort((a, b) => a.severity === b.severity ? a.title.localeCompare(b.title) : a.severity === "urgent" ? -1 : 1).map((w) => ({
+    name: w.title,
+    detail: w.owner_label ? `${w.reason} (${w.owner_label})` : w.reason,
+    path: w.link || "/app",
+    urgent: w.severity === "urgent"
+  }));
 }
 function digestErrors(errors) {
   const counts = /* @__PURE__ */ new Map();
@@ -1982,6 +1992,12 @@ function digestSections(d) {
     { key: "overdueActions", title: "Overdue CTRM next actions", empty: "No overdue next actions.", items: d.overdueActions },
     { key: "overHours", title: "Clients over their hours", empty: "No client is over hours two months running.", items: d.overHours }
   ];
+  if (d.lateInvoices?.length) {
+    sections.push({ key: "lateInvoices", title: "Invoices 3, 7 or 14 days late", empty: "", items: d.lateInvoices });
+  }
+  if (d.staleDeals?.length) {
+    sections.push({ key: "staleDeals", title: "Deals nobody has touched", empty: "", items: d.staleDeals });
+  }
   if (d.appErrors?.length) {
     sections.push({ key: "appErrors", title: "App errors in the last day", empty: "", items: d.appErrors });
   }
