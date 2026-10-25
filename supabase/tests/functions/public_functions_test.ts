@@ -17,6 +17,7 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "watchdog": { kind: "cron secret or manager JWT", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret[\s\S]*rr_is_manager_or_admin/ },
   "contract-invoices": { kind: "cron secret or manager JWT", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret[\s\S]*rr_is_manager_or_admin/ },
   "client-portal": { kind: "hashed link token", pattern: /isPortalToken\(token\)[\s\S]*token_hash[\s\S]*portalAccessState/ },
+  "quote-accept": { kind: "hashed link token", pattern: /isAcceptToken\(token\)[\s\S]*token_hash[\s\S]*acceptLinkState/ },
   "ai-assist": { kind: "signed in user (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)/ },
   "whatsapp-in": { kind: "Meta signature", pattern: /if \(!appSecret\)[\s\S]*validSignature\(raw, req\.headers\.get\("x-hub-signature-256"\)/ },
   "whatsapp-send": { kind: "signed in user (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)/ },
@@ -221,4 +222,12 @@ Deno.test({ name: "lead-intake needs its secret or a signed form token", ...opts
   } finally {
     Deno.env.set("LEAD_INTAKE_SECRET", ENV.LEAD_INTAKE_SECRET)
   }
+} })
+
+Deno.test({ name: "quote-accept refuses a missing or malformed link token", ...opts, fn: async () => {
+  const fn = "quote-accept"
+  assertEquals(await call(fn, post(fn, {})), 404)
+  assertEquals(await call(fn, post(fn, { token: "guess" })), 404)
+  assertEquals(await call(fn, post(fn, { token: "guess", action: "accept", name: "Someone", agreed: true })), 404)
+  assertEquals(await call(fn, post(fn, { token: "x".repeat(44), action: "pdf" })), 404)
 } })

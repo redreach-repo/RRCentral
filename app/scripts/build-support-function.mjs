@@ -22,6 +22,8 @@
 //   (src/lib/paymentReminder.ts), so what is sent is what the app shows.
 // * lead-intake gets the lead rules (src/lib/leadIntake.ts), so matching,
 //   owners and the New leads list agree with the app.
+// * quote-accept gets the accept link rules (src/lib/quoteAccept.ts), so the
+//   link, the draft contract and the client's view match the app.
 //
 //   npm run build:support-fn              # regenerate
 //   npm run build:support-fn -- --check   # CI: fail if a bundle is stale
@@ -44,6 +46,7 @@ const bundles = [
   { entry: 'src/lib/watchdog.ts', out: '../supabase/functions/watchdog/watchdog.bundle.js' },
   { entry: 'src/lib/paymentReminder.ts', out: '../supabase/functions/payment-reminder/paymentReminder.bundle.js' },
   { entry: 'src/lib/leadIntake.ts', out: '../supabase/functions/lead-intake/leadIntake.bundle.js' },
+  { entry: 'src/lib/quoteAccept.ts', out: '../supabase/functions/quote-accept/quoteAccept.bundle.js' },
 ]
 
 let stale = false

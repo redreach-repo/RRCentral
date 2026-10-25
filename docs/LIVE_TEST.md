@@ -32,6 +32,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 13 | My deals | none (app and SQL only) |
 | 14 | Next step and lost reason | none (app and SQL only) |
 | 15 | Website and WhatsApp leads | `lead-intake` |
+| 16 | Quote accept links | `quote-accept` |
 
 ---
 
@@ -148,6 +149,8 @@ lists both. **Delete** works only on an empty test church.
 Supabase must match `RR_CENTRAL_API_TOKEN` on Vercel. Buttons missing: you are not signed in as an admin.
 A refused action is in the audit log with WorshipHub's reason.
 
+---
+
 ## 9. Other functions
 
 - **Zoho** (`zoho-proxy`): Settings → Zoho → test the connection, or send any document by email.
@@ -257,4 +260,25 @@ WhatsApp opens on the Red Reach number with "Hi" typed. The click is counted but
 **If it fails.** System check row "Website and WhatsApp leads". Down with `LEAD_INTAKE_SECRET` means the
 secret is not set. If the form still says "Received" but nothing shows under New leads, the "Lead intake"
 SQL has not been run (the form then falls back to the old direct save). App errors under `lead-intake`.
+
+---
+
+## 16. Quote accept links
+
+**Trigger.** Make a test quote to your own company and finalise it. If you want to see the contract part,
+put its RR number in **Quote reference** on a test AI CRM deal at Quote sent. Open the quote (**PDF / Email**),
+press **Accept link**, then **Make a new link**. The link is copied. Open it in a private browser window.
+
+**You should see.** The quote's number, amount and an **Open the quote PDF** button that shows the same PDF.
+Type a name, keep today's date, tick the box and press **Accept**: "Accepted. Thank you." Back in RR Central the
+quote shows **Accepted**, the test deal is **Signed** with a **draft** contract (it bills nothing), and an open CRM
+lead for the client is **Won**. As admin, **Accept link** shows who accepted, the date, the time and the address.
+Opening the link again shows it was accepted; it cannot be accepted twice. **Turn off** on a new link makes it say
+"This link does not work any more".
+
+**Finalise by hand.** Mark the quote **Awarded** with **Outcome** to invoice it, and activate the draft contract
+on the account.
+
+**If it fails.** "Run the Quote accept link SQL first" means the SQL has not been run. System check row
+"Quote accept links"; App errors under `quote-accept`.
 
