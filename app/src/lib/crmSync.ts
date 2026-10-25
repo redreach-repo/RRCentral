@@ -1,4 +1,5 @@
 import { db } from './db'
+import { defaultNextActionDate, isLostReason } from './dealRules'
 import { logActivity } from './activity'
 import { companiesMatch, normalizeCompanyKey } from './customerFiles'
 import type { CrmEntry } from './types'
@@ -80,11 +81,23 @@ export async function syncCrmFromQuote(opts: SyncCrmFromQuoteOpts): Promise<{
   if (targetStage && shouldAdvanceStage(crm.pipeline_stage || 'Lead', targetStage)) {
     patch.pipeline_stage = targetStage
     stageChanged = true
+    // Every move into an open stage needs a next step (dealRules.ts); give one if it has none.
+    if (targetStage !== 'Won' && targetStage !== 'Lost') {
+      if (!String(crm.next_action || '').trim()) patch.next_action = 'Follow up on quote'
+      if (!crm.follow_up_date) patch.follow_up_date = defaultNextActionDate()
+    }
   }
 
   const reason = (opts.outcomeReason || '').trim()
   if (reason && (targetStage === 'Won' || targetStage === 'Lost' || opts.quoteStatus === 'Awarded' || opts.quoteStatus === 'Not awarded')) {
     patch.outcome_reason = reason
+  }
+  // A move to Lost needs a listed reason and a note (dealRules.ts): keep the
+  // quote's reason when it is on the list, otherwise file it under Other.
+  if (stageChanged && targetStage === 'Lost') {
+    const why = opts.quoteStatus === 'Expired' ? 'expired' : 'was not awarded'
+    patch.outcome_reason = isLostReason(reason) ? reason : opts.quoteStatus === 'Expired' ? 'No response' : 'Other'
+    patch.lost_note = [`Quote ${ref || ''} ${why}`.replace(/\s+/g, ' '), isLostReason(reason) ? '' : reason].filter(Boolean).join('. ')
   }
 
   const meaningful =
@@ -93,7 +106,12 @@ export async function syncCrmFromQuote(opts: SyncCrmFromQuoteOpts): Promise<{
     patch.outcome_reason !== undefined
   if (!meaningful) return { updated: false, crmId: crm.id }
 
-  const { error } = await db.from('crm').update(patch).eq('id', crm.id)
+  let { error } = await db.from('crm').update(patch).eq('id', crm.id)
+  if (error && patch.lost_note !== undefined && /lost_note/.test(error.message || '')) {
+    // The Wave 3 SQL has not been run yet, so there is no lost_note column (and no rule needing it).
+    delete patch.lost_note
+    ;({ error } = await db.from('crm').update(patch).eq('id', crm.id))
+  }
   if (error) {
     console.error('CRM sync failed:', error.message)
     return { updated: false, crmId: crm.id }

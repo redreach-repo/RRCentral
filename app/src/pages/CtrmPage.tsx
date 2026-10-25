@@ -7,6 +7,7 @@ import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import { useCompactCrm } from '../hooks/useMediaQuery'
 import Modal from '../components/Modal'
+import LostReasonFields from '../components/deals/LostReasonFields'
 import DealFormModal, { type DealFormValues } from '../components/ctrm/DealFormModal'
 import { canEditAccount, visibleAccounts } from '../lib/accounts'
 import { listAccounts, listContacts, listTeam } from '../lib/accountsStore'
@@ -24,6 +25,7 @@ import {
 } from '../lib/ctrm'
 import { listCommissions, listDeals, logTouch, saveDealForm, updateDeal } from '../lib/ctrmStore'
 import { can } from '../lib/permissions'
+import { lostText, stageMoveProblem } from '../lib/dealRules'
 import { errorMessage } from '../lib/errors'
 import { formatAED } from '../lib/money'
 import type { Account, AccountContact, AppUser, CtrmCommission, CtrmDeal, CtrmStage } from '../lib/types'
@@ -32,7 +34,6 @@ import {
   buttonSecondaryStyle,
   cardStyle,
   colors,
-  inputStyle,
   pageStyle,
   pageSubtitleStyle,
   pageTitleStyle,
@@ -68,7 +69,7 @@ export default function CtrmPage() {
   const [commissions, setCommissions] = useState<CtrmCommission[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<{ deal: CtrmDeal | null; stage?: CtrmStage } | null>(null)
-  const [losing, setLosing] = useState<{ deal: CtrmDeal; reason: string } | null>(null)
+  const [losing, setLosing] = useState<{ deal: CtrmDeal; reason: string; code: string } | null>(null)
   const [saving, setSaving] = useState(false)
   const [dragId, setDragId] = useState<string | null>(null)
 
@@ -155,7 +156,7 @@ export default function CtrmPage() {
   async function move(deal: CtrmDeal, stage: CtrmStage) {
     if (stage === deal.stage || !canEdit(deal)) return
     if (stage === 'lost') {
-      setLosing({ deal, reason: '' })
+      setLosing({ deal, reason: '', code: '' })
       return
     }
     // Reopening a deal without a next action goes through the form so one gets added.
@@ -174,13 +175,21 @@ export default function CtrmPage() {
 
   async function confirmLost() {
     if (!losing) return
-    if (!losing.reason.trim()) {
-      showToast('Say why the deal was lost', 'error')
+    const problem = stageMoveProblem({
+      open: false,
+      lost: true,
+      next_action: '',
+      next_action_date: null,
+      lost_reason_code: losing.code,
+      lost_note: losing.reason,
+    })
+    if (problem) {
+      showToast(problem, 'error')
       return
     }
     setSaving(true)
     try {
-      await updateDeal(losing.deal, { stage: 'lost', lost_reason: losing.reason.trim() }, author)
+      await updateDeal(losing.deal, { stage: 'lost', lost_reason_code: losing.code, lost_reason: losing.reason.trim() }, author)
       setLosing(null)
       await load()
     } catch (e) {
@@ -225,7 +234,7 @@ export default function CtrmPage() {
   const editingDeal = editing?.deal ? { ...editing.deal, stage: editing.stage ?? editing.deal.stage } : null
 
   function nextLine(d: CtrmDeal) {
-    if (!isOpenDeal(d)) return d.stage === 'lost' ? `Lost: ${d.lost_reason}` : 'Signed'
+    if (!isOpenDeal(d)) return d.stage === 'lost' ? `Lost: ${lostText(d.lost_reason_code || '', d.lost_reason)}` : 'Signed'
     const late = isOverdue(d, now)
     return (
       <span style={{ color: late ? colors.danger : colors.muted }}>
@@ -504,15 +513,15 @@ export default function CtrmPage() {
             void confirmLost()
           }}
         >
-          <label htmlFor="lost-reason" style={{ display: 'block', fontSize: 13, color: colors.muted, marginBottom: 6 }}>
-            Why was {losing ? nameOf(losing.deal) : ''} lost?
-          </label>
-          <input
-            id="lost-reason"
-            style={{ ...inputStyle, marginBottom: 12 }}
-            value={losing?.reason ?? ''}
-            placeholder="Chose another system, no budget this year"
-            onChange={(e) => setLosing((l) => (l ? { ...l, reason: e.target.value } : l))}
+          <p style={{ fontSize: 13, color: colors.muted, margin: '0 0 10px' }}>
+            {losing ? nameOf(losing.deal) : ''} moves to Lost.
+          </p>
+          <LostReasonFields
+            idPrefix="ctrm-lost"
+            code={losing?.code ?? ''}
+            note={losing?.reason ?? ''}
+            notePlaceholder="Chose another system, no budget this year"
+            onChange={({ code, note }) => setLosing((l) => (l ? { ...l, code, reason: note } : l))}
           />
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <button type="button" style={buttonSecondaryStyle} onClick={() => setLosing(null)}>

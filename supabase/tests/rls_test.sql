@@ -366,7 +366,7 @@ insert into ctrm_deal_commissions (deal_id, expected_commission)
 select id as other_deal from ctrm_deals where account_id = (select id from accounts where name = 'Other Trading House') \gset
 
 select pg_temp.expect(pg_temp.fails($q$update ctrm_deals set stage = 'lost' where region = 'india'$q$), 'lost needs a reason');
-select pg_temp.expect(not pg_temp.fails($q$update ctrm_deals set stage = 'lost', lost_reason = 'Chose another vendor' where region = 'india'$q$), 'lost with a reason is fine');
+select pg_temp.expect(not pg_temp.fails($q$update ctrm_deals set stage = 'lost', lost_reason_code = 'Competitor won', lost_reason = 'Chose another vendor' where region = 'india'$q$), 'lost with a reason is fine');
 update ctrm_deals set stage = 'identified', lost_reason = '' where region = 'india';
 select pg_temp.expect(pg_temp.fails($q$update ctrm_deals set next_action = '' where region = 'india'$q$), 'open deals need a next action');
 select pg_temp.expect(pg_temp.fails($q$update ctrm_deals set next_action_date = null where region = 'india'$q$), 'open deals need a next action date');
@@ -834,6 +834,206 @@ reset role;
 
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from watch_items'), 'anon cannot read watch items');
+reset role;
+
+------------------------------------------------------------ My deals: when each deal reached its stage (Wave 3, PR H)
+alter table ctrm_deals disable trigger rr_stage_changed_at;
+update ctrm_deals set stage_changed_at = '2020-01-01';
+alter table ctrm_deals enable trigger rr_stage_changed_at;
+alter table crm disable trigger rr_stage_changed_at;
+update crm set stage_changed_at = '2020-01-01';
+alter table crm enable trigger rr_stage_changed_at;
+
+update ctrm_deals set notes = 'touched' where region = 'middle_east';
+select pg_temp.expect((select stage_changed_at from ctrm_deals where region = 'middle_east') = '2020-01-01', 'saving without a stage move keeps stage_changed_at');
+update ctrm_deals set stage_changed_at = '2025-05-05' where region = 'middle_east';
+select pg_temp.expect((select stage_changed_at from ctrm_deals where region = 'middle_east') = '2020-01-01', 'stage_changed_at cannot be set by hand');
+insert into crm (company_name, pipeline_stage) values ('Stage Clock Co', 'Lead');
+select pg_temp.expect((select stage_changed_at from crm where company_name = 'Stage Clock Co') is not null, 'a new CRM lead starts its stage clock');
+alter table crm disable trigger rr_stage_changed_at;
+update crm set stage_changed_at = '2020-01-01' where company_name = 'Stage Clock Co';
+alter table crm enable trigger rr_stage_changed_at;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+update ctrm_deals set stage = 'intro_call_booked', next_action = 'Call', next_action_date = '2026-11-03' where region = 'india';
+select pg_temp.expect((select stage_changed_at from ctrm_deals where region = 'india') > '2020-01-01', 'staff moving their deal restarts its stage clock');
+select pg_temp.expect((select count(*) from ctrm_deals where stage_changed_at is not null) = 1, 'staff reads stage times only on their own deals');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+update crm set pipeline_stage = 'Contacted', next_action = 'Call', follow_up_date = '2026-11-03' where company_name = 'Stage Clock Co';
+reset role;
+select pg_temp.expect((select pipeline_stage from crm where company_name = 'Stage Clock Co') = 'Contacted', 'sales moves a CRM lead');
+select pg_temp.expect((select count(*) from crm where stage_changed_at > '2020-01-01') = 1, 'only the moved CRM lead restarts its stage clock');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from ctrm_deals where stage_changed_at is not null) = 2, 'viewer reads stage times');
+select pg_temp.expect((select count(*) from ctrm_deal_commissions) = 0, 'viewer still sees no commission for My deals');
+update ctrm_deals set stage = 'lost', lost_reason = 'x';
+reset role;
+select pg_temp.expect((select count(*) from ctrm_deals where stage = 'lost') = 0, 'viewer cannot move deals');
+------------------------------------------------------------ Next step and lost reason on every move (Wave 3, PR I)
+insert into crm (company_name, pipeline_stage) values ('No Step Co', 'Lead');
+select pg_temp.expect(not pg_temp.fails($q$update crm set notes = 'still no next step' where company_name = 'No Step Co'$q$), 'a deal without a next step can still be edited');
+select pg_temp.expect(pg_temp.fails($q$update crm set pipeline_stage = 'Contacted' where company_name = 'No Step Co'$q$), 'CRM move to an open stage needs a next action');
+select pg_temp.expect(pg_temp.fails($q$update crm set pipeline_stage = 'Contacted', next_action = 'Call' where company_name = 'No Step Co'$q$), 'CRM move to an open stage needs a date');
+select pg_temp.expect(pg_temp.fails($q$update crm set pipeline_stage = 'Lost', outcome_reason = 'They went quiet', lost_note = 'x' where company_name = 'No Step Co'$q$), 'CRM lost reason must come from the list');
+select pg_temp.expect(pg_temp.fails($q$update crm set pipeline_stage = 'Lost', outcome_reason = 'Price' where company_name = 'No Step Co'$q$), 'CRM lost needs a note');
+select pg_temp.expect(not pg_temp.fails($q$update crm set pipeline_stage = 'Won', outcome_reason = 'Relationship' where company_name = 'No Step Co'$q$), 'CRM won needs no next step');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect(not pg_temp.fails($q$update crm set pipeline_stage = 'Lost', outcome_reason = 'Price', lost_note = 'Too dear for them this year' where company_name = 'No Step Co'$q$), 'sales marks a CRM deal lost with a reason and note');
+select pg_temp.expect(pg_temp.fails($q$update ctrm_deals set stage = 'lost', lost_reason = 'Chose another vendor', lost_reason_code = '' where region = 'middle_east'$q$), 'sales cannot lose a CTRM deal without a listed reason');
+select pg_temp.expect(not pg_temp.fails($q$update ctrm_deals set stage = 'demo_done', next_action = 'Send proposal', next_action_date = '2026-11-20' where region = 'middle_east'$q$), 'sales moves a CTRM deal with a next step');
+reset role;
+select pg_temp.expect((select pipeline_stage from crm where company_name = 'No Step Co') = 'Lost', 'the CRM deal is lost');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect(pg_temp.fails($q$update ctrm_deals set stage = 'lost', lost_reason = 'Gone', lost_reason_code = 'Nope' where region = 'india'$q$), 'staff cannot lose their deal with an unlisted reason');
+select pg_temp.expect(not pg_temp.fails($q$update ctrm_deals set stage = 'lost', lost_reason = 'Chose an in-house tool', lost_reason_code = 'Competitor won' where region = 'india'$q$), 'staff loses their own deal with a reason and note');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+update crm set pipeline_stage = 'Lead', next_action = 'x', follow_up_date = '2026-12-01' where company_name = 'No Step Co';
+reset role;
+select pg_temp.expect((select pipeline_stage from crm where company_name = 'No Step Co') = 'Lost', 'viewer cannot reopen a deal');
+------------------------------------------------------------ Lead intake (Wave 3, PR J)
+-- The website can still post an enquiry, but only lead-intake (service key)
+-- may link it to an account or deal, set its owner or mark it matched.
+-- Rate limit window: clear earlier anon inserts so these are not refused for volume.
+delete from website_inquiries;
+insert into website_inquiries (name, email, status, channel, pipeline, source, utm_source, account_id, deal_id, matched, crm_id, created_at)
+  values ('Intake Lead', 'lead@x.com', 'converted', 'landing_page', 'ai_crm', 'AI CRM landing page, google', 'google',
+          (select id from accounts where reference = 'AC-07-26001'), 'deal-1', true, '', now());
+set role anon;
+select pg_temp.expect(not pg_temp.fails($q$insert into website_inquiries (name, email, message, utm_source, utm_campaign, page_url) values ('Visitor', 'v@x.com', 'hi', 'google', 'q4', 'https://redreach.ae/contact')$q$), 'anon can submit a form with UTM values');
+select pg_temp.expect(pg_temp.fails($q$insert into website_inquiries (name, email, matched) values ('X', 'x@x.com', true)$q$), 'anon cannot mark an enquiry as matched');
+select pg_temp.expect(pg_temp.fails($q$insert into website_inquiries (name, email, deal_id) values ('X', 'x@x.com', 'deal-1')$q$), 'anon cannot link an enquiry to a deal');
+select pg_temp.expect(pg_temp.fails($q$insert into website_inquiries (name, email, channel) values ('X', 'x@x.com', 'landing_page')$q$), 'anon cannot claim another channel');
+select pg_temp.expect(pg_temp.fails($q$insert into website_inquiries (name, email, ip_hash) values ('X', 'x@x.com', 'abc')$q$), 'anon cannot set the sender hash');
+select pg_temp.expect(pg_temp.fails($q$insert into website_inquiries (name, email, utm_source) values ('X', 'x@x.com', repeat('u', 300))$q$), 'anon UTM length capped');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select pg_temp.expect((select count(*) from website_inquiries where source like 'AI CRM landing page%') = 1, 'admin reads new leads with their source');
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect((select count(*) from website_inquiries where matched) = 1, 'manager reads new leads');
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from website_inquiries where deal_id = 'deal-1') = 1, 'sales reads new leads');
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from website_inquiries) = 0, 'staff (VA) does not see leads');
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from website_inquiries) = 0, 'viewer does not see leads');
+reset role;
+
+------------------------------------------------------------ Quote accept link (Wave 3, PR K)
+insert into quotations (id, client, reference_number, status) values ('00000000-0000-0000-0000-0000000000e1', 'Accept Co', 'RR-07-26901', 'Sent');
+insert into quote_accept_links (id, quotation_id, token_hash, accepted_at, accepted_name) values
+  ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000e1', repeat('a', 64), now(), 'Sara Khan');
+insert into quote_accept_pdfs (link_id, pdf_base64) values ('00000000-0000-0000-0000-0000000000e2', 'JVBERi0=');
+insert into quote_acceptances (link_id, quotation_id, accepted_name, accepted_date, ip) values
+  ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000e1', 'Sara Khan', current_date, '203.0.113.9');
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from quote_accept_links'), 'anon cannot read accept links');
+select pg_temp.expect(pg_temp.fails('select 1 from quote_accept_pdfs'), 'anon cannot read accept PDFs');
+select pg_temp.expect(pg_temp.fails('select 1 from quote_acceptances'), 'anon cannot read acceptances');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select pg_temp.expect((select count(*) from quote_acceptances where ip = '203.0.113.9') = 1, 'admin sees who accepted, when and from where');
+select pg_temp.expect(not pg_temp.fails($q$insert into quote_accept_links (quotation_id, token_hash) values ('00000000-0000-0000-0000-0000000000e1', repeat('b', 64))$q$), 'admin can make an accept link');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect((select count(*) from quote_accept_links where accepted_name = 'Sara Khan') = 1, 'manager sees that the quote was accepted');
+select pg_temp.expect((select count(*) from quote_acceptances) = 0, 'manager does not see the full acceptance record');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect(not pg_temp.fails($q$insert into quote_accept_links (quotation_id, token_hash) values ('00000000-0000-0000-0000-0000000000e1', repeat('c', 64))$q$), 'sales can make an accept link');
+select pg_temp.expect(pg_temp.fails($q$insert into quote_accept_links (quotation_id, token_hash, accepted_at, accepted_name) values ('00000000-0000-0000-0000-0000000000e1', repeat('d', 64), now(), 'Forged')$q$), 'sales cannot make a link that is already accepted');
+select pg_temp.expect(pg_temp.fails($q$update quote_accept_links set accepted_name = 'Forged' where token_hash = repeat('c', 64) returning 1$q$) or (select count(*) from quote_accept_links where accepted_name = 'Forged') = 0, 'sales cannot mark a link accepted');
+update quote_accept_links set revoked_at = now() where token_hash = repeat('c', 64);
+select pg_temp.expect((select revoked_at is not null from quote_accept_links where token_hash = repeat('c', 64)), 'sales can turn a link off');
+update quote_accept_links set revoked_at = now() where accepted_at is not null;
+select pg_temp.expect((select revoked_at is null from quote_accept_links where accepted_name = 'Sara Khan'), 'an accepted link cannot be changed');
+select pg_temp.expect((select count(*) from quote_acceptances) = 0, 'sales does not see the full acceptance record');
+select pg_temp.expect(pg_temp.fails($q$delete from quote_accept_links returning 1$q$) or (select count(*) from quote_accept_links) = 3, 'sales cannot delete accept links');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from quote_accept_links) = 0, 'staff (VA) does not see accept links');
+select pg_temp.expect(pg_temp.fails($q$insert into quote_accept_links (quotation_id, token_hash) values ('00000000-0000-0000-0000-0000000000e1', repeat('e', 64))$q$), 'staff (VA) cannot make accept links');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from quote_accept_pdfs) = 0, 'viewer does not see accept PDFs');
+select pg_temp.expect(pg_temp.fails($q$insert into quote_accept_links (quotation_id, token_hash) values ('00000000-0000-0000-0000-0000000000e1', repeat('f', 64))$q$), 'viewer cannot make accept links');
+reset role;
+
+------------------------------------------------------------ Follow up templates and nudges (Wave 3, PR L)
+insert into message_templates (name, channel, body) values ('Seed', 'whatsapp', 'Hi {{name}}');
+insert into quotations (id, client, reference_number, status, updated_at) values ('00000000-0000-0000-0000-0000000000f1', 'Nudge Co', 'RR-03-26991', 'Finalized', now() - interval '9 days');
+update quotations set status = 'Sent' where id = '00000000-0000-0000-0000-0000000000f1';
+select pg_temp.expect((select sent_at > now() - interval '1 minute' from quotations where id = '00000000-0000-0000-0000-0000000000f1'), 'marking a quote Sent records when');
+update quotations set notes = 'still sent' where id = '00000000-0000-0000-0000-0000000000f1';
+update quotations set sent_at = now() - interval '5 days' where id = '00000000-0000-0000-0000-0000000000f1';
+update quotations set notes = 'edited again' where id = '00000000-0000-0000-0000-0000000000f1';
+select pg_temp.expect((select sent_at < now() - interval '4 days' from quotations where id = '00000000-0000-0000-0000-0000000000f1'), 'editing a sent quote keeps when it was sent');
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from message_templates'), 'anon cannot read templates');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select pg_temp.expect(not pg_temp.fails($q$insert into message_templates (name, channel, division_code, body) values ('Admin', 'email', '01', 'x')$q$), 'admin can add a template');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect(not pg_temp.fails($q$update message_templates set body = 'Hello {{name}}' where name = 'Seed' returning 1$q$), 'manager can edit a template');
+select pg_temp.expect(pg_temp.fails($q$insert into message_templates (name, channel, division_code, body) values ('Bad', 'whatsapp', 'x1', 'x')$q$), 'a template needs a real division code');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from message_templates) = 2, 'sales reads the templates');
+select pg_temp.expect(pg_temp.fails($q$insert into message_templates (name, channel, body) values ('Sales', 'whatsapp', 'x')$q$), 'sales cannot add templates');
+update message_templates set body = 'changed by sales';
+select pg_temp.expect((select count(*) from message_templates where body = 'changed by sales') = 0, 'sales cannot edit templates');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from message_templates) = 0, 'staff (VA) does not see templates');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from message_templates) = 0, 'viewer does not see templates');
+select pg_temp.expect(pg_temp.fails($q$insert into message_templates (name, channel, body) values ('V', 'whatsapp', 'x')$q$), 'viewer cannot add templates');
 reset role;
 
 ------------------------------------------------------------ Fireflies calls on the timeline (Wave 3, PR M)

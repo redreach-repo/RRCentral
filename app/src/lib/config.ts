@@ -11,6 +11,8 @@ export const QUOTE_STATUSES = [
   'Draft',
   'Finalized',
   'Sent',
+  /** The client accepted through an accept link; a person still marks it Awarded. */
+  'Accepted',
   'Awarded',
   'Not awarded',
   'Expired',

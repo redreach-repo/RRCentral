@@ -1,4 +1,5 @@
 import { db } from './db'
+import { lostText } from './dealRules'
 import { isMissingRelationError } from './errors'
 import { createAccount, logAccountEvent } from './accountsStore'
 import { stageLabel } from './ctrm'
@@ -75,11 +76,17 @@ export async function updateDeal(deal: CtrmDeal, patch: Partial<DealInput>, auth
   const moved = patch.stage && patch.stage !== deal.stage
   const next: Record<string, unknown> = { ...patch, updated_at: now }
   if (moved) next.last_touch_at = now
-  if (patch.stage && patch.stage !== 'lost') next.lost_reason = ''
+  if (patch.stage && patch.stage !== 'lost') {
+    next.lost_reason = ''
+    if (deal.lost_reason_code) next.lost_reason_code = ''
+  }
   check(await db.from('ctrm_deals').update(next).eq('id', deal.id))
   if (moved && patch.stage) {
     await recordStage(deal.id, deal.stage, patch.stage, author, now)
-    const reason = patch.stage === 'lost' && patch.lost_reason ? ` (${patch.lost_reason})` : ''
+    const reason =
+      patch.stage === 'lost' && (patch.lost_reason_code || patch.lost_reason)
+        ? ` (${lostText(patch.lost_reason_code || '', patch.lost_reason || '')})`
+        : ''
     await logAccountEvent(
       deal.account_id,
       `CTRM Next stage moved from ${stageLabel(deal.stage)} to ${stageLabel(patch.stage)}${reason}`,
@@ -156,6 +163,7 @@ export async function saveDealForm(
     next_action: values.next_action.trim(),
     next_action_date: values.next_action_date,
     lost_reason: values.stage === 'lost' ? values.lost_reason.trim() : '',
+    ...(values.stage === 'lost' ? { lost_reason_code: values.lost_reason_code } : {}),
     notes: values.notes,
   }
   let dealId = deal?.id ?? ''

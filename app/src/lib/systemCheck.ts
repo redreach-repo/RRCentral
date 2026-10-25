@@ -31,6 +31,8 @@ export const SYSTEM_FUNCTIONS: SystemFunction[] = [
   { name: 'contract-invoices', feature: 'Contract invoices each morning', liveTest: '10' },
   { name: 'watchdog', feature: 'Daily watchdog list', liveTest: '11' },
   { name: 'payment-reminder', feature: 'One tap payment reminders', liveTest: '12' },
+  { name: 'lead-intake', feature: 'Website and WhatsApp leads', liveTest: '15' },
+  { name: 'quote-accept', feature: 'Quote accept links', liveTest: '16' },
   { name: 'fireflies-fetch', feature: 'Fireflies calls on the timeline', liveTest: '18' },
 ]
 

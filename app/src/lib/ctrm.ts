@@ -1,4 +1,5 @@
 import { addDays, differenceInCalendarDays, format, parseISO, startOfWeek } from 'date-fns'
+import { isLostReason } from './dealRules'
 import type { CtrmCompanyType, CtrmDeal, CtrmRegion, CtrmStage, CtrmStageChange } from './types'
 
 /** Pipeline stages in order. */
@@ -55,11 +56,14 @@ export function isOverdue(d: Pick<CtrmDeal, 'stage' | 'next_action_date'>, now: 
   return d.next_action_date < format(now, 'yyyy-MM-dd')
 }
 
-export type DealDraft = Pick<CtrmDeal, 'stage' | 'next_action' | 'next_action_date' | 'lost_reason'>
+export type DealDraft = Pick<CtrmDeal, 'stage' | 'next_action' | 'next_action_date' | 'lost_reason'> & { lost_reason_code?: string }
 
 /** The rules a deal must meet before it is saved. Returns a message, or null when it is fine. */
 export function dealProblem(d: DealDraft): string | null {
-  if (d.stage === 'lost' && !d.lost_reason.trim()) return 'Say why the deal was lost'
+  if (d.stage === 'lost') {
+    if (!isLostReason(d.lost_reason_code)) return 'Pick why the deal was lost'
+    if (!d.lost_reason.trim()) return 'Add a note on why the deal was lost'
+  }
   if (isOpenDeal(d)) {
     if (!d.next_action.trim()) return 'Every open deal needs a next action'
     if (!d.next_action_date) return 'Give the next action a date'

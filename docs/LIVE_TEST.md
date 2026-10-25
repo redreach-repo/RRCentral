@@ -29,6 +29,11 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 10 | Contract invoices each morning | `contract-invoices` |
 | 11 | Daily watchdog | `watchdog` |
 | 12 | One tap payment reminders | `payment-reminder` |
+| 13 | My deals | none (app and SQL only) |
+| 14 | Next step and lost reason | none (app and SQL only) |
+| 15 | Website and WhatsApp leads | `lead-intake` |
+| 16 | Quote accept links | `quote-accept` |
+| 17 | Quote follow up templates and nudges | `daily-digest` |
 | 18 | Fireflies calls on the timeline | `fireflies-fetch` |
 
 ---
@@ -146,6 +151,8 @@ lists both. **Delete** works only on an empty test church.
 Supabase must match `RR_CENTRAL_API_TOKEN` on Vercel. Buttons missing: you are not signed in as an admin.
 A refused action is in the audit log with WorshipHub's reason.
 
+---
+
 ## 9. Other functions
 
 - **Zoho** (`zoho-proxy`): Settings → Zoho → test the connection, or send any document by email.
@@ -203,6 +210,97 @@ nothing: "This reminder was already sent." Do the same with **WhatsApp** once th
 **If it fails.** The toast says why (no contact address, Zoho Mail not connected, WhatsApp template not
 approved). Nothing is recorded when sending fails, so you can press again once fixed. System check row
 "One tap payment reminders"; App errors under `payment-reminder`.
+
+---
+
+## 13. My deals
+
+**Trigger.** Run the "Wave 3: My deals" SQL from the copy page once. Sign in as yourself and open
+**Sales → My deals**.
+
+**You should see.** Your open deals from the CRM, AI CRM sales and CTRM Next in one table, with value,
+weighted value, next action and days in stage. Switch to **Board** to see them by stage. Pick
+**Everyone** to see the whole team. Move a test deal to another stage on its own page, come back: its
+days in stage is 0. Sign in as a viewer or staff login: CTRM Next deals show no value (commission stays
+hidden), and staff see no CRM deals.
+
+**If it fails.** "Could not load the deals" names the table. Days in stage that never reset means the
+SQL has not been run. Nothing goes to App errors unless the page itself crashes.
+
+---
+
+## 14. Next step and lost reason
+
+**Trigger.** Run the "Wave 3: Next step and lost reason" SQL from the copy page once. Take a test deal in
+each of CRM, AI CRM sales and CTRM Next.
+
+**You should see.** Moving a deal to an open stage without a next action or date stops with "Every open
+deal needs a next action" (or "Give the next action a date") and opens the deal to add it. Moving to Lost
+asks for a reason from the list and a note; both are needed, and the timeline shows them. The dashboard
+has a **No next step** card listing open deals with no next action or date.
+
+**If it fails.** A move that saves without a next step means the SQL has not been run. "column lost_note
+does not exist" (or lost_reason_code) means the same.
+
+---
+
+## 15. Website and WhatsApp leads
+
+**Trigger.** In a private browser window open the website contact page with
+`?utm_source=test&utm_campaign=live-check` on the end of the address. Wait a few seconds, then send the form
+with your own name and a phone number nobody else in the CRM has.
+
+**You should see.** The form says "Received". On the dashboard, **New leads** shows your name with
+"Website form, test, live-check, new contact". It links to a new CRM lead at stage Lead with next action
+"Call the new lead" for today, owned by the person set under **Packages and rates → New leads: who gets
+them**. Send the form again with the same phone: no second CRM row, the note is added to the first one and
+the lead says "known contact". Next morning's digest has "New leads in the last day".
+
+**WhatsApp link.** Open `https://pszjylxrpvlumldtptrr.supabase.co/functions/v1/lead-intake?wa=1&text=Hi&utm_source=test`:
+WhatsApp opens on the Red Reach number with "Hi" typed. The click is counted but is not a lead.
+
+**If it fails.** System check row "Website and WhatsApp leads". Down with `LEAD_INTAKE_SECRET` means the
+secret is not set. If the form still says "Received" but nothing shows under New leads, the "Lead intake"
+SQL has not been run (the form then falls back to the old direct save). App errors under `lead-intake`.
+
+---
+
+## 16. Quote accept links
+
+**Trigger.** Make a test quote to your own company and finalise it. If you want to see the contract part,
+put its RR number in **Quote reference** on a test AI CRM deal at Quote sent. Open the quote (**PDF / Email**),
+press **Accept link**, then **Make a new link**. The link is copied. Open it in a private browser window.
+
+**You should see.** The quote's number, amount and an **Open the quote PDF** button that shows the same PDF.
+Type a name, keep today's date, tick the box and press **Accept**: "Accepted. Thank you." Back in RR Central the
+quote shows **Accepted**, the test deal is **Signed** with a **draft** contract (it bills nothing), and an open CRM
+lead for the client is **Won**. As admin, **Accept link** shows who accepted, the date, the time and the address.
+Opening the link again shows it was accepted; it cannot be accepted twice. **Turn off** on a new link makes it say
+"This link does not work any more".
+
+**Finalise by hand.** Mark the quote **Awarded** with **Outcome** to invoice it, and activate the draft contract
+on the account.
+
+**If it fails.** "Run the Quote accept link SQL first" means the SQL has not been run. System check row
+"Quote accept links"; App errors under `quote-accept`.
+
+---
+
+## 17. Quote follow up templates and nudges
+
+**Trigger.** Packages and rates → **Follow up templates**: add a WhatsApp template for one division using
+`{{name}}`, `{{quote_number}}` and `{{amount}}`; the preview below the box fills them with sample values.
+Then mark a test quote to your own company **Sent**. To see the nudge today without waiting, run this in the
+Supabase SQL editor with its RR number: `update quotations set sent_at = now() - interval '4 days' where reference_number = 'RR-…';`
+
+**You should see.** CRM → **My Day** shows **Quotes waiting for a reply** with the quote, its amount and
+"4 days without a reply". **WhatsApp** opens WhatsApp to the client's contact with your template filled in;
+**Email** opens your email with the subject and message ready. The row disappears and comes back 3 days later
+if the quote is still Sent. Next morning's digest lists it under "Quotes waiting 3 days for a reply" (redeploy
+`daily-digest` first).
+
+**If it fails.** "Run the Follow up templates SQL first" means the SQL has not been run. "No WhatsApp or phone
+number" means the account's contact or the CRM row has no number.
 
 ---
 
