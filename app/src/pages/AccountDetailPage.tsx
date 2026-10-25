@@ -614,6 +614,10 @@ export default function AccountDetailPage() {
         />
       )}
 
+      {account.type === 'ctrm_prospect' ? (
+        <AccountTicketsCard account={account} contacts={contacts} team={team} editable={editable} author={author} />
+      ) : null}
+
       {seesMoney ? (
         <section style={{ ...cardStyle, marginTop: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>

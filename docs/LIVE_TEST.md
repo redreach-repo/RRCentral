@@ -43,6 +43,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 24 | Before the call brief | `ai-assist` (redeploy) |
 | 25 | Duplicates and Quick add | none (SQL only) |
 | 26 | CTRM Next fit sheet | none (SQL only) |
+| 27 | CTRM Next client issues | `daily-digest` (redeploy) |
 
 ---
 
@@ -482,3 +483,18 @@ the move now works. **PDF** opens the sheet on the letterhead with **Download PD
 deal value. The modules list is edited under Settings → CTRM Next lists. A viewer sees the sheet but cannot edit.
 
 **If it fails.** "Run the fit sheet SQL first" means the SQL has not run.
+
+## 27. CTRM Next client issues
+
+**Trigger.** Run the Wave 5 client issues SQL and redeploy `daily-digest`. Open a CTRM Next account and press
+**Log an issue** in the **Client issues** card.
+
+**You should see.** The form starts on the CTRM Next channel and says not to paste client trade data. The issue
+page has a **CTRM Next issue** box: vendor ticket number, vendor side (Not raised, Raised, In progress, Fixed,
+Waiting for client), last update sent to the client and **Updated them today**. A reply to the client sets the
+update date by itself. **Clients and partners → CTRM issues** lists them grouped by client, oldest first; an issue
+with no update to the client for 2 working days turns red. The morning digest has a section "Open CTRM Next
+issues, oldest first". Changing the vendor side is noted on the account timeline.
+
+**If it fails.** No CTRM Next channel, or an error saving the vendor fields, means the SQL has not run. No digest
+section means `daily-digest` was not redeployed.

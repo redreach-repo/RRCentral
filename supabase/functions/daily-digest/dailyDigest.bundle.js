@@ -1807,6 +1807,95 @@ function isOverdue(d, now = /* @__PURE__ */ new Date()) {
   return d.next_action_date < format(now, "yyyy-MM-dd");
 }
 
+// src/lib/sla.ts
+var DEFAULT_WORKING_CALENDAR = {
+  days: [1, 2, 3, 4, 5],
+  startMinute: 9 * 60,
+  endMinute: 18 * 60,
+  utcOffsetMinutes: 4 * 60
+};
+var SLA_WARNING_SHARE = 0.25;
+var MINUTE = 6e4;
+var DAY_MINUTES = 24 * 60;
+function workingDayHours(cal) {
+  return (cal.endMinute - cal.startMinute) / 60;
+}
+function addWorkingHours(from, hours, cal = DEFAULT_WORKING_CALENDAR) {
+  if (!cal.days.length || cal.endMinute <= cal.startMinute) return new Date(from.getTime() + hours * 60 * MINUTE);
+  let t = Math.floor(from.getTime() / MINUTE) + cal.utcOffsetMinutes;
+  let remaining = Math.max(0, Math.round(hours * 60));
+  for (let guard = 0; guard < 3700; guard++) {
+    const dayStart = Math.floor(t / DAY_MINUTES) * DAY_MINUTES;
+    const minuteOfDay = t - dayStart;
+    const isoDay = (Math.floor(t / DAY_MINUTES) + 3) % 7 + 1;
+    if (!cal.days.includes(isoDay) || minuteOfDay >= cal.endMinute) {
+      t = dayStart + DAY_MINUTES + cal.startMinute;
+      continue;
+    }
+    if (minuteOfDay < cal.startMinute) t = dayStart + cal.startMinute;
+    const available = dayStart + cal.endMinute - t;
+    if (remaining <= available) {
+      t += remaining;
+      return new Date((t - cal.utcOffsetMinutes) * MINUTE);
+    }
+    remaining -= available;
+    t = dayStart + DAY_MINUTES + cal.startMinute;
+  }
+  return new Date((t - cal.utcOffsetMinutes) * MINUTE);
+}
+function slaState(ticket, now = /* @__PURE__ */ new Date()) {
+  if (!ticket.sla_due_at) return "none";
+  const due = new Date(ticket.sla_due_at).getTime();
+  if (ticket.first_response_at) return new Date(ticket.first_response_at).getTime() <= due ? "met" : "missed";
+  if (ticket.status === "resolved" || ticket.status === "closed") return "none";
+  const created = new Date(ticket.created_at).getTime();
+  const t = now.getTime();
+  if (t > due) return "breached";
+  if (due - t <= (due - created) * SLA_WARNING_SHARE) return "warning";
+  return "ok";
+}
+
+// src/lib/support.ts
+var OPEN_STATUSES = ["new", "open", "waiting_on_client"];
+function isOpenTicket(t) {
+  return OPEN_STATUSES.includes(t.status);
+}
+
+// src/lib/ctrmIssues.ts
+var CTRM_CHANNEL = "ctrm_next";
+var VENDOR_STATUSES = [
+  { value: "not_raised", label: "Not raised" },
+  { value: "raised", label: "Raised" },
+  { value: "in_progress", label: "In progress" },
+  { value: "fixed", label: "Fixed" },
+  { value: "waiting_for_client", label: "Waiting for client" }
+];
+var vendorStatusLabel = (s) => VENDOR_STATUSES.find((o) => o.value === s)?.label ?? "Not raised";
+var CLIENT_UPDATE_DAYS = 2;
+var isCtrmIssue = (t) => t.channel === CTRM_CHANNEL;
+function clientUpdateDue(t, cal = DEFAULT_WORKING_CALENDAR) {
+  const last = new Date(t.client_updated_at || t.created_at);
+  return addWorkingHours(last, CLIENT_UPDATE_DAYS * workingDayHours(cal), cal);
+}
+function needsClientUpdate(t, now = /* @__PURE__ */ new Date(), cal = DEFAULT_WORKING_CALENDAR) {
+  if (!isCtrmIssue(t) || !isOpenTicket(t)) return false;
+  return clientUpdateDue(t, cal).getTime() <= now.getTime();
+}
+var daysOpen = (t, now) => Math.max(0, Math.floor((now.getTime() - new Date(t.created_at).getTime()) / 864e5));
+function openIssues(tickets) {
+  return tickets.filter((t) => isCtrmIssue(t) && isOpenTicket(t)).sort((a, b) => a.created_at.localeCompare(b.created_at));
+}
+function issueDetail(t, clientName, now = /* @__PURE__ */ new Date(), cal = DEFAULT_WORKING_CALENDAR) {
+  const days = daysOpen(t, now);
+  const parts = [
+    clientName,
+    `open ${days} ${days === 1 ? "day" : "days"}`,
+    `vendor: ${vendorStatusLabel(t.vendor_status)}${t.vendor_ticket_ref ? ` (${t.vendor_ticket_ref})` : ""}`
+  ];
+  if (needsClientUpdate(t, now, cal)) parts.push(t.client_updated_at ? `no update to the client since ${t.client_updated_at.slice(0, 10)}` : "client not updated yet");
+  return parts.join(", ");
+}
+
 // src/lib/leadIntake.ts
 var LEAD_CHANNEL_LABELS = {
   website_form: "Website form",
@@ -1926,33 +2015,6 @@ function renewalLabel(flag) {
   return `Renews in ${flag.days} days`;
 }
 
-// src/lib/sla.ts
-var DEFAULT_WORKING_CALENDAR = {
-  days: [1, 2, 3, 4, 5],
-  startMinute: 9 * 60,
-  endMinute: 18 * 60,
-  utcOffsetMinutes: 4 * 60
-};
-var SLA_WARNING_SHARE = 0.25;
-var DAY_MINUTES = 24 * 60;
-function slaState(ticket, now = /* @__PURE__ */ new Date()) {
-  if (!ticket.sla_due_at) return "none";
-  const due = new Date(ticket.sla_due_at).getTime();
-  if (ticket.first_response_at) return new Date(ticket.first_response_at).getTime() <= due ? "met" : "missed";
-  if (ticket.status === "resolved" || ticket.status === "closed") return "none";
-  const created = new Date(ticket.created_at).getTime();
-  const t = now.getTime();
-  if (t > due) return "breached";
-  if (due - t <= (due - created) * SLA_WARNING_SHARE) return "warning";
-  return "ok";
-}
-
-// src/lib/support.ts
-var OPEN_STATUSES = ["new", "open", "waiting_on_client"];
-function isOpenTicket(t) {
-  return OPEN_STATUSES.includes(t.status);
-}
-
 // src/lib/timeTracking.ts
 function weekStartKey(today = /* @__PURE__ */ new Date()) {
   return format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
@@ -2060,6 +2122,12 @@ function buildDigest(input) {
       detail: `${n.quote_number}, ${n.amount}, ${n.days} days without a reply`,
       path: n.kind === "quote" ? "/crm?follow=Due" : n.path,
       urgent: false
+    })),
+    ctrmIssues: openIssues(input.ctrmIssues || []).map((t) => ({
+      name: t.subject || "No subject",
+      detail: issueDetail(t, t.account_id ? nameOf.get(t.account_id) ?? "Account" : "No client", now),
+      path: `/support/${t.id}`,
+      urgent: needsClientUpdate(t, now)
     }))
   };
 }
@@ -2102,6 +2170,9 @@ function digestSections(d) {
   }
   if (d.quoteNudges?.length) {
     sections.push({ key: "quoteNudges", title: "Quotes waiting 3 days for a reply", empty: "", items: d.quoteNudges });
+  }
+  if (d.ctrmIssues?.length) {
+    sections.push({ key: "ctrmIssues", title: "Open CTRM Next issues, oldest first", empty: "", items: d.ctrmIssues });
   }
   if (d.lateInvoices?.length) {
     sections.push({ key: "lateInvoices", title: "Invoices 3, 7 or 14 days late", empty: "", items: d.lateInvoices });

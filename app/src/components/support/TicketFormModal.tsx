@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { NO_TRADE_DATA_NOTE } from '../../lib/ctrmIssues'
 import Modal from '../Modal'
 import { accountTypeLabel } from '../../lib/accounts'
 import { TICKET_CHANNELS, TICKET_PRIORITIES } from '../../lib/support'
@@ -11,6 +12,7 @@ import {
   inputStyle,
   labelStyle,
   selectStyle,
+  colors,
 } from '../../lib/uiStyles'
 
 export type TicketFormValues = {
@@ -32,6 +34,8 @@ type Props = {
   /** Fixes the account, e.g. when opened from an account page. */
   lockedAccountId?: string
   defaultAssigneeId: string | null
+  /** How it came in, when the form opens (CTRM Next accounts start on CTRM Next). */
+  defaultChannel?: TicketChannel
   saving: boolean
   onSave: (values: TicketFormValues) => void
 }
@@ -44,6 +48,7 @@ export default function TicketFormModal({
   team,
   lockedAccountId,
   defaultAssigneeId,
+  defaultChannel = 'email',
   saving,
   onSave,
 }: Props) {
@@ -51,7 +56,7 @@ export default function TicketFormModal({
   const [contactId, setContactId] = useState('')
   const [subject, setSubject] = useState('')
   const [details, setDetails] = useState('')
-  const [channel, setChannel] = useState<TicketChannel>('email')
+  const [channel, setChannel] = useState<TicketChannel>(defaultChannel)
   const [priority, setPriority] = useState<TicketPriority>('normal')
   const [assignee, setAssignee] = useState(defaultAssigneeId ?? '')
 
@@ -61,10 +66,10 @@ export default function TicketFormModal({
     setContactId('')
     setSubject('')
     setDetails('')
-    setChannel('email')
+    setChannel(defaultChannel)
     setPriority('normal')
     setAssignee(defaultAssigneeId ?? '')
-  }, [open, lockedAccountId, defaultAssigneeId])
+  }, [open, lockedAccountId, defaultAssigneeId, defaultChannel])
 
   const accountContacts = contacts.filter((c) => c.account_id === accountId)
   const sorted = [...accounts].sort((a, b) => a.name.localeCompare(b.name))
@@ -150,6 +155,7 @@ export default function TicketFormModal({
             value={details}
             onChange={(e) => setDetails(e.target.value)}
           />
+          {channel === 'ctrm_next' ? <p style={{ color: colors.muted, fontSize: 12, margin: '6px 0 0' }}>{NO_TRADE_DATA_NOTE}</p> : null}
         </div>
         <div style={formGridStyle}>
           <div style={fieldStyle}>

@@ -1404,3 +1404,56 @@ reset role;
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from ctrm_fit_sheets'), 'anon cannot read fit sheets');
 reset role;
+
+------------------------------------------------------------ CTRM Next client issues (Wave 5, PR W)
+insert into tickets (account_id, subject, channel, vendor_status) select id, 'Export fails', 'ctrm_next', 'not_raised' from accounts where name = 'VA Fit Prospect';
+insert into tickets (account_id, subject, channel) select id, 'Other house issue', 'ctrm_next' from accounts where name = 'Other Trading House';
+select pg_temp.expect(pg_temp.fails($q$insert into tickets (subject, channel) values ('x', 'carrier_pigeon')$q$), 'only listed channels are allowed');
+select pg_temp.expect(pg_temp.fails($q$update tickets set vendor_status = 'lost_it' where subject = 'Export fails'$q$), 'only listed vendor statuses are allowed');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from tickets where channel = 'ctrm_next') = 1, 'staff (VA) sees issues on their account only');
+select pg_temp.expect(not pg_temp.fails($q$update tickets set vendor_ticket_ref = 'CN-881', vendor_status = 'raised', client_updated_at = now() where subject = 'Export fails'$q$), 'staff (VA) updates the vendor side and the client update date');
+select pg_temp.expect(not pg_temp.fails($q$update tickets set vendor_status = 'fixed' where subject = 'Export fails'$q$), 'staff (VA) marks it fixed');
+reset role;
+select pg_temp.expect((select vendor_fixed_at is not null from tickets where subject = 'Export fails'), 'the fixed date is set when it becomes Fixed');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+update tickets set vendor_fixed_at = '2020-01-01' where subject = 'Export fails';
+reset role;
+select pg_temp.expect((select vendor_fixed_at > '2026-01-01' from tickets where subject = 'Export fails'), 'nobody back dates the fixed date');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+update tickets set vendor_status = 'in_progress' where subject = 'Export fails';
+reset role;
+select pg_temp.expect((select vendor_fixed_at is null from tickets where subject = 'Export fails'), 'moving off Fixed clears the fixed date');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from tickets where channel = 'ctrm_next') = 2, 'sales sees every CTRM issue');
+select pg_temp.expect(not pg_temp.fails($q$update tickets set vendor_status = 'waiting_for_client' where subject = 'Other house issue'$q$), 'sales updates the vendor side');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect(not pg_temp.fails($q$update tickets set client_updated_at = now() where subject = 'Other house issue'$q$), 'manager notes a client update');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from tickets where channel = 'ctrm_next') = 2, 'viewer reads CTRM issues');
+update tickets set vendor_ticket_ref = 'viewer' where channel = 'ctrm_next';
+reset role;
+select pg_temp.expect((select count(*) from tickets where vendor_ticket_ref = 'viewer') = 0, 'viewer cannot change CTRM issues');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000c';
+select pg_temp.expect((select count(*) from tickets where channel = 'ctrm_next') = 0, 'a stranger sees no CTRM issues');
+reset role;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails($q$select vendor_ticket_ref from tickets$q$), 'anon cannot read CTRM issues');
+reset role;

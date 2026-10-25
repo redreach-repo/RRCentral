@@ -14,9 +14,11 @@
  * It also says how many contract invoices the 06:00 run drafted today,
  * lists the new leads from the website, WhatsApp and the landing page,
  * and which quotes have waited 3 days for a reply (quoteNudges.ts).
+ * It lists open CTRM Next client issues, oldest first (ctrmIssues.ts).
  */
 import { format, isFriday, parseISO } from 'date-fns'
 import { isOverdue } from './ctrm'
+import { issueDetail, needsClientUpdate, openIssues, type IssueRow } from './ctrmIssues'
 import { newLeads, type IntakeRow } from './leadIntake'
 import { quoteNudges, type NudgeDeal, type NudgeQuote } from './quoteNudges'
 import { currentContract, hoursAlert, renewalFlag, renewalLabel } from './delivery'
@@ -55,6 +57,8 @@ export type Digest = {
   newLeads: DigestItem[]
   /** Quotes sent 3 or more days ago with no follow up since. */
   quoteNudges: DigestItem[]
+  /** Open CTRM Next client issues, oldest first. */
+  ctrmIssues?: DigestItem[]
 }
 
 /** An open watch_items row, as much as the digest needs. */
@@ -87,6 +91,8 @@ export type DigestInput = {
   /** Sent quotes and AI CRM deals at Quote sent (optional). */
   sentQuotes?: NudgeQuote[]
   quoteDeals?: NudgeDeal[]
+  /** CTRM Next issues (tickets with channel ctrm_next) that are open (optional). */
+  ctrmIssues?: IssueRow[]
 }
 
 const day = (iso: string) => format(parseISO(iso.slice(0, 10)), 'd MMM')
@@ -185,6 +191,12 @@ export function buildDigest(input: DigestInput): Digest {
       path: n.kind === 'quote' ? '/crm?follow=Due' : n.path,
       urgent: false,
     })),
+    ctrmIssues: openIssues(input.ctrmIssues || []).map((t) => ({
+      name: t.subject || 'No subject',
+      detail: issueDetail(t, t.account_id ? nameOf.get(t.account_id) ?? 'Account' : 'No client', now),
+      path: `/support/${t.id}`,
+      urgent: needsClientUpdate(t, now),
+    })),
   }
 }
 
@@ -242,6 +254,9 @@ export function digestSections(d: Digest): DigestSection[] {
   }
   if (d.quoteNudges?.length) {
     sections.push({ key: 'quoteNudges', title: 'Quotes waiting 3 days for a reply', empty: '', items: d.quoteNudges })
+  }
+  if (d.ctrmIssues?.length) {
+    sections.push({ key: 'ctrmIssues', title: 'Open CTRM Next issues, oldest first', empty: '', items: d.ctrmIssues })
   }
   if (d.lateInvoices?.length) {
     sections.push({ key: 'lateInvoices', title: 'Invoices 3, 7 or 14 days late', empty: '', items: d.lateInvoices })
