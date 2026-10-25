@@ -11,10 +11,12 @@
  *  4. AI CRM clients over their hours two months running (delivery.ts).
  * On Fridays it also names clients with no hours logged this week.
  * From the 07:30 watchdog (watchdog.ts) it adds stale deals and late invoices.
- * It also says how many contract invoices the 06:00 run drafted today.
+ * It also says how many contract invoices the 06:00 run drafted today,
+ * and which quotes have waited 3 days for a reply (quoteNudges.ts).
  */
 import { format, isFriday, parseISO } from 'date-fns'
 import { isOverdue } from './ctrm'
+import { quoteNudges, type NudgeDeal, type NudgeQuote } from './quoteNudges'
 import { currentContract, hoursAlert, renewalFlag, renewalLabel } from './delivery'
 import { slaState } from './sla'
 import { isOpenTicket } from './support'
@@ -47,6 +49,8 @@ export type Digest = {
   lateInvoices: DigestItem[]
   /** Contract invoices drafted by today's run: one line while there are any to finalise. */
   contractDrafts: DigestItem[]
+  /** Quotes sent 3 or more days ago with no follow up since. */
+  quoteNudges: DigestItem[]
 }
 
 /** An open watch_items row, as much as the digest needs. */
@@ -74,6 +78,9 @@ export type DigestInput = {
   watch?: DigestWatchItem[]
   /** Contract invoices drafted in the last 24 hours (optional). */
   contractDrafts?: number
+  /** Sent quotes and AI CRM deals at Quote sent (optional). */
+  sentQuotes?: NudgeQuote[]
+  quoteDeals?: NudgeDeal[]
 }
 
 const day = (iso: string) => format(parseISO(iso.slice(0, 10)), 'd MMM')
@@ -160,6 +167,12 @@ export function buildDigest(input: DigestInput): Digest {
     staleDeals: watchLines(input.watch || [], 'stale_deal'),
     lateInvoices: watchLines(input.watch || [], 'invoice_overdue'),
     contractDrafts: contractDraftItems(input.contractDrafts ?? 0),
+    quoteNudges: quoteNudges({ quotes: input.sentQuotes || [], deals: input.quoteDeals || [], accountNames: nameOf, now }).map((n) => ({
+      name: n.account || n.quote_number,
+      detail: `${n.quote_number}, ${n.amount}, ${n.days} days without a reply`,
+      path: n.kind === 'quote' ? '/crm?follow=Due' : n.path,
+      urgent: false,
+    })),
   }
 }
 
@@ -212,6 +225,9 @@ export function digestSections(d: Digest): DigestSection[] {
     { key: 'overdueActions', title: 'Overdue CTRM next actions', empty: 'No overdue next actions.', items: d.overdueActions },
     { key: 'overHours', title: 'Clients over their hours', empty: 'No client is over hours two months running.', items: d.overHours },
   ]
+  if (d.quoteNudges?.length) {
+    sections.push({ key: 'quoteNudges', title: 'Quotes waiting 3 days for a reply', empty: '', items: d.quoteNudges })
+  }
   if (d.lateInvoices?.length) {
     sections.push({ key: 'lateInvoices', title: 'Invoices 3, 7 or 14 days late', empty: '', items: d.lateInvoices })
   }

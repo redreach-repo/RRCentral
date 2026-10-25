@@ -181,7 +181,12 @@ Deno.serve(withErrorLog("daily-digest", async (req) => {
     // Drafts raised by the 06:00 contract-invoices run (Wave 2, PR E).
     const drafts = await selectAll(sb, "contract_invoices", "id", (q) =>
       q.gte("created_at", since).not("invoice_id", "is", null)).catch(() => [])
-    digest = buildDigest({ now, accounts, contracts, packages, entries, tickets, deals, errors, watch, contractDrafts: drafts.length }) as Digest
+    // Quotes waiting for a reply (Wave 3, PR L).
+    const sentQuotes = await selectAll(sb, "quotations", "id, client, reference_number, division_code, amount, status, account_id, quotation_currency, sent_at, followed_up_at", (q) =>
+      q.eq("status", "Sent")).catch(() => [])
+    const quoteDeals = await selectAll(sb, "sales_deals", "id, account_id, stage, quote_reference, monthly_fee, last_touch_at, quote_sent_at", (q) =>
+      q.eq("stage", "quote_sent")).catch(() => [])
+    digest = buildDigest({ now, accounts, contracts, packages, entries, tickets, deals, errors, watch, contractDrafts: drafts.length, sentQuotes, quoteDeals }) as Digest
   } catch (e) {
     return json({ error: `Could not build the digest: ${(e as Error).message}`.slice(0, 300) }, 500)
   }

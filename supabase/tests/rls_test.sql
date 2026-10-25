@@ -835,3 +835,47 @@ reset role;
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from watch_items'), 'anon cannot read watch items');
 reset role;
+
+------------------------------------------------------------ Follow up templates and nudges (Wave 3, PR L)
+insert into message_templates (name, channel, body) values ('Seed', 'whatsapp', 'Hi {{name}}');
+insert into quotations (id, client, reference_number, status, updated_at) values ('00000000-0000-0000-0000-0000000000f1', 'Nudge Co', 'RR-03-26991', 'Finalized', now() - interval '9 days');
+update quotations set status = 'Sent' where id = '00000000-0000-0000-0000-0000000000f1';
+select pg_temp.expect((select sent_at > now() - interval '1 minute' from quotations where id = '00000000-0000-0000-0000-0000000000f1'), 'marking a quote Sent records when');
+update quotations set notes = 'still sent' where id = '00000000-0000-0000-0000-0000000000f1';
+update quotations set sent_at = now() - interval '5 days' where id = '00000000-0000-0000-0000-0000000000f1';
+update quotations set notes = 'edited again' where id = '00000000-0000-0000-0000-0000000000f1';
+select pg_temp.expect((select sent_at < now() - interval '4 days' from quotations where id = '00000000-0000-0000-0000-0000000000f1'), 'editing a sent quote keeps when it was sent');
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from message_templates'), 'anon cannot read templates');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select pg_temp.expect(not pg_temp.fails($q$insert into message_templates (name, channel, division_code, body) values ('Admin', 'email', '01', 'x')$q$), 'admin can add a template');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect(not pg_temp.fails($q$update message_templates set body = 'Hello {{name}}' where name = 'Seed' returning 1$q$), 'manager can edit a template');
+select pg_temp.expect(pg_temp.fails($q$insert into message_templates (name, channel, division_code, body) values ('Bad', 'whatsapp', 'x1', 'x')$q$), 'a template needs a real division code');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from message_templates) = 2, 'sales reads the templates');
+select pg_temp.expect(pg_temp.fails($q$insert into message_templates (name, channel, body) values ('Sales', 'whatsapp', 'x')$q$), 'sales cannot add templates');
+update message_templates set body = 'changed by sales';
+select pg_temp.expect((select count(*) from message_templates where body = 'changed by sales') = 0, 'sales cannot edit templates');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from message_templates) = 0, 'staff (VA) does not see templates');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from message_templates) = 0, 'viewer does not see templates');
+select pg_temp.expect(pg_temp.fails($q$insert into message_templates (name, channel, body) values ('V', 'whatsapp', 'x')$q$), 'viewer cannot add templates');
+reset role;

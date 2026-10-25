@@ -29,6 +29,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 10 | Contract invoices each morning | `contract-invoices` |
 | 11 | Daily watchdog | `watchdog` |
 | 12 | One tap payment reminders | `payment-reminder` |
+| 17 | Quote follow up templates and nudges | `daily-digest` |
 
 ---
 
@@ -202,3 +203,22 @@ nothing: "This reminder was already sent." Do the same with **WhatsApp** once th
 **If it fails.** The toast says why (no contact address, Zoho Mail not connected, WhatsApp template not
 approved). Nothing is recorded when sending fails, so you can press again once fixed. System check row
 "One tap payment reminders"; App errors under `payment-reminder`.
+
+---
+
+## 17. Quote follow up templates and nudges
+
+**Trigger.** Packages and rates → **Follow up templates**: add a WhatsApp template for one division using
+`{{name}}`, `{{quote_number}}` and `{{amount}}`; the preview below the box fills them with sample values.
+Then mark a test quote to your own company **Sent**. To see the nudge today without waiting, run this in the
+Supabase SQL editor with its RR number: `update quotations set sent_at = now() - interval '4 days' where reference_number = 'RR-…';`
+
+**You should see.** CRM → **My Day** shows **Quotes waiting for a reply** with the quote, its amount and
+"4 days without a reply". **WhatsApp** opens WhatsApp to the client's contact with your template filled in;
+**Email** opens your email with the subject and message ready. The row disappears and comes back 3 days later
+if the quote is still Sent. Next morning's digest lists it under "Quotes waiting 3 days for a reply" (redeploy
+`daily-digest` first).
+
+**If it fails.** "Run the Follow up templates SQL first" means the SQL has not been run. "No WhatsApp or phone
+number" means the account's contact or the CRM row has no number.
+
