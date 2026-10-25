@@ -19,6 +19,7 @@ on:
         default: worshiphub-read
         options:
           - worshiphub-read
+          - worshiphub-manage
           - usage-import
           - daily-digest
           - client-portal

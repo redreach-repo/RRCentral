@@ -5,6 +5,7 @@ import { BellRing, Church, ExternalLink, Plus, RefreshCw } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
+import ChurchActionButtons from '../components/worshiphub/ChurchActionButtons'
 import ChurchFacts from '../components/worshiphub/ChurchFacts'
 import { visibleAccounts } from '../lib/accounts'
 import { createAccount, listAccounts } from '../lib/accountsStore'
@@ -177,7 +178,10 @@ export default function ProductsPage() {
             <BellRing size={16} /> Asking to join WorshipHub ({requests.length})
           </h2>
           <p style={{ margin: '0 0 10px', fontSize: 12, color: colors.muted2 }}>
-            These churches signed up and are waiting for Red Reach to review them. Review them in WorshipHub app admin.
+            These churches signed up and are waiting for Red Reach to review them.{' '}
+            {userRole === 'admin'
+              ? 'Accept, verify, reject or delete them here. Each change is made on WorshipHub and kept in the audit log.'
+              : 'An RR Central admin can accept or reject them here, or in WorshipHub app admin.'}
           </p>
           <div style={{ display: 'grid', gap: 10 }}>
             {requests.map((t) => (
@@ -194,7 +198,8 @@ export default function ProductsPage() {
                       .join(', ')}
                   </span>
                 </span>
-                <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <ChurchActionButtons tenant={t} onDone={() => void refreshLive()} />
                   {t.admin_url ? (
                     <a
                       href={t.admin_url}
@@ -290,7 +295,7 @@ export default function ProductsPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ textAlign: 'left', color: colors.muted }}>
-                {['Church', 'Plan', 'Billing', 'Renewal', 'Users', 'Contact', 'RR Central'].map((h) => (
+                {['Church', 'Plan', 'Billing', 'Renewal', 'Users', 'Contact', 'RR Central', ...(userRole === 'admin' ? ['On WorshipHub'] : [])].map((h) => (
                   <th key={h} style={{ padding: '6px 8px', fontWeight: 600, whiteSpace: 'nowrap' }}>
                     {h}
                   </th>
@@ -306,6 +311,10 @@ export default function ProductsPage() {
                       <strong>{t.name || t.slug}</strong>
                       {t.review_status === 'pending' ? (
                         <span style={{ marginLeft: 6, fontSize: 11, color: colors.warn }}>waiting for review</span>
+                      ) : t.review_status === 'rejected' ? (
+                        <span style={{ marginLeft: 6, fontSize: 11, color: colors.danger }}>rejected</span>
+                      ) : t.verification_status === 'verified' ? (
+                        <span style={{ marginLeft: 6, fontSize: 11, color: colors.success }}>verified</span>
                       ) : null}
                       <span style={{ display: 'block', fontSize: 11, color: colors.muted2 }}>{t.slug}</span>
                     </td>
@@ -324,6 +333,11 @@ export default function ProductsPage() {
                     <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>
                       {accountId ? <Link to={`/accounts/${accountId}`}>Open account</Link> : <span style={{ color: colors.muted2 }}>Not added</span>}
                     </td>
+                    {userRole === 'admin' ? (
+                      <td style={{ padding: '6px 8px' }}>
+                        <ChurchActionButtons tenant={t} onDone={() => void refreshLive()} />
+                      </td>
+                    ) : null}
                   </tr>
                 )
               })}

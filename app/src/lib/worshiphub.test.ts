@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { churchDetailsProblem, churchView, hasBillingIssue, joinRequests, renewalSoon, sanitiseTenant, sanitiseTenants } from './worshiphub'
+import { CHURCH_ACTIONS, churchActions, churchDetailsProblem, churchView, hasBillingIssue, joinRequests, renewalSoon, sanitiseTenant, sanitiseTenants } from './worshiphub'
 import type { WorshipChurchProfile } from './types'
 
 const row = {
@@ -22,7 +22,7 @@ describe('sanitiseTenant', () => {
     expect(Object.keys(t!).sort()).toEqual(
       [
         'admin_url', 'billing_status', 'contact_email', 'contact_name', 'modules', 'name', 'plan',
-        'registered_at', 'renewal_date', 'review_status', 'slug', 'user_count',
+        'registered_at', 'renewal_date', 'review_status', 'slug', 'user_count', 'verification_status',
         'whatsapp_marketing', 'whatsapp_month', 'whatsapp_service', 'whatsapp_utility',
       ].sort(),
     )
@@ -137,5 +137,26 @@ describe('join requests', () => {
     const live = sanitiseTenant({ ...row, whatsapp_month: '', whatsapp_marketing: 0 })!
     const profile = { whatsapp_month: '2026-09', whatsapp_conversations: 80 } as WorshipChurchProfile
     expect(churchView(profile, live)).toMatchObject({ source: 'live', whatsappMonth: '2026-09', whatsappTotal: 80, whatsappSplit: null })
+  })
+})
+
+describe('church review actions', () => {
+  it('reads rejected and the verification badge', () => {
+    const t = sanitiseTenant({ ...row, review_status: 'rejected', verification_status: 'verified' })
+    expect(t).toMatchObject({ review_status: 'rejected', verification_status: 'verified' })
+    expect(sanitiseTenant({ ...row, verification_status: 'odd' })!.verification_status).toBe('')
+  })
+
+  it('offers the actions that fit the church', () => {
+    expect(churchActions({ review_status: 'pending', verification_status: 'pending' })).toEqual(['accept', 'verify', 'reject', 'delete'])
+    expect(churchActions({ review_status: 'approved', verification_status: 'verified' })).toEqual(['reject', 'delete'])
+    expect(churchActions({ review_status: 'rejected', verification_status: 'rejected' })).toEqual(['accept', 'verify', 'delete'])
+  })
+
+  it('asks before reject and delete only', () => {
+    expect(CHURCH_ACTIONS.accept.confirm).toBeNull()
+    expect(CHURCH_ACTIONS.verify.confirm).toBeNull()
+    expect(CHURCH_ACTIONS.reject.confirm?.('Grace')).toContain('Grace')
+    expect(CHURCH_ACTIONS.delete.confirm?.('Grace')).toContain('cannot be undone')
   })
 })

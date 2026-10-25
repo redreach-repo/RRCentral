@@ -2,7 +2,7 @@ import { db } from './db'
 import { isMissingRelationError } from './errors'
 import { logAccountEvent } from './accountsStore'
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseConfig'
-import { sanitiseTenants } from './worshiphub'
+import { sanitiseTenants, type ChurchAction } from './worshiphub'
 import type { WorshipChurchProfile, WorshipTenant } from './types'
 
 type Author = { appUserId: string | null; email: string }
@@ -84,4 +84,32 @@ export async function fetchLiveTenants(): Promise<LiveResult> {
     return { connected: false, reason, message: body.message ? `${NOT_CONNECTED[reason]} ${body.message}.` : NOT_CONNECTED[reason] }
   }
   return { connected: true, fetchedAt: body.fetched_at || new Date().toISOString(), tenants: sanitiseTenants(body) }
+}
+
+/**
+ * Accept, reject, verify or delete a church on WorshipHub through the
+ * worshiphub-manage Edge Function (RR Central admins only, logged there).
+ * Throws with WorshipHub's reason when it refuses.
+ */
+export async function runChurchAction(action: ChurchAction, tenant: Pick<WorshipTenant, 'slug' | 'name'>): Promise<void> {
+  if (!isSupabaseConfigured()) throw new Error(NOT_CONNECTED.local)
+  const { data, error } = await getSupabaseClient().functions.invoke('worshiphub-manage', {
+    body: { action, slug: tenant.slug, name: tenant.name },
+  })
+  if (error) {
+    const res = (error as { context?: Response }).context
+    const status = res?.status
+    if (status === 404 || /Failed to send a request/i.test(String((error as Error).message))) {
+      throw new Error('The worshiphub-manage function is not deployed yet.')
+    }
+    let reason = ''
+    try {
+      reason = ((await res?.json()) as { error?: string })?.error || ''
+    } catch {
+      // Body was not JSON.
+    }
+    throw new Error(reason || 'WorshipHub could not be changed.')
+  }
+  const body = (data || {}) as { ok?: boolean; error?: string }
+  if (!body.ok) throw new Error(body.error || 'WorshipHub could not be changed.')
 }
