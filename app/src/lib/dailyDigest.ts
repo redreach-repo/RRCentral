@@ -11,6 +11,7 @@
  *  4. AI CRM clients over their hours two months running (delivery.ts).
  * On Fridays it also names clients with no hours logged this week.
  * From the 07:30 watchdog (watchdog.ts) it adds stale deals and late invoices.
+ * It also says how many contract invoices the 06:00 run drafted today.
  */
 import { format, isFriday, parseISO } from 'date-fns'
 import { isOverdue } from './ctrm'
@@ -44,6 +45,8 @@ export type Digest = {
   staleDeals: DigestItem[]
   /** Open watchdog items: invoices 3, 7 or 14 days late. */
   lateInvoices: DigestItem[]
+  /** Contract invoices drafted by today's run: one line while there are any to finalise. */
+  contractDrafts: DigestItem[]
 }
 
 /** An open watch_items row, as much as the digest needs. */
@@ -69,6 +72,8 @@ export type DigestInput = {
   errors?: { message: string; created_at: string }[]
   /** Open watch_items rows from the watchdog (optional). */
   watch?: DigestWatchItem[]
+  /** Contract invoices drafted in the last 24 hours (optional). */
+  contractDrafts?: number
 }
 
 const day = (iso: string) => format(parseISO(iso.slice(0, 10)), 'd MMM')
@@ -154,6 +159,7 @@ export function buildDigest(input: DigestInput): Digest {
     appErrors: digestErrors(input.errors || []),
     staleDeals: watchLines(input.watch || [], 'stale_deal'),
     lateInvoices: watchLines(input.watch || [], 'invoice_overdue'),
+    contractDrafts: contractDraftItems(input.contractDrafts ?? 0),
   }
 }
 
@@ -168,6 +174,19 @@ function watchLines(watch: DigestWatchItem[], kind: string): DigestItem[] {
       path: w.link || '/app',
       urgent: w.severity === 'urgent',
     }))
+}
+
+/** "N contract invoices drafted today", linking to Invoices to finalise them. */
+export function contractDraftItems(n: number): DigestItem[] {
+  if (!(n > 0)) return []
+  return [
+    {
+      name: `${n} contract invoice${n === 1 ? '' : 's'} drafted today`,
+      detail: `check and finalise ${n === 1 ? 'it' : 'them'} on Invoices to get the RR number`,
+      path: '/invoices',
+      urgent: false,
+    },
+  ]
 }
 
 /** One line per distinct error message, most frequent first, at most 5. */
@@ -198,6 +217,9 @@ export function digestSections(d: Digest): DigestSection[] {
   }
   if (d.staleDeals?.length) {
     sections.push({ key: 'staleDeals', title: 'Deals nobody has touched', empty: '', items: d.staleDeals })
+  }
+  if (d.contractDrafts?.length) {
+    sections.push({ key: 'contractDrafts', title: 'Contract invoices', empty: '', items: d.contractDrafts })
   }
   if (d.appErrors?.length) {
     sections.push({ key: 'appErrors', title: 'App errors in the last day', empty: '', items: d.appErrors })

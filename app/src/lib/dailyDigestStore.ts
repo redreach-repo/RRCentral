@@ -1,5 +1,6 @@
 import { format, startOfMonth, subMonths } from 'date-fns'
 import { listAccounts } from './accountsStore'
+import { listContractInvoices } from './contractBillingStore'
 import { listDeals } from './ctrmStore'
 import { buildDigest, type Digest } from './dailyDigest'
 import { db } from './db'
@@ -13,19 +14,22 @@ import type { DigestRecipientRow, DigestRun } from './types'
 /** Today's digest, built in the browser from what this user can see. */
 export async function loadDigestPreview(now: Date = new Date()): Promise<Digest> {
   const since = format(startOfMonth(subMonths(now, 2)), 'yyyy-MM-dd')
-  const [{ rows: accounts }, contracts, packages, entries, tickets, deals] = await Promise.all([
+  const [{ rows: accounts }, contracts, packages, entries, tickets, deals, contractInvoices] = await Promise.all([
     listAccounts(),
     listContracts(),
     listPackages(),
     listTimeEntries(undefined, since),
     listTickets(),
     listDeals(),
+    listContractInvoices().catch(() => []),
   ])
   const { data: watch } = await db
     .from('watch_items')
     .select('kind, severity, title, reason, link, owner_label')
     .is('cleared_at', null)
-  return buildDigest({ now, accounts, contracts, packages, entries, tickets, deals, watch: watch || [] })
+  const dayAgo = now.getTime() - 24 * 60 * 60 * 1000
+  const contractDrafts = contractInvoices.filter((r) => r.invoice_id && Date.parse(r.created_at) >= dayAgo).length
+  return buildDigest({ now, accounts, contracts, packages, entries, tickets, deals, contractDrafts, watch: watch || [] })
 }
 
 export async function listRecipients(): Promise<{ rows: DigestRecipientRow[]; missingTable: boolean }> {

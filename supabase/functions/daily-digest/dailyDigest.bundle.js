@@ -1966,7 +1966,8 @@ function buildDigest(input) {
     noHours,
     appErrors: digestErrors(input.errors || []),
     staleDeals: watchLines(input.watch || [], "stale_deal"),
-    lateInvoices: watchLines(input.watch || [], "invoice_overdue")
+    lateInvoices: watchLines(input.watch || [], "invoice_overdue"),
+    contractDrafts: contractDraftItems(input.contractDrafts ?? 0)
   };
 }
 function watchLines(watch, kind) {
@@ -1976,6 +1977,17 @@ function watchLines(watch, kind) {
     path: w.link || "/app",
     urgent: w.severity === "urgent"
   }));
+}
+function contractDraftItems(n) {
+  if (!(n > 0)) return [];
+  return [
+    {
+      name: `${n} contract invoice${n === 1 ? "" : "s"} drafted today`,
+      detail: `check and finalise ${n === 1 ? "it" : "them"} on Invoices to get the RR number`,
+      path: "/invoices",
+      urgent: false
+    }
+  ];
 }
 function digestErrors(errors) {
   const counts = /* @__PURE__ */ new Map();
@@ -1997,6 +2009,9 @@ function digestSections(d) {
   }
   if (d.staleDeals?.length) {
     sections.push({ key: "staleDeals", title: "Deals nobody has touched", empty: "", items: d.staleDeals });
+  }
+  if (d.contractDrafts?.length) {
+    sections.push({ key: "contractDrafts", title: "Contract invoices", empty: "", items: d.contractDrafts });
   }
   if (d.appErrors?.length) {
     sections.push({ key: "appErrors", title: "App errors in the last day", empty: "", items: d.appErrors });
@@ -2054,6 +2069,7 @@ function digestTargets(recipients) {
 }
 export {
   buildDigest,
+  contractDraftItems,
   digestCount,
   digestDateLabel,
   digestEmail,
