@@ -23,9 +23,13 @@ export async function loadDigestPreview(now: Date = new Date()): Promise<Digest>
     listDeals(),
     listContractInvoices().catch(() => []),
   ])
+  const { data: watch } = await db
+    .from('watch_items')
+    .select('kind, severity, title, reason, link, owner_label')
+    .is('cleared_at', null)
   const dayAgo = now.getTime() - 24 * 60 * 60 * 1000
   const contractDrafts = contractInvoices.filter((r) => r.invoice_id && Date.parse(r.created_at) >= dayAgo).length
-  return buildDigest({ now, accounts, contracts, packages, entries, tickets, deals, contractDrafts })
+  return buildDigest({ now, accounts, contracts, packages, entries, tickets, deals, contractDrafts, watch: watch || [] })
 }
 
 export async function listRecipients(): Promise<{ rows: DigestRecipientRow[]; missingTable: boolean }> {

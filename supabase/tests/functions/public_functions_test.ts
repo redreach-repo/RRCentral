@@ -14,6 +14,7 @@ const read = (path: string) => Deno.readTextFile(new URL(path, ROOT))
 const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "usage-import": { kind: "cron secret or manager JWT", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret[\s\S]*rr_is_manager_or_admin/ },
   "daily-digest": { kind: "cron secret or manager JWT", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret[\s\S]*rr_is_manager_or_admin/ },
+  "watchdog": { kind: "cron secret or manager JWT", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret[\s\S]*rr_is_manager_or_admin/ },
   "contract-invoices": { kind: "cron secret or manager JWT", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret[\s\S]*rr_is_manager_or_admin/ },
   "client-portal": { kind: "hashed link token", pattern: /isPortalToken\(token\)[\s\S]*token_hash[\s\S]*portalAccessState/ },
   "ai-assist": { kind: "signed in user (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)/ },
@@ -61,6 +62,7 @@ const ENV: Record<string, string> = {
   SUPABASE_SERVICE_ROLE_KEY: "test-service-key",
   USAGE_IMPORT_CRON_SECRET: "usage-secret-for-tests",
   DIGEST_CRON_SECRET: "digest-secret-for-tests",
+  WATCHDOG_CRON_SECRET: "watchdog-secret-for-tests",
   CONTRACT_BILLING_CRON_SECRET: "billing-secret-for-tests",
   WHATSAPP_APP_SECRET: "meta-app-secret-for-tests",
   WHATSAPP_VERIFY_TOKEN: "meta-verify-token",
@@ -115,12 +117,26 @@ async function metaSignature(raw: string, secret: string): Promise<string> {
 
 const opts = { sanitizeOps: false, sanitizeResources: false }
 
-for (const fn of ["usage-import", "daily-digest", "contract-invoices"]) {
+for (const fn of ["usage-import", "daily-digest", "contract-invoices", "watchdog"]) {
   Deno.test({ name: `${fn} refuses no secret and a wrong secret`, ...opts, fn: async () => {
     assertEquals(await call(fn, post(fn, {})), 401)
     assertEquals(await call(fn, post(fn, {}, { "x-cron-secret": "wrong" })), 401)
   } })
 }
+
+Deno.test({ name: "watchdog refuses a signed in user who is not a manager or admin", ...opts, fn: async () => {
+  // The role check cannot confirm this token, so the caller counts as staff, sales or viewer.
+  assertEquals(await call("watchdog", post("watchdog", {}, { Authorization: "Bearer someone" })), 403)
+} })
+
+Deno.test({ name: "watchdog fails closed without its schedule secret", ...opts, fn: async () => {
+  Deno.env.delete("WATCHDOG_CRON_SECRET")
+  try {
+    assertEquals(await call("watchdog", post("watchdog", {}, { "x-cron-secret": ENV.WATCHDOG_CRON_SECRET })), 401)
+  } finally {
+    Deno.env.set("WATCHDOG_CRON_SECRET", ENV.WATCHDOG_CRON_SECRET)
+  }
+} })
 
 Deno.test({ name: "contract-invoices refuses a signed in user who is not a manager or admin", ...opts, fn: async () => {
   // The role check cannot confirm this token, so the caller counts as staff, sales or viewer.

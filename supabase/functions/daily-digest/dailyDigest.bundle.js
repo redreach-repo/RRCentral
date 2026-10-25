@@ -1965,8 +1965,18 @@ function buildDigest(input) {
     overHours,
     noHours,
     appErrors: digestErrors(input.errors || []),
+    staleDeals: watchLines(input.watch || [], "stale_deal"),
+    lateInvoices: watchLines(input.watch || [], "invoice_overdue"),
     contractDrafts: contractDraftItems(input.contractDrafts ?? 0)
   };
+}
+function watchLines(watch, kind) {
+  return watch.filter((w) => w.kind === kind).sort((a, b) => a.severity === b.severity ? a.title.localeCompare(b.title) : a.severity === "urgent" ? -1 : 1).map((w) => ({
+    name: w.title,
+    detail: w.owner_label ? `${w.reason} (${w.owner_label})` : w.reason,
+    path: w.link || "/app",
+    urgent: w.severity === "urgent"
+  }));
 }
 function contractDraftItems(n) {
   if (!(n > 0)) return [];
@@ -1994,6 +2004,12 @@ function digestSections(d) {
     { key: "overdueActions", title: "Overdue CTRM next actions", empty: "No overdue next actions.", items: d.overdueActions },
     { key: "overHours", title: "Clients over their hours", empty: "No client is over hours two months running.", items: d.overHours }
   ];
+  if (d.lateInvoices?.length) {
+    sections.push({ key: "lateInvoices", title: "Invoices 3, 7 or 14 days late", empty: "", items: d.lateInvoices });
+  }
+  if (d.staleDeals?.length) {
+    sections.push({ key: "staleDeals", title: "Deals nobody has touched", empty: "", items: d.staleDeals });
+  }
   if (d.contractDrafts?.length) {
     sections.push({ key: "contractDrafts", title: "Contract invoices", empty: "", items: d.contractDrafts });
   }
