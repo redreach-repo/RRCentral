@@ -36,6 +36,9 @@ on:
           - contract-invoices
           - watchdog
           - payment-reminder
+          - lead-intake
+          - quote-accept
+          - fireflies-fetch
           - invoice-pay-link
           - stripe-invoice-webhook
 

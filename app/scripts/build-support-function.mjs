@@ -20,6 +20,12 @@
 //   list matches what the app shows.
 // * payment-reminder gets the reminder rules and wording
 //   (src/lib/paymentReminder.ts), so what is sent is what the app shows.
+// * lead-intake gets the lead rules (src/lib/leadIntake.ts), so matching,
+//   owners and the New leads list agree with the app.
+// * quote-accept gets the accept link rules (src/lib/quoteAccept.ts), so the
+//   link, the draft contract and the client's view match the app.
+// * fireflies-fetch gets the Fireflies rules (src/lib/fireflies.ts), so the
+//   link parsing and the meeting fields match the app.
 // * invoice-pay-link and stripe-invoice-webhook get the card payment rules
 //   (src/lib/invoicePayLink.ts), so the link and the payment agree.
 //
@@ -43,6 +49,9 @@ const bundles = [
   { entry: 'src/lib/contractBillingRun.ts', out: '../supabase/functions/contract-invoices/contractBillingRun.bundle.js' },
   { entry: 'src/lib/watchdog.ts', out: '../supabase/functions/watchdog/watchdog.bundle.js' },
   { entry: 'src/lib/paymentReminder.ts', out: '../supabase/functions/payment-reminder/paymentReminder.bundle.js' },
+  { entry: 'src/lib/leadIntake.ts', out: '../supabase/functions/lead-intake/leadIntake.bundle.js' },
+  { entry: 'src/lib/quoteAccept.ts', out: '../supabase/functions/quote-accept/quoteAccept.bundle.js' },
+  { entry: 'src/lib/fireflies.ts', out: '../supabase/functions/fireflies-fetch/fireflies.bundle.js' },
   { entry: 'src/lib/invoicePayLink.ts', out: '../supabase/functions/invoice-pay-link/invoicePayLink.bundle.js' },
   { entry: 'src/lib/invoicePayLink.ts', out: '../supabase/functions/stripe-invoice-webhook/invoicePayLink.bundle.js' },
 ]

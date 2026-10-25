@@ -6,6 +6,7 @@ import { useCompactCrm } from '../hooks/useMediaQuery'
 import resp from '../styles/crmResponsive.module.css'
 import { db } from '../lib/db'
 import { NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
+import { crmMoveProblem } from '../lib/dealRules'
 import type { AppUser, CrmEntry } from '../lib/types'
 import { resolveOwnerEmails } from '../lib/calendarAttendees'
 import { useAuth } from '../contexts/AuthContext'
@@ -246,6 +247,19 @@ export default function FollowupsPage() {
 
   async function saveUpdate() {
     if (!updateTarget || !updateText.trim()) return
+    const moveProblem = crmMoveProblem(
+      updateTarget,
+      {
+        pipeline_stage: updateStage || updateTarget.pipeline_stage,
+        next_action: updateNextAction || updateTarget.next_action,
+        follow_up_date: updateClearDate ? null : updateFollowDate || updateTarget.follow_up_date,
+      },
+      { askedForReason: false },
+    )
+    if (moveProblem) {
+      showToast(moveProblem, 'error')
+      return
+    }
     setBusyId(updateTarget.id)
     try {
       const { error: err } = await db.from('follow_up_updates').insert({

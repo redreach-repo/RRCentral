@@ -1788,6 +1788,16 @@ function subMonths(date, amount, options) {
   return addMonths(date, -amount, options);
 }
 
+// src/lib/config.ts
+var DIVISIONS = [
+  { code: "01", brand: "RR Threads", category: "Uniforms" },
+  { code: "02", brand: "RR Wanders", category: "Tours" },
+  { code: "03", brand: "RR Marketing", category: "SEO and Marketing" },
+  { code: "04", brand: "RR Connect", category: "Virtual Assistance" },
+  { code: "05", brand: "RR Care", category: "Medical Tours / Care" },
+  { code: "06", brand: "RR Trading", category: "Trading" }
+];
+
 // src/lib/ctrm.ts
 function isOpenDeal(d) {
   return d.stage !== "signed" && d.stage !== "lost";
@@ -1795,6 +1805,77 @@ function isOpenDeal(d) {
 function isOverdue(d, now = /* @__PURE__ */ new Date()) {
   if (!isOpenDeal(d) || !d.next_action_date) return false;
   return d.next_action_date < format(now, "yyyy-MM-dd");
+}
+
+// src/lib/leadIntake.ts
+var LEAD_CHANNEL_LABELS = {
+  website_form: "Website form",
+  whatsapp: "WhatsApp",
+  landing_page: "AI CRM landing page"
+};
+var FORM_TOKEN_MAX_MS = 2 * 60 * 60 * 1e3;
+function newLeads(rows, since) {
+  return rows.filter((r) => r.created_at >= since.toISOString() && (r.status === "converted" || r.status === "new")).sort((a, b) => b.created_at.localeCompare(a.created_at)).map((r) => ({
+    id: r.id,
+    name: r.name || r.email || r.phone || "New lead",
+    detail: [r.source || LEAD_CHANNEL_LABELS[r.channel] || "Website", r.matched ? "known contact" : "new contact"].filter(Boolean).join(", "),
+    link: r.account_id ? `/accounts/${r.account_id}` : r.crm_id ? `/crm?edit=${r.crm_id}` : "/crm",
+    created_at: r.created_at
+  }));
+}
+
+// src/lib/quoteNudges.ts
+var NUDGE_DAYS = 3;
+var AI_CRM_DIVISION = "07";
+var DIVISION_OPTIONS = [
+  { value: "", label: "Every division" },
+  ...DIVISIONS.map((d) => ({ value: d.code, label: `${d.code} ${d.brand}` })),
+  { value: AI_CRM_DIVISION, label: "07 AI CRM" }
+];
+function formatQuoteAmount(amount, currency) {
+  return `${currency || "AED"} ${(Number(amount) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+var latest = (...isos) => isos.filter((v) => Boolean(v)).sort().pop() || "";
+function quoteNudges(input) {
+  const out = [];
+  for (const q of input.quotes) {
+    if (q.status !== "Sent" || !q.sent_at) continue;
+    const since = latest(q.sent_at, q.followed_up_at);
+    const days = differenceInCalendarDays(input.now, parseISO(since));
+    if (days < NUDGE_DAYS) continue;
+    out.push({
+      key: `quote:${q.id}`,
+      kind: "quote",
+      id: q.id,
+      account_id: q.account_id ?? null,
+      account: q.client || (q.account_id ? input.accountNames.get(q.account_id) ?? "" : ""),
+      division: q.division_code,
+      quote_number: q.reference_number,
+      amount: formatQuoteAmount(q.amount, q.quotation_currency || "AED"),
+      days,
+      path: `/document/quote/${q.id}`
+    });
+  }
+  for (const d of input.deals) {
+    if (d.stage !== "quote_sent") continue;
+    const since = latest(d.quote_sent_at, d.last_touch_at);
+    if (!since) continue;
+    const days = differenceInCalendarDays(input.now, parseISO(since));
+    if (days < NUDGE_DAYS) continue;
+    out.push({
+      key: `deal:${d.id}`,
+      kind: "sales_deal",
+      id: d.id,
+      account_id: d.account_id,
+      account: input.accountNames.get(d.account_id) ?? "AI CRM prospect",
+      division: AI_CRM_DIVISION,
+      quote_number: d.quote_reference || "AI CRM quote",
+      amount: `${formatQuoteAmount(d.monthly_fee, "AED")} a month`,
+      days,
+      path: `/accounts/${d.account_id}`
+    });
+  }
+  return out.sort((a, b) => b.days - a.days || a.account.localeCompare(b.account));
 }
 
 // src/lib/delivery.ts
@@ -1967,7 +2048,19 @@ function buildDigest(input) {
     appErrors: digestErrors(input.errors || []),
     staleDeals: watchLines(input.watch || [], "stale_deal"),
     lateInvoices: watchLines(input.watch || [], "invoice_overdue"),
-    contractDrafts: contractDraftItems(input.contractDrafts ?? 0)
+    contractDrafts: contractDraftItems(input.contractDrafts ?? 0),
+    newLeads: newLeads(input.leads || [], new Date(now.getTime() - 24 * 60 * 60 * 1e3)).map((l) => ({
+      name: l.name,
+      detail: l.detail,
+      path: l.link,
+      urgent: false
+    })),
+    quoteNudges: quoteNudges({ quotes: input.sentQuotes || [], deals: input.quoteDeals || [], accountNames: nameOf, now }).map((n) => ({
+      name: n.account || n.quote_number,
+      detail: `${n.quote_number}, ${n.amount}, ${n.days} days without a reply`,
+      path: n.kind === "quote" ? "/crm?follow=Due" : n.path,
+      urgent: false
+    }))
   };
 }
 function watchLines(watch, kind) {
@@ -2004,6 +2097,12 @@ function digestSections(d) {
     { key: "overdueActions", title: "Overdue CTRM next actions", empty: "No overdue next actions.", items: d.overdueActions },
     { key: "overHours", title: "Clients over their hours", empty: "No client is over hours two months running.", items: d.overHours }
   ];
+  if (d.newLeads?.length) {
+    sections.push({ key: "newLeads", title: "New leads in the last day", empty: "", items: d.newLeads });
+  }
+  if (d.quoteNudges?.length) {
+    sections.push({ key: "quoteNudges", title: "Quotes waiting 3 days for a reply", empty: "", items: d.quoteNudges });
+  }
   if (d.lateInvoices?.length) {
     sections.push({ key: "lateInvoices", title: "Invoices 3, 7 or 14 days late", empty: "", items: d.lateInvoices });
   }

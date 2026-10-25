@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Sparkles } from 'lucide-react'
 import Modal from '../Modal'
 import type { ProposedRequirement } from '../../lib/aiAssist'
@@ -16,6 +16,7 @@ export default function CallNotesModal({
   accountName,
   existing,
   asChangeRequests,
+  initialNotes = '',
   onClose,
   onAdd,
 }: {
@@ -24,6 +25,8 @@ export default function CallNotesModal({
   accountName: string
   existing: string[]
   asChangeRequests: boolean
+  /** Notes to start from, such as a Fireflies call. AI help reads them straight away. */
+  initialNotes?: string
   onClose: () => void
   onAdd: (items: ProposedRequirement[]) => Promise<void>
 }) {
@@ -41,11 +44,20 @@ export default function CallNotesModal({
     onClose()
   }
 
-  async function find() {
+  useEffect(() => {
+    if (open && initialNotes.trim()) {
+      setNotes(initialNotes)
+      void find(initialNotes)
+    }
+    // Only when opened with new notes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialNotes])
+
+  async function find(text: string = notes) {
     setBusy(true)
     setError('')
     try {
-      const r = await runAi(accountId, { feature: 'call_notes', accountName, notes, existing })
+      const r = await runAi(accountId, { feature: 'call_notes', accountName, notes: text, existing })
       setFound(r.requirements)
       setPicked(new Set(r.requirements.map((_, i) => i)))
     } catch (e) {

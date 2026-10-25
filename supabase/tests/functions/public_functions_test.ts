@@ -17,9 +17,11 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "watchdog": { kind: "cron secret or manager JWT", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret[\s\S]*rr_is_manager_or_admin/ },
   "contract-invoices": { kind: "cron secret or manager JWT", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret[\s\S]*rr_is_manager_or_admin/ },
   "client-portal": { kind: "hashed link token", pattern: /isPortalToken\(token\)[\s\S]*token_hash[\s\S]*portalAccessState/ },
+  "quote-accept": { kind: "hashed link token", pattern: /isAcceptToken\(token\)[\s\S]*token_hash[\s\S]*acceptLinkState/ },
   "ai-assist": { kind: "signed in user (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)/ },
   "whatsapp-in": { kind: "Meta signature", pattern: /if \(!appSecret\)[\s\S]*validSignature\(raw, req\.headers\.get\("x-hub-signature-256"\)/ },
   "whatsapp-send": { kind: "signed in user (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)/ },
+  "fireflies-fetch": { kind: "signed in user (JWT read in code) who can write the account", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_can_write_account/ },
   "invoice-pay-link": { kind: "signed in team member (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_staff/ },
   "stripe-invoice-webhook": { kind: "Stripe signature", pattern: /if \(!webhookSecret[\s\S]*constructEventAsync\(raw, signature, webhookSecret/ },
   "create-checkout-session": { kind: "allowed origin and public key", pattern: /allowedOrigins\(\)\.includes\(origin\)[\s\S]*shopKeyOk\(/ },
@@ -28,6 +30,7 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "bootstrap-admin": { kind: "shared secret", pattern: /x-bootstrap-secret[\s\S]*Forbidden/ },
   "manage-auth-user": { kind: "admin JWT", pattern: /admin\.auth\.getUser\(jwt\)/ },
   "zoho-proxy": { kind: "team member JWT", pattern: /admin\.auth\.getUser\(jwt\)[\s\S]*member\?\.active/ },
+  "lead-intake": { kind: "shared secret or signed form token", pattern: /if \(!secret\)[\s\S]*=== secret[\s\S]*formTokenProblem\(/ },
 }
 
 async function publicFunctions(): Promise<string[]> {
@@ -73,6 +76,7 @@ const ENV: Record<string, string> = {
   ANTHROPIC_API_KEY: "test-anthropic",
   SUPPORT_INBOUND_SECRET: "support-secret-for-tests",
   CRM_SYNC_SECRET: "crm-sync-secret-for-tests",
+  LEAD_INTAKE_SECRET: "lead-secret-for-tests",
   RR_STRIPE_SECRET_KEY: "sk_test_for_tests",
   RR_STRIPE_WEBHOOK_SECRET: "whsec_for_tests",
 }
@@ -161,7 +165,7 @@ Deno.test({ name: "client-portal refuses a missing or malformed link token", ...
   assertEquals(await call("client-portal", post("client-portal", { token: "guess" })), 404)
 } })
 
-for (const fn of ["ai-assist", "whatsapp-send", "invoice-pay-link"]) {
+for (const fn of ["ai-assist", "whatsapp-send", "fireflies-fetch", "invoice-pay-link"]) {
   Deno.test({ name: `${fn} refuses a caller who is not signed in`, ...opts, fn: async () => {
     assertEquals(await call(fn, post(fn, {})), 401)
     assertEquals(await call(fn, post(fn, {}, { Authorization: "Bearer " })), 401)
@@ -203,6 +207,35 @@ for (const [fn, header] of [["support-email-in", "x-support-secret"], ["teetribe
     assertEquals(await call(fn, post(fn, {}, { [header]: "wrong" })), 401)
   } })
 }
+
+Deno.test({ name: "lead-intake needs its secret or a signed form token", ...opts, fn: async () => {
+  const fn = "lead-intake"
+  const lead = { name: "Test Lead", email: "lead@example.com", message: "Hi" }
+  assertEquals(await call(fn, post(fn, lead)), 401)
+  assertEquals(await call(fn, post(fn, lead, { "x-lead-secret": "wrong" })), 401)
+  assertEquals(await call(fn, post(fn, { ...lead, form_token: "1700000000000.forged" })), 401)
+  // A real token straight away is refused too: people take longer than 3 seconds.
+  const tokenRes = await (await load(fn))(new Request(URL_BASE + fn + "?form_token=1"))
+  const { form_token } = await tokenRes.json()
+  assertEquals(await call(fn, post(fn, { ...lead, form_token })), 401)
+  // Positive control: the secret gets past the check to lead validation.
+  assertEquals(await call(fn, post(fn, { message: "no name" }, { "x-lead-secret": ENV.LEAD_INTAKE_SECRET })), 400)
+  // Fail closed without the secret.
+  Deno.env.delete("LEAD_INTAKE_SECRET")
+  try {
+    assertEquals(await call(fn, post(fn, lead, { "x-lead-secret": ENV.LEAD_INTAKE_SECRET })), 503)
+  } finally {
+    Deno.env.set("LEAD_INTAKE_SECRET", ENV.LEAD_INTAKE_SECRET)
+  }
+} })
+
+Deno.test({ name: "quote-accept refuses a missing or malformed link token", ...opts, fn: async () => {
+  const fn = "quote-accept"
+  assertEquals(await call(fn, post(fn, {})), 404)
+  assertEquals(await call(fn, post(fn, { token: "guess" })), 404)
+  assertEquals(await call(fn, post(fn, { token: "guess", action: "accept", name: "Someone", agreed: true })), 404)
+  assertEquals(await call(fn, post(fn, { token: "x".repeat(44), action: "pdf" })), 404)
+} })
 
 Deno.test({ name: "stripe-invoice-webhook only believes Stripe's signature", ...opts, fn: async () => {
   const fn = "stripe-invoice-webhook"
