@@ -27,6 +27,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 8 | WorshipHub review buttons | `worshiphub-read`, `worshiphub-manage` |
 | 9 | Other functions | `zoho-proxy`, `manage-auth-user`, `create-checkout-session`, `teetribe-order-sync` |
 | 10 | Contract invoices each morning | `contract-invoices` |
+| 11 | Daily watchdog | `watchdog` |
 
 ---
 
@@ -170,3 +171,16 @@ when any were drafted. Running the schedule again the same day adds nothing.
 `CONTRACT_BILLING_CRON_SECRET` means the secret is not set. In the SQL Editor,
 `select * from cron.job_run_details order by start_time desc limit 5;` shows whether the schedule ran.
 
+---
+
+## 11. Daily watchdog
+
+**Trigger.** Set up as in `docs/watchdog.md`. The next morning, open the dashboard.
+
+**You should see.** A **Watchdog** card listing your items and the ones nobody owns (**Show everyone's**
+for the rest), each with a reason, an owner and a link. The 08:00 digest has "Invoices 3, 7 or 14 days
+late" and "Deals nobody has touched" when there are any. Fix one (for example, log a touch on a stale
+deal or record a payment): the next morning it is gone.
+
+**If it fails.** System check, row "Daily watchdog list". Down with `WATCHDOG_CRON_SECRET` means the
+secret is not set. No card on the dashboard means the list is empty or the "Watchdog" SQL has not been run.

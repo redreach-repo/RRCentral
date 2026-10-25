@@ -795,3 +795,43 @@ reset role;
 set role anon;
 select pg_temp.expect(pg_temp.fails($q$insert into app_errors (message) values ('spam')$q$), 'anon cannot report errors');
 reset role;
+
+------------------------------------------------------------ Daily watchdog (Wave 2, PR F)
+insert into watch_items (key, kind, severity, title, owner_user_id)
+  values ('stale_deal:ctrm:1', 'stale_deal', 'warning', 'Admin deal', (select id from app_users where email = 'alfred@redreach.ae')),
+         ('over_hours:va', 'over_hours', 'urgent', 'VA client', (select id from app_users where email = 'va@redreach.ae'));
+select pg_temp.expect(pg_temp.fails($q$insert into watch_items (key, kind) values ('stale_deal:ctrm:1', 'stale_deal')$q$), 'one watch item per key');
+select pg_temp.expect(pg_temp.fails($q$insert into watch_items (key, kind) values ('x', 'nonsense')$q$), 'watch item kinds are fixed');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select pg_temp.expect((select count(*) from watch_items) = 2, 'admin reads every watch item');
+select pg_temp.expect(pg_temp.fails($q$insert into watch_items (key, kind) values ('y', 'renewal')$q$), 'admin cannot add watch items from the app');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect((select count(*) from watch_items) = 2, 'manager reads every watch item');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from watch_items) = 2, 'sales reads every watch item');
+select pg_temp.expect(pg_temp.fails($q$update watch_items set cleared_at = now() returning 1$q$) or (select count(*) from watch_items where cleared_at is not null) = 0, 'sales cannot clear watch items');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from watch_items) = 1, 'staff sees only their own watch items');
+select pg_temp.expect((select title from watch_items) = 'VA client', 'staff sees the right watch item');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from watch_items) = 2, 'viewer reads watch items');
+select pg_temp.expect(pg_temp.fails($q$delete from watch_items returning 1$q$) or (select count(*) from watch_items) = 2, 'viewer cannot delete watch items');
+reset role;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from watch_items'), 'anon cannot read watch items');
+reset role;

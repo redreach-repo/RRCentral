@@ -16,6 +16,8 @@
 //   (src/lib/whatsappTickets.ts, which carries the SLA rules too).
 // * contract-invoices gets the billing run (src/lib/contractBillingRun.ts),
 //   so the daily run and the app raise the same drafts.
+// * watchdog gets the watchdog rules (src/lib/watchdog.ts), so the morning
+//   list matches what the app shows.
 //
 //   npm run build:support-fn              # regenerate
 //   npm run build:support-fn -- --check   # CI: fail if a bundle is stale
@@ -35,6 +37,7 @@ const bundles = [
   { entry: 'src/lib/whatsappTickets.ts', out: '../supabase/functions/whatsapp-in/whatsappTickets.bundle.js' },
   { entry: 'src/lib/whatsappTickets.ts', out: '../supabase/functions/whatsapp-send/whatsappTickets.bundle.js' },
   { entry: 'src/lib/contractBillingRun.ts', out: '../supabase/functions/contract-invoices/contractBillingRun.bundle.js' },
+  { entry: 'src/lib/watchdog.ts', out: '../supabase/functions/watchdog/watchdog.bundle.js' },
 ]
 
 let stale = false

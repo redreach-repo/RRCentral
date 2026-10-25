@@ -10,6 +10,7 @@
  *  3. CTRM Next deals whose next action date has passed (ctrm.ts).
  *  4. AI CRM clients over their hours two months running (delivery.ts).
  * On Fridays it also names clients with no hours logged this week.
+ * From the 07:30 watchdog (watchdog.ts) it adds stale deals and late invoices.
  * It also says how many contract invoices the 06:00 run drafted today.
  */
 import { format, isFriday, parseISO } from 'date-fns'
@@ -40,8 +41,22 @@ export type Digest = {
   noHours: DigestItem[] | null
   /** App errors reported in the last 24 hours, one line per distinct message. */
   appErrors: DigestItem[]
+  /** Open watchdog items: deals nobody has touched for a while. */
+  staleDeals: DigestItem[]
+  /** Open watchdog items: invoices 3, 7 or 14 days late. */
+  lateInvoices: DigestItem[]
   /** Contract invoices drafted by today's run: one line while there are any to finalise. */
   contractDrafts: DigestItem[]
+}
+
+/** An open watch_items row, as much as the digest needs. */
+export type DigestWatchItem = {
+  kind: string
+  severity: string
+  title: string
+  reason: string
+  link: string
+  owner_label: string
 }
 
 export type DigestInput = {
@@ -55,6 +70,8 @@ export type DigestInput = {
   deals: Pick<CtrmDeal, 'id' | 'account_id' | 'stage' | 'next_action' | 'next_action_date'>[]
   /** app_errors rows from the last 24 hours (optional). */
   errors?: { message: string; created_at: string }[]
+  /** Open watch_items rows from the watchdog (optional). */
+  watch?: DigestWatchItem[]
   /** Contract invoices drafted in the last 24 hours (optional). */
   contractDrafts?: number
 }
@@ -140,8 +157,23 @@ export function buildDigest(input: DigestInput): Digest {
     overHours,
     noHours,
     appErrors: digestErrors(input.errors || []),
+    staleDeals: watchLines(input.watch || [], 'stale_deal'),
+    lateInvoices: watchLines(input.watch || [], 'invoice_overdue'),
     contractDrafts: contractDraftItems(input.contractDrafts ?? 0),
   }
+}
+
+/** Watchdog items of one kind, urgent first, with the owner named. */
+function watchLines(watch: DigestWatchItem[], kind: string): DigestItem[] {
+  return watch
+    .filter((w) => w.kind === kind)
+    .sort((a, b) => (a.severity === b.severity ? a.title.localeCompare(b.title) : a.severity === 'urgent' ? -1 : 1))
+    .map((w) => ({
+      name: w.title,
+      detail: w.owner_label ? `${w.reason} (${w.owner_label})` : w.reason,
+      path: w.link || '/app',
+      urgent: w.severity === 'urgent',
+    }))
 }
 
 /** "N contract invoices drafted today", linking to Invoices to finalise them. */
@@ -180,6 +212,12 @@ export function digestSections(d: Digest): DigestSection[] {
     { key: 'overdueActions', title: 'Overdue CTRM next actions', empty: 'No overdue next actions.', items: d.overdueActions },
     { key: 'overHours', title: 'Clients over their hours', empty: 'No client is over hours two months running.', items: d.overHours },
   ]
+  if (d.lateInvoices?.length) {
+    sections.push({ key: 'lateInvoices', title: 'Invoices 3, 7 or 14 days late', empty: '', items: d.lateInvoices })
+  }
+  if (d.staleDeals?.length) {
+    sections.push({ key: 'staleDeals', title: 'Deals nobody has touched', empty: '', items: d.staleDeals })
+  }
   if (d.contractDrafts?.length) {
     sections.push({ key: 'contractDrafts', title: 'Contract invoices', empty: '', items: d.contractDrafts })
   }

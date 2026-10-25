@@ -1,6 +1,7 @@
 // Daily digest: each morning, what needs attention in RR Central (tickets
 // near or past their reply time, renewals in the next 60 days, overdue CTRM
-// next actions, clients over hours, contract invoices drafted today), sent to the people on the digest list
+// next actions, clients over hours, contract invoices drafted today, and from
+// the watchdog stale deals and late invoices), sent to the people on the digest list
 // by email (Zoho Mail) and WhatsApp (a Meta template). Rules live in
 // app/src/lib/dailyDigest.ts (bundled).
 //
@@ -256,10 +257,13 @@ Deno.serve(withErrorLog("daily-digest", async (req) => {
     // Error monitoring (item 14): skip quietly if its SQL has not been run yet.
     const since = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
     const errors = await selectAll(sb, "app_errors", "message, created_at", (q) => q.gte("created_at", since)).catch(() => [])
+    // Stale deals and late invoices from the 07:30 watchdog (Wave 2, PR F).
+    const watch = await selectAll(sb, "watch_items", "kind, severity, title, reason, link, owner_label", (q) =>
+      q.is("cleared_at", null).in("kind", ["stale_deal", "invoice_overdue"])).catch(() => [])
     // Drafts raised by the 06:00 contract-invoices run (Wave 2, PR E).
     const drafts = await selectAll(sb, "contract_invoices", "id", (q) =>
       q.gte("created_at", since).not("invoice_id", "is", null)).catch(() => [])
-    digest = buildDigest({ now, accounts, contracts, packages, entries, tickets, deals, errors, contractDrafts: drafts.length }) as Digest
+    digest = buildDigest({ now, accounts, contracts, packages, entries, tickets, deals, errors, watch, contractDrafts: drafts.length }) as Digest
   } catch (e) {
     return json({ error: `Could not build the digest: ${(e as Error).message}`.slice(0, 300) }, 500)
   }

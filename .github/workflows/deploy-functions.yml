@@ -34,6 +34,7 @@ on:
           - zoho-proxy
           - teetribe-order-sync
           - contract-invoices
+          - watchdog
 
 permissions:
   contents: read

@@ -29,6 +29,7 @@ export const SYSTEM_FUNCTIONS: SystemFunction[] = [
   { name: 'create-checkout-session', feature: 'Shop checkout (Stripe)', liveTest: '9' },
   { name: 'teetribe-order-sync', feature: 'Tee Tribe orders into RR Central', liveTest: '9' },
   { name: 'contract-invoices', feature: 'Contract invoices each morning', liveTest: '10' },
+  { name: 'watchdog', feature: 'Daily watchdog list', liveTest: '11' },
 ]
 
 export type PingResult = {
