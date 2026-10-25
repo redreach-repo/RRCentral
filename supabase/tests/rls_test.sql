@@ -1220,3 +1220,47 @@ reset role;
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from client_report_drafts'), 'anon cannot read report drafts');
 reset role;
+
+------------------------------------------------------------ Go live checklist (Wave 4, PR R)
+select pg_temp.expect((select count(*) from build_template_items where kind = 'golive') >= 27, 'the starter templates have go live steps');
+select pg_temp.expect(pg_temp.fails($q$insert into build_template_items (template_id, kind, stage, title, owner, due_days) select id, 'golive', 'live', 'x', 'someone', 1 from build_templates limit 1$q$), 'a go live owner is Red Reach or the client');
+select pg_temp.expect(pg_temp.fails($q$insert into build_template_items (template_id, kind, stage, title, due_days) select id, 'golive', null, 'x', 1 from build_templates limit 1$q$), 'a go live step needs a stage');
+select pg_temp.expect(pg_temp.fails($q$insert into build_template_items (template_id, kind, stage, title, due_days) select id, 'golive', 'live', 'x', 400 from build_templates limit 1$q$), 'go live days stay within a year');
+insert into build_tasks (account_id, stage, title, kind, owner, due_days, due_date)
+  select id, 'live', 'Go live', 'golive', 'red_reach', 21, '2026-11-15' from accounts where name = 'Assigned Clinic LLC';
+insert into build_tasks (account_id, stage, title, kind, owner, due_days, due_date)
+  select id, 'live', 'Go live', 'golive', 'red_reach', 21, '2026-11-20' from accounts where name = 'Prospect Dental';
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from build_tasks where kind = 'golive') = 1, 'staff (VA) sees go live steps only on their accounts');
+select pg_temp.expect(not pg_temp.fails($q$update build_tasks set done = true, owner = 'client', due_date = '2026-11-18' where kind = 'golive'$q$), 'staff (VA) ticks and changes a go live step on their account');
+select pg_temp.expect(pg_temp.fails($q$update build_tasks set kind = 'unknown' where kind = 'golive'$q$), 'a step kind is task or golive');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from build_tasks where kind = 'golive') = 2, 'sales sees go live steps');
+select pg_temp.expect(pg_temp.fails($q$update build_template_items set due_days = 333 where kind = 'golive'$q$) or (select count(*) from build_template_items where due_days = 333) = 0, 'sales cannot change template go live steps');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect(not pg_temp.fails($q$update build_template_items set due_days = 22 where kind = 'golive' and title = 'Go live'$q$), 'manager edits template go live steps');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from build_tasks where kind = 'golive') = 2, 'viewer reads go live steps');
+update build_tasks set done = false where kind = 'golive';
+select pg_temp.expect((select count(*) from build_tasks where kind = 'golive' and done) = 1, 'viewer cannot tick go live steps');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000c';
+select pg_temp.expect((select count(*) from build_tasks where kind = 'golive') = 0, 'a stranger sees no go live steps');
+reset role;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from build_tasks'), 'anon cannot read go live steps');
+reset role;

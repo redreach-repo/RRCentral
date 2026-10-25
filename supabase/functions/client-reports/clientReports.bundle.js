@@ -73,8 +73,8 @@ function startOfWeek(date, options) {
   const defaultOptions2 = getDefaultOptions();
   const weekStartsOn = options?.weekStartsOn ?? options?.locale?.options?.weekStartsOn ?? defaultOptions2.weekStartsOn ?? defaultOptions2.locale?.options?.weekStartsOn ?? 0;
   const _date = toDate(date, options?.in);
-  const day2 = _date.getDay();
-  const diff = (day2 < weekStartsOn ? 7 : 0) + day2 - weekStartsOn;
+  const day3 = _date.getDay();
+  const diff = (day3 < weekStartsOn ? 7 : 0) + day3 - weekStartsOn;
   _date.setDate(_date.getDate() - diff);
   _date.setHours(0, 0, 0, 0);
   return _date;
@@ -1709,7 +1709,7 @@ function parseDate(dateString, year) {
   const isWeekDate = !!captures[4];
   const dayOfYear = parseDateUnit(captures[1]);
   const month = parseDateUnit(captures[2]) - 1;
-  const day2 = parseDateUnit(captures[3]);
+  const day3 = parseDateUnit(captures[3]);
   const week = parseDateUnit(captures[4]);
   const dayOfWeek = parseDateUnit(captures[5]) - 1;
   if (isWeekDate) {
@@ -1719,10 +1719,10 @@ function parseDate(dateString, year) {
     return dayOfISOWeekYear(year, week, dayOfWeek);
   } else {
     const date = /* @__PURE__ */ new Date(0);
-    if (!validateDate(year, month, day2) || !validateDayOfYearDate(year, dayOfYear)) {
+    if (!validateDate(year, month, day3) || !validateDayOfYearDate(year, dayOfYear)) {
       return /* @__PURE__ */ new Date(NaN);
     }
-    date.setUTCFullYear(year, month, Math.max(dayOfYear, day2));
+    date.setUTCFullYear(year, month, Math.max(dayOfYear, day3));
     return date;
   }
 }
@@ -1755,11 +1755,11 @@ function parseTimezone(timezoneString) {
   }
   return sign * (hours * millisecondsInHour + minutes * millisecondsInMinute);
 }
-function dayOfISOWeekYear(isoWeekYear, week, day2) {
+function dayOfISOWeekYear(isoWeekYear, week, day3) {
   const date = /* @__PURE__ */ new Date(0);
   date.setUTCFullYear(isoWeekYear, 0, 4);
   const fourthOfJanuaryDay = date.getUTCDay() || 7;
-  const diff = (week - 1) * 7 + day2 + 1 - fourthOfJanuaryDay;
+  const diff = (week - 1) * 7 + day3 + 1 - fourthOfJanuaryDay;
   date.setUTCDate(date.getUTCDate() + diff);
   return date;
 }
@@ -1773,8 +1773,8 @@ function validateDate(year, month, date) {
 function validateDayOfYearDate(year, dayOfYear) {
   return dayOfYear >= 1 && dayOfYear <= (isLeapYearIndex(year) ? 366 : 365);
 }
-function validateWeekDate(_year, week, day2) {
-  return week >= 1 && week <= 53 && day2 >= 0 && day2 <= 6;
+function validateWeekDate(_year, week, day3) {
+  return week >= 1 && week <= 53 && day3 >= 0 && day3 <= 6;
 }
 function validateTime(hours, minutes, seconds) {
   if (hours === 24) {
@@ -2109,6 +2109,55 @@ function acceptLinkState(row, now = /* @__PURE__ */ new Date()) {
   return "active";
 }
 
+// src/lib/goLive.ts
+var GO_LIVE_OWNERS = [
+  { value: "red_reach", label: "Red Reach", portalLabel: "Red Reach" },
+  { value: "client", label: "Client", portalLabel: "You" }
+];
+var ownerLabel = (o) => GO_LIVE_OWNERS.find((x) => x.value === o)?.label ?? "Red Reach";
+var isGoLive = (t) => t.kind === "golive";
+var byDue = (a, b) => String(a.due_date || "9999").localeCompare(String(b.due_date || "9999")) || a.sort - b.sort;
+function goLiveSteps(tasks) {
+  return tasks.filter(isGoLive).sort(byDue);
+}
+function isOverdue(t, today) {
+  return !t.done && Boolean(t.due_date) && String(t.due_date) < today;
+}
+function goLiveProgress(tasks, today) {
+  const steps = goLiveSteps(tasks);
+  const done = steps.filter((t) => t.done).length;
+  const open = steps.filter((t) => !t.done);
+  const last = steps.find((t) => /^go live$/i.test(t.title.trim())) ?? steps[steps.length - 1];
+  return {
+    done,
+    total: steps.length,
+    percent: steps.length ? Math.round(done / steps.length * 100) : 0,
+    overdue: steps.filter((t) => isOverdue(t, today)).length,
+    next: open[0] ? { title: open[0].title, owner: ownerLabel(open[0].owner), due: open[0].due_date || null } : null,
+    goLiveDate: last?.due_date || null,
+    live: steps.length > 0 && done === steps.length
+  };
+}
+var day = (iso) => format(parseISO(iso.slice(0, 10)), "d MMM yyyy");
+function portalGoLive(tasks, today) {
+  const steps = goLiveSteps(tasks);
+  if (!steps.length) return null;
+  const p = goLiveProgress(steps, today);
+  return {
+    done: p.done,
+    total: p.total,
+    percent: p.percent,
+    goLiveDate: p.goLiveDate ? day(p.goLiveDate) : null,
+    steps: steps.map((t) => ({
+      title: t.title,
+      who: GO_LIVE_OWNERS.find((o) => o.value === t.owner)?.portalLabel ?? "Red Reach",
+      due: t.due_date ? day(t.due_date) : null,
+      done: t.done,
+      late: isOverdue(t, today)
+    }))
+  };
+}
+
 // src/lib/sla.ts
 var DEFAULT_WORKING_CALENDAR = {
   days: [1, 2, 3, 4, 5],
@@ -2149,7 +2198,7 @@ function resolvedInMonth(list, month) {
 
 // src/lib/clientPortal.ts
 var PORTAL_REPORT_MONTHS = 6;
-var day = (iso) => format(parseISO(iso.slice(0, 10)), "d MMM yyyy");
+var day2 = (iso) => format(parseISO(iso.slice(0, 10)), "d MMM yyyy");
 var round22 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 function reportMonths(now) {
   return Array.from({ length: PORTAL_REPORT_MONTHS }, (_, i) => monthKey(subMonths(now, i)));
@@ -2190,9 +2239,9 @@ function buildPortalView(input) {
   const progress = buildProgress(input.stages);
   const statusLabel = (s) => BUILD_STAGE_STATUSES.find((o) => o.value === s)?.label ?? s;
   const ticketStatus = (s) => TICKET_STATUSES.find((o) => o.value === s)?.label ?? s;
-  const openTickets = input.tickets.filter(isOpenTicket).sort((a, b) => b.created_at.localeCompare(a.created_at)).map((t) => ({ id: t.id || "", subject: t.subject || "No subject", status: ticketStatus(t.status), opened: day(t.created_at), ...ticketNote(t, now) }));
+  const openTickets = input.tickets.filter(isOpenTicket).sort((a, b) => b.created_at.localeCompare(a.created_at)).map((t) => ({ id: t.id || "", subject: t.subject || "No subject", status: ticketStatus(t.status), opened: day2(t.created_at), ...ticketNote(t, now) }));
   const since = subMonths(now, 2).toISOString();
-  const recentlyResolved = input.tickets.filter((t) => t.resolved_at && t.resolved_at >= since).sort((a, b) => String(b.resolved_at).localeCompare(String(a.resolved_at))).slice(0, 10).map((t) => ({ subject: t.subject || "No subject", resolved: day(String(t.resolved_at)) }));
+  const recentlyResolved = input.tickets.filter((t) => t.resolved_at && t.resolved_at >= since).sort((a, b) => String(b.resolved_at).localeCompare(String(a.resolved_at))).slice(0, 10).map((t) => ({ subject: t.subject || "No subject", resolved: day2(String(t.resolved_at)) }));
   const monthEntries = input.entries.filter((e) => monthKey(e.date) === month);
   const resolved = resolvedInMonth(input.tickets, month);
   const answered = resolved.filter((t) => t.first_response_at && t.sla_due_at);
@@ -2214,16 +2263,17 @@ function buildPortalView(input) {
       stages: orderedStages(input.stages).map((s) => ({
         label: stageLabel(s.stage),
         status: statusLabel(s.status),
-        due: "due_date" in s && s.due_date ? day(s.due_date) : null
+        due: "due_date" in s && s.due_date ? day2(s.due_date) : null
       }))
     },
     openTickets,
+    goLive: portalGoLive(input.goLive || [], format(now, "yyyy-MM-dd")),
     quotes: portalQuotes(input.quotes || [], now),
     invoices: portalInvoices(input.invoices || [], input.payments || []),
     uploads: (input.uploads || []).slice(0, 20).map((u) => ({
       filename: u.filename,
       size: sizeLabel(u.size_bytes),
-      uploaded: day(u.created_at),
+      uploaded: day2(u.created_at),
       saved: u.status === "in_workdrive"
     })),
     recentlyResolved,
@@ -2239,7 +2289,7 @@ function buildPortalView(input) {
         hours: round22(monthEntries.filter((e) => e.category === c.value).reduce((s, e) => s + Number(e.hours || 0), 0))
       })).filter((c) => c.hours > 0),
       ticketsOpened: input.tickets.filter((t) => monthKey(t.created_at) === month).length,
-      ticketsResolved: resolved.map((t) => ({ subject: t.subject || "No subject", resolved: day(String(t.resolved_at)) })),
+      ticketsResolved: resolved.map((t) => ({ subject: t.subject || "No subject", resolved: day2(String(t.resolved_at)) })),
       answeredOnTime: answered.filter((t) => String(t.first_response_at) <= String(t.sla_due_at)).length,
       answered: answered.length,
       usage: usageFor(month, input.usage, pkg, input.rates),
@@ -2266,7 +2316,7 @@ function portalQuotes(rows, now = /* @__PURE__ */ new Date()) {
       currency: String(q.quotation_currency || q.currency || "AED") || "AED",
       state: accepted ? "accepted" : "waiting",
       acceptedBy: accepted?.accepted_name || "",
-      acceptedOn: accepted?.accepted_at ? day(accepted.accepted_at) : null,
+      acceptedOn: accepted?.accepted_at ? day2(accepted.accepted_at) : null,
       hasPdf: (accepted || live)?.has_pdf ?? false
     });
   }

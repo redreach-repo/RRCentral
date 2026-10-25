@@ -28,6 +28,7 @@ import {
 } from './delivery'
 import { invoiceDueDate } from './contractBilling'
 import { acceptableStatus, acceptLinkState } from './quoteAccept'
+import { portalGoLive, type PortalGoLive } from './goLive'
 import { slaState } from './sla'
 import { TICKET_STATUSES, isOpenTicket, resolvedInMonth } from './support'
 import type {
@@ -170,6 +171,8 @@ export type PortalView = {
     stages: { label: string; status: string; due: string | null }[]
   }
   openTickets: PortalTicket[]
+  /** The go live checklist, while there is one. */
+  goLive: PortalGoLive | null
   quotes: PortalQuote[]
   invoices: PortalInvoice[]
   uploads: PortalUpload[]
@@ -196,6 +199,8 @@ export type PortalInput = {
   invoices?: PortalInvoiceRow[]
   payments?: { invoice_ref: string; amount: number }[]
   uploads?: PortalUploadRow[]
+  /** Go live steps on this client (build_tasks, kind golive) (optional). */
+  goLive?: { title: string; stage: BuildStage['stage']; sort: number; done: boolean; done_at: string | null; kind: string; owner: string; due_date: string | null }[]
   usage: UsageRecord[]
   entries: Pick<TimeEntry, 'date' | 'hours' | 'category'>[]
   rates: DeliveryRates
@@ -312,6 +317,7 @@ export function buildPortalView(input: PortalInput): PortalView {
       })),
     },
     openTickets,
+    goLive: portalGoLive(input.goLive || [], format(now, 'yyyy-MM-dd')),
     quotes: portalQuotes(input.quotes || [], now),
     invoices: portalInvoices(input.invoices || [], input.payments || []),
     uploads: (input.uploads || []).slice(0, 20).map((u) => ({

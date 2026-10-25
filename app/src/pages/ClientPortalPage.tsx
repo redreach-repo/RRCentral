@@ -129,6 +129,30 @@ export default function ClientPortalPage() {
           </ol>
         </Section>
 
+        {view.goLive ? (
+          <Section title="Go live checklist">
+            <p style={{ margin: '0 0 10px', fontSize: 14 }}>
+              {view.goLive.done === view.goLive.total
+                ? 'Everything is done.'
+                : `${view.goLive.done} of ${view.goLive.total} steps done${view.goLive.goLiveDate ? `. Go live planned for ${view.goLive.goLiveDate}` : ''}.`}
+            </p>
+            <Bar percent={view.goLive.percent} />
+            <ol style={{ margin: '12px 0 0', padding: 0, listStyle: 'none' }}>
+              {view.goLive.steps.map((s, i) => (
+                <li key={`${s.title}-${i}`} style={rowStyle}>
+                  <span style={{ minWidth: 0, textDecoration: s.done ? 'line-through' : 'none', color: s.done ? colors.muted : colors.text }}>
+                    {s.title}
+                    <span style={{ display: 'block', ...muted, textDecoration: 'none' }}>{s.who === 'You' ? 'For you' : 'Red Reach'}</span>
+                  </span>
+                  <span style={{ textAlign: 'right', fontSize: 13, color: s.done ? colors.success : s.late ? colors.warn : colors.muted }}>
+                    {s.done ? 'Done' : s.due ? `${s.late ? 'Was due' : 'Due'} ${s.due}` : 'To do'}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </Section>
+        ) : null}
+
         <Section title={`Your requests (${view.openTickets.length} open)`}>
           {view.openTickets.length === 0 ? (
             <p style={{ ...muted, margin: 0 }}>Nothing open right now.</p>

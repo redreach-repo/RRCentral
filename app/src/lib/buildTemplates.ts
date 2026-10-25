@@ -1,4 +1,5 @@
 import { BUILD_STAGES } from './delivery'
+import { defaultGoLive, goLiveDue } from './goLive'
 import type {
   BuildStageKey,
   BuildTask,
@@ -7,6 +8,7 @@ import type {
   BuildTemplateItemKind,
   Requirement,
   TimeEntry,
+  GoLiveOwner,
 } from './types'
 
 /**
@@ -16,7 +18,15 @@ import type {
  * requirements, so each build starts from a known list instead of a blank page.
  */
 
-type DefaultItem = { kind: BuildTemplateItemKind; stage: BuildStageKey | null; title: string; detail?: string; est_hours?: number }
+type DefaultItem = {
+  kind: BuildTemplateItemKind
+  stage: BuildStageKey | null
+  title: string
+  detail?: string
+  est_hours?: number
+  owner?: GoLiveOwner
+  due_days?: number
+}
 
 export type DefaultBuildTemplate = {
   code: string
@@ -95,27 +105,31 @@ const DONE_FOR_YOU_CONFIG: DefaultItem[] = [
   config('Owner reports', 'Weekly pipeline value, team response times, revenue won by source.'),
 ]
 
+function goLiveItems(code: string): DefaultItem[] {
+  return defaultGoLive(code).map((g) => ({ kind: 'golive', stage: g.stage, title: g.title, detail: g.detail, owner: g.owner, due_days: g.due_days }))
+}
+
 export const DEFAULT_BUILD_TEMPLATES: DefaultBuildTemplate[] = [
   {
     code: 'starter',
     package_code: 'starter',
     name: 'Starter build',
     description: 'Core CRM, contacts and WhatsApp. Aim for about 12 build hours.',
-    items: [...STARTER_TASKS, ...STARTER_CONFIG],
+    items: [...STARTER_TASKS, ...STARTER_CONFIG, ...goLiveItems('starter')],
   },
   {
     code: 'growth',
     package_code: 'growth',
     name: 'Growth build',
     description: 'Starter plus website leads, automations and lead scoring. Aim for about 20 build hours.',
-    items: [...GROWTH_TASKS, ...GROWTH_CONFIG],
+    items: [...GROWTH_TASKS, ...GROWTH_CONFIG, ...goLiveItems('growth')],
   },
   {
     code: 'done_for_you',
     package_code: 'done_for_you',
     name: 'Done for you build',
     description: 'Growth plus data migration, AI replies and owner reports. Aim for about 30 build hours.',
-    items: [...DONE_FOR_YOU_TASKS, ...DONE_FOR_YOU_CONFIG],
+    items: [...DONE_FOR_YOU_TASKS, ...DONE_FOR_YOU_CONFIG, ...goLiveItems('done_for_you')],
   },
 ]
 
@@ -153,7 +167,8 @@ export function templateForPackage(templates: BuildTemplate[], packageId: string
 }
 
 export type ApplyPlan = {
-  tasks: Pick<BuildTask, 'stage' | 'title' | 'detail' | 'est_hours' | 'sort'>[]
+  tasks: (Pick<BuildTask, 'stage' | 'title' | 'detail' | 'est_hours' | 'sort'> &
+    Partial<Pick<BuildTask, 'kind' | 'owner' | 'due_days' | 'due_date'>>)[]
   requirements: Pick<Requirement, 'title' | 'detail'>[]
   /** Lines already on the client, left alone. */
   skipped: number
@@ -163,34 +178,52 @@ export type ApplyPlan = {
  * What applying a template adds to a client. Tasks already on the checklist
  * (same stage and title) and requirements with the same title are skipped,
  * so applying twice, or applying Growth after Starter, never doubles up.
+ * Go live steps get their due date from the signed date (none before signing).
  */
 export function planApply(
   items: BuildTemplateItem[],
-  existingTasks: Pick<BuildTask, 'stage' | 'title' | 'sort'>[],
+  existingTasks: (Pick<BuildTask, 'stage' | 'title' | 'sort'> & { kind?: string | null })[],
   existingRequirements: Pick<Requirement, 'title'>[],
+  signedDate: string | null = null,
 ): ApplyPlan {
-  const haveTasks = new Set(existingTasks.map((t) => `${t.stage}|${key(t.title)}`))
+  const taskKey = (kind: string | null | undefined, stage: string | null, title: string) =>
+    `${kind === 'golive' ? 'golive' : 'task'}|${stage}|${key(title)}`
+  const haveTasks = new Set(existingTasks.map((t) => taskKey(t.kind, t.stage, t.title)))
   const haveReqs = new Set(existingRequirements.map((r) => key(r.title)))
   let nextSort = existingTasks.reduce((max, t) => Math.max(max, t.sort), 0)
   const plan: ApplyPlan = { tasks: [], requirements: [], skipped: 0 }
   for (const item of sortItems(items)) {
     if (!item.title.trim()) continue
-    if (item.kind === 'task') {
+    if (item.kind === 'task' || item.kind === 'golive') {
       if (!item.stage) continue
-      const k = `${item.stage}|${key(item.title)}`
+      const k = taskKey(item.kind, item.stage, item.title)
       if (haveTasks.has(k)) {
         plan.skipped++
         continue
       }
       haveTasks.add(k)
       nextSort += 1
-      plan.tasks.push({
-        stage: item.stage,
-        title: item.title.trim(),
-        detail: item.detail,
-        est_hours: Number(item.est_hours) || 0,
-        sort: nextSort,
-      })
+      plan.tasks.push(
+        item.kind === 'golive'
+          ? {
+              stage: item.stage,
+              title: item.title.trim(),
+              detail: item.detail,
+              est_hours: 0,
+              sort: nextSort,
+              kind: 'golive',
+              owner: item.owner === 'client' ? 'client' : 'red_reach',
+              due_days: item.due_days ?? null,
+              due_date: goLiveDue(signedDate, item.due_days),
+            }
+          : {
+              stage: item.stage,
+              title: item.title.trim(),
+              detail: item.detail,
+              est_hours: Number(item.est_hours) || 0,
+              sort: nextSort,
+            },
+      )
     } else {
       const k = key(item.title)
       if (haveReqs.has(k)) {

@@ -272,7 +272,7 @@ Deno.serve(withErrorLog("client-portal", async (req) => {
 
   const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 7, 1)).toISOString().slice(0, 10)
   const settingKeys = ["companyName", ...Object.values(DELIVERY_RATE_KEYS as Record<string, string>)]
-  const [contracts, packages, stages, requirements, tickets, usage, entries, settings, quotes, invoices, uploads] = await Promise.all([
+  const [contracts, packages, stages, requirements, tickets, usage, entries, settings, quotes, invoices, uploads, goLive] = await Promise.all([
     sb.from("contracts").select("*").eq("account_id", accountId),
     sb.from("delivery_packages").select("*"),
     sb.from("build_stages").select("*").eq("account_id", accountId),
@@ -304,6 +304,12 @@ Deno.serve(withErrorLog("client-portal", async (req) => {
       .eq("account_id", accountId)
       .order("created_at", { ascending: false })
       .limit(20),
+    sb
+      .from("build_tasks")
+      .select("title, stage, sort, done, done_at, kind, owner, due_date")
+      .eq("account_id", accountId)
+      .eq("kind", "golive")
+      .limit(100),
   ])
   const failed = [contracts, packages, stages, requirements, tickets, usage, entries].find((r) => r.error)
   if (failed?.error) return json({ error: "The portal could not load. Please try again later." }, 500)
@@ -350,6 +356,7 @@ Deno.serve(withErrorLog("client-portal", async (req) => {
     invoices: invoiceRows as never[],
     payments: ((payments.data || []) as { invoice_ref: string; amount: number }[]),
     uploads: ((uploads.error ? [] : uploads.data) || []) as never[],
+    goLive: ((goLive.error ? [] : goLive.data) || []) as never[],
   })
   return json(view)
 }))

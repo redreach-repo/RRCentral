@@ -1004,7 +1004,10 @@ export interface BuildStage {
   created_at: string
 }
 
-export type BuildTemplateItemKind = 'task' | 'config'
+export type BuildTemplateItemKind = 'task' | 'config' | 'golive'
+
+/** Who does a go live step. */
+export type GoLiveOwner = 'red_reach' | 'client'
 
 /** A cloneable build checklist and starter configuration, usually one per package. */
 export interface BuildTemplate {
@@ -1022,14 +1025,21 @@ export interface BuildTemplate {
 export interface BuildTemplateItem {
   id: string
   template_id: string
-  /** task = a build checklist step; config = a starter configuration line, copied in as a requirement. */
+  /**
+   * task = a build checklist step; config = a starter configuration line, copied in as a requirement;
+   * golive = a go live checklist step with an owner and a due date counted from signing.
+   */
   kind: BuildTemplateItemKind
-  /** Build stage for tasks. Null for config lines. */
+  /** Build stage for tasks and go live steps. Null for config lines. */
   stage: BuildStageKey | null
   title: string
   detail: string
   est_hours: number
   sort: number
+  /** Go live steps: who does it. */
+  owner?: GoLiveOwner
+  /** Go live steps: due this many days after the client signed. */
+  due_days?: number | null
 }
 
 /** One build checklist step on a client, copied from a template or added by hand. */
@@ -1046,6 +1056,13 @@ export interface BuildTask {
   done_by: string
   sort: number
   created_at: string
+  /** task = build checklist step; golive = go live checklist step. Missing on older rows means task. */
+  kind?: 'task' | 'golive'
+  owner?: GoLiveOwner
+  /** The Red Reach person on it, for steps Red Reach owns. */
+  owner_user_id?: string | null
+  due_days?: number | null
+  due_date?: string | null
 }
 
 export type RequirementStatus = 'open' | 'agreed' | 'built' | 'changed'
