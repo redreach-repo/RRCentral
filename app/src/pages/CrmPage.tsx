@@ -110,6 +110,7 @@ import {
 } from '../lib/pageStyles'
 import { errorMessage } from '../lib/errors'
 import QuoteNudgesCard from '../components/quotes/QuoteNudgesCard'
+import SessionFollowUpsCard from '../components/ctrm/SessionFollowUpsCard'
 
 type CrmForm = {
   company_name: string
@@ -1235,6 +1236,7 @@ export default function CrmPage() {
         </div>
 
         {followFilter === 'Due' ? <QuoteNudgesCard /> : null}
+        {followFilter === 'Due' ? <SessionFollowUpsCard /> : null}
 
         <div className={resp.toolbar}>
           <div className={resp.toolbarSearch}>

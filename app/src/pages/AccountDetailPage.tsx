@@ -17,6 +17,7 @@ import PortalUploadsCard from '../components/accounts/PortalUploadsCard'
 import AccountTicketsCard from '../components/support/AccountTicketsCard'
 import AccountDealsCard from '../components/ctrm/AccountDealsCard'
 import FitSheetCard from '../components/ctrm/FitSheetCard'
+import SessionsCard from '../components/ctrm/SessionsCard'
 import AccountSalesDealCard from '../components/sales/AccountSalesDealCard'
 import ChurchProductCard from '../components/worshiphub/ChurchProductCard'
 import { db } from '../lib/db'
@@ -613,6 +614,8 @@ export default function AccountDetailPage() {
           onChanged={() => void load()}
         />
       )}
+
+      {account.type === 'ctrm_prospect' ? <SessionsCard account={account} editable={editable} author={author} /> : null}
 
       {account.type === 'ctrm_prospect' ? (
         <AccountTicketsCard account={account} contacts={contacts} team={team} editable={editable} author={author} />
