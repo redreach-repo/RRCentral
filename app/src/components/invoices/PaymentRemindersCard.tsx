@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { BellRing, Mail, MessageCircle } from 'lucide-react'
+import { BellRing, Mail, MessageCircle, Pencil } from 'lucide-react'
 import EmailComposeModal from '../EmailComposeModal'
 import { useAuth } from '../../contexts/AuthContext'
 import { useSettings } from '../../contexts/SettingsContext'
 import { useToast } from '../../contexts/ToastContext'
-import { listContacts } from '../../lib/accountsStore'
+import { listContacts, logAccountEvent } from '../../lib/accountsStore'
 import { reminderMessage } from '../../lib/contractBilling'
-import { listDueReminders, recordReminder, type ReminderRow } from '../../lib/contractBillingStore'
+import { listDueReminders, recordReminder, sendReminder, type ReminderRow } from '../../lib/contractBillingStore'
 import { errorMessage } from '../../lib/errors'
 import { formatAED } from '../../lib/money'
+import { reminderRecipient } from '../../lib/paymentReminder'
 import { buildWhatsAppUrl } from '../../lib/whatsapp'
 import { isZohoMailEnabled } from '../../lib/zoho'
 import type { AccountContact, CrmContact, InvoiceReminder } from '../../lib/types'
@@ -25,12 +26,15 @@ function asCrmContacts(list: AccountContact[]): CrmContact[] {
 }
 
 /**
- * Invoices 3, 7 or 14 days past their due date, with the reminder ready to
- * send by email or WhatsApp. Sending (or "Mark sent") records it, so each
- * stage is only offered once.
+ * Invoices 3, 7 or 14 days past their due date. One tap on Email or WhatsApp
+ * sends the prepared reminder to the account's contact through the
+ * payment-reminder function, which records it (each stage once per invoice)
+ * and logs it on the account timeline. Nothing is ever sent automatically.
+ * While a channel is not set up, the buttons fall back to the old way: the
+ * email opens to edit, WhatsApp opens with the message ready.
  */
 export default function PaymentRemindersCard() {
-  const { user } = useAuth()
+  const { user, appUserId } = useAuth()
   const { settings } = useSettings()
   const { showToast } = useToast()
   const [rows, setRows] = useState<ReminderRow[] | null>(null)
@@ -75,6 +79,15 @@ export default function PaymentRemindersCard() {
     setBusy(row.invoice.id)
     try {
       await recordReminder(row.invoice.id, row.due.stage, channel, user?.email || '')
+      // One tap sends log this themselves; the manual ways log it here.
+      if (row.invoice.account_id) {
+        const how = channel === 'email' ? 'by email' : channel === 'whatsapp' ? 'on WhatsApp' : 'another way'
+        await logAccountEvent(
+          row.invoice.account_id,
+          `${row.due.stage} day payment reminder for ${row.invoice.reference_number} (${formatAED(row.balance)} owing) sent ${how} by ${user?.email || 'a team member'}`,
+          { appUserId, email: user?.email || '' },
+        )
+      }
       showToast(`${row.due.stage} day reminder recorded for ${row.invoice.reference_number}`, 'success')
       await load()
     } catch (e) {
@@ -84,11 +97,41 @@ export default function PaymentRemindersCard() {
     }
   }
 
-  function sendWhatsApp(row: ReminderRow) {
+  function openWhatsApp(row: ReminderRow) {
     const { body } = message(row)
     const phone = contactsFor(row)[0]?.phone || ''
     window.open(buildWhatsAppUrl(phone, body, settings.whatsappCountryCode || '971'), '_blank', 'noopener')
     void markSent(row, 'whatsapp')
+  }
+
+  const recipientFor = (row: ReminderRow, channel: 'email' | 'whatsapp') =>
+    reminderRecipient(
+      contacts.filter((c) => row.invoice.account_id && c.account_id === row.invoice.account_id),
+      channel,
+      null,
+      settings.whatsappCountryCode || '971',
+    )
+
+  async function send(row: ReminderRow, channel: 'email' | 'whatsapp') {
+    setBusy(row.invoice.id)
+    try {
+      const result = await sendReminder(row.invoice.id, channel)
+      if (result.ok) {
+        showToast(`${result.stage} day reminder for ${row.invoice.reference_number} sent to ${result.to}`, 'success')
+        await load()
+        return
+      }
+      // Not set up yet: the old way, so reminders still go out.
+      if (result.code === 'not_deployed' || result.code === `${channel}_not_configured`) {
+        if (channel === 'email') setEmailFor(row)
+        else openWhatsApp(row)
+        return
+      }
+      showToast(result.message, result.code === 'already_sent' || result.code === 'not_due' ? 'info' : 'error')
+      if (result.code === 'already_sent' || result.code === 'not_due') await load()
+    } finally {
+      setBusy('')
+    }
   }
 
   const emailDraft = emailFor ? message(emailFor) : null
@@ -101,7 +144,8 @@ export default function PaymentRemindersCard() {
         <BellRing size={18} /> Payment reminders due ({rows.length})
       </h2>
       <p style={{ color: colors.muted, fontSize: 13, margin: '0 0 8px' }}>
-        Sent at 3, 7 and 14 days after the due date. Each button opens the message ready to send and records it.
+        Due at 3, 7 and 14 days after the due date. Email or WhatsApp sends the prepared message to the account's
+        contact in one tap and records it, so each stage goes out once. Edit opens the email first.
       </p>
       <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         {rows.map((row) => (
@@ -135,11 +179,26 @@ export default function PaymentRemindersCard() {
               </span>
             </span>
             <span style={{ display: 'flex', gap: 6 }}>
-              <button type="button" style={smallBtn} disabled={busy === row.invoice.id} onClick={() => setEmailFor(row)}>
-                <Mail size={12} /> Email
+              <button
+                type="button"
+                style={smallBtn}
+                disabled={busy === row.invoice.id || !recipientFor(row, 'email')}
+                title={recipientFor(row, 'email') ? `Send now to ${recipientFor(row, 'email')!.to}` : 'No contact email on this account'}
+                onClick={() => void send(row, 'email')}
+              >
+                <Mail size={12} /> {busy === row.invoice.id ? 'Sending…' : 'Email'}
               </button>
-              <button type="button" style={smallBtn} disabled={busy === row.invoice.id} onClick={() => sendWhatsApp(row)}>
+              <button
+                type="button"
+                style={smallBtn}
+                disabled={busy === row.invoice.id || !recipientFor(row, 'whatsapp')}
+                title={recipientFor(row, 'whatsapp') ? `Send now to +${recipientFor(row, 'whatsapp')!.to}` : 'No WhatsApp number on this account'}
+                onClick={() => void send(row, 'whatsapp')}
+              >
                 <MessageCircle size={12} /> WhatsApp
+              </button>
+              <button type="button" style={smallBtn} disabled={busy === row.invoice.id} title="Edit the email before sending" onClick={() => setEmailFor(row)}>
+                <Pencil size={12} /> Edit
               </button>
               <button type="button" style={smallBtn} disabled={busy === row.invoice.id} onClick={() => void markSent(row, 'other')}>
                 Mark sent

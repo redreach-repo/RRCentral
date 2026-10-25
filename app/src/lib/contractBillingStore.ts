@@ -1,5 +1,6 @@
 import { format } from 'date-fns'
 import { db } from './db'
+import { getSupabaseClient, isSupabaseConfigured } from './supabaseConfig'
 import { DIVISIONS } from './config'
 import { errorCode, isMissingRelationError, isUndefinedColumnError } from './errors'
 import { logAccountEvent } from './accountsStore'
@@ -338,4 +339,35 @@ export async function listDueReminders(today: Date = new Date()): Promise<Remind
     if (due) out.push({ invoice: inv, balance, due })
   }
   return out.sort((a, b) => b.due.daysLate - a.due.daysLate)
+}
+
+export type SendReminderResult =
+  | { ok: true; to: string; stage: number }
+  | { ok: false; code: string; message: string }
+
+/**
+ * One tap: the payment-reminder function sends the due reminder by email or
+ * WhatsApp and records it (once per stage). `code` tells the card when to
+ * fall back to the old way: not_deployed, email_not_configured,
+ * whatsapp_not_configured, no_recipient, already_sent, not_due, send_failed.
+ */
+export async function sendReminder(invoiceId: string, channel: 'email' | 'whatsapp', contactId?: string): Promise<SendReminderResult> {
+  if (!isSupabaseConfigured()) return { ok: false, code: 'not_deployed', message: 'Local mode cannot send reminders.' }
+  const { data, error } = await getSupabaseClient().functions.invoke('payment-reminder', {
+    body: { invoice_id: invoiceId, channel, contact_id: contactId },
+  })
+  if (error) {
+    const status = (error as { context?: { status?: number } }).context?.status
+    if (status === 404 || /Failed to send a request/i.test(String((error as Error).message))) {
+      return { ok: false, code: 'not_deployed', message: 'The payment-reminder function is not deployed yet.' }
+    }
+    try {
+      const body = await (error as { context?: Response }).context?.json()
+      return { ok: false, code: String(body?.code || 'error'), message: String(body?.error || 'The reminder was not sent.') }
+    } catch {
+      return { ok: false, code: 'error', message: 'The reminder was not sent.' }
+    }
+  }
+  const d = data as { to: string; stage: number }
+  return { ok: true, to: d.to, stage: d.stage }
 }

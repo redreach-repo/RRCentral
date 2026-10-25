@@ -26,6 +26,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 7 | WorshipHub support ticket | `support-email-in` |
 | 8 | WorshipHub review buttons | `worshiphub-read`, `worshiphub-manage` |
 | 9 | Other functions | `zoho-proxy`, `manage-auth-user`, `create-checkout-session`, `teetribe-order-sync` |
+| 12 | One tap payment reminders | `payment-reminder` |
 
 ---
 
@@ -152,3 +153,21 @@ A refused action is in the audit log with WorshipHub's reason.
   `CRM_SYNC_SECRET` in Supabase and on the Tee Tribe site.
 
 Each one fails into App errors under its own name, and its System check row turns amber for a day.
+
+---
+
+## 12. One tap payment reminders
+
+**Trigger.** Make a test invoice to your own company account (with a contact that has your email and
+WhatsApp), finalise it with a date 10 days ago and Net 7 days. Open **Invoices**: it shows under
+**Payment reminders due** as a 3 day reminder.
+
+**You should see.** Press **Email**: the reminder arrives at the contact's address within a minute, the
+row disappears, and the account's timeline has "3 day payment reminder … sent by email to …". The audit
+log has the invoice_reminders row under your name. Pressing again (or a colleague at the same time) sends
+nothing: "This reminder was already sent." Do the same with **WhatsApp** once the template is approved.
+
+**If it fails.** The toast says why (no contact address, Zoho Mail not connected, WhatsApp template not
+approved). Nothing is recorded when sending fails, so you can press again once fixed. System check row
+"One tap payment reminders"; App errors under `payment-reminder`.
+
