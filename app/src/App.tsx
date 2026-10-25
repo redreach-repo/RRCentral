@@ -9,6 +9,7 @@ import DashboardPage from './pages/DashboardPage'
 import AccountsPage from './pages/AccountsPage'
 import AccountDetailPage from './pages/AccountDetailPage'
 import ClientReportPage from './pages/ClientReportPage'
+import ClientReportsPage from './pages/ClientReportsPage'
 import DeliverySettingsPage from './pages/DeliverySettingsPage'
 import BuildTemplatesPage from './pages/BuildTemplatesPage'
 import AgreementTemplatePage from './pages/AgreementTemplatePage'
@@ -125,6 +126,7 @@ export default function App() {
               <Route path="build-templates" element={<BuildTemplatesPage />} />
               <Route path="agreement-template" element={<AgreementTemplatePage />} />
               <Route path="client-health" element={<ClientHealthPage />} />
+              <Route path="client-reports" element={<ClientReportsPage />} />
               <Route path="mrr" element={<MrrPage />} />
               <Route path="insights" element={<InsightsPage />} />
               <Route path="support" element={<SupportPage />} />

@@ -41,6 +41,7 @@ on:
           - fireflies-fetch
           - invoice-pay-link
           - stripe-invoice-webhook
+          - client-reports
 
 permissions:
   contents: read

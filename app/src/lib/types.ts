@@ -1198,6 +1198,25 @@ export interface PortalUpload {
   created_at: string
 }
 
+/** A monthly client report waiting for approval, or sent (Wave 4, PR Q). */
+export interface ClientReportDraft {
+  id: string
+  account_id: string
+  month: string
+  status: 'draft' | 'sent' | 'skipped'
+  summary: string
+  facts: string[]
+  ai_cost_usd: number
+  error: string
+  created_by: string
+  created_at: string
+  updated_at: string
+  sent_by: string
+  sent_at: string | null
+  sent_email_to: string
+  sent_whatsapp_to: string
+}
+
 /** Someone on the daily digest list. */
 export interface DigestRecipientRow {
   id: string

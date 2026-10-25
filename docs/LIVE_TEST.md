@@ -38,6 +38,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 19 | Card payment links on invoices | `invoice-pay-link`, `stripe-invoice-webhook` |
 | 20 | Reports that answer questions | none (app only) |
 | 21 | Client portal: quotes, invoices, files, replies | `client-portal`, `quote-accept` |
+| 22 | Monthly client reports to approve | `client-reports` |
 
 ---
 
@@ -388,3 +389,21 @@ from the client** on the account, where the team can download it and mark it fil
 means no sent invoice is linked to the account. A file that stays under Files from the client shows why
 (WorkDrive not set up, no folder for this client, or the WorkDrive error). Errors go to App errors under
 `client-portal`.
+
+---
+
+## 22. Monthly client reports to approve
+
+**Trigger.** Do the steps in `docs/client-reports.md`. Then, as a manager or admin, open **Clients and partners →
+Monthly reports**, pick last month and press **Build missing drafts now** (the schedule does the same on the 1st).
+
+**You should see.** One card per AI CRM client with an active contract, each with an AI written summary, the
+cost of the draft, and the numbers that go with it. Nothing has been sent. Edit a summary, press **Save summary**,
+then **Approve and send**. The client's primary contact gets the email (and the WhatsApp template, if set up), the
+card says Sent with who sent it and where, and the account timeline has the line "report sent by email to ...".
+Pressing Build again adds nothing for clients that already have a draft.
+
+**If it fails.** "Write the summary by hand" on a card means `ANTHROPIC_API_KEY` is missing or the AI did not
+answer. "Not sent" names the channel and reason (no contact email, Zoho Mail not connected, WhatsApp not set up
+or the template not approved); the card stays in the queue so it can be sent once fixed. Errors go to App errors
+under `client-reports`.

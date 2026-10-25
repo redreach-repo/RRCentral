@@ -1161,3 +1161,62 @@ reset role;
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from portal_uploads'), 'anon cannot read uploads');
 reset role;
+
+------------------------------------------------------------ Monthly client reports (Wave 4, PR Q)
+insert into client_report_drafts (account_id, month, summary, facts)
+  select id, '2026-10-01', 'AI draft for the clinic', '["4 hours worked"]' from accounts where name = 'Assigned Clinic LLC';
+insert into client_report_drafts (account_id, month, summary)
+  select id, '2026-10-01', 'AI draft for the dentist' from accounts where name = 'Prospect Dental';
+select pg_temp.expect(pg_temp.fails($q$insert into client_report_drafts (account_id, month) select id, '2026-10-01' from accounts where name = 'Prospect Dental'$q$), 'one report per client per month');
+select pg_temp.expect(pg_temp.fails($q$insert into client_report_drafts (account_id, month) select id, '2026-10-15' from accounts limit 1$q$), 'a report month is the 1st');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from client_report_drafts) = 1, 'staff (VA) sees report drafts only on their accounts');
+select pg_temp.expect(not pg_temp.fails($q$update client_report_drafts set summary = 'Checked by the VA' where summary = 'AI draft for the clinic'$q$), 'staff (VA) edits a draft summary');
+select pg_temp.expect(pg_temp.fails($q$update client_report_drafts set status = 'sent' where summary = 'Checked by the VA'$q$), 'staff (VA) cannot mark a report sent');
+select pg_temp.expect(pg_temp.fails($q$update client_report_drafts set sent_email_to = 'x@y.com' where summary = 'Checked by the VA'$q$), 'staff (VA) cannot fake the sent fields');
+select pg_temp.expect(pg_temp.fails($q$insert into client_report_drafts (account_id, month) select id, '2026-09-01' from accounts where name = 'Assigned Clinic LLC'$q$), 'staff (VA) cannot add drafts: only the function does');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from client_report_drafts) = 2, 'sales sees the report drafts');
+select pg_temp.expect(not pg_temp.fails($q$update client_report_drafts set status = 'skipped' where summary = 'AI draft for the dentist'$q$), 'sales skips a report');
+select pg_temp.expect(not pg_temp.fails($q$update client_report_drafts set status = 'draft' where summary = 'AI draft for the dentist'$q$), 'sales puts it back');
+select pg_temp.expect(pg_temp.fails($q$update client_report_drafts set facts = '["made up"]' where summary = 'AI draft for the dentist'$q$), 'sales cannot change the report numbers');
+reset role;
+
+-- Once sent (by the function), nobody edits it from the app.
+update client_report_drafts set status = 'sent', sent_by = 'alfred@redreach.ae', sent_at = now() where summary = 'AI draft for the dentist';
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect((select count(*) from client_report_drafts) = 2, 'manager sees the report drafts');
+update client_report_drafts set summary = 'changed after sending' where status = 'sent';
+select pg_temp.expect((select count(*) from client_report_drafts where summary = 'changed after sending') = 0, 'a sent report cannot be edited');
+delete from client_report_drafts;
+select pg_temp.expect((select count(*) from client_report_drafts) = 2, 'manager cannot delete report drafts');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from client_report_drafts) = 2, 'viewer reads the report drafts');
+update client_report_drafts set summary = 'viewer' where status = 'draft';
+select pg_temp.expect((select count(*) from client_report_drafts where summary = 'viewer') = 0, 'viewer cannot edit report drafts');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000c';
+select pg_temp.expect((select count(*) from client_report_drafts) = 0, 'a stranger sees no report drafts');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+delete from client_report_drafts where status = 'sent';
+select pg_temp.expect((select count(*) from client_report_drafts) = 1, 'admin deletes a report draft');
+reset role;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from client_report_drafts'), 'anon cannot read report drafts');
+reset role;
