@@ -239,7 +239,7 @@ export default function QuotationsPage() {
         (q) =>
           q.reference_number &&
           !q.valid_until &&
-          ['Finalized', 'Sent', 'Awarded', 'Expired'].includes(q.status),
+          ['Finalized', 'Sent', 'Accepted', 'Awarded', 'Expired'].includes(q.status),
       )
       for (const q of needValidUntil) {
         const until = quoteValidUntil(q.date, validityDays)
@@ -1169,7 +1169,7 @@ export default function QuotationsPage() {
             </button>
           </>
         )}
-        {['Finalized', 'Sent', 'Awarded'].includes(q.status) && (
+        {['Finalized', 'Sent', 'Accepted', 'Awarded'].includes(q.status) && (
           <button
             type="button"
             style={buttonSecondaryStyle}

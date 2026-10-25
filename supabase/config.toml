@@ -42,3 +42,6 @@ verify_jwt = false
 
 [functions.watchdog]
 verify_jwt = false
+
+[functions.quote-accept]
+verify_jwt = false

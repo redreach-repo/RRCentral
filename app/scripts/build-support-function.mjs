@@ -20,6 +20,8 @@
 //   list matches what the app shows.
 // * payment-reminder gets the reminder rules and wording
 //   (src/lib/paymentReminder.ts), so what is sent is what the app shows.
+// * quote-accept gets the accept link rules (src/lib/quoteAccept.ts), so the
+//   link, the draft contract and the client's view match the app.
 //
 //   npm run build:support-fn              # regenerate
 //   npm run build:support-fn -- --check   # CI: fail if a bundle is stale
@@ -41,6 +43,7 @@ const bundles = [
   { entry: 'src/lib/contractBillingRun.ts', out: '../supabase/functions/contract-invoices/contractBillingRun.bundle.js' },
   { entry: 'src/lib/watchdog.ts', out: '../supabase/functions/watchdog/watchdog.bundle.js' },
   { entry: 'src/lib/paymentReminder.ts', out: '../supabase/functions/payment-reminder/paymentReminder.bundle.js' },
+  { entry: 'src/lib/quoteAccept.ts', out: '../supabase/functions/quote-accept/quoteAccept.bundle.js' },
 ]
 
 let stale = false

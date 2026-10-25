@@ -835,3 +835,54 @@ reset role;
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from watch_items'), 'anon cannot read watch items');
 reset role;
+
+------------------------------------------------------------ Quote accept link (Wave 3, PR K)
+insert into quotations (id, client, reference_number, status) values ('00000000-0000-0000-0000-0000000000e1', 'Accept Co', 'RR-07-26901', 'Sent');
+insert into quote_accept_links (id, quotation_id, token_hash, accepted_at, accepted_name) values
+  ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000e1', repeat('a', 64), now(), 'Sara Khan');
+insert into quote_accept_pdfs (link_id, pdf_base64) values ('00000000-0000-0000-0000-0000000000e2', 'JVBERi0=');
+insert into quote_acceptances (link_id, quotation_id, accepted_name, accepted_date, ip) values
+  ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000e1', 'Sara Khan', current_date, '203.0.113.9');
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from quote_accept_links'), 'anon cannot read accept links');
+select pg_temp.expect(pg_temp.fails('select 1 from quote_accept_pdfs'), 'anon cannot read accept PDFs');
+select pg_temp.expect(pg_temp.fails('select 1 from quote_acceptances'), 'anon cannot read acceptances');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select pg_temp.expect((select count(*) from quote_acceptances where ip = '203.0.113.9') = 1, 'admin sees who accepted, when and from where');
+select pg_temp.expect(not pg_temp.fails($q$insert into quote_accept_links (quotation_id, token_hash) values ('00000000-0000-0000-0000-0000000000e1', repeat('b', 64))$q$), 'admin can make an accept link');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect((select count(*) from quote_accept_links where accepted_name = 'Sara Khan') = 1, 'manager sees that the quote was accepted');
+select pg_temp.expect((select count(*) from quote_acceptances) = 0, 'manager does not see the full acceptance record');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect(not pg_temp.fails($q$insert into quote_accept_links (quotation_id, token_hash) values ('00000000-0000-0000-0000-0000000000e1', repeat('c', 64))$q$), 'sales can make an accept link');
+select pg_temp.expect(pg_temp.fails($q$insert into quote_accept_links (quotation_id, token_hash, accepted_at, accepted_name) values ('00000000-0000-0000-0000-0000000000e1', repeat('d', 64), now(), 'Forged')$q$), 'sales cannot make a link that is already accepted');
+select pg_temp.expect(pg_temp.fails($q$update quote_accept_links set accepted_name = 'Forged' where token_hash = repeat('c', 64) returning 1$q$) or (select count(*) from quote_accept_links where accepted_name = 'Forged') = 0, 'sales cannot mark a link accepted');
+update quote_accept_links set revoked_at = now() where token_hash = repeat('c', 64);
+select pg_temp.expect((select revoked_at is not null from quote_accept_links where token_hash = repeat('c', 64)), 'sales can turn a link off');
+update quote_accept_links set revoked_at = now() where accepted_at is not null;
+select pg_temp.expect((select revoked_at is null from quote_accept_links where accepted_name = 'Sara Khan'), 'an accepted link cannot be changed');
+select pg_temp.expect((select count(*) from quote_acceptances) = 0, 'sales does not see the full acceptance record');
+select pg_temp.expect(pg_temp.fails($q$delete from quote_accept_links returning 1$q$) or (select count(*) from quote_accept_links) = 3, 'sales cannot delete accept links');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from quote_accept_links) = 0, 'staff (VA) does not see accept links');
+select pg_temp.expect(pg_temp.fails($q$insert into quote_accept_links (quotation_id, token_hash) values ('00000000-0000-0000-0000-0000000000e1', repeat('e', 64))$q$), 'staff (VA) cannot make accept links');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from quote_accept_pdfs) = 0, 'viewer does not see accept PDFs');
+select pg_temp.expect(pg_temp.fails($q$insert into quote_accept_links (quotation_id, token_hash) values ('00000000-0000-0000-0000-0000000000e1', repeat('f', 64))$q$), 'viewer cannot make accept links');
+reset role;

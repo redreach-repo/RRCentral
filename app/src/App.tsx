@@ -42,6 +42,7 @@ import SettingsPage from './pages/SettingsPage'
 import AuditLogPage from './pages/AuditLogPage'
 import DocumentPage from './pages/DocumentPage'
 import ClientPortalPage from './pages/ClientPortalPage'
+import QuoteAcceptPage from './pages/QuoteAcceptPage'
 import ShopLayout from './shop/ShopLayout'
 import ShopHomePage from './shop/pages/ShopHomePage'
 import ShopListingPage from './shop/pages/ShopListingPage'
@@ -84,6 +85,7 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             {/* Clients open this from a private link; no sign in. */}
             <Route path="/portal" element={<ClientPortalPage />} />
+            <Route path="/accept" element={<QuoteAcceptPage />} />
             <Route
               path="/ctrm/summary"
               element={
