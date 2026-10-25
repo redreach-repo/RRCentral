@@ -1296,3 +1296,59 @@ set role authenticated;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000c';
 select pg_temp.expect((select count(*) from ai_usage_log where feature = 'call_brief') = 0, 'a stranger sees no brief cost');
 reset role;
+
+------------------------------------------------------------ Duplicates and merge (Wave 4, PR T)
+insert into accounts (type, name, reference) values ('ai_crm_client', 'Merge Keep', 'AC-10-26001'), ('ai_crm_client', 'Merge Dup', 'AC-10-26002');
+update accounts set city = 'Dubai', notes = 'dup notes' where name = 'Merge Dup';
+insert into account_contacts (account_id, name, phone, is_primary) select id, 'Keep Primary', '0501112222', true from accounts where name = 'Merge Keep';
+insert into account_contacts (account_id, name, phone, is_primary) select id, 'Dup Primary', '0501112222', true from accounts where name = 'Merge Dup';
+insert into account_activities (account_id, kind, body) select id, 'call', 'dup call' from accounts where name = 'Merge Dup';
+-- A table that allows one row per account, to prove a clashing row is left behind, not lost or failing the merge.
+create table if not exists public.zz_merge_clash (account_id uuid unique references public.accounts(id) on delete cascade);
+insert into zz_merge_clash select id from accounts where name in ('Merge Keep', 'Merge Dup');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect(pg_temp.fails($q$select rr_merge_accounts((select id from accounts where name = 'Merge Keep'), (select id from accounts where name = 'Merge Dup'))$q$), 'sales cannot merge accounts');
+select pg_temp.expect(pg_temp.fails($q$insert into duplicate_dismissals (kind, a_id, b_id) values ('account', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002')$q$), 'sales cannot dismiss a pair');
+select pg_temp.expect(pg_temp.fails($q$select rr_repoint_rows('public.accounts'::regclass, gen_random_uuid(), gen_random_uuid())$q$), 'nobody calls the repoint helper directly');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect(pg_temp.fails($q$select rr_merge_contacts(gen_random_uuid(), gen_random_uuid())$q$), 'staff (VA) cannot merge contacts');
+select pg_temp.expect((select count(*) from duplicate_dismissals) = 0, 'staff (VA) sees no dismissed pairs');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect(pg_temp.fails($q$select rr_merge_accounts(gen_random_uuid(), gen_random_uuid())$q$), 'viewer cannot merge');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect(not pg_temp.fails($q$insert into duplicate_dismissals (kind, a_id, b_id) values ('account', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002')$q$), 'manager marks a pair not a duplicate');
+select pg_temp.expect(pg_temp.fails($q$insert into duplicate_dismissals (kind, a_id, b_id) values ('account', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001')$q$), 'a pair is stored smaller id first');
+select pg_temp.expect((select count(*) from duplicate_dismissals) = 1, 'manager reads dismissed pairs');
+select pg_temp.expect(not pg_temp.fails($q$select rr_merge_accounts((select id from accounts where name = 'Merge Keep'), (select id from accounts where name = 'Merge Dup'))$q$), 'manager merges two accounts');
+reset role;
+
+select pg_temp.expect((select count(*) from accounts where name = 'Merge Dup') = 0, 'the duplicate account is removed');
+select pg_temp.expect((select count(*) from account_activities a join accounts c on c.id = a.account_id where c.name = 'Merge Keep' and a.body = 'dup call') = 1, 'the timeline moves to the kept account');
+select pg_temp.expect((select count(*) from account_activities a join accounts c on c.id = a.account_id where c.name = 'Merge Keep' and a.kind = 'system' and a.body like 'Merged Merge Dup%') = 1, 'the merge is noted on the timeline');
+select pg_temp.expect((select count(*) from account_contacts c join accounts a on a.id = c.account_id where a.name = 'Merge Keep') = 2, 'contacts move to the kept account');
+select pg_temp.expect((select count(*) from account_contacts c join accounts a on a.id = c.account_id where a.name = 'Merge Keep' and c.is_primary) = 1, 'the kept account keeps one primary contact');
+select pg_temp.expect((select city from accounts where name = 'Merge Keep') = 'Dubai', 'blank details are filled from the duplicate');
+select pg_temp.expect((select count(*) from zz_merge_clash) = 1, 'a clashing row is left behind with the duplicate');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect(not pg_temp.fails($q$select rr_merge_contacts((select c.id from account_contacts c where c.name = 'Keep Primary'), (select c.id from account_contacts c where c.name = 'Dup Primary'))$q$), 'manager merges two contacts');
+reset role;
+select pg_temp.expect((select count(*) from account_contacts where name in ('Keep Primary', 'Dup Primary')) = 1, 'the duplicate contact is removed');
+drop table public.zz_merge_clash;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from duplicate_dismissals'), 'anon cannot read dismissed pairs');
+select pg_temp.expect(pg_temp.fails($q$select rr_merge_accounts(gen_random_uuid(), gen_random_uuid())$q$), 'anon cannot merge');
+reset role;

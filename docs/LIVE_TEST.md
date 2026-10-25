@@ -41,6 +41,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 22 | Monthly client reports to approve | `client-reports` |
 | 23 | Go live checklist | `client-portal` (redeploy) |
 | 24 | Before the call brief | `ai-assist` (redeploy) |
+| 25 | Duplicates and Quick add | none (SQL only) |
 
 ---
 
@@ -446,3 +447,24 @@ questions and no Save.
 
 **If it fails.** "AI help is not set up yet" means `ANTHROPIC_API_KEY` is missing; the facts still show. An AI
 error about the feature means the SQL has not run. Errors go to App errors under `ai-assist`.
+
+## 25. Duplicates and Quick add
+
+**Trigger.** Run the Wave 4 duplicates SQL. As a manager or admin open **Clients and partners → Duplicates**.
+For Quick add, open **Sales → Quick add** on your phone.
+
+**You should see.** Duplicates lists pairs of accounts (and, on the Contacts tab, contacts) that share a phone,
+an email, a website or a very similar name, with the reason. **Review** shows both side by side with what hangs
+off each; the one with more on it is picked to keep. **Merge** moves the timeline, contacts, tickets, quotes,
+invoices, deals and everything else to the one kept, fills its blank details, adds a "Merged ..." line to its
+timeline and removes the other. Anything the kept account already has one of (a usage row for the same month,
+say) is named as not moved. **Not a duplicate** hides the pair for good. Sales, the VA and viewers do not see
+the page and cannot merge.
+
+Quick add opens with the cursor in the phone box. Type a number you already have: the contact or CRM lead shows,
+tap an outcome (Spoke to them, No answer...) and **Log the call**; the call lands on the account timeline (or the
+CRM notes). Type a new number: add a name and press **Add lead**; it creates the account, contact and an AI CRM
+lead (or a CRM row for the other desks). It should take under ten seconds.
+
+**If it fails.** "Run the duplicates SQL first" means the SQL has not run. A merge error names the table that
+blocked it; nothing is changed when a merge fails.

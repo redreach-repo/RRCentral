@@ -10,6 +10,8 @@ import AccountsPage from './pages/AccountsPage'
 import AccountDetailPage from './pages/AccountDetailPage'
 import ClientReportPage from './pages/ClientReportPage'
 import ClientReportsPage from './pages/ClientReportsPage'
+import DuplicatesPage from './pages/DuplicatesPage'
+import QuickAddPage from './pages/QuickAddPage'
 import DeliverySettingsPage from './pages/DeliverySettingsPage'
 import BuildTemplatesPage from './pages/BuildTemplatesPage'
 import AgreementTemplatePage from './pages/AgreementTemplatePage'
@@ -128,6 +130,8 @@ export default function App() {
               <Route path="client-health" element={<ClientHealthPage />} />
               <Route path="client-reports" element={<ClientReportsPage />} />
               <Route path="mrr" element={<MrrPage />} />
+              <Route path="duplicates" element={<DuplicatesPage />} />
+              <Route path="quick-add" element={<QuickAddPage />} />
               <Route path="insights" element={<InsightsPage />} />
               <Route path="support" element={<SupportPage />} />
               <Route path="support/:id" element={<TicketPage />} />
