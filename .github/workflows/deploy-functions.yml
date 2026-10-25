@@ -33,6 +33,7 @@ on:
           - bootstrap-admin
           - zoho-proxy
           - teetribe-order-sync
+          - contract-invoices
 
 permissions:
   contents: read

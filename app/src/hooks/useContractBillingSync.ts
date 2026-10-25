@@ -3,12 +3,15 @@ import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { runContractBilling } from '../lib/contractBillingStore'
+import { BILLING_LAST_RUN_KEY, scheduleIsRunning } from '../lib/contractBillingRun'
 import { ratesFromSettings } from '../lib/delivery'
 
 /**
- * Once per sign in, raise any contract invoice that has come due (setup fee
- * at signing, then one invoice a month) as a draft on Invoices. There is no
- * server job, so this runs in the browser of whoever opens the app.
+ * Fallback for the daily contract-invoices schedule (06:00 Dubai). Once per
+ * sign in, raise any contract invoice that has come due as a draft on
+ * Invoices, but only while the schedule has not run in the last 36 hours
+ * (not set up yet, or stopped). Both use the same rules and unique key, so
+ * nothing is raised twice.
  */
 export function useContractBillingSync(enabled: boolean) {
   const { user, appUserId } = useAuth()
@@ -19,6 +22,7 @@ export function useContractBillingSync(enabled: boolean) {
   useEffect(() => {
     if (!enabled || loading || !user?.email || started.current) return
     started.current = true
+    if (scheduleIsRunning(settings[BILLING_LAST_RUN_KEY])) return
     void (async () => {
       try {
         const { raised, refreshed } = await runContractBilling({
