@@ -903,3 +903,40 @@ set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
 update crm set pipeline_stage = 'Lead', next_action = 'x', follow_up_date = '2026-12-01' where company_name = 'No Step Co';
 reset role;
 select pg_temp.expect((select pipeline_stage from crm where company_name = 'No Step Co') = 'Lost', 'viewer cannot reopen a deal');
+------------------------------------------------------------ Lead intake (Wave 3, PR J)
+-- The website can still post an enquiry, but only lead-intake (service key)
+-- may link it to an account or deal, set its owner or mark it matched.
+-- Rate limit window: clear earlier anon inserts so these are not refused for volume.
+delete from website_inquiries;
+insert into website_inquiries (name, email, status, channel, pipeline, source, utm_source, account_id, deal_id, matched, crm_id, created_at)
+  values ('Intake Lead', 'lead@x.com', 'converted', 'landing_page', 'ai_crm', 'AI CRM landing page, google', 'google',
+          (select id from accounts where reference = 'AC-07-26001'), 'deal-1', true, '', now());
+set role anon;
+select pg_temp.expect(not pg_temp.fails($q$insert into website_inquiries (name, email, message, utm_source, utm_campaign, page_url) values ('Visitor', 'v@x.com', 'hi', 'google', 'q4', 'https://redreach.ae/contact')$q$), 'anon can submit a form with UTM values');
+select pg_temp.expect(pg_temp.fails($q$insert into website_inquiries (name, email, matched) values ('X', 'x@x.com', true)$q$), 'anon cannot mark an enquiry as matched');
+select pg_temp.expect(pg_temp.fails($q$insert into website_inquiries (name, email, deal_id) values ('X', 'x@x.com', 'deal-1')$q$), 'anon cannot link an enquiry to a deal');
+select pg_temp.expect(pg_temp.fails($q$insert into website_inquiries (name, email, channel) values ('X', 'x@x.com', 'landing_page')$q$), 'anon cannot claim another channel');
+select pg_temp.expect(pg_temp.fails($q$insert into website_inquiries (name, email, ip_hash) values ('X', 'x@x.com', 'abc')$q$), 'anon cannot set the sender hash');
+select pg_temp.expect(pg_temp.fails($q$insert into website_inquiries (name, email, utm_source) values ('X', 'x@x.com', repeat('u', 300))$q$), 'anon UTM length capped');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select pg_temp.expect((select count(*) from website_inquiries where source like 'AI CRM landing page%') = 1, 'admin reads new leads with their source');
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect((select count(*) from website_inquiries where matched) = 1, 'manager reads new leads');
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from website_inquiries where deal_id = 'deal-1') = 1, 'sales reads new leads');
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from website_inquiries) = 0, 'staff (VA) does not see leads');
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from website_inquiries) = 0, 'viewer does not see leads');
+reset role;

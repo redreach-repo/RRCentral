@@ -31,6 +31,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 12 | One tap payment reminders | `payment-reminder` |
 | 13 | My deals | none (app and SQL only) |
 | 14 | Next step and lost reason | none (app and SQL only) |
+| 15 | Website and WhatsApp leads | `lead-intake` |
 
 ---
 
@@ -235,3 +236,25 @@ has a **No next step** card listing open deals with no next action or date.
 
 **If it fails.** A move that saves without a next step means the SQL has not been run. "column lost_note
 does not exist" (or lost_reason_code) means the same.
+
+---
+
+## 15. Website and WhatsApp leads
+
+**Trigger.** In a private browser window open the website contact page with
+`?utm_source=test&utm_campaign=live-check` on the end of the address. Wait a few seconds, then send the form
+with your own name and a phone number nobody else in the CRM has.
+
+**You should see.** The form says "Received". On the dashboard, **New leads** shows your name with
+"Website form, test, live-check, new contact". It links to a new CRM lead at stage Lead with next action
+"Call the new lead" for today, owned by the person set under **Packages and rates → New leads: who gets
+them**. Send the form again with the same phone: no second CRM row, the note is added to the first one and
+the lead says "known contact". Next morning's digest has "New leads in the last day".
+
+**WhatsApp link.** Open `https://pszjylxrpvlumldtptrr.supabase.co/functions/v1/lead-intake?wa=1&text=Hi&utm_source=test`:
+WhatsApp opens on the Red Reach number with "Hi" typed. The click is counted but is not a lead.
+
+**If it fails.** System check row "Website and WhatsApp leads". Down with `LEAD_INTAKE_SECRET` means the
+secret is not set. If the form still says "Received" but nothing shows under New leads, the "Lead intake"
+SQL has not been run (the form then falls back to the old direct save). App errors under `lead-intake`.
+

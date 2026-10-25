@@ -6,6 +6,7 @@ import {
   validateWebsiteInquiry,
   type WebsiteInquiryInput,
 } from '../../lib/websiteLeads'
+import { fetchLeadFormToken, pageUtm, sendLead } from '../../lib/leadIntakeStore'
 
 const EMPTY: WebsiteInquiryInput = {
   name: '',
@@ -38,6 +39,17 @@ export default function ContactForm({
 
   const [errors, setErrors] = useState<Partial<Record<keyof WebsiteInquiryInput, string>>>({})
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'fallback'>('idle')
+  // Lead intake: a form token from the function, and a hidden field bots fill in.
+  const [formToken, setFormToken] = useState('')
+  const [honeypot, setHoneypot] = useState('')
+
+  useEffect(() => {
+    let alive = true
+    void fetchLeadFormToken().then((t) => alive && setFormToken(t))
+    return () => {
+      alive = false
+    }
+  }, [])
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -46,9 +58,15 @@ export default function ContactForm({
     if (!check.ok) return
     setStatus('sending')
     try {
-      const result = await submitWebsiteInquiry(form)
-      setStatus(result.stored ? 'sent' : 'fallback')
-      if (result.stored) setForm({ ...EMPTY, vertical: defaultVertical })
+      // Through lead-intake (matches the contact, opens the lead, keeps the UTM values);
+      // the direct insert stays as the fallback until the function is deployed.
+      const viaIntake = await sendLead(
+        { ...form, channel: 'website_form', website: honeypot, ...pageUtm(window.location.href) },
+        formToken,
+      )
+      const stored = viaIntake || (await submitWebsiteInquiry(form)).stored
+      setStatus(stored ? 'sent' : 'fallback')
+      if (stored) setForm({ ...EMPTY, vertical: defaultVertical })
     } catch {
       setStatus('fallback')
     }
@@ -64,6 +82,16 @@ export default function ContactForm({
 
   return (
     <form className="site-form" onSubmit={(e) => void onSubmit(e)}>
+      <input
+        type="text"
+        name="website"
+        value={honeypot}
+        onChange={(e) => setHoneypot(e.target.value)}
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+        style={{ position: 'absolute', left: '-10000px', width: 1, height: 1, opacity: 0 }}
+      />
       <label>
         Name
         <input

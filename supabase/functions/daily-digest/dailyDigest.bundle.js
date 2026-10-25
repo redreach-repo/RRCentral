@@ -1797,6 +1797,23 @@ function isOverdue(d, now = /* @__PURE__ */ new Date()) {
   return d.next_action_date < format(now, "yyyy-MM-dd");
 }
 
+// src/lib/leadIntake.ts
+var LEAD_CHANNEL_LABELS = {
+  website_form: "Website form",
+  whatsapp: "WhatsApp",
+  landing_page: "AI CRM landing page"
+};
+var FORM_TOKEN_MAX_MS = 2 * 60 * 60 * 1e3;
+function newLeads(rows, since) {
+  return rows.filter((r) => r.created_at >= since.toISOString() && (r.status === "converted" || r.status === "new")).sort((a, b) => b.created_at.localeCompare(a.created_at)).map((r) => ({
+    id: r.id,
+    name: r.name || r.email || r.phone || "New lead",
+    detail: [r.source || LEAD_CHANNEL_LABELS[r.channel] || "Website", r.matched ? "known contact" : "new contact"].filter(Boolean).join(", "),
+    link: r.account_id ? `/accounts/${r.account_id}` : r.crm_id ? `/crm?edit=${r.crm_id}` : "/crm",
+    created_at: r.created_at
+  }));
+}
+
 // src/lib/delivery.ts
 var HOURS_ALERT_MESSAGE = "Reprice or move up a package at the next review";
 var HOURS_ALERT_THRESHOLD = 0.25;
@@ -1967,7 +1984,13 @@ function buildDigest(input) {
     appErrors: digestErrors(input.errors || []),
     staleDeals: watchLines(input.watch || [], "stale_deal"),
     lateInvoices: watchLines(input.watch || [], "invoice_overdue"),
-    contractDrafts: contractDraftItems(input.contractDrafts ?? 0)
+    contractDrafts: contractDraftItems(input.contractDrafts ?? 0),
+    newLeads: newLeads(input.leads || [], new Date(now.getTime() - 24 * 60 * 60 * 1e3)).map((l) => ({
+      name: l.name,
+      detail: l.detail,
+      path: l.link,
+      urgent: false
+    }))
   };
 }
 function watchLines(watch, kind) {
@@ -2004,6 +2027,9 @@ function digestSections(d) {
     { key: "overdueActions", title: "Overdue CTRM next actions", empty: "No overdue next actions.", items: d.overdueActions },
     { key: "overHours", title: "Clients over their hours", empty: "No client is over hours two months running.", items: d.overHours }
   ];
+  if (d.newLeads?.length) {
+    sections.push({ key: "newLeads", title: "New leads in the last day", empty: "", items: d.newLeads });
+  }
   if (d.lateInvoices?.length) {
     sections.push({ key: "lateInvoices", title: "Invoices 3, 7 or 14 days late", empty: "", items: d.lateInvoices });
   }
