@@ -1377,6 +1377,18 @@ export interface CtrmSession {
   updated_at: string
 }
 
+/** Contract and renewal dates for a CTRM Next client (Wave 5, PR Y). Dates only. */
+export interface CtrmClientTerms {
+  id: string
+  account_id: string
+  contract_start: string | null
+  renewal_date: string | null
+  notice_days: number
+  updated_by: string
+  created_at: string
+  updated_at: string
+}
+
 /** A prospect being introduced to CTRM Next. Commission lives in CtrmCommission. */
 export interface CtrmDeal {
   id: string

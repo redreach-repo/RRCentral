@@ -14,11 +14,13 @@
  * It also says how many contract invoices the 06:00 run drafted today,
  * lists the new leads from the website, WhatsApp and the landing page,
  * and which quotes have waited 3 days for a reply (quoteNudges.ts).
- * It lists open CTRM Next client issues, oldest first (ctrmIssues.ts).
+ * It lists open CTRM Next client issues, oldest first (ctrmIssues.ts),
+ * and CTRM Next renewals at 90, 60 and 30 days (ctrmRenewals.ts).
  */
 import { format, isFriday, parseISO } from 'date-fns'
 import { isOverdue } from './ctrm'
 import { issueDetail, needsClientUpdate, openIssues, type IssueRow } from './ctrmIssues'
+import { digestRenewals, isUrgentRenewal, renewalText } from './ctrmRenewals'
 import { newLeads, type IntakeRow } from './leadIntake'
 import { quoteNudges, type NudgeDeal, type NudgeQuote } from './quoteNudges'
 import { currentContract, hoursAlert, renewalFlag, renewalLabel } from './delivery'
@@ -26,7 +28,7 @@ import { slaState } from './sla'
 import { isOpenTicket } from './support'
 import { clientsWithoutHoursThisWeek } from './timeTracking'
 import { phoneDigits } from './usageImport'
-import type { Account, Contract, CtrmDeal, DeliveryPackage, Ticket, TimeEntry } from './types'
+import type { Account, Contract, CtrmClientTerms, CtrmDeal, DeliveryPackage, Ticket, TimeEntry } from './types'
 
 export type DigestItem = {
   name: string
@@ -59,6 +61,8 @@ export type Digest = {
   quoteNudges: DigestItem[]
   /** Open CTRM Next client issues, oldest first. */
   ctrmIssues?: DigestItem[]
+  /** CTRM Next renewals on their 90, 60 and 30 day marks, the last 14 days and the notice week. */
+  ctrmRenewals?: DigestItem[]
 }
 
 /** An open watch_items row, as much as the digest needs. */
@@ -93,6 +97,8 @@ export type DigestInput = {
   quoteDeals?: NudgeDeal[]
   /** CTRM Next issues (tickets with channel ctrm_next) that are open (optional). */
   ctrmIssues?: IssueRow[]
+  /** ctrm_client_terms rows (optional). */
+  ctrmTerms?: Pick<CtrmClientTerms, 'account_id' | 'renewal_date' | 'notice_days'>[]
 }
 
 const day = (iso: string) => format(parseISO(iso.slice(0, 10)), 'd MMM')
@@ -197,6 +203,12 @@ export function buildDigest(input: DigestInput): Digest {
       path: `/support/${t.id}`,
       urgent: needsClientUpdate(t, now),
     })),
+    ctrmRenewals: digestRenewals(input.ctrmTerms || [], now).map((r) => ({
+      name: nameOf.get(r.accountId) ?? 'CTRM Next client',
+      detail: renewalText(r),
+      path: `/accounts/${r.accountId}`,
+      urgent: isUrgentRenewal(r),
+    })),
   }
 }
 
@@ -254,6 +266,9 @@ export function digestSections(d: Digest): DigestSection[] {
   }
   if (d.quoteNudges?.length) {
     sections.push({ key: 'quoteNudges', title: 'Quotes waiting 3 days for a reply', empty: '', items: d.quoteNudges })
+  }
+  if (d.ctrmRenewals?.length) {
+    sections.push({ key: 'ctrmRenewals', title: 'CTRM Next renewals', empty: '', items: d.ctrmRenewals })
   }
   if (d.ctrmIssues?.length) {
     sections.push({ key: 'ctrmIssues', title: 'Open CTRM Next issues, oldest first', empty: '', items: d.ctrmIssues })

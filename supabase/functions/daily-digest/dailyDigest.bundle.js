@@ -73,8 +73,8 @@ function startOfWeek(date, options) {
   const defaultOptions2 = getDefaultOptions();
   const weekStartsOn = options?.weekStartsOn ?? options?.locale?.options?.weekStartsOn ?? defaultOptions2.weekStartsOn ?? defaultOptions2.locale?.options?.weekStartsOn ?? 0;
   const _date = toDate(date, options?.in);
-  const day2 = _date.getDay();
-  const diff = (day2 < weekStartsOn ? 7 : 0) + day2 - weekStartsOn;
+  const day3 = _date.getDay();
+  const diff = (day3 < weekStartsOn ? 7 : 0) + day3 - weekStartsOn;
   _date.setDate(_date.getDate() - diff);
   _date.setHours(0, 0, 0, 0);
   return _date;
@@ -1608,6 +1608,11 @@ function isFriday(date, options) {
   return toDate(date, options?.in).getDay() === 5;
 }
 
+// node_modules/date-fns/subDays.js
+function subDays(date, amount, options) {
+  return addDays(date, -amount, options);
+}
+
 // node_modules/date-fns/parseISO.js
 function parseISO(argument, options) {
   const invalidDate = () => constructFrom(options?.in, NaN);
@@ -1706,7 +1711,7 @@ function parseDate(dateString, year) {
   const isWeekDate = !!captures[4];
   const dayOfYear = parseDateUnit(captures[1]);
   const month = parseDateUnit(captures[2]) - 1;
-  const day2 = parseDateUnit(captures[3]);
+  const day3 = parseDateUnit(captures[3]);
   const week = parseDateUnit(captures[4]);
   const dayOfWeek = parseDateUnit(captures[5]) - 1;
   if (isWeekDate) {
@@ -1716,10 +1721,10 @@ function parseDate(dateString, year) {
     return dayOfISOWeekYear(year, week, dayOfWeek);
   } else {
     const date = /* @__PURE__ */ new Date(0);
-    if (!validateDate(year, month, day2) || !validateDayOfYearDate(year, dayOfYear)) {
+    if (!validateDate(year, month, day3) || !validateDayOfYearDate(year, dayOfYear)) {
       return /* @__PURE__ */ new Date(NaN);
     }
-    date.setUTCFullYear(year, month, Math.max(dayOfYear, day2));
+    date.setUTCFullYear(year, month, Math.max(dayOfYear, day3));
     return date;
   }
 }
@@ -1752,11 +1757,11 @@ function parseTimezone(timezoneString) {
   }
   return sign * (hours * millisecondsInHour + minutes * millisecondsInMinute);
 }
-function dayOfISOWeekYear(isoWeekYear, week, day2) {
+function dayOfISOWeekYear(isoWeekYear, week, day3) {
   const date = /* @__PURE__ */ new Date(0);
   date.setUTCFullYear(isoWeekYear, 0, 4);
   const fourthOfJanuaryDay = date.getUTCDay() || 7;
-  const diff = (week - 1) * 7 + day2 + 1 - fourthOfJanuaryDay;
+  const diff = (week - 1) * 7 + day3 + 1 - fourthOfJanuaryDay;
   date.setUTCDate(date.getUTCDate() + diff);
   return date;
 }
@@ -1770,8 +1775,8 @@ function validateDate(year, month, date) {
 function validateDayOfYearDate(year, dayOfYear) {
   return dayOfYear >= 1 && dayOfYear <= (isLeapYearIndex(year) ? 366 : 365);
 }
-function validateWeekDate(_year, week, day2) {
-  return week >= 1 && week <= 53 && day2 >= 0 && day2 <= 6;
+function validateWeekDate(_year, week, day3) {
+  return week >= 1 && week <= 53 && day3 >= 0 && day3 <= 6;
 }
 function validateTime(hours, minutes, seconds) {
   if (hours === 24) {
@@ -1894,6 +1899,43 @@ function issueDetail(t, clientName, now = /* @__PURE__ */ new Date(), cal = DEFA
   ];
   if (needsClientUpdate(t, now, cal)) parts.push(t.client_updated_at ? `no update to the client since ${t.client_updated_at.slice(0, 10)}` : "client not updated yet");
   return parts.join(", ");
+}
+
+// src/lib/ctrmRenewals.ts
+var RENEWAL_REMINDER_DAYS = [90, 60, 30];
+var PASSED_SHOW_DAYS = 30;
+var DATE = /^\d{4}-\d{2}-\d{2}$/;
+function renewalInfo(t, today = /* @__PURE__ */ new Date()) {
+  const renewal = String(t.renewal_date || "").slice(0, 10);
+  if (!DATE.test(renewal)) return null;
+  const days = differenceInCalendarDays(parseISO(renewal), today);
+  const notice = Math.max(0, Math.round(Number(t.notice_days) || 0));
+  const noticeBy = notice ? format(subDays(parseISO(renewal), notice), "yyyy-MM-dd") : null;
+  const stage = days < 0 ? "passed" : [...RENEWAL_REMINDER_DAYS].reverse().find((d) => days <= d) ?? null;
+  return {
+    accountId: t.account_id,
+    renewal,
+    days,
+    stage,
+    noticeBy,
+    noticeDaysLeft: noticeBy ? differenceInCalendarDays(parseISO(noticeBy), today) : null
+  };
+}
+function upcomingRenewals(terms, today = /* @__PURE__ */ new Date()) {
+  return terms.map((t) => renewalInfo(t, today)).filter((r) => Boolean(r && r.stage && r.days >= -PASSED_SHOW_DAYS)).sort((a, b) => a.days - b.days);
+}
+function digestRenewals(terms, today = /* @__PURE__ */ new Date()) {
+  return upcomingRenewals(terms, today).filter(
+    (r) => RENEWAL_REMINDER_DAYS.includes(r.days) || r.days <= 14 || r.noticeDaysLeft !== null && r.noticeDaysLeft >= 0 && r.noticeDaysLeft <= 7
+  );
+}
+var isUrgentRenewal = (r) => r.days <= 30 || r.noticeDaysLeft !== null && r.noticeDaysLeft >= 0 && r.noticeDaysLeft <= 7;
+var day = (d) => format(parseISO(d), "d MMM yyyy");
+function renewalText(r) {
+  const when = r.days < 0 ? `Renewal date passed ${Math.abs(r.days)} days ago (${day(r.renewal)})` : r.days === 0 ? `Renews today (${day(r.renewal)})` : `Renews in ${r.days} days (${day(r.renewal)})`;
+  if (!r.noticeBy || r.noticeDaysLeft === null) return `${when}.`;
+  const notice = r.noticeDaysLeft < 0 ? `Notice deadline passed on ${day(r.noticeBy)}` : r.noticeDaysLeft === 0 ? "Last day to give notice is today" : `Notice by ${day(r.noticeBy)}`;
+  return `${when}. ${notice}.`;
 }
 
 // src/lib/leadIntake.ts
@@ -2045,7 +2087,7 @@ function phoneDigits(raw) {
 }
 
 // src/lib/dailyDigest.ts
-var day = (iso) => format(parseISO(iso.slice(0, 10)), "d MMM");
+var day2 = (iso) => format(parseISO(iso.slice(0, 10)), "d MMM");
 function buildDigest(input) {
   const { now } = input;
   const nameOf = new Map(input.accounts.map((a) => [a.id, a.name]));
@@ -2067,7 +2109,7 @@ function buildDigest(input) {
         days: renewal.days,
         item: {
           name: a.name,
-          detail: `${renewalLabel(renewal).toLowerCase()} (${day(renewal.termEnd)})`,
+          detail: `${renewalLabel(renewal).toLowerCase()} (${day2(renewal.termEnd)})`,
           path: `/accounts/${a.id}`,
           urgent: renewal.kind === "ended"
         }
@@ -2093,7 +2135,7 @@ function buildDigest(input) {
   }
   const overdueActions = input.deals.filter((d) => isOverdue(d, now)).sort((x, y) => String(x.next_action_date).localeCompare(String(y.next_action_date))).map((d) => ({
     name: nameOf.get(d.account_id) ?? "Prospect",
-    detail: `${d.next_action || "next action"}, due ${d.next_action_date ? day(d.next_action_date) : ""}`,
+    detail: `${d.next_action || "next action"}, due ${d.next_action_date ? day2(d.next_action_date) : ""}`,
     path: `/accounts/${d.account_id}`,
     urgent: true
   }));
@@ -2128,6 +2170,12 @@ function buildDigest(input) {
       detail: issueDetail(t, t.account_id ? nameOf.get(t.account_id) ?? "Account" : "No client", now),
       path: `/support/${t.id}`,
       urgent: needsClientUpdate(t, now)
+    })),
+    ctrmRenewals: digestRenewals(input.ctrmTerms || [], now).map((r) => ({
+      name: nameOf.get(r.accountId) ?? "CTRM Next client",
+      detail: renewalText(r),
+      path: `/accounts/${r.accountId}`,
+      urgent: isUrgentRenewal(r)
     }))
   };
 }
@@ -2170,6 +2218,9 @@ function digestSections(d) {
   }
   if (d.quoteNudges?.length) {
     sections.push({ key: "quoteNudges", title: "Quotes waiting 3 days for a reply", empty: "", items: d.quoteNudges });
+  }
+  if (d.ctrmRenewals?.length) {
+    sections.push({ key: "ctrmRenewals", title: "CTRM Next renewals", empty: "", items: d.ctrmRenewals });
   }
   if (d.ctrmIssues?.length) {
     sections.push({ key: "ctrmIssues", title: "Open CTRM Next issues, oldest first", empty: "", items: d.ctrmIssues });

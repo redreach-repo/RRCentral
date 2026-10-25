@@ -43,6 +43,7 @@ export const EXPORT_TABLES: ExportTable[] = [
   { table: 'sales_deals', label: 'Sales deal', by: 'account_id', client: false },
   { table: 'ctrm_deals', label: 'CTRM deals', by: 'account_id', client: false },
   { table: 'ctrm_fit_sheets', label: 'CTRM fit sheet', by: 'account_id', client: true, hideForClient: ['updated_by'] },
+  { table: 'ctrm_client_terms', label: 'CTRM contract dates', by: 'account_id', client: true, hideForClient: ['updated_by'] },
   { table: 'ctrm_sessions', label: 'CTRM sessions', by: 'account_id', client: true, hideForClient: ['notes', 'created_by'] },
   { table: 'ai_usage_log', label: 'AI help costs', by: 'account_id', client: false },
   { table: 'usage_sources', label: 'Usage import settings', by: 'account_id', client: false },

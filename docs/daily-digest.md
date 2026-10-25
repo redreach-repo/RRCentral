@@ -10,6 +10,7 @@ attention in RR Central to the people on the digest list:
 | Overdue CTRM next actions | Open CTRM Next deals whose next action date has passed |
 | Clients over their hours | AI CRM clients more than 25% over target hours two months running (`hoursAlert`) |
 | Open CTRM Next issues, oldest first | CTRM Next client issues still open on the support desk; red when the client has had no update for 2 working days (`ctrmIssues.ts`). Only shown when there are some |
+| CTRM Next renewals | CTRM Next clients on the 90, 60 and 30 day marks before renewal, every day in the last 14 days and once passed, and the week before the notice deadline (`ctrmRenewals.ts`). Only shown when there are some |
 | Fridays only: no hours this week | Clients on a running contract with no hours logged since Monday |
 
 Email has the full list with links. WhatsApp has the counts (Meta does not

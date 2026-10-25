@@ -45,6 +45,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 26 | CTRM Next fit sheet | none (SQL only) |
 | 27 | CTRM Next client issues | `daily-digest` (redeploy) |
 | 28 | CTRM Next sessions | none (SQL only) |
+| 29 | CTRM Next renewal dates | `daily-digest` (redeploy) |
 
 ---
 
@@ -513,3 +514,17 @@ the timeline. When the follow up date arrives it shows in **CRM → My Day** und
 
 **If it fails.** "Run the sessions SQL first" means the SQL has not run. A recording link that does not start with
 https:// is refused.
+
+## 29. CTRM Next renewal dates
+
+**Trigger.** Run the Wave 5 renewal dates SQL and redeploy `daily-digest`. As sales, a manager or an admin open a
+CTRM Next client and press **Add dates** on **Contract and renewal**. Try a renewal date 60 days away and a notice
+period of 30 days.
+
+**You should see.** The card shows the dates, "Renews in 60 days" and the last day to give notice. The dashboard
+has a **CTRM Next renewals** card ("60 day reminder"). The morning digest has a **CTRM Next renewals** line on the
+90, 60 and 30 day marks, every day in the last 14 days and once passed, and every day of the week before the
+notice deadline. The VA and viewers see the dates but cannot change them.
+
+**If it fails.** "Run the renewal dates SQL first" means the SQL has not run. No digest line means `daily-digest`
+was not redeployed, or today is not one of the reminder days.

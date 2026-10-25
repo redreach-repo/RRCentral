@@ -7,7 +7,7 @@ import { ALL_SEED_PRODUCTS } from './seedCatalog'
 import { errorMessage } from './errors'
 
 export const DB_NAME = 'rrcentral_local'
-const DB_VERSION = 27
+const DB_VERSION = 28
 
 export const LOCAL_STORES = [
   'app_settings',
@@ -77,6 +77,7 @@ export const LOCAL_STORES = [
   'report_calls',
   'ctrm_fit_sheets',
   'ctrm_sessions',
+  'ctrm_client_terms',
 ] as const
 
 export type LocalStoreName = (typeof LOCAL_STORES)[number]
@@ -632,6 +633,7 @@ function withDefaults(table: string, row: Row): Row {
         'report_calls',
         'ctrm_fit_sheets',
         'ctrm_sessions',
+        'ctrm_client_terms',
       ].includes(table)
     ) {
       next.created_at = now
@@ -1118,6 +1120,7 @@ export type MigrationDump = {
   report_calls?: Row[]
   ctrm_fit_sheets?: Row[]
   ctrm_sessions?: Row[]
+  ctrm_client_terms?: Row[]
 }
 
 async function clearStore(store: string): Promise<void> {

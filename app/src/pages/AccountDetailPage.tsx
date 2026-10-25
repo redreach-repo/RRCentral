@@ -18,6 +18,7 @@ import AccountTicketsCard from '../components/support/AccountTicketsCard'
 import AccountDealsCard from '../components/ctrm/AccountDealsCard'
 import FitSheetCard from '../components/ctrm/FitSheetCard'
 import SessionsCard from '../components/ctrm/SessionsCard'
+import CtrmTermsCard from '../components/ctrm/CtrmTermsCard'
 import AccountSalesDealCard from '../components/sales/AccountSalesDealCard'
 import ChurchProductCard from '../components/worshiphub/ChurchProductCard'
 import { db } from '../lib/db'
@@ -615,6 +616,7 @@ export default function AccountDetailPage() {
         />
       )}
 
+      {account.type === 'ctrm_prospect' ? <CtrmTermsCard account={account} editable={editable} author={author} /> : null}
       {account.type === 'ctrm_prospect' ? <SessionsCard account={account} editable={editable} author={author} /> : null}
 
       {account.type === 'ctrm_prospect' ? (
