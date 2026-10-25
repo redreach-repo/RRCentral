@@ -21,6 +21,7 @@ import SupportPage from './pages/SupportPage'
 import TicketPage from './pages/TicketPage'
 import CtrmPage from './pages/CtrmPage'
 import SalesPipelinePage from './pages/SalesPipelinePage'
+import MyDealsPage from './pages/MyDealsPage'
 import CtrmSummaryPage from './pages/CtrmSummaryPage'
 import ProductsPage from './pages/ProductsPage'
 import CrmPage from './pages/CrmPage'
@@ -42,6 +43,7 @@ import SettingsPage from './pages/SettingsPage'
 import AuditLogPage from './pages/AuditLogPage'
 import DocumentPage from './pages/DocumentPage'
 import ClientPortalPage from './pages/ClientPortalPage'
+import QuoteAcceptPage from './pages/QuoteAcceptPage'
 import ShopLayout from './shop/ShopLayout'
 import ShopHomePage from './shop/pages/ShopHomePage'
 import ShopListingPage from './shop/pages/ShopListingPage'
@@ -84,6 +86,7 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             {/* Clients open this from a private link; no sign in. */}
             <Route path="/portal" element={<ClientPortalPage />} />
+            <Route path="/accept" element={<QuoteAcceptPage />} />
             <Route
               path="/ctrm/summary"
               element={
@@ -128,6 +131,7 @@ export default function App() {
               <Route path="support/:id" element={<TicketPage />} />
               <Route path="ctrm" element={<CtrmPage />} />
               <Route path="sales" element={<SalesPipelinePage />} />
+              <Route path="deals" element={<MyDealsPage />} />
               <Route path="products" element={<ProductsPage />} />
               <Route path="app/wanders" element={<WandersPage />} />
               <Route path="crm" element={<CrmPage />} />

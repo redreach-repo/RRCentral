@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import Modal from '../Modal'
+import LostReasonFields from '../deals/LostReasonFields'
 import { formatAED } from '../../lib/money'
 import { SALES_STAGES, quoteFirstYear, quoteFromPackage, salesDealProblem } from '../../lib/salesPipeline'
 import type { SalesDealInput } from '../../lib/salesPipelineStore'
@@ -69,6 +70,7 @@ export default function SalesDealFormModal({
       next_action: deal?.next_action ?? '',
       next_action_date: deal?.next_action_date ?? today(),
       lost_reason: deal?.lost_reason ?? '',
+      lost_reason_code: deal?.lost_reason_code ?? '',
       notes: deal?.notes ?? '',
       discovery_call_date: deal?.discovery_call_date ?? null,
       package_id: deal?.package_id ?? null,
@@ -206,18 +208,13 @@ export default function SalesDealFormModal({
         </div>
 
         {v.stage === 'lost' ? (
-          <div style={{ ...fieldStyle, marginBottom: 12 }}>
-            <label style={labelStyle} htmlFor="sd-lost">
-              Why was it lost?
-            </label>
-            <input
-              id="sd-lost"
-              style={inputStyle}
-              value={v.lost_reason}
-              placeholder="Went with another agency, no budget this year"
-              onChange={(e) => set({ lost_reason: e.target.value })}
-            />
-          </div>
+          <LostReasonFields
+            idPrefix="sd-lost"
+            code={v.lost_reason_code || ''}
+            note={v.lost_reason}
+            notePlaceholder="Went with another agency, no budget this year"
+            onChange={({ code, note }) => set({ lost_reason_code: code, lost_reason: note })}
+          />
         ) : null}
 
         <div style={formGridStyle}>

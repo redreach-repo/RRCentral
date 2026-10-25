@@ -2,6 +2,7 @@ import { format, startOfMonth, subMonths } from 'date-fns'
 import { listAccounts } from './accountsStore'
 import { listContractInvoices } from './contractBillingStore'
 import { listDeals } from './ctrmStore'
+import { listRecentLeads } from './leadIntakeStore'
 import { buildDigest, type Digest } from './dailyDigest'
 import type { NudgeDeal, NudgeQuote } from './quoteNudges'
 import { db } from './db'
@@ -37,6 +38,7 @@ export async function loadDigestPreview(now: Date = new Date()): Promise<Digest>
       .eq('status', 'Sent'),
     db.from('sales_deals').select('id, account_id, stage, quote_reference, monthly_fee, last_touch_at, quote_sent_at').eq('stage', 'quote_sent'),
   ])
+  const leads = await listRecentLeads(new Date(dayAgo))
   return buildDigest({
     now,
     accounts,
@@ -49,6 +51,7 @@ export async function loadDigestPreview(now: Date = new Date()): Promise<Digest>
     watch: watch || [],
     sentQuotes: sentQuotes.error ? [] : ((sentQuotes.data || []) as NudgeQuote[]),
     quoteDeals: quoteDeals.error ? [] : ((quoteDeals.data || []) as NudgeDeal[]),
+    leads,
   })
 }
 

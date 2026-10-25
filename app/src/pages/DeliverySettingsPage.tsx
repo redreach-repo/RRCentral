@@ -7,6 +7,7 @@ import EmptyState from '../components/EmptyState'
 import SupportSettingsCard from '../components/support/SupportSettingsCard'
 import ContractInvoiceSettingsCard from '../components/invoices/ContractInvoiceSettingsCard'
 import WatchdogSettingsCard from '../components/watchdog/WatchdogSettingsCard'
+import LeadIntakeSettingsCard from '../components/leads/LeadIntakeSettingsCard'
 import MessageTemplatesCard from '../components/quotes/MessageTemplatesCard'
 import UsageImportCard from '../components/accounts/UsageImportCard'
 import DailyDigestCard from '../components/accounts/DailyDigestCard'
@@ -183,6 +184,7 @@ export default function DeliverySettingsPage() {
 
       <ContractInvoiceSettingsCard />
       <WatchdogSettingsCard />
+      <LeadIntakeSettingsCard />
       <MessageTemplatesCard />
 
       <UsageImportCard />

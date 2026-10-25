@@ -50,6 +50,9 @@ import { hydrateContacts, primaryContact } from '../lib/contacts'
 import { findClientByCompany, resolveBillToParty } from '../lib/clientLookup'
 import { isZohoMailEnabled } from '../lib/zoho'
 import EmailComposeModal from '../components/EmailComposeModal'
+import QuoteAcceptLinksModal from '../components/quotes/QuoteAcceptLinksModal'
+import { canHaveAcceptLink, canManageAcceptLinks } from '../lib/quoteAccept'
+import { pdfBase64FromDataUrl } from '../lib/quoteAcceptStore'
 import LinkWorkDriveModal from '../components/LinkWorkDriveModal'
 import SaveToFolderPrompt from '../components/SaveToFolderPrompt'
 import { logActivity } from '../lib/activity'
@@ -68,7 +71,7 @@ export default function DocumentPage() {
   const docType: PrintableDocType = parseDocumentType(type)
   const { settings } = useSettings()
   const { showToast } = useToast()
-  const { user } = useAuth()
+  const { user, userRole } = useAuth()
   const navigate = useNavigate()
   const sheetRef = useRef<HTMLDivElement>(null)
 
@@ -96,6 +99,7 @@ export default function DocumentPage() {
   const [workdriveLinks, setWorkdriveLinks] = useState<CustomerDocument[]>([])
   const [linkMode, setLinkMode] = useState<'signed' | 'communication' | null>(null)
   const [savePrompt, setSavePrompt] = useState<'email' | 'whatsapp' | null>(null)
+  const [acceptOpen, setAcceptOpen] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1161,6 +1165,11 @@ export default function DocumentPage() {
         <ToolbarBtn onClick={() => setLinkMode('communication')}>
           <FileUp size={14} /> Link chat / email
         </ToolbarBtn>
+        {docType === 'quote' && quote && canManageAcceptLinks(userRole) && (canHaveAcceptLink(quote) || quote.status === 'Accepted') ? (
+          <ToolbarBtn onClick={() => setAcceptOpen(true)}>
+            <Link2 size={14} /> Accept link
+          </ToolbarBtn>
+        ) : null}
         {docType === 'quote' && quote && canCreateDeliveryNoteFromQuote(quote) ? (
           <ToolbarBtn onClick={() => void createDnFromQuote()} disabled={dnBusy}>
             <Truck size={14} /> {dnBusy ? 'Creating…' : 'Delivery note'}
@@ -1342,6 +1351,18 @@ export default function DocumentPage() {
         )}
       </div>
 
+      {docType === 'quote' && quote ? (
+        <QuoteAcceptLinksModal
+          open={acceptOpen}
+          onClose={() => setAcceptOpen(false)}
+          quote={quote}
+          makePdfBase64={async () => {
+            if (!sheetRef.current) return ''
+            const { dataUrl } = await elementToPdfBlob(sheetRef.current, { filenameHint: `quote-${displayRef}`, fitToPage })
+            return pdfBase64FromDataUrl(dataUrl)
+          }}
+        />
+      ) : null}
       <EmailComposeModal
         open={emailOpen}
         companyName={doc.client || ''}
