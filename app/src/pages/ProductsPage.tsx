@@ -130,19 +130,12 @@ export default function ProductsPage() {
     }
   }
 
-  let connection: { text: string; tone: string }
-  if (!live) connection = { text: 'Checking the WorshipHub connection…', tone: colors.muted }
-  else if (live.connected) {
-    connection = {
-      text: `Connected to WorshipHub. Plan, usage and billing below are live, read only.`,
-      tone: colors.success,
-    }
-  } else {
-    connection = {
-      text: `WorshipHub is not connected. ${live.message} The page shows the details entered by hand on each church.`,
-      tone: colors.warn,
-    }
-  }
+  // Each visit fetches fresh numbers from WorshipHub; the page only speaks up
+  // when that fails, so a working connection shows nothing.
+  const connectionProblem =
+    live && !live.connected
+      ? `WorshipHub is not connected. ${live.message} The page shows the details entered by hand on each church.`
+      : ''
 
   return (
     <div style={pageStyle}>
@@ -163,14 +156,16 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      <section style={{ ...cardStyle, marginBottom: 16 }} aria-label="WorshipHub connection">
-        <p style={{ margin: 0, fontSize: 13, color: connection.tone }}>{connection.text}</p>
-        {live && !live.connected && userRole === 'admin' ? (
-          <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted2 }}>
-            To connect, follow docs/worshiphub-integration.md in the repo.
-          </p>
-        ) : null}
-      </section>
+      {connectionProblem ? (
+        <section style={{ ...cardStyle, marginBottom: 16 }} aria-label="WorshipHub connection">
+          <p style={{ margin: 0, fontSize: 13, color: colors.warn }}>{connectionProblem}</p>
+          {userRole === 'admin' ? (
+            <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted2 }}>
+              To connect, follow docs/worshiphub-integration.md in the repo.
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       {requests.length ? (
         <section style={{ ...cardStyle, marginBottom: 16, borderColor: colors.warn }} aria-label="Churches asking to join WorshipHub">
