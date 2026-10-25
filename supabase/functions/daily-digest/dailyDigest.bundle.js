@@ -1788,6 +1788,16 @@ function subMonths(date, amount, options) {
   return addMonths(date, -amount, options);
 }
 
+// src/lib/config.ts
+var DIVISIONS = [
+  { code: "01", brand: "RR Threads", category: "Uniforms" },
+  { code: "02", brand: "RR Wanders", category: "Tours" },
+  { code: "03", brand: "RR Marketing", category: "SEO and Marketing" },
+  { code: "04", brand: "RR Connect", category: "Virtual Assistance" },
+  { code: "05", brand: "RR Care", category: "Medical Tours / Care" },
+  { code: "06", brand: "RR Trading", category: "Trading" }
+];
+
 // src/lib/ctrm.ts
 function isOpenDeal(d) {
   return d.stage !== "signed" && d.stage !== "lost";
@@ -1812,6 +1822,60 @@ function newLeads(rows, since) {
     link: r.account_id ? `/accounts/${r.account_id}` : r.crm_id ? `/crm?edit=${r.crm_id}` : "/crm",
     created_at: r.created_at
   }));
+}
+
+// src/lib/quoteNudges.ts
+var NUDGE_DAYS = 3;
+var AI_CRM_DIVISION = "07";
+var DIVISION_OPTIONS = [
+  { value: "", label: "Every division" },
+  ...DIVISIONS.map((d) => ({ value: d.code, label: `${d.code} ${d.brand}` })),
+  { value: AI_CRM_DIVISION, label: "07 AI CRM" }
+];
+function formatQuoteAmount(amount, currency) {
+  return `${currency || "AED"} ${(Number(amount) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+var latest = (...isos) => isos.filter((v) => Boolean(v)).sort().pop() || "";
+function quoteNudges(input) {
+  const out = [];
+  for (const q of input.quotes) {
+    if (q.status !== "Sent" || !q.sent_at) continue;
+    const since = latest(q.sent_at, q.followed_up_at);
+    const days = differenceInCalendarDays(input.now, parseISO(since));
+    if (days < NUDGE_DAYS) continue;
+    out.push({
+      key: `quote:${q.id}`,
+      kind: "quote",
+      id: q.id,
+      account_id: q.account_id ?? null,
+      account: q.client || (q.account_id ? input.accountNames.get(q.account_id) ?? "" : ""),
+      division: q.division_code,
+      quote_number: q.reference_number,
+      amount: formatQuoteAmount(q.amount, q.quotation_currency || "AED"),
+      days,
+      path: `/document/quote/${q.id}`
+    });
+  }
+  for (const d of input.deals) {
+    if (d.stage !== "quote_sent") continue;
+    const since = latest(d.quote_sent_at, d.last_touch_at);
+    if (!since) continue;
+    const days = differenceInCalendarDays(input.now, parseISO(since));
+    if (days < NUDGE_DAYS) continue;
+    out.push({
+      key: `deal:${d.id}`,
+      kind: "sales_deal",
+      id: d.id,
+      account_id: d.account_id,
+      account: input.accountNames.get(d.account_id) ?? "AI CRM prospect",
+      division: AI_CRM_DIVISION,
+      quote_number: d.quote_reference || "AI CRM quote",
+      amount: `${formatQuoteAmount(d.monthly_fee, "AED")} a month`,
+      days,
+      path: `/accounts/${d.account_id}`
+    });
+  }
+  return out.sort((a, b) => b.days - a.days || a.account.localeCompare(b.account));
 }
 
 // src/lib/delivery.ts
@@ -1990,6 +2054,12 @@ function buildDigest(input) {
       detail: l.detail,
       path: l.link,
       urgent: false
+    })),
+    quoteNudges: quoteNudges({ quotes: input.sentQuotes || [], deals: input.quoteDeals || [], accountNames: nameOf, now }).map((n) => ({
+      name: n.account || n.quote_number,
+      detail: `${n.quote_number}, ${n.amount}, ${n.days} days without a reply`,
+      path: n.kind === "quote" ? "/crm?follow=Due" : n.path,
+      urgent: false
     }))
   };
 }
@@ -2029,6 +2099,9 @@ function digestSections(d) {
   ];
   if (d.newLeads?.length) {
     sections.push({ key: "newLeads", title: "New leads in the last day", empty: "", items: d.newLeads });
+  }
+  if (d.quoteNudges?.length) {
+    sections.push({ key: "quoteNudges", title: "Quotes waiting 3 days for a reply", empty: "", items: d.quoteNudges });
   }
   if (d.lateInvoices?.length) {
     sections.push({ key: "lateInvoices", title: "Invoices 3, 7 or 14 days late", empty: "", items: d.lateInvoices });

@@ -109,6 +109,7 @@ import {
   colors,
 } from '../lib/pageStyles'
 import { errorMessage } from '../lib/errors'
+import QuoteNudgesCard from '../components/quotes/QuoteNudgesCard'
 
 type CrmForm = {
   company_name: string
@@ -1232,6 +1233,8 @@ export default function CrmPage() {
             <span className={resp.dueTileLabel}>{canViewAll ? 'All deals' : 'My deals'}</span>
           </button>
         </div>
+
+        {followFilter === 'Due' ? <QuoteNudgesCard /> : null}
 
         <div className={resp.toolbar}>
           <div className={resp.toolbarSearch}>

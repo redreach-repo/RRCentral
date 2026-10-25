@@ -12,11 +12,13 @@
  * On Fridays it also names clients with no hours logged this week.
  * From the 07:30 watchdog (watchdog.ts) it adds stale deals and late invoices.
  * It also says how many contract invoices the 06:00 run drafted today,
- * and lists the new leads from the website, WhatsApp and the landing page.
+ * lists the new leads from the website, WhatsApp and the landing page,
+ * and which quotes have waited 3 days for a reply (quoteNudges.ts).
  */
 import { format, isFriday, parseISO } from 'date-fns'
 import { isOverdue } from './ctrm'
 import { newLeads, type IntakeRow } from './leadIntake'
+import { quoteNudges, type NudgeDeal, type NudgeQuote } from './quoteNudges'
 import { currentContract, hoursAlert, renewalFlag, renewalLabel } from './delivery'
 import { slaState } from './sla'
 import { isOpenTicket } from './support'
@@ -51,6 +53,8 @@ export type Digest = {
   contractDrafts: DigestItem[]
   /** Leads from the lead intake in the last 24 hours. */
   newLeads: DigestItem[]
+  /** Quotes sent 3 or more days ago with no follow up since. */
+  quoteNudges: DigestItem[]
 }
 
 /** An open watch_items row, as much as the digest needs. */
@@ -80,6 +84,9 @@ export type DigestInput = {
   contractDrafts?: number
   /** website_inquiries rows from the last 24 hours (optional). */
   leads?: IntakeRow[]
+  /** Sent quotes and AI CRM deals at Quote sent (optional). */
+  sentQuotes?: NudgeQuote[]
+  quoteDeals?: NudgeDeal[]
 }
 
 const day = (iso: string) => format(parseISO(iso.slice(0, 10)), 'd MMM')
@@ -172,6 +179,12 @@ export function buildDigest(input: DigestInput): Digest {
       path: l.link,
       urgent: false,
     })),
+    quoteNudges: quoteNudges({ quotes: input.sentQuotes || [], deals: input.quoteDeals || [], accountNames: nameOf, now }).map((n) => ({
+      name: n.account || n.quote_number,
+      detail: `${n.quote_number}, ${n.amount}, ${n.days} days without a reply`,
+      path: n.kind === 'quote' ? '/crm?follow=Due' : n.path,
+      urgent: false,
+    })),
   }
 }
 
@@ -226,6 +239,9 @@ export function digestSections(d: Digest): DigestSection[] {
   ]
   if (d.newLeads?.length) {
     sections.push({ key: 'newLeads', title: 'New leads in the last day', empty: '', items: d.newLeads })
+  }
+  if (d.quoteNudges?.length) {
+    sections.push({ key: 'quoteNudges', title: 'Quotes waiting 3 days for a reply', empty: '', items: d.quoteNudges })
   }
   if (d.lateInvoices?.length) {
     sections.push({ key: 'lateInvoices', title: 'Invoices 3, 7 or 14 days late', empty: '', items: d.lateInvoices })

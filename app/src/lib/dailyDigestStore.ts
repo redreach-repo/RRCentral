@@ -4,6 +4,7 @@ import { listContractInvoices } from './contractBillingStore'
 import { listDeals } from './ctrmStore'
 import { listRecentLeads } from './leadIntakeStore'
 import { buildDigest, type Digest } from './dailyDigest'
+import type { NudgeDeal, NudgeQuote } from './quoteNudges'
 import { db } from './db'
 import { listContracts, listPackages, listTimeEntries } from './deliveryStore'
 import { isMissingRelationError, isUndefinedColumnError } from './errors'
@@ -30,8 +31,28 @@ export async function loadDigestPreview(now: Date = new Date()): Promise<Digest>
     .is('cleared_at', null)
   const dayAgo = now.getTime() - 24 * 60 * 60 * 1000
   const contractDrafts = contractInvoices.filter((r) => r.invoice_id && Date.parse(r.created_at) >= dayAgo).length
+  const [sentQuotes, quoteDeals] = await Promise.all([
+    db
+      .from('quotations')
+      .select('id, client, reference_number, division_code, amount, status, account_id, quotation_currency, sent_at, followed_up_at')
+      .eq('status', 'Sent'),
+    db.from('sales_deals').select('id, account_id, stage, quote_reference, monthly_fee, last_touch_at, quote_sent_at').eq('stage', 'quote_sent'),
+  ])
   const leads = await listRecentLeads(new Date(dayAgo))
-  return buildDigest({ now, accounts, contracts, packages, entries, tickets, deals, contractDrafts, watch: watch || [], leads })
+  return buildDigest({
+    now,
+    accounts,
+    contracts,
+    packages,
+    entries,
+    tickets,
+    deals,
+    contractDrafts,
+    watch: watch || [],
+    sentQuotes: sentQuotes.error ? [] : ((sentQuotes.data || []) as NudgeQuote[]),
+    quoteDeals: quoteDeals.error ? [] : ((quoteDeals.data || []) as NudgeDeal[]),
+    leads,
+  })
 }
 
 export async function listRecipients(): Promise<{ rows: DigestRecipientRow[]; missingTable: boolean }> {

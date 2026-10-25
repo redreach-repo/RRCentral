@@ -33,6 +33,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 14 | Next step and lost reason | none (app and SQL only) |
 | 15 | Website and WhatsApp leads | `lead-intake` |
 | 16 | Quote accept links | `quote-accept` |
+| 17 | Quote follow up templates and nudges | `daily-digest` |
 
 ---
 
@@ -281,4 +282,22 @@ on the account.
 
 **If it fails.** "Run the Quote accept link SQL first" means the SQL has not been run. System check row
 "Quote accept links"; App errors under `quote-accept`.
+
+---
+
+## 17. Quote follow up templates and nudges
+
+**Trigger.** Packages and rates → **Follow up templates**: add a WhatsApp template for one division using
+`{{name}}`, `{{quote_number}}` and `{{amount}}`; the preview below the box fills them with sample values.
+Then mark a test quote to your own company **Sent**. To see the nudge today without waiting, run this in the
+Supabase SQL editor with its RR number: `update quotations set sent_at = now() - interval '4 days' where reference_number = 'RR-…';`
+
+**You should see.** CRM → **My Day** shows **Quotes waiting for a reply** with the quote, its amount and
+"4 days without a reply". **WhatsApp** opens WhatsApp to the client's contact with your template filled in;
+**Email** opens your email with the subject and message ready. The row disappears and comes back 3 days later
+if the quote is still Sent. Next morning's digest lists it under "Quotes waiting 3 days for a reply" (redeploy
+`daily-digest` first).
+
+**If it fails.** "Run the Follow up templates SQL first" means the SQL has not been run. "No WhatsApp or phone
+number" means the account's contact or the CRM row has no number.
 
