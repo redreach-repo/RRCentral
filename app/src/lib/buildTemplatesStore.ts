@@ -2,6 +2,7 @@ import { currentAuthMode, db } from './db'
 import { isMissingRelationError } from './errors'
 import { DEFAULT_BUILD_TEMPLATES, configSource, planApply } from './buildTemplates'
 import { listPackages } from './deliveryStore'
+import { goLiveDue, isGoLive, signedDateFor } from './goLive'
 import type { BuildStageKey, BuildTask, BuildTemplate, BuildTemplateItem, Requirement } from './types'
 
 async function rows<T>(query: PromiseLike<{ data: unknown; error: unknown }>): Promise<T[]> {
@@ -100,10 +101,16 @@ export async function copyBuildTemplate(source: BuildTemplate, input: TemplateIn
   return newId
 }
 
-export type TemplateItemInput = Pick<BuildTemplateItem, 'kind' | 'stage' | 'title' | 'detail' | 'est_hours' | 'sort'>
+export type TemplateItemInput = Pick<BuildTemplateItem, 'kind' | 'stage' | 'title' | 'detail' | 'est_hours' | 'sort' | 'owner' | 'due_days'>
 
 export async function saveTemplateItem(templateId: string, input: TemplateItemInput, id?: string): Promise<void> {
-  const row = { ...input, stage: input.kind === 'task' ? input.stage : null }
+  const golive = input.kind === 'golive'
+  const row = {
+    ...input,
+    stage: input.kind === 'config' ? null : input.stage,
+    owner: golive ? input.owner ?? 'red_reach' : 'red_reach',
+    due_days: golive ? input.due_days ?? 0 : null,
+  }
   if (id) {
     check(await db.from('build_template_items').update(row).eq('id', id))
   } else {
@@ -161,12 +168,12 @@ export async function deleteBuildTask(id: string): Promise<void> {
 export async function applyBuildTemplate(
   accountId: string,
   template: BuildTemplate,
-  existingTasks: Pick<BuildTask, 'stage' | 'title' | 'sort'>[],
+  existingTasks: (Pick<BuildTask, 'stage' | 'title' | 'sort'> & { kind?: string | null })[],
   existingRequirements: Pick<Requirement, 'title'>[],
   createdBy: string,
-): Promise<{ tasks: number; requirements: number; skipped: number }> {
+): Promise<{ tasks: number; requirements: number; goLive: number; skipped: number }> {
   const items = await listTemplateItems(template.id)
-  const plan = planApply(items, existingTasks, existingRequirements)
+  const plan = planApply(items, existingTasks, existingRequirements, await signedDateForAccount(accountId))
   const now = new Date().toISOString()
   if (plan.tasks.length) {
     check(
@@ -201,5 +208,59 @@ export async function applyBuildTemplate(
       ),
     )
   }
-  return { tasks: plan.tasks.length, requirements: plan.requirements.length, skipped: plan.skipped }
+  const goLive = plan.tasks.filter(isGoLive).length
+  return { tasks: plan.tasks.length - goLive, requirements: plan.requirements.length, goLive, skipped: plan.skipped }
+}
+
+/** When the client signed (see signedDateFor), or null before signing. */
+export async function signedDateForAccount(accountId: string): Promise<string | null> {
+  const [deals, contracts] = await Promise.all([
+    rows<{ stage: string; signed_at: string | null }>(db.from('sales_deals').select('stage, signed_at').eq('account_id', accountId)),
+    rows<{ status: string; term_start: string | null; created_at: string }>(
+      db.from('contracts').select('status, term_start, created_at').eq('account_id', accountId),
+    ),
+  ])
+  return signedDateFor({ deals, contracts })
+}
+
+/** Sets every open go live step's due date from the signed date. Returns how many changed. */
+export async function refreshGoLiveDates(tasks: BuildTask[], signedDate: string): Promise<number> {
+  let changed = 0
+  for (const t of tasks) {
+    if (!isGoLive(t) || t.done || t.due_days == null) continue
+    const due = goLiveDue(signedDate, t.due_days)
+    if (due === (t.due_date ?? null)) continue
+    check(await db.from('build_tasks').update({ due_date: due }).eq('id', t.id))
+    changed++
+  }
+  return changed
+}
+
+export async function updateGoLiveStep(id: string, fields: Partial<Pick<BuildTask, 'owner' | 'owner_user_id' | 'due_date'>>): Promise<void> {
+  check(await db.from('build_tasks').update(fields).eq('id', id))
+}
+
+export async function addGoLiveStep(
+  accountId: string,
+  input: Pick<BuildTask, 'stage' | 'title' | 'owner' | 'due_date'>,
+  existing: Pick<BuildTask, 'sort'>[],
+): Promise<void> {
+  check(
+    await db.from('build_tasks').insert({
+      ...input,
+      id: crypto.randomUUID(),
+      account_id: accountId,
+      template_id: null,
+      kind: 'golive',
+      detail: '',
+      est_hours: 0,
+      due_days: null,
+      owner_user_id: null,
+      done: false,
+      done_at: null,
+      done_by: '',
+      sort: existing.reduce((max, t) => Math.max(max, t.sort), 0) + 1,
+      created_at: new Date().toISOString(),
+    }),
+  )
 }

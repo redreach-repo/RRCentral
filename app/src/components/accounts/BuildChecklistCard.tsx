@@ -13,6 +13,7 @@ import {
   setBuildTaskDone,
 } from '../../lib/buildTemplatesStore'
 import { errorMessage } from '../../lib/errors'
+import { isGoLive } from '../../lib/goLive'
 import { hoursLabel } from '../../lib/timeTracking'
 import type { BuildStageKey, BuildTask, BuildTemplate, DeliveryPackage, Requirement } from '../../lib/types'
 import {
@@ -36,6 +37,8 @@ type Props = {
   authorEmail: string
   /** Called after a template adds requirements, so the requirements list reloads. */
   onRequirementsAdded: () => void
+  /** Called after a template adds go live steps, so the go live card reloads. */
+  onGoLiveAdded?: () => void
 }
 
 const smallBtn: CSSProperties = { ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }
@@ -49,6 +52,7 @@ export default function BuildChecklistCard({
   requirements,
   authorEmail,
   onRequirementsAdded,
+  onGoLiveAdded,
 }: Props) {
   const { showToast } = useToast()
   const [tasks, setTasks] = useState<BuildTask[]>([])
@@ -76,8 +80,10 @@ export default function BuildChecklistCard({
     setTemplateId((current) => current || suggested?.id || templates[0]?.id || '')
   }, [suggested, templates])
 
-  const progress = checklistProgress(tasks)
-  const groups = useMemo(() => tasksByStage(tasks), [tasks])
+  // Go live steps have their own card; this one is the build work.
+  const buildTasks = useMemo(() => tasks.filter((t) => !isGoLive(t)), [tasks])
+  const progress = checklistProgress(buildTasks)
+  const groups = useMemo(() => tasksByStage(buildTasks), [buildTasks])
   const target = pkg?.build_hours_target ?? 0
   const overTarget = target > 0 && buildHours > target
 
@@ -99,7 +105,8 @@ export default function BuildChecklistCard({
     await run(async () => {
       const added = await applyBuildTemplate(accountId, template, tasks, requirements, authorEmail)
       if (added.requirements) onRequirementsAdded()
-      const parts = [`${added.tasks} tasks`, `${added.requirements} starter config lines`]
+      if (added.goLive) onGoLiveAdded?.()
+      const parts = [`${added.tasks} tasks`, `${added.requirements} starter config lines`, ...(added.goLive ? [`${added.goLive} go live steps`] : [])]
       showToast(
         added.tasks || added.requirements
           ? `${template.name} added ${parts.join(' and ')}${added.skipped ? `, ${added.skipped} already there` : ''}`
@@ -128,7 +135,7 @@ export default function BuildChecklistCard({
     <section style={cardStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Build checklist</h2>
-        {tasks.length ? (
+        {buildTasks.length ? (
           <span style={{ fontSize: 12, color: colors.muted }}>
             {progress.done} of {progress.total} done, about {hoursLabel(progress.estHoursLeft)} left
           </span>
@@ -138,7 +145,7 @@ export default function BuildChecklistCard({
       <p style={{ ...mutedNote, marginTop: 8, color: overTarget ? colors.warn : colors.muted }}>
         Build hours logged: {hoursLabel(buildHours)}
         {target > 0 ? ` of ${hoursLabel(target)} target for ${pkg?.name}` : ''}
-        {tasks.length ? `. Checklist estimate ${hoursLabel(progress.estHours)}.` : '.'}
+        {buildTasks.length ? `. Checklist estimate ${hoursLabel(progress.estHours)}.` : '.'}
         {overTarget ? ' Over the target, note what took longer so the template can improve.' : ''}
       </p>
 
@@ -163,7 +170,7 @@ export default function BuildChecklistCard({
         </div>
       ) : null}
 
-      {tasks.length === 0 ? (
+      {buildTasks.length === 0 ? (
         <p style={{ ...mutedNote, marginTop: 12 }}>
           No checklist yet. Start from the template for this package to copy in the build steps and the starter
           configuration.{' '}

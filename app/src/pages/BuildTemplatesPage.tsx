@@ -20,7 +20,8 @@ import { listPackages } from '../lib/deliveryStore'
 import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
 import { hoursLabel } from '../lib/timeTracking'
-import type { BuildStageKey, BuildTemplate, BuildTemplateItem, BuildTemplateItemKind, DeliveryPackage } from '../lib/types'
+import type { BuildStageKey, BuildTemplate, BuildTemplateItem, BuildTemplateItemKind, DeliveryPackage, GoLiveOwner } from '../lib/types'
+import { GO_LIVE_OWNERS, dueDaysProblem, ownerLabel } from '../lib/goLive'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -48,7 +49,16 @@ const rowStyle: CSSProperties = {
 }
 
 type TemplateForm = { id?: string; copyOf?: BuildTemplate; name: string; description: string; package_id: string; active: boolean }
-type ItemForm = { id?: string; kind: BuildTemplateItemKind; stage: BuildStageKey; title: string; detail: string; hours: string }
+type ItemForm = {
+  id?: string
+  kind: BuildTemplateItemKind
+  stage: BuildStageKey
+  title: string
+  detail: string
+  hours: string
+  owner: GoLiveOwner
+  dueDays: string
+}
 
 export default function BuildTemplatesPage() {
   const { userRole } = useAuth()
@@ -84,6 +94,9 @@ export default function BuildTemplatesPage() {
   const selectedItems = useMemo(() => sortItems(items.filter((i) => i.template_id === selectedId)), [items, selectedId])
   const tasks = selectedItems.filter((i) => i.kind === 'task')
   const configLines = selectedItems.filter((i) => i.kind === 'config')
+  const goLiveLines = [...selectedItems.filter((i) => i.kind === 'golive')].sort(
+    (a, b) => (a.due_days ?? 0) - (b.due_days ?? 0) || a.sort - b.sort,
+  )
   const pkgOf = (t: BuildTemplate) => packages.find((p) => p.id === t.package_id) ?? null
   const hoursFor = (t: BuildTemplate) => templateHours(items.filter((i) => i.template_id === t.id))
 
@@ -136,13 +149,20 @@ export default function BuildTemplatesPage() {
       showToast('Hours must be a number', 'error')
       return
     }
+    const daysProblem = itemForm.kind === 'golive' ? dueDaysProblem(itemForm.dueDays) : null
+    if (daysProblem) {
+      showToast(daysProblem, 'error')
+      return
+    }
     const existing = selectedItems.find((i) => i.id === itemForm.id)
     const input: TemplateItemInput = {
       kind: itemForm.kind,
-      stage: itemForm.kind === 'task' ? itemForm.stage : null,
+      stage: itemForm.kind === 'config' ? null : itemForm.stage,
       title,
       detail: itemForm.detail.trim(),
       est_hours: itemForm.kind === 'task' ? hours : 0,
+      owner: itemForm.owner,
+      due_days: itemForm.kind === 'golive' ? Number(itemForm.dueDays) : null,
       sort: existing?.sort ?? selectedItems.reduce((max, i) => Math.max(max, i.sort), 0) + 1,
     }
     await run(async () => {
@@ -159,6 +179,8 @@ export default function BuildTemplatesPage() {
       title: item?.title ?? '',
       detail: item?.detail ?? '',
       hours: item && item.est_hours ? String(item.est_hours) : '',
+      owner: item?.owner ?? 'red_reach',
+      dueDays: item?.due_days != null ? String(item.due_days) : '',
     })
   }
 
@@ -171,6 +193,11 @@ export default function BuildTemplatesPage() {
         </div>
         {i.kind === 'task' && i.est_hours > 0 ? (
           <span style={{ color: colors.muted2, fontSize: 12, whiteSpace: 'nowrap' }}>{hoursLabel(i.est_hours)}</span>
+        ) : null}
+        {i.kind === 'golive' ? (
+          <span style={{ color: colors.muted2, fontSize: 12, whiteSpace: 'nowrap' }}>
+            {ownerLabel(i.owner)}, day {i.due_days ?? 0}
+          </span>
         ) : null}
         {canEdit ? (
           <span style={{ display: 'flex', gap: 6 }}>
@@ -358,6 +385,23 @@ export default function BuildTemplatesPage() {
               ) : (
                 <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 0' }}>{configLines.map(itemRow)}</ul>
               )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20 }}>
+                <h3 style={{ fontSize: 14, margin: 0 }}>Go live checklist, {goLiveLines.length} steps</h3>
+                {canEdit ? (
+                  <button type="button" style={smallBtn} onClick={() => openItem('golive')}>
+                    <Plus size={12} /> Go live step
+                  </button>
+                ) : null}
+              </div>
+              <p style={{ color: colors.muted2, fontSize: 12, margin: '4px 0 0' }}>
+                Who does what before go live, due a number of days after the client signs. The client sees it in their portal.
+              </p>
+              {goLiveLines.length === 0 ? (
+                <p style={{ color: colors.muted, fontSize: 13 }}>No go live steps yet.</p>
+              ) : (
+                <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 0' }}>{goLiveLines.map(itemRow)}</ul>
+              )}
             </section>
           ) : null}
         </div>
@@ -425,7 +469,7 @@ export default function BuildTemplatesPage() {
 
       <Modal
         open={Boolean(itemForm)}
-        title={itemForm?.kind === 'config' ? 'Starter configuration line' : 'Build step'}
+        title={itemForm?.kind === 'config' ? 'Starter configuration line' : itemForm?.kind === 'golive' ? 'Go live step' : 'Build step'}
         onClose={() => setItemForm(null)}
       >
         {itemForm ? (
@@ -457,8 +501,49 @@ export default function BuildTemplatesPage() {
                 </div>
               </div>
             ) : null}
+            {itemForm.kind === 'golive' ? (
+              <div style={formGridStyle}>
+                <div style={fieldStyle}>
+                  <label style={labelStyle}>Stage</label>
+                  <select
+                    style={selectStyle}
+                    value={itemForm.stage}
+                    onChange={(e) => setItemForm({ ...itemForm, stage: e.target.value as BuildStageKey })}
+                  >
+                    {BUILD_STAGES.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div style={fieldStyle}>
+                  <label style={labelStyle}>Owner</label>
+                  <select
+                    style={selectStyle}
+                    value={itemForm.owner}
+                    onChange={(e) => setItemForm({ ...itemForm, owner: e.target.value as GoLiveOwner })}
+                  >
+                    {GO_LIVE_OWNERS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div style={fieldStyle}>
+                  <label style={labelStyle}>Due, days after signing</label>
+                  <input
+                    style={inputStyle}
+                    inputMode="numeric"
+                    value={itemForm.dueDays}
+                    onChange={(e) => setItemForm({ ...itemForm, dueDays: e.target.value })}
+                  />
+                </div>
+              </div>
+            ) : null}
             <div style={fieldStyle}>
-              <label style={labelStyle}>{itemForm.kind === 'task' ? 'Step' : 'What is set up'}</label>
+              <label style={labelStyle}>{itemForm.kind === 'config' ? 'What is set up' : 'Step'}</label>
               <input
                 style={inputStyle}
                 value={itemForm.title}

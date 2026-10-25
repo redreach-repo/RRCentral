@@ -9,6 +9,7 @@ import {
   portalExpiry,
   portalLink,
   ratesFromSettings,
+  type PortalInput,
   type PortalInvoiceRow,
   type PortalView,
 } from './clientPortal'
@@ -165,7 +166,7 @@ async function loadLocalPortal(token: string, month: string | null): Promise<Por
   const account = await getAccount(access.account_id)
   if (!account || account.type !== 'ai_crm_client') return { ok: false, message: NOT_VALID }
   const id = account.id
-  const [contracts, packages, stages, requirements, tickets, usage, entries, settings, invoices, payments] = await Promise.all([
+  const [contracts, packages, stages, requirements, tickets, usage, entries, settings, invoices, payments, buildTasks] = await Promise.all([
     listContracts(id),
     listPackages(),
     listStages(id),
@@ -176,6 +177,7 @@ async function loadLocalPortal(token: string, month: string | null): Promise<Por
     db.from('app_settings').select('key, value'),
     db.from('invoices').select('*').eq('account_id', id),
     db.from('payment_log').select('invoice_ref, amount'),
+    db.from('build_tasks').select('*').eq('account_id', id),
   ])
   const map: Record<string, string> = {}
   for (const s of ((settings as { data: unknown }).data || []) as { key: string; value: string }[]) map[s.key] = s.value
@@ -196,6 +198,7 @@ async function loadLocalPortal(token: string, month: string | null): Promise<Por
       rates: ratesFromSettings(map),
       invoices: ((invoices as { data: unknown }).data || []) as PortalInvoiceRow[],
       payments: ((payments as { data: unknown }).data || []) as { invoice_ref: string; amount: number }[],
+      goLive: (((buildTasks as { data: unknown }).data || []) as NonNullable<PortalInput['goLive']>).filter((t) => t.kind === 'golive'),
     }),
   }
 }

@@ -5,6 +5,7 @@ import { AlertTriangle, CalendarClock, Clock, FileText, Pencil, Play, Plus, Spar
 import Modal from '../Modal'
 import CallNotesModal from './CallNotesModal'
 import BuildChecklistCard from './BuildChecklistCard'
+import GoLiveCard from './GoLiveCard'
 import ServiceAgreementButton from './ServiceAgreementButton'
 import ClientHealthCard from './ClientHealthCard'
 import { useCompactCrm } from '../../hooks/useMediaQuery'
@@ -169,6 +170,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
   const rates = useMemo(() => ratesFromSettings(settings), [settings])
   const [packages, setPackages] = useState<DeliveryPackage[]>([])
   const [contracts, setContracts] = useState<Contract[]>([])
+  const [goLiveKey, setGoLiveKey] = useState(0)
   const [stages, setStages] = useState<BuildStage[]>([])
   const [requirements, setRequirements] = useState<Requirement[]>([])
   const [entries, setEntries] = useState<TimeEntry[]>([])
@@ -1063,7 +1065,10 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
         requirements={requirements}
         authorEmail={author.email}
         onRequirementsAdded={() => void load()}
+        onGoLiveAdded={() => setGoLiveKey((k) => k + 1)}
       />
+
+      <GoLiveCard accountId={account.id} canEdit={canLog} team={team} authorEmail={author.email} reloadKey={goLiveKey} />
 
       <section style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>

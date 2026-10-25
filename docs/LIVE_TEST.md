@@ -39,6 +39,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 20 | Reports that answer questions | none (app only) |
 | 21 | Client portal: quotes, invoices, files, replies | `client-portal`, `quote-accept` |
 | 22 | Monthly client reports to approve | `client-reports` |
+| 23 | Go live checklist | `client-portal` (redeploy) |
 
 ---
 
@@ -407,3 +408,22 @@ Pressing Build again adds nothing for clients that already have a draft.
 answer. "Not sent" names the channel and reason (no contact email, Zoho Mail not connected, WhatsApp not set up
 or the template not approved); the card stays in the queue so it can be sent once fixed. Errors go to App errors
 under `client-reports`.
+
+---
+
+## 23. Go live checklist
+
+**Trigger.** Run the Wave 4 go live SQL and redeploy `client-portal`. Open **Build templates**: each starter
+template now has a **Go live checklist** section. Then open an AI CRM client whose deal is signed (or who has
+an active contract) and, on the Delivery tab, press **Start from template** (or **Add from template**).
+
+**You should see.** On Build templates, go live steps with an owner (Red Reach or Client) and "day N" after
+signing, which a manager can edit or add to. On the client, a **Go live checklist** card under the build
+checklist with each step, its owner and a due date counted from the signed date, a progress bar, and overdue
+steps in amber. Steps can be ticked, given a team member or handed to the client, and redated. The build
+checklist itself no longer lists these steps. The client's portal shows the same list under **Go live
+checklist**, with their own steps marked "For you". For a client applied before signing, **Set due dates from
+the signed date** fills the dates in once the deal is signed.
+
+**If it fails.** No Go live section on Build templates means the SQL has not run. No due dates means the client
+has no signed deal or contract yet. The portal hides the section until the client has go live steps.

@@ -14,6 +14,7 @@ import {
 import { DEFAULT_PACKAGES } from './delivery'
 import type { BuildTemplate, BuildTemplateItem } from './types'
 import migrationSql from '../../../supabase/migrations/20261106090000_build_templates.sql?raw'
+import goLiveSql from '../../../supabase/migrations/20261123090000_go_live_checklist.sql?raw'
 
 function item(partial: Partial<BuildTemplateItem>): BuildTemplateItem {
   return {
@@ -66,6 +67,11 @@ describe('default build templates', () => {
     for (const t of DEFAULT_BUILD_TEMPLATES) {
       expect(migrationSql).toContain(`${q(t.code)}, ${q(t.name)}, ${q(t.description)}`)
       for (const i of t.items) {
+        if (i.kind === 'golive') {
+          // Seeded by the go live migration (code, stage, title, owner, days, sort).
+          expect(goLiveSql).toContain(`(${q(t.code)}, ${q(i.stage)}, ${q(i.title)}, ${q(i.owner)}, ${i.due_days},`)
+          continue
+        }
         const hours = (i.est_hours ?? 0).toFixed(2)
         expect(migrationSql).toContain(`(${q(t.code)}, ${q(i.kind)}, ${q(i.stage)}, ${q(i.title)}, ${q(i.detail ?? '')}, ${hours},`)
       }
