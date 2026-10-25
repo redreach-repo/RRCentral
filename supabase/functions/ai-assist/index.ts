@@ -1,5 +1,6 @@
 // AI help inside RR Central: summarise a ticket thread, draft a reply, write
-// the monthly report summary, or turn call notes into requirements. Uses
+// the monthly report summary, turn call notes into requirements, or suggest
+// three questions before a call (read only: nothing is saved). Uses
 // Claude Haiku and logs the cost of every request against the account in
 // ai_usage_log, so it counts in that client's profitability.
 //
@@ -19,6 +20,7 @@ import {
   aiCostUsd,
   buildAiRequest,
   normaliseAiInput,
+  parseQuestions,
   parseRequirements,
   tidyAiText,
 } from "./aiAssist.bundle.js"
@@ -131,6 +133,11 @@ Deno.serve(withErrorLog("ai-assist", async (req) => {
   }
   if (input.feature === "call_notes") {
     return json({ text: "", requirements: parseRequirements(text), costUsd })
+  }
+  if (input.feature === "call_brief") {
+    const questions = parseQuestions(text)
+    if (!questions.length) return json({ error: "AI help came back empty. Please try again." }, 502)
+    return json({ text: "", requirements: [], questions, costUsd })
   }
   text = tidyAiText(text)
   if (!text) return json({ error: "AI help came back empty. Please try again." }, 502)

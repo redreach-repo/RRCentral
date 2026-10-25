@@ -10,6 +10,7 @@ import Modal from '../components/Modal'
 import StatusPill from '../components/StatusPill'
 import AccountFormModal from '../components/accounts/AccountFormModal'
 import DeliveryPanel from '../components/accounts/DeliveryPanel'
+import CallBriefButton from '../components/accounts/CallBriefButton'
 import ClientExportButton from '../components/accounts/ClientExportButton'
 import PortalLinksCard from '../components/accounts/PortalLinksCard'
 import PortalUploadsCard from '../components/accounts/PortalUploadsCard'
@@ -351,6 +352,13 @@ export default function AccountDetailPage() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <CallBriefButton
+              account={account}
+              accountKind={accountTypeLabel(account.type)}
+              editable={editable}
+              author={author}
+              onSaved={() => void load()}
+            />
             {editable ? (
               <ClientExportButton account={account} canFull={can(userRole, 'delivery.packages')} author={author} />
             ) : null}

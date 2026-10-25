@@ -14,7 +14,8 @@ var AI_FEATURES = [
   { value: "ticket_summary", label: "Ticket summary" },
   { value: "ticket_reply", label: "Reply draft" },
   { value: "report_summary", label: "Report summary" },
-  { value: "call_notes", label: "Requirements from call notes" }
+  { value: "call_notes", label: "Requirements from call notes" },
+  { value: "call_brief", label: "Before the call questions" }
 ];
 function isAiFeature(v) {
   return AI_FEATURES.some((f) => f.value === v);
@@ -68,6 +69,25 @@ var REQUIREMENTS_SCHEMA = {
   required: ["requirements"],
   additionalProperties: false
 };
+var QUESTIONS_SCHEMA = {
+  type: "object",
+  properties: {
+    questions: { type: "array", items: { type: "string" } }
+  },
+  required: ["questions"],
+  additionalProperties: false
+};
+function parseQuestions(text) {
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    return [];
+  }
+  const list = data?.questions;
+  if (!Array.isArray(list)) return [];
+  return list.map((q) => tidyAiText(String(q ?? "")).slice(0, 300)).filter(Boolean).slice(0, 3);
+}
 function buildAiRequest(input) {
   switch (input.feature) {
     case "ticket_summary":
@@ -100,6 +120,16 @@ Facts:
 ${input.facts.map((f) => `- ${f}`).join("\n")}`,
         maxTokens: 800,
         schema: null
+      };
+    case "call_brief":
+      return {
+        system: "You help someone at Red Reach prepare for a call with a client or prospect. From the facts given, suggest exactly three questions to ask on the call. Each question is one sentence, at most 25 words, asked directly to the client. Aim them at what is open, late or undecided in the facts, most important first. Use only the facts given; never invent numbers, names or events. " + STYLE,
+        user: `Account: ${input.accountName} (${input.accountKind})
+
+Facts:
+${input.facts.map((f) => `- ${f}`).join("\n")}`,
+        maxTokens: 600,
+        schema: QUESTIONS_SCHEMA
       };
     case "call_notes":
       return {
@@ -205,6 +235,11 @@ function normaliseAiInput(raw) {
       if (!facts.length) return null;
       return { feature: "report_summary", accountName, monthLabel: str(r.monthLabel, 40), facts };
     }
+    case "call_brief": {
+      const facts = strList(r.facts, 40, 600).filter((f) => f.trim());
+      if (!facts.length) return null;
+      return { feature: "call_brief", accountName, accountKind: str(r.accountKind, 60), facts };
+    }
     case "call_notes": {
       const notes = str(r.notes, AI_MAX_INPUT_CHARS);
       if (!notes.trim()) return null;
@@ -219,12 +254,14 @@ export {
   AI_MAX_INPUT_CHARS,
   AI_MODEL,
   AI_PRICES,
+  QUESTIONS_SCHEMA,
   REQUIREMENTS_SCHEMA,
   aiCostUsd,
   assistCostInMonth,
   buildAiRequest,
   isAiFeature,
   normaliseAiInput,
+  parseQuestions,
   parseRequirements,
   reportFacts,
   signOffFor,

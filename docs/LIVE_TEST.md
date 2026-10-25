@@ -40,6 +40,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 21 | Client portal: quotes, invoices, files, replies | `client-portal`, `quote-accept` |
 | 22 | Monthly client reports to approve | `client-reports` |
 | 23 | Go live checklist | `client-portal` (redeploy) |
+| 24 | Before the call brief | `ai-assist` (redeploy) |
 
 ---
 
@@ -427,3 +428,21 @@ the signed date** fills the dates in once the deal is signed.
 
 **If it fails.** No Go live section on Build templates means the SQL has not run. No due dates means the client
 has no signed deal or contract yet. The portal hides the section until the client has go live steps.
+
+---
+
+## 24. Before the call brief
+
+**Trigger.** Run the Wave 4 call brief SQL and redeploy `ai-assist`. Open any account you can edit and press
+**Before the call** at the top.
+
+**You should see.** One screen with the last call, email, meeting or note (who and how long ago), open tickets,
+unpaid invoices with what is owed, the AI CRM or CTRM Next deal stage and next step, and a list of what is
+overdue (late invoices, tickets waiting for a first reply, deal next steps past their date, go live steps past
+due). Below it, three questions to ask, suggested by AI from those facts only, with the cost logged on the
+account (Utilisation and profit shows it under "Before the call questions"). Nothing is saved until you press
+**Save as a note**, which puts the brief and questions on the timeline. A viewer sees the facts but no AI
+questions and no Save.
+
+**If it fails.** "AI help is not set up yet" means `ANTHROPIC_API_KEY` is missing; the facts still show. An AI
+error about the feature means the SQL has not run. Errors go to App errors under `ai-assist`.

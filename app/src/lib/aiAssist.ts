@@ -28,13 +28,14 @@ export const AI_PRICES = {
 /** Longest text sent in one request. Long threads keep the first message and the latest ones. */
 export const AI_MAX_INPUT_CHARS = 60_000
 
-export type AiFeature = 'ticket_summary' | 'ticket_reply' | 'report_summary' | 'call_notes'
+export type AiFeature = 'ticket_summary' | 'ticket_reply' | 'report_summary' | 'call_notes' | 'call_brief'
 
 export const AI_FEATURES: { value: AiFeature; label: string }[] = [
   { value: 'ticket_summary', label: 'Ticket summary' },
   { value: 'ticket_reply', label: 'Reply draft' },
   { value: 'report_summary', label: 'Report summary' },
   { value: 'call_notes', label: 'Requirements from call notes' },
+  { value: 'call_brief', label: 'Before the call questions' },
 ]
 
 export function isAiFeature(v: unknown): v is AiFeature {
@@ -54,6 +55,7 @@ export type AiInput =
       signOff: string
     }
   | { feature: 'report_summary'; accountName: string; monthLabel: string; facts: string[] }
+  | { feature: 'call_brief'; accountName: string; accountKind: string; facts: string[] }
   | { feature: 'call_notes'; accountName: string; notes: string; existing: string[] }
 
 export type AiRequest = {
@@ -128,6 +130,31 @@ export const REQUIREMENTS_SCHEMA = {
   additionalProperties: false,
 } as const
 
+export const QUESTIONS_SCHEMA = {
+  type: 'object',
+  properties: {
+    questions: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['questions'],
+  additionalProperties: false,
+} as const
+
+/** Reads the before the call answer: at most three short questions. Malformed answers give none. */
+export function parseQuestions(text: string): string[] {
+  let data: unknown
+  try {
+    data = JSON.parse(text)
+  } catch {
+    return []
+  }
+  const list = (data as { questions?: unknown })?.questions
+  if (!Array.isArray(list)) return []
+  return list
+    .map((q) => tidyAiText(String(q ?? '')).slice(0, 300))
+    .filter(Boolean)
+    .slice(0, 3)
+}
+
 export function buildAiRequest(input: AiInput): AiRequest {
   switch (input.feature) {
     case 'ticket_summary':
@@ -170,6 +197,19 @@ export function buildAiRequest(input: AiInput): AiRequest {
         user: `Client: ${input.accountName}\nMonth: ${input.monthLabel}\n\nFacts:\n${input.facts.map((f) => `- ${f}`).join('\n')}`,
         maxTokens: 800,
         schema: null,
+      }
+    case 'call_brief':
+      return {
+        system:
+          'You help someone at Red Reach prepare for a call with a client or prospect. ' +
+          'From the facts given, suggest exactly three questions to ask on the call. ' +
+          'Each question is one sentence, at most 25 words, asked directly to the client. ' +
+          'Aim them at what is open, late or undecided in the facts, most important first. ' +
+          'Use only the facts given; never invent numbers, names or events. ' +
+          STYLE,
+        user: `Account: ${input.accountName} (${input.accountKind})\n\nFacts:\n${input.facts.map((f) => `- ${f}`).join('\n')}`,
+        maxTokens: 600,
+        schema: QUESTIONS_SCHEMA as unknown as Record<string, unknown>,
       }
     case 'call_notes':
       return {
@@ -325,6 +365,11 @@ export function normaliseAiInput(raw: unknown): AiInput | null {
       const facts = strList(r.facts, 30, 600).filter((f) => f.trim())
       if (!facts.length) return null
       return { feature: 'report_summary', accountName, monthLabel: str(r.monthLabel, 40), facts }
+    }
+    case 'call_brief': {
+      const facts = strList(r.facts, 40, 600).filter((f) => f.trim())
+      if (!facts.length) return null
+      return { feature: 'call_brief', accountName, accountKind: str(r.accountKind, 60), facts }
     }
     case 'call_notes': {
       const notes = str(r.notes, AI_MAX_INPUT_CHARS)

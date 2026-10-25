@@ -1850,6 +1850,14 @@ var REQUIREMENTS_SCHEMA = {
   required: ["requirements"],
   additionalProperties: false
 };
+var QUESTIONS_SCHEMA = {
+  type: "object",
+  properties: {
+    questions: { type: "array", items: { type: "string" } }
+  },
+  required: ["questions"],
+  additionalProperties: false
+};
 function buildAiRequest(input) {
   switch (input.feature) {
     case "ticket_summary":
@@ -1882,6 +1890,16 @@ Facts:
 ${input.facts.map((f) => `- ${f}`).join("\n")}`,
         maxTokens: 800,
         schema: null
+      };
+    case "call_brief":
+      return {
+        system: "You help someone at Red Reach prepare for a call with a client or prospect. From the facts given, suggest exactly three questions to ask on the call. Each question is one sentence, at most 25 words, asked directly to the client. Aim them at what is open, late or undecided in the facts, most important first. Use only the facts given; never invent numbers, names or events. " + STYLE,
+        user: `Account: ${input.accountName} (${input.accountKind})
+
+Facts:
+${input.facts.map((f) => `- ${f}`).join("\n")}`,
+        maxTokens: 600,
+        schema: QUESTIONS_SCHEMA
       };
     case "call_notes":
       return {
