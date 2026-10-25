@@ -4,7 +4,10 @@ import { Download } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS, PIPELINE_STAGES, VAT_RATE } from '../lib/config'
 import type {
+  Account,
   CrmEntry,
+  CtrmDeal,
+  CtrmStageChange,
   CustomerPayment,
   CustomerRefund,
   Expense,
@@ -12,8 +15,10 @@ import type {
   Invoice,
   PaymentLogEntry,
   Quotation,
+  SalesDeal,
   SupplierCommitment,
 } from '../lib/types'
+import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
@@ -54,8 +59,20 @@ import { errorMessage } from '../lib/errors'
 import { buildStatement, entriesLabel, quarterRange, signedAmount, signedVat, statementCsv, statementPdf } from '../lib/statementReport'
 import { downloadBlob } from '../lib/documents'
 import { statementXlsx, XLSX_MIME } from '../lib/statementXlsx'
+import { ratesFromSettings } from '../lib/delivery'
+import {
+  averageSalesCycle,
+  canSeeProfit,
+  cashForecast,
+  revenueByDivision,
+  revenueByLeadSource,
+  winRateByPipeline,
+  winRateBySource,
+  type RevenueRow,
+  type WinRateRow,
+} from '../lib/salesReports'
 
-type Tab = 'winrate' | 'aging' | 'pnl' | 'vat' | 'statement' | 'funnel' | 'fx'
+type Tab = 'answers' | 'cashflow' | 'winrate' | 'aging' | 'pnl' | 'vat' | 'statement' | 'funnel' | 'fx'
 
 const tabStyle = (active: boolean): CSSProperties => ({
   ...buttonSecondaryStyle,
@@ -66,6 +83,8 @@ const tabStyle = (active: boolean): CSSProperties => ({
 export default function ReportsPage() {
   const { showToast } = useToast()
   const { settings } = useSettings()
+  const { userRole } = useAuth()
+  const seesProfit = canSeeProfit(userRole)
   const vatRate = Number(settings.vatRate || VAT_RATE) || VAT_RATE
   const [tab, setTab] = useState<Tab>('vat')
   const [loading, setLoading] = useState(true)
@@ -79,6 +98,10 @@ export default function ReportsPage() {
   const [suppliers, setSuppliers] = useState<SupplierCommitment[]>([])
   const [paymentLog, setPaymentLog] = useState<PaymentLogEntry[]>([])
   const [deletedInvoiceRefs, setDeletedInvoiceRefs] = useState<string[]>([])
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [salesDeals, setSalesDeals] = useState<SalesDeal[]>([])
+  const [ctrmDeals, setCtrmDeals] = useState<CtrmDeal[]>([])
+  const [ctrmChanges, setCtrmChanges] = useState<CtrmStageChange[]>([])
 
   const nowQ = currentVatQuarter()
   const [vatYear, setVatYear] = useState(nowQ.year)
@@ -102,6 +125,17 @@ export default function ReportsPage() {
         db.from('supplier_commitments').select('*'),
         db.from('payment_log').select('id, invoice_ref, amount, created_at'),
       ])
+      // Pipelines for the sales answers. Each can be missing or hidden by role, so none of them stops the page.
+      const [acc, sd, cd, cc] = await Promise.all([
+        db.from('accounts').select('id, name, source'),
+        db.from('sales_deals').select('id, stage, source, created_at, signed_at'),
+        db.from('ctrm_deals').select('id, stage, source, created_at'),
+        db.from('ctrm_deal_stage_changes').select('deal_id, to_stage, changed_at'),
+      ])
+      setAccounts(acc.error ? [] : ((acc.data || []) as Account[]))
+      setSalesDeals(sd.error ? [] : ((sd.data || []) as SalesDeal[]))
+      setCtrmDeals(cd.error ? [] : ((cd.data || []) as CtrmDeal[]))
+      setCtrmChanges(cc.error ? [] : ((cc.data || []) as CtrmStageChange[]))
       if (q.error) throw q.error
       if (i.error) throw i.error
       if (inc.error) throw inc.error
@@ -148,6 +182,30 @@ export default function ReportsPage() {
     [quotes, payments, refunds, suppliers],
   )
   const cashByCurrency = useMemo(() => cashReceivedByCurrency(payments), [payments])
+
+  const answers = useMemo(
+    () => ({
+      byPipeline: winRateByPipeline({ quotes, crm, sales: salesDeals, ctrm: ctrmDeals }),
+      bySource: winRateBySource({ crm, sales: salesDeals, ctrm: ctrmDeals }),
+      cycle: averageSalesCycle({ crm, sales: salesDeals, ctrm: ctrmDeals, ctrmChanges }),
+      byDivision: revenueByDivision(recognizedIncome, vatRate),
+      byLeadSource: revenueByLeadSource(recognizedIncome, { invoices, accounts, crm }, vatRate),
+    }),
+    [quotes, crm, salesDeals, ctrmDeals, ctrmChanges, recognizedIncome, invoices, accounts, vatRate],
+  )
+
+  const forecast = useMemo(
+    () =>
+      cashForecast({
+        invoices,
+        paymentLog,
+        income: recognizedIncome,
+        expenses,
+        fixedMonthlyCostAed: ratesFromSettings(settings as Record<string, string | undefined>).fixedMonthlyCostAed,
+        vatRate,
+      }),
+    [invoices, paymentLog, recognizedIncome, expenses, settings, vatRate],
+  )
 
   const winRate = useMemo(() => {
     return DIVISIONS.map((d) => {
@@ -360,6 +418,7 @@ export default function ReportsPage() {
 
   function exportCsv() {
     if (tab === 'statement') {
+      if (!seesProfit) return
       downloadCsv(`${statementName}.csv`, statementCsv(statement, settings.companyName || ''))
     } else if (tab === 'fx') {
       const lines = [
@@ -389,12 +448,16 @@ export default function ReportsPage() {
         `Currency-conversion fees (raw),${fxReport.conversionFees}`,
         `Currency-conversion fees ${BASE_CURRENCY},${fxReport.conversionFeesBase}`,
         `Exchange-rate gains and losses ${BASE_CURRENCY},${fxReport.fxGainLossBase}`,
-        '',
-        'GROSS PROFIT BY BOOKING CURRENCY (est. in AED keyed by quote currency)',
-        'Quote currency,Est GP AED',
-        ...Object.entries(fxReport.estimatedGpByBookingCurrency).map(([c, a]) => `${escapeCsv(c)},${a}`),
-        `Estimated GP ${BASE_CURRENCY},${fxReport.estimatedGpBase}`,
-        `Actual GP ${BASE_CURRENCY},${fxReport.actualGpBase}`,
+        ...(seesProfit
+          ? [
+              '',
+              'GROSS PROFIT BY BOOKING CURRENCY (est. in AED keyed by quote currency)',
+              'Quote currency,Est GP AED',
+              ...Object.entries(fxReport.estimatedGpByBookingCurrency).map(([c, a]) => `${escapeCsv(c)},${a}`),
+              `Estimated GP ${BASE_CURRENCY},${fxReport.estimatedGpBase}`,
+              `Actual GP ${BASE_CURRENCY},${fxReport.actualGpBase}`,
+            ]
+          : []),
       ]
       downloadCsv('multi-currency-report.csv', lines.join('\n'))
     } else if (tab === 'funnel') {
@@ -432,7 +495,43 @@ export default function ReportsPage() {
       const header = ['Bucket', 'Count', 'Amount']
       const rows = aging.map((r) => [r.key, r.count, r.amount].map(escapeCsv).join(','))
       downloadCsv('invoice-aging.csv', [header.join(','), ...rows].join('\n'))
+    } else if (tab === 'answers') {
+      const winLines = (rows: WinRateRow[]) => rows.map((r) => [r.label, r.open, r.won, r.lost, r.winPct ?? ''].map(escapeCsv).join(','))
+      const revLines = (rows: RevenueRow[]) => rows.map((r) => [r.label, r.count, r.revenue].map(escapeCsv).join(','))
+      downloadCsv(
+        'sales-answers.csv',
+        [
+          'WIN RATE BY PIPELINE',
+          'Pipeline,Open,Won,Lost,Win %',
+          ...winLines(answers.byPipeline),
+          '',
+          'WIN RATE BY SOURCE',
+          'Source,Open,Won,Lost,Win %',
+          ...winLines(answers.bySource),
+          '',
+          'AVERAGE SALES CYCLE (days)',
+          'Pipeline,Deals won,Average,Median',
+          ...answers.cycle.map((r) => [r.label, r.count, r.avgDays ?? '', r.medianDays ?? ''].map(escapeCsv).join(',')),
+          '',
+          'REVENUE BY DIVISION (paid, excluding VAT)',
+          'Division,Entries,Revenue',
+          ...revLines(answers.byDivision),
+          '',
+          'REVENUE BY LEAD SOURCE (paid, excluding VAT)',
+          'Source,Entries,Revenue',
+          ...revLines(answers.byLeadSource),
+        ].join('\n'),
+      )
+    } else if (tab === 'cashflow') {
+      const header = ['Date', 'Type', 'Item', 'Amount']
+      const rows = forecast.lines.map((l) =>
+        [l.date, l.kind === 'in' ? (l.overdue ? 'In (overdue)' : 'In') : l.kind === 'vat' ? 'VAT' : 'Out', l.label, l.kind === 'in' ? l.amount : -l.amount]
+          .map(escapeCsv)
+          .join(','),
+      )
+      downloadCsv(`cash-forecast-${forecast.from}.csv`, [header.join(','), ...rows].join('\n'))
     } else if (tab === 'pnl') {
+      if (!seesProfit) return
       const header = ['Month', 'Income (paid)', 'Expenses', 'Net']
       const rows = monthlyPnl.map((r) =>
         [r.label, r.income, r.expenses, r.net].map(escapeCsv).join(','),
@@ -491,7 +590,7 @@ export default function ReportsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
         <div>
           <h1 style={pageTitleStyle}>Reports</h1>
-          <p style={pageSubtitleStyle}>VAT, sales, aging, multi-currency, and P&L — income excludes not-awarded quotes</p>
+          <p style={pageSubtitleStyle}>VAT, sales answers, cash flow, aging, multi-currency, and P&L — income excludes not-awarded quotes</p>
         </div>
         <button type="button" style={buttonPrimaryStyle} onClick={exportCsv} disabled={loading}>
           <Download size={16} /> Export CSV
@@ -502,9 +601,17 @@ export default function ReportsPage() {
         <button type="button" style={tabStyle(tab === 'vat')} onClick={() => setTab('vat')}>
           VAT report
         </button>
-        <button type="button" style={tabStyle(tab === 'statement')} onClick={() => setTab('statement')}>
-          Income &amp; expenses
+        <button type="button" style={tabStyle(tab === 'answers')} onClick={() => setTab('answers')}>
+          Sales answers
         </button>
+        <button type="button" style={tabStyle(tab === 'cashflow')} onClick={() => setTab('cashflow')}>
+          Cash flow, 90 days
+        </button>
+        {seesProfit && (
+          <button type="button" style={tabStyle(tab === 'statement')} onClick={() => setTab('statement')}>
+            Income &amp; expenses
+          </button>
+        )}
         <button type="button" style={tabStyle(tab === 'fx')} onClick={() => setTab('fx')}>
           Multi-currency
         </button>
@@ -517,13 +624,131 @@ export default function ReportsPage() {
         <button type="button" style={tabStyle(tab === 'aging')} onClick={() => setTab('aging')}>
           Invoice aging
         </button>
-        <button type="button" style={tabStyle(tab === 'pnl')} onClick={() => setTab('pnl')}>
-          Monthly P&L
-        </button>
+        {seesProfit && (
+          <button type="button" style={tabStyle(tab === 'pnl')} onClick={() => setTab('pnl')}>
+            Monthly P&L
+          </button>
+        )}
       </div>
 
       {loading ? (
         <div style={{ ...cardStyle, color: colors.muted }}>Loading reports…</div>
+      ) : !seesProfit && (tab === 'pnl' || tab === 'statement') ? (
+        <EmptyState title="Managers and admins only" subtitle="Profit figures are shown to managers and admins." />
+      ) : tab === 'answers' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <WinRateTable title="Win rate by pipeline" first="Pipeline" rows={answers.byPipeline} />
+          <WinRateTable title="Win rate by lead source" first="Source" rows={answers.bySource} />
+          <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '12px 16px', borderBottom: `1px solid ${colors.border}`, fontWeight: 700 }}>
+              Average sales cycle
+            </div>
+            <div style={tableWrapStyle}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Pipeline</th>
+                    <th style={thStyle}>Deals won</th>
+                    <th style={thStyle}>Average</th>
+                    <th style={thStyle}>Median</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {answers.cycle.map((r) => (
+                    <tr key={r.key}>
+                      <td style={tdStyle}>{r.label}</td>
+                      <td style={tdStyle}>{r.count}</td>
+                      <td style={tdStyle}>{r.avgDays == null ? '—' : `${r.avgDays} days`}</td>
+                      <td style={tdStyle}>{r.medianDays == null ? '—' : `${r.medianDays} days`}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p style={{ margin: 0, padding: '10px 16px', fontSize: 12, color: colors.muted }}>
+              From the day a deal was created to the day it was won. The CRM keeps no stage history, so its
+              figure uses the last change to a Won row.
+            </p>
+          </div>
+          <RevenueTable title="Revenue by division (paid, excluding VAT)" first="Division" rows={answers.byDivision} />
+          <RevenueTable title="Revenue by lead source (paid, excluding VAT)" first="Source" rows={answers.byLeadSource} />
+        </div>
+      ) : tab === 'cashflow' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 12 }}>
+            <StatementKpi label="Invoices due in" value={formatAED(forecast.totals.cashIn)} color={colors.success} sub="Open balances, overdue counted today" />
+            <StatementKpi label="Recurring costs out" value={formatAED(forecast.totals.cashOut)} color={colors.danger} sub="Bank deductions and fixed monthly cost" />
+            <StatementKpi label="VAT due" value={formatAED(forecast.totals.vat)} color={colors.danger} sub="Returns due by the 28th in the window" />
+            <StatementKpi
+              label="Net cash"
+              value={formatAED(forecast.totals.net)}
+              color={forecast.totals.net < 0 ? colors.danger : colors.success}
+              sub={`${forecast.from} to ${forecast.to}`}
+            />
+          </div>
+          <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+            <div style={tableWrapStyle}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Week</th>
+                    <th style={thStyle}>In</th>
+                    <th style={thStyle}>Out</th>
+                    <th style={thStyle}>Net</th>
+                    <th style={thStyle}>Running</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {forecast.weeks.map((w) => (
+                    <tr key={w.start}>
+                      <td style={tdStyle}>{format(parseISO(w.start), 'd MMM')} to {format(parseISO(w.end), 'd MMM')}</td>
+                      <td style={tdStyle}>{formatAED(w.cashIn)}</td>
+                      <td style={tdStyle}>{formatAED(w.cashOut)}</td>
+                      <td style={{ ...tdStyle, color: w.net < 0 ? colors.danger : undefined }}>{formatAED(w.net)}</td>
+                      <td style={{ ...tdStyle, color: w.running < 0 ? colors.danger : undefined }}>{formatAED(w.running)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+            {forecast.lines.length === 0 ? (
+              <EmptyState title="Nothing due" subtitle="No open invoices, costs or VAT fall in the next 90 days." />
+            ) : (
+              <div style={tableWrapStyle}>
+                <table style={tableStyle}>
+                  <thead>
+                    <tr>
+                      <th style={thStyle}>Date</th>
+                      <th style={thStyle}>Item</th>
+                      <th style={thStyle}>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {forecast.lines.map((l, i) => (
+                      <tr key={`${l.date}-${l.label}-${i}`}>
+                        <td style={tdStyle}>{l.date}</td>
+                        <td style={tdStyle}>
+                          {l.label}
+                          {l.overdue ? <span style={{ color: colors.danger, marginLeft: 6, fontSize: 12 }}>overdue</span> : null}
+                        </td>
+                        <td style={{ ...tdStyle, color: l.kind === 'in' ? colors.success : colors.danger }}>
+                          {l.kind === 'in' ? '+' : '-'}
+                          {formatAED(l.amount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+          <p style={{ margin: 0, fontSize: 12, color: colors.muted }}>
+            Invoices land on their due date from the payment terms, less anything already in the payment log.
+            Set the fixed monthly cost on Packages and rates.
+          </p>
+        </div>
       ) : tab === 'fx' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <p style={{ margin: 0, fontSize: 12, color: colors.muted }}>
@@ -556,24 +781,30 @@ export default function ReportsPage() {
               label={`Conversion fees (${BASE_CURRENCY})`}
               value={formatMoneyAmount(fxReport.conversionFeesBase, BASE_CURRENCY)}
             />
-            <FxKpi
-              label={`Est. GP (${BASE_CURRENCY})`}
-              value={formatMoneyAmount(fxReport.estimatedGpBase, BASE_CURRENCY)}
-            />
-            <FxKpi
-              label={`Actual GP (${BASE_CURRENCY})`}
-              value={formatMoneyAmount(fxReport.actualGpBase, BASE_CURRENCY)}
-            />
+            {seesProfit && (
+              <>
+                <FxKpi
+                  label={`Est. GP (${BASE_CURRENCY})`}
+                  value={formatMoneyAmount(fxReport.estimatedGpBase, BASE_CURRENCY)}
+                />
+                <FxKpi
+                  label={`Actual GP (${BASE_CURRENCY})`}
+                  value={formatMoneyAmount(fxReport.actualGpBase, BASE_CURRENCY)}
+                />
+              </>
+            )}
           </div>
           <CurrencyTable title="Customer revenue by original currency (invoiced)" rows={fxReport.revenueByCurrency} />
           <CurrencyTable title="Cash received by payment currency" rows={cashByCurrency} />
           <CurrencyTable title="Outstanding balances by currency" rows={fxReport.outstandingByCurrency} />
           <CurrencyTable title="Supplier payables by currency" rows={fxReport.supplierPayablesByCurrency} />
-          <CurrencyTable
-            title={`Gross profit (est. ${BASE_CURRENCY}) keyed by booking/quote currency`}
-            rows={fxReport.estimatedGpByBookingCurrency}
-            asBase
-          />
+          {seesProfit && (
+            <CurrencyTable
+              title={`Gross profit (est. ${BASE_CURRENCY}) keyed by booking/quote currency`}
+              rows={fxReport.estimatedGpByBookingCurrency}
+              asBase
+            />
+          )}
         </div>
       ) : tab === 'funnel' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -1017,6 +1248,74 @@ function Bar({ label, value, max, color }: { label: string; value: number; max: 
         <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 999 }} />
       </div>
       <span style={{ fontSize: 12, textAlign: 'right' }}>{formatAED(value)}</span>
+    </div>
+  )
+}
+
+function WinRateTable({ title, first, rows }: { title: string; first: string; rows: WinRateRow[] }) {
+  return (
+    <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${colors.border}`, fontWeight: 700 }}>{title}</div>
+      {rows.length === 0 ? (
+        <div style={{ padding: 16, color: colors.muted, fontSize: 13 }}>No deals yet.</div>
+      ) : (
+        <div style={tableWrapStyle}>
+          <table style={tableStyle}>
+            <thead>
+              <tr>
+                <th style={thStyle}>{first}</th>
+                <th style={thStyle}>Open</th>
+                <th style={thStyle}>Won</th>
+                <th style={thStyle}>Lost</th>
+                <th style={thStyle}>Win %</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.key}>
+                  <td style={tdStyle}>{r.label}</td>
+                  <td style={tdStyle}>{r.open}</td>
+                  <td style={tdStyle}>{r.won}</td>
+                  <td style={tdStyle}>{r.lost}</td>
+                  <td style={tdStyle}>{r.winPct == null ? '—' : `${r.winPct}%`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RevenueTable({ title, first, rows }: { title: string; first: string; rows: RevenueRow[] }) {
+  return (
+    <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${colors.border}`, fontWeight: 700 }}>{title}</div>
+      {rows.length === 0 ? (
+        <div style={{ padding: 16, color: colors.muted, fontSize: 13 }}>No paid income yet.</div>
+      ) : (
+        <div style={tableWrapStyle}>
+          <table style={tableStyle}>
+            <thead>
+              <tr>
+                <th style={thStyle}>{first}</th>
+                <th style={thStyle}>Entries</th>
+                <th style={thStyle}>Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.key}>
+                  <td style={tdStyle}>{r.label}</td>
+                  <td style={tdStyle}>{r.count}</td>
+                  <td style={tdStyle}>{formatAED(r.revenue)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
