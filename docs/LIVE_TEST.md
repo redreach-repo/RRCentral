@@ -29,6 +29,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 10 | Contract invoices each morning | `contract-invoices` |
 | 11 | Daily watchdog | `watchdog` |
 | 12 | One tap payment reminders | `payment-reminder` |
+| 13 | My deals | none (app and SQL only) |
 
 ---
 
@@ -202,3 +203,19 @@ nothing: "This reminder was already sent." Do the same with **WhatsApp** once th
 **If it fails.** The toast says why (no contact address, Zoho Mail not connected, WhatsApp template not
 approved). Nothing is recorded when sending fails, so you can press again once fixed. System check row
 "One tap payment reminders"; App errors under `payment-reminder`.
+
+---
+
+## 13. My deals
+
+**Trigger.** Run the "Wave 3: My deals" SQL from the copy page once. Sign in as yourself and open
+**Sales → My deals**.
+
+**You should see.** Your open deals from the CRM, AI CRM sales and CTRM Next in one table, with value,
+weighted value, next action and days in stage. Switch to **Board** to see them by stage. Pick
+**Everyone** to see the whole team. Move a test deal to another stage on its own page, come back: its
+days in stage is 0. Sign in as a viewer or staff login: CTRM Next deals show no value (commission stays
+hidden), and staff see no CRM deals.
+
+**If it fails.** "Could not load the deals" names the table. Days in stage that never reset means the
+SQL has not been run. Nothing goes to App errors unless the page itself crashes.
