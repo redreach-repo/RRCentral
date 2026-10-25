@@ -52,6 +52,7 @@ export async function loadDigestPreview(now: Date = new Date()): Promise<Digest>
     sentQuotes: sentQuotes.error ? [] : ((sentQuotes.data || []) as NudgeQuote[]),
     quoteDeals: quoteDeals.error ? [] : ((quoteDeals.data || []) as NudgeDeal[]),
     leads,
+    ctrmIssues: tickets,
   })
 }
 

@@ -1264,7 +1264,8 @@ export interface DigestRun {
   message: string
 }
 
-export type TicketChannel = 'email' | 'whatsapp' | 'phone' | 'in_person' | 'internal' | 'web_form' | 'chatbot'
+export type TicketChannel = 'email' | 'whatsapp' | 'phone' | 'in_person' | 'internal' | 'web_form' | 'chatbot' | 'ctrm_next'
+export type VendorStatus = '' | 'not_raised' | 'raised' | 'in_progress' | 'fixed' | 'waiting_for_client'
 export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent'
 export type TicketStatus = 'new' | 'open' | 'waiting_on_client' | 'resolved' | 'closed'
 
@@ -1286,6 +1287,13 @@ export interface Ticket {
   sla_due_at: string | null
   first_response_at: string | null
   resolved_at: string | null
+  /** CTRM Next issues (Wave 5, PR W): the vendor's ticket number, typed in by hand. */
+  vendor_ticket_ref?: string
+  vendor_status?: VendorStatus
+  /** When the client was last sent an update on this issue. */
+  client_updated_at?: string | null
+  /** When the vendor status became Fixed (set by the database). */
+  vendor_fixed_at?: string | null
   created_by: string
   created_at: string
   updated_at: string

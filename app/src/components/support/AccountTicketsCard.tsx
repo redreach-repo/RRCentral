@@ -59,6 +59,7 @@ export default function AccountTicketsCard({ account, contacts, team, editable, 
     }
   }
 
+  const isCtrm = account.type === 'ctrm_prospect'
   const openCount = tickets.filter(isOpenTicket).length
   const shown = sortQueue(showAll ? tickets : tickets.filter(isOpenTicket)).slice(0, showAll ? 50 : 8)
 
@@ -66,17 +67,21 @@ export default function AccountTicketsCard({ account, contacts, team, editable, 
     <section style={{ ...cardStyle, marginTop: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>
-          Support tickets {openCount ? <span style={{ color: colors.muted, fontWeight: 400 }}>({openCount} open)</span> : null}
+          {isCtrm ? 'Client issues' : 'Support tickets'} {openCount ? <span style={{ color: colors.muted, fontWeight: 400 }}>({openCount} open)</span> : null}
         </h2>
         {editable ? (
           <button type="button" style={{ ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }} onClick={() => setOpen(true)}>
-            <Plus size={14} /> New ticket
+            <Plus size={14} /> {isCtrm ? 'Log an issue' : 'New ticket'}
           </button>
         ) : null}
       </div>
       {shown.length === 0 ? (
         <p style={{ color: colors.muted, fontSize: 13, margin: '10px 0 0' }}>
-          {tickets.length ? 'No open tickets.' : 'No tickets yet. Open one when they ask for help so the reply time is tracked.'}
+          {tickets.length
+            ? 'No open tickets.'
+            : isCtrm
+              ? 'No issues yet. Log one when the client reports a problem with CTRM Next so updates to them are tracked.'
+              : 'No tickets yet. Open one when they ask for help so the reply time is tracked.'}
         </p>
       ) : (
         <ul style={{ listStyle: 'none', margin: '12px 0 0', padding: 0, display: 'grid', gap: 8 }}>
@@ -122,6 +127,7 @@ export default function AccountTicketsCard({ account, contacts, team, editable, 
         team={team}
         lockedAccountId={account.id}
         defaultAssigneeId={author.appUserId}
+        defaultChannel={isCtrm ? 'ctrm_next' : 'email'}
         saving={saving}
         onSave={(v) => void handleCreate(v)}
       />

@@ -1,4 +1,5 @@
 import { currentAuthMode, db } from './db'
+import { isCtrmIssue, vendorStatusLabel } from './ctrmIssues'
 import { isMissingRelationError } from './errors'
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseConfig'
 import { logAccountEvent } from './accountsStore'
@@ -143,6 +144,7 @@ export async function createTicket(
       sla_due_at: addWorkingHours(now, slaHours, calendar).toISOString(),
       first_response_at: null,
       resolved_at: null,
+      ...(input.channel === 'ctrm_next' ? { vendor_status: 'not_raised' } : {}),
       created_by: author.email,
       created_at: now.toISOString(),
       updated_at: now.toISOString(),
@@ -167,11 +169,11 @@ export async function createTicket(
   return id
 }
 
-export async function updateTicket(
-  ticket: Ticket,
-  patch: Partial<Pick<Ticket, 'status' | 'priority' | 'assignee_user_id' | 'account_id' | 'contact_id'>>,
-  author: Author,
-): Promise<void> {
+export type TicketPatch = Partial<
+  Pick<Ticket, 'status' | 'priority' | 'assignee_user_id' | 'account_id' | 'contact_id' | 'vendor_ticket_ref' | 'vendor_status' | 'client_updated_at'>
+>
+
+export async function updateTicket(ticket: Ticket, patch: TicketPatch, author: Author): Promise<void> {
   const next: Record<string, unknown> = { ...patch, updated_at: new Date().toISOString() }
   if (patch.status) {
     const closing = patch.status === 'resolved' || patch.status === 'closed'
@@ -181,6 +183,9 @@ export async function updateTicket(
   const accountId = patch.account_id ?? ticket.account_id
   if (accountId && patch.status === 'resolved' && ticket.status !== 'resolved') {
     await logAccountEvent(accountId, `Ticket resolved: ${ticket.subject}`, author)
+  }
+  if (accountId && patch.vendor_status !== undefined && patch.vendor_status !== (ticket.vendor_status ?? '')) {
+    await logAccountEvent(accountId, `CTRM Next issue "${ticket.subject}": vendor side now ${vendorStatusLabel(patch.vendor_status)}`, author)
   }
 }
 
@@ -212,6 +217,8 @@ export async function addTicketMessage(
   const patch: Record<string, unknown> = { updated_at: now }
   if (!ticket.first_response_at) patch.first_response_at = now
   if (ticket.status === 'new') patch.status = 'open'
+  // A reply to a CTRM Next client counts as the update they are owed.
+  if (isCtrmIssue(ticket)) patch.client_updated_at = now
   check(await db.from('tickets').update(patch).eq('id', ticket.id))
   if (ticket.account_id) {
     const excerpt = body.length > 160 ? `${body.slice(0, 157)}...` : body

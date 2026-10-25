@@ -189,7 +189,10 @@ Deno.serve(withErrorLog("daily-digest", async (req) => {
     // New leads from lead-intake (Wave 3, PR J).
     const leads = await selectAll(sb, "website_inquiries", "id, name, email, phone, source, channel, status, pipeline, account_id, crm_id, deal_id, matched, created_at", (q) =>
       q.gte("created_at", since).in("status", ["new", "converted"])).catch(() => [])
-    digest = buildDigest({ now, accounts, contracts, packages, entries, tickets, deals, errors, watch, contractDrafts: drafts.length, sentQuotes, quoteDeals, leads }) as Digest
+    // Open CTRM Next client issues (Wave 5, PR W): skip quietly if its SQL has not been run yet.
+    const ctrmIssues = await selectAll(sb, "tickets", "id, subject, account_id, status, created_at, channel, assignee_user_id, vendor_ticket_ref, vendor_status, client_updated_at, vendor_fixed_at", (q) =>
+      q.eq("channel", "ctrm_next").in("status", ["new", "open", "waiting_on_client"])).catch(() => [])
+    digest = buildDigest({ now, accounts, contracts, packages, entries, tickets, deals, errors, watch, contractDrafts: drafts.length, sentQuotes, quoteDeals, leads, ctrmIssues }) as Digest
   } catch (e) {
     return json({ error: `Could not build the digest: ${(e as Error).message}`.slice(0, 300) }, 500)
   }

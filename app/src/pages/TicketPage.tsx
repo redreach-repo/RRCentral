@@ -10,7 +10,9 @@ import SlaBadge from '../components/support/SlaBadge'
 import { accountTypeLabel, canEditAccount } from '../lib/accounts'
 import { listAccounts, listContacts, listTeam } from '../lib/accountsStore'
 import { TICKET_CHANNELS, TICKET_PRIORITIES, TICKET_STATUSES, optionLabel } from '../lib/support'
-import { LOGGED_FOR_CLIENT, addTicketMessage, getTicket, listMessages, sendWhatsAppReply, updateTicket } from '../lib/supportStore'
+import { LOGGED_FOR_CLIENT, addTicketMessage, getTicket, listMessages, sendWhatsAppReply, updateTicket, type TicketPatch } from '../lib/supportStore'
+import CtrmIssueBox from '../components/support/CtrmIssueBox'
+import { NO_TRADE_DATA_NOTE, isCtrmIssue } from '../lib/ctrmIssues'
 import { DELIVERY_LABELS, serviceWindow, type DeliveryStatus } from '../lib/whatsappTickets'
 import { errorMessage } from '../lib/errors'
 import { signOffFor, type AiThreadMessage } from '../lib/aiAssist'
@@ -121,7 +123,7 @@ export default function TicketPage() {
     [...messages].reverse().find((m) => m.author_kind === 'contact' && m.external_id.startsWith('wamid.'))?.created_at ?? null
   const waWindow = serviceWindow(lastClientAt)
 
-  async function change(patch: Partial<Pick<Ticket, 'status' | 'priority' | 'assignee_user_id' | 'account_id' | 'contact_id'>>) {
+  async function change(patch: TicketPatch) {
     if (!ticket) return
     setBusy(true)
     try {
@@ -377,6 +379,8 @@ export default function TicketPage() {
         </div>
       </div>
 
+      {isCtrmIssue(ticket) ? <CtrmIssueBox ticket={ticket} editable={editable} busy={busy} onChange={change} /> : null}
+
       <section style={{ ...cardStyle, marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
           <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Conversation</h2>
@@ -451,6 +455,7 @@ export default function TicketPage() {
       {editable ? (
         <section style={cardStyle}>
           <h2 style={sectionTitleStyle}>{internal ? 'Internal note' : 'Reply to the client'}</h2>
+          {isCtrmIssue(ticket) ? <p style={{ color: colors.muted, fontSize: 13, marginTop: 0 }}>{NO_TRADE_DATA_NOTE}</p> : null}
           <textarea
             aria-label={internal ? 'Internal note' : 'Reply'}
             style={{ ...inputStyle, minHeight: 110, resize: 'vertical', marginBottom: 10 }}
