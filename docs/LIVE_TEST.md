@@ -37,6 +37,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 18 | Fireflies calls on the timeline | `fireflies-fetch` |
 | 19 | Card payment links on invoices | `invoice-pay-link`, `stripe-invoice-webhook` |
 | 20 | Reports that answer questions | none (app only) |
+| 21 | Client portal: quotes, invoices, files, replies | `client-portal`, `quote-accept` |
 
 ---
 
@@ -364,3 +365,26 @@ hidden. Managers and admins still see them.
 **If it fails.** A source showing as "Not recorded" means the deal or account has no source filled in.
 No fixed monthly cost line means it is not set on Packages and rates. Nothing goes to App errors unless
 the page itself crashes.
+
+---
+
+## 21. Client portal: quotes, invoices, files, replies
+
+**Trigger.** Run the Wave 4 portal uploads SQL, then deploy `client-portal` and `quote-accept` from the
+**Deploy Edge Functions** workflow. On an AI CRM client account, send a quote with an accept link (so it is
+in the portal), make sure the client has an open ticket and a sent invoice with a card payment link, then
+open the client's portal link in a private window.
+
+**You should see.** A **Quotes** card with the quote, **View PDF** and **Accept quote**. Accepting with a name,
+today's date and the tick box marks it Accepted, and the account timeline says "accepted in the client
+portal", exactly as the accept link would (the deal moves to Signed with a draft contract). An **Invoices**
+card with what is still owed and a **Pay by card** button while money is owed. **Add a message** on an open
+ticket puts the message on the ticket in Support; a ticket that was Waiting on client goes back to Open. **Send
+us a file** takes a PDF, image, Office file, CSV or text file up to 5 MB. With Zoho WorkDrive set up and a
+WorkDrive folder on the client's CRM row, the file lands in that folder. Otherwise it shows under **Files
+from the client** on the account, where the team can download it and mark it filed.
+
+**If it fails.** No Quotes card means no quote on this account has a working accept link. No Invoices card
+means no sent invoice is linked to the account. A file that stays under Files from the client shows why
+(WorkDrive not set up, no folder for this client, or the WorkDrive error). Errors go to App errors under
+`client-portal`.

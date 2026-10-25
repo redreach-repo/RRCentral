@@ -1815,6 +1815,7 @@ function isPortalToken(token) {
 async function hashPortalToken(token) {
   return toHex(await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)));
 }
+var PORTAL_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 
 // src/lib/config.ts
 var DIVISIONS = [

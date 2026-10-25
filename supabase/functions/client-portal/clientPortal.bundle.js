@@ -30,6 +30,15 @@ function toDate(argument, context) {
   return constructFrom(context || argument, argument);
 }
 
+// node_modules/date-fns/addDays.js
+function addDays(date, amount, options) {
+  const _date = toDate(date, options?.in);
+  if (isNaN(amount)) return constructFrom(options?.in || date, NaN);
+  if (!amount) return _date;
+  _date.setDate(_date.getDate() + amount);
+  return _date;
+}
+
 // node_modules/date-fns/addMonths.js
 function addMonths(date, amount, options) {
   const _date = toDate(date, options?.in);
@@ -1904,6 +1913,38 @@ function buildProgress(stages) {
   };
 }
 
+// src/lib/contractBilling.ts
+function paymentTermDays(terms) {
+  const m = String(terms || "").match(/net\s*(\d{1,3})/i) || String(terms || "").match(/(\d{1,3})\s*days?/i);
+  return m ? Number(m[1]) : 0;
+}
+function invoiceDueDate(inv) {
+  if (!inv.date) return null;
+  return format(addDays(parseISO(String(inv.date).slice(0, 10)), paymentTermDays(inv.payment_terms)), "yyyy-MM-dd");
+}
+
+// src/lib/quoteAccept.ts
+function acceptableStatus(status) {
+  return status === "Finalized" || status === "Sent";
+}
+function acceptLinkState(row, now = /* @__PURE__ */ new Date()) {
+  if (row.accepted_at) return "accepted";
+  if (row.revoked_at) return "revoked";
+  if (row.expires_at && Date.parse(row.expires_at) <= now.getTime()) return "expired";
+  return "active";
+}
+function acceptProblem(input, now = /* @__PURE__ */ new Date()) {
+  const name = input.name.trim();
+  if (name.length < 2 || name.length > 200) return "Type your full name";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return "Pick the date";
+  const d = parseISO(input.date);
+  if (Number.isNaN(d.getTime())) return "Pick the date";
+  const today = format(now, "yyyy-MM-dd");
+  if (input.date > today || input.date < format(addDays(now, -7), "yyyy-MM-dd")) return "Use today\u2019s date or one from the last week";
+  if (!input.agreed) return "Tick the box to accept the quote";
+  return null;
+}
+
 // src/lib/sla.ts
 var DEFAULT_WORKING_CALENDAR = {
   days: [1, 2, 3, 4, 5],
@@ -2013,7 +2054,7 @@ function buildPortalView(input) {
   const progress = buildProgress(input.stages);
   const statusLabel = (s) => BUILD_STAGE_STATUSES.find((o) => o.value === s)?.label ?? s;
   const ticketStatus = (s) => TICKET_STATUSES.find((o) => o.value === s)?.label ?? s;
-  const openTickets = input.tickets.filter(isOpenTicket).sort((a, b) => b.created_at.localeCompare(a.created_at)).map((t) => ({ subject: t.subject || "No subject", status: ticketStatus(t.status), opened: day(t.created_at), ...ticketNote(t, now) }));
+  const openTickets = input.tickets.filter(isOpenTicket).sort((a, b) => b.created_at.localeCompare(a.created_at)).map((t) => ({ id: t.id || "", subject: t.subject || "No subject", status: ticketStatus(t.status), opened: day(t.created_at), ...ticketNote(t, now) }));
   const since = subMonths(now, 2).toISOString();
   const recentlyResolved = input.tickets.filter((t) => t.resolved_at && t.resolved_at >= since).sort((a, b) => String(b.resolved_at).localeCompare(String(a.resolved_at))).slice(0, 10).map((t) => ({ subject: t.subject || "No subject", resolved: day(String(t.resolved_at)) }));
   const monthEntries = input.entries.filter((e) => monthKey(e.date) === month);
@@ -2041,6 +2082,14 @@ function buildPortalView(input) {
       }))
     },
     openTickets,
+    quotes: portalQuotes(input.quotes || [], now),
+    invoices: portalInvoices(input.invoices || [], input.payments || []),
+    uploads: (input.uploads || []).slice(0, 20).map((u) => ({
+      filename: u.filename,
+      size: sizeLabel(u.size_bytes),
+      uploaded: day(u.created_at),
+      saved: u.status === "in_workdrive"
+    })),
     recentlyResolved,
     usage: months.slice(0, 2).map((m) => usageFor(m, input.usage, pkg, input.rates)).filter((u) => u !== null),
     reportMonths: months.map((m) => ({ month: m, label: monthLabel(m) })),
@@ -2066,17 +2115,136 @@ function buildPortalView(input) {
     }
   };
 }
+function portalQuotes(rows, now = /* @__PURE__ */ new Date()) {
+  const out = [];
+  for (const q of rows) {
+    const accepted = q.links.find((l) => l.accepted_at);
+    const live = q.links.find((l) => acceptLinkState(l, now) === "active");
+    if (!accepted && !(live && acceptableStatus(q.status))) continue;
+    out.push({
+      id: q.id,
+      reference: q.reference_number,
+      date: q.date,
+      validUntil: q.valid_until,
+      amount: Number(q.amount || 0),
+      currency: String(q.quotation_currency || q.currency || "AED") || "AED",
+      state: accepted ? "accepted" : "waiting",
+      acceptedBy: accepted?.accepted_name || "",
+      acceptedOn: accepted?.accepted_at ? day(accepted.accepted_at) : null,
+      hasPdf: (accepted || live)?.has_pdf ?? false
+    });
+  }
+  return out.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+}
+function portalInvoices(rows, payments) {
+  const paidByRef = /* @__PURE__ */ new Map();
+  for (const p of payments) {
+    const ref = String(p.invoice_ref || "").trim();
+    if (ref) paidByRef.set(ref, (paidByRef.get(ref) ?? 0) + (Number(p.amount) || 0));
+  }
+  return rows.filter((i) => {
+    const s = String(i.status || "").toLowerCase();
+    return s !== "draft" && s !== "cancelled";
+  }).map((i) => {
+    const paid = String(i.payment_status || "").toLowerCase() === "paid";
+    const amount = Number(i.amount || 0);
+    const balance = paid ? 0 : round22(Math.max(0, amount - (paidByRef.get(i.reference_number.trim()) ?? 0)));
+    const url = String(i.pay_link_url || "").trim();
+    return {
+      id: i.id,
+      reference: i.reference_number,
+      date: i.date,
+      due: invoiceDueDate(i),
+      amount,
+      currency: String(i.currency || "AED") || "AED",
+      balance,
+      paid: paid || balance <= 0,
+      payUrl: !paid && balance > 0 && /^https:\/\//.test(url) ? url : null
+    };
+  }).sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))).slice(0, 50);
+}
+var PORTAL_MESSAGE_MAX = 4e3;
+function portalMessageProblem(message2) {
+  const m = message2.trim();
+  if (!m) return "Write your message first.";
+  if (m.length > PORTAL_MESSAGE_MAX) return `Keep the message under ${PORTAL_MESSAGE_MAX} characters.`;
+  return null;
+}
+var PORTAL_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
+var PORTAL_UPLOAD_TYPES = {
+  pdf: "application/pdf",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  csv: "text/csv",
+  txt: "text/plain",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+};
+function safeUploadName(name) {
+  const base = String(name || "").split(/[\\/]/).pop() || "";
+  const cleaned = base.replace(/[^A-Za-z0-9 ._()-]+/g, "_").replace(/\s+/g, " ").replace(/^[ .]+/, "").trim();
+  return (cleaned || "file").slice(-120);
+}
+function uploadContentType(name) {
+  const ext = (String(name).split(".").pop() || "").toLowerCase();
+  return PORTAL_UPLOAD_TYPES[ext] ?? null;
+}
+function portalUploadProblem(input) {
+  if (!input.filename.trim()) return "Pick a file.";
+  if (!uploadContentType(input.filename)) return "That type of file cannot be uploaded. Use PDF, an image, Word, Excel, PowerPoint, CSV or text.";
+  if (!(input.size > 0)) return "The file is empty.";
+  if (input.size > PORTAL_UPLOAD_MAX_BYTES) return "The file is over 5 MB. Send a smaller one, or share a link in a ticket message.";
+  return null;
+}
+function base64Bytes(b64) {
+  const clean = b64.replace(/\s/g, "");
+  const pad = clean.endsWith("==") ? 2 : clean.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.floor(clean.length * 3 / 4) - pad);
+}
+function sizeLabel(bytes) {
+  if (bytes >= 1024 * 1024) return `${Math.round(bytes / (1024 * 1024) * 10) / 10} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+function workDriveFolderId(url) {
+  const u = String(url || "").trim();
+  if (!u) return null;
+  for (const re of [/\/folders?\/([a-zA-Z0-9_-]+)/i, /[?&]id=([a-zA-Z0-9_-]+)/i]) {
+    const m = u.match(re);
+    if (m?.[1] && m[1].length >= 8) return m[1];
+  }
+  if (/^[a-zA-Z0-9_-]{10,}$/.test(u) && !u.includes("://")) return u;
+  return null;
+}
 export {
   DELIVERY_RATE_KEYS,
   PORTAL_LINK_MONTHS,
+  PORTAL_MESSAGE_MAX,
   PORTAL_REPORT_MONTHS,
+  PORTAL_UPLOAD_MAX_BYTES,
+  PORTAL_UPLOAD_TYPES,
+  acceptProblem,
+  base64Bytes,
   buildPortalView,
   hashPortalToken,
   isPortalToken,
   newPortalToken,
   portalAccessState,
   portalExpiry,
+  portalInvoices,
   portalLink,
+  portalMessageProblem,
+  portalQuotes,
+  portalUploadProblem,
   ratesFromSettings,
-  reportMonths
+  reportMonths,
+  safeUploadName,
+  sizeLabel,
+  uploadContentType,
+  workDriveFolderId
 };
