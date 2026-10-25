@@ -23,6 +23,8 @@ import {
 } from 'lucide-react'
 import { db } from '../lib/db'
 import { CRM_OUTCOME_REASONS, NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
+import { crmMoveProblem, isLostReason } from '../lib/dealRules'
+import LostReasonFields from '../components/deals/LostReasonFields'
 import type { ActivityLogEntry, AppUser, CrmContact, CrmEntry, CustomerDocument, Invoice, Quotation } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
@@ -122,6 +124,7 @@ type CrmForm = {
   pipeline_stage: string
   quote_ref: string
   outcome_reason: string
+  lost_note: string
 }
 
 type FollowFilter = FollowBucket
@@ -142,6 +145,7 @@ const emptyForm = (): CrmForm => ({
   pipeline_stage: 'Lead',
   quote_ref: '',
   outcome_reason: '',
+  lost_note: '',
 })
 
 const chip = (active: boolean): CSSProperties => ({
@@ -212,6 +216,7 @@ export default function CrmPage() {
   const [dealInvoices, setDealInvoices] = useState<Invoice[]>([])
   const [outcomeTarget, setOutcomeTarget] = useState<CrmEntry | null>(null)
   const [outcomeStage, setOutcomeStage] = useState<'Won' | 'Lost'>('Won')
+  const [outcomeNote, setOutcomeNote] = useState('')
   const [outcomeReason, setOutcomeReason] = useState('')
   const [sheetTab, setSheetTab] = useState<SheetTab>('overview')
   const [defaultsReady, setDefaultsReady] = useState(false)
@@ -278,6 +283,7 @@ export default function CrmPage() {
       pipeline_stage: entry.pipeline_stage || 'Lead',
       quote_ref: entry.quote_ref || '',
       outcome_reason: entry.outcome_reason || '',
+      lost_note: entry.lost_note || '',
     })
     setSheetTab('overview')
     setModalOpen(true)
@@ -493,6 +499,17 @@ export default function CrmPage() {
       setOutcomeTarget(entry)
       setOutcomeStage(patch.pipeline_stage)
       setOutcomeReason(entry.outcome_reason || '')
+      setOutcomeNote(entry.lost_note || '')
+      return
+    }
+    const moveProblem = crmMoveProblem(entry, {
+      pipeline_stage: patch.pipeline_stage ?? entry.pipeline_stage,
+      next_action: patch.next_action ?? entry.next_action,
+      follow_up_date: patch.follow_up_date !== undefined ? patch.follow_up_date : entry.follow_up_date,
+    })
+    if (moveProblem) {
+      showToast(`${entry.company_name}: ${moveProblem}. Add it here, then move the stage.`, 'error')
+      openEdit(entry)
       return
     }
 
@@ -557,6 +574,19 @@ export default function CrmPage() {
       showToast('Outcome reason is required', 'error')
       return
     }
+    if (outcomeStage === 'Lost') {
+      const problem = crmMoveProblem(outcomeTarget, {
+        pipeline_stage: 'Lost',
+        next_action: outcomeTarget.next_action,
+        follow_up_date: outcomeTarget.follow_up_date,
+        outcome_reason: outcomeReason.trim(),
+        lost_note: outcomeNote,
+      })
+      if (problem) {
+        showToast(problem, 'error')
+        return
+      }
+    }
     const entry = outcomeTarget
     setQuickBusyId(entry.id)
     try {
@@ -565,6 +595,7 @@ export default function CrmPage() {
         .update({
           pipeline_stage: outcomeStage,
           outcome_reason: outcomeReason.trim(),
+          ...(outcomeStage === 'Lost' ? { lost_note: outcomeNote.trim() } : {}),
           updated_by: user?.email || '',
           updated_at: new Date().toISOString(),
         })
@@ -574,7 +605,7 @@ export default function CrmPage() {
         'close_crm',
         'crm',
         entry.company_name,
-        `${outcomeStage}: ${outcomeReason.trim()}`,
+        `${outcomeStage}: ${outcomeReason.trim()}${outcomeStage === 'Lost' && outcomeNote.trim() ? ` (${outcomeNote.trim()})` : ''}`,
         user?.email || '',
         entry.id,
       )
@@ -592,6 +623,19 @@ export default function CrmPage() {
   async function saveLogTouch(payload: LogTouchPayload) {
     if (!logTouchTarget) return
     const entry = logTouchTarget
+    const moveProblem = crmMoveProblem(
+      entry,
+      {
+        pipeline_stage: payload.pipeline_stage || entry.pipeline_stage,
+        next_action: payload.next_action || entry.next_action,
+        follow_up_date: payload.clearDate ? null : payload.follow_up_date || entry.follow_up_date,
+      },
+      { askedForReason: false },
+    )
+    if (moveProblem) {
+      showToast(moveProblem, 'error')
+      return
+    }
     setQuickBusyId(entry.id)
     try {
       const { error: err } = await db.from('follow_up_updates').insert({
@@ -917,6 +961,16 @@ export default function CrmPage() {
       setError(`${stage} reason is required`)
       return
     }
+    if (stage === 'Lost' && (editing?.pipeline_stage || '') !== 'Lost') {
+      if (!isLostReason(form.outcome_reason)) {
+        setError('Pick why the deal was lost from the list')
+        return
+      }
+      if (!form.lost_note.trim()) {
+        setError('Add a note on why the deal was lost')
+        return
+      }
+    }
     setSaving(true)
     setError('')
     const who = user?.email || ''
@@ -940,6 +994,8 @@ export default function CrmPage() {
       pipeline_stage: stage,
       quote_ref: form.quote_ref.trim(),
       outcome_reason: form.outcome_reason.trim(),
+      // Only sent with Lost, so saving works before the Wave 3 SQL is run.
+      ...(stage === 'Lost' ? { lost_note: form.lost_note.trim() } : {}),
       updated_by: who,
       updated_at: new Date().toISOString(),
     }
@@ -1744,7 +1800,17 @@ export default function CrmPage() {
                       placeholder="RR-01-26001"
                     />
                   </Field>
-                  {(form.pipeline_stage === 'Won' || form.pipeline_stage === 'Lost') && (
+                  {form.pipeline_stage === 'Lost' ? (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <LostReasonFields
+                        idPrefix="crm-form-lost"
+                        code={form.outcome_reason}
+                        note={form.lost_note}
+                        onChange={({ code, note }) => setForm((f) => ({ ...f, outcome_reason: code, lost_note: note }))}
+                      />
+                    </div>
+                  ) : null}
+                  {form.pipeline_stage === 'Won' && (
                     <Field label={`${form.pipeline_stage} reason`}>
                       <select
                         style={input}
@@ -1986,34 +2052,46 @@ export default function CrmPage() {
               </button>
             </div>
             <div style={modalBody}>
-              <Field label={`${outcomeStage} reason *`}>
-                <select
-                  style={input}
-                  value={
-                    CRM_OUTCOME_REASONS.includes(outcomeReason as (typeof CRM_OUTCOME_REASONS)[number])
-                      ? outcomeReason
-                      : ''
-                  }
-                  onChange={(e) => setOutcomeReason(e.target.value)}
-                >
-                  <option value="">Select reason…</option>
-                  {CRM_OUTCOME_REASONS.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  style={{ ...input, marginTop: 8 }}
-                  placeholder="Or type a custom reason"
-                  value={
-                    CRM_OUTCOME_REASONS.includes(outcomeReason as (typeof CRM_OUTCOME_REASONS)[number])
-                      ? ''
-                      : outcomeReason
-                  }
-                  onChange={(e) => setOutcomeReason(e.target.value)}
+              {outcomeStage === 'Lost' ? (
+                <LostReasonFields
+                  idPrefix="crm-lost"
+                  code={outcomeReason}
+                  note={outcomeNote}
+                  onChange={({ code, note }) => {
+                    setOutcomeReason(code)
+                    setOutcomeNote(note)
+                  }}
                 />
-              </Field>
+              ) : (
+                <Field label={`${outcomeStage} reason *`}>
+                  <select
+                    style={input}
+                    value={
+                      CRM_OUTCOME_REASONS.includes(outcomeReason as (typeof CRM_OUTCOME_REASONS)[number])
+                        ? outcomeReason
+                        : ''
+                    }
+                    onChange={(e) => setOutcomeReason(e.target.value)}
+                  >
+                    <option value="">Select reason…</option>
+                    {CRM_OUTCOME_REASONS.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    style={{ ...input, marginTop: 8 }}
+                    placeholder="Or type a custom reason"
+                    value={
+                      CRM_OUTCOME_REASONS.includes(outcomeReason as (typeof CRM_OUTCOME_REASONS)[number])
+                        ? ''
+                        : outcomeReason
+                    }
+                    onChange={(e) => setOutcomeReason(e.target.value)}
+                  />
+                </Field>
+              )}
             </div>
             <div style={modalFooter}>
               <button type="button" style={btn} onClick={() => setOutcomeTarget(null)}>
