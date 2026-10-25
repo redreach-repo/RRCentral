@@ -335,6 +335,10 @@ export interface Invoice {
   date: string | null
   description: string
   amount: number
+  /** The invoice's currency; AED unless it came from a quote in another currency. */
+  currency?: string
+  /** The current card payment link, if one was made. */
+  pay_link_url?: string
   status: string
   payment_status: string
   payment_terms: string
@@ -488,6 +492,10 @@ export interface PaymentLogEntry {
   user_email: string
   balance_after: number
   created_at: string
+  /** The currency the payment was made in (the invoice's). */
+  currency?: string
+  /** Stripe checkout id for card payments. */
+  external_ref?: string
 }
 
 export interface Attachment {

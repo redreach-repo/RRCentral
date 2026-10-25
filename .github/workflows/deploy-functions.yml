@@ -36,6 +36,8 @@ on:
           - contract-invoices
           - watchdog
           - payment-reminder
+          - invoice-pay-link
+          - stripe-invoice-webhook
 
 permissions:
   contents: read

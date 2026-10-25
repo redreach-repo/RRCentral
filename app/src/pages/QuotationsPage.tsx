@@ -1046,7 +1046,7 @@ export default function QuotationsPage() {
             (Number(q.discount_amount) ? ` + ${Number(q.discount_amount).toFixed(2)}` : '')
           : ''
 
-      const { error } = await db.from('invoices').insert({
+      const invoiceRow = {
         client: q.client,
         vertical: q.vertical,
         reference_number: q.reference_number,
@@ -1056,6 +1056,7 @@ export default function QuotationsPage() {
             ? `${q.description} (${pct}% deposit)`.trim()
             : q.description,
         amount,
+        currency: (q.quotation_currency || 'AED').toUpperCase(),
         status: 'Sent',
         payment_status: 'Pending',
         payment_terms: q.payment_terms,
@@ -1064,7 +1065,13 @@ export default function QuotationsPage() {
         delivery_terms: q.delivery_terms,
         created_by: who,
         updated_by: who,
-      })
+      }
+      let { error } = await db.from('invoices').insert(invoiceRow)
+      // Before the "Card payments" SQL there is no currency column: AED invoices save without it.
+      if (error && isUndefinedColumnError(error) && invoiceRow.currency === 'AED') {
+        const { currency: _currency, ...withoutCurrency } = invoiceRow
+        ;({ error } = await db.from('invoices').insert(withoutCurrency))
+      }
       if (error) throw error
 
       await saveLineItems('Invoice', q.reference_number, draftItems, vatRate)

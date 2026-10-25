@@ -42,3 +42,9 @@ verify_jwt = false
 
 [functions.watchdog]
 verify_jwt = false
+
+[functions.invoice-pay-link]
+verify_jwt = false
+
+[functions.stripe-invoice-webhook]
+verify_jwt = false

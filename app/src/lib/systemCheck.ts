@@ -31,6 +31,8 @@ export const SYSTEM_FUNCTIONS: SystemFunction[] = [
   { name: 'contract-invoices', feature: 'Contract invoices each morning', liveTest: '10' },
   { name: 'watchdog', feature: 'Daily watchdog list', liveTest: '11' },
   { name: 'payment-reminder', feature: 'One tap payment reminders', liveTest: '12' },
+  { name: 'invoice-pay-link', feature: 'Card payment links on invoices', liveTest: '19' },
+  { name: 'stripe-invoice-webhook', feature: 'Card payments mark invoices paid', liveTest: '19' },
 ]
 
 export type PingResult = {

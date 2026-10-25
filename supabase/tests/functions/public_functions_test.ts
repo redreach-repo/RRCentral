@@ -20,6 +20,8 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "ai-assist": { kind: "signed in user (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)/ },
   "whatsapp-in": { kind: "Meta signature", pattern: /if \(!appSecret\)[\s\S]*validSignature\(raw, req\.headers\.get\("x-hub-signature-256"\)/ },
   "whatsapp-send": { kind: "signed in user (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)/ },
+  "invoice-pay-link": { kind: "signed in team member (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_staff/ },
+  "stripe-invoice-webhook": { kind: "Stripe signature", pattern: /if \(!webhookSecret[\s\S]*constructEventAsync\(raw, signature, webhookSecret/ },
   "create-checkout-session": { kind: "allowed origin and public key", pattern: /allowedOrigins\(\)\.includes\(origin\)[\s\S]*shopKeyOk\(/ },
   "support-email-in": { kind: "shared secret", pattern: /if \(!expected\)[\s\S]*provided !== expected/ },
   "teetribe-order-sync": { kind: "shared secret", pattern: /if \(!expected \|\| provided !== expected\)/ },
@@ -71,6 +73,8 @@ const ENV: Record<string, string> = {
   ANTHROPIC_API_KEY: "test-anthropic",
   SUPPORT_INBOUND_SECRET: "support-secret-for-tests",
   CRM_SYNC_SECRET: "crm-sync-secret-for-tests",
+  RR_STRIPE_SECRET_KEY: "sk_test_for_tests",
+  RR_STRIPE_WEBHOOK_SECRET: "whsec_for_tests",
 }
 
 async function load(fn: string): Promise<Handler> {
@@ -157,7 +161,7 @@ Deno.test({ name: "client-portal refuses a missing or malformed link token", ...
   assertEquals(await call("client-portal", post("client-portal", { token: "guess" })), 404)
 } })
 
-for (const fn of ["ai-assist", "whatsapp-send"]) {
+for (const fn of ["ai-assist", "whatsapp-send", "invoice-pay-link"]) {
   Deno.test({ name: `${fn} refuses a caller who is not signed in`, ...opts, fn: async () => {
     assertEquals(await call(fn, post(fn, {})), 401)
     assertEquals(await call(fn, post(fn, {}, { Authorization: "Bearer " })), 401)
@@ -199,3 +203,17 @@ for (const [fn, header] of [["support-email-in", "x-support-secret"], ["teetribe
     assertEquals(await call(fn, post(fn, {}, { [header]: "wrong" })), 401)
   } })
 }
+
+Deno.test({ name: "stripe-invoice-webhook only believes Stripe's signature", ...opts, fn: async () => {
+  const fn = "stripe-invoice-webhook"
+  const raw = JSON.stringify({ id: "evt_1", type: "checkout.session.completed", data: { object: { metadata: { invoice_id: "x", source: "rr-central" } } } })
+  assertEquals(await call(fn, post(fn, raw)), 401)
+  assertEquals(await call(fn, post(fn, raw, { "stripe-signature": "t=1,v1=forged" })), 401)
+  // Fail closed without the signing secret.
+  Deno.env.delete("RR_STRIPE_WEBHOOK_SECRET")
+  try {
+    assertEquals(await call(fn, post(fn, raw, { "stripe-signature": "t=1,v1=forged" })), 500)
+  } finally {
+    Deno.env.set("RR_STRIPE_WEBHOOK_SECRET", ENV.RR_STRIPE_WEBHOOK_SECRET)
+  }
+} })
