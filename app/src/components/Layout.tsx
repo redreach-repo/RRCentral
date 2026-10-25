@@ -40,6 +40,8 @@ import {
   Bug,
   Activity,
   Gauge,
+  CopyCheck,
+  PhoneCall,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders'
@@ -84,6 +86,7 @@ const navGroups: NavGroup[] = [
       { to: '/client-health', label: 'Client health', icon: HeartPulse, forStaff: true },
       { to: '/client-reports', label: 'Monthly reports', icon: FileBarChart, forStaff: true },
       { to: '/mrr', label: 'MRR', icon: TrendingUp, minRole: 'manager' },
+      { to: '/duplicates', label: 'Duplicates', icon: CopyCheck, minRole: 'manager' },
       { to: '/support', label: 'Support', icon: LifeBuoy, forStaff: true },
       { to: '/deals', label: 'My deals', icon: Briefcase, forStaff: true },
       { to: '/sales', label: 'AI CRM sales', icon: Target, forStaff: true },
@@ -99,6 +102,7 @@ const navGroups: NavGroup[] = [
     id: 'sales',
     label: 'Sales',
     items: [
+      { to: '/quick-add', label: 'Quick add', icon: PhoneCall, minRole: 'sales' },
       { to: '/crm', label: 'CRM', icon: Users },
       { to: '/follow-ups', label: 'Follow-ups', icon: CalendarClock },
       { to: '/quotations', label: 'Quotations', icon: FileText },
@@ -156,6 +160,8 @@ const titleByPath: { match: (path: string) => boolean; title: string }[] = [
   { match: (p) => p.startsWith('/client-health'), title: 'Client health' },
   { match: (p) => p.startsWith('/client-reports'), title: 'Monthly reports' },
   { match: (p) => p.startsWith('/mrr'), title: 'Monthly recurring revenue' },
+  { match: (p) => p.startsWith('/duplicates'), title: 'Duplicates' },
+  { match: (p) => p.startsWith('/quick-add'), title: 'Quick add' },
   { match: (p) => p.startsWith('/insights'), title: 'Utilisation and profit' },
   { match: (p) => p.startsWith('/support'), title: 'Support' },
   { match: (p) => p.startsWith('/ctrm'), title: 'CTRM Next pipeline' },
