@@ -29,6 +29,8 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 10 | Contract invoices each morning | `contract-invoices` |
 | 11 | Daily watchdog | `watchdog` |
 | 12 | One tap payment reminders | `payment-reminder` |
+| 13 | My deals | none (app and SQL only) |
+| 14 | Next step and lost reason | none (app and SQL only) |
 | 15 | Website and WhatsApp leads | `lead-intake` |
 
 ---
@@ -203,6 +205,37 @@ nothing: "This reminder was already sent." Do the same with **WhatsApp** once th
 **If it fails.** The toast says why (no contact address, Zoho Mail not connected, WhatsApp template not
 approved). Nothing is recorded when sending fails, so you can press again once fixed. System check row
 "One tap payment reminders"; App errors under `payment-reminder`.
+
+---
+
+## 13. My deals
+
+**Trigger.** Run the "Wave 3: My deals" SQL from the copy page once. Sign in as yourself and open
+**Sales → My deals**.
+
+**You should see.** Your open deals from the CRM, AI CRM sales and CTRM Next in one table, with value,
+weighted value, next action and days in stage. Switch to **Board** to see them by stage. Pick
+**Everyone** to see the whole team. Move a test deal to another stage on its own page, come back: its
+days in stage is 0. Sign in as a viewer or staff login: CTRM Next deals show no value (commission stays
+hidden), and staff see no CRM deals.
+
+**If it fails.** "Could not load the deals" names the table. Days in stage that never reset means the
+SQL has not been run. Nothing goes to App errors unless the page itself crashes.
+
+---
+
+## 14. Next step and lost reason
+
+**Trigger.** Run the "Wave 3: Next step and lost reason" SQL from the copy page once. Take a test deal in
+each of CRM, AI CRM sales and CTRM Next.
+
+**You should see.** Moving a deal to an open stage without a next action or date stops with "Every open
+deal needs a next action" (or "Give the next action a date") and opens the deal to add it. Moving to Lost
+asks for a reason from the list and a note; both are needed, and the timeline shows them. The dashboard
+has a **No next step** card listing open deals with no next action or date.
+
+**If it fails.** A move that saves without a next step means the SQL has not been run. "column lost_note
+does not exist" (or lost_reason_code) means the same.
 
 ---
 

@@ -40,6 +40,7 @@ import { companyDocAlertLabel, companyDocExpiryAlerts } from '../lib/companyDocA
 import { listOwnedDomains } from '../lib/domains'
 import ModuleAlertsCard from '../components/accounts/ModuleAlertsCard'
 import WatchdogCard from '../components/watchdog/WatchdogCard'
+import NoNextStepCard from '../components/deals/NoNextStepCard'
 import NewLeadsCard from '../components/leads/NewLeadsCard'
 import { domainAlertLabel, domainRenewalAlerts } from '../lib/domainAlerts'
 import { syncUnansweredQuoteFollowUps } from '../lib/quoteFollowUpSync'
@@ -412,6 +413,7 @@ export default function DashboardPage() {
       <NewLeadsCard />
 
       <WatchdogCard />
+      <NoNextStepCard />
 
       <ModuleAlertsCard />
 

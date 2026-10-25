@@ -1,4 +1,5 @@
 import { db } from './db'
+import { lostText } from './dealRules'
 import { isMissingRelationError } from './errors'
 import { createAccount, logAccountEvent, updateAccount } from './accountsStore'
 import { saveContract } from './deliveryStore'
@@ -34,11 +35,17 @@ export async function updateSalesDeal(deal: SalesDeal, patch: Partial<SalesDealI
   const moved = patch.stage && patch.stage !== deal.stage
   const next: Record<string, unknown> = { ...patch, updated_at: now }
   if (moved) next.last_touch_at = now
-  if (patch.stage && patch.stage !== 'lost') next.lost_reason = ''
+  if (patch.stage && patch.stage !== 'lost') {
+    next.lost_reason = ''
+    if (deal.lost_reason_code) next.lost_reason_code = ''
+  }
   if (patch.stage === 'quote_sent' && !deal.quote_sent_at) next.quote_sent_at = now
   check(await db.from('sales_deals').update(next).eq('id', deal.id))
   if (moved && patch.stage) {
-    const reason = patch.stage === 'lost' && patch.lost_reason ? ` (${patch.lost_reason})` : ''
+    const reason =
+      patch.stage === 'lost' && (patch.lost_reason_code || patch.lost_reason)
+        ? ` (${lostText(patch.lost_reason_code || '', patch.lost_reason || '')})`
+        : ''
     await logAccountEvent(
       deal.account_id,
       `Sales stage moved from ${salesStageLabel(deal.stage)} to ${salesStageLabel(patch.stage)}${reason}`,
@@ -87,6 +94,7 @@ export async function saveSalesDealForm(
     ...rest,
     next_action: rest.next_action.trim(),
     lost_reason: rest.stage === 'lost' ? rest.lost_reason.trim() : '',
+    ...(rest.stage === 'lost' ? { lost_reason_code: rest.lost_reason_code || '' } : { lost_reason_code: undefined }),
     quote_reference: rest.quote_reference.trim(),
   }
   if (deal) {

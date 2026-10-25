@@ -21,6 +21,7 @@ import SupportPage from './pages/SupportPage'
 import TicketPage from './pages/TicketPage'
 import CtrmPage from './pages/CtrmPage'
 import SalesPipelinePage from './pages/SalesPipelinePage'
+import MyDealsPage from './pages/MyDealsPage'
 import CtrmSummaryPage from './pages/CtrmSummaryPage'
 import ProductsPage from './pages/ProductsPage'
 import CrmPage from './pages/CrmPage'
@@ -128,6 +129,7 @@ export default function App() {
               <Route path="support/:id" element={<TicketPage />} />
               <Route path="ctrm" element={<CtrmPage />} />
               <Route path="sales" element={<SalesPipelinePage />} />
+              <Route path="deals" element={<MyDealsPage />} />
               <Route path="products" element={<ProductsPage />} />
               <Route path="app/wanders" element={<WandersPage />} />
               <Route path="crm" element={<CrmPage />} />
