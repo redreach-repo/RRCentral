@@ -1,10 +1,30 @@
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import BrandLogo from '../components/BrandLogo'
-import type { PortalUsage, PortalView } from '../lib/clientPortal'
-import { loadPortal } from '../lib/clientPortalStore'
+import {
+  PORTAL_MESSAGE_MAX,
+  PORTAL_UPLOAD_TYPES,
+  acceptProblem,
+  portalUploadProblem,
+  safeUploadName,
+  type PortalInvoice,
+  type PortalQuote,
+  type PortalTicket,
+  type PortalUsage,
+  type PortalView,
+} from '../lib/clientPortal'
+import { fileToBase64, loadPortal, portalAction } from '../lib/clientPortalStore'
 import { formatAED } from '../lib/money'
-import { cardStyle, colors, sectionTitleStyle, selectStyle } from '../lib/uiStyles'
+import {
+  buttonPrimaryStyle,
+  buttonSecondaryStyle,
+  cardStyle,
+  colors,
+  inputStyle,
+  labelStyle,
+  sectionTitleStyle,
+  selectStyle,
+} from '../lib/uiStyles'
 
 const wrap: CSSProperties = {
   minHeight: '100vh',
@@ -15,6 +35,9 @@ const wrap: CSSProperties = {
 }
 const column: CSSProperties = { maxWidth: 880, margin: '0 auto', display: 'grid', gap: 16 }
 const muted: CSSProperties = { color: colors.muted, fontSize: 13 }
+const smallButton: CSSProperties = { ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 13 }
+const money = (n: number, currency: string) =>
+  currency && currency !== 'AED' ? `${currency} ${n.toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : formatAED(n)
 const rowStyle: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
@@ -112,16 +135,7 @@ export default function ClientPortalPage() {
           ) : (
             <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
               {view.openTickets.map((t, i) => (
-                <li key={`${t.subject}-${i}`} style={rowStyle}>
-                  <span style={{ minWidth: 0 }}>
-                    <strong style={{ fontWeight: 600 }}>{t.subject}</strong>
-                    <span style={{ display: 'block', ...muted }}>Opened {t.opened}</span>
-                  </span>
-                  <span style={{ textAlign: 'right', fontSize: 13 }}>
-                    {t.status}
-                    <span style={{ display: 'block', color: t.late ? colors.warn : colors.muted }}>{t.note}</span>
-                  </span>
-                </li>
+                <TicketRow key={t.id || `${t.subject}-${i}`} token={token} ticket={t} onDone={load} />
               ))}
             </ul>
           )}
@@ -133,6 +147,45 @@ export default function ClientPortalPage() {
                   <li key={`${t.subject}-${i}`} style={rowStyle}>
                     <span>{t.subject}</span>
                     <span style={muted}>{t.resolved}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+        </Section>
+
+        {view.quotes.length ? (
+          <Section title="Quotes">
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+              {view.quotes.map((q) => (
+                <QuoteRow key={q.id} token={token} quote={q} onDone={load} />
+              ))}
+            </ul>
+          </Section>
+        ) : null}
+
+        {view.invoices.length ? (
+          <Section title="Invoices">
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+              {view.invoices.map((inv) => (
+                <InvoiceRow key={inv.id} invoice={inv} />
+              ))}
+            </ul>
+          </Section>
+        ) : null}
+
+        <Section title="Send us a file">
+          <UploadForm token={token} onDone={load} />
+          {view.uploads.length ? (
+            <>
+              <div style={{ ...muted, margin: '14px 0 4px' }}>Files you sent</div>
+              <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+                {view.uploads.map((u, i) => (
+                  <li key={`${u.filename}-${i}`} style={rowStyle}>
+                    <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{u.filename}</span>
+                    <span style={{ ...muted, textAlign: 'right' }}>
+                      {u.size}, {u.uploaded}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -222,7 +275,7 @@ export default function ClientPortalPage() {
           {view.plan?.termStart && view.plan.termEnd
             ? `Contract ${view.plan.termStart} to ${view.plan.termEnd}. `
             : ''}
-          Amounts exclude 5% VAT. To raise a request, message us on WhatsApp or email support as usual.
+          Usage amounts exclude 5% VAT. To raise a new request, message us on WhatsApp or email support as usual.
         </p>
       </div>
     </div>
@@ -268,6 +321,254 @@ function UsageBlock({ usage }: { usage: PortalUsage }) {
       <div style={{ fontSize: 13, marginTop: 6, color: usage.aboveAed > 0 ? colors.warn : colors.muted }}>
         {usage.aboveAed > 0 ? `Above your plan: about ${formatAED(usage.aboveAed)}` : 'Within your plan'}
       </div>
+    </div>
+  )
+}
+
+function useBusy() {
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  const [failed, setFailed] = useState(false)
+  const run = async (work: () => Promise<string | null>, done?: string) => {
+    setBusy(true)
+    setMessage('')
+    try {
+      const problem = await work()
+      setFailed(Boolean(problem))
+      setMessage(problem || done || '')
+      return !problem
+    } catch {
+      setFailed(true)
+      setMessage('That did not work. Please try again later.')
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+  const note = message ? <p style={{ margin: '6px 0 0', fontSize: 13, color: failed ? colors.warn : colors.success }}>{message}</p> : null
+  return { busy, run, note }
+}
+
+function TicketRow({ token, ticket, onDone }: { token: string; ticket: PortalTicket; onDone: () => Promise<void> }) {
+  const [open, setOpen] = useState(false)
+  const [text, setText] = useState('')
+  const { busy, run, note } = useBusy()
+  const send = async () => {
+    const ok = await run(async () => {
+      const r = await portalAction(token, { action: 'ticket_message', ticket_id: ticket.id, message: text })
+      return r.ok ? null : r.message
+    }, 'Sent. The team will see it on your request.')
+    if (ok) {
+      setText('')
+      setOpen(false)
+      await onDone()
+    }
+  }
+  return (
+    <li style={{ ...rowStyle, flexDirection: 'column' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+        <span style={{ minWidth: 0 }}>
+          <strong style={{ fontWeight: 600 }}>{ticket.subject}</strong>
+          <span style={{ display: 'block', ...muted }}>Opened {ticket.opened}</span>
+        </span>
+        <span style={{ textAlign: 'right', fontSize: 13 }}>
+          {ticket.status}
+          <span style={{ display: 'block', color: ticket.late ? colors.warn : colors.muted }}>{ticket.note}</span>
+        </span>
+      </div>
+      {ticket.id ? (
+        open ? (
+          <div style={{ display: 'grid', gap: 8 }}>
+            <label style={labelStyle}>
+              Your message
+              <textarea
+                style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }}
+                maxLength={PORTAL_MESSAGE_MAX}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+              />
+            </label>
+            <span style={{ display: 'flex', gap: 8 }}>
+              <button type="button" style={{ ...buttonPrimaryStyle, padding: '6px 12px' }} disabled={busy || !text.trim()} onClick={() => void send()}>
+                {busy ? 'Sending…' : 'Send'}
+              </button>
+              <button type="button" style={smallButton} onClick={() => setOpen(false)}>
+                Cancel
+              </button>
+            </span>
+          </div>
+        ) : (
+          <span>
+            <button type="button" style={smallButton} onClick={() => setOpen(true)}>
+              Add a message
+            </button>
+          </span>
+        )
+      ) : null}
+      {note}
+    </li>
+  )
+}
+
+function QuoteRow({ token, quote, onDone }: { token: string; quote: PortalQuote; onDone: () => Promise<void> }) {
+  const [accepting, setAccepting] = useState(false)
+  const [name, setName] = useState('')
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [agreed, setAgreed] = useState(false)
+  const { busy, run, note } = useBusy()
+
+  const openPdf = () =>
+    run(async () => {
+      const r = await portalAction(token, { action: 'quote_pdf', quote_id: quote.id })
+      if (!r.ok) return r.message
+      const bin = atob(String(r.data.pdf_base64 || ''))
+      const bytes = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }))
+      window.open(url, '_blank', 'noopener')
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+      return null
+    })
+
+  const accept = async () => {
+    const ok = await run(async () => {
+      const problem = acceptProblem({ name, date, agreed })
+      if (problem) return problem
+      const r = await portalAction(token, { action: 'accept_quote', quote_id: quote.id, name, date, agreed })
+      return r.ok ? null : r.message
+    }, 'Thank you. The quote is accepted and Red Reach will be in touch.')
+    if (ok) {
+      setAccepting(false)
+      await onDone()
+    }
+  }
+
+  return (
+    <li style={{ ...rowStyle, flexDirection: 'column' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <span style={{ minWidth: 0 }}>
+          <strong style={{ fontWeight: 600 }}>{quote.reference}</strong>
+          <span style={{ display: 'block', ...muted }}>
+            {quote.date ? `Sent ${quote.date}` : ''}
+            {quote.state === 'waiting' && quote.validUntil ? `, valid until ${quote.validUntil}` : ''}
+          </span>
+        </span>
+        <span style={{ textAlign: 'right', fontSize: 13 }}>
+          {money(quote.amount, quote.currency)}
+          <span style={{ display: 'block', color: quote.state === 'accepted' ? colors.success : colors.muted }}>
+            {quote.state === 'accepted' ? `Accepted${quote.acceptedBy ? ` by ${quote.acceptedBy}` : ''}${quote.acceptedOn ? ` on ${quote.acceptedOn}` : ''}` : 'Waiting for you'}
+          </span>
+        </span>
+      </div>
+      <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {quote.hasPdf ? (
+          <button type="button" style={smallButton} disabled={busy} onClick={() => void openPdf()}>
+            View PDF
+          </button>
+        ) : null}
+        {quote.state === 'waiting' && !accepting ? (
+          <button type="button" style={{ ...buttonPrimaryStyle, padding: '6px 12px' }} onClick={() => setAccepting(true)}>
+            Accept quote
+          </button>
+        ) : null}
+      </span>
+      {accepting ? (
+        <div style={{ display: 'grid', gap: 8 }}>
+          <label style={labelStyle}>
+            Your full name
+            <input style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
+          </label>
+          <label style={labelStyle}>
+            Date
+            <input style={inputStyle} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </label>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 14 }}>
+            <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+            <span>I accept this quote and its terms on behalf of my company.</span>
+          </label>
+          <span style={{ display: 'flex', gap: 8 }}>
+            <button type="button" style={{ ...buttonPrimaryStyle, padding: '6px 12px' }} disabled={busy} onClick={() => void accept()}>
+              {busy ? 'Accepting…' : 'Accept'}
+            </button>
+            <button type="button" style={smallButton} onClick={() => setAccepting(false)}>
+              Cancel
+            </button>
+          </span>
+        </div>
+      ) : null}
+      {note}
+    </li>
+  )
+}
+
+function InvoiceRow({ invoice }: { invoice: PortalInvoice }) {
+  return (
+    <li style={rowStyle}>
+      <span style={{ minWidth: 0 }}>
+        <strong style={{ fontWeight: 600 }}>{invoice.reference}</strong>
+        <span style={{ display: 'block', ...muted }}>
+          {invoice.date ? `Issued ${invoice.date}` : ''}
+          {!invoice.paid && invoice.due ? `, due ${invoice.due}` : ''}
+        </span>
+      </span>
+      <span style={{ textAlign: 'right', fontSize: 13, display: 'grid', gap: 4, justifyItems: 'end' }}>
+        <span>{money(invoice.amount, invoice.currency)}</span>
+        {invoice.paid ? (
+          <span style={{ color: colors.success }}>Paid</span>
+        ) : (
+          <span style={{ color: colors.muted }}>{money(invoice.balance, invoice.currency)} to pay</span>
+        )}
+        {invoice.payUrl ? (
+          <a href={invoice.payUrl} target="_blank" rel="noopener noreferrer" style={{ ...buttonPrimaryStyle, padding: '6px 12px', textDecoration: 'none' }}>
+            Pay by card
+          </a>
+        ) : null}
+      </span>
+    </li>
+  )
+}
+
+function UploadForm({ token, onDone }: { token: string; onDone: () => Promise<void> }) {
+  const [file, setFile] = useState<File | null>(null)
+  const [noteText, setNoteText] = useState('')
+  const [inputKey, setInputKey] = useState(0)
+  const { busy, run, note } = useBusy()
+  const send = async () => {
+    if (!file) return
+    const ok = await run(async () => {
+      const problem = portalUploadProblem({ filename: safeUploadName(file.name), size: file.size })
+      if (problem) return problem
+      const r = await portalAction(token, { action: 'upload', filename: file.name, content_base64: await fileToBase64(file), note: noteText })
+      return r.ok ? null : r.message
+    }, 'Thank you, we have your file.')
+    if (ok) {
+      setFile(null)
+      setNoteText('')
+      setInputKey((k) => k + 1)
+      await onDone()
+    }
+  }
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      <p style={{ ...muted, margin: 0 }}>Documents, logos or lists for your system, up to 5 MB each. They go straight to your project folder.</p>
+      <input
+        key={inputKey}
+        type="file"
+        aria-label="File to send"
+        accept={Object.keys(PORTAL_UPLOAD_TYPES).map((e) => `.${e}`).join(',')}
+        onChange={(e) => setFile(e.target.files?.[0] || null)}
+        style={{ fontSize: 14 }}
+      />
+      <label style={labelStyle}>
+        Note (optional)
+        <input style={inputStyle} maxLength={1000} value={noteText} onChange={(e) => setNoteText(e.target.value)} />
+      </label>
+      <span>
+        <button type="button" style={{ ...buttonPrimaryStyle, padding: '6px 12px' }} disabled={busy || !file} onClick={() => void send()}>
+          {busy ? 'Sending…' : 'Send file'}
+        </button>
+      </span>
+      {note}
     </div>
   )
 }

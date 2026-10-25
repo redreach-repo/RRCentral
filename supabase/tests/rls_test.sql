@@ -1110,3 +1110,54 @@ set role authenticated;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
 select pg_temp.expect(pg_temp.fails($q$insert into payment_log (invoice_ref, amount, external_ref) values ('RR-06-26950', 1, 'cs_forged')$q$), 'viewer cannot record a payment');
 reset role;
+
+------------------------------------------------------------ Files from the client portal (Wave 4, PR P)
+insert into portal_uploads (account_id, filename, size_bytes, content_base64)
+  select id, 'menu.pdf', 10, 'aGVsbG8=' from accounts where name = 'Assigned Clinic LLC';
+insert into portal_uploads (account_id, filename, size_bytes, content_base64)
+  select id, 'other.pdf', 10, 'aGVsbG8=' from accounts where name = 'Prospect Dental';
+select pg_temp.expect(pg_temp.fails($q$insert into portal_uploads (account_id, filename, size_bytes) select id, 'big.pdf', 6000000 from accounts limit 1$q$), 'uploads over 5 MB are refused');
+select pg_temp.expect(pg_temp.fails($q$insert into portal_uploads (account_id, filename, size_bytes, status) select id, 'a.pdf', 1, 'lost' from accounts limit 1$q$), 'upload status is checked');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from portal_uploads) = 1, 'staff (VA) sees uploads only on their accounts');
+select pg_temp.expect(not pg_temp.fails($q$update portal_uploads set status = 'in_workdrive', content_base64 = '' where filename = 'menu.pdf'$q$), 'staff (VA) marks an upload filed');
+select pg_temp.expect((select status from portal_uploads where filename = 'menu.pdf') = 'in_workdrive', 'the upload is filed');
+select pg_temp.expect(pg_temp.fails($q$insert into portal_uploads (account_id, filename, size_bytes) select id, 'x.pdf', 1 from accounts where name = 'Assigned Clinic LLC'$q$), 'staff (VA) cannot add uploads: only the portal does');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from portal_uploads) = 2, 'sales sees uploads');
+select pg_temp.expect(pg_temp.fails($q$insert into portal_uploads (account_id, filename, size_bytes) select id, 'x.pdf', 1 from accounts limit 1$q$), 'sales cannot add uploads');
+delete from portal_uploads where filename = 'other.pdf';
+select pg_temp.expect((select count(*) from portal_uploads) = 2, 'sales cannot delete uploads');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect((select count(*) from portal_uploads) = 2, 'manager sees uploads');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from portal_uploads) = 2, 'viewer reads uploads');
+update portal_uploads set note = 'viewer' where filename = 'other.pdf';
+select pg_temp.expect((select count(*) from portal_uploads where note = 'viewer') = 0, 'viewer cannot change uploads');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000c';
+select pg_temp.expect((select count(*) from portal_uploads) = 0, 'a stranger sees no uploads');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+delete from portal_uploads where filename = 'other.pdf';
+select pg_temp.expect((select count(*) from portal_uploads) = 1, 'admin deletes an upload');
+reset role;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from portal_uploads'), 'anon cannot read uploads');
+reset role;

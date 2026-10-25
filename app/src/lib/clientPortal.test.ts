@@ -5,8 +5,18 @@ import {
   isPortalToken,
   newPortalToken,
   portalAccessState,
+  portalInvoices,
   portalLink,
+  portalMessageProblem,
+  portalQuotes,
+  portalUploadProblem,
+  base64Bytes,
+  safeUploadName,
+  sizeLabel,
+  uploadContentType,
+  workDriveFolderId,
   type PortalInput,
+  type PortalQuoteRow,
 } from './clientPortal'
 import { DEFAULT_DELIVERY_RATES } from './delivery'
 import type { BuildStage, Contract, DeliveryPackage } from './types'
@@ -117,8 +127,8 @@ describe('buildPortalView', () => {
   it('lists open tickets with a plain status, newest first', () => {
     const v = buildPortalView(input())
     expect(v.openTickets).toEqual([
-      { subject: 'Bot not replying', status: 'Open', opened: '22 Oct 2026', note: 'Reply overdue, we are on it', late: true },
-      { subject: 'Add a FAQ', status: 'Waiting on client', opened: '21 Oct 2026', note: 'We have replied', late: false },
+      { id: '', subject: 'Bot not replying', status: 'Open', opened: '22 Oct 2026', note: 'Reply overdue, we are on it', late: true },
+      { id: '', subject: 'Add a FAQ', status: 'Waiting on client', opened: '21 Oct 2026', note: 'We have replied', late: false },
     ])
     expect(v.recentlyResolved).toEqual([{ subject: 'Fix logo', resolved: '5 Oct 2026' }])
   })
@@ -169,5 +179,138 @@ describe('buildPortalView', () => {
     for (const word of ['monthly_fee', 'tool_cost', 'internal', 'owner', 'account_id', 'notes']) {
       expect(text).not.toContain(word)
     }
+  })
+})
+
+describe('portal quotes', () => {
+  const link = { expires_at: '2026-11-30T00:00:00Z', revoked_at: null, accepted_at: null, accepted_name: '', has_pdf: true }
+  const q = (over: Partial<PortalQuoteRow>): PortalQuoteRow => ({
+    id: 'q1',
+    reference_number: 'RR-07-26010',
+    date: '2026-10-20',
+    valid_until: '2026-11-19',
+    amount: 4500,
+    status: 'Sent',
+    links: [link],
+    ...over,
+  })
+  it('shows a sent quote with a working link as waiting', () => {
+    expect(portalQuotes([q({})], now)).toEqual([
+      expect.objectContaining({ id: 'q1', state: 'waiting', amount: 4500, currency: 'AED', hasPdf: true }),
+    ])
+  })
+  it('hides quotes with no link, a turned off or expired link, or a status that cannot be accepted', () => {
+    const rows = [
+      q({ id: 'none', links: [] }),
+      q({ id: 'off', links: [{ ...link, revoked_at: '2026-10-21T00:00:00Z' }] }),
+      q({ id: 'old', links: [{ ...link, expires_at: '2026-10-01T00:00:00Z' }] }),
+      q({ id: 'draft', status: 'Draft' }),
+    ]
+    expect(portalQuotes(rows, now)).toEqual([])
+  })
+  it('keeps an accepted quote with who accepted it', () => {
+    const rows = [q({ status: 'Accepted', links: [{ ...link, accepted_at: '2026-10-22T09:00:00Z', accepted_name: 'Sara Ali' }] })]
+    expect(portalQuotes(rows, now)[0]).toMatchObject({ state: 'accepted', acceptedBy: 'Sara Ali', acceptedOn: '22 Oct 2026' })
+  })
+  it('uses the quote currency and sorts newest first', () => {
+    const rows = [q({ id: 'a', date: '2026-10-01' }), q({ id: 'b', date: '2026-10-21', quotation_currency: 'USD' })]
+    const out = portalQuotes(rows, now)
+    expect(out.map((r) => r.id)).toEqual(['b', 'a'])
+    expect(out[0].currency).toBe('USD')
+  })
+})
+
+describe('portal invoices', () => {
+  const inv = (over: Record<string, unknown>) => ({
+    id: 'i1',
+    reference_number: 'RR-07-26001',
+    date: '2026-10-01',
+    amount: 4725,
+    status: 'Sent',
+    payment_status: 'Unpaid',
+    payment_terms: 'Net 30',
+    pay_link_url: 'https://checkout.stripe.com/c/pay/abc',
+    ...over,
+  })
+  it('works out what is owed from the payments and offers the pay link', () => {
+    const [i] = portalInvoices([inv({})], [{ invoice_ref: 'RR-07-26001', amount: 725 }])
+    expect(i).toMatchObject({ balance: 4000, paid: false, due: '2026-10-31', payUrl: 'https://checkout.stripe.com/c/pay/abc' })
+  })
+  it('drops the pay link once paid', () => {
+    const [a, b] = portalInvoices(
+      [inv({ id: 'a', date: '2026-10-02', payment_status: 'Paid' }), inv({ id: 'b', reference_number: 'RR-07-26002' })],
+      [{ invoice_ref: 'RR-07-26002', amount: 4725 }],
+    )
+    expect(a).toMatchObject({ id: 'a', paid: true, balance: 0, payUrl: null })
+    expect(b).toMatchObject({ id: 'b', paid: true, balance: 0, payUrl: null })
+  })
+  it('hides drafts and cancelled invoices, and links that are not https', () => {
+    const out = portalInvoices([inv({ id: 'd', status: 'Draft' }), inv({ id: 'c', status: 'Cancelled' }), inv({ id: 'x', pay_link_url: 'http://bad' })], [])
+    expect(out.map((r) => r.id)).toEqual(['x'])
+    expect(out[0].payUrl).toBeNull()
+  })
+})
+
+describe('portal view extras', () => {
+  it('carries ticket ids, quotes, invoices and uploads', () => {
+    const view = buildPortalView(
+      input({
+        tickets: [{ id: 't1', subject: 'Help', status: 'open', created_at: '2026-10-22T06:00:00Z', sla_due_at: null, first_response_at: null, resolved_at: null }],
+        invoices: [{ id: 'i1', reference_number: 'RR-07-1', date: '2026-10-01', amount: 100, status: 'Sent', payment_status: 'Unpaid', payment_terms: '' }],
+        payments: [],
+        uploads: [{ filename: 'logo.png', size_bytes: 2048, created_at: '2026-10-22T06:00:00Z', status: 'in_workdrive' }],
+      }),
+    )
+    expect(view.openTickets[0].id).toBe('t1')
+    expect(view.invoices).toHaveLength(1)
+    expect(view.quotes).toEqual([])
+    expect(view.uploads).toEqual([{ filename: 'logo.png', size: '2 KB', uploaded: '22 Oct 2026', saved: true }])
+  })
+  it('has empty lists when the extras are not loaded', () => {
+    const view = buildPortalView(input())
+    expect(view.quotes).toEqual([])
+    expect(view.invoices).toEqual([])
+    expect(view.uploads).toEqual([])
+  })
+})
+
+describe('portal messages and uploads', () => {
+  it('checks a ticket message', () => {
+    expect(portalMessageProblem('  ')).toMatch(/Write/)
+    expect(portalMessageProblem('x'.repeat(4001))).toMatch(/4000/)
+    expect(portalMessageProblem('Thanks, that works')).toBeNull()
+  })
+  it('cleans file names', () => {
+    expect(safeUploadName('C:\\Users\\me\\My <logo>.png')).toBe('My _logo_.png')
+    expect(safeUploadName('../../etc/passwd')).toBe('passwd')
+    expect(safeUploadName('')).toBe('file')
+    expect(safeUploadName(`${'a'.repeat(200)}.pdf`)).toHaveLength(120)
+    expect(safeUploadName(`${'a'.repeat(200)}.pdf`).endsWith('.pdf')).toBe(true)
+  })
+  it('only takes allowed types up to 5 MB', () => {
+    expect(uploadContentType('Menu.PDF')).toBe('application/pdf')
+    expect(uploadContentType('run.exe')).toBeNull()
+    expect(uploadContentType('page.html')).toBeNull()
+    expect(portalUploadProblem({ filename: 'run.exe', size: 10 })).toMatch(/type/)
+    expect(portalUploadProblem({ filename: 'a.pdf', size: 0 })).toMatch(/empty/)
+    expect(portalUploadProblem({ filename: 'a.pdf', size: 5 * 1024 * 1024 + 1 })).toMatch(/5 MB/)
+    expect(portalUploadProblem({ filename: 'a.pdf', size: 5 * 1024 * 1024 })).toBeNull()
+  })
+  it('measures base64 without decoding', () => {
+    expect(base64Bytes(btoa('hello'))).toBe(5)
+    expect(base64Bytes(btoa('hell'))).toBe(4)
+    expect(base64Bytes(btoa('hel'))).toBe(3)
+    expect(base64Bytes('')).toBe(0)
+  })
+  it('labels sizes', () => {
+    expect(sizeLabel(100)).toBe('1 KB')
+    expect(sizeLabel(3 * 1024 * 1024)).toBe('3 MB')
+  })
+  it('finds the WorkDrive folder id in a link', () => {
+    expect(workDriveFolderId('https://workdrive.zoho.com/home/abc/teams/t1/ws/w1/folders/f1a2b3c4d5e6')).toBe('f1a2b3c4d5e6')
+    expect(workDriveFolderId('https://workdrive.zoho.com/folder/abcdefgh12')).toBe('abcdefgh12')
+    expect(workDriveFolderId('abcdefghij12')).toBe('abcdefghij12')
+    expect(workDriveFolderId('https://drive.google.com/drive/u/0/')).toBeNull()
+    expect(workDriveFolderId('')).toBeNull()
   })
 })

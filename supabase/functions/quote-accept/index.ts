@@ -19,12 +19,11 @@ import {
   acceptLinkState,
   acceptProblem,
   acceptView,
-  dealForQuote,
-  draftContractFromAcceptedDeal,
   hashAcceptToken,
   isAcceptToken,
 } from "./quoteAccept.bundle.js"
 import { withErrorLog } from "../_shared/functionHealth.ts"
+import { acceptQuote } from "../_shared/quoteAcceptance.ts"
 
 const DEFAULT_ORIGINS = [
   "https://redreach-repo.github.io",
@@ -126,106 +125,18 @@ Deno.serve(withErrorLog("quote-accept", async (req) => {
     const problem = acceptProblem({ name, date, agreed: body.agreed === true }, now)
     if (problem) return json({ error: problem }, 400)
 
-    // Claim the link once: a second press or a second tab changes nothing.
-    const { data: claimed } = await sb
-      .from("quote_accept_links")
-      .update({ accepted_at: now.toISOString(), accepted_name: name.slice(0, 200) })
-      .eq("id", link.id)
-      .is("accepted_at", null)
-      .is("revoked_at", null)
-      .select("id")
-    if (!claimed || (claimed as unknown[]).length === 0) return json({ error: "This quote was already accepted." }, 409)
-
     const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || req.headers.get("cf-connecting-ip") || ""
-    const who = `quote-accept (${name.slice(0, 200)})`
-
-    await sb.from("quotations").update({ status: "Accepted", updated_by: who }).eq("id", quote.id).in("status", ["Finalized", "Sent"])
-
-    // The AI CRM deal with this quote: Signed, with a draft contract.
-    let salesDealId: string | null = null
-    let dealAccountId: string | null = null
-    let contractId: string | null = null
-    const refs = [quote.reference_number, quote.base_reference].filter(Boolean)
-    if (refs.length) {
-      const { data: deals } = await sb
-        .from("sales_deals")
-        .select("*")
-        .in("quote_reference", refs)
-        .is("contract_id", null)
-      const deal = dealForQuote((deals || []) as never[], quote) as Record<string, unknown> | undefined
-      if (deal) {
-        const draft = draftContractFromAcceptedDeal(deal as never, name, now)
-        const { data: contract, error: cErr } = await sb
-          .from("contracts")
-          .insert({ ...draft, account_id: deal.account_id })
-          .select("id")
-          .single()
-        if (cErr) throw new Error(`Could not make the draft contract: ${cErr.message}`)
-        contractId = (contract as { id: string }).id
-        const { data: signed } = await sb
-          .from("sales_deals")
-          .update({ stage: "signed", contract_id: contractId, signed_at: now.toISOString(), last_touch_at: now.toISOString(), updated_at: now.toISOString() })
-          .eq("id", deal.id as string)
-          .is("contract_id", null)
-          .select("id")
-        if (!signed || (signed as unknown[]).length === 0) {
-          await sb.from("contracts").delete().eq("id", contractId)
-          contractId = null
-        } else {
-          salesDealId = deal.id as string
-          dealAccountId = deal.account_id as string
-        }
-      }
-    }
-
-    // An open CRM lead for the client: Won.
-    let crmId = ""
-    if (quote.client.trim()) {
-      const { data: crm } = await sb
-        .from("crm")
-        .select("id, pipeline_stage")
-        .ilike("company_name", quote.client.trim().replace(/[%_]/g, ""))
-        .limit(5)
-      const open = ((crm || []) as { id: string; pipeline_stage: string }[]).find((r) => r.pipeline_stage !== "Won" && r.pipeline_stage !== "Lost")
-      if (open) {
-        crmId = open.id
-        await sb
-          .from("crm")
-          .update({ pipeline_stage: "Won", outcome_reason: `Quote ${quote.reference_number} accepted online by ${name}`.slice(0, 500), quote_ref: quote.reference_number, updated_at: now.toISOString(), updated_by: who })
-          .eq("id", open.id)
-      }
-    }
-
-    await sb.from("quote_acceptances").insert({
-      link_id: link.id,
-      quotation_id: quote.id,
-      accepted_name: name.slice(0, 200),
-      accepted_date: date,
-      accepted_at: now.toISOString(),
-      ip: ip.slice(0, 100),
-      user_agent: (req.headers.get("user-agent") || "").slice(0, 500),
-      sales_deal_id: salesDealId,
-      contract_id: contractId,
-      crm_id: crmId,
+    const done = await acceptQuote(sb, {
+      link,
+      quote,
+      name,
+      date,
+      ip,
+      userAgent: req.headers.get("user-agent") || "",
+      source: "quote-accept",
+      now,
     })
-    const accountId = quote.account_id || dealAccountId
-    if (accountId) {
-      await sb.from("account_activities").insert({
-        account_id: accountId,
-        kind: "system",
-        body: `Quote ${quote.reference_number} accepted online by ${name} on ${date}.${contractId ? " A draft contract was made: check and activate it." : ""} Mark the quote Awarded to invoice it.`,
-        user_email: "quote-accept",
-      })
-    }
-    await sb.from("activity_log").insert({
-      action: "quote_accepted",
-      entity: "quotation",
-      reference: quote.reference_number,
-      details: `Accepted online by ${name}`,
-      user_email: "quote-accept",
-      ...(crmId ? { crm_id: crmId } : {}),
-    })
-
+    if (!done) return json({ error: "This quote was already accepted." }, 409)
     return json(acceptView({ ...quote, status: "Accepted" }, { ...link, accepted_at: now.toISOString(), accepted_name: name, has_pdf: true }, now))
   }
 

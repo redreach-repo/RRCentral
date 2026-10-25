@@ -89,14 +89,14 @@ export default function PortalLinksCard({
   }
 
   const message = (url: string, label: string) =>
-    `Hi ${label.split(' ')[0]}, here is your private Red Reach portal. It shows your requests, build progress, usage and monthly report: ${url}`
+    `Hi ${label.split(' ')[0]}, here is your private Red Reach portal. You can see your requests, build progress, usage, monthly report, quotes and invoices, and send us files: ${url}`
 
   return (
     <section style={{ ...cardStyle, marginTop: 16 }} aria-label="Client portal">
       <h2 style={sectionTitleStyle}>Client portal</h2>
       <p style={{ color: colors.muted, fontSize: 13, margin: '0 0 12px' }}>
-        Send a private link so the client can see their requests, build progress, usage against plan and monthly report. No
-        password needed. Links work for 12 months and you can turn one off at any time.
+        Send a private link so the client can see their requests, build progress, usage against plan and monthly report,
+        accept quotes, pay invoices, reply on open requests and send files. No password needed. Links work for 12 months and you can turn one off at any time.
       </p>
 
       {missingTable ? (

@@ -1182,6 +1182,22 @@ export interface PortalAccess {
   last_used_at: string | null
 }
 
+/** A file a client sent from the portal. content_base64 is kept only until it is in WorkDrive. */
+export interface PortalUpload {
+  id: string
+  account_id: string
+  portal_access_id: string | null
+  filename: string
+  content_type: string
+  size_bytes: number
+  note: string
+  status: 'received' | 'in_workdrive'
+  workdrive_id: string
+  workdrive_url: string
+  error: string
+  created_at: string
+}
+
 /** Someone on the daily digest list. */
 export interface DigestRecipientRow {
   id: string

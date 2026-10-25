@@ -7,6 +7,10 @@
  *
  * Clients open the portal with a private link. The link carries a random
  * token; only its SHA-256 hash is stored (portal_access.token_hash).
+ *
+ * From the portal a client can also accept a quote that has an accept link,
+ * open an invoice's card payment link, add a message to an open ticket and
+ * upload a file to their account (Wave 4, PR P).
  */
 import { addMonths, format, parseISO, subMonths } from 'date-fns'
 import {
@@ -22,6 +26,8 @@ import {
   stageLabel,
   type DeliveryRates,
 } from './delivery'
+import { invoiceDueDate } from './contractBilling'
+import { acceptableStatus, acceptLinkState } from './quoteAccept'
 import { slaState } from './sla'
 import { TICKET_STATUSES, isOpenTicket, resolvedInMonth } from './support'
 import type {
@@ -89,7 +95,33 @@ export function portalExpiry(now: Date = new Date()): string {
 
 // ---- What the client sees ----
 
-export type PortalTicket = { subject: string; status: string; opened: string; note: string; late: boolean }
+export type PortalTicket = { id: string; subject: string; status: string; opened: string; note: string; late: boolean }
+export type PortalQuote = {
+  id: string
+  reference: string
+  date: string | null
+  validUntil: string | null
+  amount: number
+  currency: string
+  /** waiting: can be accepted now. accepted: done. */
+  state: 'waiting' | 'accepted'
+  acceptedBy: string
+  acceptedOn: string | null
+  hasPdf: boolean
+}
+export type PortalInvoice = {
+  id: string
+  reference: string
+  date: string | null
+  due: string | null
+  amount: number
+  currency: string
+  balance: number
+  paid: boolean
+  /** The card payment link, while there is money owing and one was made. */
+  payUrl: string | null
+}
+export type PortalUpload = { filename: string; size: string; uploaded: string; saved: boolean }
 export type PortalUsage = {
   month: string
   label: string
@@ -138,6 +170,9 @@ export type PortalView = {
     stages: { label: string; status: string; due: string | null }[]
   }
   openTickets: PortalTicket[]
+  quotes: PortalQuote[]
+  invoices: PortalInvoice[]
+  uploads: PortalUpload[]
   recentlyResolved: { subject: string; resolved: string }[]
   usage: PortalUsage[]
   reportMonths: { month: string; label: string }[]
@@ -154,11 +189,41 @@ export type PortalInput = {
   packages: DeliveryPackage[]
   stages: BuildStage[]
   requirements: Pick<Requirement, 'title' | 'status' | 'is_change_request'>[]
-  tickets: Pick<Ticket, 'subject' | 'status' | 'created_at' | 'sla_due_at' | 'first_response_at' | 'resolved_at'>[]
+  tickets: (Pick<Ticket, 'subject' | 'status' | 'created_at' | 'sla_due_at' | 'first_response_at' | 'resolved_at'> & { id?: string })[]
+  /** Quotes for this account that Red Reach sent with an accept link (optional). */
+  quotes?: PortalQuoteRow[]
+  /** This account's invoices and the payments logged against them (optional). */
+  invoices?: PortalInvoiceRow[]
+  payments?: { invoice_ref: string; amount: number }[]
+  uploads?: PortalUploadRow[]
   usage: UsageRecord[]
   entries: Pick<TimeEntry, 'date' | 'hours' | 'category'>[]
   rates: DeliveryRates
 }
+
+export type PortalQuoteRow = {
+  id: string
+  reference_number: string
+  date: string | null
+  valid_until: string | null
+  amount: number
+  status: string
+  quotation_currency?: string | null
+  currency?: string | null
+  links: { expires_at: string | null; revoked_at: string | null; accepted_at: string | null; accepted_name: string; has_pdf: boolean }[]
+}
+export type PortalInvoiceRow = {
+  id: string
+  reference_number: string
+  date: string | null
+  amount: number
+  status: string
+  payment_status: string
+  payment_terms: string
+  currency?: string | null
+  pay_link_url?: string | null
+}
+export type PortalUploadRow = { filename: string; size_bytes: number; created_at: string; status: string }
 
 const day = (iso: string) => format(parseISO(iso.slice(0, 10)), 'd MMM yyyy')
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
@@ -211,7 +276,7 @@ export function buildPortalView(input: PortalInput): PortalView {
   const openTickets = input.tickets
     .filter(isOpenTicket)
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
-    .map((t) => ({ subject: t.subject || 'No subject', status: ticketStatus(t.status), opened: day(t.created_at), ...ticketNote(t, now) }))
+    .map((t) => ({ id: t.id || '', subject: t.subject || 'No subject', status: ticketStatus(t.status), opened: day(t.created_at), ...ticketNote(t, now) }))
   const since = subMonths(now, 2).toISOString()
   const recentlyResolved = input.tickets
     .filter((t) => t.resolved_at && t.resolved_at >= since)
@@ -247,6 +312,14 @@ export function buildPortalView(input: PortalInput): PortalView {
       })),
     },
     openTickets,
+    quotes: portalQuotes(input.quotes || [], now),
+    invoices: portalInvoices(input.invoices || [], input.payments || []),
+    uploads: (input.uploads || []).slice(0, 20).map((u) => ({
+      filename: u.filename,
+      size: sizeLabel(u.size_bytes),
+      uploaded: day(u.created_at),
+      saved: u.status === 'in_workdrive',
+    })),
     recentlyResolved,
     usage: months
       .slice(0, 2)
@@ -276,5 +349,138 @@ export function buildPortalView(input: PortalInput): PortalView {
   }
 }
 
+// ---- Quotes, invoices, messages and uploads (Wave 4, PR P) ----
+
+/** Quotes the client can see: those sent with an accept link that still works, or already accepted. */
+export function portalQuotes(rows: PortalQuoteRow[], now: Date = new Date()): PortalQuote[] {
+  const out: PortalQuote[] = []
+  for (const q of rows) {
+    const accepted = q.links.find((l) => l.accepted_at)
+    const live = q.links.find((l) => acceptLinkState(l, now) === 'active')
+    if (!accepted && !(live && acceptableStatus(q.status))) continue
+    out.push({
+      id: q.id,
+      reference: q.reference_number,
+      date: q.date,
+      validUntil: q.valid_until,
+      amount: Number(q.amount || 0),
+      currency: String(q.quotation_currency || q.currency || 'AED') || 'AED',
+      state: accepted ? 'accepted' : 'waiting',
+      acceptedBy: accepted?.accepted_name || '',
+      acceptedOn: accepted?.accepted_at ? day(accepted.accepted_at) : null,
+      hasPdf: (accepted || live)?.has_pdf ?? false,
+    })
+  }
+  return out.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+}
+
+/** Invoices that have gone out (not drafts or cancelled), newest first, with what is still owed. */
+export function portalInvoices(rows: PortalInvoiceRow[], payments: { invoice_ref: string; amount: number }[]): PortalInvoice[] {
+  const paidByRef = new Map<string, number>()
+  for (const p of payments) {
+    const ref = String(p.invoice_ref || '').trim()
+    if (ref) paidByRef.set(ref, (paidByRef.get(ref) ?? 0) + (Number(p.amount) || 0))
+  }
+  return rows
+    .filter((i) => {
+      const s = String(i.status || '').toLowerCase()
+      return s !== 'draft' && s !== 'cancelled'
+    })
+    .map((i) => {
+      const paid = String(i.payment_status || '').toLowerCase() === 'paid'
+      const amount = Number(i.amount || 0)
+      const balance = paid ? 0 : round2(Math.max(0, amount - (paidByRef.get(i.reference_number.trim()) ?? 0)))
+      const url = String(i.pay_link_url || '').trim()
+      return {
+        id: i.id,
+        reference: i.reference_number,
+        date: i.date,
+        due: invoiceDueDate(i),
+        amount,
+        currency: String(i.currency || 'AED') || 'AED',
+        balance,
+        paid: paid || balance <= 0,
+        payUrl: !paid && balance > 0 && /^https:\/\//.test(url) ? url : null,
+      }
+    })
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+    .slice(0, 50)
+}
+
+export const PORTAL_MESSAGE_MAX = 4000
+
+/** Why a ticket message from the portal cannot be sent, or null. */
+export function portalMessageProblem(message: string): string | null {
+  const m = message.trim()
+  if (!m) return 'Write your message first.'
+  if (m.length > PORTAL_MESSAGE_MAX) return `Keep the message under ${PORTAL_MESSAGE_MAX} characters.`
+  return null
+}
+
+/** 5 MB: files travel as base64 inside one request. */
+export const PORTAL_UPLOAD_MAX_BYTES = 5 * 1024 * 1024
+export const PORTAL_UPLOAD_TYPES: Record<string, string> = {
+  pdf: 'application/pdf',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
+  csv: 'text/csv',
+  txt: 'text/plain',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+}
+
+/** A file name that is safe to store: no folders, no odd characters, 120 characters at most. */
+export function safeUploadName(name: string): string {
+  const base = String(name || '').split(/[\\/]/).pop() || ''
+  const cleaned = base.replace(/[^A-Za-z0-9 ._()-]+/g, '_').replace(/\s+/g, ' ').replace(/^[ .]+/, '').trim()
+  return (cleaned || 'file').slice(-120)
+}
+
+/** The content type for an allowed file, from its extension, or null when the type is not allowed. */
+export function uploadContentType(name: string): string | null {
+  const ext = (String(name).split('.').pop() || '').toLowerCase()
+  return PORTAL_UPLOAD_TYPES[ext] ?? null
+}
+
+/** Why an upload is refused, or null. `size` is the file size in bytes. */
+export function portalUploadProblem(input: { filename: string; size: number }): string | null {
+  if (!input.filename.trim()) return 'Pick a file.'
+  if (!uploadContentType(input.filename)) return 'That type of file cannot be uploaded. Use PDF, an image, Word, Excel, PowerPoint, CSV or text.'
+  if (!(input.size > 0)) return 'The file is empty.'
+  if (input.size > PORTAL_UPLOAD_MAX_BYTES) return 'The file is over 5 MB. Send a smaller one, or share a link in a ticket message.'
+  return null
+}
+
+/** Bytes in a base64 string, without decoding it. */
+export function base64Bytes(b64: string): number {
+  const clean = b64.replace(/\s/g, '')
+  const pad = clean.endsWith('==') ? 2 : clean.endsWith('=') ? 1 : 0
+  return Math.max(0, Math.floor((clean.length * 3) / 4) - pad)
+}
+
+export function sizeLabel(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${Math.round((bytes / (1024 * 1024)) * 10) / 10} MB`
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`
+}
+
+/** The WorkDrive folder id inside a folder link (or a bare id). Same rules as zohoWorkDrive.ts. */
+export function workDriveFolderId(url: string): string | null {
+  const u = String(url || '').trim()
+  if (!u) return null
+  for (const re of [/\/folders?\/([a-zA-Z0-9_-]+)/i, /[?&]id=([a-zA-Z0-9_-]+)/i]) {
+    const m = u.match(re)
+    if (m?.[1] && m[1].length >= 8) return m[1]
+  }
+  if (/^[a-zA-Z0-9_-]{10,}$/.test(u) && !u.includes('://')) return u
+  return null
+}
+
 // For the Edge Function, which reads the rates from app_settings.
 export { DELIVERY_RATE_KEYS, ratesFromSettings } from './delivery'
+export { acceptProblem } from './quoteAccept'

@@ -165,6 +165,31 @@ Deno.test({ name: "client-portal refuses a missing or malformed link token", ...
   assertEquals(await call("client-portal", post("client-portal", { token: "guess" })), 404)
 } })
 
+Deno.test({ name: "client-portal actions need a valid link token too", ...opts, fn: async () => {
+  for (const body of [
+    { action: "accept_quote", quote_id: "00000000-0000-0000-0000-000000000001", name: "Guess", date: "2026-10-25", agreed: true },
+    { action: "upload", filename: "a.pdf", content_base64: "aGVsbG8=" },
+    { action: "ticket_message", ticket_id: "00000000-0000-0000-0000-000000000001", message: "hi" },
+    { action: "quote_pdf", quote_id: "00000000-0000-0000-0000-000000000001" },
+  ]) {
+    assertEquals(await call("client-portal", post("client-portal", body)), 404)
+    assertEquals(await call("client-portal", post("client-portal", { ...body, token: "guess" })), 404)
+  }
+} })
+
+Deno.test("client-portal checks the link and the account before any action", async () => {
+  const source = await read("functions/client-portal/index.ts")
+  const guard = source.indexOf('type !== "ai_crm_client"')
+  assert(guard > source.indexOf("portalAccessState("), "the account check comes after the link check")
+  for (const action of ["quote_pdf", "accept_quote", "ticket_message", "upload"]) {
+    const at = source.indexOf(`action === "${action}"`)
+    assert(at > guard, `${action} is only handled after the link and account checks`)
+  }
+  // Every row an action touches is looked up with this link's account.
+  assert(/from\("quotations"\)[\s\S]*?\.eq\("account_id", accountId\)/.test(source), "quotes are limited to the link's account")
+  assert(/from\("tickets"\)[\s\S]*?\.eq\("account_id", accountId\)/.test(source), "tickets are limited to the link's account")
+})
+
 for (const fn of ["ai-assist", "whatsapp-send", "fireflies-fetch", "invoice-pay-link"]) {
   Deno.test({ name: `${fn} refuses a caller who is not signed in`, ...opts, fn: async () => {
     assertEquals(await call(fn, post(fn, {})), 401)

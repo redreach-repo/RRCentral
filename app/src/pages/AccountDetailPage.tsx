@@ -12,6 +12,7 @@ import AccountFormModal from '../components/accounts/AccountFormModal'
 import DeliveryPanel from '../components/accounts/DeliveryPanel'
 import ClientExportButton from '../components/accounts/ClientExportButton'
 import PortalLinksCard from '../components/accounts/PortalLinksCard'
+import PortalUploadsCard from '../components/accounts/PortalUploadsCard'
 import AccountTicketsCard from '../components/support/AccountTicketsCard'
 import AccountDealsCard from '../components/ctrm/AccountDealsCard'
 import AccountSalesDealCard from '../components/sales/AccountSalesDealCard'
@@ -578,7 +579,10 @@ export default function AccountDetailPage() {
       ) : null}
 
       {account.type === 'ai_crm_client' ? (
-        <PortalLinksCard account={account} contacts={sortedContacts} editable={editable} author={author} />
+        <>
+          <PortalLinksCard account={account} contacts={sortedContacts} editable={editable} author={author} />
+          <PortalUploadsCard account={account} editable={editable} />
+        </>
       ) : null}
 
       {account.type === 'worship_church' ? (
