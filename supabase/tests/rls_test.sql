@@ -366,7 +366,7 @@ insert into ctrm_deal_commissions (deal_id, expected_commission)
 select id as other_deal from ctrm_deals where account_id = (select id from accounts where name = 'Other Trading House') \gset
 
 select pg_temp.expect(pg_temp.fails($q$update ctrm_deals set stage = 'lost' where region = 'india'$q$), 'lost needs a reason');
-select pg_temp.expect(not pg_temp.fails($q$update ctrm_deals set stage = 'lost', lost_reason = 'Chose another vendor' where region = 'india'$q$), 'lost with a reason is fine');
+select pg_temp.expect(not pg_temp.fails($q$update ctrm_deals set stage = 'lost', lost_reason_code = 'Competitor won', lost_reason = 'Chose another vendor' where region = 'india'$q$), 'lost with a reason is fine');
 update ctrm_deals set stage = 'identified', lost_reason = '' where region = 'india';
 select pg_temp.expect(pg_temp.fails($q$update ctrm_deals set next_action = '' where region = 'india'$q$), 'open deals need a next action');
 select pg_temp.expect(pg_temp.fails($q$update ctrm_deals set next_action_date = null where region = 'india'$q$), 'open deals need a next action date');
@@ -834,6 +834,111 @@ reset role;
 
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from watch_items'), 'anon cannot read watch items');
+reset role;
+
+------------------------------------------------------------ My deals: when each deal reached its stage (Wave 3, PR H)
+alter table ctrm_deals disable trigger rr_stage_changed_at;
+update ctrm_deals set stage_changed_at = '2020-01-01';
+alter table ctrm_deals enable trigger rr_stage_changed_at;
+alter table crm disable trigger rr_stage_changed_at;
+update crm set stage_changed_at = '2020-01-01';
+alter table crm enable trigger rr_stage_changed_at;
+
+update ctrm_deals set notes = 'touched' where region = 'middle_east';
+select pg_temp.expect((select stage_changed_at from ctrm_deals where region = 'middle_east') = '2020-01-01', 'saving without a stage move keeps stage_changed_at');
+update ctrm_deals set stage_changed_at = '2025-05-05' where region = 'middle_east';
+select pg_temp.expect((select stage_changed_at from ctrm_deals where region = 'middle_east') = '2020-01-01', 'stage_changed_at cannot be set by hand');
+insert into crm (company_name, pipeline_stage) values ('Stage Clock Co', 'Lead');
+select pg_temp.expect((select stage_changed_at from crm where company_name = 'Stage Clock Co') is not null, 'a new CRM lead starts its stage clock');
+alter table crm disable trigger rr_stage_changed_at;
+update crm set stage_changed_at = '2020-01-01' where company_name = 'Stage Clock Co';
+alter table crm enable trigger rr_stage_changed_at;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+update ctrm_deals set stage = 'intro_call_booked', next_action = 'Call', next_action_date = '2026-11-03' where region = 'india';
+select pg_temp.expect((select stage_changed_at from ctrm_deals where region = 'india') > '2020-01-01', 'staff moving their deal restarts its stage clock');
+select pg_temp.expect((select count(*) from ctrm_deals where stage_changed_at is not null) = 1, 'staff reads stage times only on their own deals');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+update crm set pipeline_stage = 'Contacted', next_action = 'Call', follow_up_date = '2026-11-03' where company_name = 'Stage Clock Co';
+reset role;
+select pg_temp.expect((select pipeline_stage from crm where company_name = 'Stage Clock Co') = 'Contacted', 'sales moves a CRM lead');
+select pg_temp.expect((select count(*) from crm where stage_changed_at > '2020-01-01') = 1, 'only the moved CRM lead restarts its stage clock');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from ctrm_deals where stage_changed_at is not null) = 2, 'viewer reads stage times');
+select pg_temp.expect((select count(*) from ctrm_deal_commissions) = 0, 'viewer still sees no commission for My deals');
+update ctrm_deals set stage = 'lost', lost_reason = 'x';
+reset role;
+select pg_temp.expect((select count(*) from ctrm_deals where stage = 'lost') = 0, 'viewer cannot move deals');
+------------------------------------------------------------ Next step and lost reason on every move (Wave 3, PR I)
+insert into crm (company_name, pipeline_stage) values ('No Step Co', 'Lead');
+select pg_temp.expect(not pg_temp.fails($q$update crm set notes = 'still no next step' where company_name = 'No Step Co'$q$), 'a deal without a next step can still be edited');
+select pg_temp.expect(pg_temp.fails($q$update crm set pipeline_stage = 'Contacted' where company_name = 'No Step Co'$q$), 'CRM move to an open stage needs a next action');
+select pg_temp.expect(pg_temp.fails($q$update crm set pipeline_stage = 'Contacted', next_action = 'Call' where company_name = 'No Step Co'$q$), 'CRM move to an open stage needs a date');
+select pg_temp.expect(pg_temp.fails($q$update crm set pipeline_stage = 'Lost', outcome_reason = 'They went quiet', lost_note = 'x' where company_name = 'No Step Co'$q$), 'CRM lost reason must come from the list');
+select pg_temp.expect(pg_temp.fails($q$update crm set pipeline_stage = 'Lost', outcome_reason = 'Price' where company_name = 'No Step Co'$q$), 'CRM lost needs a note');
+select pg_temp.expect(not pg_temp.fails($q$update crm set pipeline_stage = 'Won', outcome_reason = 'Relationship' where company_name = 'No Step Co'$q$), 'CRM won needs no next step');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect(not pg_temp.fails($q$update crm set pipeline_stage = 'Lost', outcome_reason = 'Price', lost_note = 'Too dear for them this year' where company_name = 'No Step Co'$q$), 'sales marks a CRM deal lost with a reason and note');
+select pg_temp.expect(pg_temp.fails($q$update ctrm_deals set stage = 'lost', lost_reason = 'Chose another vendor', lost_reason_code = '' where region = 'middle_east'$q$), 'sales cannot lose a CTRM deal without a listed reason');
+select pg_temp.expect(not pg_temp.fails($q$update ctrm_deals set stage = 'demo_done', next_action = 'Send proposal', next_action_date = '2026-11-20' where region = 'middle_east'$q$), 'sales moves a CTRM deal with a next step');
+reset role;
+select pg_temp.expect((select pipeline_stage from crm where company_name = 'No Step Co') = 'Lost', 'the CRM deal is lost');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect(pg_temp.fails($q$update ctrm_deals set stage = 'lost', lost_reason = 'Gone', lost_reason_code = 'Nope' where region = 'india'$q$), 'staff cannot lose their deal with an unlisted reason');
+select pg_temp.expect(not pg_temp.fails($q$update ctrm_deals set stage = 'lost', lost_reason = 'Chose an in-house tool', lost_reason_code = 'Competitor won' where region = 'india'$q$), 'staff loses their own deal with a reason and note');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+update crm set pipeline_stage = 'Lead', next_action = 'x', follow_up_date = '2026-12-01' where company_name = 'No Step Co';
+reset role;
+select pg_temp.expect((select pipeline_stage from crm where company_name = 'No Step Co') = 'Lost', 'viewer cannot reopen a deal');
+------------------------------------------------------------ Lead intake (Wave 3, PR J)
+-- The website can still post an enquiry, but only lead-intake (service key)
+-- may link it to an account or deal, set its owner or mark it matched.
+-- Rate limit window: clear earlier anon inserts so these are not refused for volume.
+delete from website_inquiries;
+insert into website_inquiries (name, email, status, channel, pipeline, source, utm_source, account_id, deal_id, matched, crm_id, created_at)
+  values ('Intake Lead', 'lead@x.com', 'converted', 'landing_page', 'ai_crm', 'AI CRM landing page, google', 'google',
+          (select id from accounts where reference = 'AC-07-26001'), 'deal-1', true, '', now());
+set role anon;
+select pg_temp.expect(not pg_temp.fails($q$insert into website_inquiries (name, email, message, utm_source, utm_campaign, page_url) values ('Visitor', 'v@x.com', 'hi', 'google', 'q4', 'https://redreach.ae/contact')$q$), 'anon can submit a form with UTM values');
+select pg_temp.expect(pg_temp.fails($q$insert into website_inquiries (name, email, matched) values ('X', 'x@x.com', true)$q$), 'anon cannot mark an enquiry as matched');
+select pg_temp.expect(pg_temp.fails($q$insert into website_inquiries (name, email, deal_id) values ('X', 'x@x.com', 'deal-1')$q$), 'anon cannot link an enquiry to a deal');
+select pg_temp.expect(pg_temp.fails($q$insert into website_inquiries (name, email, channel) values ('X', 'x@x.com', 'landing_page')$q$), 'anon cannot claim another channel');
+select pg_temp.expect(pg_temp.fails($q$insert into website_inquiries (name, email, ip_hash) values ('X', 'x@x.com', 'abc')$q$), 'anon cannot set the sender hash');
+select pg_temp.expect(pg_temp.fails($q$insert into website_inquiries (name, email, utm_source) values ('X', 'x@x.com', repeat('u', 300))$q$), 'anon UTM length capped');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select pg_temp.expect((select count(*) from website_inquiries where source like 'AI CRM landing page%') = 1, 'admin reads new leads with their source');
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect((select count(*) from website_inquiries where matched) = 1, 'manager reads new leads');
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from website_inquiries where deal_id = 'deal-1') = 1, 'sales reads new leads');
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from website_inquiries) = 0, 'staff (VA) does not see leads');
+reset role;
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from website_inquiries) = 0, 'viewer does not see leads');
 reset role;
 
 ------------------------------------------------------------ Quote accept link (Wave 3, PR K)

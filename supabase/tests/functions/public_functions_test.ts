@@ -27,6 +27,7 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "bootstrap-admin": { kind: "shared secret", pattern: /x-bootstrap-secret[\s\S]*Forbidden/ },
   "manage-auth-user": { kind: "admin JWT", pattern: /admin\.auth\.getUser\(jwt\)/ },
   "zoho-proxy": { kind: "team member JWT", pattern: /admin\.auth\.getUser\(jwt\)[\s\S]*member\?\.active/ },
+  "lead-intake": { kind: "shared secret or signed form token", pattern: /if \(!secret\)[\s\S]*=== secret[\s\S]*formTokenProblem\(/ },
 }
 
 async function publicFunctions(): Promise<string[]> {
@@ -72,6 +73,7 @@ const ENV: Record<string, string> = {
   ANTHROPIC_API_KEY: "test-anthropic",
   SUPPORT_INBOUND_SECRET: "support-secret-for-tests",
   CRM_SYNC_SECRET: "crm-sync-secret-for-tests",
+  LEAD_INTAKE_SECRET: "lead-secret-for-tests",
 }
 
 async function load(fn: string): Promise<Handler> {
@@ -200,6 +202,27 @@ for (const [fn, header] of [["support-email-in", "x-support-secret"], ["teetribe
     assertEquals(await call(fn, post(fn, {}, { [header]: "wrong" })), 401)
   } })
 }
+
+Deno.test({ name: "lead-intake needs its secret or a signed form token", ...opts, fn: async () => {
+  const fn = "lead-intake"
+  const lead = { name: "Test Lead", email: "lead@example.com", message: "Hi" }
+  assertEquals(await call(fn, post(fn, lead)), 401)
+  assertEquals(await call(fn, post(fn, lead, { "x-lead-secret": "wrong" })), 401)
+  assertEquals(await call(fn, post(fn, { ...lead, form_token: "1700000000000.forged" })), 401)
+  // A real token straight away is refused too: people take longer than 3 seconds.
+  const tokenRes = await (await load(fn))(new Request(URL_BASE + fn + "?form_token=1"))
+  const { form_token } = await tokenRes.json()
+  assertEquals(await call(fn, post(fn, { ...lead, form_token })), 401)
+  // Positive control: the secret gets past the check to lead validation.
+  assertEquals(await call(fn, post(fn, { message: "no name" }, { "x-lead-secret": ENV.LEAD_INTAKE_SECRET })), 400)
+  // Fail closed without the secret.
+  Deno.env.delete("LEAD_INTAKE_SECRET")
+  try {
+    assertEquals(await call(fn, post(fn, lead, { "x-lead-secret": ENV.LEAD_INTAKE_SECRET })), 503)
+  } finally {
+    Deno.env.set("LEAD_INTAKE_SECRET", ENV.LEAD_INTAKE_SECRET)
+  }
+} })
 
 Deno.test({ name: "quote-accept refuses a missing or malformed link token", ...opts, fn: async () => {
   const fn = "quote-accept"

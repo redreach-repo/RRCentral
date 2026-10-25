@@ -23,7 +23,13 @@ describe('stale and overdue deals', () => {
 describe('dealProblem', () => {
   it('needs a reason to mark a deal lost', () => {
     expect(dealProblem({ stage: 'lost', lost_reason: ' ', next_action: '', next_action_date: null })).toMatch(/lost/)
-    expect(dealProblem({ stage: 'lost', lost_reason: 'Budget', next_action: '', next_action_date: null })).toBeNull()
+    expect(dealProblem({ stage: 'lost', lost_reason: 'Budget', next_action: '', next_action_date: null })).toBe('Pick why the deal was lost')
+    expect(
+      dealProblem({ stage: 'lost', lost_reason_code: 'Timing / budget', lost_reason: ' ', next_action: '', next_action_date: null }),
+    ).toBe('Add a note on why the deal was lost')
+    expect(
+      dealProblem({ stage: 'lost', lost_reason_code: 'Timing / budget', lost_reason: 'Budget', next_action: '', next_action_date: null }),
+    ).toBeNull()
   })
 
   it('needs a next action and date on open deals', () => {

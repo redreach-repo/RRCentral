@@ -11,10 +11,12 @@
  *  4. AI CRM clients over their hours two months running (delivery.ts).
  * On Fridays it also names clients with no hours logged this week.
  * From the 07:30 watchdog (watchdog.ts) it adds stale deals and late invoices.
- * It also says how many contract invoices the 06:00 run drafted today.
+ * It also says how many contract invoices the 06:00 run drafted today,
+ * and lists the new leads from the website, WhatsApp and the landing page.
  */
 import { format, isFriday, parseISO } from 'date-fns'
 import { isOverdue } from './ctrm'
+import { newLeads, type IntakeRow } from './leadIntake'
 import { currentContract, hoursAlert, renewalFlag, renewalLabel } from './delivery'
 import { slaState } from './sla'
 import { isOpenTicket } from './support'
@@ -47,6 +49,8 @@ export type Digest = {
   lateInvoices: DigestItem[]
   /** Contract invoices drafted by today's run: one line while there are any to finalise. */
   contractDrafts: DigestItem[]
+  /** Leads from the lead intake in the last 24 hours. */
+  newLeads: DigestItem[]
 }
 
 /** An open watch_items row, as much as the digest needs. */
@@ -74,6 +78,8 @@ export type DigestInput = {
   watch?: DigestWatchItem[]
   /** Contract invoices drafted in the last 24 hours (optional). */
   contractDrafts?: number
+  /** website_inquiries rows from the last 24 hours (optional). */
+  leads?: IntakeRow[]
 }
 
 const day = (iso: string) => format(parseISO(iso.slice(0, 10)), 'd MMM')
@@ -160,6 +166,12 @@ export function buildDigest(input: DigestInput): Digest {
     staleDeals: watchLines(input.watch || [], 'stale_deal'),
     lateInvoices: watchLines(input.watch || [], 'invoice_overdue'),
     contractDrafts: contractDraftItems(input.contractDrafts ?? 0),
+    newLeads: newLeads(input.leads || [], new Date(now.getTime() - 24 * 60 * 60 * 1000)).map((l) => ({
+      name: l.name,
+      detail: l.detail,
+      path: l.link,
+      urgent: false,
+    })),
   }
 }
 
@@ -212,6 +224,9 @@ export function digestSections(d: Digest): DigestSection[] {
     { key: 'overdueActions', title: 'Overdue CTRM next actions', empty: 'No overdue next actions.', items: d.overdueActions },
     { key: 'overHours', title: 'Clients over their hours', empty: 'No client is over hours two months running.', items: d.overHours },
   ]
+  if (d.newLeads?.length) {
+    sections.push({ key: 'newLeads', title: 'New leads in the last day', empty: '', items: d.newLeads })
+  }
   if (d.lateInvoices?.length) {
     sections.push({ key: 'lateInvoices', title: 'Invoices 3, 7 or 14 days late', empty: '', items: d.lateInvoices })
   }

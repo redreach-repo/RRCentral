@@ -2,6 +2,7 @@ import { format, startOfMonth, subMonths } from 'date-fns'
 import { listAccounts } from './accountsStore'
 import { listContractInvoices } from './contractBillingStore'
 import { listDeals } from './ctrmStore'
+import { listRecentLeads } from './leadIntakeStore'
 import { buildDigest, type Digest } from './dailyDigest'
 import { db } from './db'
 import { listContracts, listPackages, listTimeEntries } from './deliveryStore'
@@ -29,7 +30,8 @@ export async function loadDigestPreview(now: Date = new Date()): Promise<Digest>
     .is('cleared_at', null)
   const dayAgo = now.getTime() - 24 * 60 * 60 * 1000
   const contractDrafts = contractInvoices.filter((r) => r.invoice_id && Date.parse(r.created_at) >= dayAgo).length
-  return buildDigest({ now, accounts, contracts, packages, entries, tickets, deals, contractDrafts, watch: watch || [] })
+  const leads = await listRecentLeads(new Date(dayAgo))
+  return buildDigest({ now, accounts, contracts, packages, entries, tickets, deals, contractDrafts, watch: watch || [], leads })
 }
 
 export async function listRecipients(): Promise<{ rows: DigestRecipientRow[]; missingTable: boolean }> {
