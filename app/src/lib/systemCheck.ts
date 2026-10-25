@@ -30,6 +30,7 @@ export const SYSTEM_FUNCTIONS: SystemFunction[] = [
   { name: 'teetribe-order-sync', feature: 'Tee Tribe orders into RR Central', liveTest: '9' },
   { name: 'contract-invoices', feature: 'Contract invoices each morning', liveTest: '10' },
   { name: 'watchdog', feature: 'Daily watchdog list', liveTest: '11' },
+  { name: 'payment-reminder', feature: 'One tap payment reminders', liveTest: '12' },
 ]
 
 export type PingResult = {

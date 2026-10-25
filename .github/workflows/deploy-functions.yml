@@ -35,6 +35,7 @@ on:
           - teetribe-order-sync
           - contract-invoices
           - watchdog
+          - payment-reminder
 
 permissions:
   contents: read
