@@ -16,7 +16,7 @@
 //   and DIGEST_WHATSAPP_LANGUAGE (default en)
 //   DIGEST_CRON_SECRET (for the schedule)
 //   optional APP_URL (default https://redreach-repo.github.io/RRCentral)
-// Deploy: npx supabase functions deploy daily-digest --no-verify-jwt
+// Deploy: Actions > Deploy Edge Functions (verify_jwt = false in supabase/config.toml).
 // (the function checks the caller itself, so the schedule can call it).
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"

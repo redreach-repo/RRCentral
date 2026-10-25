@@ -30,9 +30,8 @@ the buttons show a note that AI help needs the Supabase connection.
 3. In Supabase, Edge Functions, Secrets, add `ANTHROPIC_API_KEY` with that key.
 4. Deploy the function:
 
-   ```
-   npx supabase functions deploy ai-assist --no-verify-jwt
-   ```
+   GitHub → RRCentral → **Actions** → **Deploy Edge Functions** → **Run workflow** → pick `ai-assist` → **Run workflow**.
+   Verify JWT is off for it in `supabase/config.toml`; the function checks the caller itself.
 
 If the app runs on a domain other than `redreach-repo.github.io` or
 `redreach.ae`, add it to the `ALLOWED_ORIGINS` secret (comma separated).

@@ -4,7 +4,8 @@
 // the Vite dev-server middleware. Prices and validation come from
 // app/src/shop/checkout.ts (bundled into checkout.bundle.js), never the browser.
 //
-// Deploy:  npx supabase functions deploy create-checkout-session --no-verify-jwt
+// Deploy:  Actions > Deploy Edge Functions (verify_jwt = false in supabase/config.toml).
+//          Callers must send an allowed Origin and the project's public key as apikey.
 // Secrets: npx supabase secrets set STRIPE_SECRET_KEY=sk_live_...
 //          npx supabase secrets set ALLOWED_ORIGINS=https://redreach-repo.github.io,https://www.redreach.ae
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
@@ -36,6 +37,14 @@ function corsHeaders(req: Request): Record<string, string> {
   }
 }
 
+/** The project's public (anon or publishable) key; CHECKOUT_PUBLIC_KEYS adds more, comma separated. */
+function shopKeyOk(provided: string): boolean {
+  const keys = [Deno.env.get("SUPABASE_ANON_KEY") || "", ...(Deno.env.get("CHECKOUT_PUBLIC_KEYS") || "").split(",")]
+    .map((k) => k.trim())
+    .filter(Boolean)
+  return provided !== "" && keys.includes(provided.trim())
+}
+
 function json(req: Request, status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
     status,
@@ -47,9 +56,15 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) })
   if (req.method !== "POST") return json(req, 405, { error: "POST only" })
 
-  const origin = req.headers.get("Origin")
-  if (origin && !allowedOrigins().includes(origin)) {
+  // Verify JWT is off (the shop may use a non-JWT publishable key), so the
+  // checks live here: the shop's own origin, plus the project's public key
+  // sent as apikey, as the shop does. Prices still come from the server.
+  const origin = req.headers.get("Origin") || ""
+  if (!allowedOrigins().includes(origin)) {
     return json(req, 403, { error: "Origin not allowed" })
+  }
+  if (!shopKeyOk(req.headers.get("apikey") || "")) {
+    return json(req, 401, { error: "Unauthorized" })
   }
 
   const length = Number(req.headers.get("Content-Length") || 0)

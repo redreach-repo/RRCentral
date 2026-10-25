@@ -9,7 +9,7 @@
 // Secret: ANTHROPIC_API_KEY (an Anthropic API key, not the admin key that
 // usage-import uses).
 //
-// Deploy: npx supabase functions deploy ai-assist --no-verify-jwt
+// Deploy: Actions > Deploy Edge Functions (verify_jwt = false in supabase/config.toml).
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
@@ -56,6 +56,18 @@ Deno.serve(async (req) => {
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || ""
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
   if (!supabaseUrl || !anonKey || !serviceKey) return json({ error: "Server misconfigured" }, 500)
+
+  // Verify JWT is off for this function, so check the signed in user here,
+  // before anything else: no token or a token Auth does not accept is refused.
+  const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim()
+  if (!jwt) return json({ error: "Sign in to RR Central first" }, 401)
+  const userDb = createClient(supabaseUrl, anonKey, {
+    auth: { persistSession: false },
+    global: { headers: { Authorization: `Bearer ${jwt}` } },
+  })
+  const { data: who } = await userDb.auth.getUser(jwt)
+  if (!who?.user) return json({ error: "Sign in to RR Central first" }, 401)
+
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY") || ""
   if (!apiKey) return json({ error: "AI help is not set up yet. Add the ANTHROPIC_API_KEY secret in Supabase." }, 503)
 
@@ -64,15 +76,7 @@ Deno.serve(async (req) => {
   const input = normaliseAiInput(body.input)
   if (!accountId || !input) return json({ error: "Nothing to work with. Add some text first." }, 400)
 
-  // Who is asking, and may they work on this account?
-  const authHeader = req.headers.get("Authorization") || ""
-  if (!authHeader) return json({ error: "Sign in to RR Central first" }, 401)
-  const userDb = createClient(supabaseUrl, anonKey, {
-    auth: { persistSession: false },
-    global: { headers: { Authorization: authHeader } },
-  })
-  const { data: who } = await userDb.auth.getUser()
-  if (!who?.user) return json({ error: "Sign in to RR Central first" }, 401)
+  // May they work on this account?
   const { data: allowed } = await userDb.rpc("rr_can_write_account", { target: accountId })
   if (allowed !== true) return json({ error: "You can only use AI help on accounts you can edit" }, 403)
 

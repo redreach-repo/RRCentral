@@ -41,9 +41,8 @@ A source with no secrets is skipped, so WhatsApp and AI can be set up one at a t
 
 ## 3. Deploy
 
-```
-npx supabase functions deploy usage-import --no-verify-jwt
-```
+GitHub → RRCentral → **Actions** → **Deploy Edge Functions** → **Run workflow** → pick `usage-import` → **Run workflow**.
+Verify JWT is off for it in `supabase/config.toml`; the function checks the caller itself.
 
 The function checks the caller itself: a signed in manager or admin, or the
 schedule's secret header. Then press **Import now** on Packages and rates.

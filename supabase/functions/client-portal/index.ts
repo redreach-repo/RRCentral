@@ -7,7 +7,7 @@
 // portal_access with the service role; a revoked, expired or unknown link
 // gets the same plain answer.
 //
-// Deploy: npx supabase functions deploy client-portal --no-verify-jwt
+// Deploy: Actions > Deploy Edge Functions (verify_jwt = false in supabase/config.toml).
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
