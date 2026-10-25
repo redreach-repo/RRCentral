@@ -25,6 +25,7 @@ export type Permission =
   | 'support.policies'
   | 'support.workingWeek'
   | 'ctrm.commission'
+  | 'system.check'
 
 /**
  * Hierarchy: admin > manager > sales, plus two restricted roles
@@ -62,6 +63,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     'support.policies',
     'support.workingWeek',
     'ctrm.commission',
+    'system.check',
   ]),
   manager: new Set<Permission>([
     'crm.reassignOwner',

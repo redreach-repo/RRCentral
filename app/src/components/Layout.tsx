@@ -36,6 +36,7 @@ import {
   HeartPulse,
   TrendingUp,
   Bug,
+  Activity,
   Gauge,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -137,6 +138,7 @@ const navGroups: NavGroup[] = [
       },
       { to: '/audit-log', label: 'Audit log', icon: ShieldCheck, minRole: 'admin' },
       { to: '/app-errors', label: 'App errors', icon: Bug, minRole: 'admin' },
+      { to: '/system-check', label: 'System check', icon: Activity, minRole: 'admin' },
     ],
   },
 ]
@@ -172,6 +174,7 @@ const titleByPath: { match: (path: string) => boolean; title: string }[] = [
   { match: (p) => p.startsWith('/settings'), title: 'Settings' },
   { match: (p) => p.startsWith('/audit-log'), title: 'Audit log' },
   { match: (p) => p.startsWith('/app-errors'), title: 'App errors' },
+  { match: (p) => p.startsWith('/system-check'), title: 'System check' },
 ]
 
 /** Primary destinations for phone / foldable bottom nav (big phones included). */

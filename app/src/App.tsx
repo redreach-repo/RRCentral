@@ -15,6 +15,7 @@ import AgreementTemplatePage from './pages/AgreementTemplatePage'
 import ClientHealthPage from './pages/ClientHealthPage'
 import MrrPage from './pages/MrrPage'
 import AppErrorsPage from './pages/AppErrorsPage'
+import SystemCheckPage from './pages/SystemCheckPage'
 import InsightsPage from './pages/InsightsPage'
 import SupportPage from './pages/SupportPage'
 import TicketPage from './pages/TicketPage'
@@ -146,6 +147,7 @@ export default function App() {
               <Route path="settings" element={<SettingsPage />} />
               <Route path="audit-log" element={<AuditLogPage />} />
               <Route path="app-errors" element={<AppErrorsPage />} />
+              <Route path="system-check" element={<SystemCheckPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>

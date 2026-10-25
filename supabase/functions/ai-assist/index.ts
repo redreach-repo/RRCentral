@@ -22,6 +22,7 @@ import {
   parseRequirements,
   tidyAiText,
 } from "./aiAssist.bundle.js"
+import { withErrorLog } from "../_shared/functionHealth.ts"
 
 const DEFAULT_ORIGINS = [
   "https://redreach-repo.github.io",
@@ -45,7 +46,7 @@ function corsHeadersFor(req: Request): Record<string, string> {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-Deno.serve(async (req) => {
+Deno.serve(withErrorLog("ai-assist", async (req) => {
   const cors = corsHeadersFor(req)
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } })
@@ -134,4 +135,4 @@ Deno.serve(async (req) => {
   text = tidyAiText(text)
   if (!text) return json({ error: "AI help came back empty. Please try again." }, 502)
   return json({ text, requirements: [], costUsd })
-})
+}, { secrets: ["ANTHROPIC_API_KEY"] }))

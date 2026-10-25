@@ -2,6 +2,7 @@
 // Deploy: supabase functions deploy zoho-proxy --project-ref <your-ref>
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
+import { withErrorLog } from "../_shared/functionHealth.ts"
 
 const ALLOWED_HOST_RE =
   /^([a-z0-9-]+\.)*(zoho\.com|zoho\.eu|zoho\.in|zoho\.com\.au|zohoapis\.com|zohoapis\.eu|zohoapis\.in|upload\.zoho\.com|upload\.zoho\.eu|upload\.zoho\.in)$/i
@@ -109,7 +110,7 @@ function base64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
   return out
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve(withErrorLog("zoho-proxy", async (req: Request) => {
   const cors = corsHeadersFor(req)
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: cors })
@@ -117,7 +118,7 @@ Deno.serve(async (req: Request) => {
   const res = await handle(req)
   for (const [k, v] of Object.entries(cors)) res.headers.set(k, v)
   return res
-})
+}))
 
 async function handle(req: Request): Promise<Response> {
   if (req.method !== "POST") {

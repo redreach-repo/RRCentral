@@ -5,13 +5,14 @@
 //                CRM_SYNC_SECRET=<shared secret>
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+import { withErrorLog } from '../_shared/functionHealth.ts'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-crm-sync-secret',
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withErrorLog('teetribe-order-sync', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
@@ -118,4 +119,4 @@ Deno.serve(async (req) => {
     status: 200,
     headers: { ...cors, 'Content-Type': 'application/json' },
   })
-})
+}, { secrets: ['CRM_SYNC_SECRET'] }))

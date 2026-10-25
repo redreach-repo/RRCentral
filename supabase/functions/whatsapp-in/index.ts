@@ -26,6 +26,7 @@ import {
   ticketSubject,
   validSignature,
 } from "./whatsappTickets.bundle.js"
+import { withErrorLog } from "../_shared/functionHealth.ts"
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } })
@@ -34,7 +35,7 @@ const OPEN = ["new", "open", "waiting_on_client"]
 
 type Contact = { id: string; account_id: string; name: string; phone: string; whatsapp: string }
 
-Deno.serve(async (req) => {
+Deno.serve(withErrorLog("whatsapp-in", async (req) => {
   const url = new URL(req.url)
 
   // Meta's one time check when the webhook is saved.
@@ -201,4 +202,4 @@ Deno.serve(async (req) => {
   }
 
   return json({ ok: true, created, added, statuses: statuses.length })
-})
+}, { secrets: ["WHATSAPP_APP_SECRET", "WHATSAPP_VERIFY_TOKEN"] }))

@@ -15,6 +15,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
 import { addWorkingHours, calendarFromSettings, slaHoursFor } from './sla.bundle.js'
+import { withErrorLog } from "../_shared/functionHealth.ts"
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -57,7 +58,7 @@ function normalise(raw: Record<string, unknown>): Inbound | null {
   }
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withErrorLog("support-email-in", async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
   // Fail closed: without a configured secret nobody can post tickets.
@@ -208,4 +209,4 @@ Deno.serve(async (req) => {
   }
 
   return json({ ok: true, ticket_id: ticket.id, matched: Boolean(accountId) })
-})
+}, { secrets: ["SUPPORT_INBOUND_SECRET"] }))
