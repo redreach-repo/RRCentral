@@ -3,6 +3,8 @@ import { lostText } from './dealRules'
 import { isMissingRelationError } from './errors'
 import { createAccount, logAccountEvent } from './accountsStore'
 import { stageLabel } from './ctrm'
+import { checkFitSheetForStage } from './fitSheetStore'
+import { fitSheetStageProblem, stageNeedsFitSheet } from './fitSheet'
 import type { CtrmCommission, CtrmDeal, CtrmStage, CtrmStageChange } from './types'
 
 type Author = { appUserId: string | null; email: string }
@@ -53,6 +55,7 @@ async function recordStage(dealId: string, from: string, to: CtrmStage, author: 
 }
 
 export async function createDeal(input: DealInput, author: Author): Promise<string> {
+  await checkFitSheetForStage(input.account_id, '', input.stage)
   const now = new Date().toISOString()
   const id = crypto.randomUUID()
   check(
@@ -74,6 +77,7 @@ export async function createDeal(input: DealInput, author: Author): Promise<stri
 export async function updateDeal(deal: CtrmDeal, patch: Partial<DealInput>, author: Author): Promise<void> {
   const now = new Date().toISOString()
   const moved = patch.stage && patch.stage !== deal.stage
+  if (moved && patch.stage) await checkFitSheetForStage(deal.account_id, deal.stage, patch.stage)
   const next: Record<string, unknown> = { ...patch, updated_at: now }
   if (moved) next.last_touch_at = now
   if (patch.stage && patch.stage !== 'lost') {
@@ -132,6 +136,10 @@ export async function saveDealForm(
   author: Author,
 ): Promise<{ dealId: string; accountId: string }> {
   let accountId = values.accountId
+  // A new company has no fit sheet yet, so it starts before Demo done.
+  if (!accountId && stageNeedsFitSheet('', values.stage)) {
+    throw new Error(`${fitSheetStageProblem(['the whole sheet'])} Save the deal at an earlier stage first, then fill in the fit sheet on the account.`)
+  }
   if (!accountId) {
     const account = await createAccount(
       {

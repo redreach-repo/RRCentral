@@ -16,6 +16,7 @@ import PortalLinksCard from '../components/accounts/PortalLinksCard'
 import PortalUploadsCard from '../components/accounts/PortalUploadsCard'
 import AccountTicketsCard from '../components/support/AccountTicketsCard'
 import AccountDealsCard from '../components/ctrm/AccountDealsCard'
+import FitSheetCard from '../components/ctrm/FitSheetCard'
 import AccountSalesDealCard from '../components/sales/AccountSalesDealCard'
 import ChurchProductCard from '../components/worshiphub/ChurchProductCard'
 import { db } from '../lib/db'
@@ -596,6 +597,8 @@ export default function AccountDetailPage() {
       {account.type === 'worship_church' ? (
         <ChurchProductCard account={account} editable={editable} author={author} onChanged={() => void load()} />
       ) : null}
+
+      {account.type === 'ctrm_prospect' ? <FitSheetCard account={account} contacts={sortedContacts} editable={editable} author={author} /> : null}
 
       {account.type !== 'ctrm_prospect' ? (
         <AccountTicketsCard account={account} contacts={contacts} team={team} editable={editable} author={author} />

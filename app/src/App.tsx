@@ -11,6 +11,7 @@ import AccountDetailPage from './pages/AccountDetailPage'
 import ClientReportPage from './pages/ClientReportPage'
 import ClientReportsPage from './pages/ClientReportsPage'
 import DuplicatesPage from './pages/DuplicatesPage'
+import FitSheetPage from './pages/FitSheetPage'
 import QuickAddPage from './pages/QuickAddPage'
 import DeliverySettingsPage from './pages/DeliverySettingsPage'
 import BuildTemplatesPage from './pages/BuildTemplatesPage'
@@ -103,6 +104,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <ClientReportPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounts/:id/fit-sheet"
+              element={
+                <ProtectedRoute>
+                  <FitSheetPage />
                 </ProtectedRoute>
               }
             />

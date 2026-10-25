@@ -888,7 +888,7 @@ set role authenticated;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
 select pg_temp.expect(not pg_temp.fails($q$update crm set pipeline_stage = 'Lost', outcome_reason = 'Price', lost_note = 'Too dear for them this year' where company_name = 'No Step Co'$q$), 'sales marks a CRM deal lost with a reason and note');
 select pg_temp.expect(pg_temp.fails($q$update ctrm_deals set stage = 'lost', lost_reason = 'Chose another vendor', lost_reason_code = '' where region = 'middle_east'$q$), 'sales cannot lose a CTRM deal without a listed reason');
-select pg_temp.expect(not pg_temp.fails($q$update ctrm_deals set stage = 'demo_done', next_action = 'Send proposal', next_action_date = '2026-11-20' where region = 'middle_east'$q$), 'sales moves a CTRM deal with a next step');
+select pg_temp.expect(not pg_temp.fails($q$update ctrm_deals set stage = 'intro_call_booked', next_action = 'Send proposal', next_action_date = '2026-11-20' where region = 'middle_east'$q$), 'sales moves a CTRM deal with a next step');
 reset role;
 select pg_temp.expect((select pipeline_stage from crm where company_name = 'No Step Co') = 'Lost', 'the CRM deal is lost');
 
@@ -1351,4 +1351,56 @@ drop table public.zz_merge_clash;
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from duplicate_dismissals'), 'anon cannot read dismissed pairs');
 select pg_temp.expect(pg_temp.fails($q$select rr_merge_accounts(gen_random_uuid(), gen_random_uuid())$q$), 'anon cannot merge');
+reset role;
+
+------------------------------------------------------------ Prospect fit sheet (Wave 5, PR V)
+insert into accounts (type, name, reference, owner_user_id) values
+  ('ctrm_prospect', 'VA Fit Prospect', 'AC-09-26101', (select id from app_users where email = 'va@redreach.ae'));
+insert into account_contacts (account_id, name) select id, 'Fit Decider' from accounts where name = 'VA Fit Prospect';
+insert into account_contacts (account_id, name) select id, 'Clinic Person' from accounts where name = 'Assigned Clinic LLC';
+insert into ctrm_deals (account_id, stage, region, next_action, next_action_date)
+  select id, 'intro_call_booked', 'middle_east', 'Book the demo', '2026-12-01' from accounts where name = 'VA Fit Prospect';
+select id as other_house from accounts where name = 'Other Trading House' \gset
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect(pg_temp.fails($q$update ctrm_deals set stage = 'demo_done' where account_id = (select id from accounts where name = 'VA Fit Prospect')$q$), 'a deal cannot move to Demo done without a fit sheet');
+select pg_temp.expect(pg_temp.fails($q$insert into ctrm_deals (account_id, stage, region, next_action, next_action_date) select id, 'evaluating', 'middle_east', 'x', '2026-12-01' from accounts where name = 'VA Fit Prospect'$q$), 'a new deal cannot start past the demo without a fit sheet');
+select pg_temp.expect(not pg_temp.fails($q$insert into ctrm_fit_sheets (account_id, commodities, focus) select id, 'Diesel', 'trading' from accounts where name = 'VA Fit Prospect'$q$), 'staff (VA) starts a fit sheet on their account');
+select pg_temp.expect(pg_temp.fails($q$update ctrm_deals set stage = 'demo_done' where account_id = (select id from accounts where name = 'VA Fit Prospect')$q$), 'a half filled fit sheet still blocks the demo');
+select pg_temp.expect(pg_temp.fails($q$update ctrm_fit_sheets set decision_maker_id = (select id from account_contacts where name = 'Clinic Person')$q$), 'the decision maker must be on the same account');
+select pg_temp.expect(not pg_temp.fails($q$update ctrm_fit_sheets set user_count = 8, current_system = 'Spreadsheets', modules = '{Credit}', decision_maker_id = (select id from account_contacts where name = 'Fit Decider')$q$), 'staff (VA) completes the fit sheet');
+select pg_temp.expect(not pg_temp.fails($q$update ctrm_deals set stage = 'demo_done' where account_id = (select id from accounts where name = 'VA Fit Prospect')$q$), 'with the fit sheet the deal moves to Demo done');
+select pg_temp.expect(pg_temp.fails(format('insert into ctrm_fit_sheets (account_id) values (%L)', :'other_house')), 'staff (VA) cannot add a fit sheet to an account that is not theirs');
+delete from ctrm_fit_sheets;
+reset role;
+select pg_temp.expect((select count(*) from ctrm_fit_sheets) = 1, 'staff (VA) cannot delete a fit sheet');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from ctrm_fit_sheets) = 1, 'sales reads fit sheets');
+select pg_temp.expect(not pg_temp.fails($q$insert into ctrm_fit_sheets (account_id, commodities) select id, 'Crude' from accounts where name = 'Other Trading House'$q$), 'sales adds a fit sheet');
+select pg_temp.expect(pg_temp.fails($q$insert into ctrm_fit_sheets (account_id) select id from accounts where name = 'Other Trading House'$q$), 'one fit sheet per account');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from ctrm_fit_sheets) = 2, 'viewer reads fit sheets');
+update ctrm_fit_sheets set notes = 'viewer edit';
+select pg_temp.expect((select count(*) from ctrm_fit_sheets where notes = 'viewer edit') = 0, 'viewer cannot edit fit sheets');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect(not pg_temp.fails($q$delete from ctrm_fit_sheets where commodities = 'Crude'$q$), 'manager deletes a fit sheet');
+select pg_temp.expect((select count(*) from ctrm_fit_sheets) = 1, 'the deleted fit sheet is gone');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000c';
+select pg_temp.expect((select count(*) from ctrm_fit_sheets) = 0, 'a stranger sees no fit sheets');
+reset role;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from ctrm_fit_sheets'), 'anon cannot read fit sheets');
 reset role;

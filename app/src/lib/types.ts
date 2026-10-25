@@ -1330,6 +1330,25 @@ export type CtrmStage =
 export type CtrmRegion = 'middle_east' | 'india'
 export type CtrmCompanyType = 'trading_house' | 'energy' | 'other'
 
+export type CtrmFitFocus = '' | 'trading' | 'operations' | 'both'
+
+/** The prospect fit sheet (Wave 5, PR V). Relationship facts only. */
+export interface CtrmFitSheet {
+  id: string
+  account_id: string
+  /** Commodities and products they deal in, in words. */
+  commodities: string
+  focus: CtrmFitFocus
+  user_count: number | null
+  current_system: string
+  decision_maker_id: string | null
+  modules: string[]
+  notes: string
+  updated_by: string
+  created_at: string
+  updated_at: string
+}
+
 /** A prospect being introduced to CTRM Next. Commission lives in CtrmCommission. */
 export interface CtrmDeal {
   id: string
