@@ -18,7 +18,7 @@ export { formatAED } from './money'
 
 export type ReminderChannel = 'email' | 'whatsapp'
 
-type ReminderContact = { id: string; name: string; email: string; phone: string; whatsapp: string; is_primary: boolean }
+export type ReminderContact = { id: string; name: string; email: string; phone: string; whatsapp: string; is_primary: boolean }
 
 /**
  * Who a one tap reminder goes to: the chosen contact, else the primary, else

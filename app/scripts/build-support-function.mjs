@@ -54,6 +54,7 @@ const bundles = [
   { entry: 'src/lib/fireflies.ts', out: '../supabase/functions/fireflies-fetch/fireflies.bundle.js' },
   { entry: 'src/lib/invoicePayLink.ts', out: '../supabase/functions/invoice-pay-link/invoicePayLink.bundle.js' },
   { entry: 'src/lib/invoicePayLink.ts', out: '../supabase/functions/stripe-invoice-webhook/invoicePayLink.bundle.js' },
+  { entry: 'src/lib/clientReports.ts', out: '../supabase/functions/client-reports/clientReports.bundle.js' },
 ]
 
 let stale = false

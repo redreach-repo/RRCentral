@@ -35,6 +35,7 @@ import {
   ClipboardList,
   FileSignature,
   HeartPulse,
+  FileBarChart,
   TrendingUp,
   Bug,
   Activity,
@@ -81,6 +82,7 @@ const navGroups: NavGroup[] = [
     items: [
       { to: '/accounts', label: 'Accounts', icon: Contact, forStaff: true },
       { to: '/client-health', label: 'Client health', icon: HeartPulse, forStaff: true },
+      { to: '/client-reports', label: 'Monthly reports', icon: FileBarChart, forStaff: true },
       { to: '/mrr', label: 'MRR', icon: TrendingUp, minRole: 'manager' },
       { to: '/support', label: 'Support', icon: LifeBuoy, forStaff: true },
       { to: '/deals', label: 'My deals', icon: Briefcase, forStaff: true },
@@ -152,6 +154,7 @@ const titleByPath: { match: (path: string) => boolean; title: string }[] = [
   { match: (p) => p.startsWith('/build-templates'), title: 'Build templates' },
   { match: (p) => p.startsWith('/agreement-template'), title: 'Agreement template' },
   { match: (p) => p.startsWith('/client-health'), title: 'Client health' },
+  { match: (p) => p.startsWith('/client-reports'), title: 'Monthly reports' },
   { match: (p) => p.startsWith('/mrr'), title: 'Monthly recurring revenue' },
   { match: (p) => p.startsWith('/insights'), title: 'Utilisation and profit' },
   { match: (p) => p.startsWith('/support'), title: 'Support' },
