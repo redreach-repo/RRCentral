@@ -89,6 +89,8 @@ export interface CrmEntry {
   trn: string
   /** Sales pipeline stage: Lead → … → Won/Lost */
   pipeline_stage: string
+  /** When pipeline_stage last changed (set by the database). Null on rows saved before it existed. */
+  stage_changed_at?: string | null
   quote_ref: string
   /** Why the deal was Won or Lost (company-level). Lost uses the LOST_REASONS list. */
   outcome_reason: string
@@ -1135,6 +1137,8 @@ export interface SalesDeal {
   contract_id: string | null
   signed_at: string | null
   last_touch_at: string
+  /** When the stage last changed (set by the database). Null on rows saved before it existed. */
+  stage_changed_at?: string | null
   created_by: string
   created_at: string
   updated_at: string
@@ -1274,6 +1278,8 @@ export interface CtrmDeal {
   source: string
   owner_user_id: string | null
   last_touch_at: string
+  /** When the stage last changed (set by the database). Null on rows saved before it existed. */
+  stage_changed_at?: string | null
   next_action: string
   next_action_date: string | null
   /** The note in words on why it was lost. */

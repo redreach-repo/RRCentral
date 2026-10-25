@@ -836,6 +836,45 @@ set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from watch_items'), 'anon cannot read watch items');
 reset role;
 
+------------------------------------------------------------ My deals: when each deal reached its stage (Wave 3, PR H)
+alter table ctrm_deals disable trigger rr_stage_changed_at;
+update ctrm_deals set stage_changed_at = '2020-01-01';
+alter table ctrm_deals enable trigger rr_stage_changed_at;
+alter table crm disable trigger rr_stage_changed_at;
+update crm set stage_changed_at = '2020-01-01';
+alter table crm enable trigger rr_stage_changed_at;
+
+update ctrm_deals set notes = 'touched' where region = 'middle_east';
+select pg_temp.expect((select stage_changed_at from ctrm_deals where region = 'middle_east') = '2020-01-01', 'saving without a stage move keeps stage_changed_at');
+update ctrm_deals set stage_changed_at = '2025-05-05' where region = 'middle_east';
+select pg_temp.expect((select stage_changed_at from ctrm_deals where region = 'middle_east') = '2020-01-01', 'stage_changed_at cannot be set by hand');
+insert into crm (company_name, pipeline_stage) values ('Stage Clock Co', 'Lead');
+select pg_temp.expect((select stage_changed_at from crm where company_name = 'Stage Clock Co') is not null, 'a new CRM lead starts its stage clock');
+alter table crm disable trigger rr_stage_changed_at;
+update crm set stage_changed_at = '2020-01-01' where company_name = 'Stage Clock Co';
+alter table crm enable trigger rr_stage_changed_at;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+update ctrm_deals set stage = 'intro_call_booked', next_action = 'Call', next_action_date = '2026-11-03' where region = 'india';
+select pg_temp.expect((select stage_changed_at from ctrm_deals where region = 'india') > '2020-01-01', 'staff moving their deal restarts its stage clock');
+select pg_temp.expect((select count(*) from ctrm_deals where stage_changed_at is not null) = 1, 'staff reads stage times only on their own deals');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+update crm set pipeline_stage = 'Contacted', next_action = 'Call', follow_up_date = '2026-11-03' where company_name = 'Stage Clock Co';
+reset role;
+select pg_temp.expect((select pipeline_stage from crm where company_name = 'Stage Clock Co') = 'Contacted', 'sales moves a CRM lead');
+select pg_temp.expect((select count(*) from crm where stage_changed_at > '2020-01-01') = 1, 'only the moved CRM lead restarts its stage clock');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from ctrm_deals where stage_changed_at is not null) = 2, 'viewer reads stage times');
+select pg_temp.expect((select count(*) from ctrm_deal_commissions) = 0, 'viewer still sees no commission for My deals');
+update ctrm_deals set stage = 'lost', lost_reason = 'x';
+reset role;
+select pg_temp.expect((select count(*) from ctrm_deals where stage = 'lost') = 0, 'viewer cannot move deals');
 ------------------------------------------------------------ Next step and lost reason on every move (Wave 3, PR I)
 insert into crm (company_name, pipeline_stage) values ('No Step Co', 'Lead');
 select pg_temp.expect(not pg_temp.fails($q$update crm set notes = 'still no next step' where company_name = 'No Step Co'$q$), 'a deal without a next step can still be edited');
