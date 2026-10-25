@@ -10,6 +10,7 @@
  *  3. CTRM Next deals whose next action date has passed (ctrm.ts).
  *  4. AI CRM clients over their hours two months running (delivery.ts).
  * On Fridays it also names clients with no hours logged this week.
+ * It also says how many contract invoices the 06:00 run drafted today.
  */
 import { format, isFriday, parseISO } from 'date-fns'
 import { isOverdue } from './ctrm'
@@ -39,6 +40,8 @@ export type Digest = {
   noHours: DigestItem[] | null
   /** App errors reported in the last 24 hours, one line per distinct message. */
   appErrors: DigestItem[]
+  /** Contract invoices drafted by today's run: one line while there are any to finalise. */
+  contractDrafts: DigestItem[]
 }
 
 export type DigestInput = {
@@ -52,6 +55,8 @@ export type DigestInput = {
   deals: Pick<CtrmDeal, 'id' | 'account_id' | 'stage' | 'next_action' | 'next_action_date'>[]
   /** app_errors rows from the last 24 hours (optional). */
   errors?: { message: string; created_at: string }[]
+  /** Contract invoices drafted in the last 24 hours (optional). */
+  contractDrafts?: number
 }
 
 const day = (iso: string) => format(parseISO(iso.slice(0, 10)), 'd MMM')
@@ -135,7 +140,21 @@ export function buildDigest(input: DigestInput): Digest {
     overHours,
     noHours,
     appErrors: digestErrors(input.errors || []),
+    contractDrafts: contractDraftItems(input.contractDrafts ?? 0),
   }
+}
+
+/** "N contract invoices drafted today", linking to Invoices to finalise them. */
+export function contractDraftItems(n: number): DigestItem[] {
+  if (!(n > 0)) return []
+  return [
+    {
+      name: `${n} contract invoice${n === 1 ? '' : 's'} drafted today`,
+      detail: `check and finalise ${n === 1 ? 'it' : 'them'} on Invoices to get the RR number`,
+      path: '/invoices',
+      urgent: false,
+    },
+  ]
 }
 
 /** One line per distinct error message, most frequent first, at most 5. */
@@ -161,6 +180,9 @@ export function digestSections(d: Digest): DigestSection[] {
     { key: 'overdueActions', title: 'Overdue CTRM next actions', empty: 'No overdue next actions.', items: d.overdueActions },
     { key: 'overHours', title: 'Clients over their hours', empty: 'No client is over hours two months running.', items: d.overHours },
   ]
+  if (d.contractDrafts?.length) {
+    sections.push({ key: 'contractDrafts', title: 'Contract invoices', empty: '', items: d.contractDrafts })
+  }
   if (d.appErrors?.length) {
     sections.push({ key: 'appErrors', title: 'App errors in the last day', empty: '', items: d.appErrors })
   }
