@@ -52,6 +52,19 @@ expect "$different" 4 DIFFERENT "old Dubai address"
 expect "$different" 5 DIFFERENT "Mass Allied without TRN"
 expect "$different" 6 DIFFERENT "quote without offset VAT"
 
+# The clean-up refuses while a data: file is stored, and deletes nothing.
+refused=$("${PSQL[@]}" 2>&1 <<'SQL' || true
+begin;
+alter table public.attachments drop constraint if exists attachments_url_no_data;
+alter table public.attachments drop constraint if exists attachments_url_https_or_empty;
+insert into public.attachments (entity_type, file_name, url) values ('invoice', 'x.pdf', 'data:application/pdf;base64,AAAA');
+\i scripts/attachments-link-only-rules.sql
+SQL
+)
+if [[ "$refused" == *"Not changed: 1 attachments"* ]]; then echo "ok - clean-up refuses while a file is stored"; else echo "FAIL - clean-up did not refuse: $refused" >&2; fail=1; fi
+"${PSQL[@]}" -f scripts/attachments-link-only-rules.sql
+echo "ok - clean-up runs again on a clean database"
+
 # Read only: running it changed nothing.
 after=$("${PSQL[@]}" -f scripts/check-catch-up-skipped.sql)
 [[ "$after" == "$applied" ]] || { echo "FAIL - the check changed data" >&2; fail=1; }

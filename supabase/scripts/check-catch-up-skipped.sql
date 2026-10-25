@@ -112,7 +112,7 @@ select * from (
       || case when x.c1 and x.c2 then 'on' when x.c1 or x.c2 then 'half on' else 'off' end,
     case when x.data_rows = 0 and x.other_rows = 0 and x.c1 and x.c2 then 'OK' else 'DIFFERENT' end,
     case
-      when x.data_rows > 0 then 'These files live only in the database. Save any you need to WorkDrive first, then run the "Attachments clean-up" section on the copy page.'
+      when x.data_rows > 0 then 'These files live only in the database. Save any you need to WorkDrive, remove them from their records, then run the "Attachments clean-up" section on the copy page.'
       when x.other_rows > 0 then 'Some links are not https. Fix or remove them on the record, then run the "Attachments clean-up" section.'
       when not (x.c1 and x.c2) then 'Run the "Attachments clean-up" section on the copy page (nothing left to delete).'
       else 'Nothing to do.'
