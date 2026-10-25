@@ -28,21 +28,13 @@ jobs:
         working-directory: app
       - run: npm test
         working-directory: app
-      # EMERGENCY 2026-10-09: do not strip secrets. Cloud data vanished when we
-      # refused to embed the mis-set service_role key (app fell into Local mode).
-      # Prefer anon key — assert warns but must not block deploy until secret is fixed.
-      - run: npm run assert:supabase-key
-        working-directory: app
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          ALLOW_UNSAFE_SUPABASE_KEY: '1'
+      # VITE_SUPABASE_ANON_KEY must be the anon key. The build stops on a
+      # service_role key, and the scan below checks the finished site too.
       - run: npm run build
         working-directory: app
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          ALLOW_UNSAFE_SUPABASE_KEY: '1'
       # Staging copy at /RRCentral/staging/, built only once its own Supabase
       # project is set up (docs/STAGING.md). Never with the live project.
       - name: Build staging copy
@@ -63,6 +55,9 @@ jobs:
           npm run assert:supabase-key
           VITE_APP_ENV=staging VITE_BASE=/RRCentral/staging/ npx vite build --outDir dist-staging
           mv dist-staging dist/staging
+      - name: No service_role key in the site
+        run: npm run scan:bundle -- dist
+        working-directory: app
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

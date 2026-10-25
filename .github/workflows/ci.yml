@@ -31,6 +31,8 @@ jobs:
       - name: Support email Edge Function bundle is up to date
         run: npm run build:support-fn -- --check
       - run: npm run build
+      - name: No service_role key in the built site
+        run: npm run scan:bundle -- dist
       - name: No customer data in the published folder
         run: |
           if find public dist -name 'migration-data*.json' -o -name 'rrcentral-backup-*.json' | grep -q .; then
