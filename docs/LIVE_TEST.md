@@ -26,6 +26,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 7 | WorshipHub support ticket | `support-email-in` |
 | 8 | WorshipHub review buttons | `worshiphub-read`, `worshiphub-manage` |
 | 9 | Other functions | `zoho-proxy`, `manage-auth-user`, `create-checkout-session`, `teetribe-order-sync` |
+| 10 | Contract invoices each morning | `contract-invoices` |
 | 12 | One tap payment reminders | `payment-reminder` |
 
 ---
@@ -156,6 +157,22 @@ Each one fails into App errors under its own name, and its System check row turn
 
 ---
 
+## 10. Contract invoices each morning
+
+**Trigger.** Set up as in `docs/contract-invoices.md`. The next morning, without opening the app
+before 06:30 Dubai time, open **Invoices**.
+
+**You should see.** A draft (INV-DRAFT-…) for each AI CRM contract with automatic invoicing on that
+came due, created by "RR Central daily run", and a line on the client's timeline. On the 1st of the
+month, each such contract gets that month's draft. The 08:00 digest has a "Contract invoices" row
+when any were drafted. Running the schedule again the same day adds nothing.
+
+**If it fails.** System check, row "Contract invoices each morning". Down with
+`CONTRACT_BILLING_CRON_SECRET` means the secret is not set. In the SQL Editor,
+`select * from cron.job_run_details order by start_time desc limit 5;` shows whether the schedule ran.
+
+---
+
 ## 12. One tap payment reminders
 
 **Trigger.** Make a test invoice to your own company account (with a contact that has your email and
@@ -170,4 +187,3 @@ nothing: "This reminder was already sent." Do the same with **WhatsApp** once th
 **If it fails.** The toast says why (no contact address, Zoho Mail not connected, WhatsApp template not
 approved). Nothing is recorded when sending fails, so you can press again once fixed. System check row
 "One tap payment reminders"; App errors under `payment-reminder`.
-

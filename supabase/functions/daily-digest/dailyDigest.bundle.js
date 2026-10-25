@@ -1964,8 +1964,20 @@ function buildDigest(input) {
     overdueActions,
     overHours,
     noHours,
-    appErrors: digestErrors(input.errors || [])
+    appErrors: digestErrors(input.errors || []),
+    contractDrafts: contractDraftItems(input.contractDrafts ?? 0)
   };
+}
+function contractDraftItems(n) {
+  if (!(n > 0)) return [];
+  return [
+    {
+      name: `${n} contract invoice${n === 1 ? "" : "s"} drafted today`,
+      detail: `check and finalise ${n === 1 ? "it" : "them"} on Invoices to get the RR number`,
+      path: "/invoices",
+      urgent: false
+    }
+  ];
 }
 function digestErrors(errors) {
   const counts = /* @__PURE__ */ new Map();
@@ -1982,6 +1994,9 @@ function digestSections(d) {
     { key: "overdueActions", title: "Overdue CTRM next actions", empty: "No overdue next actions.", items: d.overdueActions },
     { key: "overHours", title: "Clients over their hours", empty: "No client is over hours two months running.", items: d.overHours }
   ];
+  if (d.contractDrafts?.length) {
+    sections.push({ key: "contractDrafts", title: "Contract invoices", empty: "", items: d.contractDrafts });
+  }
   if (d.appErrors?.length) {
     sections.push({ key: "appErrors", title: "App errors in the last day", empty: "", items: d.appErrors });
   }
@@ -2038,6 +2053,7 @@ function digestTargets(recipients) {
 }
 export {
   buildDigest,
+  contractDraftItems,
   digestCount,
   digestDateLabel,
   digestEmail,
