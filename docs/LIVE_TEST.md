@@ -29,6 +29,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 10 | Contract invoices each morning | `contract-invoices` |
 | 11 | Daily watchdog | `watchdog` |
 | 12 | One tap payment reminders | `payment-reminder` |
+| 15 | Website and WhatsApp leads | `lead-intake` |
 
 ---
 
@@ -202,3 +203,25 @@ nothing: "This reminder was already sent." Do the same with **WhatsApp** once th
 **If it fails.** The toast says why (no contact address, Zoho Mail not connected, WhatsApp template not
 approved). Nothing is recorded when sending fails, so you can press again once fixed. System check row
 "One tap payment reminders"; App errors under `payment-reminder`.
+
+---
+
+## 15. Website and WhatsApp leads
+
+**Trigger.** In a private browser window open the website contact page with
+`?utm_source=test&utm_campaign=live-check` on the end of the address. Wait a few seconds, then send the form
+with your own name and a phone number nobody else in the CRM has.
+
+**You should see.** The form says "Received". On the dashboard, **New leads** shows your name with
+"Website form, test, live-check, new contact". It links to a new CRM lead at stage Lead with next action
+"Call the new lead" for today, owned by the person set under **Packages and rates → New leads: who gets
+them**. Send the form again with the same phone: no second CRM row, the note is added to the first one and
+the lead says "known contact". Next morning's digest has "New leads in the last day".
+
+**WhatsApp link.** Open `https://pszjylxrpvlumldtptrr.supabase.co/functions/v1/lead-intake?wa=1&text=Hi&utm_source=test`:
+WhatsApp opens on the Red Reach number with "Hi" typed. The click is counted but is not a lead.
+
+**If it fails.** System check row "Website and WhatsApp leads". Down with `LEAD_INTAKE_SECRET` means the
+secret is not set. If the form still says "Received" but nothing shows under New leads, the "Lead intake"
+SQL has not been run (the form then falls back to the old direct save). App errors under `lead-intake`.
+

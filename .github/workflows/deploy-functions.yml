@@ -36,6 +36,7 @@ on:
           - contract-invoices
           - watchdog
           - payment-reminder
+          - lead-intake
 
 permissions:
   contents: read
