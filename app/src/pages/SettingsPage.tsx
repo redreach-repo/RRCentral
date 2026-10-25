@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import CtrmListsCard from '../components/ctrm/CtrmListsCard'
 import { Download, HardDrive, Pencil, Plus, Trash2, Upload, Plug } from 'lucide-react'
 import { db, currentAuthMode } from '../lib/db'
 import type { AppUser, CompanyDocument, CompanyDocumentCategory, UserRole } from '../lib/types'
@@ -956,6 +957,7 @@ export default function SettingsPage() {
         WANDERS_KEYS,
       )}
       {renderSection('System', 'System', SYSTEM_KEYS)}
+      <CtrmListsCard />
       {renderSection(
         'Customer WorkDrive (files stay on Zoho WorkDrive — CRM stores links only). Enable WorkDrive auto-file and set the Customers root so Dashboard → Scan & file can archive matched emails.',
         'Customer WorkDrive',

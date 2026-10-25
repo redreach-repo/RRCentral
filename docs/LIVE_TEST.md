@@ -42,6 +42,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 23 | Go live checklist | `client-portal` (redeploy) |
 | 24 | Before the call brief | `ai-assist` (redeploy) |
 | 25 | Duplicates and Quick add | none (SQL only) |
+| 26 | CTRM Next fit sheet | none (SQL only) |
 
 ---
 
@@ -468,3 +469,16 @@ lead (or a CRM row for the other desks). It should take under ten seconds.
 
 **If it fails.** "Run the duplicates SQL first" means the SQL has not run. A merge error names the table that
 blocked it; nothing is changed when a merge fails.
+
+## 26. CTRM Next fit sheet
+
+**Trigger.** Run the Wave 5 fit sheet SQL. Open a CTRM Next account whose deal is before Demo done and try to
+move the deal to **Demo done** on the CTRM Next board.
+
+**You should see.** The move is refused with "Fill in the fit sheet before the demo" and what is missing. The
+account has a **Fit sheet** card: press **Fill in**, add what they trade, the focus, the number of users and the
+current system (decision maker, modules and notes are optional) and save. The card says "Ready for the demo" and
+the move now works. **PDF** opens the sheet on the letterhead with **Download PDF**; it shows no commission or
+deal value. The modules list is edited under Settings → CTRM Next lists. A viewer sees the sheet but cannot edit.
+
+**If it fails.** "Run the fit sheet SQL first" means the SQL has not run.
