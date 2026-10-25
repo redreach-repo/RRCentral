@@ -76,6 +76,9 @@ jobs:
         # shell: bash adds pipefail — without it `| tee` hid every failure and CI stayed green.
         shell: bash
         run: bash supabase/tests/run.sh 2>&1 | tee /tmp/migrate-rls.log
+      - name: Production data check (23 Oct catch-up) gives the right status
+        shell: bash
+        run: bash supabase/tests/catch_up_check_test.sh
       - name: Backup restore check
         shell: bash
         run: |
