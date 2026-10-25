@@ -12,6 +12,8 @@ export type Permission =
   | 'crm.deleteAny'
   | 'quote.deleteAny'
   | 'finance.reports'
+  /** Profit figures: P&L, gross profit and net. Managers and admins only. */
+  | 'finance.profit'
   | 'crm.viewAll'
   | 'legacy.access'
   | 'accounts.viewAll'
@@ -50,6 +52,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     'crm.deleteAny',
     'quote.deleteAny',
     'finance.reports',
+    'finance.profit',
     'crm.viewAll',
     'legacy.access',
     'accounts.viewAll',
@@ -70,6 +73,7 @@ const ROLE_PERMISSIONS: Record<UserRole, ReadonlySet<Permission>> = {
     'crm.deleteAny',
     'quote.deleteAny',
     'finance.reports',
+    'finance.profit',
     'crm.viewAll',
     'legacy.access',
     'accounts.viewAll',

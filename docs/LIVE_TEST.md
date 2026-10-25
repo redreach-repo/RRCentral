@@ -36,6 +36,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 17 | Quote follow up templates and nudges | `daily-digest` |
 | 18 | Fireflies calls on the timeline | `fireflies-fetch` |
 | 19 | Card payment links on invoices | `invoice-pay-link`, `stripe-invoice-webhook` |
+| 20 | Reports that answer questions | none (app only) |
 
 ---
 
@@ -346,3 +347,20 @@ the card link asks only for the rest.
 through in Stripe but the invoice stays unpaid, check Stripe → Webhooks for the delivery error and the System
 check row "Card payments mark invoices paid".
 
+---
+
+## 20. Reports that answer questions
+
+**Trigger.** Nothing to set up. Open **Finance → Reports** as an admin.
+
+**You should see.** A **Sales answers** tab with win rate by pipeline (quotations, CRM, AI CRM sales, CTRM
+Next) and by lead source, the average days from new deal to won, and paid revenue (excluding VAT) by
+division and by lead source. A **Cash flow, 90 days** tab with open invoice balances on their due date
+(overdue ones today), the monthly bank deductions and fixed monthly cost going out, and any VAT return due
+by the 28th, week by week with a running total. Export CSV works on both. Sign in as a sales login: the
+**Income & expenses** and **Monthly P&L** tabs are gone and the gross profit figures on Multi-currency are
+hidden. Managers and admins still see them.
+
+**If it fails.** A source showing as "Not recorded" means the deal or account has no source filled in.
+No fixed monthly cost line means it is not set on Packages and rates. Nothing goes to App errors unless
+the page itself crashes.

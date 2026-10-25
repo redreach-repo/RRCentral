@@ -76,6 +76,16 @@ describe('restricted roles', () => {
   })
 })
 
+describe('finance profit permissions', () => {
+  it('shows profit to admin and manager only', () => {
+    expect(can('admin', 'finance.profit')).toBe(true)
+    expect(can('manager', 'finance.profit')).toBe(true)
+    expect(can('sales', 'finance.profit')).toBe(false)
+    expect(can('staff', 'finance.profit')).toBe(false)
+    expect(can('viewer', 'finance.profit')).toBe(false)
+  })
+})
+
 describe('client delivery permissions', () => {
   it('shows profitability to admin and manager only', () => {
     expect(can('admin', 'delivery.profitability')).toBe(true)
