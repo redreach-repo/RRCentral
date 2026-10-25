@@ -1264,3 +1264,35 @@ reset role;
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from build_tasks'), 'anon cannot read go live steps');
 reset role;
+
+------------------------------------------------------------ Before the call brief (Wave 4, PR S)
+insert into ai_usage_log (account_id, feature, model, input_tokens, output_tokens, cost_usd)
+  select id, 'call_brief', 'claude-haiku-5-5', 500, 80, 0.0001 from accounts where name = 'Assigned Clinic LLC';
+select pg_temp.expect((select count(*) from ai_usage_log where feature = 'call_brief') = 1, 'the brief logs its AI cost as call_brief');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from ai_usage_log where feature = 'call_brief') = 1, 'staff (VA) sees the brief cost on their account');
+select pg_temp.expect(pg_temp.fails($q$insert into ai_usage_log (account_id, feature) select id, 'call_brief' from accounts where name = 'Assigned Clinic LLC'$q$), 'staff (VA) cannot log brief costs themselves');
+select pg_temp.expect(not pg_temp.fails($q$insert into account_activities (account_id, kind, body) select id, 'note', 'Before the call brief' from accounts where name = 'Assigned Clinic LLC'$q$), 'staff (VA) saves a brief as a note on their account');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from ai_usage_log where feature = 'call_brief') = 1, 'sales sees the brief cost');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect((select count(*) from ai_usage_log where feature = 'call_brief') = 1, 'manager sees the brief cost');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect(pg_temp.fails($q$insert into account_activities (account_id, kind, body) select id, 'note', 'Before the call brief' from accounts limit 1$q$), 'viewer cannot save a brief');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000c';
+select pg_temp.expect((select count(*) from ai_usage_log where feature = 'call_brief') = 0, 'a stranger sees no brief cost');
+reset role;

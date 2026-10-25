@@ -4,7 +4,7 @@ import { isMissingRelationError } from './errors'
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseConfig'
 import type { AiUsageLog } from './types'
 
-export type AiResult = { text: string; requirements: ProposedRequirement[]; costUsd: number }
+export type AiResult = { text: string; requirements: ProposedRequirement[]; questions: string[]; costUsd: number }
 
 export const AI_LOCAL_MODE = 'AI help works once RR Central is connected to Supabase.'
 
@@ -23,7 +23,12 @@ export async function runAi(accountId: string, input: AiInput): Promise<AiResult
     throw new Error(message)
   }
   const d = (data || {}) as Partial<AiResult>
-  return { text: String(d.text || ''), requirements: Array.isArray(d.requirements) ? d.requirements : [], costUsd: Number(d.costUsd) || 0 }
+  return {
+    text: String(d.text || ''),
+    requirements: Array.isArray(d.requirements) ? d.requirements : [],
+    questions: Array.isArray(d.questions) ? d.questions.map(String) : [],
+    costUsd: Number(d.costUsd) || 0,
+  }
 }
 
 /** AI use logged on one account, or on every visible account when no id is given, since a date. */
