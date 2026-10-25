@@ -6,7 +6,8 @@
 #   SUPABASE_PROJECT_REF   the project id in the Supabase URL
 #
 # Verify JWT for each function comes from supabase/config.toml, as with a
-# deploy from a laptop. Functions not listed there keep it on.
+# deploy from a laptop. Functions not listed there keep it on. The ones with
+# it off check their caller in code (CI: supabase/tests/functions/).
 name: Deploy Edge Functions
 
 on:

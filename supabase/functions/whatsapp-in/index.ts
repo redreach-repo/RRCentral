@@ -12,7 +12,7 @@
 // Meta's webhook setup), WHATSAPP_APP_SECRET (Meta app, Settings, Basic) and,
 // optionally, WHATSAPP_PHONE_NUMBER_ID to ignore other numbers on the app.
 //
-// Deploy: npx supabase functions deploy whatsapp-in --no-verify-jwt
+// Deploy: Actions > Deploy Edge Functions (verify_jwt = false in supabase/config.toml).
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"

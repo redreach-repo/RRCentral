@@ -66,9 +66,8 @@ Without the WhatsApp secrets, WhatsApp is skipped and email still goes.
 
 ## 5. Deploy
 
-```
-npx supabase functions deploy daily-digest --no-verify-jwt
-```
+GitHub → RRCentral → **Actions** → **Deploy Edge Functions** → **Run workflow** → pick `daily-digest` → **Run workflow**.
+Verify JWT is off for it in `supabase/config.toml`; the function checks the caller itself.
 
 The function checks the caller itself: a signed in manager or admin, or the
 schedule's secret header. Then press **Send now** on Packages and rates.

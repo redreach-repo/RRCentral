@@ -26,9 +26,8 @@ On an AI CRM account, the **Client portal** card makes a link for a contact
 1. Run `supabase/migrations/20261103090000_client_portal.sql`.
 2. Deploy the function:
 
-   ```
-   npx supabase functions deploy client-portal --no-verify-jwt
-   ```
+   GitHub → RRCentral → **Actions** → **Deploy Edge Functions** → **Run workflow** → pick `client-portal` → **Run workflow**.
+   Verify JWT is off for it in `supabase/config.toml`; the function checks the caller itself.
 
 No secrets to add. The function uses the project's own service key, which
 Supabase provides. If the app runs on a domain other than

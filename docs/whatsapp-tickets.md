@@ -42,10 +42,8 @@ Add them yourself in Supabase, Edge Functions, Secrets.
 2. Add the secrets above.
 3. Deploy both functions:
 
-   ```
-   npx supabase functions deploy whatsapp-in --no-verify-jwt
-   npx supabase functions deploy whatsapp-send --no-verify-jwt
-   ```
+   GitHub → RRCentral → **Actions** → **Deploy Edge Functions** → **Run workflow**, once with `whatsapp-in` and once with `whatsapp-send`.
+   Verify JWT is off for them in `supabase/config.toml`; each checks the caller itself.
 
 4. In Meta, WhatsApp, Configuration, Webhook: Callback URL
    `https://<your-project>.supabase.co/functions/v1/whatsapp-in`, Verify token

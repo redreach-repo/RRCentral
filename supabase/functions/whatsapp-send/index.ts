@@ -8,7 +8,7 @@
 // Secrets: WHATSAPP_PHONE_NUMBER_ID and META_ACCESS_TOKEN (the same ones the
 // daily digest uses); META_GRAPH_VERSION is optional.
 //
-// Deploy: npx supabase functions deploy whatsapp-send --no-verify-jwt
+// Deploy: Actions > Deploy Edge Functions (verify_jwt = false in supabase/config.toml).
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
@@ -47,6 +47,18 @@ Deno.serve(async (req) => {
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || ""
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
   if (!supabaseUrl || !anonKey || !serviceKey) return json({ error: "Server misconfigured" }, 500)
+
+  // Verify JWT is off for this function, so check the signed in user here,
+  // before anything else: no token or a token Auth does not accept is refused.
+  const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim()
+  if (!jwt) return json({ error: "Sign in to RR Central first" }, 401)
+  const userDb = createClient(supabaseUrl, anonKey, {
+    auth: { persistSession: false },
+    global: { headers: { Authorization: `Bearer ${jwt}` } },
+  })
+  const { data: who } = await userDb.auth.getUser(jwt)
+  if (!who?.user) return json({ error: "Sign in to RR Central first" }, 401)
+
   const phoneNumberId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") || ""
   const token = Deno.env.get("META_ACCESS_TOKEN") || ""
   if (!phoneNumberId || !token) {
@@ -59,15 +71,7 @@ Deno.serve(async (req) => {
   if (!ticketId || !text) return json({ error: "Write a reply first" }, 400)
   if (text.length > WHATSAPP_MAX_TEXT) return json({ error: `WhatsApp replies can be up to ${WHATSAPP_MAX_TEXT} characters` }, 400)
 
-  // Who is sending, and may they reply on this ticket? Read it as them, so RLS decides.
-  const authHeader = req.headers.get("Authorization") || ""
-  if (!authHeader) return json({ error: "Sign in to RR Central first" }, 401)
-  const userDb = createClient(supabaseUrl, anonKey, {
-    auth: { persistSession: false },
-    global: { headers: { Authorization: authHeader } },
-  })
-  const { data: who } = await userDb.auth.getUser()
-  if (!who?.user) return json({ error: "Sign in to RR Central first" }, 401)
+  // May they reply on this ticket? Read it as them, so RLS decides.
   const { data: ticket } = await userDb
     .from("tickets")
     .select("id, account_id, subject, status, channel, requester_phone, first_response_at")

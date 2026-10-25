@@ -20,9 +20,10 @@ Deno.serve(async (req) => {
     })
   }
 
+  // Fail closed: without CRM_SYNC_SECRET set, nobody can post orders.
   const expected = Deno.env.get('CRM_SYNC_SECRET') || ''
   const provided = req.headers.get('x-crm-sync-secret') || ''
-  if (expected && provided !== expected) {
+  if (!expected || provided !== expected) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
       headers: { ...cors, 'Content-Type': 'application/json' },

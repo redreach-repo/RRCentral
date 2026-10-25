@@ -12,3 +12,27 @@ verify_jwt = false
 
 [functions.support-email-in]
 verify_jwt = false
+
+# Called from outside RR Central (schedules, Meta, client links, the shop) or
+# with keys the gateway cannot check. Each one checks its caller itself; the
+# test supabase/tests/functions/public_functions_test.ts fails CI if one does not.
+[functions.usage-import]
+verify_jwt = false
+
+[functions.daily-digest]
+verify_jwt = false
+
+[functions.client-portal]
+verify_jwt = false
+
+[functions.ai-assist]
+verify_jwt = false
+
+[functions.whatsapp-in]
+verify_jwt = false
+
+[functions.whatsapp-send]
+verify_jwt = false
+
+[functions.create-checkout-session]
+verify_jwt = false

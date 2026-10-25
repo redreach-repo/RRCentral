@@ -10,7 +10,7 @@
 //   META_WABA_ID, META_ACCESS_TOKEN, optional META_GRAPH_VERSION (default v21.0)
 //   ANTHROPIC_ADMIN_KEY
 //   USAGE_IMPORT_CRON_SECRET (for the schedule)
-// Deploy: npx supabase functions deploy usage-import --no-verify-jwt
+// Deploy: Actions > Deploy Edge Functions (verify_jwt = false in supabase/config.toml).
 // (the function checks the caller itself, so the schedule can call it).
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
