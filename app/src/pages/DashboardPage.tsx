@@ -39,6 +39,7 @@ import { listCompanyDocuments } from '../lib/companyDocs'
 import { companyDocAlertLabel, companyDocExpiryAlerts } from '../lib/companyDocAlerts'
 import { listOwnedDomains } from '../lib/domains'
 import ModuleAlertsCard from '../components/accounts/ModuleAlertsCard'
+import CtrmRenewalsCard from '../components/ctrm/CtrmRenewalsCard'
 import WatchdogCard from '../components/watchdog/WatchdogCard'
 import NoNextStepCard from '../components/deals/NoNextStepCard'
 import NewLeadsCard from '../components/leads/NewLeadsCard'
@@ -416,6 +417,7 @@ export default function DashboardPage() {
       <NoNextStepCard />
 
       <ModuleAlertsCard />
+      <CtrmRenewalsCard />
 
       {domainAlerts.length > 0 || ownedDomains.length > 0 ? (
         <div style={{ ...cardStyle, marginBottom: 16 }}>

@@ -1498,3 +1498,49 @@ reset role;
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from ctrm_sessions'), 'anon cannot read sessions');
 reset role;
+
+------------------------------------------------------------ CTRM Next contract and renewal dates (Wave 5, PR Y)
+select pg_temp.expect(pg_temp.fails($q$insert into ctrm_client_terms (account_id, contract_start, renewal_date) select id, '2027-01-01', '2026-01-01' from accounts where name = 'Other Trading House'$q$), 'renewal must come after the contract start');
+select pg_temp.expect(pg_temp.fails($q$insert into ctrm_client_terms (account_id, notice_days) select id, 900 from accounts where name = 'Other Trading House'$q$), 'notice period is 0 to 365 days');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect(pg_temp.fails($q$insert into ctrm_client_terms (account_id, renewal_date) select id, '2027-06-01' from accounts where name = 'VA Fit Prospect'$q$), 'staff (VA) cannot set contract dates, even on their account');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect(not pg_temp.fails($q$insert into ctrm_client_terms (account_id, contract_start, renewal_date, notice_days) select id, '2026-01-01', '2027-01-01', 60 from accounts where name = 'VA Fit Prospect'$q$), 'sales sets contract dates');
+select pg_temp.expect(not pg_temp.fails($q$update ctrm_client_terms set notice_days = 30$q$), 'sales edits contract dates');
+select pg_temp.expect(pg_temp.fails($q$insert into ctrm_client_terms (account_id) select id from accounts where name = 'VA Fit Prospect'$q$), 'one set of dates per account');
+delete from ctrm_client_terms;
+reset role;
+select pg_temp.expect((select count(*) from ctrm_client_terms) = 1, 'sales cannot delete contract dates');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from ctrm_client_terms) = 1, 'staff (VA) reads the dates on their account');
+update ctrm_client_terms set notice_days = 1;
+reset role;
+select pg_temp.expect((select notice_days from ctrm_client_terms) = 30, 'staff (VA) cannot change the dates');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from ctrm_client_terms) = 1, 'viewer reads contract dates');
+select pg_temp.expect(pg_temp.fails($q$insert into ctrm_client_terms (account_id) select id from accounts where name = 'Other Trading House'$q$), 'viewer cannot set contract dates');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect(not pg_temp.fails($q$delete from ctrm_client_terms$q$), 'manager deletes contract dates');
+reset role;
+select pg_temp.expect((select count(*) from ctrm_client_terms) = 0, 'the dates are gone');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000c';
+select pg_temp.expect(pg_temp.fails(format('insert into ctrm_client_terms (account_id) values (%L)', :'other_house')), 'a stranger cannot set contract dates');
+reset role;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from ctrm_client_terms'), 'anon cannot read contract dates');
+reset role;
