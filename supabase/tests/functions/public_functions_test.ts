@@ -135,6 +135,9 @@ Deno.test({ name: "watchdog fails closed without its schedule secret", ...opts, 
     assertEquals(await call("watchdog", post("watchdog", {}, { "x-cron-secret": ENV.WATCHDOG_CRON_SECRET })), 401)
   } finally {
     Deno.env.set("WATCHDOG_CRON_SECRET", ENV.WATCHDOG_CRON_SECRET)
+  }
+} })
+
 Deno.test({ name: "contract-invoices refuses a signed in user who is not a manager or admin", ...opts, fn: async () => {
   // The role check cannot confirm this token, so the caller counts as staff, sales or viewer.
   assertEquals(await call("contract-invoices", post("contract-invoices", {}, { Authorization: "Bearer someone" })), 403)
