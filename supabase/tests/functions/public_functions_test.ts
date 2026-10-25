@@ -21,6 +21,7 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "ai-assist": { kind: "signed in user (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)/ },
   "whatsapp-in": { kind: "Meta signature", pattern: /if \(!appSecret\)[\s\S]*validSignature\(raw, req\.headers\.get\("x-hub-signature-256"\)/ },
   "whatsapp-send": { kind: "signed in user (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)/ },
+  "fireflies-fetch": { kind: "signed in user (JWT read in code) who can write the account", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_can_write_account/ },
   "create-checkout-session": { kind: "allowed origin and public key", pattern: /allowedOrigins\(\)\.includes\(origin\)[\s\S]*shopKeyOk\(/ },
   "support-email-in": { kind: "shared secret", pattern: /if \(!expected\)[\s\S]*provided !== expected/ },
   "teetribe-order-sync": { kind: "shared secret", pattern: /if \(!expected \|\| provided !== expected\)/ },
@@ -160,7 +161,7 @@ Deno.test({ name: "client-portal refuses a missing or malformed link token", ...
   assertEquals(await call("client-portal", post("client-portal", { token: "guess" })), 404)
 } })
 
-for (const fn of ["ai-assist", "whatsapp-send"]) {
+for (const fn of ["ai-assist", "whatsapp-send", "fireflies-fetch"]) {
   Deno.test({ name: `${fn} refuses a caller who is not signed in`, ...opts, fn: async () => {
     assertEquals(await call(fn, post(fn, {})), 401)
     assertEquals(await call(fn, post(fn, {}, { Authorization: "Bearer " })), 401)

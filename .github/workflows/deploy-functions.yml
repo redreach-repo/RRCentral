@@ -38,6 +38,7 @@ on:
           - payment-reminder
           - lead-intake
           - quote-accept
+          - fireflies-fetch
 
 permissions:
   contents: read

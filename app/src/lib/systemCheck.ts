@@ -33,6 +33,7 @@ export const SYSTEM_FUNCTIONS: SystemFunction[] = [
   { name: 'payment-reminder', feature: 'One tap payment reminders', liveTest: '12' },
   { name: 'lead-intake', feature: 'Website and WhatsApp leads', liveTest: '15' },
   { name: 'quote-accept', feature: 'Quote accept links', liveTest: '16' },
+  { name: 'fireflies-fetch', feature: 'Fireflies calls on the timeline', liveTest: '18' },
 ]
 
 export type PingResult = {

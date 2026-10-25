@@ -98,6 +98,8 @@ type Props = {
   userRole: UserRole
   team: AppUser[]
   author: { appUserId: string | null; email: string }
+  /** Notes from a Fireflies call just added on the timeline. A new object each time. */
+  callNotesSeed?: { notes: string } | null
 }
 
 const smallBtn: CSSProperties = { ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }
@@ -161,7 +163,7 @@ function emptyContract(pkg: DeliveryPackage | undefined): ContractInput {
   }
 }
 
-export default function DeliveryPanel({ account, editable, userRole, team, author }: Props) {
+export default function DeliveryPanel({ account, editable, userRole, team, author, callNotesSeed }: Props) {
   const { showToast } = useToast()
   const { settings } = useSettings()
   const rates = useMemo(() => ratesFromSettings(settings), [settings])
@@ -188,6 +190,14 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
   const [usageForm, setUsageForm] = useState({ marketing: '', service: '', ai: '', leads: '' })
   const [reqForm, setReqForm] = useState({ title: '', detail: '' })
   const [callNotesOpen, setCallNotesOpen] = useState(false)
+  const [seededNotes, setSeededNotes] = useState('')
+  // A Fireflies call was added on the timeline: read it for requirements.
+  useEffect(() => {
+    if (callNotesSeed?.notes) {
+      setSeededNotes(callNotesSeed.notes)
+      setCallNotesOpen(true)
+    }
+  }, [callNotesSeed])
   const [assistUsd, setAssistUsd] = useState(0)
 
   const canContracts = can(userRole, 'delivery.contracts')
@@ -1075,7 +1085,11 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
           accountName={account.name}
           existing={requirements.map((r) => r.title)}
           asChangeRequests={signedOff}
-          onClose={() => setCallNotesOpen(false)}
+          initialNotes={seededNotes}
+          onClose={() => {
+            setCallNotesOpen(false)
+            setSeededNotes('')
+          }}
           onAdd={addFromCallNotes}
         />
         {requirements.length === 0 ? (

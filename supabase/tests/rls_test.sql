@@ -1035,3 +1035,40 @@ set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
 select pg_temp.expect((select count(*) from message_templates) = 0, 'viewer does not see templates');
 select pg_temp.expect(pg_temp.fails($q$insert into message_templates (name, channel, body) values ('V', 'whatsapp', 'x')$q$), 'viewer cannot add templates');
 reset role;
+
+------------------------------------------------------------ Fireflies calls on the timeline (Wave 3, PR M)
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect(not pg_temp.fails($q$insert into account_activities (account_id, kind, body, external_source, external_id) select id, 'meeting', 'Fireflies: call', 'fireflies', 'FF1' from accounts where name = 'Assigned Clinic LLC'$q$), 'staff (VA) can add a Fireflies call on their own account');
+select pg_temp.expect(pg_temp.fails($q$insert into account_activities (account_id, kind, body, external_source, external_id) select id, 'meeting', 'again', 'fireflies', 'FF1' from accounts where name = 'Assigned Clinic LLC'$q$), 'the same Fireflies call cannot be added twice');
+-- The VA cannot even see the other account; a guessed id is refused by RLS.
+reset role;
+select set_config('rr.test_church', (select id::text from accounts where name = 'Unassigned Church'), false);
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect(pg_temp.fails($q$insert into account_activities (account_id, kind, body, external_source, external_id) values (current_setting('rr.test_church')::uuid, 'meeting', 'x', 'fireflies', 'FF2')$q$), 'staff (VA) cannot add a call on an account they do not have');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect(not pg_temp.fails($q$insert into account_activities (account_id, kind, body, external_source, external_id) select id, 'meeting', 'Fireflies: call', 'fireflies', 'FF1' from accounts where name = 'Unassigned Church'$q$), 'the same call can go on a different account');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect((select count(*) from account_activities where external_source = 'fireflies') = 2, 'manager sees the Fireflies calls');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select pg_temp.expect((select count(*) from account_activities where external_id = 'FF1') = 2, 'admin sees the Fireflies calls');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect(pg_temp.fails($q$insert into account_activities (account_id, kind, body, external_source, external_id) select id, 'meeting', 'v', 'fireflies', 'FF9' from accounts limit 1$q$), 'viewer cannot add a Fireflies call');
+reset role;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from account_activities'), 'anon cannot read the timeline');
+reset role;

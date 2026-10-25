@@ -34,6 +34,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 15 | Website and WhatsApp leads | `lead-intake` |
 | 16 | Quote accept links | `quote-accept` |
 | 17 | Quote follow up templates and nudges | `daily-digest` |
+| 18 | Fireflies calls on the timeline | `fireflies-fetch` |
 
 ---
 
@@ -300,4 +301,21 @@ if the quote is still Sent. Next morning's digest lists it under "Quotes waiting
 
 **If it fails.** "Run the Follow up templates SQL first" means the SQL has not been run. "No WhatsApp or phone
 number" means the account's contact or the CRM row has no number.
+
+---
+
+## 18. Fireflies calls on the timeline
+
+**Trigger.** In Fireflies, open a recent call with a client and copy its link from the address bar. In RR Central
+open that client's AI CRM account, press **Fireflies call** under Timeline, paste the link and press
+**Get the summary**.
+
+**You should see.** The call's title, date, length, people, summary and action items. **Add to timeline** puts
+it on the timeline as a Meeting with the summary, the action items and a link to the transcript. Because it is
+an AI CRM build client, **Requirements from call notes** opens by itself and AI help lists the requirements it
+found; tick the ones to keep and press **Add**. Adding the same call again says "This meeting is already on the
+timeline". On a church or CTRM account the call is only added to the timeline.
+
+**If it fails.** "Fireflies is not set up yet" means `FIREFLIES_API_KEY` is not set. "Fireflies refused the API
+key" means the key is wrong. System check row "Fireflies calls on the timeline"; App errors under `fireflies-fetch`.
 

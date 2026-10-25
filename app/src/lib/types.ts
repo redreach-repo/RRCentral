@@ -871,6 +871,9 @@ export interface AccountActivity {
   kind: AccountActivityKind
   body: string
   created_at: string
+  /** Where an imported entry came from, e.g. 'fireflies', with its id there. */
+  external_source?: string
+  external_id?: string
 }
 
 /** AI CRM package catalogue row (editable in Packages and rates). */
