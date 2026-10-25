@@ -20,6 +20,8 @@
 //   list matches what the app shows.
 // * payment-reminder gets the reminder rules and wording
 //   (src/lib/paymentReminder.ts), so what is sent is what the app shows.
+// * fireflies-fetch gets the Fireflies rules (src/lib/fireflies.ts), so the
+//   link parsing and the meeting fields match the app.
 //
 //   npm run build:support-fn              # regenerate
 //   npm run build:support-fn -- --check   # CI: fail if a bundle is stale
@@ -41,6 +43,7 @@ const bundles = [
   { entry: 'src/lib/contractBillingRun.ts', out: '../supabase/functions/contract-invoices/contractBillingRun.bundle.js' },
   { entry: 'src/lib/watchdog.ts', out: '../supabase/functions/watchdog/watchdog.bundle.js' },
   { entry: 'src/lib/paymentReminder.ts', out: '../supabase/functions/payment-reminder/paymentReminder.bundle.js' },
+  { entry: 'src/lib/fireflies.ts', out: '../supabase/functions/fireflies-fetch/fireflies.bundle.js' },
 ]
 
 let stale = false

@@ -29,6 +29,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 10 | Contract invoices each morning | `contract-invoices` |
 | 11 | Daily watchdog | `watchdog` |
 | 12 | One tap payment reminders | `payment-reminder` |
+| 18 | Fireflies calls on the timeline | `fireflies-fetch` |
 
 ---
 
@@ -202,3 +203,21 @@ nothing: "This reminder was already sent." Do the same with **WhatsApp** once th
 **If it fails.** The toast says why (no contact address, Zoho Mail not connected, WhatsApp template not
 approved). Nothing is recorded when sending fails, so you can press again once fixed. System check row
 "One tap payment reminders"; App errors under `payment-reminder`.
+
+---
+
+## 18. Fireflies calls on the timeline
+
+**Trigger.** In Fireflies, open a recent call with a client and copy its link from the address bar. In RR Central
+open that client's AI CRM account, press **Fireflies call** under Timeline, paste the link and press
+**Get the summary**.
+
+**You should see.** The call's title, date, length, people, summary and action items. **Add to timeline** puts
+it on the timeline as a Meeting with the summary, the action items and a link to the transcript. Because it is
+an AI CRM build client, **Requirements from call notes** opens by itself and AI help lists the requirements it
+found; tick the ones to keep and press **Add**. Adding the same call again says "This meeting is already on the
+timeline". On a church or CTRM account the call is only added to the timeline.
+
+**If it fails.** "Fireflies is not set up yet" means `FIREFLIES_API_KEY` is not set. "Fireflies refused the API
+key" means the key is wrong. System check row "Fireflies calls on the timeline"; App errors under `fireflies-fetch`.
+

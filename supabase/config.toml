@@ -42,3 +42,6 @@ verify_jwt = false
 
 [functions.watchdog]
 verify_jwt = false
+
+[functions.fireflies-fetch]
+verify_jwt = false

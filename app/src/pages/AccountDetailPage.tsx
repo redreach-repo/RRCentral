@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
+import FirefliesCallModal from '../components/accounts/FirefliesCallModal'
+import { canAttachCalls, meetingNotesForAi } from '../lib/fireflies'
 import { ArrowLeft, ExternalLink, Link2, Pencil, Plus, Star, Trash2, Unlink } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -125,6 +127,8 @@ export default function AccountDetailPage() {
   const [noteKind, setNoteKind] = useState<AccountActivityKind>('note')
   const [noteBody, setNoteBody] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [firefliesOpen, setFirefliesOpen] = useState(false)
+  const [callNotesSeed, setCallNotesSeed] = useState<{ notes: string } | null>(null)
 
   const seesMoney = can(userRole, 'legacy.access')
   const author = useMemo(() => ({ appUserId, email: user?.email || '' }), [appUserId, user?.email])
@@ -491,7 +495,24 @@ export default function AccountDetailPage() {
                 >
                   Add
                 </button>
+                {canAttachCalls(userRole) ? (
+                  <button type="button" style={buttonSecondaryStyle} onClick={() => setFirefliesOpen(true)}>
+                    Fireflies call
+                  </button>
+                ) : null}
               </div>
+              <FirefliesCallModal
+                open={firefliesOpen}
+                accountId={account.id}
+                isBuildClient={account.type === 'ai_crm_client'}
+                author={author}
+                onClose={() => setFirefliesOpen(false)}
+                onSaved={(m) => {
+                  void listActivities(account.id).then(setTimeline)
+                  showToast('Meeting added to the timeline', 'success')
+                  if (account.type === 'ai_crm_client') setCallNotesSeed({ notes: meetingNotesForAi(m) })
+                }}
+              />
               <textarea
                 style={{ ...inputStyle, minHeight: 64, resize: 'vertical' }}
                 placeholder="What happened? Who said what, and what is next?"
@@ -545,7 +566,15 @@ export default function AccountDetailPage() {
       ) : null}
 
       {account.type === 'ai_crm_client' ? (
-        <DeliveryPanel key={deliveryKey} account={account} editable={editable} userRole={userRole} team={team} author={author} />
+        <DeliveryPanel
+          key={deliveryKey}
+          account={account}
+          editable={editable}
+          userRole={userRole}
+          team={team}
+          author={author}
+          callNotesSeed={callNotesSeed}
+        />
       ) : null}
 
       {account.type === 'ai_crm_client' ? (

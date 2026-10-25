@@ -36,6 +36,7 @@ on:
           - contract-invoices
           - watchdog
           - payment-reminder
+          - fireflies-fetch
 
 permissions:
   contents: read
