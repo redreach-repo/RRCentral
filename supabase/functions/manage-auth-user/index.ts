@@ -2,6 +2,7 @@
 // Deploy: supabase functions deploy manage-auth-user --project-ref pszjylxrpvlumldtptrr
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
+import { withErrorLog } from "../_shared/functionHealth.ts"
 
 const DEFAULT_ORIGINS = [
   "https://redreach-repo.github.io",
@@ -98,7 +99,7 @@ async function findAuthUserId(
   }
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve(withErrorLog("manage-auth-user", async (req: Request) => {
   const cors = corsHeadersFor(req)
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: cors })
@@ -144,4 +145,4 @@ Deno.serve(async (req: Request) => {
     }
     return json(500, { error: e instanceof Error ? e.message : "Server error" }, cors)
   }
-})
+}))

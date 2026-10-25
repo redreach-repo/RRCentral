@@ -10,6 +10,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import Stripe from "npm:stripe@22"
 import { buildCheckoutSessionParams, parseCheckoutRequest } from "./checkout.bundle.js"
+import { withErrorLog } from "../_shared/functionHealth.ts"
 
 const DEFAULT_ORIGINS = [
   "https://redreach-repo.github.io",
@@ -43,7 +44,7 @@ function json(req: Request, status: number, body: unknown) {
   })
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve(withErrorLog("create-checkout-session", async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) })
   if (req.method !== "POST") return json(req, 405, { error: "POST only" })
 
@@ -83,4 +84,4 @@ Deno.serve(async (req: Request) => {
     console.error("stripe checkout failed", e)
     return json(req, 502, { error: "Payment provider error — please try again." })
   }
-})
+}, { secrets: ["STRIPE_SECRET_KEY|STRIPE_RESTRICTED_KEY"] }))

@@ -94,3 +94,16 @@ jobs:
             echo "::error::${safe}"
           done
 
+
+  function-health:
+    name: Edge Function error logging and ping
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check every function with the shared wrapper
+        run: deno check supabase/functions/_shared/functionHealth.ts supabase/functions/worshiphub-manage/index.ts supabase/functions/manage-auth-user/index.ts
+      - name: Failures reach app_errors, ping answers without running the function
+        run: deno test --allow-env --allow-read --allow-net supabase/tests/functions/function_health_test.ts

@@ -19,6 +19,7 @@ import {
   portalAccessState,
   ratesFromSettings,
 } from "./clientPortal.bundle.js"
+import { withErrorLog } from "../_shared/functionHealth.ts"
 
 type PortalAccessRow = {
   id: string
@@ -50,7 +51,7 @@ function corsHeadersFor(req: Request): Record<string, string> {
 
 const NOT_VALID = "This link does not work any more. Ask Red Reach for a new one."
 
-Deno.serve(async (req) => {
+Deno.serve(withErrorLog("client-portal", async (req) => {
   const cors = corsHeadersFor(req)
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {
@@ -126,4 +127,4 @@ Deno.serve(async (req) => {
     rates: ratesFromSettings(settingMap),
   })
   return json(view)
-})
+}))

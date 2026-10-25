@@ -28,6 +28,7 @@ import {
   digestTargets,
   digestWhatsAppValues,
 } from "./dailyDigest.bundle.js"
+import { withErrorLog } from "../_shared/functionHealth.ts"
 
 // Shapes from app/src/lib/dailyDigest.ts (the bundle is plain JS).
 type Digest = { date: string }
@@ -199,7 +200,7 @@ async function sendWhatsApp(phones: string[], values: string[]) {
   return { sent, errors }
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withErrorLog("daily-digest", async (req) => {
   const cors = corsHeadersFor(req)
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } })
@@ -338,4 +339,4 @@ Deno.serve(async (req) => {
     whatsappSent,
     message: messages.join(" "),
   })
-})
+}, { secrets: ["DIGEST_CRON_SECRET"] }))

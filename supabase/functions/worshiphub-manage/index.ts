@@ -12,6 +12,7 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
+import { withErrorLog } from "../_shared/functionHealth.ts"
 
 const DEFAULT_ORIGINS = [
   "https://redreach-repo.github.io",
@@ -36,7 +37,7 @@ function corsHeadersFor(req: Request): Record<string, string> {
   }
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withErrorLog("worshiphub-manage", async (req) => {
   const cors = corsHeadersFor(req)
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } })
@@ -123,4 +124,4 @@ Deno.serve(async (req) => {
 
   // Refusals answer 200 with ok false, so the app can show WorshipHub's reason.
   return ok ? json({ ok: true, action, slug }) : json({ ok: false, error: message })
-})
+}, { secrets: ["WORSHIPHUB_API_URL", "WORSHIPHUB_API_TOKEN|WORSHIPHUB_API_KEY"] }))

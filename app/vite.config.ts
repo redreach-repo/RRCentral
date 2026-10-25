@@ -33,6 +33,8 @@ function spaFallback404(): Plugin {
     'domains',
     'settings',
     'audit-log',
+    'app-errors',
+    'system-check',
     'shop',
   ]
   const iosAssets = [

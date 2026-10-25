@@ -22,6 +22,7 @@ import {
   parseWhatsAppAnalytics,
   planUsageUpdates,
 } from "./usageImport.bundle.js"
+import { withErrorLog } from "../_shared/functionHealth.ts"
 
 // Shapes from app/src/lib/usageImport.ts (the bundle is plain JS).
 type WhatsAppCounts = { marketing: number; service: number }
@@ -101,7 +102,7 @@ async function fetchAnthropic(month: string, now: Date): Promise<Map<string, num
   return parseAnthropicCost(pages)
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withErrorLog("usage-import", async (req) => {
   const cors = corsHeadersFor(req)
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } })
@@ -222,4 +223,4 @@ Deno.serve(async (req) => {
     clientsLinked: sources.length,
     message: messages.join(" "),
   })
-})
+}, { secrets: ["USAGE_IMPORT_CRON_SECRET", "META_WABA_ID", "META_ACCESS_TOKEN", "ANTHROPIC_ADMIN_KEY"] }))
