@@ -55,6 +55,7 @@ const bundles = [
   { entry: 'src/lib/invoicePayLink.ts', out: '../supabase/functions/invoice-pay-link/invoicePayLink.bundle.js' },
   { entry: 'src/lib/invoicePayLink.ts', out: '../supabase/functions/stripe-invoice-webhook/invoicePayLink.bundle.js' },
   { entry: 'src/lib/clientReports.ts', out: '../supabase/functions/client-reports/clientReports.bundle.js' },
+  { entry: 'src/lib/weeklyUpdates.ts', out: '../supabase/functions/client-updates/weeklyUpdates.bundle.js' },
 ]
 
 let stale = false

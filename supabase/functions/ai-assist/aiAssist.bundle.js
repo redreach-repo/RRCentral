@@ -15,7 +15,8 @@ var AI_FEATURES = [
   { value: "ticket_reply", label: "Reply draft" },
   { value: "report_summary", label: "Report summary" },
   { value: "call_notes", label: "Requirements from call notes" },
-  { value: "call_brief", label: "Before the call questions" }
+  { value: "call_brief", label: "Before the call questions" },
+  { value: "update_tidy", label: "Weekly update wording" }
 ];
 function isAiFeature(v) {
   return AI_FEATURES.some((f) => f.value === v);
@@ -131,6 +132,16 @@ ${input.facts.map((f) => `- ${f}`).join("\n")}`,
         maxTokens: 600,
         schema: QUESTIONS_SCHEMA
       };
+    case "update_tidy":
+      return {
+        system: "You tidy the wording of a short weekly update that Red Reach sends to a client about their CTRM Next work. Fix grammar and make it read smoothly, keeping the same layout (greeting, short lists, sign off). Change the wording only: keep every issue, status, reference, date and name exactly as given, and never add a fact, number, date, promise or detail that is not in the text. Do not remove anything. Reply with the tidied text only. " + STYLE,
+        user: `Client: ${input.accountName}
+
+Update:
+${clip(input.text, 4e3)}`,
+        maxTokens: 1500,
+        schema: null
+      };
     case "call_notes":
       return {
         system: 'You turn notes from a call with a client into requirements for their AI CRM build at Red Reach. Each requirement is one thing the client wants the system to do or have. Title: a short action, at most 10 words (for example "Send a WhatsApp reminder the day before each appointment"). Detail: one or two sentences with the specifics from the notes, or an empty string. Leave out small talk, pricing and anything already in the existing list. Return an empty list if the notes contain no requirements. ' + STYLE,
@@ -167,6 +178,11 @@ function parseRequirements(text) {
     out.push({ title, detail });
   }
   return out;
+}
+function newNumbers(before, after) {
+  const nums = (t) => t.match(/\d+(?:[.,:]\d+)*/g) || [];
+  const had = new Set(nums(before));
+  return [...new Set(nums(after).filter((n) => !had.has(n)))];
 }
 function tidyAiText(text) {
   return text.replace(/\s*[—–]\s*/g, ", ").replace(/,\s*,/g, ",").trim();
@@ -240,6 +256,11 @@ function normaliseAiInput(raw) {
       if (!facts.length) return null;
       return { feature: "call_brief", accountName, accountKind: str(r.accountKind, 60), facts };
     }
+    case "update_tidy": {
+      const text = str(r.text, 4e3);
+      if (text.trim().length < 20) return null;
+      return { feature: "update_tidy", accountName, text };
+    }
     case "call_notes": {
       const notes = str(r.notes, AI_MAX_INPUT_CHARS);
       if (!notes.trim()) return null;
@@ -260,6 +281,7 @@ export {
   assistCostInMonth,
   buildAiRequest,
   isAiFeature,
+  newNumbers,
   normaliseAiInput,
   parseQuestions,
   parseRequirements,

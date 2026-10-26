@@ -528,3 +528,20 @@ notice deadline. The VA and viewers see the dates but cannot change them.
 
 **If it fails.** "Run the renewal dates SQL first" means the SQL has not run. No digest line means `daily-digest`
 was not redeployed, or today is not one of the reminder days.
+
+## 30. Weekly CTRM Next client updates
+
+**Trigger.** Run the Wave 5 weekly updates SQL, add the `CLIENT_UPDATE_CRON_SECRET` secret, deploy `client-updates`
+and `ai-assist`, and run the weekly updates schedule SQL. On a CTRM Next client with a signed deal, log one issue as
+fixed this week and leave one open, and add a session next week. As a manager open **Weekly updates** and press
+**Build missing drafts now**.
+
+**You should see.** One draft for the client with "Fixed this week", "Still open" (the vendor status in plain words)
+and "Coming up". **Tidy wording** changes how it reads but never adds a date or number (if it tries, it says so and
+keeps your text). **Send by email** emails the primary contact; **Send by WhatsApp** opens WhatsApp with the text
+typed in. Either way the card shows Sent and the account timeline has a "Weekly CTRM Next update" line. On Thursday
+the drafts appear on their own. The VA can edit the wording but cannot send; viewers only read.
+
+**If it fails.** "Run the weekly updates SQL first" means the SQL has not run. "not deployed yet" means
+`client-updates` was not deployed. "Nothing to report this week" means the client had no issues fixed or open and
+no session or dated next step coming up.

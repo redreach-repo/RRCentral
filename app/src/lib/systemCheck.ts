@@ -37,6 +37,7 @@ export const SYSTEM_FUNCTIONS: SystemFunction[] = [
   { name: 'invoice-pay-link', feature: 'Card payment links on invoices', liveTest: '19' },
   { name: 'stripe-invoice-webhook', feature: 'Card payments mark invoices paid', liveTest: '19' },
   { name: 'client-reports', feature: 'Monthly client reports to approve', liveTest: '22' },
+  { name: 'client-updates', feature: 'Weekly CTRM Next client updates to approve', liveTest: '30' },
 ]
 
 export type PingResult = {

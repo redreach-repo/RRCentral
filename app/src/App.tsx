@@ -12,6 +12,7 @@ import ClientReportPage from './pages/ClientReportPage'
 import ClientReportsPage from './pages/ClientReportsPage'
 import DuplicatesPage from './pages/DuplicatesPage'
 import CtrmIssuesPage from './pages/CtrmIssuesPage'
+import ClientUpdatesPage from './pages/ClientUpdatesPage'
 import FitSheetPage from './pages/FitSheetPage'
 import QuickAddPage from './pages/QuickAddPage'
 import DeliverySettingsPage from './pages/DeliverySettingsPage'
@@ -147,6 +148,7 @@ export default function App() {
               <Route path="support/:id" element={<TicketPage />} />
               <Route path="ctrm" element={<CtrmPage />} />
               <Route path="ctrm-issues" element={<CtrmIssuesPage />} />
+              <Route path="client-updates" element={<ClientUpdatesPage />} />
               <Route path="sales" element={<SalesPipelinePage />} />
               <Route path="deals" element={<MyDealsPage />} />
               <Route path="products" element={<ProductsPage />} />

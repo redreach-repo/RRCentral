@@ -43,6 +43,9 @@ verify_jwt = false
 [functions.client-reports]
 verify_jwt = false
 
+[functions.client-updates]
+verify_jwt = false
+
 [functions.watchdog]
 verify_jwt = false
 

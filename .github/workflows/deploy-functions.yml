@@ -42,6 +42,7 @@ on:
           - invoice-pay-link
           - stripe-invoice-webhook
           - client-reports
+          - client-updates
 
 permissions:
   contents: read

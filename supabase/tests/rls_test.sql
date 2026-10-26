@@ -1544,3 +1544,67 @@ reset role;
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from ctrm_client_terms'), 'anon cannot read contract dates');
 reset role;
+
+------------------------------------------------------------ Weekly CTRM Next client updates (Wave 5, PR Z)
+insert into client_update_drafts (account_id, week_start, body, facts)
+  select id, '2026-10-26', 'Update for the VA prospect', '["Fixed this week: export"]' from accounts where name = 'VA Fit Prospect';
+insert into client_update_drafts (account_id, week_start, body)
+  values (:'other_house', '2026-10-26', 'Update for the trading house');
+select pg_temp.expect(pg_temp.fails(format('insert into client_update_drafts (account_id, week_start) values (%L, %L)', :'other_house', '2026-10-26')), 'one update per client per week');
+select pg_temp.expect(pg_temp.fails(format('insert into client_update_drafts (account_id, week_start) values (%L, %L)', :'other_house', '2026-10-29')), 'an update week starts on a Monday');
+select pg_temp.expect(pg_temp.fails(format('insert into client_update_drafts (account_id, week_start, sent_via) values (%L, %L, %L)', :'other_house', '2026-11-02', 'sms')), 'an update goes by email or WhatsApp only');
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
+select pg_temp.expect((select count(*) from client_update_drafts) = 1, 'staff (VA) sees updates only on their accounts');
+select pg_temp.expect(not pg_temp.fails($q$update client_update_drafts set body = 'Checked by the VA' where body = 'Update for the VA prospect'$q$), 'staff (VA) edits the wording');
+select pg_temp.expect(pg_temp.fails($q$update client_update_drafts set status = 'sent' where body = 'Checked by the VA'$q$), 'staff (VA) cannot mark an update sent');
+select pg_temp.expect(pg_temp.fails($q$update client_update_drafts set sent_to = '971500000000' where body = 'Checked by the VA'$q$), 'staff (VA) cannot fake the sent fields');
+select pg_temp.expect(pg_temp.fails($q$update client_update_drafts set facts = '["made up"]' where body = 'Checked by the VA'$q$), 'staff (VA) cannot change what the update was built from');
+select pg_temp.expect(pg_temp.fails($q$insert into client_update_drafts (account_id, week_start) select id, '2026-11-02' from accounts where name = 'VA Fit Prospect'$q$), 'staff (VA) cannot add updates: only the function does');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.expect((select count(*) from client_update_drafts) = 2, 'sales sees the updates');
+select pg_temp.expect(not pg_temp.fails($q$update client_update_drafts set status = 'skipped' where body = 'Update for the trading house'$q$), 'sales skips a week');
+select pg_temp.expect(not pg_temp.fails($q$update client_update_drafts set status = 'draft' where body = 'Update for the trading house'$q$), 'sales puts it back');
+select pg_temp.expect(pg_temp.fails($q$update client_update_drafts set week_start = '2026-11-02' where body = 'Update for the trading house'$q$), 'sales cannot move an update to another week');
+reset role;
+
+-- Once sent (by the function), nobody edits it from the app.
+update client_update_drafts set status = 'sent', sent_by = 'alfred@redreach.ae', sent_at = now(), sent_via = 'whatsapp', sent_to = '971500000000'
+  where body = 'Update for the trading house';
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+select pg_temp.expect((select count(*) from client_update_drafts) = 2, 'manager sees the updates');
+update client_update_drafts set body = 'changed after sending' where status = 'sent';
+select pg_temp.expect((select count(*) from client_update_drafts where body = 'changed after sending') = 0, 'a sent update cannot be edited');
+delete from client_update_drafts;
+select pg_temp.expect((select count(*) from client_update_drafts) = 2, 'manager cannot delete updates');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000012';
+select pg_temp.expect((select count(*) from client_update_drafts) = 2, 'viewer reads the updates');
+update client_update_drafts set body = 'viewer' where status = 'draft';
+select pg_temp.expect((select count(*) from client_update_drafts where body = 'viewer') = 0, 'viewer cannot edit updates');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000c';
+select pg_temp.expect((select count(*) from client_update_drafts) = 0, 'a stranger sees no updates');
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+delete from client_update_drafts where status = 'sent';
+select pg_temp.expect((select count(*) from client_update_drafts) = 1, 'admin deletes an update');
+reset role;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from client_update_drafts'), 'anon cannot read updates');
+reset role;
+
+select pg_temp.expect(not pg_temp.fails(format('insert into ai_usage_log (account_id, feature, model) values (%L, %L, %L)', :'other_house', 'update_tidy', 'test')), 'the weekly update wording counts as an AI feature');
