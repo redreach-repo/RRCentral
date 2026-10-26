@@ -26,6 +26,6 @@ describe('signedDeliveryNotes', () => {
         files: [{ name: 'scan.pdf', dataUrl: 'data:application/pdf;base64,AAA' }],
         uploadedBy: 'ops@redreach.ae',
       }),
-    ).rejects.toThrow(/WorkDrive/)
+    ).rejects.toThrow(/Google Drive/)
   })
 })

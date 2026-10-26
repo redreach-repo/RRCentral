@@ -22,8 +22,8 @@ import {
 import {
   expenseReportDescription,
   formatSupplierExpenseDescription,
-  saveWorkDriveLinkToExpense,
-  saveWorkDriveLinkToQuote,
+  saveDriveLinkToExpense,
+  saveDriveLinkToQuote,
   syncQuoteSupplierCostFromExpense,
 } from '../lib/supplierInvoiceStore'
 import { ensureVendor, listVendors } from '../lib/vendors'
@@ -135,8 +135,8 @@ export default function ExpensesPage() {
   const [parseHint, setParseHint] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Expense | null>(null)
   const [attachments, setAttachments] = useState<Attachment[]>([])
-  const [workDriveUrl, setWorkDriveUrl] = useState('')
-  const [workDriveTitle, setWorkDriveTitle] = useState('')
+  const [driveLinkUrl, setDriveLinkUrl] = useState('')
+  const [driveLinkTitle, setDriveLinkTitle] = useState('')
 
   const syncRecurring = useCallback(async (quiet = false) => {
     const { inserted, removed, error } = await ensureRecurringDeductions()
@@ -250,8 +250,8 @@ export default function ExpensesPage() {
     setEditing(null)
     setForm(emptyForm())
     setAttachments([])
-    setWorkDriveUrl('')
-    setWorkDriveTitle('')
+    setDriveLinkUrl('')
+    setDriveLinkTitle('')
     setParseHint('')
     setOpen(true)
   }
@@ -292,8 +292,8 @@ export default function ExpensesPage() {
       quote_ref: e.quote_ref || '',
       supplier_invoice_no: e.supplier_invoice_no || '',
     })
-    setWorkDriveUrl('')
-    setWorkDriveTitle('')
+    setDriveLinkUrl('')
+    setDriveLinkTitle('')
     setParseHint('')
     setOpen(true)
     void loadAttachments(e.id)
@@ -344,7 +344,7 @@ export default function ExpensesPage() {
       const list = [...files]
       const pdf = list.find((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name))
       if (!pdf) {
-        showToast('Choose a PDF to fill the form. Store the file on WorkDrive and paste the link below.', 'error')
+        showToast('Choose a PDF to fill the form. Store the file on Google Drive and paste the link below.', 'error')
         return
       }
       setParsing(true)
@@ -352,8 +352,8 @@ export default function ExpensesPage() {
         const { parseSupplierInvoicePdf } = await import('../lib/supplierInvoicePdf')
         const parsed = await parseSupplierInvoicePdf(pdf, vatRate)
         applyParsedInvoice(parsed)
-        if (!workDriveTitle.trim()) setWorkDriveTitle(pdf.name.replace(/\.pdf$/i, '') || 'Supplier invoice')
-        showToast('Supplier invoice PDF read — review the form, then paste the WorkDrive link', 'success')
+        if (!driveLinkTitle.trim()) setDriveLinkTitle(pdf.name.replace(/\.pdf$/i, '') || 'Supplier invoice')
+        showToast('Supplier invoice PDF read — review the form, then paste the Google Drive link', 'success')
       } catch (e) {
         setParseHint('Could not read text from this PDF. Fill the form manually.')
         showToast(errorMessage(e, 'PDF parse failed'), 'error')
@@ -367,15 +367,15 @@ export default function ExpensesPage() {
 
   async function saveAttachmentsFor(expenseId: string) {
     const who = user?.email || ''
-    const url = workDriveUrl.trim()
+    const url = driveLinkUrl.trim()
     if (!url) return
     const link = {
       url,
-      title: workDriveTitle.trim() || 'Expense attachment',
+      title: driveLinkTitle.trim() || 'Expense attachment',
     }
-    await saveWorkDriveLinkToExpense({ expenseId, link, uploadedBy: who })
+    await saveDriveLinkToExpense({ expenseId, link, uploadedBy: who })
     if (linkedQuote) {
-      await saveWorkDriveLinkToQuote({ quote: linkedQuote, link, uploadedBy: who })
+      await saveDriveLinkToQuote({ quote: linkedQuote, link, uploadedBy: who })
     }
   }
 
@@ -468,7 +468,7 @@ export default function ExpensesPage() {
         expenseId = newId
       }
 
-      if (workDriveUrl.trim() && expenseId) {
+      if (driveLinkUrl.trim() && expenseId) {
         await saveAttachmentsFor(expenseId)
       }
 
@@ -689,7 +689,7 @@ export default function ExpensesPage() {
           />
           <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted, lineHeight: 1.45 }}>
             PDF text is copied into the form when possible. The file is not stored in the database — upload
-            it to Zoho WorkDrive and paste the share link below.
+            it to Google Drive and paste the share link below.
           </p>
           {parsing ? (
             <p style={{ margin: '6px 0 0', fontSize: 13, color: colors.accent }}>Reading PDF…</p>
@@ -702,19 +702,19 @@ export default function ExpensesPage() {
         <div style={fieldStyle}>
           <label style={labelStyle}>
             <Paperclip size={12} style={{ marginRight: 4 }} />
-            WorkDrive share link
+            Google Drive share link
           </label>
           <input
             style={inputStyle}
-            value={workDriveUrl}
-            onChange={(e) => setWorkDriveUrl(e.target.value)}
-            placeholder="https://workdrive.zoho…/…"
+            value={driveLinkUrl}
+            onChange={(e) => setDriveLinkUrl(e.target.value)}
+            placeholder="https://drive.google.com/…"
             inputMode="url"
           />
           <input
             style={{ ...inputStyle, marginTop: 8 }}
-            value={workDriveTitle}
-            onChange={(e) => setWorkDriveTitle(e.target.value)}
+            value={driveLinkTitle}
+            onChange={(e) => setDriveLinkTitle(e.target.value)}
             placeholder="Link title (optional)"
           />
           <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted, lineHeight: 1.45 }}>

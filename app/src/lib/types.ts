@@ -97,7 +97,7 @@ export interface CrmEntry {
   /** The note in words when the deal was lost. */
   lost_note?: string
   calendar_event_id: string
-  /** Zoho WorkDrive folder URL for this customer's files (files stay on WorkDrive). */
+  /** Google Drive folder URL for this customer's files (files stay on Google Drive). */
   drive_folder_url?: string
   contacts?: CrmContact[]
   created_by: string
@@ -106,7 +106,7 @@ export interface CrmEntry {
   updated_at: string
 }
 
-/** File index for a customer folder — binaries live on Zoho WorkDrive. */
+/** File index for a customer folder — binaries live on Google Drive. */
 export type CustomerDocumentCategory =
   | 'quotation'
   | 'invoice'
@@ -118,7 +118,7 @@ export type CustomerDocumentCategory =
   | 'whatsapp'
   | 'call_notes'
   | 'communication'
-  /** @deprecated Kept so older WorkDrive rows still load. */
+  /** @deprecated Kept so older Google Drive rows still load. */
   | 'payment_slip'
   | 'supplier_invoice'
   | 'other'
@@ -138,7 +138,7 @@ export interface CustomerDocument {
   uploaded_at: string
 }
 
-/** Red Reach company papers (trade license, VAT cert, etc.) — WorkDrive links. */
+/** Red Reach company papers (trade license, VAT cert, etc.) — Google Drive links. */
 export type CompanyDocumentCategory =
   | 'trade_license'
   | 'vat_certificate'
@@ -1199,7 +1199,7 @@ export interface PortalAccess {
   last_used_at: string | null
 }
 
-/** A file a client sent from the portal. content_base64 is kept only until it is in WorkDrive. */
+/** A file a client sent from the portal. content_base64 is kept only until it is in Google Drive. */
 export interface PortalUpload {
   id: string
   account_id: string
@@ -1208,9 +1208,9 @@ export interface PortalUpload {
   content_type: string
   size_bytes: number
   note: string
-  status: 'received' | 'in_workdrive'
-  workdrive_id: string
-  workdrive_url: string
+  status: 'received' | 'filed'
+  drive_file_id: string
+  drive_url: string
   error: string
   created_at: string
 }

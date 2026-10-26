@@ -68,7 +68,7 @@ import {
 } from '../lib/zoho'
 import { resolveOwnerEmails } from '../lib/calendarAttendees'
 import EmailComposeModal from '../components/EmailComposeModal'
-import LinkWorkDriveModal from '../components/LinkWorkDriveModal'
+import LinkDriveFileModal from '../components/LinkDriveFileModal'
 import SaveToFolderPrompt from '../components/SaveToFolderPrompt'
 import WebsiteInquiriesPanel from '../site/components/WebsiteInquiriesPanel'
 import PageHeader from '../components/PageHeader'
@@ -347,18 +347,18 @@ export default function CrmPage() {
             ({
               id: `wd-${d.id || i}`,
               action: d.category.startsWith('signed_')
-                ? 'workdrive_signed'
+                ? 'drive_signed'
                 : d.category === 'supplier_invoice'
-                  ? 'workdrive_supplier'
-                  : 'workdrive_communication',
+                  ? 'drive_supplier'
+                  : 'drive_communication',
               entity: 'customer_document',
-              reference: d.title || d.file_name || 'WorkDrive file',
+              reference: d.title || d.file_name || 'Google Drive file',
               details: [
                 ['email', 'whatsapp', 'call_notes', 'communication'].includes(d.category)
                   ? communicationKindLabel(d.category)
                   : d.category.replace(/_/g, ' '),
                 d.related_ref ? `Ref ${d.related_ref}` : '',
-                d.drive_url ? 'WorkDrive link' : '',
+                d.drive_url ? 'Google Drive link' : '',
               ]
                 .filter(Boolean)
                 .join(' · '),
@@ -1676,13 +1676,13 @@ export default function CrmPage() {
                         rel="noreferrer"
                         style={{ ...btn, textDecoration: 'none' }}
                       >
-                        <ExternalLink size={14} /> WorkDrive
+                        <ExternalLink size={14} /> Google Drive
                       </a>
                     ) : (
                       <Link
                         to={`/customer-files?company=${encodeURIComponent(editing.company_name)}`}
                         style={{ ...btn, textDecoration: 'none', opacity: 0.85 }}
-                        title="Link a Zoho WorkDrive folder"
+                        title="Link a Google Drive folder"
                       >
                         <FolderOpen size={14} /> Link folder
                       </Link>
@@ -2183,7 +2183,7 @@ export default function CrmPage() {
         }}
       />
 
-      <LinkWorkDriveModal
+      <LinkDriveFileModal
         open={!!linkFileTarget}
         onClose={() => setLinkFileTarget(null)}
         onSaved={async () => {

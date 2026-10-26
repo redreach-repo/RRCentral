@@ -3,20 +3,6 @@ import {
   isZohoMessageAlreadyFiled,
   zohoMessageRelatedRef,
 } from './zohoEmailArchive'
-import { parseWorkDriveResourceId } from './zohoWorkDrive'
-
-describe('zohoWorkDrive parseWorkDriveResourceId', () => {
-  it('parses folder URLs and bare ids', () => {
-    expect(parseWorkDriveResourceId('https://workdrive.zoho.com/folder/abc123XYZ99')).toBe(
-      'abc123XYZ99',
-    )
-    expect(
-      parseWorkDriveResourceId('https://workdrive.zoho.eu/home/xxx/folders/folderIdHere99'),
-    ).toBe('folderIdHere99')
-    expect(parseWorkDriveResourceId('plainResourceId99')).toBe('plainResourceId99')
-    expect(parseWorkDriveResourceId('https://example.com/nope')).toBe(null)
-  })
-})
 
 describe('zohoEmailArchive dedupe', () => {
   it('detects already-filed Zoho messages', () => {
@@ -32,10 +18,10 @@ describe('zohoEmailArchive dedupe', () => {
             category: 'email',
             title: 'Email',
             file_name: 'Email',
-            drive_url: 'https://workdrive.zoho.com/file/x',
+            drive_url: 'https://drive.google.com/file/d/x/view',
             related_ref: ref,
             notes: '',
-            storage_provider: 'zoho_workdrive',
+            storage_provider: 'google_drive',
             uploaded_by: 'a@b.c',
             uploaded_at: '',
           },

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import CtrmListsCard from '../components/ctrm/CtrmListsCard'
+import GoogleDriveCard from '../components/GoogleDriveCard'
 import { Download, HardDrive, Pencil, Plus, Trash2, Upload, Plug } from 'lucide-react'
 import { db, currentAuthMode } from '../lib/db'
 import type { AppUser, CompanyDocument, CompanyDocumentCategory, UserRole } from '../lib/types'
@@ -112,28 +113,6 @@ const SYSTEM_KEYS = [
   { key: 'followUpDaysAfterQuote', label: 'Follow-up days after quote' },
 ] as const
 
-const CUSTOMER_DRIVE_KEYS = [
-  {
-    key: 'customerWorkDriveRootUrl',
-    label: 'Customers root folder URL (Zoho WorkDrive)',
-  },
-  {
-    key: 'zohoWorkDriveRootFolderId',
-    label: 'Customers root folder ID (optional if URL contains /folder/…)',
-  },
-  {
-    key: 'zohoWorkDriveEnabled',
-    label: 'WorkDrive auto-file emails (yes/no)',
-  },
-] as const
-
-const COMPANY_DRIVE_KEYS = [
-  {
-    key: 'companyWorkDriveRootUrl',
-    label: 'Company documents folder URL (Zoho WorkDrive)',
-  },
-] as const
-
 const WANDERS_KEYS = [
   { key: 'wandersTradingName', label: 'Trading / brand name' },
   { key: 'wandersLegalEntityName', label: 'Registered legal entity (TBC)' },
@@ -176,12 +155,10 @@ const ZOHO_KEYS = [
   { key: 'zohoAccountsDomain', label: 'Accounts domain' },
   { key: 'zohoCalendarDomain', label: 'Calendar domain' },
   { key: 'zohoMailDomain', label: 'Mail domain' },
-  { key: 'zohoWorkDriveApiDomain', label: 'WorkDrive API domain (optional)' },
   { key: 'zohoCalendarUid', label: 'Calendar UID (optional)' },
   { key: 'zohoMailAccountId', label: 'Mail account ID (optional)' },
   { key: 'zohoCalendarEnabled', label: 'Calendar sync (yes/no)' },
   { key: 'zohoMailEnabled', label: 'Mail send + inbox (yes/no)' },
-  { key: 'zohoWorkDriveEnabled', label: 'WorkDrive auto-file (yes/no)' },
 ] as const
 
 type UserForm = {
@@ -868,7 +845,7 @@ export default function SettingsPage() {
           <div>
             <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Company documents</h2>
             <p style={{ color: colors.muted2, fontSize: 12, margin: '6px 0 0', maxWidth: 560, lineHeight: 1.5 }}>
-              Trade license, VAT certificate, and other company papers. Upload files to Zoho WorkDrive,
+              Trade license, VAT certificate, and other company papers. Upload files to Google Drive,
               then paste the share link here. Central stores links only — not the files.
             </p>
           </div>
@@ -958,16 +935,7 @@ export default function SettingsPage() {
       )}
       {renderSection('System', 'System', SYSTEM_KEYS)}
       <CtrmListsCard />
-      {renderSection(
-        'Customer WorkDrive (files stay on Zoho WorkDrive — CRM stores links only). Enable WorkDrive auto-file and set the Customers root so Dashboard → Scan & file can archive matched emails.',
-        'Customer WorkDrive',
-        CUSTOMER_DRIVE_KEYS,
-      )}
-      {renderSection(
-        'Company WorkDrive folder (optional root for trade license / VAT certificate uploads)',
-        'Company WorkDrive',
-        COMPANY_DRIVE_KEYS,
-      )}
+      <GoogleDriveCard />
 
       <div style={{ ...cardStyle, marginBottom: 20 }}>
         <h2 style={sectionTitleStyle}>Message templates</h2>
@@ -1378,11 +1346,11 @@ export default function SettingsPage() {
           />
         </div>
         <div style={fieldStyle}>
-          <label style={labelStyle}>WorkDrive share link *</label>
+          <label style={labelStyle}>Google Drive share link *</label>
           <input
             style={inputStyle}
             value={companyDocForm.drive_url}
-            placeholder="https://workdrive.zoho.com/…"
+            placeholder="https://drive.google.com/…"
             onChange={(e) => setCompanyDocForm((f) => ({ ...f, drive_url: e.target.value }))}
           />
         </div>
@@ -1434,7 +1402,7 @@ export default function SettingsPage() {
       >
         <p style={{ color: colors.muted, fontSize: 14 }}>
           Remove <strong style={{ color: colors.text }}>{deleteCompanyDoc?.title || 'this document'}</strong>{' '}
-          from Central? The file on WorkDrive is not deleted.
+          from Central? The file on Google Drive is not deleted.
         </p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setDeleteCompanyDoc(null)}>

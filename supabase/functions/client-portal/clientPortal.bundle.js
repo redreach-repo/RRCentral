@@ -2138,7 +2138,7 @@ function buildPortalView(input) {
       filename: u.filename,
       size: sizeLabel(u.size_bytes),
       uploaded: day2(u.created_at),
-      saved: u.status === "in_workdrive"
+      saved: u.status === "filed"
     })),
     recentlyResolved,
     usage: months.slice(0, 2).map((m) => usageFor(m, input.usage, pkg, input.rates)).filter((u) => u !== null),
@@ -2261,16 +2261,6 @@ function sizeLabel(bytes) {
   if (bytes >= 1024 * 1024) return `${Math.round(bytes / (1024 * 1024) * 10) / 10} MB`;
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
-function workDriveFolderId(url) {
-  const u = String(url || "").trim();
-  if (!u) return null;
-  for (const re of [/\/folders?\/([a-zA-Z0-9_-]+)/i, /[?&]id=([a-zA-Z0-9_-]+)/i]) {
-    const m = u.match(re);
-    if (m?.[1] && m[1].length >= 8) return m[1];
-  }
-  if (/^[a-zA-Z0-9_-]{10,}$/.test(u) && !u.includes("://")) return u;
-  return null;
-}
 export {
   DELIVERY_RATE_KEYS,
   PORTAL_LINK_MONTHS,
@@ -2295,6 +2285,5 @@ export {
   reportMonths,
   safeUploadName,
   sizeLabel,
-  uploadContentType,
-  workDriveFolderId
+  uploadContentType
 };

@@ -1,4 +1,5 @@
 import { db } from './db'
+import { DRIVE_STORAGE_PROVIDER, isGoogleDriveUrl } from './googleDrive'
 import { isMissingRelationError } from './errors'
 import type {
   CrmEntry,
@@ -33,51 +34,51 @@ export const CUSTOMER_FOLDER_SECTIONS: {
   {
     id: 'quotation',
     label: 'Quotations',
-    hint: 'CRM quotes + signed quote on WorkDrive',
+    hint: 'CRM quotes + signed quote on Google Drive',
     mode: 'signed',
     signedCategory: 'signed_quotation',
     uploadButton: 'Add signed quote',
     uploadTitle: 'Signed quotation',
-    uploadHint: 'Upload the signed quote PDF to Zoho WorkDrive, then paste the share link.',
+    uploadHint: 'Upload the signed quote PDF to Google Drive, then paste the share link.',
   },
   {
     id: 'invoice',
     label: 'Invoices',
-    hint: 'CRM invoices + signed invoice on WorkDrive',
+    hint: 'CRM invoices + signed invoice on Google Drive',
     mode: 'signed',
     signedCategory: 'signed_invoice',
     uploadButton: 'Add signed invoice',
     uploadTitle: 'Signed invoice',
-    uploadHint: 'Upload the signed invoice PDF to Zoho WorkDrive, then paste the share link.',
+    uploadHint: 'Upload the signed invoice PDF to Google Drive, then paste the share link.',
   },
   {
     id: 'delivery_note',
     label: 'Delivery notes',
-    hint: 'CRM delivery notes + signed DN on WorkDrive',
+    hint: 'CRM delivery notes + signed DN on Google Drive',
     mode: 'signed',
     signedCategory: 'signed_delivery_note',
     uploadButton: 'Add signed delivery note',
     uploadTitle: 'Signed delivery note',
-    uploadHint: 'Upload the customer-signed DN to Zoho WorkDrive, then paste the share link.',
+    uploadHint: 'Upload the customer-signed DN to Google Drive, then paste the share link.',
   },
   {
     id: 'communication',
     label: 'Communications',
-    hint: 'Emails, WhatsApp chats, call notes on WorkDrive',
+    hint: 'Emails, WhatsApp chats, call notes on Google Drive',
     mode: 'communication',
     uploadButton: 'Add communication',
     uploadTitle: 'Communication',
     uploadHint:
-      'Save the email export, WhatsApp chat, or notes PDF in Zoho WorkDrive, then paste the share link here.',
+      'Save the email export, WhatsApp chat, or notes PDF in Google Drive, then paste the share link here.',
   },
   {
     id: 'purchasing',
     label: 'Purchasing',
-    hint: 'Supplier invoices linked from quotes (WorkDrive)',
+    hint: 'Supplier invoices linked from quotes (Google Drive)',
     mode: 'purchasing',
     uploadButton: 'Add supplier invoice',
     uploadTitle: 'Supplier invoice',
-    uploadHint: 'Paste the Zoho WorkDrive share link for the supplier invoice PDF.',
+    uploadHint: 'Paste the Google Drive share link for the supplier invoice PDF.',
   },
 ]
 
@@ -88,11 +89,9 @@ export const CUSTOMER_DOCUMENT_CATEGORIES = CUSTOMER_FOLDER_SECTIONS.map((s) => 
   hint: s.hint,
 }))
 
-export const WORKDRIVE_STORAGE_PROVIDER = 'zoho_workdrive'
-
 export type FolderSectionId = (typeof CUSTOMER_FOLDER_SECTIONS)[number]['id']
 
-export type FolderItemKind = 'crm' | 'workdrive'
+export type FolderItemKind = 'crm' | 'drive'
 
 export type CustomerFolderItem = {
   key: string
@@ -129,7 +128,7 @@ export type FolderChecklistItem = {
 }
 
 export type FolderFileCounts = {
-  workdrive: number
+  files: number
   signed: number
   communication: number
   purchasing: number
@@ -164,20 +163,9 @@ export function sectionForCategory(category: CustomerDocumentCategory): FolderSe
   }
 }
 
-/** Accept Zoho WorkDrive share / folder links (incl. regional + external hosts). */
-export function isWorkDriveShareUrl(url: string): boolean {
-  const u = url.trim().toLowerCase()
-  if (!u) return false
-  return (
-    u.includes('workdrive.zoho') ||
-    u.includes('workdrive.zohoexternal.com') ||
-    /https?:\/\/[^/]*zoho[^/]*\/workdrive\//.test(u)
-  )
-}
-
-/** @deprecated Prefer isWorkDriveShareUrl — kept for older call sites. */
+/** Accept Google Drive share / folder links (and Docs, Sheets, Slides). */
 export function isDriveShareUrl(url: string): boolean {
-  return isWorkDriveShareUrl(url)
+  return isGoogleDriveUrl(url)
 }
 
 export function suggestedDriveFolderName(company: string): string {
@@ -188,7 +176,7 @@ export function suggestedDriveFolderName(company: string): string {
     .trim()
 }
 
-/** Suggested title when linking a WorkDrive file (naming convention helper). */
+/** Suggested title when linking a Google Drive file (naming convention helper). */
 export function suggestedDocumentTitle(
   category: CustomerDocumentCategory,
   relatedRef?: string,
@@ -214,7 +202,7 @@ export function suggestedDocumentTitle(
     case 'supplier_invoice':
       return ref ? `Supplier invoice – ${ref}` : 'Supplier invoice'
     default:
-      return ref || 'WorkDrive file'
+      return ref || 'Google Drive file'
   }
 }
 
@@ -252,10 +240,10 @@ export function relatedRefOptionsForSection(
 
 export function folderFileCounts(folder: CustomerFolder | null | undefined): FolderFileCounts {
   const items = folder?.items || []
-  const workdrive = items.filter((i) => i.kind === 'workdrive')
+  const files = items.filter((i) => i.kind === 'drive')
   return {
-    workdrive: workdrive.length,
-    signed: workdrive.filter((i) =>
+    files: files.length,
+    signed: files.filter((i) =>
       ['quotation', 'invoice', 'delivery_note'].includes(i.section),
     ).length,
     communication: folder?.bySection.communication.length || 0,
@@ -272,7 +260,7 @@ export function buildFolderChecklist(folder: CustomerFolder): FolderChecklistIte
       id: 'no-folder',
       level: 'warn',
       message:
-        'No WorkDrive folder linked yet — create the customer folder in Zoho and paste the URL above.',
+        'No Google Drive folder linked yet — click Create folder in Google Drive above, or paste a folder link.',
     })
   }
 
@@ -281,7 +269,7 @@ export function buildFolderChecklist(folder: CustomerFolder): FolderChecklistIte
   )
   const signedRefs = new Set(
     folder.bySection.quotation
-      .filter((i) => i.kind === 'workdrive')
+      .filter((i) => i.kind === 'drive')
       .map((i) => String(i.relatedRef || i.title || '').trim().toLowerCase())
       .filter(Boolean),
   )
@@ -293,7 +281,7 @@ export function buildFolderChecklist(folder: CustomerFolder): FolderChecklistIte
       signedRefs.has(key) ||
       folder.bySection.quotation.some(
         (i) =>
-          i.kind === 'workdrive' &&
+          i.kind === 'drive' &&
           (String(i.title || '').toLowerCase().includes(key) ||
             String(i.relatedRef || '').toLowerCase() === key),
       )
@@ -301,7 +289,7 @@ export function buildFolderChecklist(folder: CustomerFolder): FolderChecklistIte
       items.push({
         id: `signed-missing-${ref}`,
         level: 'info',
-        message: `${ref} is ${q.status} — link the signed quote on WorkDrive when you have it.`,
+        message: `${ref} is ${q.status} — link the signed quote from Google Drive when you have it.`,
       })
     }
   }
@@ -362,7 +350,7 @@ function filterByCompany<T extends { client?: string; company_name?: string }>(
   return rows.filter((row) => companiesMatch(String(row.client || row.company_name || ''), company))
 }
 
-/** Build a customer folder from live CRM docs + signed WorkDrive uploads. */
+/** Build a customer folder from live CRM docs + signed copies linked from Google Drive. */
 export function buildCustomerFolder(opts: {
   company: string
   crm: CrmEntry | null
@@ -433,11 +421,11 @@ export function buildCustomerFolder(opts: {
       isComms ? communicationKindLabel(doc.category) : null,
       doc.related_ref ? `Ref ${doc.related_ref}` : null,
       doc.notes ||
-        (signed ? 'Signed copy on WorkDrive' : isPurchasing ? 'Supplier invoice on WorkDrive' : null),
+        (signed ? 'Signed copy on Google Drive' : isPurchasing ? 'Supplier invoice on Google Drive' : null),
     ].filter(Boolean)
     items.push({
       key: `doc-${doc.id}`,
-      kind: 'workdrive',
+      kind: 'drive',
       category: doc.category,
       section,
       title: doc.title || doc.file_name || (isComms ? 'Communication' : isPurchasing ? 'Supplier invoice' : 'Signed copy'),
@@ -581,8 +569,8 @@ export async function saveCustomerDriveLink(opts: {
   const driveUrl = opts.driveUrl.trim()
   const title = opts.title.trim()
   if (!company) throw new Error('Company is required')
-  if (!driveUrl) throw new Error('Paste a Zoho WorkDrive share link')
-  if (!isWorkDriveShareUrl(driveUrl)) throw new Error('Use a Zoho WorkDrive share link')
+  if (!driveUrl) throw new Error('Paste a Google Drive share link')
+  if (!isDriveShareUrl(driveUrl)) throw new Error('Use a Google Drive share link')
   if (!title) throw new Error('Give the file a short title')
 
   const row = {
@@ -594,7 +582,7 @@ export async function saveCustomerDriveLink(opts: {
     drive_url: driveUrl,
     related_ref: (opts.relatedRef || '').trim(),
     notes: (opts.notes || '').trim(),
-    storage_provider: WORKDRIVE_STORAGE_PROVIDER,
+    storage_provider: DRIVE_STORAGE_PROVIDER,
     uploaded_by: opts.uploadedBy,
     uploaded_at: new Date().toISOString(),
   }

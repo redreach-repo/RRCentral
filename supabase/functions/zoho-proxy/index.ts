@@ -1,11 +1,11 @@
-// Zoho API proxy — browsers cannot call Zoho OAuth/Mail/WorkDrive APIs directly (CORS → 405).
+// Zoho API proxy — browsers cannot call Zoho OAuth/Mail/Calendar APIs directly (CORS → 405).
 // Deploy: supabase functions deploy zoho-proxy --project-ref <your-ref>
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
 import { withErrorLog } from "../_shared/functionHealth.ts"
 
 const ALLOWED_HOST_RE =
-  /^([a-z0-9-]+\.)*(zoho\.com|zoho\.eu|zoho\.in|zoho\.com\.au|zohoapis\.com|zohoapis\.eu|zohoapis\.in|upload\.zoho\.com|upload\.zoho\.eu|upload\.zoho\.in)$/i
+  /^([a-z0-9-]+\.)*(zoho\.com|zoho\.eu|zoho\.in|zoho\.com\.au|zohoapis\.com|zohoapis\.eu|zohoapis\.in)$/i
 
 // Sites allowed to call this function from a browser. Override with the
 // ALLOWED_ORIGINS secret (comma-separated).
@@ -102,14 +102,6 @@ function assertZohoUrl(raw: string): URL {
   return url
 }
 
-function base64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
-  const cleaned = b64.replace(/^data:[^;]+;base64,/, "").replace(/\s+/g, "")
-  const bin = atob(cleaned)
-  const out = new Uint8Array(new ArrayBuffer(bin.length))
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
-  return out
-}
-
 Deno.serve(withErrorLog("zoho-proxy", async (req: Request) => {
   const cors = corsHeadersFor(req)
   if (req.method === "OPTIONS") {
@@ -142,12 +134,6 @@ async function handle(req: Request): Promise<Response> {
       method?: string
       headers?: Record<string, string>
       body?: string | null
-      /** WorkDrive multipart upload (base64 file body). */
-      parentId?: string
-      filename?: string
-      contentBase64?: string
-      contentType?: string
-      authorization?: string
     }
 
     const action = payload.action || "token"
@@ -193,43 +179,6 @@ async function handle(req: Request): Promise<Response> {
         method,
         headers,
         body: payload.body == null || method === "GET" || method === "HEAD" ? undefined : payload.body,
-      })
-      const text = await res.text()
-      let parsed: unknown = text
-      try {
-        parsed = JSON.parse(text)
-      } catch {
-        /* keep text */
-      }
-      return json(200, { ok: res.ok, status: res.status, body: parsed })
-    }
-
-    if (action === "upload") {
-      const target = assertZohoUrl(
-        String(payload.url || "https://www.zohoapis.com/workdrive/api/v1/upload"),
-      )
-      const parentId = String(payload.parentId || "").trim()
-      const filename = String(payload.filename || "file.bin").trim()
-      const auth = String(payload.authorization || payload.headers?.Authorization || "").trim()
-      const contentBase64 = String(payload.contentBase64 || "")
-      if (!parentId) return json(400, { error: "parentId is required" })
-      if (!auth) return json(400, { error: "authorization is required" })
-      if (!contentBase64) return json(400, { error: "contentBase64 is required" })
-
-      const bytes = base64ToBytes(contentBase64)
-      const form = new FormData()
-      form.append("parent_id", parentId)
-      form.append("override-name-exist", "true")
-      form.append(
-        "content",
-        new Blob([bytes], { type: payload.contentType || "application/octet-stream" }),
-        filename,
-      )
-
-      const res = await fetch(target.toString(), {
-        method: "POST",
-        headers: { Authorization: auth },
-        body: form,
       })
       const text = await res.text()
       let parsed: unknown = text

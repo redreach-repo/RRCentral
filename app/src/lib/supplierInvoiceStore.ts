@@ -93,7 +93,7 @@ export async function listExpensesForVendor(companyName: string): Promise<Expens
   return expensesMatchVendor((data || []) as Expense[], companyName)
 }
 
-/** PDF / WorkDrive links saved on expense rows (entity_type = expense). */
+/** PDF / Google Drive links saved on expense rows (entity_type = expense). */
 export async function listExpenseAttachmentsForIds(expenseIds: string[]): Promise<Attachment[]> {
   const ids = expenseIds.map((id) => String(id || '').trim()).filter(Boolean)
   if (!ids.length) return []
@@ -113,8 +113,8 @@ export async function loadDealQuotes(dealRef: string): Promise<Quotation[]> {
 
 export type PendingAttachment = { name: string; dataUrl: string; mime?: string }
 
-/** WorkDrive share link stored as a light attachment row (url is https, not a data: blob). */
-export type PendingWorkDriveLink = { title: string; url: string }
+/** Google Drive share link stored as a light attachment row (url is https, not a data: blob). */
+export type PendingDriveLink = { title: string; url: string }
 
 function isDataUrlBlob(url: string): boolean {
   return String(url || '').trim().toLowerCase().startsWith('data:')
@@ -146,15 +146,15 @@ export async function saveAttachmentsToQuote(opts: {
   const entityRef = resolveDealRef(opts.quote)
   if (!entityRef) throw new Error('Quotation needs a reference before attaching a supplier invoice')
   for (const file of opts.files) {
-    // Refuse to persist data-URL blobs — use WorkDrive links instead.
+    // Refuse to persist data-URL blobs — use Google Drive links instead.
     if (isDataUrlBlob(file.dataUrl)) {
-      throw new Error('Upload the PDF to Zoho WorkDrive and paste the share link instead of storing the file here')
+      throw new Error('Upload the PDF to Google Drive and paste the share link instead of storing the file here')
     }
     const { error } = await db.from('attachments').insert({
       entity_type: QUOTE_SUPPLIER_INVOICE_ENTITY,
       entity_ref: entityRef,
       file_name: file.name,
-      storage_path: 'zoho_workdrive',
+      storage_path: 'google_drive',
       url: file.dataUrl,
       uploaded_by: opts.uploadedBy,
       uploaded_at: new Date().toISOString(),
@@ -164,22 +164,22 @@ export async function saveAttachmentsToQuote(opts: {
   return entityRef
 }
 
-export async function saveWorkDriveLinkToQuote(opts: {
+export async function saveDriveLinkToQuote(opts: {
   quote: Pick<Quotation, 'deal_ref' | 'reference_number' | 'quote_id' | 'id' | 'base_reference' | 'client'>
-  link: PendingWorkDriveLink
+  link: PendingDriveLink
   uploadedBy: string
 }): Promise<string> {
   const entityRef = resolveDealRef(opts.quote)
   if (!entityRef) throw new Error('Quotation needs a reference before attaching a supplier invoice')
   const url = opts.link.url.trim()
   const title = opts.link.title.trim() || 'Supplier invoice'
-  if (!url) throw new Error('Paste a Zoho WorkDrive share link')
+  if (!url) throw new Error('Paste a Google Drive share link')
 
   const { error } = await db.from('attachments').insert({
     entity_type: QUOTE_SUPPLIER_INVOICE_ENTITY,
     entity_ref: entityRef,
     file_name: title,
-    storage_path: 'zoho_workdrive',
+    storage_path: 'google_drive',
     url,
     uploaded_by: opts.uploadedBy,
     uploaded_at: new Date().toISOString(),
@@ -216,18 +216,18 @@ export async function saveAttachmentsToExpense(opts: {
   for (const file of opts.files) {
     if (isDataUrlBlob(file.dataUrl)) {
       throw new Error(
-        'Upload the file to Zoho WorkDrive and paste the share link instead of storing the file in the database',
+        'Upload the file to Google Drive and paste the share link instead of storing the file in the database',
       )
     }
     const url = String(file.dataUrl || '').trim()
     if (!url.startsWith('https://')) {
-      throw new Error('Expense attachments must be https WorkDrive (or other) share links')
+      throw new Error('Expense attachments must be https Google Drive (or other) share links')
     }
     const { error } = await db.from('attachments').insert({
       entity_type: 'expense',
       entity_ref: opts.expenseId,
       file_name: file.name,
-      storage_path: 'zoho_workdrive',
+      storage_path: 'google_drive',
       url,
       uploaded_by: opts.uploadedBy,
       uploaded_at: new Date().toISOString(),
@@ -236,15 +236,15 @@ export async function saveAttachmentsToExpense(opts: {
   }
 }
 
-/** Save a WorkDrive https link against an expense (no binary upload). */
-export async function saveWorkDriveLinkToExpense(opts: {
+/** Save a Google Drive https link against an expense (no binary upload). */
+export async function saveDriveLinkToExpense(opts: {
   expenseId: string
-  link: PendingWorkDriveLink
+  link: PendingDriveLink
   uploadedBy: string
 }) {
   const url = opts.link.url.trim()
   const title = opts.link.title.trim() || 'Expense attachment'
-  if (!url.startsWith('https://')) throw new Error('Paste a Zoho WorkDrive https share link')
+  if (!url.startsWith('https://')) throw new Error('Paste a Google Drive https share link')
   await saveAttachmentsToExpense({
     expenseId: opts.expenseId,
     files: [{ name: title, dataUrl: url }],
@@ -342,11 +342,11 @@ export async function syncQuoteSupplierCostFromExpense(opts: {
   return shares
 }
 
-/** Save WorkDrive link on the quotation, mirror as finance expense, update quote GP. */
+/** Save Google Drive link on the quotation, mirror as finance expense, update quote GP. */
 export async function saveSupplierInvoiceForQuote(opts: {
   quote: Quotation
   files?: PendingAttachment[]
-  workDriveLink?: PendingWorkDriveLink | null
+  driveLink?: PendingDriveLink | null
   uploadedBy: string
   vendor: string
   date: string | null
@@ -373,16 +373,16 @@ export async function saveSupplierInvoiceForQuote(opts: {
     if (dealErr && !isUndefinedColumnError(dealErr)) throw dealErr
   }
 
-  // Clear old data-URL blobs once when saving the new WorkDrive-based flow.
+  // Clear old data-URL blobs once when saving the new Google Drive-based flow.
   try {
     await clearSupplierInvoiceBlobs()
   } catch {
     /* best-effort purge */
   }
 
-  const link = opts.workDriveLink
+  const link = opts.driveLink
   if (link?.url.trim()) {
-    await saveWorkDriveLinkToQuote({
+    await saveDriveLinkToQuote({
       quote: { ...opts.quote, deal_ref: dealRef },
       link,
       uploadedBy: opts.uploadedBy,

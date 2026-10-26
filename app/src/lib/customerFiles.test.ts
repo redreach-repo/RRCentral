@@ -7,7 +7,7 @@ import {
   CUSTOMER_FOLDER_SECTIONS,
   filterFolderItems,
   folderFileCounts,
-  isWorkDriveShareUrl,
+  isDriveShareUrl,
   normalizeCompanyKey,
   relatedRefOptionsForSection,
   sectionForCategory,
@@ -16,12 +16,14 @@ import {
 } from './customerFiles'
 
 describe('customerFiles', () => {
-  it('accepts Zoho WorkDrive share URLs', () => {
-    expect(isWorkDriveShareUrl('https://workdrive.zoho.com/folder/abc')).toBe(true)
-    expect(
-      isWorkDriveShareUrl('https://workdrive.zohoexternal.com/external/3iWUoMURXKC-OCgNc'),
-    ).toBe(true)
-    expect(isWorkDriveShareUrl('https://example.com/file.pdf')).toBe(false)
+  it('accepts Google Drive share URLs only', () => {
+    expect(isDriveShareUrl('https://drive.google.com/file/d/1AbC/view?usp=sharing')).toBe(true)
+    expect(isDriveShareUrl('https://drive.google.com/drive/folders/1AbCdEfGhIjKlMnOp')).toBe(true)
+    expect(isDriveShareUrl('https://docs.google.com/spreadsheets/d/1AbC/edit')).toBe(true)
+    expect(isDriveShareUrl('https://workdrive.zoho.com/folder/abc')).toBe(false)
+    expect(isDriveShareUrl('http://drive.google.com/file/d/1AbC/view')).toBe(false)
+    expect(isDriveShareUrl('https://drive.google.com.evil.example/file')).toBe(false)
+    expect(isDriveShareUrl('https://example.com/file.pdf')).toBe(false)
   })
 
   it('maps signed, communication, and purchasing categories onto folder sections', () => {
@@ -54,7 +56,7 @@ describe('customerFiles', () => {
     ])
   })
 
-  it('sanitizes folder names for WorkDrive', () => {
+  it('sanitizes folder names for Google Drive', () => {
     expect(suggestedDriveFolderName('Acme / Trading: LLC')).toBe('Acme Trading LLC')
   })
 
@@ -103,10 +105,10 @@ describe('customerFiles', () => {
           category: 'signed_delivery_note',
           title: 'Signed DN-01-26001',
           file_name: 'Signed DN-01-26001',
-          drive_url: 'https://workdrive.zohoexternal.com/external/abc123',
+          drive_url: 'https://drive.google.com/file/d/abc123/view',
           related_ref: 'DN-01-26001',
           notes: 'Signed copy',
-          storage_provider: 'zoho_workdrive',
+          storage_provider: 'google_drive',
           uploaded_by: 'a@b.c',
           uploaded_at: '2026-09-12T10:00:00.000Z',
         },
@@ -117,10 +119,10 @@ describe('customerFiles', () => {
           category: 'whatsapp',
           title: 'WhatsApp – uniforms follow-up',
           file_name: 'WhatsApp – uniforms follow-up',
-          drive_url: 'https://workdrive.zoho.com/file/wa123',
+          drive_url: 'https://drive.google.com/file/d/wa123/view',
           related_ref: 'RR-01-26001',
           notes: 'Exported Mar 2026',
-          storage_provider: 'zoho_workdrive',
+          storage_provider: 'google_drive',
           uploaded_by: 'a@b.c',
           uploaded_at: '2026-09-13T10:00:00.000Z',
         },
@@ -131,10 +133,10 @@ describe('customerFiles', () => {
           category: 'supplier_invoice',
           title: 'Supplier invoice – RR-01-26001',
           file_name: 'Supplier invoice – RR-01-26001',
-          drive_url: 'https://workdrive.zoho.com/file/si123',
+          drive_url: 'https://drive.google.com/file/d/si123/view',
           related_ref: 'RR-01-26001',
           notes: '',
-          storage_provider: 'zoho_workdrive',
+          storage_provider: 'google_drive',
           uploaded_by: 'a@b.c',
           uploaded_at: '2026-09-11T10:00:00.000Z',
         },
@@ -145,10 +147,10 @@ describe('customerFiles', () => {
           category: 'payment_slip',
           title: 'Should hide',
           file_name: 'Should hide',
-          drive_url: 'https://workdrive.zoho.com/x',
+          drive_url: 'https://drive.google.com/file/d/x/view',
           related_ref: '',
           notes: '',
-          storage_provider: 'zoho_workdrive',
+          storage_provider: 'google_drive',
           uploaded_by: 'a@b.c',
           uploaded_at: '2026-09-12T10:00:00.000Z',
         },

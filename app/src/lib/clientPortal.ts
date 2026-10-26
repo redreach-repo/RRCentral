@@ -324,7 +324,7 @@ export function buildPortalView(input: PortalInput): PortalView {
       filename: u.filename,
       size: sizeLabel(u.size_bytes),
       uploaded: day(u.created_at),
-      saved: u.status === 'in_workdrive',
+      saved: u.status === 'filed',
     })),
     recentlyResolved,
     usage: months
@@ -473,18 +473,6 @@ export function base64Bytes(b64: string): number {
 export function sizeLabel(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${Math.round((bytes / (1024 * 1024)) * 10) / 10} MB`
   return `${Math.max(1, Math.round(bytes / 1024))} KB`
-}
-
-/** The WorkDrive folder id inside a folder link (or a bare id). Same rules as zohoWorkDrive.ts. */
-export function workDriveFolderId(url: string): string | null {
-  const u = String(url || '').trim()
-  if (!u) return null
-  for (const re of [/\/folders?\/([a-zA-Z0-9_-]+)/i, /[?&]id=([a-zA-Z0-9_-]+)/i]) {
-    const m = u.match(re)
-    if (m?.[1] && m[1].length >= 8) return m[1]
-  }
-  if (/^[a-zA-Z0-9_-]{10,}$/.test(u) && !u.includes('://')) return u
-  return null
 }
 
 // For the Edge Function, which reads the rates from app_settings.

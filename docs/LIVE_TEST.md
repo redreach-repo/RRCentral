@@ -388,13 +388,13 @@ today's date and the tick box marks it Accepted, and the account timeline says "
 portal", exactly as the accept link would (the deal moves to Signed with a draft contract). An **Invoices**
 card with what is still owed and a **Pay by card** button while money is owed. **Add a message** on an open
 ticket puts the message on the ticket in Support; a ticket that was Waiting on client goes back to Open. **Send
-us a file** takes a PDF, image, Office file, CSV or text file up to 5 MB. With Zoho WorkDrive set up and a
-WorkDrive folder on the client's CRM row, the file lands in that folder. Otherwise it shows under **Files
+us a file** takes a PDF, image, Office file, CSV or text file up to 5 MB. With Google Drive connected (Settings) and
+the client in the CRM, the file lands in the client's Google Drive folder (made on first use). Otherwise it shows under **Files
 from the client** on the account, where the team can download it and mark it filed.
 
 **If it fails.** No Quotes card means no quote on this account has a working accept link. No Invoices card
 means no sent invoice is linked to the account. A file that stays under Files from the client shows why
-(WorkDrive not set up, no folder for this client, or the WorkDrive error). Errors go to App errors under
+(Google Drive not connected, the client is not in the CRM yet, or the Google Drive error). Errors go to App errors under
 `client-portal`.
 
 ---
@@ -545,3 +545,24 @@ the drafts appear on their own. The VA can edit the wording but cannot send; vie
 **If it fails.** "Run the weekly updates SQL first" means the SQL has not run. "not deployed yet" means
 `client-updates` was not deployed. "Nothing to report this week" means the client had no issues fixed or open and
 no session or dated next step coming up.
+
+## 31. Google Drive (replaces Zoho WorkDrive)
+
+**Trigger.** Run the Google Drive SQL, add the `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` secrets, deploy
+`google-drive` and `client-portal`. As an admin open **Settings → Google Drive** and press **Connect Google Drive**,
+pick the company Google account and allow access. Then open **Customer files**, pick a client that is in the CRM and
+press **Create folder in Google Drive**. Send a file from that client's portal link, and run **Scan & file to Google
+Drive** on the Dashboard.
+
+**You should see.** Settings says "Connected as …" with links to the RR Central, Customers and Company documents
+folders, and Google Drive has an **RR Central** folder with **Customers** and **Company documents** inside. The
+client gets a folder under Customers and its link shows on the CRM card. The portal file lands in that folder and
+shows "Open file" under Files from the client. Matched emails land there as HTML files and show under Customer
+files → Communications. Pasting a Zoho WorkDrive link on a signed copy is refused ("Use a Google Drive share link").
+Managers see the status but cannot connect or disconnect; the VA and viewers cannot create folders or upload.
+
+**If it fails.** "Not set up yet" in Settings means the two secrets are missing. Google saying
+"redirect_uri_mismatch" means the redirect URI in Google Cloud is not exactly the one Settings shows. "Google
+access was not given" means Allow was not pressed. "Google sign in failed" later on means access was removed in the
+Google account, or the Google Cloud app is still in Testing (access then ends after 7 days): publish it and press
+Reconnect.

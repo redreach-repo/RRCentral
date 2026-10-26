@@ -6,7 +6,7 @@ import { logActivity } from '../lib/activity'
 import { errorMessage, isMissingRelationError } from '../lib/errors'
 import {
   COMMUNICATION_KINDS,
-  isWorkDriveShareUrl,
+  isDriveShareUrl,
   saveCustomerDriveLink,
   suggestedDocumentTitle,
   type RelatedRefOption,
@@ -20,7 +20,7 @@ import {
   labelStyle,
 } from '../lib/uiStyles'
 
-export type LinkWorkDriveMode = 'signed' | 'communication' | 'purchasing'
+export type LinkDriveFileMode = 'signed' | 'communication' | 'purchasing'
 
 type Props = {
   open: boolean
@@ -29,7 +29,7 @@ type Props = {
   company: string
   crmId?: string | null
   uploadedBy: string
-  mode: LinkWorkDriveMode
+  mode: LinkDriveFileMode
   /** Fixed signed / purchasing category when mode is not communication. */
   category?: CustomerDocumentCategory
   title?: string
@@ -41,7 +41,7 @@ type Props = {
   defaultNotes?: string
 }
 
-export default function LinkWorkDriveModal({
+export default function LinkDriveFileModal({
   open,
   onClose,
   onSaved,
@@ -85,10 +85,10 @@ export default function LinkWorkDriveModal({
   const modalHint =
     hint ||
     (mode === 'communication'
-      ? 'Save the email export, WhatsApp chat, or notes PDF in Zoho WorkDrive, then paste the share link here.'
+      ? 'Save the email export, WhatsApp chat, or notes PDF in Google Drive, then paste the share link here.'
       : mode === 'purchasing'
-        ? 'Paste the Zoho WorkDrive share link for the supplier invoice PDF.'
-        : 'Upload the signed PDF to Zoho WorkDrive, then paste the share link.')
+        ? 'Paste the Google Drive share link for the supplier invoice PDF.'
+        : 'Upload the signed PDF to Google Drive, then paste the share link.')
 
   useEffect(() => {
     if (!open) return
@@ -133,8 +133,8 @@ export default function LinkWorkDriveModal({
       showToast('Company is required', 'error')
       return
     }
-    if (!isWorkDriveShareUrl(driveUrl)) {
-      showToast('Use a Zoho WorkDrive share link', 'error')
+    if (!isDriveShareUrl(driveUrl)) {
+      showToast('Use a Google Drive share link', 'error')
       return
     }
     if (!docTitle.trim()) {
@@ -175,7 +175,7 @@ export default function LinkWorkDriveModal({
       if (isMissingRelationError(e)) {
         showToast('Run supabase/migrations/20260924224316_customer_files.sql in Supabase first', 'error')
       } else {
-        showToast(errorMessage(e, 'Could not save WorkDrive link'), 'error')
+        showToast(errorMessage(e, 'Could not save Google Drive link'), 'error')
       }
     } finally {
       setSaving(false)
@@ -246,12 +246,12 @@ export default function LinkWorkDriveModal({
         </p>
       </div>
       <div style={fieldStyle}>
-        <label style={labelStyle}>Zoho WorkDrive share link *</label>
+        <label style={labelStyle}>Google Drive share link *</label>
         <input
           style={inputStyle}
           value={driveUrl}
           onChange={(e) => setDriveUrl(e.target.value)}
-          placeholder="https://workdrive.zoho.com/… or workdrive.zohoexternal.com/…"
+          placeholder="https://drive.google.com/…"
         />
       </div>
       <div style={fieldStyle}>

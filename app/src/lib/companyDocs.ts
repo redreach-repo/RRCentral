@@ -1,7 +1,7 @@
 import { db } from './db'
 import { isMissingRelationError } from './errors'
 import type { CompanyDocument, CompanyDocumentCategory } from './types'
-import { WORKDRIVE_STORAGE_PROVIDER } from './customerFiles'
+import { DRIVE_STORAGE_PROVIDER } from './googleDrive'
 
 export const COMPANY_DOC_CATEGORIES: {
   id: CompanyDocumentCategory
@@ -62,7 +62,7 @@ export async function saveCompanyDocument(
 ): Promise<CompanyDocument> {
   const driveUrl = input.drive_url.trim()
   if (!driveUrl || !isHttpUrl(driveUrl)) {
-    throw new Error('Paste a valid WorkDrive (or file) share link starting with https://')
+    throw new Error('Paste a valid Google Drive (or file) share link starting with https://')
   }
   const title = input.title.trim() || companyDocCategoryLabel(input.category)
   const payload = {
@@ -72,7 +72,7 @@ export async function saveCompanyDocument(
     drive_url: driveUrl,
     notes: (input.notes || '').trim(),
     expires_on: input.expires_on?.trim() || null,
-    storage_provider: WORKDRIVE_STORAGE_PROVIDER,
+    storage_provider: DRIVE_STORAGE_PROVIDER,
     uploaded_by: (input.uploaded_by || '').trim(),
     uploaded_at: new Date().toISOString(),
   }
