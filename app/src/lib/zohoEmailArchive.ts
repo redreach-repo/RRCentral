@@ -1,6 +1,6 @@
 /**
- * Scan Zoho Mail inbox + sent, match CRM contacts, file emails into WorkDrive,
- * and link them on the customer folder (Communications).
+ * Scan Zoho Mail inbox + sent, match CRM contacts, file emails into the
+ * client's Google Drive folder, and link them on the customer folder (Communications).
  */
 
 import { db } from './db'
@@ -14,20 +14,8 @@ import {
   type ZohoSettings,
 } from './zoho'
 import { attachCrmMatches, type InboxRow } from './zohoInboxMatch'
-import {
-  createWorkDriveFolder,
-  createWorkDriveShareLink,
-  customersRootFolderId,
-  isZohoWorkDriveEnabled,
-  parseWorkDriveResourceId,
-  uploadWorkDriveFile,
-} from './zohoWorkDrive'
-import {
-  loadCustomerDocuments,
-  saveCustomerDriveLink,
-  suggestedDriveFolderName,
-  updateCrmDriveFolderUrl,
-} from './customerFiles'
+import { DRIVE_STORAGE_PROVIDER, uploadToClientDrive } from './googleDrive'
+import { loadCustomerDocuments, saveCustomerDriveLink } from './customerFiles'
 import { logActivity } from './activity'
 import { isMissingRelationError, errorMessage } from './errors'
 
@@ -103,41 +91,6 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;')
 }
 
-async function ensureCustomerWorkDriveFolder(
-  settings: ZohoSettings,
-  entry: CrmEntry,
-): Promise<{ folderId: string; folderUrl: string }> {
-  const existingId = parseWorkDriveResourceId(entry.drive_folder_url || '')
-  if (existingId) {
-    return { folderId: existingId, folderUrl: entry.drive_folder_url || '' }
-  }
-
-  const rootId = customersRootFolderId(settings)
-  if (!rootId) {
-    throw new Error(
-      'Set Customers root folder ID/URL in Settings → Customer WorkDrive (and enable WorkDrive)',
-    )
-  }
-
-  const created = await createWorkDriveFolder(settings, {
-    parentId: rootId,
-    name: suggestedDriveFolderName(entry.company_name),
-  })
-
-  let folderUrl = created.permalink
-  try {
-    folderUrl = await createWorkDriveShareLink(settings, {
-      resourceId: created.resourceId,
-      linkName: sanitizeFilename(entry.company_name).slice(0, 40) || 'customer',
-    })
-  } catch {
-    /* permalink fallback already on created */
-  }
-
-  await updateCrmDriveFolderUrl(entry.id, folderUrl)
-  return { folderId: created.resourceId, folderUrl }
-}
-
 export type FileEmailResult = {
   messageId: string
   company: string
@@ -190,7 +143,7 @@ async function fileOneMatchedEmail(opts: {
   }
 
   try {
-    let entry = await loadCrmById(row.crm.crmId)
+    const entry = await loadCrmById(row.crm.crmId)
     if (!entry) {
       return {
         messageId: row.messageId,
@@ -199,10 +152,6 @@ async function fileOneMatchedEmail(opts: {
         detail: 'CRM company missing',
       }
     }
-
-    const { folderId } = await ensureCustomerWorkDriveFolder(settings, entry)
-    // Reload entry if folder was just linked
-    entry = (await loadCrmById(row.crm.crmId)) || entry
 
     let bodyHtml = ''
     try {
@@ -229,22 +178,14 @@ async function fileOneMatchedEmail(opts: {
     })
 
     const filename = `${sanitizeFilename(row.subject || 'email')}-${row.messageId.slice(-8)}.html`
-    const uploaded = await uploadWorkDriveFile(settings, {
-      parentId: folderId,
+    // Makes the client's folder under RR Central / Customers on first use.
+    const uploaded = await uploadToClientDrive({
+      crmId: entry.id,
       filename,
       content: html,
       contentType: 'text/html;charset=utf-8',
     })
-
-    let driveUrl = uploaded.permalink
-    try {
-      driveUrl = await createWorkDriveShareLink(settings, {
-        resourceId: uploaded.resourceId,
-        linkName: sanitizeFilename(row.subject).slice(0, 40) || 'email',
-      })
-    } catch {
-      /* keep permalink */
-    }
+    const driveUrl = uploaded.url
 
     const title =
       mailbox === 'sent'
@@ -263,7 +204,7 @@ async function fileOneMatchedEmail(opts: {
     })
 
     await logActivity(
-      'file_zoho_email_workdrive',
+      'file_zoho_email_drive',
       'customer_document',
       company,
       `${mailbox}: ${row.subject}`,
@@ -281,7 +222,7 @@ async function fileOneMatchedEmail(opts: {
       drive_url: driveUrl,
       related_ref: zohoMessageRelatedRef(row.messageId),
       notes: '',
-      storage_provider: 'zoho_workdrive',
+      storage_provider: DRIVE_STORAGE_PROVIDER,
       uploaded_by: uploadedBy,
       uploaded_at: new Date().toISOString(),
     })
@@ -304,22 +245,18 @@ async function fileOneMatchedEmail(opts: {
 }
 
 /**
- * Scan inbox + sent, match CRM contact emails, create WorkDrive folders as needed,
- * upload HTML archives, and link under Communications.
+ * Scan inbox + sent, match CRM contact emails, upload HTML copies into each
+ * client's Google Drive folder (made as needed), and link under Communications.
  */
 export async function scanAndFileCrmEmails(opts: {
   settings: ZohoSettings
+  driveConnected: boolean
   crmEntries: CrmEntry[]
   uploadedBy: string
   limitPerFolder?: number
 }): Promise<ScanAndFileSummary> {
-  if (!isZohoWorkDriveEnabled(opts.settings)) {
-    throw new Error(
-      'Enable Zoho WorkDrive in Settings (yes) and set the Customers root folder URL/ID. Regenerate the refresh token with WorkDrive.files.CREATE + WorkDrive.links.CREATE.',
-    )
-  }
-  if (!customersRootFolderId(opts.settings)) {
-    throw new Error('Set Customers root folder URL (or zohoWorkDriveRootFolderId) in Settings')
+  if (!opts.driveConnected) {
+    throw new Error('Connect Google Drive in Settings first (an admin does this once)')
   }
 
   const limit = Math.min(Math.max(opts.limitPerFolder || 25, 1), 40)

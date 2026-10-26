@@ -9,7 +9,7 @@ function doc(partial: Partial<CompanyDocument> & { id: string; expires_on: strin
     file_name: partial.file_name || '',
     drive_url: partial.drive_url || '',
     notes: '',
-    storage_provider: 'workdrive',
+    storage_provider: 'google_drive',
     uploaded_by: '',
     uploaded_at: '2026-01-01T00:00:00.000Z',
     ...partial,

@@ -34,10 +34,10 @@ export async function saveSignedDeliveryNoteAttachments(opts: {
   uploadedBy: string
 }): Promise<string> {
   void opts
-  // Signed DNs are WorkDrive-only via customer_documents + LinkWorkDriveModal.
+  // Signed DNs are Google Drive-only via customer_documents + LinkDriveFileModal.
   // Never persist data: blobs (or any attachment row) from this path.
   throw new Error(
-    'Store signed delivery notes on Zoho WorkDrive and link them from the delivery note (Customer files), not as database blobs.',
+    'Store signed delivery notes on Google Drive and link them from the delivery note (Customer files), not as database blobs.',
   )
 }
 

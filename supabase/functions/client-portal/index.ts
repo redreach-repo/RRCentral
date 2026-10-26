@@ -35,11 +35,10 @@ import {
   ratesFromSettings,
   safeUploadName,
   uploadContentType,
-  workDriveFolderId,
 } from "./clientPortal.bundle.js"
 import { withErrorLog } from "../_shared/functionHealth.ts"
 import { acceptQuote } from "../_shared/quoteAcceptance.ts"
-import { workDriveUploader } from "../_shared/zohoWorkDrive.ts"
+import { driveUploader } from "../_shared/googleDrive.ts"
 
 type PortalAccessRow = {
   id: string
@@ -228,31 +227,31 @@ Deno.serve(withErrorLog("client-portal", async (req) => {
     if (uErr) throw new Error(`Could not save the file: ${uErr.message}`)
     const uploadId = (saved as { id: string }).id
 
-    // Into the client's WorkDrive folder, when there is one.
-    let inWorkDrive = false
+    // Into the client's Google Drive folder (made on first use).
+    let inDrive = false
     try {
-      const upload = await workDriveUploader(sb)
+      const drive = await driveUploader(sb)
       const { data: crm } = await sb
         .from("crm")
-        .select("drive_folder_url")
+        .select("id, company_name, drive_folder_url")
         .ilike("company_name", accountName.replace(/[%_]/g, ""))
-        .neq("drive_folder_url", "")
         .limit(1)
-      const folderId = workDriveFolderId(((crm || [])[0] as { drive_folder_url?: string } | undefined)?.drive_folder_url || "")
-      if (upload && folderId) {
+      const crmRow = (crm || [])[0] as { id: string; company_name: string; drive_folder_url?: string } | undefined
+      if (drive && crmRow) {
+        const folder = await drive.ensureClientFolder(crmRow)
         const bin = atob(content)
         const bytes = new Uint8Array(bin.length)
         for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-        const file = await upload({ folderId, filename, contentType, bytes })
+        const file = await drive.upload({ folderId: folder.id, filename, contentType, bytes })
         await sb
           .from("portal_uploads")
-          .update({ status: "in_workdrive", workdrive_id: file.id, workdrive_url: file.url, content_base64: "", error: "" })
+          .update({ status: "filed", drive_file_id: file.id, drive_url: file.url, content_base64: "", error: "" })
           .eq("id", uploadId)
-        inWorkDrive = true
+        inDrive = true
       } else {
         await sb
           .from("portal_uploads")
-          .update({ error: upload ? "No WorkDrive folder for this client yet" : "WorkDrive is not set up" })
+          .update({ error: drive ? "This client is not in the CRM yet" : "Google Drive is not connected" })
           .eq("id", uploadId)
       }
     } catch (e) {
@@ -262,7 +261,7 @@ Deno.serve(withErrorLog("client-portal", async (req) => {
     await sb.from("account_activities").insert({
       account_id: accountId,
       kind: "system",
-      body: `The client uploaded ${filename} from the portal.${inWorkDrive ? " It is in their WorkDrive folder." : " It is waiting under Client uploads on the account."}`,
+      body: `The client uploaded ${filename} from the portal.${inDrive ? " It is in their Google Drive folder." : " It is waiting under Client uploads on the account."}`,
       user_email: "client-portal",
     })
     return json({ ok: true })

@@ -53,7 +53,7 @@ import EmailComposeModal from '../components/EmailComposeModal'
 import QuoteAcceptLinksModal from '../components/quotes/QuoteAcceptLinksModal'
 import { canHaveAcceptLink, canManageAcceptLinks } from '../lib/quoteAccept'
 import { pdfBase64FromDataUrl } from '../lib/quoteAcceptStore'
-import LinkWorkDriveModal from '../components/LinkWorkDriveModal'
+import LinkDriveFileModal from '../components/LinkDriveFileModal'
 import SaveToFolderPrompt from '../components/SaveToFolderPrompt'
 import { logActivity } from '../lib/activity'
 import { findCrmByCompany, syncCrmFromQuote } from '../lib/crmSync'
@@ -96,7 +96,7 @@ export default function DocumentPage() {
   const [signedAttachments, setSignedAttachments] = useState<Attachment[]>([])
   const [signedBusy, setSignedBusy] = useState(false)
   const [crmRecord, setCrmRecord] = useState<CrmEntry | null>(null)
-  const [workdriveLinks, setWorkdriveLinks] = useState<CustomerDocument[]>([])
+  const [driveLinks, setDriveLinks] = useState<CustomerDocument[]>([])
   const [linkMode, setLinkMode] = useState<'signed' | 'communication' | null>(null)
   const [savePrompt, setSavePrompt] = useState<'email' | 'whatsapp' | null>(null)
   const [acceptOpen, setAcceptOpen] = useState(false)
@@ -142,12 +142,12 @@ export default function DocumentPage() {
         setItems(lines)
         await attachClient(q.client)
         setSignedAttachments([])
-        setWorkdriveLinks([])
+        setDriveLinks([])
         const crm = await findCrmByCompany(q.client)
         setCrmRecord(crm)
         try {
           const docs = await loadCustomerDocuments(q.client)
-          setWorkdriveLinks(
+          setDriveLinks(
             docs.filter(
               (d) =>
                 d.category === 'signed_quotation' &&
@@ -156,7 +156,7 @@ export default function DocumentPage() {
             ),
           )
         } catch {
-          setWorkdriveLinks([])
+          setDriveLinks([])
         }
       } else if (docType === 'delivery-note') {
         const note = await getDeliveryNote(id)
@@ -175,7 +175,7 @@ export default function DocumentPage() {
         }
         try {
           const docs = await loadCustomerDocuments(note.client)
-          setWorkdriveLinks(
+          setDriveLinks(
             docs.filter(
               (d) =>
                 d.category === 'signed_delivery_note' &&
@@ -184,7 +184,7 @@ export default function DocumentPage() {
             ),
           )
         } catch {
-          setWorkdriveLinks([])
+          setDriveLinks([])
         }
       } else {
         const { data, error: err } = await db.from('invoices').select('*').eq('id', id).maybeSingle()
@@ -200,7 +200,7 @@ export default function DocumentPage() {
         setCrmRecord(crm)
         try {
           const docs = await loadCustomerDocuments(inv.client)
-          setWorkdriveLinks(
+          setDriveLinks(
             docs.filter(
               (d) =>
                 d.category === 'signed_invoice' &&
@@ -209,7 +209,7 @@ export default function DocumentPage() {
             ),
           )
         } catch {
-          setWorkdriveLinks([])
+          setDriveLinks([])
         }
       }
     } catch (e) {
@@ -383,7 +383,7 @@ export default function DocumentPage() {
     }
   }
 
-  async function refreshWorkdriveLinks() {
+  async function refreshDriveLinks() {
     const clientName = doc?.client || ''
     if (!clientName) return
     try {
@@ -394,7 +394,7 @@ export default function DocumentPage() {
           : docType === 'invoice'
             ? 'signed_invoice'
             : 'signed_delivery_note'
-      setWorkdriveLinks(
+      setDriveLinks(
         docs.filter(
           (d) =>
             d.category === cat &&
@@ -1199,10 +1199,10 @@ export default function DocumentPage() {
               marginBottom: 8,
             }}
           >
-            <Link2 size={16} /> Customer folder · WorkDrive
+            <Link2 size={16} /> Customer folder · Google Drive
           </div>
           <p style={{ margin: '0 0 10px', fontSize: 13, color: '#555', lineHeight: 1.45 }}>
-            Keep signed copies and chat exports on Zoho WorkDrive. Paste the share link here — the CRM
+            Keep signed copies and chat exports on Google Drive. Paste the share link here — the CRM
             only stores the URL (not file bytes).
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
@@ -1261,19 +1261,19 @@ export default function DocumentPage() {
               </Link>
             ) : null}
           </div>
-          {workdriveLinks.length > 0 ? (
+          {driveLinks.length > 0 ? (
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
-              {workdriveLinks.map((d) => (
+              {driveLinks.map((d) => (
                 <li key={d.id} style={{ marginBottom: 4 }}>
                   <a href={d.drive_url} target="_blank" rel="noreferrer" style={{ color: '#c1121f' }}>
                     <ExternalLink size={12} style={{ verticalAlign: -1, marginRight: 4 }} />
-                    {d.title || 'WorkDrive file'}
+                    {d.title || 'Google Drive file'}
                   </a>
                 </li>
               ))}
             </ul>
           ) : (
-            <p style={{ margin: 0, fontSize: 12, color: '#888' }}>No WorkDrive link for this document yet.</p>
+            <p style={{ margin: 0, fontSize: 12, color: '#888' }}>No Google Drive link for this document yet.</p>
           )}
           {isDeliveryNote && signedAttachments.length > 0 ? (
             <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #eee' }}>
@@ -1288,7 +1288,7 @@ export default function DocumentPage() {
                   color: '#888',
                 }}
               >
-                <Paperclip size={14} /> Legacy copies stored in CRM (prefer WorkDrive above)
+                <Paperclip size={14} /> Legacy copies stored in CRM (prefer Google Drive above)
               </div>
               <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
                 {signedAttachments.map((a) => (
@@ -1380,10 +1380,10 @@ export default function DocumentPage() {
         onSent={() => void onEmailSent()}
       />
 
-      <LinkWorkDriveModal
+      <LinkDriveFileModal
         open={linkMode === 'signed'}
         onClose={() => setLinkMode(null)}
-        onSaved={() => refreshWorkdriveLinks()}
+        onSaved={() => refreshDriveLinks()}
         company={doc.client || ''}
         crmId={crmRecord?.id || null}
         uploadedBy={user?.email || ''}
@@ -1399,10 +1399,10 @@ export default function DocumentPage() {
         relatedRefOptions={displayRef ? [{ value: displayRef, label: displayRef }] : []}
       />
 
-      <LinkWorkDriveModal
+      <LinkDriveFileModal
         open={linkMode === 'communication'}
         onClose={() => setLinkMode(null)}
-        onSaved={() => refreshWorkdriveLinks()}
+        onSaved={() => refreshDriveLinks()}
         company={doc.client || ''}
         crmId={crmRecord?.id || null}
         uploadedBy={user?.email || ''}

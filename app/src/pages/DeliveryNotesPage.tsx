@@ -9,7 +9,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
-import LinkWorkDriveModal from '../components/LinkWorkDriveModal'
+import LinkDriveFileModal from '../components/LinkDriveFileModal'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
 import { logActivity } from '../lib/activity'
@@ -590,11 +590,11 @@ export default function DeliveryNotesPage() {
         <div style={fieldStyle}>
           <label style={labelStyle}>
             <Link2 size={12} style={{ marginRight: 4 }} />
-            Signed delivery note (WorkDrive)
+            Signed delivery note (Google Drive)
           </label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             <button type="button" style={buttonSecondaryStyle} onClick={() => setLinkSignedOpen(true)}>
-              <Link2 size={14} /> Link signed DN on WorkDrive
+              <Link2 size={14} /> Link signed DN on Google Drive
             </button>
             {editing?.client ? (
               <Link
@@ -606,7 +606,7 @@ export default function DeliveryNotesPage() {
             ) : null}
           </div>
           <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted, lineHeight: 1.45 }}>
-            Prefer Zoho WorkDrive — paste the share link so the CRM stays light. Legacy in-app copies
+            Prefer Google Drive — paste the share link so the CRM stays light. Legacy in-app copies
             below can still be removed.
           </p>
         </div>
@@ -640,7 +640,7 @@ export default function DeliveryNotesPage() {
         </div>
       </Modal>
 
-      <LinkWorkDriveModal
+      <LinkDriveFileModal
         open={linkSignedOpen && !!editing}
         onClose={() => setLinkSignedOpen(false)}
         company={editing?.client || ''}

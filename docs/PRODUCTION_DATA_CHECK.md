@@ -32,7 +32,7 @@ an SQL file rather than a page in the app.
 | 6 | Quote RR-01-26003 | part of `20260924180942_offset_vat` | set offset VAT on, discount 0, amount 4535 | ☐ |
 
 Fix each one in the app where you can (Settings → Users, Settings → Company,
-the client, the quote). For item 3, save any file you need to WorkDrive and remove
+the client, the quote). For item 3, save any file you need to Google Drive and remove
 it from its record, then run the copy page's **Attachments clean-up** section. That
 section deletes nothing: it turns on the link-only rules, and stops with a message
 if a file is still stored in the database.

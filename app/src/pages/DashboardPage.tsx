@@ -297,7 +297,7 @@ export default function DashboardPage() {
 
   const docAlerts = useMemo(() => companyDocExpiryAlerts(companyDocs, 60), [companyDocs])
   const domainAlerts = useMemo(() => domainRenewalAlerts(ownedDomains, 90), [ownedDomains])
-  const companyVaultRoot = (settings.companyWorkDriveRootUrl || '').trim()
+  const companyVaultRoot = (settings.companyDriveFolderUrl || '').trim()
   const showCompanyVault = can(userRole, 'settings.manage')
 
   if (loading) {
@@ -493,17 +493,17 @@ export default function DashboardPage() {
               <FolderOpen size={18} /> Company vault
             </h2>
             <p style={{ color: colors.muted2, fontSize: 13, margin: '0 0 10px', lineHeight: 1.45 }}>
-              Trade license, VAT certificate, and other company papers (WorkDrive links).
+              Trade license, VAT certificate, and other company papers (Google Drive links).
             </p>
             {companyVaultRoot ? (
               <p style={{ margin: '0 0 10px', fontSize: 13 }}>
                 <a href={companyVaultRoot} target="_blank" rel="noreferrer" style={{ color: colors.accent }}>
-                  Open company WorkDrive folder
+                  Open company Google Drive folder
                 </a>
               </p>
             ) : (
               <p style={{ color: colors.muted2, fontSize: 12, margin: '0 0 10px' }}>
-                Set the company WorkDrive folder URL in Settings to show a quick link here.
+                Connect Google Drive in Settings to show a quick link here.
               </p>
             )}
             {companyDocs.length === 0 ? (

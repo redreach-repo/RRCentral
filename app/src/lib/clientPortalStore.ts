@@ -63,7 +63,7 @@ export async function revokePortalLink(id: string): Promise<void> {
   if (error) throw error
 }
 
-const UPLOAD_COLUMNS = 'id, account_id, portal_access_id, filename, content_type, size_bytes, note, status, workdrive_id, workdrive_url, error, created_at'
+const UPLOAD_COLUMNS = 'id, account_id, portal_access_id, filename, content_type, size_bytes, note, status, drive_file_id, drive_url, error, created_at'
 
 /** Files the client sent from the portal, newest first (without their content). */
 export async function listPortalUploads(accountId: string): Promise<{ rows: PortalUpload[]; missingTable: boolean }> {
@@ -80,7 +80,7 @@ export async function downloadPortalUpload(upload: PortalUpload): Promise<void> 
   const { data, error } = await db.from('portal_uploads').select('content_base64').eq('id', upload.id).maybeSingle()
   if (error) throw error
   const b64 = String((data as { content_base64?: string } | null)?.content_base64 || '')
-  if (!b64) throw new Error('The file is no longer stored here. Look in the client’s WorkDrive folder.')
+  if (!b64) throw new Error('The file is no longer stored here. Look in the client’s Google Drive folder.')
   const bin = atob(b64)
   const bytes = new Uint8Array(bin.length)
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
@@ -93,10 +93,10 @@ export async function downloadPortalUpload(upload: PortalUpload): Promise<void> 
 }
 
 /** The team filed a waiting file by hand: note where, and clear the stored copy. */
-export async function markPortalUploadFiled(id: string, workdriveUrl: string): Promise<void> {
+export async function markPortalUploadFiled(id: string, driveUrl: string): Promise<void> {
   const { error } = await db
     .from('portal_uploads')
-    .update({ status: 'in_workdrive', workdrive_url: workdriveUrl.trim(), content_base64: '', error: '' })
+    .update({ status: 'filed', drive_url: driveUrl.trim(), content_base64: '', error: '' })
     .eq('id', id)
   if (error) throw error
 }

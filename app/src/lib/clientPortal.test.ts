@@ -14,7 +14,6 @@ import {
   safeUploadName,
   sizeLabel,
   uploadContentType,
-  workDriveFolderId,
   type PortalInput,
   type PortalQuoteRow,
 } from './clientPortal'
@@ -258,7 +257,7 @@ describe('portal view extras', () => {
         tickets: [{ id: 't1', subject: 'Help', status: 'open', created_at: '2026-10-22T06:00:00Z', sla_due_at: null, first_response_at: null, resolved_at: null }],
         invoices: [{ id: 'i1', reference_number: 'RR-07-1', date: '2026-10-01', amount: 100, status: 'Sent', payment_status: 'Unpaid', payment_terms: '' }],
         payments: [],
-        uploads: [{ filename: 'logo.png', size_bytes: 2048, created_at: '2026-10-22T06:00:00Z', status: 'in_workdrive' }],
+        uploads: [{ filename: 'logo.png', size_bytes: 2048, created_at: '2026-10-22T06:00:00Z', status: 'filed' }],
       }),
     )
     expect(view.openTickets[0].id).toBe('t1')
@@ -305,12 +304,5 @@ describe('portal messages and uploads', () => {
   it('labels sizes', () => {
     expect(sizeLabel(100)).toBe('1 KB')
     expect(sizeLabel(3 * 1024 * 1024)).toBe('3 MB')
-  })
-  it('finds the WorkDrive folder id in a link', () => {
-    expect(workDriveFolderId('https://workdrive.zoho.com/home/abc/teams/t1/ws/w1/folders/f1a2b3c4d5e6')).toBe('f1a2b3c4d5e6')
-    expect(workDriveFolderId('https://workdrive.zoho.com/folder/abcdefgh12')).toBe('abcdefgh12')
-    expect(workDriveFolderId('abcdefghij12')).toBe('abcdefghij12')
-    expect(workDriveFolderId('https://drive.google.com/drive/u/0/')).toBeNull()
-    expect(workDriveFolderId('')).toBeNull()
   })
 })

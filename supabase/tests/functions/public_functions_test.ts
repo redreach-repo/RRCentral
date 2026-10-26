@@ -30,6 +30,7 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "bootstrap-admin": { kind: "shared secret", pattern: /x-bootstrap-secret[\s\S]*Forbidden/ },
   "manage-auth-user": { kind: "admin JWT", pattern: /admin\.auth\.getUser\(jwt\)/ },
   "zoho-proxy": { kind: "team member JWT", pattern: /admin\.auth\.getUser\(jwt\)[\s\S]*member\?\.active/ },
+  "google-drive": { kind: "signed state from Google, team member JWT for the rest", pattern: /readState\(app\.clientSecret[\s\S]*if \(!state\)[\s\S]*role !== "admin"[\s\S]*auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_member[\s\S]*rr_is_admin[\s\S]*rr_is_staff/ },
   "client-reports": { kind: "cron secret, manager JWT to build, team JWT to send", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret[\s\S]*auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_manager_or_admin[\s\S]*rr_is_staff[\s\S]*rr_can_write_account/ },
   "client-updates": { kind: "cron secret, manager JWT to build, team JWT to send", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret[\s\S]*auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_manager_or_admin[\s\S]*rr_is_staff[\s\S]*rr_can_write_account/ },
   "lead-intake": { kind: "shared secret or signed form token", pattern: /if \(!secret\)[\s\S]*=== secret[\s\S]*formTokenProblem\(/ },
@@ -83,6 +84,8 @@ const ENV: Record<string, string> = {
   RR_STRIPE_WEBHOOK_SECRET: "whsec_for_tests",
   CLIENT_REPORT_CRON_SECRET: "report-secret-for-tests",
   CLIENT_UPDATE_CRON_SECRET: "update-secret-for-tests",
+  GOOGLE_CLIENT_ID: "google-client-for-tests",
+  GOOGLE_CLIENT_SECRET: "google-secret-for-tests",
 }
 
 async function load(fn: string): Promise<Handler> {
@@ -308,4 +311,20 @@ Deno.test({ name: "stripe-invoice-webhook only believes Stripe's signature", ...
   } finally {
     Deno.env.set("RR_STRIPE_WEBHOOK_SECRET", ENV.RR_STRIPE_WEBHOOK_SECRET)
   }
+} })
+
+Deno.test({ name: "google-drive needs a sign in, and Google's answer needs a signed state", ...opts, fn: async () => {
+  const fn = "google-drive"
+  for (const action of ["status", "connect", "disconnect", "client-folder", "upload"]) {
+    assertEquals(await call(fn, post(fn, { action, crm_id: "00000000-0000-0000-0000-000000000001" })), 401)
+    assertEquals(await call(fn, post(fn, { action }, { Authorization: "Bearer someone" })), 401)
+  }
+  const get = (query: string) => new Request(URL_BASE + fn + query, { method: "GET" })
+  assertEquals(await call(fn, get("?code=abc")), 400)
+  assertEquals(await call(fn, get("?code=abc&state=forged.state")), 400)
+  const { signState } = await import(new URL("functions/_shared/googleDrive.ts", ROOT).href)
+  const otherKey = await signState("not-the-secret", { email: "alfred@redreach.ae", returnTo: "https://redreach.ae/", exp: Date.now() + 60_000 })
+  assertEquals(await call(fn, get(`?code=abc&state=${encodeURIComponent(otherKey)}`)), 400)
+  const expired = await signState(ENV.GOOGLE_CLIENT_SECRET, { email: "alfred@redreach.ae", returnTo: "https://redreach.ae/", exp: Date.now() - 1 })
+  assertEquals(await call(fn, get(`?code=abc&state=${encodeURIComponent(expired)}`)), 400)
 } })

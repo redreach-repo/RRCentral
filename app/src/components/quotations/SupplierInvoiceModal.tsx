@@ -16,7 +16,7 @@ import {
   loadQuoteSupplierInvoiceAttachments,
   saveSupplierInvoiceForQuote,
 } from '../../lib/supplierInvoiceStore'
-import { isWorkDriveShareUrl } from '../../lib/customerFiles'
+import { isDriveShareUrl } from '../../lib/customerFiles'
 import { resolveDealRef } from '../../lib/dealQuotes'
 import {
   buttonPrimaryStyle,
@@ -57,8 +57,8 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
     payment_method: 'Bank transfer',
     notes: '',
   })
-  const [supplierInvoiceWorkDriveUrl, setSupplierInvoiceWorkDriveUrl] = useState('')
-  const [supplierInvoiceWorkDriveTitle, setSupplierInvoiceWorkDriveTitle] = useState('')
+  const [supplierInvoiceDriveUrl, setSupplierInvoiceDriveUrl] = useState('')
+  const [supplierInvoiceDriveTitle, setSupplierInvoiceDriveTitle] = useState('')
   const [supplierInvoiceAttachments, setSupplierInvoiceAttachments] = useState<Attachment[]>([])
   const [supplierInvoiceExpenses, setSupplierInvoiceExpenses] = useState<Expense[]>([])
   const [supplierInvoiceHint, setSupplierInvoiceHint] = useState('')
@@ -110,10 +110,10 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
       payment_method: PAYMENT_METHODS[0] || 'Bank transfer',
       notes: '',
     })
-    setSupplierInvoiceWorkDriveUrl('')
-    setSupplierInvoiceWorkDriveTitle('')
+    setSupplierInvoiceDriveUrl('')
+    setSupplierInvoiceDriveTitle('')
     setSupplierInvoiceHint(
-      'Upload the PDF to Zoho WorkDrive, then paste the share link here. Old PDF blobs in Supabase are cleared automatically.',
+      'Upload the PDF to Google Drive, then paste the share link here. Old PDF blobs in Supabase are cleared automatically.',
     )
     try {
       // Free Supabase space from legacy data-URL supplier PDFs.
@@ -133,14 +133,14 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
         loadQuoteSupplierInvoiceAttachments(q),
         loadQuoteSupplierExpenses(q),
       ])
-      // Prefer WorkDrive https links; hide leftover data-URL blobs from the list.
+      // Prefer Google Drive https links; hide leftover data-URL blobs from the list.
       const links = atts.filter((a) => !String(a.url || '').startsWith('data:'))
       setSupplierInvoiceAttachments(links)
       setSupplierInvoiceExpenses(exps)
       const latestLink = links[0]
       if (latestLink) {
-        setSupplierInvoiceWorkDriveUrl(latestLink.url || '')
-        setSupplierInvoiceWorkDriveTitle(latestLink.file_name || '')
+        setSupplierInvoiceDriveUrl(latestLink.url || '')
+        setSupplierInvoiceDriveTitle(latestLink.file_name || '')
       }
       const latest = exps[0]
       if (latest) {
@@ -190,9 +190,10 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
       showToast('Enter the supplier invoice total', 'error')
       return
     }
-    const linkUrl = supplierInvoiceWorkDriveUrl.trim()
-    if (linkUrl && !isWorkDriveShareUrl(linkUrl)) {
-      showToast('Use a Zoho WorkDrive share link', 'error')
+    const linkUrl = supplierInvoiceDriveUrl.trim()
+    // A link saved before the move (old WorkDrive) may stay; new links are Google Drive.
+    if (linkUrl && !isDriveShareUrl(linkUrl) && linkUrl !== supplierInvoiceAttachments[0]?.url) {
+      showToast('Use a Google Drive share link', 'error')
       return
     }
     setSaving(true)
@@ -225,11 +226,11 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
 
       const result = await saveSupplierInvoiceForQuote({
         quote: supplierInvoiceTarget,
-        workDriveLink: linkUrl
+        driveLink: linkUrl
           ? {
               url: linkUrl,
               title:
-                supplierInvoiceWorkDriveTitle.trim() ||
+                supplierInvoiceDriveTitle.trim() ||
                 supplierInvoiceForm.supplier_invoice_no.trim() ||
                 'Supplier invoice',
             }
@@ -276,7 +277,7 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
       width={640}
     >
       <p style={{ color: colors.muted, fontSize: 14, marginTop: 0, lineHeight: 1.5 }}>
-        Store the PDF on <strong style={{ color: colors.text }}>Zoho WorkDrive</strong>, then paste
+        Store the PDF on <strong style={{ color: colors.text }}>Google Drive</strong>, then paste
         the share link on this quotation’s deal (
         {supplierInvoiceTarget ? resolveDealRef(supplierInvoiceTarget) : '—'}). A matching expense
         is created for finance reports. Branch quotes on the same deal share the supplier cost.
@@ -284,18 +285,18 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
       <div style={fieldStyle}>
         <label style={labelStyle}>
           <FileUp size={12} style={{ marginRight: 4 }} />
-          Zoho WorkDrive share link
+          Google Drive share link
         </label>
         <input
           style={inputStyle}
-          value={supplierInvoiceWorkDriveUrl}
-          onChange={(e) => setSupplierInvoiceWorkDriveUrl(e.target.value)}
-          placeholder="https://workdrive.zoho.com/… or workdrive.zohoexternal.com/…"
+          value={supplierInvoiceDriveUrl}
+          onChange={(e) => setSupplierInvoiceDriveUrl(e.target.value)}
+          placeholder="https://drive.google.com/…"
         />
         <input
           style={{ ...inputStyle, marginTop: 8 }}
-          value={supplierInvoiceWorkDriveTitle}
-          onChange={(e) => setSupplierInvoiceWorkDriveTitle(e.target.value)}
+          value={supplierInvoiceDriveTitle}
+          onChange={(e) => setSupplierInvoiceDriveTitle(e.target.value)}
           placeholder="Link title (optional) — e.g. Uniforms INV-8821"
         />
         {supplierInvoiceHint ? (
@@ -561,7 +562,7 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
       </div>
       {supplierInvoiceAttachments.length > 0 ? (
         <div style={fieldStyle}>
-          <label style={labelStyle}>WorkDrive links on this quotation</label>
+          <label style={labelStyle}>Google Drive links on this quotation</label>
           <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13 }}>
             {supplierInvoiceAttachments.map((a) => (
               <li key={a.id}>

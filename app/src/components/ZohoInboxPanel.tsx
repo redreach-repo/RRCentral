@@ -15,7 +15,7 @@ import {
   type ZohoInboxMessage,
 } from '../lib/zoho'
 import { attachCrmMatches, type InboxRow } from '../lib/zohoInboxMatch'
-import { isZohoWorkDriveEnabled } from '../lib/zohoWorkDrive'
+import { useDriveStatus } from '../hooks/useDriveStatus'
 import { archiveSetupHint, scanAndFileCrmEmails } from '../lib/zohoEmailArchive'
 import {
   buttonPrimaryStyle,
@@ -54,7 +54,7 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
 
   const enabled = isZohoMailEnabled(settings)
   const configured = isZohoConfigured(settings)
-  const workDriveOn = isZohoWorkDriveEnabled(settings)
+  const driveOn = useDriveStatus().status.connected
 
   const load = useCallback(async () => {
     if (!enabled) return
@@ -87,6 +87,7 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
     try {
       const summary = await scanAndFileCrmEmails({
         settings,
+        driveConnected: driveOn,
         crmEntries,
         uploadedBy: user?.email || '',
         limitPerFolder: 25,
@@ -94,7 +95,7 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
       const line = `Scanned ${summary.scanned} · matched ${summary.matched} · filed ${summary.filed} · skipped ${summary.skipped} · errors ${summary.errors}`
       setLastScan(line)
       if (summary.filed > 0) {
-        showToast(`Filed ${summary.filed} email(s) to WorkDrive + CRM`, 'success')
+        showToast(`Filed ${summary.filed} email(s) to Google Drive + CRM`, 'success')
       } else if (summary.errors > 0) {
         const firstErr = summary.results.find((r) => r.status === 'error')
         showToast(firstErr?.detail || 'Scan finished with errors', 'error')
@@ -201,26 +202,26 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
             style={buttonPrimaryStyle}
             disabled={filing || loading}
             title={
-              workDriveOn
-                ? 'Scan inbox + sent, create customer WorkDrive folders, file matched emails into CRM'
-                : 'Enable WorkDrive in Settings first'
+              driveOn
+                ? 'Scan inbox + sent, make customer folders in Google Drive, file matched emails into CRM'
+                : 'Connect Google Drive in Settings first'
             }
             onClick={() => void runScanAndFile()}
           >
             {filing ? <Loader2 size={14} className="spin" /> : <CloudUpload size={14} />}
-            {filing ? 'Filing…' : 'Scan & file to WorkDrive'}
+            {filing ? 'Filing…' : 'Scan & file to Google Drive'}
           </button>
         </div>
       </div>
 
       <p style={{ margin: '0 0 12px', fontSize: 12, color: colors.muted, lineHeight: 1.45 }}>
-        Matches mail by contact email on the CRM card. Filing creates the customer folder under your
-        Customers root (if missing), stores an HTML copy of the email in WorkDrive, and links it under{' '}
+        Matches mail by contact email on the CRM card. Filing makes the customer folder under RR
+        Central / Customers in Google Drive (if missing), stores an HTML copy of the email there, and links it under{' '}
         <FolderOpen size={12} style={{ verticalAlign: -1 }} /> Customer files → Communications.
-        {!workDriveOn ? (
+        {!driveOn ? (
           <>
             {' '}
-            Set <strong>WorkDrive</strong> to <em>yes</em> and the Customers root folder in{' '}
+            An admin connects <strong>Google Drive</strong> once in{' '}
             <Link to="/settings" style={{ color: colors.accent }}>
               Settings
             </Link>
@@ -302,13 +303,6 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
             <code style={{ color: '#ff9f4a' }}>ZohoMail.messages.READ</code> +{' '}
             <code style={{ color: '#ff9f4a' }}>ZohoMail.folders.READ</code> +{' '}
             <code style={{ color: '#ff9f4a' }}>ZohoMail.accounts.READ</code>
-            {workDriveOn ? (
-              <>
-                {' '}
-                + <code style={{ color: '#ff9f4a' }}>WorkDrive.files.CREATE</code> +{' '}
-                <code style={{ color: '#ff9f4a' }}>WorkDrive.links.CREATE</code>
-              </>
-            ) : null}
             , then Test connection in Settings.
           </div>
           <Link to="/settings" style={{ color: colors.accent, display: 'inline-flex', gap: 6, marginTop: 10 }}>

@@ -16,11 +16,10 @@ import {
 import { db } from '../lib/db'
 import type { CrmEntry } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
-import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import StatusPill from '../components/StatusPill'
-import LinkWorkDriveModal, { type LinkWorkDriveMode } from '../components/LinkWorkDriveModal'
+import LinkDriveFileModal, { type LinkDriveFileMode } from '../components/LinkDriveFileModal'
 import { logActivity } from '../lib/activity'
 import { errorMessage, isMissingRelationError } from '../lib/errors'
 import {
@@ -37,6 +36,8 @@ import {
   type FolderSectionId,
 } from '../lib/customerFiles'
 import { useCompactCrm } from '../hooks/useMediaQuery'
+import { useDriveStatus } from '../hooks/useDriveStatus'
+import { driveFolderId, ensureClientDriveFolder } from '../lib/googleDrive'
 import resp from '../styles/crmResponsive.module.css'
 import {
   buttonDangerStyle,
@@ -82,12 +83,12 @@ type FolderSection = (typeof CUSTOMER_FOLDER_SECTIONS)[number]
 
 function itemKindLabel(item: CustomerFolderItem): string {
   if (item.kind === 'crm') return 'In CRM'
-  if (item.section === 'communication') return 'WorkDrive'
-  if (item.section === 'purchasing') return 'Purchasing · WorkDrive'
-  return 'Signed · WorkDrive'
+  if (item.section === 'communication') return 'Google Drive'
+  if (item.section === 'purchasing') return 'Purchasing · Google Drive'
+  return 'Signed · Google Drive'
 }
 
-function sectionToMode(section: FolderSection): LinkWorkDriveMode {
+function sectionToMode(section: FolderSection): LinkDriveFileMode {
   if (section.mode === 'communication') return 'communication'
   if (section.mode === 'purchasing') return 'purchasing'
   return 'signed'
@@ -95,7 +96,6 @@ function sectionToMode(section: FolderSection): LinkWorkDriveMode {
 
 export default function CustomerFilesPage() {
   const { user } = useAuth()
-  const { settings } = useSettings()
   const { showToast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const compact = useCompactCrm()
@@ -119,11 +119,28 @@ export default function CustomerFilesPage() {
     setAddOpen(true)
   }
 
-  const rootDrive = (
-    settings.customerWorkDriveRootUrl ||
-    settings.customerDriveRootUrl ||
-    ''
-  ).trim()
+  const { status: drive } = useDriveStatus()
+  const rootDrive = drive.customers_url
+  const [makingFolder, setMakingFolder] = useState(false)
+
+  async function createDriveFolder() {
+    if (!folder?.crm?.id) {
+      showToast('Save this company in CRM first, then make its Google Drive folder', 'error')
+      return
+    }
+    setMakingFolder(true)
+    try {
+      const made = await ensureClientDriveFolder(folder.crm.id)
+      setDriveFolderUrl(made.url)
+      await logActivity('set_customer_drive_folder', 'crm', folder.company, made.url, who, folder.crm.id)
+      showToast('Google Drive folder ready', 'success')
+      await openCompany(folder.company)
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not make the Google Drive folder'), 'error')
+    } finally {
+      setMakingFolder(false)
+    }
+  }
 
   const checklist = useMemo(
     () => (folder ? buildFolderChecklist({ ...folder, crm: folder.crm ? { ...folder.crm, drive_folder_url: driveFolderUrl } : null }) : []),
@@ -201,7 +218,7 @@ export default function CustomerFilesPage() {
 
   async function saveDriveFolder() {
     if (!folder?.crm?.id) {
-      showToast('Save this company in CRM first, then link its WorkDrive folder', 'error')
+      showToast('Save this company in CRM first, then link its Google Drive folder', 'error')
       return
     }
     setSavingFolder(true)
@@ -215,10 +232,10 @@ export default function CustomerFilesPage() {
         who,
         folder.crm.id,
       )
-      showToast('WorkDrive folder linked', 'success')
+      showToast('Google Drive folder linked', 'success')
       await openCompany(folder.company)
     } catch (e) {
-      showToast(errorMessage(e, 'Could not save WorkDrive folder link'), 'error')
+      showToast(errorMessage(e, 'Could not save Google Drive folder link'), 'error')
     } finally {
       setSavingFolder(false)
     }
@@ -228,7 +245,7 @@ export default function CustomerFilesPage() {
     if (!item.documentId) return
     try {
       await deleteCustomerDocument(item.documentId)
-      showToast('Link removed (file stays on WorkDrive)', 'success')
+      showToast('Link removed (file stays on Google Drive)', 'success')
       if (selected) await openCompany(selected)
     } catch (e) {
       showToast(errorMessage(e, 'Could not remove link'), 'error')
@@ -242,7 +259,7 @@ export default function CustomerFilesPage() {
           <h1 style={pageTitleStyle}>Customer files</h1>
           <p style={pageSubtitleStyle}>
             One folder per customer — quotes, invoices, delivery notes, communications, purchasing,
-            and signed WorkDrive copies
+            and signed Google Drive copies
           </p>
         </div>
       </div>
@@ -252,7 +269,7 @@ export default function CustomerFilesPage() {
           <strong style={{ color: colors.warn }}>SQL needed</strong>
           <p style={{ margin: '8px 0 0', color: colors.muted, fontSize: 14, lineHeight: 1.5 }}>
             Run <code style={{ color: colors.accent }}>supabase/migrations/20260924224316_customer_files.sql</code> in
-            the Supabase SQL editor so customer folders and WorkDrive links can be saved.
+            the Supabase SQL editor so customer folders and Google Drive links can be saved.
           </p>
         </div>
       ) : null}
@@ -305,7 +322,7 @@ export default function CustomerFilesPage() {
                     </div>
                     <div style={{ fontSize: 11, color: colors.muted2, marginTop: 2 }}>
                       {c.pipeline_stage || 'Lead'}
-                      {c.drive_folder_url ? ' · WorkDrive linked' : ''}
+                      {c.drive_folder_url ? ' · Google Drive linked' : ''}
                     </div>
                   </button>
                 )
@@ -319,7 +336,7 @@ export default function CustomerFilesPage() {
             <EmptyState
               icon={<FolderOpen size={22} />}
               title="Open a customer folder"
-              subtitle="Pick a company to see quotations, invoices, delivery notes, communications, and purchasing — and attach Zoho WorkDrive share links."
+              subtitle="Pick a company to see quotations, invoices, delivery notes, communications, and purchasing — and attach Google Drive share links."
             />
           ) : loadingFolder ? (
             <div style={{ ...cardStyle, color: colors.muted }}>Opening folder…</div>
@@ -366,7 +383,7 @@ export default function CustomerFilesPage() {
                     </h2>
                     <p style={{ margin: '8px 0 0', color: colors.muted, fontSize: 13 }}>
                       {folder.items.length} item{folder.items.length === 1 ? '' : 's'} · suggested
-                      WorkDrive folder name:{' '}
+                      Google Drive folder name:{' '}
                       <strong style={{ color: colors.text }}>
                         {suggestedDriveFolderName(folder.company)}
                       </strong>
@@ -402,8 +419,18 @@ export default function CustomerFilesPage() {
                         rel="noreferrer"
                         style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}
                       >
-                        <ExternalLink size={14} /> Open in WorkDrive
+                        <ExternalLink size={14} /> Open in Google Drive
                       </a>
+                    ) : null}
+                    {drive.connected && folder.crm?.id && !driveFolderId(driveFolderUrl) ? (
+                      <button
+                        type="button"
+                        style={buttonPrimaryStyle}
+                        disabled={makingFolder}
+                        onClick={() => void createDriveFolder()}
+                      >
+                        <FolderOpen size={14} /> {makingFolder ? 'Making folder…' : 'Create folder in Google Drive'}
+                      </button>
                     ) : null}
                     {rootDrive ? (
                       <a
@@ -431,12 +458,12 @@ export default function CustomerFilesPage() {
                 <div style={{ ...fieldStyle, marginTop: 16, marginBottom: 0 }}>
                   <label style={labelStyle}>
                     <Link2 size={12} style={{ marginRight: 4 }} />
-                    Zoho WorkDrive folder URL
+                    Google Drive folder URL
                   </label>
                   <div className={resp.toolbar} style={{ marginBottom: 0, gap: 8 }}>
                     <input
                       style={{ ...inputStyle, flex: 1 }}
-                      placeholder="https://workdrive.zoho.com/… or share link"
+                      placeholder="https://drive.google.com/drive/folders/…"
                       value={driveFolderUrl}
                       onChange={(e) => setDriveFolderUrl(e.target.value)}
                     />
@@ -450,9 +477,9 @@ export default function CustomerFilesPage() {
                     </button>
                   </div>
                   <p style={{ margin: '8px 0 0', fontSize: 12, color: colors.muted, lineHeight: 1.45 }}>
-                    Keep signed docs, emails, WhatsApp chats, supplier invoices, and notes in Zoho
-                    WorkDrive, then paste share links below. Set a shared Customers root in Settings →
-                    Customer WorkDrive.
+                    Keep signed docs, emails, WhatsApp chats, supplier invoices, and notes in the
+                    client's Google Drive folder, then paste share links below. Use Create folder so RR
+                    Central can also file emails and portal uploads into it.
                   </p>
                 </div>
 
@@ -593,7 +620,7 @@ export default function CustomerFilesPage() {
                                   rel="noreferrer"
                                   style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}
                                 >
-                                  <ExternalLink size={14} /> WorkDrive
+                                  <ExternalLink size={14} /> Google Drive
                                 </a>
                               ) : null}
                               {item.documentId ? (
@@ -619,7 +646,7 @@ export default function CustomerFilesPage() {
         </section>
       </div>
 
-      <LinkWorkDriveModal
+      <LinkDriveFileModal
         open={addOpen}
         onClose={() => setAddOpen(false)}
         onSaved={() => (selected ? openCompany(selected) : undefined)}

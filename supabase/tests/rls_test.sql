@@ -135,7 +135,7 @@ reset role;
 
 ------------------------------------------------------------ company documents vault
 insert into company_documents (category, title, drive_url, expires_on)
-values ('trade_license', 'Trade license', 'https://workdrive.example/doc', current_date + 10);
+values ('trade_license', 'Trade license', 'https://drive.google.com/file/d/doc/view', current_date + 10);
 
 set role authenticated;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
@@ -1122,8 +1122,8 @@ select pg_temp.expect(pg_temp.fails($q$insert into portal_uploads (account_id, f
 set role authenticated;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000011';
 select pg_temp.expect((select count(*) from portal_uploads) = 1, 'staff (VA) sees uploads only on their accounts');
-select pg_temp.expect(not pg_temp.fails($q$update portal_uploads set status = 'in_workdrive', content_base64 = '' where filename = 'menu.pdf'$q$), 'staff (VA) marks an upload filed');
-select pg_temp.expect((select status from portal_uploads where filename = 'menu.pdf') = 'in_workdrive', 'the upload is filed');
+select pg_temp.expect(not pg_temp.fails($q$update portal_uploads set status = 'filed', content_base64 = '' where filename = 'menu.pdf'$q$), 'staff (VA) marks an upload filed');
+select pg_temp.expect((select status from portal_uploads where filename = 'menu.pdf') = 'filed', 'the upload is filed');
 select pg_temp.expect(pg_temp.fails($q$insert into portal_uploads (account_id, filename, size_bytes) select id, 'x.pdf', 1 from accounts where name = 'Assigned Clinic LLC'$q$), 'staff (VA) cannot add uploads: only the portal does');
 reset role;
 
@@ -1608,3 +1608,35 @@ select pg_temp.expect(pg_temp.fails('select 1 from client_update_drafts'), 'anon
 reset role;
 
 select pg_temp.expect(not pg_temp.fails(format('insert into ai_usage_log (account_id, feature, model) values (%L, %L, %L)', :'other_house', 'update_tidy', 'test')), 'the weekly update wording counts as an AI feature');
+
+------------------------------------------------------------ Google Drive connection (replaces Zoho WorkDrive)
+insert into drive_connection (id, refresh_token, account_email) values (1, 'google-refresh-token', 'files@redreach.ae')
+  on conflict (id) do update set refresh_token = excluded.refresh_token;
+select pg_temp.expect(pg_temp.fails($q$insert into drive_connection (id) values (2)$q$), 'only one Google Drive connection');
+select pg_temp.expect(pg_temp.fails($q$insert into portal_uploads (account_id, filename, size_bytes, status) select id, 'a.pdf', 1, 'in_workdrive' from accounts limit 1$q$), 'the old WorkDrive upload status is gone');
+
+do $$
+declare
+  who text[];
+begin
+  foreach who slice 1 in array array[
+    ['00000000-0000-0000-0000-00000000000a', 'admin'],
+    ['00000000-0000-0000-0000-000000000013', 'manager'],
+    ['00000000-0000-0000-0000-00000000000b', 'sales'],
+    ['00000000-0000-0000-0000-000000000011', 'staff (VA)'],
+    ['00000000-0000-0000-0000-000000000012', 'viewer'],
+    ['00000000-0000-0000-0000-00000000000c', 'someone not on the team']
+  ] loop
+    perform set_config('request.jwt.claim.sub', who[1], true);
+    execute 'set local role authenticated';
+    perform pg_temp.expect(pg_temp.fails('select refresh_token from drive_connection'), format('%s cannot read the Google Drive token', who[2]));
+    perform pg_temp.expect(pg_temp.fails($q$update drive_connection set refresh_token = 'x'$q$), format('%s cannot change the Google Drive connection', who[2]));
+    perform pg_temp.expect(pg_temp.fails('delete from drive_connection'), format('%s cannot remove the Google Drive connection', who[2]));
+    execute 'reset role';
+  end loop;
+end $$;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from drive_connection'), 'anon cannot read the Google Drive connection');
+reset role;
+select pg_temp.expect((select refresh_token from drive_connection) = 'google-refresh-token', 'the Google Drive connection is untouched');

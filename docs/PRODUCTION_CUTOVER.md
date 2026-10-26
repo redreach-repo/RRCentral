@@ -77,5 +77,5 @@ Leave `bootstrap-admin` undeployed unless locked down (see its README).
 1. Two devices, same login → same CRM data (not IndexedDB).
 2. No **Local mode** banner.
 3. Settings → User management works (`manage-auth-user`).
-4. Zoho Mail/WorkDrive actions work (`zoho-proxy`).
+4. Zoho Mail actions work (`zoho-proxy`); Google Drive shows Connected in Settings (`google-drive`).
 5. Tee Tribe checkout reaches Stripe (`create-checkout-session` + `STRIPE_SECRET_KEY`).

@@ -12,8 +12,8 @@ const smallBtn = { ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12, d
 const row = { display: 'flex', flexWrap: 'wrap' as const, gap: 8, alignItems: 'center' }
 
 /**
- * Files the client sent from the portal. Most go straight to their WorkDrive
- * folder; one that could not (no folder, WorkDrive off) waits here until
+ * Files the client sent from the portal. Most go straight to their Google
+ * Drive folder; one that could not (not in the CRM, Drive not connected) waits here until
  * someone downloads it and files it.
  */
 export default function PortalUploadsCard({ account, editable }: { account: Account; editable: boolean }) {
@@ -48,7 +48,7 @@ export default function PortalUploadsCard({ account, editable }: { account: Acco
   }
 
   async function filed(u: PortalUpload) {
-    const url = window.prompt(`Where did you file ${u.filename}? Paste the WorkDrive link (optional).`, '')
+    const url = window.prompt(`Where did you file ${u.filename}? Paste the Google Drive link (optional).`, '')
     if (url === null) return
     setBusy(u.id)
     try {
@@ -69,8 +69,8 @@ export default function PortalUploadsCard({ account, editable }: { account: Acco
       <h2 style={sectionTitleStyle}>Files from the client</h2>
       <p style={{ color: colors.muted, fontSize: 13, margin: '0 0 12px' }}>
         {waiting
-          ? `${waiting} ${waiting === 1 ? 'file is' : 'files are'} waiting here. Download, put it in the client's WorkDrive folder, then mark it filed.`
-          : 'Everything the client sent is in their WorkDrive folder.'}
+          ? `${waiting} ${waiting === 1 ? 'file is' : 'files are'} waiting here. Download, put it in the client's Google Drive folder, then mark it filed.`
+          : 'Everything the client sent is in their Google Drive folder.'}
       </p>
       <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         {rows.map((u) => (
@@ -84,10 +84,10 @@ export default function PortalUploadsCard({ account, editable }: { account: Acco
               {u.status === 'received' && u.error ? <span style={{ display: 'block', color: colors.warn, fontSize: 12 }}>{u.error}</span> : null}
             </span>
             <span style={row}>
-              {u.status === 'in_workdrive' ? (
-                u.workdrive_url ? (
-                  <a style={smallBtn} href={u.workdrive_url} target="_blank" rel="noreferrer">
-                    <ExternalLink size={14} /> In WorkDrive
+              {u.status === 'filed' ? (
+                u.drive_url ? (
+                  <a style={smallBtn} href={u.drive_url} target="_blank" rel="noreferrer">
+                    <ExternalLink size={14} /> Open file
                   </a>
                 ) : (
                   <span style={{ color: colors.success }}>Filed</span>

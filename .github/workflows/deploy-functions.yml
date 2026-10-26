@@ -32,6 +32,7 @@ on:
           - manage-auth-user
           - bootstrap-admin
           - zoho-proxy
+          - google-drive
           - teetribe-order-sync
           - contract-invoices
           - watchdog

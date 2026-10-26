@@ -11,13 +11,12 @@ npx supabase link --project-ref YOUR_RR_CENTRAL_REF
 npx supabase functions deploy zoho-proxy
 ```
 
-After deploying, regenerate the Zoho refresh token with Mail **and** WorkDrive scopes if you use
-**Dashboard → Scan & file to WorkDrive**:
+After deploying, regenerate the Zoho refresh token with the Mail scopes:
 
 - `ZohoMail.messages.READ`, `ZohoMail.folders.READ`, `ZohoMail.accounts.READ`
-- `WorkDrive.files.CREATE`, `WorkDrive.files.READ`, `WorkDrive.links.CREATE`
 
-Set Settings → WorkDrive auto-file = **yes** and Customers root folder URL/ID.
+Files no longer go to Zoho WorkDrive. **Dashboard → Scan & file to Google Drive** uploads
+through the `google-drive` function (connect Google Drive in Settings).
 
 ## Deploy (Supabase Dashboard)
 

@@ -906,7 +906,7 @@ export async function listZohoSentMessages(
   return listZohoFolderMessages(settings, { folderId, limit: opts?.limit, status: 'all' })
 }
 
-/** HTML body for a message (for archival to WorkDrive). */
+/** HTML body for a message (for archival to Google Drive). */
 export async function getZohoMessageHtml(
   settings: ZohoSettings,
   opts: { folderId: string; messageId: string },

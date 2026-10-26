@@ -12,11 +12,11 @@ type Props = {
   company: string
   channel: 'email' | 'whatsapp'
   onClose: () => void
-  /** Open the WorkDrive link modal to file this conversation. */
+  /** Open the Google Drive link modal to file this conversation. */
   onFileNow: () => void
 }
 
-/** After sending email / opening WhatsApp — nudge to file the thread on WorkDrive. */
+/** After sending email / opening WhatsApp — nudge to file the thread on Google Drive. */
 export default function SaveToFolderPrompt({
   open,
   company,
@@ -33,7 +33,7 @@ export default function SaveToFolderPrompt({
       width={440}
     >
       <p style={{ color: colors.muted, fontSize: 14, marginTop: 0, lineHeight: 1.5 }}>
-        Export or save this {label} to Zoho WorkDrive, then link it on{' '}
+        Export or save this {label} to Google Drive, then link it on{' '}
         <strong style={{ color: colors.text }}>{company}</strong> so the CRM keeps the share URL.
       </p>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end' }}>
@@ -55,7 +55,7 @@ export default function SaveToFolderPrompt({
             onFileNow()
           }}
         >
-          <Link2 size={14} /> Link WorkDrive file
+          <Link2 size={14} /> Link Google Drive file
         </button>
       </div>
     </Modal>

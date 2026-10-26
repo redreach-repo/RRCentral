@@ -2302,7 +2302,7 @@ function buildPortalView(input) {
       filename: u.filename,
       size: sizeLabel(u.size_bytes),
       uploaded: day2(u.created_at),
-      saved: u.status === "in_workdrive"
+      saved: u.status === "filed"
     })),
     recentlyResolved,
     usage: months.slice(0, 2).map((m) => usageFor(m, input.usage, pkg, input.rates)).filter((u) => u !== null),
