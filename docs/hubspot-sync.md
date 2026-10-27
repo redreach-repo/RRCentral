@@ -55,12 +55,12 @@ Then open **Settings → HubSpot** and press **Sync now**.
 
 ## 5. Run it nightly
 
-In the Supabase SQL editor, once (needs `pg_cron` and `pg_net`, under Database
+Use the "HubSpot nightly schedule" section on the SQL copy page, or in the Supabase SQL editor, once (needs `pg_cron` and `pg_net`, under Database
 → Extensions). Replace the secret:
 
 ```sql
 select cron.schedule(
-  'rr-hubspot-sync-nightly',
+  'rr-hubspot-sync',
   '30 22 * * *',
   $$
   select net.http_post(
@@ -73,7 +73,7 @@ select cron.schedule(
 ```
 
 That runs at 22:30 UTC (02:30 in Dubai). To stop it:
-`select cron.unschedule('rr-hubspot-sync-nightly');`
+`select cron.unschedule('rr-hubspot-sync');`
 
 ## Checking it
 
