@@ -28,8 +28,13 @@ drop policy if exists "Viewers read" on public.drive_connection;
 -- No policies: the refresh token is a key to the company Drive.
 
 ------------------------------------------------------------ portal_uploads
+-- Skipped where the Wave 4 client portal SQL has not been run yet; that
+-- section now creates the table with these names.
 do $$
 begin
+  if to_regclass('public.portal_uploads') is null then
+    return;
+  end if;
   if exists (select 1 from information_schema.columns
              where table_schema = 'public' and table_name = 'portal_uploads' and column_name = 'workdrive_id') then
     alter table public.portal_uploads rename column workdrive_id to drive_file_id;
@@ -38,17 +43,23 @@ begin
              where table_schema = 'public' and table_name = 'portal_uploads' and column_name = 'workdrive_url') then
     alter table public.portal_uploads rename column workdrive_url to drive_url;
   end if;
+  alter table public.portal_uploads drop constraint if exists portal_uploads_status_check;
+  update public.portal_uploads set status = 'filed' where status = 'in_workdrive';
+  alter table public.portal_uploads add constraint portal_uploads_status_check
+    check (status in ('received', 'filed'));
 end $$;
-
-alter table public.portal_uploads drop constraint if exists portal_uploads_status_check;
-update public.portal_uploads set status = 'filed' where status = 'in_workdrive';
-alter table public.portal_uploads add constraint portal_uploads_status_check
-  check (status in ('received', 'filed'));
 
 ------------------------------------------------------------ file links
 -- New links are Google Drive links. Rows already saved keep their provider.
-alter table public.customer_documents alter column storage_provider set default 'google_drive';
-alter table public.company_documents alter column storage_provider set default 'google_drive';
+do $$
+begin
+  if to_regclass('public.customer_documents') is not null then
+    alter table public.customer_documents alter column storage_provider set default 'google_drive';
+  end if;
+  if to_regclass('public.company_documents') is not null then
+    alter table public.company_documents alter column storage_provider set default 'google_drive';
+  end if;
+end $$;
 
 ------------------------------------------------------------ settings
 -- WorkDrive settings are gone. The company folder link is set when Google
