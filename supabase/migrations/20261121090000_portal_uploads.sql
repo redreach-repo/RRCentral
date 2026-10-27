@@ -1,8 +1,8 @@
 -- Wave 4, PR P: files a client uploads from the client portal. The
 -- client-portal Edge Function (service key) writes the row and puts the file
--- in the client's WorkDrive folder. While WorkDrive is not set up, or the
--- folder is unknown, the file waits here (content_base64, 5 MB at most) so the
--- team can download it; the content is cleared once it is in WorkDrive.
+-- in the client's Google Drive folder. While Google Drive is not connected, or
+-- the client is not in the CRM, the file waits here (content_base64, 5 MB at
+-- most) so the team can download it; the content is cleared once it is filed.
 -- Clients never read tables. Safe to run more than once.
 
 create table if not exists public.portal_uploads (
@@ -13,10 +13,10 @@ create table if not exists public.portal_uploads (
   content_type text not null default '',
   size_bytes integer not null check (size_bytes between 1 and 5242880),
   note text not null default '' check (char_length(note) <= 1000),
-  -- received: waiting here. in_workdrive: saved in the client's folder.
-  status text not null default 'received' check (status in ('received', 'in_workdrive')),
-  workdrive_id text not null default '',
-  workdrive_url text not null default '',
+  -- received: waiting here. filed: saved in the client's Google Drive folder.
+  status text not null default 'received' check (status in ('received', 'filed')),
+  drive_file_id text not null default '',
+  drive_url text not null default '',
   error text not null default '',
   content_base64 text not null default '' check (char_length(content_base64) <= 7000000),
   created_at timestamptz not null default now()
