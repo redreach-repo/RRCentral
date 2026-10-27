@@ -33,6 +33,7 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "google-drive": { kind: "signed state from Google, team member JWT for the rest", pattern: /readState\(app\.clientSecret[\s\S]*if \(!state\)[\s\S]*role !== "admin"[\s\S]*auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_member[\s\S]*rr_is_admin[\s\S]*rr_is_staff/ },
   "client-reports": { kind: "cron secret, manager JWT to build, team JWT to send", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret[\s\S]*auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_manager_or_admin[\s\S]*rr_is_staff[\s\S]*rr_can_write_account/ },
   "client-updates": { kind: "cron secret, manager JWT to build, team JWT to send", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret[\s\S]*auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_manager_or_admin[\s\S]*rr_is_staff[\s\S]*rr_can_write_account/ },
+  "hubspot-sync": { kind: "cron secret or manager JWT", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret[\s\S]*rr_is_manager_or_admin/ },
   "lead-intake": { kind: "shared secret or signed form token", pattern: /if \(!secret\)[\s\S]*=== secret[\s\S]*formTokenProblem\(/ },
 }
 
@@ -86,6 +87,8 @@ const ENV: Record<string, string> = {
   CLIENT_UPDATE_CRON_SECRET: "update-secret-for-tests",
   GOOGLE_CLIENT_ID: "google-client-for-tests",
   GOOGLE_CLIENT_SECRET: "google-secret-for-tests",
+  HUBSPOT_CRON_SECRET: "hubspot-secret-for-tests",
+  HUBSPOT_ACCESS_TOKEN: "hubspot-token-for-tests",
 }
 
 async function load(fn: string): Promise<Handler> {
@@ -132,7 +135,7 @@ async function metaSignature(raw: string, secret: string): Promise<string> {
 
 const opts = { sanitizeOps: false, sanitizeResources: false }
 
-for (const fn of ["usage-import", "daily-digest", "contract-invoices", "watchdog", "client-reports", "client-updates"]) {
+for (const fn of ["usage-import", "daily-digest", "contract-invoices", "watchdog", "client-reports", "client-updates", "hubspot-sync"]) {
   Deno.test({ name: `${fn} refuses no secret and a wrong secret`, ...opts, fn: async () => {
     assertEquals(await call(fn, post(fn, {})), 401)
     assertEquals(await call(fn, post(fn, {}, { "x-cron-secret": "wrong" })), 401)
@@ -185,6 +188,20 @@ Deno.test({ name: "client-updates refuses an unknown sign in and lets the schedu
     assertEquals(await call("client-updates", post("client-updates", {}, { "x-cron-secret": ENV.CLIENT_UPDATE_CRON_SECRET })), 401)
   } finally {
     Deno.env.set("CLIENT_UPDATE_CRON_SECRET", ENV.CLIENT_UPDATE_CRON_SECRET)
+  }
+} })
+
+Deno.test({ name: "hubspot-sync refuses a signed in user who is not a manager or admin", ...opts, fn: async () => {
+  // The role check cannot confirm this token, so the caller counts as staff, sales or viewer.
+  assertEquals(await call("hubspot-sync", post("hubspot-sync", {}, { Authorization: "Bearer someone" })), 403)
+} })
+
+Deno.test({ name: "hubspot-sync fails closed without its schedule secret", ...opts, fn: async () => {
+  Deno.env.delete("HUBSPOT_CRON_SECRET")
+  try {
+    assertEquals(await call("hubspot-sync", post("hubspot-sync", {}, { "x-cron-secret": ENV.HUBSPOT_CRON_SECRET })), 401)
+  } finally {
+    Deno.env.set("HUBSPOT_CRON_SECRET", ENV.HUBSPOT_CRON_SECRET)
   }
 } })
 

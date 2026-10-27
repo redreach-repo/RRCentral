@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import CtrmListsCard from '../components/ctrm/CtrmListsCard'
 import GoogleDriveCard from '../components/GoogleDriveCard'
+import HubSpotCard from '../components/HubSpotCard'
 import { Download, HardDrive, Pencil, Plus, Trash2, Upload, Plug } from 'lucide-react'
 import { db, currentAuthMode } from '../lib/db'
 import type { AppUser, CompanyDocument, CompanyDocumentCategory, UserRole } from '../lib/types'
@@ -936,6 +937,7 @@ export default function SettingsPage() {
       {renderSection('System', 'System', SYSTEM_KEYS)}
       <CtrmListsCard />
       <GoogleDriveCard />
+      <HubSpotCard />
 
       <div style={{ ...cardStyle, marginBottom: 20 }}>
         <h2 style={sectionTitleStyle}>Message templates</h2>
