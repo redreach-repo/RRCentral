@@ -1640,3 +1640,44 @@ set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from drive_connection'), 'anon cannot read the Google Drive connection');
 reset role;
 select pg_temp.expect((select refresh_token from drive_connection) = 'google-refresh-token', 'the Google Drive connection is untouched');
+
+------------------------------------------------------------ HubSpot sync (RR Central -> HubSpot)
+insert into hubspot_links (rr_table, rr_id, hubspot_type, hubspot_id, synced_hash)
+  select 'accounts', id, 'companies', '555', 'h' from accounts limit 1
+  on conflict (rr_table, rr_id) do nothing;
+insert into hubspot_sync_runs (trigger, requested_by, companies_created) values ('schedule', 'schedule', 1);
+select pg_temp.expect(pg_temp.fails($q$insert into hubspot_links (rr_table, rr_id, hubspot_type, hubspot_id) values ('invoices', gen_random_uuid(), 'companies', '1')$q$), 'only accounts, contacts and deals link to HubSpot');
+
+do $$
+declare
+  who text[];
+begin
+  foreach who slice 1 in array array[
+    ['00000000-0000-0000-0000-00000000000a', 'admin', 'reads'],
+    ['00000000-0000-0000-0000-000000000013', 'manager', 'reads'],
+    ['00000000-0000-0000-0000-00000000000b', 'sales', 'none'],
+    ['00000000-0000-0000-0000-000000000011', 'staff (VA)', 'none'],
+    ['00000000-0000-0000-0000-000000000012', 'viewer', 'none'],
+    ['00000000-0000-0000-0000-00000000000c', 'someone not on the team', 'none']
+  ] loop
+    perform set_config('request.jwt.claim.sub', who[1], true);
+    execute 'set local role authenticated';
+    if who[3] = 'reads' then
+      perform pg_temp.expect((select count(*) from hubspot_sync_runs) >= 1, format('%s sees the HubSpot sync runs', who[2]));
+      perform pg_temp.expect((select count(*) from hubspot_links) >= 1, format('%s sees the HubSpot links', who[2]));
+    else
+      perform pg_temp.expect((select count(*) from hubspot_sync_runs) = 0, format('%s sees no HubSpot sync runs', who[2]));
+      perform pg_temp.expect((select count(*) from hubspot_links) = 0, format('%s sees no HubSpot links', who[2]));
+    end if;
+    perform pg_temp.expect(pg_temp.fails($q$insert into hubspot_sync_runs (trigger) values ('manual')$q$), format('%s cannot log a HubSpot sync', who[2]));
+    perform pg_temp.expect(pg_temp.fails($q$update hubspot_links set hubspot_id = 'x'$q$), format('%s cannot change a HubSpot link', who[2]));
+    perform pg_temp.expect(pg_temp.fails('delete from hubspot_links'), format('%s cannot remove HubSpot links', who[2]));
+    execute 'reset role';
+  end loop;
+end $$;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from hubspot_links'), 'anon cannot read HubSpot links');
+select pg_temp.expect(pg_temp.fails('select 1 from hubspot_sync_runs'), 'anon cannot read HubSpot sync runs');
+reset role;
+select pg_temp.expect((select hubspot_id from hubspot_links where rr_table = 'accounts' limit 1) = '555', 'the HubSpot link is untouched');

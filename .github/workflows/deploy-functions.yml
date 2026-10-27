@@ -33,6 +33,7 @@ on:
           - bootstrap-admin
           - zoho-proxy
           - google-drive
+          - hubspot-sync
           - teetribe-order-sync
           - contract-invoices
           - watchdog

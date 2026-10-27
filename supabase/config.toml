@@ -10,6 +10,9 @@ verify_jwt = false
 [functions.google-drive]
 verify_jwt = false
 
+[functions.hubspot-sync]
+verify_jwt = false
+
 [functions.teetribe-order-sync]
 verify_jwt = false
 

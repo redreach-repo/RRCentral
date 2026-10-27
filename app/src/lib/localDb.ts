@@ -7,7 +7,7 @@ import { ALL_SEED_PRODUCTS } from './seedCatalog'
 import { errorMessage } from './errors'
 
 export const DB_NAME = 'rrcentral_local'
-const DB_VERSION = 29
+const DB_VERSION = 30
 
 export const LOCAL_STORES = [
   'app_settings',
@@ -79,6 +79,8 @@ export const LOCAL_STORES = [
   'ctrm_sessions',
   'ctrm_client_terms',
   'client_update_drafts',
+  'hubspot_links',
+  'hubspot_sync_runs',
 ] as const
 
 export type LocalStoreName = (typeof LOCAL_STORES)[number]
@@ -1124,6 +1126,8 @@ export type MigrationDump = {
   ctrm_sessions?: Row[]
   ctrm_client_terms?: Row[]
   client_update_drafts?: Row[]
+  hubspot_links?: Row[]
+  hubspot_sync_runs?: Row[]
 }
 
 async function clearStore(store: string): Promise<void> {

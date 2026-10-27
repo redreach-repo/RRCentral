@@ -566,3 +566,20 @@ Managers see the status but cannot connect or disconnect; the VA and viewers can
 access was not given" means Allow was not pressed. "Google sign in failed" later on means access was removed in the
 Google account, or the Google Cloud app is still in Testing (access then ends after 7 days): publish it and press
 Reconnect.
+
+## 32. HubSpot sync (RR Central to HubSpot, one way)
+
+**Trigger.** Run the HubSpot sync SQL, make the HubSpot private app, add `HUBSPOT_ACCESS_TOKEN` and
+`HUBSPOT_CRON_SECRET`, deploy `hubspot-sync` (docs/hubspot-sync.md). As a manager or admin open **Settings → HubSpot**
+and press **Sync now**. Then change one AI CRM deal's stage and press **Sync now** again.
+
+**You should see.** The first run says how many companies, contacts and deals were sent. In HubSpot each account is a
+company, its contacts are linked to it, and each AI CRM deal sits in the Sales Pipeline at the matching stage with the
+first year value in US dollars. The second run says "1 deal sent" and the deal moved stage in HubSpot. A third press
+with nothing changed says "Nothing new to send". Sales, the VA and viewers see "Managers and admins run the HubSpot
+sync" and no button.
+
+**If it fails.** "HubSpot is not set up yet" means `HUBSPOT_ACCESS_TOKEN` is missing. "HubSpot 401" means the token
+is wrong or the app was deleted; "HubSpot 403" means a scope from step 2 is missing. "Stopped early" is normal on a big
+first sync: press Sync now again.
+
