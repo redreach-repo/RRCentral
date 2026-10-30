@@ -28,6 +28,8 @@ import { can } from '../lib/permissions'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
+import ClientBillToFields from '../components/ClientBillToFields'
+import { useClientBillTo } from '../hooks/useClientBillTo'
 import SupplierInvoiceModal from '../components/quotations/SupplierInvoiceModal'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
@@ -192,6 +194,7 @@ export default function QuotationsPage() {
   const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState<Quotation | null>(null)
   const [form, setForm] = useState<QuoteForm>(emptyForm())
+  const billTo = useClientBillTo(clients)
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Quotation | null>(null)
   const [outcomeTarget, setOutcomeTarget] = useState<Quotation | null>(null)
@@ -435,6 +438,7 @@ export default function QuotationsPage() {
 
   async function openCreate() {
     setEditing(null)
+    billTo.reset()
     setForm(
       emptyForm({
         payment_terms: settings.paymentTerms || PAYMENT_TERMS[0],
@@ -449,6 +453,8 @@ export default function QuotationsPage() {
     setEditing(q)
     try {
       const items = await loadLineItems('Quote', q.quote_id)
+      billTo.reset()
+      billTo.prefillFor(q.client || '')
       setForm({
         client: q.client || '',
         division_code: q.division_code || '01',
@@ -611,6 +617,8 @@ export default function QuotationsPage() {
       await updateSetting(OFFSET_VAT_SETTING_KEY, JSON.stringify(nextFlags))
       step = 'logging activity'
       await logActivity('save_quote', 'quotation', 'DRAFT', `${payload.client} · Draft`, who)
+      step = 'saving the client address and TRN'
+      if ((await billTo.save(payload.client)) === 'created') showToast(`${payload.client} added to Clients`, 'success')
       showToast(
         registered.added
           ? `Draft saved · ${registered.added} new item${registered.added === 1 ? '' : 's'} added to the catalog`
@@ -1382,6 +1390,7 @@ export default function QuotationsPage() {
               value={form.client}
               onChange={(e) => {
                 setForm((f) => ({ ...f, client: e.target.value }))
+                billTo.prefillFor(e.target.value)
                 setClientSuggest(true)
               }}
               onFocus={() => setClientSuggest(true)}
@@ -1420,6 +1429,7 @@ export default function QuotationsPage() {
                     }}
                     onMouseDown={() => {
                       setForm((f) => ({ ...f, client: c.company_name }))
+                      billTo.prefillFor(c.company_name)
                       setClientSuggest(false)
                     }}
                   >
@@ -1463,6 +1473,12 @@ export default function QuotationsPage() {
               . Catalogue and PDF layout switch with the division; amounts stay editable per customer.
             </p>
           </div>
+          <ClientBillToFields
+            draft={billTo.draft}
+            onChange={billTo.edit}
+            client={form.client}
+            savedClient={billTo.isSavedClient(form.client)}
+          />
           <div style={fieldStyle}>
             <label style={labelStyle}>Date</label>
             <input

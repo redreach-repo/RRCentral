@@ -1325,10 +1325,10 @@ export default function DocumentPage() {
           }}
         >
           This client has no {missingBillToFields(billTo).join(' or ')} on file, so it is left off the invoice.{' '}
-          <Link to="/crm" style={{ color: '#7a5b00', fontWeight: 600 }}>
-            Add it in the CRM
+          <Link to="/invoices" style={{ color: '#7a5b00', fontWeight: 600 }}>
+            Edit the invoice
           </Link>{' '}
-          and reopen this invoice.
+          and fill in Client address and Client TRN under the client name.
         </div>
       ) : null}
 
