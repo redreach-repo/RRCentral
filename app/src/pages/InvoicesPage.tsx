@@ -22,6 +22,8 @@ import PaymentRemindersCard from '../components/invoices/PaymentRemindersCard'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
+import ClientBillToFields from '../components/ClientBillToFields'
+import { useClientBillTo } from '../hooks/useClientBillTo'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
 import { logActivity } from '../lib/activity'
@@ -157,6 +159,7 @@ export default function InvoicesPage() {
   const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState<Invoice | null>(null)
   const [form, setForm] = useState<InvoiceForm>(emptyForm())
+  const billTo = useClientBillTo(clients)
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null)
   const [payTarget, setPayTarget] = useState<Invoice | null>(null)
@@ -250,6 +253,7 @@ export default function InvoicesPage() {
   function openCreate() {
     setEditing(null)
     setDivisionCode('01')
+    billTo.reset()
     setForm(
       emptyForm({
         payment_terms: settings.paymentTerms || PAYMENT_TERMS[0],
@@ -267,6 +271,8 @@ export default function InvoicesPage() {
       const items = await loadLineItems('Invoice', inv.reference_number)
       const div = DIVISIONS.find((d) => d.brand === inv.vertical)
       setDivisionCode(div?.code || '01')
+      billTo.reset()
+      billTo.prefillFor(inv.client || '')
       setForm({
         client: inv.client || '',
         vertical: inv.vertical || '',
@@ -378,6 +384,7 @@ export default function InvoicesPage() {
         totals,
       )
       await logActivity('save_invoice', 'invoice', reference, `${payload.client} · ${status}`, who)
+      await saveBillToForClient(payload.client)
       showToast('Invoice saved', 'success')
       setEditorOpen(false)
       await load()
@@ -385,6 +392,16 @@ export default function InvoicesPage() {
       showToast(errorMessage(e, 'Save failed'), 'error')
     } finally {
       setSaving(false)
+    }
+  }
+
+  /** Address/TRN typed on the form go to the client record, which the invoice prints from. */
+  async function saveBillToForClient(client: string) {
+    try {
+      const result = await billTo.save(client)
+      if (result === 'created') showToast(`${client} added to Clients`, 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Invoice saved, but the client address/TRN could not be saved'), 'error')
     }
   }
 
@@ -834,7 +851,10 @@ export default function InvoicesPage() {
               style={inputStyle}
               list="invoice-clients"
               value={form.client}
-              onChange={(e) => setForm((f) => ({ ...f, client: e.target.value }))}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, client: e.target.value }))
+                billTo.prefillFor(e.target.value)
+              }}
             />
             <datalist id="invoice-clients">
               {clients.map((c) => (
@@ -898,6 +918,12 @@ export default function InvoicesPage() {
               ))}
             </select>
           </div>
+          <ClientBillToFields
+            draft={billTo.draft}
+            onChange={billTo.edit}
+            client={form.client}
+            savedClient={billTo.isSavedClient(form.client)}
+          />
           <div style={fieldStyle}>
             <label style={labelStyle}>Payment terms</label>
             <select
