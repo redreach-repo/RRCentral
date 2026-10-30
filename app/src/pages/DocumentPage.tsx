@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import { ArrowLeft, Download, ExternalLink, FileUp, Link2, Mail, MessageCircle, Paperclip, Printer, Truck } from 'lucide-react'
+import { ArrowLeft, Download, ExternalLink, FileUp, Link2, Mail, MessageCircle, Moon, Paperclip, Printer, Sun, Truck } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS, VAT_RATE } from '../lib/config'
 import type { Attachment, Client, CrmContact, CrmEntry, CustomerDocument, DeliveryNote, Invoice, LineItem, Quotation } from '../lib/types'
@@ -37,6 +37,7 @@ import {
   type PdfPageLayout,
   quoteValidUntil,
 } from '../lib/documents'
+import { VIEWER_BACKDROP, loadViewerTheme, saveViewerTheme, toggleViewerTheme, type ViewerTheme } from '../lib/viewerTheme'
 import styles from './DocumentPage.module.css'
 import {
   DELIVERY_NOTE_COLUMNS,
@@ -222,6 +223,15 @@ export default function DocumentPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const [viewerTheme, setViewerTheme] = useState<ViewerTheme>(() => loadViewerTheme())
+  const switchViewerTheme = useCallback(() => {
+    setViewerTheme((current) => {
+      const next = toggleViewerTheme(current)
+      saveViewerTheme(next)
+      return next
+    })
+  }, [])
 
   const doc = quote || invoice || deliveryNote
   const billTo = useMemo(
@@ -1082,7 +1092,10 @@ export default function DocumentPage() {
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f0f0f0', color: '#111' }}>
+    <div
+      data-viewer-theme={viewerTheme}
+      style={{ minHeight: '100vh', background: VIEWER_BACKDROP[viewerTheme], color: '#111', transition: 'background 0.2s ease' }}
+    >
       <div
         style={{
           position: 'sticky',
@@ -1110,6 +1123,10 @@ export default function DocumentPage() {
         >
           <ArrowLeft size={16} /> Back
         </Link>
+        <ToolbarBtn onClick={switchViewerTheme}>
+          {viewerTheme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+          {viewerTheme === 'dark' ? 'Light view' : 'Dark view'}
+        </ToolbarBtn>
         <ToolbarBtn onClick={() => window.print()}>
           <Printer size={14} /> Print
         </ToolbarBtn>
