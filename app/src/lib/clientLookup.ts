@@ -83,3 +83,31 @@ export function resolveBillToParty(
   const trn = (client?.trn || crm?.trn || known?.trn || '').trim()
   return { companyName, primaryContact, email, phone, address, trn }
 }
+
+/** One line under the bill-to company name on a quote, invoice or delivery note. */
+export type BillToLine = { kind: 'address' | 'trn' | 'contact' | 'email' | 'phone'; text: string }
+
+/**
+ * Lines printed under the client name, in the Mass Allied Freighters layout:
+ * address first, then TRN, then contact details. Empty fields are left out.
+ */
+export function billToLines(party: BillToParty): BillToLine[] {
+  const lines: BillToLine[] = []
+  for (const line of party.address.split(/\n+/)) {
+    const text = line.trim()
+    if (text) lines.push({ kind: 'address', text })
+  }
+  if (party.trn) lines.push({ kind: 'trn', text: `TRN: ${party.trn}` })
+  if (party.primaryContact) lines.push({ kind: 'contact', text: party.primaryContact })
+  if (party.email) lines.push({ kind: 'email', text: party.email })
+  if (party.phone) lines.push({ kind: 'phone', text: `Tel: ${party.phone}` })
+  return lines
+}
+
+/** Which bill-to fields an invoice is missing, so staff can fill them in before sending. */
+export function missingBillToFields(party: BillToParty): Array<'address' | 'TRN'> {
+  const missing: Array<'address' | 'TRN'> = []
+  if (!party.address.trim()) missing.push('address')
+  if (!party.trn.trim()) missing.push('TRN')
+  return missing
+}

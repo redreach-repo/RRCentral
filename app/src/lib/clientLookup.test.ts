@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveBillToParty } from './clientLookup'
+import { billToLines, missingBillToFields, resolveBillToParty, type BillToParty } from './clientLookup'
 import type { Client, CrmEntry } from './types'
 
 describe('resolveBillToParty', () => {
@@ -46,5 +46,42 @@ describe('resolveBillToParty', () => {
     expect(party.phone).toBe('+971 4 882 4433')
     expect(party.trn).toBe('100286214000003')
     expect(party.address).toContain('Grosvenor Business Tower')
+  })
+})
+
+describe('billToLines', () => {
+  const massAllied = resolveBillToParty('Mass Allied Freighters', null, null)
+
+  it('puts address then TRN straight under the client name, like the Mass Allied invoice', () => {
+    const lines = billToLines(massAllied)
+    expect(lines.map((l) => l.text)).toEqual([
+      'Grosvenor Business Tower, Office 1506,',
+      'P.O. Box 6641, Barsha Heights, TECOM,',
+      'Dubai, UAE',
+      'TRN: 100286214000003',
+      'Tel: +971 4 882 4433',
+    ])
+  })
+
+  it('keeps contact, email and phone after address and TRN', () => {
+    const party: BillToParty = {
+      companyName: 'Acme',
+      primaryContact: 'Sara',
+      email: 'sara@acme.ae',
+      phone: '050 000 0000',
+      address: 'Office 1, Dubai',
+      trn: '123',
+    }
+    expect(billToLines(party).map((l) => l.kind)).toEqual(['address', 'trn', 'contact', 'email', 'phone'])
+  })
+
+  it('leaves out missing address and TRN without blank lines', () => {
+    const party: BillToParty = { companyName: 'Acme', primaryContact: '', email: '', phone: '', address: ' \n ', trn: '' }
+    expect(billToLines(party)).toEqual([])
+    expect(missingBillToFields(party)).toEqual(['address', 'TRN'])
+  })
+
+  it('reports nothing missing for a complete client', () => {
+    expect(missingBillToFields(massAllied)).toEqual([])
   })
 })

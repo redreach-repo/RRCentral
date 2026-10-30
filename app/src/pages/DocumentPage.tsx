@@ -48,7 +48,7 @@ import {
   type PrintableDocType,
 } from '../lib/deliveryNotes'
 import { hydrateContacts, primaryContact } from '../lib/contacts'
-import { findClientByCompany, resolveBillToParty } from '../lib/clientLookup'
+import { billToLines, findClientByCompany, missingBillToFields, resolveBillToParty } from '../lib/clientLookup'
 import { isZohoMailEnabled } from '../lib/zoho'
 import EmailComposeModal from '../components/EmailComposeModal'
 import QuoteAcceptLinksModal from '../components/quotes/QuoteAcceptLinksModal'
@@ -672,41 +672,12 @@ export default function DocumentPage() {
           </h3>
           <p style={{ margin: 0, lineHeight: 1.5, fontSize: 14 }}>
             <strong>{billTo.companyName || doc.client}</strong>
-            {billTo.primaryContact ? (
-              <>
+            {billToLines(billTo).map((line, i) => (
+              <span key={`${line.kind}-${i}`}>
                 <br />
-                {billTo.primaryContact}
-              </>
-            ) : null}
-            {billTo.email ? (
-              <>
-                <br />
-                {billTo.email}
-              </>
-            ) : null}
-            {billTo.phone ? (
-              <>
-                <br />
-                Tel: {billTo.phone}
-              </>
-            ) : null}
-            {billTo.address ? (
-              <>
-                <br />
-                {billTo.address.split(/\n+/).map((line, i) => (
-                  <span key={`addr-${i}`}>
-                    {i > 0 ? <br /> : null}
-                    {line}
-                  </span>
-                ))}
-              </>
-            ) : null}
-            {billTo.trn ? (
-              <>
-                <br />
-                TRN: {billTo.trn}
-              </>
-            ) : null}
+                {line.text}
+              </span>
+            ))}
           </p>
         </div>
         <div>
@@ -1335,6 +1306,29 @@ export default function DocumentPage() {
               </ul>
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {docType === 'invoice' && invoice && missingBillToFields(billTo).length > 0 ? (
+        <div
+          className="no-print"
+          role="status"
+          style={{
+            width: 'min(210mm, calc(100% - 24px))',
+            margin: '16px auto 0',
+            padding: '10px 14px',
+            borderRadius: 10,
+            background: '#fff3cd',
+            color: '#7a5b00',
+            fontSize: 13,
+            boxSizing: 'border-box',
+          }}
+        >
+          This client has no {missingBillToFields(billTo).join(' or ')} on file, so it is left off the invoice.{' '}
+          <Link to="/crm" style={{ color: '#7a5b00', fontWeight: 600 }}>
+            Add it in the CRM
+          </Link>{' '}
+          and reopen this invoice.
         </div>
       ) : null}
 
