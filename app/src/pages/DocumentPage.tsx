@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import { ArrowLeft, Download, ExternalLink, FileUp, Link2, Mail, MessageCircle, Paperclip, Printer, Truck } from 'lucide-react'
+import { ArrowLeft, Download, ExternalLink, FileUp, Link2, Mail, MessageCircle, Moon, Paperclip, Printer, Sun, Truck } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS, VAT_RATE } from '../lib/config'
 import type { Attachment, Client, CrmContact, CrmEntry, CustomerDocument, DeliveryNote, Invoice, LineItem, Quotation } from '../lib/types'
@@ -37,6 +37,7 @@ import {
   type PdfPageLayout,
   quoteValidUntil,
 } from '../lib/documents'
+import { VIEWER_BACKDROP, loadViewerTheme, saveViewerTheme, toggleViewerTheme, type ViewerTheme } from '../lib/viewerTheme'
 import styles from './DocumentPage.module.css'
 import {
   DELIVERY_NOTE_COLUMNS,
@@ -47,7 +48,7 @@ import {
   type PrintableDocType,
 } from '../lib/deliveryNotes'
 import { hydrateContacts, primaryContact } from '../lib/contacts'
-import { findClientByCompany, resolveBillToParty } from '../lib/clientLookup'
+import { billToLines, findClientByCompany, missingBillToFields, resolveBillToParty } from '../lib/clientLookup'
 import { isZohoMailEnabled } from '../lib/zoho'
 import EmailComposeModal from '../components/EmailComposeModal'
 import QuoteAcceptLinksModal from '../components/quotes/QuoteAcceptLinksModal'
@@ -222,6 +223,15 @@ export default function DocumentPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const [viewerTheme, setViewerTheme] = useState<ViewerTheme>(() => loadViewerTheme())
+  const switchViewerTheme = useCallback(() => {
+    setViewerTheme((current) => {
+      const next = toggleViewerTheme(current)
+      saveViewerTheme(next)
+      return next
+    })
+  }, [])
 
   const doc = quote || invoice || deliveryNote
   const billTo = useMemo(
@@ -662,41 +672,12 @@ export default function DocumentPage() {
           </h3>
           <p style={{ margin: 0, lineHeight: 1.5, fontSize: 14 }}>
             <strong>{billTo.companyName || doc.client}</strong>
-            {billTo.primaryContact ? (
-              <>
+            {billToLines(billTo).map((line, i) => (
+              <span key={`${line.kind}-${i}`}>
                 <br />
-                {billTo.primaryContact}
-              </>
-            ) : null}
-            {billTo.email ? (
-              <>
-                <br />
-                {billTo.email}
-              </>
-            ) : null}
-            {billTo.phone ? (
-              <>
-                <br />
-                Tel: {billTo.phone}
-              </>
-            ) : null}
-            {billTo.address ? (
-              <>
-                <br />
-                {billTo.address.split(/\n+/).map((line, i) => (
-                  <span key={`addr-${i}`}>
-                    {i > 0 ? <br /> : null}
-                    {line}
-                  </span>
-                ))}
-              </>
-            ) : null}
-            {billTo.trn ? (
-              <>
-                <br />
-                TRN: {billTo.trn}
-              </>
-            ) : null}
+                {line.text}
+              </span>
+            ))}
           </p>
         </div>
         <div>
@@ -1082,7 +1063,10 @@ export default function DocumentPage() {
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f0f0f0', color: '#111' }}>
+    <div
+      data-viewer-theme={viewerTheme}
+      style={{ minHeight: '100vh', background: VIEWER_BACKDROP[viewerTheme], color: '#111', transition: 'background 0.2s ease' }}
+    >
       <div
         style={{
           position: 'sticky',
@@ -1110,6 +1094,10 @@ export default function DocumentPage() {
         >
           <ArrowLeft size={16} /> Back
         </Link>
+        <ToolbarBtn onClick={switchViewerTheme}>
+          {viewerTheme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+          {viewerTheme === 'dark' ? 'Light view' : 'Dark view'}
+        </ToolbarBtn>
         <ToolbarBtn onClick={() => window.print()}>
           <Printer size={14} /> Print
         </ToolbarBtn>
@@ -1318,6 +1306,29 @@ export default function DocumentPage() {
               </ul>
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {docType === 'invoice' && invoice && missingBillToFields(billTo).length > 0 ? (
+        <div
+          className="no-print"
+          role="status"
+          style={{
+            width: 'min(210mm, calc(100% - 24px))',
+            margin: '16px auto 0',
+            padding: '10px 14px',
+            borderRadius: 10,
+            background: '#fff3cd',
+            color: '#7a5b00',
+            fontSize: 13,
+            boxSizing: 'border-box',
+          }}
+        >
+          This client has no {missingBillToFields(billTo).join(' or ')} on file, so it is left off the invoice.{' '}
+          <Link to="/crm" style={{ color: '#7a5b00', fontWeight: 600 }}>
+            Add it in the CRM
+          </Link>{' '}
+          and reopen this invoice.
         </div>
       ) : null}
 
