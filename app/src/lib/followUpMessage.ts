@@ -1,7 +1,7 @@
 import { format, parseISO } from 'date-fns'
 import { db } from './db'
 import { formatAED } from './money'
-import { displayDocumentReference } from './documents'
+import { displayDocumentReference, invoiceKindLabel } from './documents'
 import { applyMessageTemplate } from './templates'
 import { isOpenInvoice } from './finance'
 import type { CrmEntry, Invoice, Quotation } from './types'
@@ -19,6 +19,8 @@ export type FollowUpDocument = {
   paymentStatus?: string
   validUntil?: string | null
   client: string
+  /** "Quotation", "Tax invoice" or "Proforma invoice". */
+  title: string
 }
 
 export const DEFAULT_WHATSAPP_FOLLOWUP_QUOTE = `Hello{{contactGreeting}},
@@ -32,7 +34,7 @@ Best regards,
 
 export const DEFAULT_WHATSAPP_FOLLOWUP_INVOICE = `Hello{{contactGreeting}},
 
-Following up on our invoice {{ref}} dated {{date}} for {{client}} ({{amount}}). Current payment status: {{paymentStatus}}.
+Following up on our {{titleLower}} {{ref}} dated {{date}} for {{client}} ({{amount}}). Current payment status: {{paymentStatus}}.
 
 Kindly update us on the payment status at your earliest convenience.
 
@@ -137,6 +139,7 @@ export function pickFollowUpDocument(opts: {
       status: q.status || '',
       validUntil: q.valid_until,
       client: q.client || opts.company,
+      title: 'Quotation',
     }
   }
 
@@ -157,6 +160,7 @@ export function pickFollowUpDocument(opts: {
       status: inv.status || '',
       paymentStatus: inv.payment_status || inv.status || 'Pending',
       client: inv.client || opts.company,
+      title: invoiceKindLabel(inv.reference_number),
     }
   }
 
@@ -235,8 +239,8 @@ export function buildFollowUpWhatsAppMessage(opts: {
       amount: opts.doc.amountLabel,
       status: opts.doc.status,
       paymentStatus: opts.doc.paymentStatus || 'Pending',
-      title: 'Invoice',
-      titleLower: 'invoice',
+      title: opts.doc.title,
+      titleLower: opts.doc.title.toLowerCase(),
     })
   }
 

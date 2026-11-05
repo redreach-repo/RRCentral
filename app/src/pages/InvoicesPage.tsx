@@ -28,6 +28,7 @@ import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
 import { logActivity } from '../lib/activity'
 import { formatAED } from '../lib/money'
+import { invoiceKindLabel } from '../lib/documentRefs'
 import { generateReference } from '../lib/referenceNumber'
 import { getDivisionQuoteFormat } from '../lib/divisionQuoteFormats'
 import { registerLineItemSkus } from '../lib/skuRegistry'
@@ -785,6 +786,7 @@ export default function InvoicesPage() {
                   <div className={resp.cardTitle} style={{ cursor: 'default' }}>
                     {inv.reference_number || '—'}
                   </div>
+                  <div className={resp.cardMeta}>{invoiceKindLabel(inv.reference_number)}</div>
                   <div className={resp.cardMeta}>
                     {clientCell(inv)}
                     {inv.date ? ` · ${format(new Date(inv.date), 'dd MMM yyyy')}` : ''}
@@ -822,6 +824,7 @@ export default function InvoicesPage() {
                   <tr key={inv.id}>
                     <td style={tdStyle}>
                       <strong>{inv.reference_number || '—'}</strong>
+                      <div style={{ fontSize: 12, color: colors.muted }}>{invoiceKindLabel(inv.reference_number)}</div>
                     </td>
                     <td style={tdStyle}>{clientCell(inv)}</td>
                     <td style={tdStyle}>

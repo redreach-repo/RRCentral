@@ -108,6 +108,7 @@ describe('pickFollowUpDocument', () => {
     })
     expect(doc?.kind).toBe('invoice')
     expect(doc?.ref).toBe('RR-01-26010')
+    expect(doc?.title).toBe('Tax invoice')
   })
 })
 
@@ -145,9 +146,21 @@ describe('buildFollowUpWhatsAppMessage', () => {
       companyName: 'Red Reach Middle East FZE',
       doc,
     })
-    expect(text).toContain('invoice')
+    expect(text).toContain('our tax invoice RR-01-26010')
     expect(text).toContain('20 Jul 2026')
     expect(text).toContain('Partial')
     expect(text).toContain('payment status')
+  })
+
+  it('calls an invoice without its RR number a proforma invoice', () => {
+    const doc = pickFollowUpDocument({
+      company: 'Acme LLC',
+      nextAction: 'Collect payment',
+      quotes: [],
+      invoices: [invoice({ reference_number: 'INV-DRAFT-1791536651592', payment_status: 'Pending' })],
+    })
+    expect(doc?.title).toBe('Proforma invoice')
+    const text = buildFollowUpWhatsAppMessage({ entry, contactName: 'Sara', companyName: 'Red Reach Middle East FZE', doc })
+    expect(text).toContain('our proforma invoice DRAFT')
   })
 })
