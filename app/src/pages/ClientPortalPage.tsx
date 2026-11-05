@@ -15,6 +15,7 @@ import {
 } from '../lib/clientPortal'
 import { fileToBase64, loadPortal, portalAction } from '../lib/clientPortalStore'
 import { formatAED } from '../lib/money'
+import { invoiceKindLabel } from '../lib/documentRefs'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -530,6 +531,7 @@ function InvoiceRow({ invoice }: { invoice: PortalInvoice }) {
     <li style={rowStyle}>
       <span style={{ minWidth: 0 }}>
         <strong style={{ fontWeight: 600 }}>{invoice.reference}</strong>
+        <span style={{ display: 'block', ...muted }}>{invoiceKindLabel(invoice.reference)}</span>
         <span style={{ display: 'block', ...muted }}>
           {invoice.date ? `Issued ${invoice.date}` : ''}
           {!invoice.paid && invoice.due ? `, due ${invoice.due}` : ''}

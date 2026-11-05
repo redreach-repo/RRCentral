@@ -776,7 +776,7 @@ export default function CrmPage() {
       )
       if (doc) {
         showToast(
-          `WhatsApp ready · ${doc.kind === 'quote' ? 'Quotation' : 'Invoice'} ${doc.ref}`,
+          `WhatsApp ready · ${doc.title} ${doc.ref}`,
           'success',
         )
       } else {

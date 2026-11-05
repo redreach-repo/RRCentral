@@ -57,16 +57,17 @@ export function savePdfPageLayout(layout: PdfPageLayout): void {
   }
 }
 
-/** Internal draft ids look like Q-1785391827656 — never show these on customer PDFs. */
-export function isInternalDraftId(value: string | null | undefined): boolean {
-  return /^Q-\d{10,}$/i.test(String(value || '').trim())
-}
-
-/** Temporary invoice / DN ids — never show these on customer PDFs. */
-export function isTempDocumentRef(value: string | null | undefined): boolean {
-  const ref = String(value || '').trim()
-  return !ref || isInternalDraftId(ref) || /^INV-DRAFT-/i.test(ref) || /^DN-DRAFT-/i.test(ref)
-}
+// Reference rules and Proforma / Tax invoice naming live in a small module with no
+// PDF libraries, so light pages (client portal, lists) can use them.
+export {
+  invoiceDocumentTitle,
+  invoiceKind,
+  invoiceKindLabel,
+  isInternalDraftId,
+  isTempDocumentRef,
+  type InvoiceKind,
+} from './documentRefs'
+import { isTempDocumentRef } from './documentRefs'
 
 /** Customer-facing reference: finalized number, or "DRAFT". */
 export function displayDocumentReference(opts: {

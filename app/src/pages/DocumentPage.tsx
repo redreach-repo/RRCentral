@@ -29,6 +29,7 @@ import { buildWhatsAppUrl } from '../lib/whatsapp'
 import { resolveLogoUrl } from '../lib/brand'
 import {
   displayDocumentReference,
+  invoiceDocumentTitle,
   downloadBlob,
   elementToPdfBlob,
   PDF_PAGE_LAYOUTS,
@@ -268,7 +269,7 @@ export default function DocumentPage() {
       ? getDivisionQuoteFormat(docDivisionCode, settings).documentTitle
       : docType === 'delivery-note'
         ? 'DELIVERY NOTE'
-        : 'INVOICE'
+        : invoiceDocumentTitle(invoice?.reference_number)
   const quoteFormat = getDivisionQuoteFormat(docDivisionCode, settings)
   const lineColumns = isDeliveryNote ? DELIVERY_NOTE_COLUMNS : quoteFormat.columns
   const backTo =

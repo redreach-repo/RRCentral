@@ -106,7 +106,7 @@ export default function FollowupsPage() {
       )
       if (doc) {
         showToast(
-          `WhatsApp ready · ${doc.kind === 'quote' ? 'Quotation' : 'Invoice'} ${doc.ref}`,
+          `WhatsApp ready · ${doc.title} ${doc.ref}`,
           'success',
         )
       }
