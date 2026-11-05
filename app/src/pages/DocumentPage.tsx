@@ -30,6 +30,8 @@ import { resolveLogoUrl } from '../lib/brand'
 import {
   displayDocumentReference,
   invoiceDocumentTitle,
+  invoiceKind,
+  printsDraftBanner,
   downloadBlob,
   elementToPdfBlob,
   PDF_PAGE_LAYOUTS,
@@ -274,13 +276,17 @@ export default function DocumentPage() {
   const lineColumns = isDeliveryNote ? DELIVERY_NOTE_COLUMNS : quoteFormat.columns
   const backTo =
     docType === 'quote' ? '/quotations' : docType === 'delivery-note' ? '/delivery-notes' : '/invoices'
-  const isDraft =
+  // A proforma invoice shows its title only: no DRAFT reference line on the sheet.
+  const isProformaInvoice = docType === 'invoice' && invoiceKind(invoice?.reference_number) === 'proforma'
+  const isDraft = printsDraftBanner(
+    docType,
     displayRef === 'DRAFT' ||
     (quote
       ? !quote.reference_number || quote.status === 'Draft'
       : deliveryNote
         ? deliveryNote.status === 'Draft'
-        : invoice?.status === 'Draft')
+        : invoice?.status === 'Draft'),
+  )
   const division =
     DIVISIONS.find((d) => d.code === docDivisionCode)?.brand ||
     quote?.vertical ||
@@ -607,7 +613,7 @@ export default function DocumentPage() {
         </div>
         <div className={styles.docMeta}>
           <div className={styles.docLabel}>{title}</div>
-          <h1>{displayRef}</h1>
+          {isProformaInvoice ? null : <h1>{displayRef}</h1>}
           <div className={styles.metaGrid}>
             <div>
               <span style={{ color: '#555' }}>Date: </span>
