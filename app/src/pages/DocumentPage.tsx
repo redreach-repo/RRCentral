@@ -1490,6 +1490,10 @@ function renderLineCell(col: QuoteColumnId, it: LineItem, showSku: boolean): Rea
           <img
             src={image}
             alt=""
+            width={48}
+            height={48}
+            decoding="sync"
+            data-line-image="1"
             style={{
               width: 48,
               height: 48,
