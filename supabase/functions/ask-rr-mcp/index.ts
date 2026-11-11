@@ -85,6 +85,55 @@ function quoteFacts(rows: Array<Record<string, unknown>>, limit = 40): string[] 
   })
 }
 
+function pickQuotesForQuestion(rows: Array<Record<string, unknown>>, question: string, limit = 6) {
+  const q = question.trim().toLowerCase()
+  if (!q || !rows.length || limit <= 0) return [] as Array<Record<string, unknown>>
+  const matched = rows.filter((row) => {
+    const client = String(row.client || "").trim().toLowerCase()
+    if (!client) return false
+    if (q.includes(client) || client.includes(q)) return true
+    return client.split(/[^a-z0-9]+/).filter((t) => t.length >= 4).some((t) => q.includes(t))
+  })
+  const pool = matched.length ? matched : rows.slice(0, Math.min(limit, 3))
+  return pool.slice(0, limit)
+}
+
+async function lineFactsForQuestion(
+  db: ReturnType<typeof createClient>,
+  quotes: Array<Record<string, unknown>>,
+  question: string,
+): Promise<string[]> {
+  const picked = pickQuotesForQuestion(quotes, question, 6)
+  const out: string[] = []
+  for (const quote of picked) {
+    const quoteId = String(quote.quote_id || "").trim()
+    const ref = String(quote.reference_number || "").trim() || "DRAFT"
+    const client = String(quote.client || "").trim() || "client"
+    if (!quoteId) continue
+    const { data, error } = await db
+      .from("line_items")
+      .select("description, sku, qty, unit_price, amount")
+      .eq("doc_type", "Quote")
+      .eq("reference", quoteId)
+      .order("line_no", { ascending: true })
+      .limit(25)
+    if (error) continue
+    const rows = data || []
+    if (!rows.length) {
+      out.push(`Quote ${ref} · ${client}: no line items on file`)
+      continue
+    }
+    for (const item of rows) {
+      const desc = String(item.description || item.sku || "item").replace(/\s+/g, " ").trim()
+      const qty = Number(item.qty) || 0
+      const unit = Number(item.unit_price) || 0
+      const amount = Number(item.amount) || qty * unit
+      out.push(`Quote ${ref} · ${client} · ${desc} · qty ${qty} · unit AED ${unit} · amount AED ${amount}`)
+    }
+  }
+  return out
+}
+
 Deno.serve(withErrorLog("ask-rr-mcp", async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", {
@@ -133,9 +182,11 @@ Deno.serve(withErrorLog("ask-rr-mcp", async (req) => {
           db.from("crm").select("*").order("updated_at", { ascending: false }).limit(400),
           db.from("quotations").select("*").order("created_at", { ascending: false }).limit(80),
         ])
+        const quoteRows = (quotes || []) as Array<Record<string, unknown>>
         const facts = [
           ...compactFacts((crm || []) as Array<Record<string, unknown>>),
-          ...quoteFacts((quotes || []) as Array<Record<string, unknown>>),
+          ...quoteFacts(quoteRows),
+          ...(await lineFactsForQuestion(db, quoteRows, question)),
         ]
         if (!facts.length) return textResult("No CRM facts loaded.")
 
@@ -147,12 +198,13 @@ Deno.serve(withErrorLog("ask-rr-mcp", async (req) => {
         }
         const request = buildAiRequest(input)
         if (!request.schema) return textResult("Ask RR schema missing.")
-        const client = new Anthropic({ apiKey, maxRetries: 2, timeout: 60_000 })
+        const client = new Anthropic({ apiKey, maxRetries: 2, timeout: 120_000 })
         const message = await client.messages.create({
           model: AI_MODEL,
           max_tokens: request.maxTokens,
           system: request.system,
           messages: [{ role: "user", content: request.user }],
+          thinking: { type: "disabled" },
           output_config: {
             effort: "low",
             format: { type: "json_schema", schema: request.schema },

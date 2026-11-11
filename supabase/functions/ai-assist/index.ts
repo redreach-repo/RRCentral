@@ -92,7 +92,9 @@ Deno.serve(withErrorLog("ai-assist", async (req) => {
 
   const request = buildAiRequest(input)
   const schema = request.schema
-  const client = new Anthropic({ apiKey, maxRetries: 2, timeout: 60_000 })
+  // Haiku 5.5 thinks by default; thinking tokens count toward max_tokens and
+  // were emptying Ask RR replies. Disable thinking for these short staff tools.
+  const client = new Anthropic({ apiKey, maxRetries: 2, timeout: 120_000 })
   let message: Anthropic.Message
   try {
     message = await client.messages.create({
@@ -100,6 +102,7 @@ Deno.serve(withErrorLog("ai-assist", async (req) => {
       max_tokens: request.maxTokens,
       system: request.system,
       messages: [{ role: "user", content: request.user }],
+      thinking: { type: "disabled" },
       output_config: {
         effort: "low",
         ...(schema ? { format: { type: "json_schema", schema } } : {}),
@@ -113,8 +116,15 @@ Deno.serve(withErrorLog("ai-assist", async (req) => {
       return json({ error: "AI help is busy. Please try again in a minute." }, 429)
     }
     if (e instanceof Anthropic.APIError) {
-      return json({ error: "AI help is not available right now. Please try again." }, 502)
+      const detail = String(e.message || "").replace(/\s+/g, " ").trim().slice(0, 180)
+      console.error("ai-assist Anthropic APIError", e.status, detail)
+      return json({
+        error: detail
+          ? `AI help failed (${e.status || "error"}): ${detail}`
+          : "AI help is not available right now. Please try again.",
+      }, 502)
     }
+    console.error("ai-assist Anthropic unreachable", e instanceof Error ? e.message : e)
     return json({ error: "AI help could not be reached. Please try again." }, 502)
   }
 
@@ -147,6 +157,9 @@ Deno.serve(withErrorLog("ai-assist", async (req) => {
     return json({ text: "", requirements: [], questions, costUsd })
   }
   if (input.feature === "crm_ask") {
+    if (message.stop_reason === "max_tokens") {
+      return json({ error: "Ask RR ran out of space for the answer. Please ask a shorter question." }, 502)
+    }
     const parsed = parseCrmAskAnswer(text)
     if (!parsed.reply && !parsed.quoteDraft && !parsed.quoteLookupClient) {
       return json({ error: "AI help came back empty. Please try again." }, 502)

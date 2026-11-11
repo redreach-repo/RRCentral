@@ -314,11 +314,11 @@ export function buildAiRequest(input: AiInput): AiRequest {
       return {
         system:
           'You are Ask RR for Red Reach\'s Threads CRM (company pipeline, follow-ups, quotations). ' +
-          'Answer using only the CRM facts, quotation facts and the salesperson\'s question. ' +
-          'Be concrete: name companies, stages, owners, follow-up dates, quote refs and amounts when relevant. ' +
-          'If facts are missing, say what is missing. Never invent quote references or company names that are not in the facts ' +
+          'Answer using only the CRM facts, quotation facts (including line unit prices when present) and the salesperson\'s question. ' +
+          'Be concrete: name companies, stages, owners, follow-up dates, quote refs, line descriptions and unit prices when relevant. ' +
+          'If facts are missing, say what is missing. Never invent quote references, prices or company names that are not in the facts ' +
           '(except when the salesperson clearly names a new client for a new quotation). ' +
-          'Keep reply under 180 words. Use bullet points when listing deals or quotes. ' +
+          'Keep reply under 180 words. Use bullet points when listing deals, quotes or line prices. ' +
           'When the salesperson asks whether a quotation exists, to pull up / open / find a quote for a company, ' +
           'set quote_lookup_client to that company name (prefer exact name from facts) and set quote_draft to null. ' +
           'When they ask to create, draft, make, raise or generate a quotation, fill quote_draft with client, division_code ' +
@@ -332,7 +332,9 @@ export function buildAiRequest(input: AiInput): AiRequest {
         user:
           `Salesperson: ${input.askerName || 'team'}\n\nQuestion: ${clip(input.question, 1000)}\n\n` +
           `CRM facts:\n${input.facts.map((f) => `- ${f}`).join('\n')}`,
-        maxTokens: 1800,
+        // Haiku 5.5 thinks by default and thinking counts toward max_tokens.
+        // Ask RR disables thinking in the edge function; keep headroom anyway.
+        maxTokens: 4096,
         schema: CRM_ASK_SCHEMA as unknown as Record<string, unknown>,
       }
   }
@@ -554,7 +556,8 @@ export function normaliseAiInput(raw: unknown): AiInput | null {
     }
     case 'crm_ask': {
       const question = str(r.question, 1000).trim()
-      const facts = strList(r.facts, 80, 600).filter((f) => f.trim())
+      // Allow CRM + quote totals + per-line prices for a few matching quotes.
+      const facts = strList(r.facts, 140, 700).filter((f) => f.trim())
       if (!question || !facts.length) return null
       return { feature: 'crm_ask', askerName: str(r.askerName, 120), question, facts }
     }
