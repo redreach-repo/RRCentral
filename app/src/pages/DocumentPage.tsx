@@ -455,16 +455,17 @@ export default function DocumentPage() {
 
   async function shareWhatsApp() {
     const p = primaryContact(emailContacts)
-    const phone = p?.phone || client?.mobile || ''
+    const contactName = quote?.contact_name || p?.name || client?.primary_contact || ''
+    const phone = quote?.contact_phone || p?.phone || client?.mobile || ''
     const company = settings.companyName || 'Red Reach Middle East FZE'
     const text = applyMessageTemplate(settings.whatsappQuoteMessage || DEFAULT_WHATSAPP_QUOTE, {
-      contactGreeting: p?.name || client?.primary_contact ? ` ${p?.name || client?.primary_contact}` : '',
+      contactGreeting: contactName ? ` ${contactName}` : '',
       titleLower: title.toLowerCase(),
       ref: displayRef,
       amount: isDeliveryNote ? goodsQtyLabel : money(summary.total),
       company,
       client: doc?.client || '',
-      contact: p?.name || client?.primary_contact || 'team',
+      contact: contactName || 'team',
       validUntil: validUntil ? format(new Date(validUntil), 'dd MMM yyyy') : '',
     })
     const url = buildWhatsAppUrl(phone, text, settings.whatsappCountryCode || '971')
@@ -547,7 +548,8 @@ export default function DocumentPage() {
     ref: displayRef,
     company: settings.companyName || 'Red Reach Middle East FZE',
     client: doc?.client || '',
-    contact: primaryContact(emailContacts)?.name || client?.primary_contact || 'team',
+    contact:
+      quote?.contact_name || primaryContact(emailContacts)?.name || client?.primary_contact || 'team',
     amount: isDeliveryNote ? goodsQtyLabel : money(summary.total),
     validUntil: validUntil ? format(new Date(validUntil), 'dd MMM yyyy') : '',
     validUntilLine: validUntil && docType === 'quote' ? `\nValid until: ${format(new Date(validUntil), 'dd MMM yyyy')}` : '',
@@ -673,6 +675,14 @@ export default function DocumentPage() {
           </h3>
           <p style={{ margin: 0, lineHeight: 1.5, fontSize: 14 }}>
             <strong>{billTo.companyName || doc.client}</strong>
+            {quote?.contact_name ? (
+              <span>
+                <br />
+                Attn: {quote.contact_name}
+                {quote.contact_email ? ` · ${quote.contact_email}` : ''}
+                {quote.contact_phone ? ` · ${quote.contact_phone}` : ''}
+              </span>
+            ) : null}
             {billToLines(billTo).map((line, i) => (
               <span key={`${line.kind}-${i}`}>
                 <br />
@@ -1378,7 +1388,24 @@ export default function DocumentPage() {
       <EmailComposeModal
         open={emailOpen}
         companyName={doc.client || ''}
-        contacts={emailContacts}
+        contacts={
+          quote?.contact_name || quote?.contact_email
+            ? [
+                {
+                  id: 'quote-contact',
+                  name: quote.contact_name || 'Contact',
+                  email: quote.contact_email || '',
+                  phone: quote.contact_phone || '',
+                  role: 'Primary',
+                },
+                ...emailContacts.filter(
+                  (c) =>
+                    c.email.toLowerCase() !== String(quote.contact_email || '').toLowerCase() &&
+                    c.name.toLowerCase() !== String(quote.contact_name || '').toLowerCase(),
+                ),
+              ]
+            : emailContacts
+        }
         defaultSubject={applyMessageTemplate(
           settings.emailQuoteSubject || DEFAULT_EMAIL_QUOTE_SUBJECT,
           emailVars,

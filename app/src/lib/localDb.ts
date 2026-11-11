@@ -709,6 +709,9 @@ function withDefaults(table: string, row: Row): Row {
   }
 
   if (table === 'quotations') {
+    if (next.contact_name == null) next.contact_name = ''
+    if (next.contact_email == null) next.contact_email = ''
+    if (next.contact_phone == null) next.contact_phone = ''
     if (next.currency == null) next.currency = 'AED'
     if (next.quotation_currency == null) next.quotation_currency = next.currency || 'AED'
     if (next.payment_currency == null) next.payment_currency = next.quotation_currency
