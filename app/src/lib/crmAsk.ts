@@ -13,7 +13,7 @@ export const CRM_ASK_SUGGESTIONS = [
   "What's overdue for me today?",
   'Who needs a follow-up this week?',
   'Summarise the open pipeline by stage',
-  'Which deals have no next action?',
+  'Draft a quotation for…',
 ] as const
 
 function shortNote(notes: string | null | undefined): string {

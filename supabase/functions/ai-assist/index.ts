@@ -22,6 +22,7 @@ import {
   buildAiRequest,
   newNumbers,
   normaliseAiInput,
+  parseCrmAskAnswer,
   parseQuestions,
   parseRequirements,
   tidyAiText,
@@ -144,6 +145,19 @@ Deno.serve(withErrorLog("ai-assist", async (req) => {
     const questions = parseQuestions(text)
     if (!questions.length) return json({ error: "AI help came back empty. Please try again." }, 502)
     return json({ text: "", requirements: [], questions, costUsd })
+  }
+  if (input.feature === "crm_ask") {
+    const parsed = parseCrmAskAnswer(text)
+    if (!parsed.reply && !parsed.quoteDraft) {
+      return json({ error: "AI help came back empty. Please try again." }, 502)
+    }
+    return json({
+      text: parsed.reply,
+      requirements: [],
+      questions: [],
+      quoteDraft: parsed.quoteDraft,
+      costUsd,
+    })
   }
   text = tidyAiText(text)
   if (!text) return json({ error: "AI help came back empty. Please try again." }, 502)

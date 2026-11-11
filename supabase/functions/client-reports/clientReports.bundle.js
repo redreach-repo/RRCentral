@@ -1858,6 +1858,43 @@ var QUESTIONS_SCHEMA = {
   required: ["questions"],
   additionalProperties: false
 };
+var CRM_ASK_SCHEMA = {
+  type: "object",
+  properties: {
+    reply: { type: "string" },
+    quote_draft: {
+      anyOf: [
+        { type: "null" },
+        {
+          type: "object",
+          properties: {
+            client: { type: "string" },
+            division_code: { type: "string" },
+            description: { type: "string" },
+            notes: { type: "string" },
+            items: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  description: { type: "string" },
+                  qty: { type: "number" },
+                  unit_price: { type: "number" }
+                },
+                required: ["description", "qty", "unit_price"],
+                additionalProperties: false
+              }
+            }
+          },
+          required: ["client", "division_code", "description", "notes", "items"],
+          additionalProperties: false
+        }
+      ]
+    }
+  },
+  required: ["reply", "quote_draft"],
+  additionalProperties: false
+};
 function buildAiRequest(input) {
   switch (input.feature) {
     case "ticket_summary":
@@ -1926,15 +1963,15 @@ ${clip(input.notes, AI_MAX_INPUT_CHARS)}`,
       };
     case "crm_ask":
       return {
-        system: "You are Ask RR, a read-only assistant for Red Reach's Threads CRM (company pipeline and follow-ups). Answer the salesperson's question using only the CRM facts given. Be concrete: name companies, stages, owners, follow-up dates and next actions when relevant. If the facts are not enough, say what is missing. Never invent deals, quotes, amounts or contacts. Do not claim you changed the CRM; you cannot write to it. When helpful, end with one short suggested next step the person can take themselves. Keep answers short (under 180 words) with bullet points when listing deals. " + STYLE,
+        system: "You are Ask RR for Red Reach's Threads CRM (company pipeline, follow-ups, quotations). Answer using only the CRM facts and the salesperson's question. Be concrete: name companies, stages, owners, follow-up dates and next actions when relevant. If facts are missing, say what is missing. Never invent contacts or company names that are not in the facts (except when the salesperson clearly names a new client for a new quotation). Keep reply under 180 words. Use bullet points when listing deals. When the salesperson asks you to create, draft, make or generate a quotation or quote, fill quote_draft with client (prefer an exact company name from the facts when it matches), division_code (01 Threads/uniforms, 02 Wanders/tours, 03 Marketing, 04 Connect, 05 Care, 06 Trading; default 01), a short description, optional notes, and line items with description, qty and unit_price in AED. Only include numbers the salesperson stated or that are clearly in the facts; if a price or qty is missing, ask for it in reply and set quote_draft to null. For ordinary questions that are not asking for a quotation, set quote_draft to null. Never claim the quotation was already saved; the salesperson must confirm in the app. " + STYLE,
         user: `Salesperson: ${input.askerName || "team"}
 
 Question: ${clip(input.question, 1e3)}
 
 CRM facts:
 ${input.facts.map((f) => `- ${f}`).join("\n")}`,
-        maxTokens: 1200,
-        schema: null
+        maxTokens: 1800,
+        schema: CRM_ASK_SCHEMA
       };
   }
   throw new Error("Unknown AI feature");

@@ -43,7 +43,7 @@ describe('buildCrmAskFacts', () => {
 })
 
 describe('crm_ask AI request', () => {
-  it('normalises and builds a read-only prompt', () => {
+  it('normalises and builds a prompt that can propose draft quotes', () => {
     const input = normaliseAiInput({
       feature: 'crm_ask',
       askerName: 'Alfred',
@@ -58,8 +58,9 @@ describe('crm_ask AI request', () => {
     })
     if (!input || input.feature !== 'crm_ask') return
     const req = buildAiRequest(input)
-    expect(req.system).toMatch(/read-only/i)
-    expect(req.system).toMatch(/cannot write/i)
+    expect(req.system).toMatch(/quote_draft/)
+    expect(req.system).toMatch(/must confirm/i)
+    expect(req.schema).not.toBeNull()
     expect(req.user).toContain("What's overdue?")
     expect(req.user).toContain('Mass Allied')
   })
