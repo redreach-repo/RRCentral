@@ -1,5 +1,6 @@
 import { VAT_RATE } from './config'
 import { db } from './db'
+import { isUndefinedColumnError } from './errors'
 import { formatSizes, parseSizesJson, sumSizes, type SizeBreakdown } from './sizes'
 import type { LineItem, LineItemDocType } from './types'
 
@@ -13,6 +14,8 @@ export interface DraftLineItem {
   remarks?: string
   sku?: string
   sizes?: SizeBreakdown | null
+  /** Optional product image data URL / https. Empty = omit on printable quote. */
+  image_data?: string
 }
 
 export function newDraftLine(partial?: Partial<DraftLineItem>): DraftLineItem {
@@ -25,6 +28,7 @@ export function newDraftLine(partial?: Partial<DraftLineItem>): DraftLineItem {
     remarks: '',
     sku: '',
     sizes: null,
+    image_data: '',
     ...partial,
   }
 }
@@ -297,6 +301,7 @@ export function toDraftItems(rows: LineItem[]): DraftLineItem[] {
       remarks: r.remarks || '',
       sku: r.sku || '',
       sizes,
+      image_data: String(r.image_data || '').trim(),
     }
   })
 }
@@ -355,6 +360,7 @@ export function toPersistedLineItemRows(
       remarks,
       sku: item.sku || '',
       sizes_json: item.sizes || null,
+      image_data: String(item.image_data || '').trim(),
     }
   })
 }
@@ -376,7 +382,15 @@ export async function saveLineItems(
   if (!rows.length) return
 
   const { error } = await db.from('line_items').insert(rows)
-  if (error) throw error
+  if (!error) return
+  // Until migration `line_item_image` is applied, save without image_data.
+  if (isUndefinedColumnError(error)) {
+    const stripped = rows.map(({ image_data: _image, ...rest }) => rest)
+    const { error: retryError } = await db.from('line_items').insert(stripped)
+    if (retryError) throw retryError
+    return
+  }
+  throw error
 }
 
 export async function deleteLineItems(

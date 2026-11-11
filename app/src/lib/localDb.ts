@@ -696,6 +696,7 @@ function withDefaults(table: string, row: Row): Row {
 
   if (table === 'line_items') {
     if (next.unit_cost == null) next.unit_cost = 0
+    if (next.image_data == null) next.image_data = ''
   }
 
   if (table === 'inventory_movements') {
