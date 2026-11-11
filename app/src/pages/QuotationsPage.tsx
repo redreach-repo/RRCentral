@@ -605,7 +605,7 @@ export default function QuotationsPage() {
         `quotation ${editing?.reference_number || quoteId}`,
       )
       step = 'saving line items'
-      await saveLineItems('Quote', quoteId, registered.items, vatRate)
+      const lineSave = await saveLineItems('Quote', quoteId, registered.items, vatRate)
       const flagIds = [quoteId, editing?.id, editing?.reference_number].filter(
         (v): v is string => Boolean(v),
       )
@@ -620,12 +620,19 @@ export default function QuotationsPage() {
       await logActivity('save_quote', 'quotation', 'DRAFT', `${payload.client} · Draft`, who)
       step = 'saving the client address and TRN'
       if ((await billTo.save(payload.client)) === 'created') showToast(`${payload.client} added to Clients`, 'success')
-      showToast(
-        registered.added
-          ? `Draft saved · ${registered.added} new item${registered.added === 1 ? '' : 's'} added to the catalog`
-          : 'Draft saved',
-        'success',
-      )
+      if (lineSave.imagesDropped) {
+        showToast(
+          'Draft saved, but product images were dropped — apply the line_item_image DB migration, then re-save.',
+          'error',
+        )
+      } else {
+        showToast(
+          registered.added
+            ? `Draft saved · ${registered.added} new item${registered.added === 1 ? '' : 's'} added to the catalog`
+            : 'Draft saved',
+          'success',
+        )
+      }
       setEditorOpen(false)
       await load()
     } catch (e) {

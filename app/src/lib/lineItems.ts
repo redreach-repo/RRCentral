@@ -365,12 +365,17 @@ export function toPersistedLineItemRows(
   })
 }
 
+export type SaveLineItemsResult = {
+  /** True when images were dropped because `line_items.image_data` is missing in the DB. */
+  imagesDropped: boolean
+}
+
 export async function saveLineItems(
   docType: LineItemDocType,
   reference: string,
   items: DraftLineItem[],
   vatRate = VAT_RATE,
-): Promise<void> {
+): Promise<SaveLineItemsResult> {
   const { error: deleteError } = await db
     .from('line_items')
     .delete()
@@ -379,16 +384,17 @@ export async function saveLineItems(
   if (deleteError) throw deleteError
 
   const rows = toPersistedLineItemRows(docType, reference, items, vatRate)
-  if (!rows.length) return
+  if (!rows.length) return { imagesDropped: false }
 
+  const hadImages = rows.some((r) => Boolean(String(r.image_data || '').trim()))
   const { error } = await db.from('line_items').insert(rows)
-  if (!error) return
+  if (!error) return { imagesDropped: false }
   // Until migration `line_item_image` is applied, save without image_data.
   if (isUndefinedColumnError(error)) {
     const stripped = rows.map(({ image_data: _image, ...rest }) => rest)
     const { error: retryError } = await db.from('line_items').insert(stripped)
     if (retryError) throw retryError
-    return
+    return { imagesDropped: hadImages }
   }
   throw error
 }
