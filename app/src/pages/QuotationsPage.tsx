@@ -24,7 +24,15 @@ import {
   QUOTE_STATUSES,
   VAT_RATE,
 } from '../lib/config'
-import type { Client, Product, Quotation, QuoteTemplate, Vendor } from '../lib/types'
+import type { Client, CrmContact, CrmEntry, Product, Quotation, QuoteTemplate, Vendor } from '../lib/types'
+import {
+  contactsForCompany,
+  contactToQuoteFields,
+  EMPTY_QUOTE_CONTACT,
+  quoteContactLabel,
+  resolveQuoteContactSelection,
+  shouldShowQuoteContactPicker,
+} from '../lib/quoteContact'
 import { useAuth } from '../contexts/AuthContext'
 import { can } from '../lib/permissions'
 import { useSettings } from '../contexts/SettingsContext'
@@ -112,6 +120,11 @@ type StatusTab = 'All' | 'Draft' | 'Finalized' | 'Sent' | 'Awarded'
 
 interface QuoteForm {
   client: string
+  /** Selected CRM/client contact id for the picker (not persisted). */
+  contact_id: string
+  contact_name: string
+  contact_email: string
+  contact_phone: string
   division_code: string
   description: string
   payment_terms: string
@@ -144,6 +157,8 @@ interface QuoteForm {
 
 const emptyForm = (defaults?: Partial<QuoteForm>): QuoteForm => ({
   client: '',
+  contact_id: '',
+  ...EMPTY_QUOTE_CONTACT,
   division_code: '01',
   description: '',
   payment_terms: '',
@@ -190,6 +205,7 @@ export default function QuotationsPage() {
 
   const [quotes, setQuotes] = useState<Quotation[]>([])
   const [clients, setClients] = useState<Client[]>([])
+  const [crmRows, setCrmRows] = useState<CrmEntry[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [loading, setLoading] = useState(true)
@@ -226,15 +242,21 @@ export default function QuotationsPage() {
     setLoading(true)
     try {
       await ensureDivisionCataloguesSeeded().catch(() => undefined)
-      const [qRes, cRes, pRes, vendorRows] = await Promise.all([
+      const [qRes, cRes, crmRes, pRes, vendorRows] = await Promise.all([
         db.from('quotations').select('*').order('created_at', { ascending: false }),
         db.from('clients').select('*').order('company_name'),
+        db
+          .from('crm')
+          .select('id, company_name, primary_contact, email_phone, mobile_number, office_number, contacts')
+          .order('company_name'),
         db.from('products').select('*').eq('active', true).order('name'),
         listVendors().catch(() => [] as Vendor[]),
       ])
       if (qRes.error) throw qRes.error
       if (cRes.error) throw cRes.error
       if (pRes.error) throw pRes.error
+      setClients((cRes.data || []) as Client[])
+      setCrmRows((crmRes.data || []) as CrmEntry[])
       setProducts((pRes.data || []) as Product[])
       setVendors(vendorRows)
 
@@ -295,13 +317,38 @@ export default function QuotationsPage() {
       }
 
       setQuotes(rows)
-      setClients((cRes.data || []) as Client[])
     } catch (e) {
       showToast(errorMessage(e, 'Failed to load quotations'), 'error')
     } finally {
       setLoading(false)
     }
   }, [showToast, settings.quoteValidityDays])
+
+  const companyContacts = useMemo(
+    () => contactsForCompany(form.client, { clients, crm: crmRows }),
+    [form.client, clients, crmRows],
+  )
+
+  const contactFieldsForClient = useCallback(
+    (
+      company: string,
+      saved?: Partial<Pick<Quotation, 'contact_name' | 'contact_email' | 'contact_phone'>> | null,
+    ) => {
+      const list = contactsForCompany(company, { clients, crm: crmRows })
+      const picked = resolveQuoteContactSelection(list, saved)
+      return { contact_id: picked.contactId, ...picked.fields }
+    },
+    [clients, crmRows],
+  )
+
+  function selectQuoteContact(contactId: string, list: CrmContact[] = companyContacts) {
+    const hit = list.find((c) => c.id === contactId) || null
+    setForm((f) => ({
+      ...f,
+      contact_id: contactId,
+      ...contactToQuoteFields(hit),
+    }))
+  }
 
   useEffect(() => {
     void load()
@@ -330,9 +377,12 @@ export default function QuotationsPage() {
     const division = searchParams.get('division')
     if (!wantNew || loading) return
     setEditing(null)
+    billTo.reset()
+    if (client) billTo.prefillFor(client)
     setForm(
       emptyForm({
         client: client || '',
+        ...contactFieldsForClient(client || ''),
         division_code: division === '02' ? '02' : '01',
         payment_terms: settings.paymentTerms || PAYMENT_TERMS[0],
         delivery_terms: settings.deliveryTerms || DELIVERY_TERMS[0],
@@ -349,7 +399,7 @@ export default function QuotationsPage() {
     )
     setEditorOpen(true)
     setSearchParams({}, { replace: true })
-  }, [searchParams, loading, setSearchParams, settings])
+  }, [searchParams, loading, setSearchParams, settings, clients, crmRows, contactFieldsForClient, billTo])
 
   useEffect(() => {
     const templateId = searchParams.get('template')
@@ -459,8 +509,10 @@ export default function QuotationsPage() {
       const items = await loadLineItems('Quote', q.quote_id)
       billTo.reset()
       billTo.prefillFor(q.client || '')
+      const contact = contactFieldsForClient(q.client || '', q)
       setForm({
         client: q.client || '',
+        ...contact,
         division_code: q.division_code || '01',
         description: q.description || '',
         payment_terms: q.payment_terms || '',
@@ -542,6 +594,9 @@ export default function QuotationsPage() {
       }
       const payload = {
         client: form.client.trim(),
+        contact_name: form.contact_name.trim(),
+        contact_email: form.contact_email.trim(),
+        contact_phone: form.contact_phone.trim(),
         vertical,
         division_code: form.division_code,
         description: form.description.trim(),
@@ -560,6 +615,17 @@ export default function QuotationsPage() {
         ...currencyFields,
       }
 
+      const stripOptionalQuoteColumns = <T extends Record<string, unknown>>(row: T) => {
+        const {
+          offset_vat: _o,
+          contact_name: _n,
+          contact_email: _e,
+          contact_phone: _p,
+          ...rest
+        } = row
+        return rest
+      }
+
       if (form.quotation_currency !== BASE_CURRENCY || fxRate !== 1) {
         step = 'saving the FX rate'
         await approveFxRate({
@@ -575,8 +641,10 @@ export default function QuotationsPage() {
       if (editing) {
         const { error } = await db.from('quotations').update(payload).eq('id', editing.id)
         if (error && isUndefinedColumnError(error)) {
-          const { offset_vat: _omit, ...withoutFlag } = payload
-          const retry = await db.from('quotations').update(withoutFlag).eq('id', editing.id)
+          const retry = await db
+            .from('quotations')
+            .update(stripOptionalQuoteColumns(payload))
+            .eq('id', editing.id)
           if (retry.error) throw retry.error
         } else if (error) throw error
       } else {
@@ -592,10 +660,8 @@ export default function QuotationsPage() {
         }
         const { error } = await db.from('quotations').insert(insertRow)
         if (error && isUndefinedColumnError(error)) {
-          // Databases without the offset_vat column (migration 20260924180942) — the
-          // flag is also kept in app_settings, so save the quote without it.
-          const { offset_vat: _omit, ...withoutFlag } = insertRow
-          const retry = await db.from('quotations').insert(withoutFlag)
+          // Older DBs may lack offset_vat / contact_* — save without those columns.
+          const retry = await db.from('quotations').insert(stripOptionalQuoteColumns(insertRow))
           if (retry.error) throw retry.error
         } else if (error) throw error
       }
@@ -1410,8 +1476,13 @@ export default function QuotationsPage() {
               style={inputStyle}
               value={form.client}
               onChange={(e) => {
-                setForm((f) => ({ ...f, client: e.target.value }))
-                billTo.prefillFor(e.target.value)
+                const name = e.target.value
+                setForm((f) => ({
+                  ...f,
+                  client: name,
+                  ...contactFieldsForClient(name),
+                }))
+                billTo.prefillFor(name)
                 setClientSuggest(true)
               }}
               onFocus={() => setClientSuggest(true)}
@@ -1449,7 +1520,11 @@ export default function QuotationsPage() {
                       fontSize: 13,
                     }}
                     onMouseDown={() => {
-                      setForm((f) => ({ ...f, client: c.company_name }))
+                      setForm((f) => ({
+                        ...f,
+                        client: c.company_name,
+                        ...contactFieldsForClient(c.company_name),
+                      }))
                       billTo.prefillFor(c.company_name)
                       setClientSuggest(false)
                     }}
@@ -1460,6 +1535,30 @@ export default function QuotationsPage() {
               </div>
             )}
           </div>
+          {shouldShowQuoteContactPicker(companyContacts) ? (
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Contact person *</label>
+              <select
+                style={selectStyle}
+                value={form.contact_id}
+                onChange={(e) => selectQuoteContact(e.target.value)}
+              >
+                {companyContacts.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {quoteContactLabel(c)}
+                  </option>
+                ))}
+              </select>
+              <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted }}>
+                This company has {companyContacts.length} contacts — choose who this quotation is for.
+              </p>
+            </div>
+          ) : companyContacts.length === 1 ? (
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Contact person</label>
+              <input style={inputStyle} value={quoteContactLabel(companyContacts[0])} readOnly />
+            </div>
+          ) : null}
           <div style={fieldStyle}>
             <label style={labelStyle}>Division</label>
             <select

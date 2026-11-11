@@ -174,6 +174,13 @@ export interface Quotation {
   /** Linked account (RR Central modules). Null until linked. */
   account_id?: string | null
   client: string
+  /**
+   * Contact person chosen for this quote when the company has several contacts.
+   * Shown as Attn on the printable quotation. Empty = no specific contact.
+   */
+  contact_name?: string
+  contact_email?: string
+  contact_phone?: string
   vertical: string
   reference_number: string
   date: string | null
