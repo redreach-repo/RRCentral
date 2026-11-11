@@ -683,7 +683,11 @@ export default function DocumentPage() {
                 {quote.contact_phone ? ` · ${quote.contact_phone}` : ''}
               </span>
             ) : null}
-            {billToLines(billTo).map((line, i) => (
+            {billToLines(billTo, {
+              // Quotation already shows the chosen contact as Attn — don't also
+              // print the client's other primary contact underneath.
+              includeContact: !quote?.contact_name,
+            }).map((line, i) => (
               <span key={`${line.kind}-${i}`}>
                 <br />
                 {line.text}
