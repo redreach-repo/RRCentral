@@ -19,6 +19,7 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "client-portal": { kind: "hashed link token", pattern: /isPortalToken\(token\)[\s\S]*token_hash[\s\S]*portalAccessState/ },
   "quote-accept": { kind: "hashed link token", pattern: /isAcceptToken\(token\)[\s\S]*token_hash[\s\S]*acceptLinkState/ },
   "ai-assist": { kind: "signed in user (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)/ },
+  "ask-rr-mcp": { kind: "shared secret", pattern: /if \(!expected \|\| provided !== expected\)/ },
   "whatsapp-in": { kind: "Meta signature", pattern: /if \(!appSecret\)[\s\S]*validSignature\(raw, req\.headers\.get\("x-hub-signature-256"\)/ },
   "whatsapp-send": { kind: "signed in user (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)/ },
   "fireflies-fetch": { kind: "signed in user (JWT read in code) who can write the account", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_can_write_account/ },
@@ -78,6 +79,7 @@ const ENV: Record<string, string> = {
   WHATSAPP_PHONE_NUMBER_ID: "123",
   META_ACCESS_TOKEN: "meta-token",
   ANTHROPIC_API_KEY: "test-anthropic",
+  ASK_RR_MCP_TOKEN: "ask-rr-mcp-secret-for-tests",
   SUPPORT_INBOUND_SECRET: "support-secret-for-tests",
   CRM_SYNC_SECRET: "crm-sync-secret-for-tests",
   LEAD_INTAKE_SECRET: "lead-secret-for-tests",
@@ -250,6 +252,12 @@ for (const fn of ["ai-assist", "whatsapp-send", "fireflies-fetch", "invoice-pay-
     assertEquals(await call(fn, post(fn, {}, { Authorization: "Bearer " })), 401)
   } })
 }
+
+Deno.test({ name: "ask-rr-mcp refuses no secret and a wrong secret", ...opts, fn: async () => {
+  assertEquals(await call("ask-rr-mcp", post("ask-rr-mcp", {})), 401)
+  assertEquals(await call("ask-rr-mcp", post("ask-rr-mcp", {}, { Authorization: "Bearer wrong" })), 401)
+  assertEquals(await call("ask-rr-mcp", post("ask-rr-mcp", {}, { "x-ask-rr-token": "wrong" })), 401)
+} })
 
 Deno.test({ name: "whatsapp-in only accepts Meta's signature", ...opts, fn: async () => {
   const raw = JSON.stringify({ object: "whatsapp_business_account", entry: [] })

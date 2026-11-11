@@ -34,6 +34,9 @@ verify_jwt = false
 [functions.ai-assist]
 verify_jwt = false
 
+[functions.ask-rr-mcp]
+verify_jwt = false
+
 [functions.whatsapp-in]
 verify_jwt = false
 

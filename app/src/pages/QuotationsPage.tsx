@@ -11,9 +11,11 @@ import {
   Plus,
   Receipt,
   RotateCcw,
+  Sparkles,
   Trash2,
   Truck,
 } from 'lucide-react'
+import { useAskRr } from '../contexts/AskRrContext'
 import { db } from '../lib/db'
 import {
   DELIVERY_TERMS,
@@ -179,6 +181,7 @@ const tabBtn = (active: boolean): CSSProperties => ({
 
 export default function QuotationsPage() {
   const { user, userRole } = useAuth()
+  const { setOpen: setAskRrOpen } = useAskRr()
   const { settings, updateSetting } = useSettings()
   const { showToast } = useToast()
   const navigate = useNavigate()
@@ -1265,9 +1268,19 @@ export default function QuotationsPage() {
           <h1 style={pageTitleStyle}>Quotations</h1>
           <p style={pageSubtitleStyle}>Create, revise, and track quotations</p>
         </div>
-        <button type="button" style={buttonPrimaryStyle} onClick={() => void openCreate()}>
-          <Plus size={16} /> New quotation
-        </button>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <button
+            type="button"
+            style={buttonPrimaryStyle}
+            onClick={() => setAskRrOpen(true)}
+            title="Ask RR about quotes and the pipeline"
+          >
+            <Sparkles size={16} /> Ask RR
+          </button>
+          <button type="button" style={buttonPrimaryStyle} onClick={() => void openCreate()}>
+            <Plus size={16} /> New quotation
+          </button>
+        </div>
       </div>
 
       <div className={resp.toolbar} style={{ marginBottom: 16 }}>
