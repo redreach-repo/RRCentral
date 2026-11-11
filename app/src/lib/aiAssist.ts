@@ -150,6 +150,57 @@ export const QUESTIONS_SCHEMA = {
   additionalProperties: false,
 } as const
 
+/** Ask RR may answer in prose and optionally propose a draft quotation for confirm. */
+export const CRM_ASK_SCHEMA = {
+  type: 'object',
+  properties: {
+    reply: { type: 'string' },
+    quote_draft: {
+      anyOf: [
+        { type: 'null' },
+        {
+          type: 'object',
+          properties: {
+            client: { type: 'string' },
+            division_code: { type: 'string' },
+            description: { type: 'string' },
+            notes: { type: 'string' },
+            items: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  description: { type: 'string' },
+                  qty: { type: 'number' },
+                  unit_price: { type: 'number' },
+                },
+                required: ['description', 'qty', 'unit_price'],
+                additionalProperties: false,
+              },
+            },
+          },
+          required: ['client', 'division_code', 'description', 'notes', 'items'],
+          additionalProperties: false,
+        },
+      ],
+    },
+  },
+  required: ['reply', 'quote_draft'],
+  additionalProperties: false,
+} as const
+
+export type AskQuoteLine = { description: string; qty: number; unit_price: number }
+
+export type AskQuoteDraft = {
+  client: string
+  division_code: string
+  description: string
+  notes: string
+  items: AskQuoteLine[]
+}
+
+export type CrmAskParsed = { reply: string; quoteDraft: AskQuoteDraft | null }
+
 /** Reads the before the call answer: at most three short questions. Malformed answers give none. */
 export function parseQuestions(text: string): string[] {
   let data: unknown
@@ -255,25 +306,66 @@ export function buildAiRequest(input: AiInput): AiRequest {
     case 'crm_ask':
       return {
         system:
-          'You are Ask RR, a read-only assistant for Red Reach\'s Threads CRM (company pipeline and follow-ups). ' +
-          'Answer the salesperson\'s question using only the CRM facts given. ' +
+          'You are Ask RR for Red Reach\'s Threads CRM (company pipeline, follow-ups, quotations). ' +
+          'Answer using only the CRM facts and the salesperson\'s question. ' +
           'Be concrete: name companies, stages, owners, follow-up dates and next actions when relevant. ' +
-          'If the facts are not enough, say what is missing. Never invent deals, quotes, amounts or contacts. ' +
-          'Do not claim you changed the CRM; you cannot write to it. ' +
-          'When helpful, end with one short suggested next step the person can take themselves. ' +
-          'Keep answers short (under 180 words) with bullet points when listing deals. ' +
+          'If facts are missing, say what is missing. Never invent contacts or company names that are not in the facts ' +
+          '(except when the salesperson clearly names a new client for a new quotation). ' +
+          'Keep reply under 180 words. Use bullet points when listing deals. ' +
+          'When the salesperson asks you to create, draft, make or generate a quotation or quote, fill quote_draft ' +
+          'with client (prefer an exact company name from the facts when it matches), division_code ' +
+          '(01 Threads/uniforms, 02 Wanders/tours, 03 Marketing, 04 Connect, 05 Care, 06 Trading; default 01), ' +
+          'a short description, optional notes, and line items with description, qty and unit_price in AED. ' +
+          'Only include numbers the salesperson stated or that are clearly in the facts; if a price or qty is missing, ' +
+          'ask for it in reply and set quote_draft to null. ' +
+          'For ordinary questions that are not asking for a quotation, set quote_draft to null. ' +
+          'Never claim the quotation was already saved; the salesperson must confirm in the app. ' +
           STYLE,
         user:
           `Salesperson: ${input.askerName || 'team'}\n\nQuestion: ${clip(input.question, 1000)}\n\n` +
           `CRM facts:\n${input.facts.map((f) => `- ${f}`).join('\n')}`,
-        maxTokens: 1200,
-        schema: null,
+        maxTokens: 1800,
+        schema: CRM_ASK_SCHEMA as unknown as Record<string, unknown>,
       }
   }
   throw new Error('Unknown AI feature')
 }
 
 export type ProposedRequirement = { title: string; detail: string }
+
+/** Reads Ask RR JSON. Malformed answers become plain text with no quote draft. */
+export function parseCrmAskAnswer(text: string): CrmAskParsed {
+  let data: unknown
+  try {
+    data = JSON.parse(text)
+  } catch {
+    return { reply: tidyAiText(text), quoteDraft: null }
+  }
+  const obj = (data ?? {}) as Record<string, unknown>
+  const reply = tidyAiText(String(obj.reply ?? ''))
+  const raw = obj.quote_draft
+  if (!raw || typeof raw !== 'object') return { reply: reply || tidyAiText(text), quoteDraft: null }
+  const draft = raw as Record<string, unknown>
+  const client = String(draft.client ?? '').trim().slice(0, 200)
+  const division_code = String(draft.division_code ?? '01').trim().slice(0, 2) || '01'
+  const description = String(draft.description ?? '').trim().slice(0, 500)
+  const notes = String(draft.notes ?? '').trim().slice(0, 2000)
+  const itemsRaw = Array.isArray(draft.items) ? draft.items : []
+  const items: AskQuoteLine[] = []
+  for (const row of itemsRaw.slice(0, 40)) {
+    const r = (row ?? {}) as Record<string, unknown>
+    const lineDescription = String(r.description ?? '').trim().slice(0, 500)
+    const qty = Number(r.qty)
+    const unit_price = Number(r.unit_price)
+    if (!lineDescription || !Number.isFinite(qty) || qty <= 0 || !Number.isFinite(unit_price) || unit_price < 0) continue
+    items.push({ description: lineDescription, qty, unit_price })
+  }
+  if (!client || !items.length) return { reply: reply || 'I need a client and at least one line item to propose a draft quotation.', quoteDraft: null }
+  return {
+    reply: reply || `Draft quotation ready for ${client}. Confirm to save it as a Draft.`,
+    quoteDraft: { client, division_code, description, notes, items },
+  }
+}
 
 /** Reads the call notes answer. Anything malformed becomes an empty list rather than an error. */
 export function parseRequirements(text: string): ProposedRequirement[] {

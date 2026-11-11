@@ -1,12 +1,42 @@
 import { db } from './db'
-import type { AiInput, ProposedRequirement } from './aiAssist'
+import type { AiInput, AskQuoteDraft, ProposedRequirement } from './aiAssist'
 import { isMissingRelationError } from './errors'
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseConfig'
 import type { AiUsageLog } from './types'
 
-export type AiResult = { text: string; requirements: ProposedRequirement[]; questions: string[]; costUsd: number }
+export type AiResult = {
+  text: string
+  requirements: ProposedRequirement[]
+  questions: string[]
+  quoteDraft: AskQuoteDraft | null
+  costUsd: number
+}
 
 export const AI_LOCAL_MODE = 'AI help works once RR Central is connected to Supabase.'
+
+function asQuoteDraft(raw: unknown): AskQuoteDraft | null {
+  if (!raw || typeof raw !== 'object') return null
+  const d = raw as Record<string, unknown>
+  const client = String(d.client || '').trim()
+  const items = Array.isArray(d.items) ? d.items : []
+  if (!client || !items.length) return null
+  return {
+    client,
+    division_code: String(d.division_code || '01').trim() || '01',
+    description: String(d.description || '').trim(),
+    notes: String(d.notes || '').trim(),
+    items: items
+      .map((row) => {
+        const r = (row || {}) as Record<string, unknown>
+        return {
+          description: String(r.description || '').trim(),
+          qty: Number(r.qty) || 0,
+          unit_price: Number(r.unit_price) || 0,
+        }
+      })
+      .filter((i) => i.description && i.qty > 0),
+  }
+}
 
 async function invokeAi(body: { account_id: string | null; input: AiInput }): Promise<AiResult> {
   if (!isSupabaseConfigured()) throw new Error(AI_LOCAL_MODE)
@@ -21,11 +51,12 @@ async function invokeAi(body: { account_id: string | null; input: AiInput }): Pr
     }
     throw new Error(message)
   }
-  const d = (data || {}) as Partial<AiResult>
+  const d = (data || {}) as Partial<AiResult> & { quoteDraft?: unknown }
   return {
     text: String(d.text || ''),
     requirements: Array.isArray(d.requirements) ? d.requirements : [],
     questions: Array.isArray(d.questions) ? d.questions.map(String) : [],
+    quoteDraft: asQuoteDraft(d.quoteDraft),
     costUsd: Number(d.costUsd) || 0,
   }
 }

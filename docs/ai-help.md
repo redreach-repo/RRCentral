@@ -6,7 +6,7 @@ only and never writes to the CRM).
 
 | Where | Button | What it does |
 | --- | --- | --- |
-| Pipeline (CRM) | **Ask RR** | Read-only chat about overdue follow-ups, companies and pipeline. Uses only deals already loaded on the page. Cannot change CRM records. |
+| Pipeline (CRM) | **Ask RR** | Chat about overdue follow-ups, companies and pipeline. Can propose a **Draft quotation**; nothing is saved until you confirm. |
 | Ticket page | **Summarise** | Short summary of the thread: what the client wants, what was done, what is open. Can be saved as an internal note. |
 | Ticket page | **Draft a reply** | Puts a draft reply in the reply box. Internal notes are used for context but never quoted. You edit it, send it as usual and log it. |
 | Monthly report | **Write summary with AI** | Writes the opening summary from the report's numbers. You can edit it before printing. |
