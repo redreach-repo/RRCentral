@@ -1924,6 +1924,18 @@ ${clip(input.notes, AI_MAX_INPUT_CHARS)}`,
         maxTokens: 3e3,
         schema: REQUIREMENTS_SCHEMA
       };
+    case "crm_ask":
+      return {
+        system: "You are Ask RR, a read-only assistant for Red Reach's Threads CRM (company pipeline and follow-ups). Answer the salesperson's question using only the CRM facts given. Be concrete: name companies, stages, owners, follow-up dates and next actions when relevant. If the facts are not enough, say what is missing. Never invent deals, quotes, amounts or contacts. Do not claim you changed the CRM; you cannot write to it. When helpful, end with one short suggested next step the person can take themselves. Keep answers short (under 180 words) with bullet points when listing deals. " + STYLE,
+        user: `Salesperson: ${input.askerName || "team"}
+
+Question: ${clip(input.question, 1e3)}
+
+CRM facts:
+${input.facts.map((f) => `- ${f}`).join("\n")}`,
+        maxTokens: 1200,
+        schema: null
+      };
   }
   throw new Error("Unknown AI feature");
 }

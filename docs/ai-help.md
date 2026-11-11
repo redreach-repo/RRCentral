@@ -1,10 +1,12 @@
 # AI help
 
-RR Central uses Claude Haiku (`claude-haiku-5-5`) for four jobs. Nothing is
-sent or saved without a person checking it first.
+RR Central uses Claude Haiku (`claude-haiku-5-5`) for AI help. Nothing is
+sent or saved without a person checking it first (CRM Ask answers in chat
+only and never writes to the CRM).
 
 | Where | Button | What it does |
 | --- | --- | --- |
+| Pipeline (CRM) | **Ask RR** | Read-only chat about overdue follow-ups, companies and pipeline. Uses only deals already loaded on the page. Cannot change CRM records. |
 | Ticket page | **Summarise** | Short summary of the thread: what the client wants, what was done, what is open. Can be saved as an internal note. |
 | Ticket page | **Draft a reply** | Puts a draft reply in the reply box. Internal notes are used for context but never quoted. You edit it, send it as usual and log it. |
 | Monthly report | **Write summary with AI** | Writes the opening summary from the report's numbers. You can edit it before printing. |
@@ -24,7 +26,8 @@ the buttons show a note that AI help needs the Supabase connection.
 
 ## Setup
 
-1. Run `supabase/migrations/20261104090000_ai_assist.sql`.
+1. Run `supabase/migrations/20261104090000_ai_assist.sql` (and
+   `20261204090000_crm_ask.sql` for Ask RR on Pipeline).
 2. Create an API key at console.anthropic.com (Settings, API keys). This is
    a normal API key, not the admin key used by usage import.
 3. In Supabase, Edge Functions, Secrets, add `ANTHROPIC_API_KEY` with that key.

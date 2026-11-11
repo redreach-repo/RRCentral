@@ -79,11 +79,15 @@ Deno.serve(withErrorLog("ai-assist", async (req) => {
   const body = (await req.json().catch(() => ({}))) as { account_id?: unknown; input?: unknown }
   const accountId = typeof body.account_id === "string" && UUID.test(body.account_id) ? body.account_id : ""
   const input = normaliseAiInput(body.input)
-  if (!accountId || !input) return json({ error: "Nothing to work with. Add some text first." }, 400)
+  if (!input) return json({ error: "Nothing to work with. Add some text first." }, 400)
 
-  // May they work on this account?
-  const { data: allowed } = await userDb.rpc("rr_can_write_account", { target: accountId })
-  if (allowed !== true) return json({ error: "You can only use AI help on accounts you can edit" }, 403)
+  // CRM Ask is read-only over a snapshot the signed-in person already loaded — no account write check.
+  const isCrmAsk = input.feature === "crm_ask"
+  if (!isCrmAsk) {
+    if (!accountId) return json({ error: "Nothing to work with. Add some text first." }, 400)
+    const { data: allowed } = await userDb.rpc("rr_can_write_account", { target: accountId })
+    if (allowed !== true) return json({ error: "You can only use AI help on accounts you can edit" }, 403)
+  }
 
   const request = buildAiRequest(input)
   const schema = request.schema
@@ -116,7 +120,7 @@ Deno.serve(withErrorLog("ai-assist", async (req) => {
   const costUsd = aiCostUsd(message.usage)
   const sb = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
   const { error: logError } = await sb.from("ai_usage_log").insert({
-    account_id: accountId,
+    account_id: isCrmAsk ? null : accountId,
     feature: input.feature,
     model: message.model || AI_MODEL,
     input_tokens: message.usage.input_tokens || 0,
