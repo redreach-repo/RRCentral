@@ -1476,8 +1476,34 @@ function renderLineCell(col: QuoteColumnId, it: LineItem, showSku: boolean): Rea
       return it.line_no
     case 'sku':
       return showSku ? it.sku || '—' : '—'
-    case 'description':
-      return it.description
+    case 'description': {
+      const image = String(it.image_data || '').trim()
+      if (!image) return it.description
+      return (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 8,
+          }}
+        >
+          <img
+            src={image}
+            alt=""
+            style={{
+              width: 48,
+              height: 48,
+              objectFit: 'cover',
+              borderRadius: 3,
+              border: '1px solid #ddd',
+              flexShrink: 0,
+              background: '#fff',
+            }}
+          />
+          <span style={{ minWidth: 0 }}>{it.description}</span>
+        </div>
+      )
+    }
     case 'sizes':
       return formatSizes(it.sizes_json)
     case 'qty':

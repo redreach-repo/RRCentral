@@ -28,6 +28,7 @@ import { can } from '../lib/permissions'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
+import LineItemImageField from '../components/LineItemImageField'
 import ClientBillToFields from '../components/ClientBillToFields'
 import { useClientBillTo } from '../hooks/useClientBillTo'
 import SupplierInvoiceModal from '../components/quotations/SupplierInvoiceModal'
@@ -1625,6 +1626,10 @@ export default function QuotationsPage() {
                           <span style={{ fontSize: 11, color: colors.muted2 }}>SKU {it.sku}</span>
                         ) : null}
                       </div>
+                      <LineItemImageField
+                        value={it.image_data}
+                        onChange={(image_data) => updateItem(it.key, { image_data })}
+                      />
                     </div>
                     <div className={resp.cardField}>
                       <label>Qty</label>
@@ -1750,6 +1755,10 @@ export default function QuotationsPage() {
                             <span style={{ fontSize: 11, color: colors.muted2 }}>SKU {it.sku}</span>
                           ) : null}
                         </div>
+                        <LineItemImageField
+                          value={it.image_data}
+                          onChange={(image_data) => updateItem(it.key, { image_data })}
+                        />
                       </td>
                       <td style={{ ...tdStyle, width: 80 }}>
                         <input

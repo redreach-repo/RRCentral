@@ -401,6 +401,11 @@ export interface LineItem {
   sku?: string
   /** Optional size breakdown JSON, e.g. { S: 2, M: 4 }. */
   sizes_json?: string | Record<string, number> | null
+  /**
+   * Optional compressed product image (data URL or https).
+   * Empty / missing = do not show any image on the quotation.
+   */
+  image_data?: string
   created_at: string
 }
 
