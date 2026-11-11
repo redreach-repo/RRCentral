@@ -1180,8 +1180,16 @@ export interface SalesDeal {
 /** One AI request made from RR Central, logged against the account (ai_usage_log). */
 export interface AiUsageLog {
   id: string
-  account_id: string
-  feature: 'ticket_summary' | 'ticket_reply' | 'report_summary' | 'call_notes'
+  /** Null for CRM Ask (not tied to a client account). */
+  account_id: string | null
+  feature:
+    | 'ticket_summary'
+    | 'ticket_reply'
+    | 'report_summary'
+    | 'call_notes'
+    | 'call_brief'
+    | 'update_tidy'
+    | 'crm_ask'
   model: string
   input_tokens: number
   output_tokens: number

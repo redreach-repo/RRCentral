@@ -8,15 +8,14 @@ export type AiResult = { text: string; requirements: ProposedRequirement[]; ques
 
 export const AI_LOCAL_MODE = 'AI help works once RR Central is connected to Supabase.'
 
-/** Asks the ai-assist function. It checks the person may edit the account and logs the cost there. */
-export async function runAi(accountId: string, input: AiInput): Promise<AiResult> {
+async function invokeAi(body: { account_id: string | null; input: AiInput }): Promise<AiResult> {
   if (!isSupabaseConfigured()) throw new Error(AI_LOCAL_MODE)
-  const { data, error } = await getSupabaseClient().functions.invoke('ai-assist', { body: { account_id: accountId, input } })
+  const { data, error } = await getSupabaseClient().functions.invoke('ai-assist', { body })
   if (error) {
     let message = 'AI help is not available right now. Please try again.'
     try {
-      const body = await (error as { context?: Response }).context?.json()
-      if (body?.error) message = String(body.error)
+      const errBody = await (error as { context?: Response }).context?.json()
+      if (errBody?.error) message = String(errBody.error)
     } catch {
       // keep the plain message
     }
@@ -29,6 +28,16 @@ export async function runAi(accountId: string, input: AiInput): Promise<AiResult
     questions: Array.isArray(d.questions) ? d.questions.map(String) : [],
     costUsd: Number(d.costUsd) || 0,
   }
+}
+
+/** Asks the ai-assist function. It checks the person may edit the account and logs the cost there. */
+export async function runAi(accountId: string, input: AiInput): Promise<AiResult> {
+  return invokeAi({ account_id: accountId, input })
+}
+
+/** Read-only Ask RR over a CRM snapshot the signed-in person already loaded. */
+export async function runCrmAsk(input: Extract<AiInput, { feature: 'crm_ask' }>): Promise<AiResult> {
+  return invokeAi({ account_id: null, input })
 }
 
 /** AI use logged on one account, or on every visible account when no id is given, since a date. */

@@ -28,7 +28,14 @@ export const AI_PRICES = {
 /** Longest text sent in one request. Long threads keep the first message and the latest ones. */
 export const AI_MAX_INPUT_CHARS = 60_000
 
-export type AiFeature = 'ticket_summary' | 'ticket_reply' | 'report_summary' | 'call_notes' | 'call_brief' | 'update_tidy'
+export type AiFeature =
+  | 'ticket_summary'
+  | 'ticket_reply'
+  | 'report_summary'
+  | 'call_notes'
+  | 'call_brief'
+  | 'update_tidy'
+  | 'crm_ask'
 
 export const AI_FEATURES: { value: AiFeature; label: string }[] = [
   { value: 'ticket_summary', label: 'Ticket summary' },
@@ -37,6 +44,7 @@ export const AI_FEATURES: { value: AiFeature; label: string }[] = [
   { value: 'call_notes', label: 'Requirements from call notes' },
   { value: 'call_brief', label: 'Before the call questions' },
   { value: 'update_tidy', label: 'Weekly update wording' },
+  { value: 'crm_ask', label: 'Ask RR (CRM)' },
 ]
 
 export function isAiFeature(v: unknown): v is AiFeature {
@@ -59,6 +67,7 @@ export type AiInput =
   | { feature: 'call_brief'; accountName: string; accountKind: string; facts: string[] }
   | { feature: 'call_notes'; accountName: string; notes: string; existing: string[] }
   | { feature: 'update_tidy'; accountName: string; text: string }
+  | { feature: 'crm_ask'; askerName: string; question: string; facts: string[] }
 
 export type AiRequest = {
   system: string
@@ -243,7 +252,25 @@ export function buildAiRequest(input: AiInput): AiRequest {
         maxTokens: 3000,
         schema: REQUIREMENTS_SCHEMA as unknown as Record<string, unknown>,
       }
-  }  throw new Error('Unknown AI feature')
+    case 'crm_ask':
+      return {
+        system:
+          'You are Ask RR, a read-only assistant for Red Reach\'s Threads CRM (company pipeline and follow-ups). ' +
+          'Answer the salesperson\'s question using only the CRM facts given. ' +
+          'Be concrete: name companies, stages, owners, follow-up dates and next actions when relevant. ' +
+          'If the facts are not enough, say what is missing. Never invent deals, quotes, amounts or contacts. ' +
+          'Do not claim you changed the CRM; you cannot write to it. ' +
+          'When helpful, end with one short suggested next step the person can take themselves. ' +
+          'Keep answers short (under 180 words) with bullet points when listing deals. ' +
+          STYLE,
+        user:
+          `Salesperson: ${input.askerName || 'team'}\n\nQuestion: ${clip(input.question, 1000)}\n\n` +
+          `CRM facts:\n${input.facts.map((f) => `- ${f}`).join('\n')}`,
+        maxTokens: 1200,
+        schema: null,
+      }
+  }
+  throw new Error('Unknown AI feature')
 }
 
 export type ProposedRequirement = { title: string; detail: string }
@@ -289,7 +316,7 @@ export function tidyAiText(text: string): string {
     .trim()
 }
 
-export type AiUsageRow = { account_id: string; cost_usd: number | string; created_at: string }
+export type AiUsageRow = { account_id: string | null; cost_usd: number | string; created_at: string }
 
 /** RR Central AI spend on one account in one month (`YYYY-MM`), USD. */
 export function assistCostInMonth(rows: AiUsageRow[], accountId: string, month: string): number {
@@ -405,6 +432,12 @@ export function normaliseAiInput(raw: unknown): AiInput | null {
       const notes = str(r.notes, AI_MAX_INPUT_CHARS)
       if (!notes.trim()) return null
       return { feature: 'call_notes', accountName, notes, existing: strList(r.existing, 200, 200) }
+    }
+    case 'crm_ask': {
+      const question = str(r.question, 1000).trim()
+      const facts = strList(r.facts, 80, 600).filter((f) => f.trim())
+      if (!question || !facts.length) return null
+      return { feature: 'crm_ask', askerName: str(r.askerName, 120), question, facts }
     }
     default:
       return null

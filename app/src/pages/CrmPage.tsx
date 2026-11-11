@@ -70,6 +70,7 @@ import { resolveOwnerEmails } from '../lib/calendarAttendees'
 import EmailComposeModal from '../components/EmailComposeModal'
 import LinkDriveFileModal from '../components/LinkDriveFileModal'
 import SaveToFolderPrompt from '../components/SaveToFolderPrompt'
+import CrmAskPanel from '../components/CrmAskPanel'
 import WebsiteInquiriesPanel from '../site/components/WebsiteInquiriesPanel'
 import PageHeader from '../components/PageHeader'
 import CrmLogTouchModal, { type LogTouchPayload } from '../components/CrmLogTouchModal'
@@ -2205,6 +2206,8 @@ export default function CrmPage() {
         open={calendarSettingsOpen}
         onClose={() => setCalendarSettingsOpen(false)}
       />
+
+      <CrmAskPanel entries={entries} owners={owners} />
     </div>
   )
 }
