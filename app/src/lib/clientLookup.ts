@@ -90,17 +90,27 @@ export type BillToLine = { kind: 'address' | 'trn' | 'contact' | 'email' | 'phon
 /**
  * Lines printed under the client name, in the Mass Allied Freighters layout:
  * address first, then TRN, then contact details. Empty fields are left out.
+ *
+ * Pass `includeContact: false` when the document already prints a chosen
+ * Attn contact (quotations), so the client's other primary contact is not
+ * dumped underneath as a second person.
  */
-export function billToLines(party: BillToParty): BillToLine[] {
+export function billToLines(
+  party: BillToParty,
+  opts?: { includeContact?: boolean },
+): BillToLine[] {
+  const includeContact = opts?.includeContact !== false
   const lines: BillToLine[] = []
   for (const line of party.address.split(/\n+/)) {
     const text = line.trim()
     if (text) lines.push({ kind: 'address', text })
   }
   if (party.trn) lines.push({ kind: 'trn', text: `TRN: ${party.trn}` })
-  if (party.primaryContact) lines.push({ kind: 'contact', text: party.primaryContact })
-  if (party.email) lines.push({ kind: 'email', text: party.email })
-  if (party.phone) lines.push({ kind: 'phone', text: `Tel: ${party.phone}` })
+  if (includeContact) {
+    if (party.primaryContact) lines.push({ kind: 'contact', text: party.primaryContact })
+    if (party.email) lines.push({ kind: 'email', text: party.email })
+    if (party.phone) lines.push({ kind: 'phone', text: `Tel: ${party.phone}` })
+  }
   return lines
 }
 
