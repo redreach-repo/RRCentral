@@ -28,7 +28,8 @@ the buttons show a note that AI help needs the Supabase connection.
 ## Setup
 
 1. Run `supabase/migrations/20261104090000_ai_assist.sql` (and
-   `20261204090000_crm_ask.sql` for Ask RR on CRM).
+   `20261204090000_crm_ask.sql` for Ask RR on CRM — needed so usage logging
+   accepts `crm_ask` with a null account).
 2. Create an API key at console.anthropic.com (Settings, API keys). This is
    a normal API key, not the admin key used by usage import.
 3. In Supabase, Edge Functions, Secrets, add `ANTHROPIC_API_KEY` with that key.
@@ -36,6 +37,7 @@ the buttons show a note that AI help needs the Supabase connection.
 
    GitHub → RRCentral → **Actions** → **Deploy Edge Functions** → **Run workflow** → pick `ai-assist` → **Run workflow**.
    Verify JWT is off for it in `supabase/config.toml`; the function checks the caller itself.
+   After Ask RR changes, redeploy `ai-assist` (and `ask-rr-mcp` if you use Claude connectors).
 
 5. For Claude Mac / iPhone, also set `ASK_RR_MCP_TOKEN` and deploy `ask-rr-mcp`
    (see [ask-rr-claude.md](./ask-rr-claude.md)).

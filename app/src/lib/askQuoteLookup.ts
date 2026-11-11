@@ -4,6 +4,7 @@
 
 import { db } from './db'
 import { displayDocumentReference } from './documents'
+import { loadLineItems } from './lineItems'
 import { formatAED } from './money'
 import type { Quotation } from './types'
 
@@ -53,6 +54,59 @@ export function quotationFactLines(quotes: Quotation[], limit = 40): string[] {
     const hit = toAskQuoteHit(q)
     return `Quote ${hit.label} · ${hit.client} · ${hit.status} · ${hit.amountLabel} · ${hit.date || 'no date'}`
   })
+}
+
+/**
+ * Prefer quotes whose client name appears in the question (e.g. "Green Cement"),
+ * otherwise fall back to the newest few so price questions still have lines.
+ */
+export function pickQuotesForQuestion(quotes: Quotation[], question: string, limit = 6): Quotation[] {
+  const q = question.trim().toLowerCase()
+  if (!q || !quotes.length || limit <= 0) return []
+  const matched = quotes.filter((row) => {
+    const client = String(row.client || '').trim().toLowerCase()
+    if (!client) return false
+    if (q.includes(client) || client.includes(q)) return true
+    const tokens = client.split(/[^a-z0-9]+/).filter((t) => t.length >= 4)
+    return tokens.some((t) => q.includes(t))
+  })
+  const pool = matched.length ? matched : quotes.slice(0, Math.min(limit, 3))
+  return pool.slice(0, limit)
+}
+
+/** Per-line unit prices for quotes relevant to the salesperson's question. */
+export async function loadQuotationLineFacts(
+  quotes: Quotation[],
+  question: string,
+  opts: { quoteLimit?: number; linesPerQuote?: number } = {},
+): Promise<string[]> {
+  const quoteLimit = opts.quoteLimit ?? 6
+  const linesPerQuote = opts.linesPerQuote ?? 25
+  const picked = pickQuotesForQuestion(quotes, question, quoteLimit)
+  const out: string[] = []
+  for (const quote of picked) {
+    const hit = toAskQuoteHit(quote)
+    if (!quote.quote_id) continue
+    try {
+      const items = await loadLineItems('Quote', quote.quote_id)
+      if (!items.length) {
+        out.push(`Quote ${hit.label} · ${hit.client}: no line items on file`)
+        continue
+      }
+      for (const item of items.slice(0, linesPerQuote)) {
+        const desc = String(item.description || item.sku || 'item').replace(/\s+/g, ' ').trim()
+        const qty = Number(item.qty) || 0
+        const unit = Number(item.unit_price) || 0
+        const amount = Number(item.amount) || qty * unit
+        out.push(
+          `Quote ${hit.label} · ${hit.client} · ${desc} · qty ${qty} · unit ${formatAED(unit)} · amount ${formatAED(amount)}`,
+        )
+      }
+    } catch {
+      // Skip quotes we cannot load lines for; totals still remain in quotationFactLines.
+    }
+  }
+  return out
 }
 
 export async function loadRecentQuotations(limit = 80): Promise<Quotation[]> {

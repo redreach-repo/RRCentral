@@ -11,6 +11,7 @@ import { AI_LOCAL_MODE, runCrmAsk } from '../lib/aiAssistStore'
 import { createAskDraftQuote } from '../lib/askDraftQuote'
 import {
   findQuotationsForClient,
+  loadQuotationLineFacts,
   loadRecentQuotations,
   quotationFactLines,
   type AskQuoteHit,
@@ -149,9 +150,11 @@ export default function CrmAskPanel({
         .map((t) => `${t.role === 'user' ? 'Earlier question' : 'Earlier answer'}: ${t.text}`)
 
       let quoteFacts: string[] = []
+      let lineFacts: string[] = []
       try {
         const recent = await loadRecentQuotations(80)
         quoteFacts = quotationFactLines(recent, 40)
+        lineFacts = await loadQuotationLineFacts(recent, q)
       } catch {
         // CRM answers still work if quotations cannot be loaded
       }
@@ -160,7 +163,7 @@ export default function CrmAskPanel({
         feature: 'crm_ask',
         askerName: myOwnerName || user?.email || 'team',
         question: q,
-        facts: [...facts, ...quoteFacts, ...historyFacts],
+        facts: [...facts, ...quoteFacts, ...lineFacts, ...historyFacts],
       })
 
       let quoteHits: AskQuoteHit[] = []

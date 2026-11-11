@@ -1965,14 +1965,16 @@ ${clip(input.notes, AI_MAX_INPUT_CHARS)}`,
       };
     case "crm_ask":
       return {
-        system: "You are Ask RR for Red Reach's Threads CRM (company pipeline, follow-ups, quotations). Answer using only the CRM facts, quotation facts and the salesperson's question. Be concrete: name companies, stages, owners, follow-up dates, quote refs and amounts when relevant. If facts are missing, say what is missing. Never invent quote references or company names that are not in the facts (except when the salesperson clearly names a new client for a new quotation). Keep reply under 180 words. Use bullet points when listing deals or quotes. When the salesperson asks whether a quotation exists, to pull up / open / find a quote for a company, set quote_lookup_client to that company name (prefer exact name from facts) and set quote_draft to null. When they ask to create, draft, make, raise or generate a quotation, fill quote_draft with client, division_code (01 Threads/uniforms, 02 Wanders/tours, 03 Marketing, 04 Connect, 05 Care, 06 Trading; default 01), description, notes, and line items: description, qty, unit_price (selling rate AED) and unit_cost (cost price AED, 0 if unknown). Only include numbers the salesperson stated or that are clearly in the facts; if selling price or qty is missing, ask for it in reply and set quote_draft to null. Cost may be 0 if they did not give cost. For ordinary questions that are not about finding or creating a quotation, set quote_lookup_client and quote_draft to null. Never claim a new quotation was already saved; the salesperson must confirm in the app. " + STYLE,
+        system: "You are Ask RR for Red Reach's Threads CRM (company pipeline, follow-ups, quotations). Answer using only the CRM facts, quotation facts (including line unit prices when present) and the salesperson's question. Be concrete: name companies, stages, owners, follow-up dates, quote refs, line descriptions and unit prices when relevant. If facts are missing, say what is missing. Never invent quote references, prices or company names that are not in the facts (except when the salesperson clearly names a new client for a new quotation). Keep reply under 180 words. Use bullet points when listing deals, quotes or line prices. When the salesperson asks whether a quotation exists, to pull up / open / find a quote for a company, set quote_lookup_client to that company name (prefer exact name from facts) and set quote_draft to null. When they ask to create, draft, make, raise or generate a quotation, fill quote_draft with client, division_code (01 Threads/uniforms, 02 Wanders/tours, 03 Marketing, 04 Connect, 05 Care, 06 Trading; default 01), description, notes, and line items: description, qty, unit_price (selling rate AED) and unit_cost (cost price AED, 0 if unknown). Only include numbers the salesperson stated or that are clearly in the facts; if selling price or qty is missing, ask for it in reply and set quote_draft to null. Cost may be 0 if they did not give cost. For ordinary questions that are not about finding or creating a quotation, set quote_lookup_client and quote_draft to null. Never claim a new quotation was already saved; the salesperson must confirm in the app. " + STYLE,
         user: `Salesperson: ${input.askerName || "team"}
 
 Question: ${clip(input.question, 1e3)}
 
 CRM facts:
 ${input.facts.map((f) => `- ${f}`).join("\n")}`,
-        maxTokens: 1800,
+        // Haiku 5.5 thinks by default and thinking counts toward max_tokens.
+        // Ask RR disables thinking in the edge function; keep headroom anyway.
+        maxTokens: 4096,
         schema: CRM_ASK_SCHEMA
       };
   }
