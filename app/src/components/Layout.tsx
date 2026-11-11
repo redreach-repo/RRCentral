@@ -55,9 +55,7 @@ import { useRecurringDeductionsSync } from '../hooks/useRecurringDeductionsSync'
 import { usePhoneShell } from '../hooks/useMediaQuery'
 import { can, roleAtLeast } from '../lib/permissions'
 import type { UserRole } from '../lib/types'
-import { AskRrProvider } from '../contexts/AskRrContext'
 import BrandLogo from './BrandLogo'
-import CrmAskHost from './CrmAskHost'
 import ErrorBoundary from './ErrorBoundary'
 import styles from './Layout.module.css'
 
@@ -242,7 +240,6 @@ export default function Layout() {
   )
 
   return (
-    <AskRrProvider>
     <div className={`${styles.shell} ${phoneShell ? styles.shellPhone : ''}`}>
       <div className={styles.ambient} aria-hidden />
       {isLocalMode && (
@@ -418,8 +415,6 @@ export default function Layout() {
           </nav>
         ) : null}
       </div>
-      <CrmAskHost />
     </div>
-    </AskRrProvider>
   )
 }
