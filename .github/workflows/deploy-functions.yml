@@ -72,4 +72,5 @@ jobs:
         with:
           version: latest
       - name: Deploy
-        run: supabase functions deploy "$FUNCTION" --project-ref "$SUPABASE_PROJECT_REF"
+        # --yes: newer CLI prompts for confirmation; Actions has no TTY.
+        run: supabase functions deploy "$FUNCTION" --project-ref "$SUPABASE_PROJECT_REF" --yes
