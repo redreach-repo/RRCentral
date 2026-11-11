@@ -51,6 +51,7 @@ const bundles = [
   { entry: 'src/lib/paymentReminder.ts', out: '../supabase/functions/payment-reminder/paymentReminder.bundle.js' },
   { entry: 'src/lib/leadIntake.ts', out: '../supabase/functions/lead-intake/leadIntake.bundle.js' },
   { entry: 'src/lib/quoteAccept.ts', out: '../supabase/functions/quote-accept/quoteAccept.bundle.js' },
+  { entry: 'src/lib/legalDocuments.ts', out: '../supabase/functions/legal-sign/legalDocuments.bundle.js' },
   { entry: 'src/lib/fireflies.ts', out: '../supabase/functions/fireflies-fetch/fireflies.bundle.js' },
   { entry: 'src/lib/invoicePayLink.ts', out: '../supabase/functions/invoice-pay-link/invoicePayLink.bundle.js' },
   { entry: 'src/lib/invoicePayLink.ts', out: '../supabase/functions/stripe-invoice-webhook/invoicePayLink.bundle.js' },

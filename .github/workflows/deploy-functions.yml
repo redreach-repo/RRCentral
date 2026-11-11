@@ -40,6 +40,7 @@ on:
           - payment-reminder
           - lead-intake
           - quote-accept
+          - legal-sign
           - fireflies-fetch
           - invoice-pay-link
           - stripe-invoice-webhook

@@ -61,6 +61,9 @@ verify_jwt = false
 [functions.quote-accept]
 verify_jwt = false
 
+[functions.legal-sign]
+verify_jwt = false
+
 [functions.fireflies-fetch]
 verify_jwt = false
 

@@ -7,7 +7,7 @@ import { ALL_SEED_PRODUCTS } from './seedCatalog'
 import { errorMessage } from './errors'
 
 export const DB_NAME = 'rrcentral_local'
-const DB_VERSION = 30
+const DB_VERSION = 31
 
 export const LOCAL_STORES = [
   'app_settings',
@@ -30,6 +30,11 @@ export const LOCAL_STORES = [
   'attachments',
   'customer_documents',
   'company_documents',
+  'nda_templates',
+  'legal_documents',
+  'legal_sign_links',
+  'legal_sign_pdfs',
+  'legal_signatures',
   'activity_log',
   'inventory_movements',
   'customer_payments',
@@ -1080,6 +1085,11 @@ export type MigrationDump = {
   attachments?: Row[]
   customer_documents?: Row[]
   company_documents?: Row[]
+  nda_templates?: Row[]
+  legal_documents?: Row[]
+  legal_sign_links?: Row[]
+  legal_sign_pdfs?: Row[]
+  legal_signatures?: Row[]
   activity_log?: Row[]
   inventory_movements?: Row[]
   customer_payments?: Row[]
