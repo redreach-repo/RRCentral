@@ -99,9 +99,9 @@ function pickQuotesForQuestion(rows: Array<Record<string, unknown>>, question: s
 }
 
 async function lineFactsForQuestion(
-  db: ReturnType<typeof createClient>,
   quotes: Array<Record<string, unknown>>,
   question: string,
+  fetchLines: (quoteId: string) => Promise<Array<Record<string, unknown>>>,
 ): Promise<string[]> {
   const picked = pickQuotesForQuestion(quotes, question, 6)
   const out: string[] = []
@@ -110,15 +110,7 @@ async function lineFactsForQuestion(
     const ref = String(quote.reference_number || "").trim() || "DRAFT"
     const client = String(quote.client || "").trim() || "client"
     if (!quoteId) continue
-    const { data, error } = await db
-      .from("line_items")
-      .select("description, sku, qty, unit_price, amount")
-      .eq("doc_type", "Quote")
-      .eq("reference", quoteId)
-      .order("line_no", { ascending: true })
-      .limit(25)
-    if (error) continue
-    const rows = data || []
+    const rows = await fetchLines(quoteId)
     if (!rows.length) {
       out.push(`Quote ${ref} · ${client}: no line items on file`)
       continue
@@ -186,7 +178,17 @@ Deno.serve(withErrorLog("ask-rr-mcp", async (req) => {
         const facts = [
           ...compactFacts((crm || []) as Array<Record<string, unknown>>),
           ...quoteFacts(quoteRows),
-          ...(await lineFactsForQuestion(db, quoteRows, question)),
+          ...(await lineFactsForQuestion(quoteRows, question, async (quoteId) => {
+            const { data, error } = await db
+              .from("line_items")
+              .select("description, sku, qty, unit_price, amount")
+              .eq("doc_type", "Quote")
+              .eq("reference", quoteId)
+              .order("line_no", { ascending: true })
+              .limit(25)
+            if (error) return []
+            return (data || []) as Array<Record<string, unknown>>
+          })),
         ]
         if (!facts.length) return textResult("No CRM facts loaded.")
 
