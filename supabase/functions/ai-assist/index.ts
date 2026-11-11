@@ -148,7 +148,7 @@ Deno.serve(withErrorLog("ai-assist", async (req) => {
   }
   if (input.feature === "crm_ask") {
     const parsed = parseCrmAskAnswer(text)
-    if (!parsed.reply && !parsed.quoteDraft) {
+    if (!parsed.reply && !parsed.quoteDraft && !parsed.quoteLookupClient) {
       return json({ error: "AI help came back empty. Please try again." }, 502)
     }
     return json({
@@ -156,6 +156,7 @@ Deno.serve(withErrorLog("ai-assist", async (req) => {
       requirements: [],
       questions: [],
       quoteDraft: parsed.quoteDraft,
+      quoteLookupClient: parsed.quoteLookupClient,
       costUsd,
     })
   }

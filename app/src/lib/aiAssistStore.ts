@@ -9,6 +9,7 @@ export type AiResult = {
   requirements: ProposedRequirement[]
   questions: string[]
   quoteDraft: AskQuoteDraft | null
+  quoteLookupClient: string | null
   costUsd: number
 }
 
@@ -32,6 +33,7 @@ function asQuoteDraft(raw: unknown): AskQuoteDraft | null {
           description: String(r.description || '').trim(),
           qty: Number(r.qty) || 0,
           unit_price: Number(r.unit_price) || 0,
+          unit_cost: Math.max(0, Number(r.unit_cost) || 0),
         }
       })
       .filter((i) => i.description && i.qty > 0),
@@ -51,12 +53,16 @@ async function invokeAi(body: { account_id: string | null; input: AiInput }): Pr
     }
     throw new Error(message)
   }
-  const d = (data || {}) as Partial<AiResult> & { quoteDraft?: unknown }
+  const d = (data || {}) as Partial<AiResult> & { quoteDraft?: unknown; quoteLookupClient?: unknown }
   return {
     text: String(d.text || ''),
     requirements: Array.isArray(d.requirements) ? d.requirements : [],
     questions: Array.isArray(d.questions) ? d.questions.map(String) : [],
     quoteDraft: asQuoteDraft(d.quoteDraft),
+    quoteLookupClient:
+      typeof d.quoteLookupClient === 'string' && d.quoteLookupClient.trim()
+        ? d.quoteLookupClient.trim()
+        : null,
     costUsd: Number(d.costUsd) || 0,
   }
 }

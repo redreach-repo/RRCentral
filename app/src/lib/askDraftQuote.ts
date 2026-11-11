@@ -23,6 +23,8 @@ export type AskDraftQuoteDefaults = {
 
 export type AskDraftQuoteResult = {
   quoteId: string
+  /** Database row id for /document/quote/:id links. */
+  rowId: string | null
   client: string
   amount: number
 }
@@ -61,6 +63,7 @@ export async function createAskDraftQuote(args: {
         description: i.description,
         qty: i.qty,
         unit_price: i.unit_price,
+        unit_cost: Math.max(0, Number(i.unit_cost) || 0),
       }),
     )
     .filter((i) => i.description.trim() && i.qty > 0)
@@ -116,5 +119,9 @@ export async function createAskDraftQuote(args: {
   await saveLineItems('Quote', quoteId, registered.items, vatRate)
   await logActivity('save_quote', 'quotation', 'DRAFT', `${client} · Draft (Ask RR)`, who)
 
-  return { quoteId, client, amount: totals.total }
+  let rowId: string | null = null
+  const found = await db.from('quotations').select('id').eq('quote_id', quoteId).maybeSingle()
+  if (!found.error && found.data?.id) rowId = String(found.data.id)
+
+  return { quoteId, rowId, client, amount: totals.total }
 }
