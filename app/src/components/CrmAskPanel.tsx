@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { FilePlus2, MessageCircle, Send, Sparkles, X } from 'lucide-react'
+import { ExternalLink, FilePlus2, MessageCircle, Send, Sparkles, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import type { AskQuoteDraft } from '../lib/aiAssist'
 import { AI_LOCAL_MODE, runCrmAsk } from '../lib/aiAssistStore'
 import { createAskDraftQuote } from '../lib/askDraftQuote'
+import {
+  findQuotationsForClient,
+  loadRecentQuotations,
+  quotationFactLines,
+  type AskQuoteHit,
+} from '../lib/askQuoteLookup'
 import { buildCrmAskFacts, CRM_ASK_SUGGESTIONS } from '../lib/crmAsk'
 import { resolveSalesOwnerName } from '../lib/crmWorkQueue'
 import { DIVISIONS, VAT_RATE } from '../lib/config'
@@ -21,6 +27,7 @@ type ChatTurn = {
   text: string
   costUsd?: number
   quoteDraft?: AskQuoteDraft | null
+  quoteHits?: AskQuoteHit[]
 }
 
 const fab: CSSProperties = {
@@ -60,9 +67,15 @@ function divisionLabel(code: string): string {
   return DIVISIONS.find((d) => d.code === code)?.brand || code
 }
 
+function lineMoney(line: AskQuoteDraft['items'][number]): string {
+  const sell = `${line.qty} × ${formatAED(line.unit_price)}`
+  if (line.unit_cost > 0) return `${sell} (cost ${formatAED(line.unit_cost)})`
+  return sell
+}
+
 /**
- * Ask RR chat: answers from loaded CRM, and can propose a Draft quotation
- * that is only saved after the salesperson confirms.
+ * Ask RR chat: answers from loaded CRM + recent quotes, can pull up existing
+ * quotations, and can propose a Draft that is only saved after confirm.
  */
 export default function CrmAskPanel({ entries, owners }: Props) {
   const { user } = useAuth()
@@ -74,7 +87,7 @@ export default function CrmAskPanel({ entries, owners }: Props) {
   const [creatingKey, setCreatingKey] = useState<number | null>(null)
   const [turns, setTurns] = useState<ChatTurn[]>([])
   const [error, setError] = useState('')
-  const [createdQuoteId, setCreatedQuoteId] = useState<string | null>(null)
+  const [createdPath, setCreatedPath] = useState<string | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
 
   const myOwnerName = useMemo(
@@ -100,7 +113,7 @@ export default function CrmAskPanel({ entries, owners }: Props) {
       return
     }
     setError('')
-    setCreatedQuoteId(null)
+    setCreatedPath(null)
     setDraft('')
     setTurns((t) => [...t, { role: 'user', text: q }])
     setBusy(true)
@@ -109,19 +122,44 @@ export default function CrmAskPanel({ entries, owners }: Props) {
       const historyFacts = turns
         .slice(-4)
         .map((t) => `${t.role === 'user' ? 'Earlier question' : 'Earlier answer'}: ${t.text}`)
+
+      let quoteFacts: string[] = []
+      try {
+        const recent = await loadRecentQuotations(80)
+        quoteFacts = quotationFactLines(recent, 40)
+      } catch {
+        // CRM answers still work if quotations cannot be loaded
+      }
+
       const r = await runCrmAsk({
         feature: 'crm_ask',
         askerName: myOwnerName || user?.email || 'team',
         question: q,
-        facts: [...facts, ...historyFacts],
+        facts: [...facts, ...quoteFacts, ...historyFacts],
       })
+
+      let quoteHits: AskQuoteHit[] = []
+      if (r.quoteLookupClient) {
+        try {
+          quoteHits = await findQuotationsForClient(r.quoteLookupClient)
+        } catch {
+          quoteHits = []
+        }
+      }
+
+      const replyText =
+        r.quoteLookupClient && !quoteHits.length
+          ? `${r.text || ''}${r.text ? '\n\n' : ''}No quotations found for ${r.quoteLookupClient} in recent records.`
+          : r.text
+
       setTurns((t) => [
         ...t,
         {
           role: 'assistant',
-          text: r.text,
+          text: replyText,
           costUsd: r.costUsd,
           quoteDraft: r.quoteDraft,
+          quoteHits,
         },
       ])
     } catch (e) {
@@ -149,7 +187,8 @@ export default function CrmAskPanel({ entries, owners }: Props) {
           vatRate: Number(settings.vatRate || VAT_RATE) || VAT_RATE,
         },
       })
-      setCreatedQuoteId(result.quoteId)
+      const path = result.rowId ? `/document/quote/${result.rowId}` : '/app/quotations'
+      setCreatedPath(path)
       showToast(`Draft quotation saved for ${result.client}`, 'success')
       setTurns((t) =>
         t.map((turn, i) =>
@@ -198,7 +237,7 @@ export default function CrmAskPanel({ entries, owners }: Props) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: 14 }}>Ask RR</div>
           <div style={{ fontSize: 11, color: colors.muted2 }}>
-            Answers + draft quotes (confirm to save)
+            Find quotes, draft with rate + cost (confirm to save)
           </div>
         </div>
         <button type="button" style={{ ...btnGhost, padding: 6 }} onClick={() => setOpen(false)} aria-label="Close Ask RR">
@@ -212,7 +251,7 @@ export default function CrmAskPanel({ entries, owners }: Props) {
       >
         {turns.length === 0 ? (
           <div style={{ color: colors.muted, fontSize: 13, lineHeight: 1.45 }}>
-            Ask about overdue follow-ups, or say “Draft a quotation for Mass Allied: 50 polos at 48 AED”. Quotes are
+            Ask “Do we have a quote for Mass Allied?”, or “Draft a quotation: 50 polos at 48 AED, cost 28”. Quotes are
             only saved when you confirm.
           </div>
         ) : null}
@@ -237,6 +276,39 @@ export default function CrmAskPanel({ entries, owners }: Props) {
                 <div style={{ marginTop: 6, fontSize: 10, color: colors.muted2 }}>~${t.costUsd.toFixed(4)}</div>
               ) : null}
             </div>
+            {t.role === 'assistant' && t.quoteHits && t.quoteHits.length > 0 ? (
+              <div
+                style={{
+                  alignSelf: 'flex-start',
+                  maxWidth: '96%',
+                  padding: 12,
+                  borderRadius: 12,
+                  border: `1px solid ${colors.border}`,
+                  background: colors.card,
+                  fontSize: 12,
+                  lineHeight: 1.45,
+                }}
+              >
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>Quotations found</div>
+                <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {t.quoteHits.map((hit) => (
+                    <li key={hit.id}>
+                      <Link
+                        to={hit.path}
+                        style={{ color: colors.accent, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                      >
+                        <ExternalLink size={12} />
+                        {hit.label} · {hit.client}
+                      </Link>
+                      <div style={{ color: colors.muted, marginLeft: 18 }}>
+                        {hit.status} · {hit.amountLabel}
+                        {hit.date ? ` · ${hit.date}` : ''}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             {t.role === 'assistant' && t.quoteDraft ? (
               <div
                 style={{
@@ -260,7 +332,7 @@ export default function CrmAskPanel({ entries, owners }: Props) {
                 <ul style={{ margin: '8px 0', paddingLeft: 18 }}>
                   {t.quoteDraft.items.map((line, li) => (
                     <li key={`${line.description}-${li}`}>
-                      {line.description} · {line.qty} × {formatAED(line.unit_price)}
+                      {line.description} · {lineMoney(line)}
                     </li>
                   ))}
                 </ul>
@@ -278,11 +350,11 @@ export default function CrmAskPanel({ entries, owners }: Props) {
         ))}
         {busy ? <div style={{ fontSize: 12, color: colors.muted2 }}>Thinking…</div> : null}
         {error ? <div style={{ fontSize: 12, color: colors.danger }}>{error}</div> : null}
-        {createdQuoteId ? (
+        {createdPath ? (
           <div style={{ fontSize: 12, color: colors.success }}>
             Draft saved.{' '}
-            <Link to="/app/quotations" style={{ color: colors.accent }}>
-              Open quotations
+            <Link to={createdPath} style={{ color: colors.accent }}>
+              Open quotation
             </Link>
           </div>
         ) : null}
@@ -297,7 +369,7 @@ export default function CrmAskPanel({ entries, owners }: Props) {
             style={{ ...btn, padding: '4px 8px', fontSize: 11, borderRadius: 999 }}
             onClick={() => {
               if (s.endsWith('…')) {
-                setDraft('Draft a quotation for ')
+                setDraft(s.startsWith('Pull up') ? 'Pull up the quote for ' : 'Draft a quotation for ')
                 return
               }
               void ask(s)
@@ -315,7 +387,7 @@ export default function CrmAskPanel({ entries, owners }: Props) {
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Ask, or draft a quotation…"
+          placeholder="Ask, find a quote, or draft one…"
           disabled={busy}
           style={{ ...input, flex: 1 }}
         />

@@ -12,7 +12,7 @@ const NOTE_CHARS = 120
 export const CRM_ASK_SUGGESTIONS = [
   "What's overdue for me today?",
   'Who needs a follow-up this week?',
-  'Summarise the open pipeline by stage',
+  'Pull up the quote for…',
   'Draft a quotation for…',
 ] as const
 

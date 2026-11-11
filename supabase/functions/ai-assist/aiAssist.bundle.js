@@ -83,6 +83,7 @@ var CRM_ASK_SCHEMA = {
   type: "object",
   properties: {
     reply: { type: "string" },
+    quote_lookup_client: { anyOf: [{ type: "string" }, { type: "null" }] },
     quote_draft: {
       anyOf: [
         { type: "null" },
@@ -100,9 +101,10 @@ var CRM_ASK_SCHEMA = {
                 properties: {
                   description: { type: "string" },
                   qty: { type: "number" },
-                  unit_price: { type: "number" }
+                  unit_price: { type: "number" },
+                  unit_cost: { type: "number" }
                 },
-                required: ["description", "qty", "unit_price"],
+                required: ["description", "qty", "unit_price", "unit_cost"],
                 additionalProperties: false
               }
             }
@@ -113,7 +115,7 @@ var CRM_ASK_SCHEMA = {
       ]
     }
   },
-  required: ["reply", "quote_draft"],
+  required: ["reply", "quote_lookup_client", "quote_draft"],
   additionalProperties: false
 };
 function parseQuestions(text) {
@@ -195,7 +197,7 @@ ${clip(input.notes, AI_MAX_INPUT_CHARS)}`,
       };
     case "crm_ask":
       return {
-        system: "You are Ask RR for Red Reach's Threads CRM (company pipeline, follow-ups, quotations). Answer using only the CRM facts and the salesperson's question. Be concrete: name companies, stages, owners, follow-up dates and next actions when relevant. If facts are missing, say what is missing. Never invent contacts or company names that are not in the facts (except when the salesperson clearly names a new client for a new quotation). Keep reply under 180 words. Use bullet points when listing deals. When the salesperson asks you to create, draft, make or generate a quotation or quote, fill quote_draft with client (prefer an exact company name from the facts when it matches), division_code (01 Threads/uniforms, 02 Wanders/tours, 03 Marketing, 04 Connect, 05 Care, 06 Trading; default 01), a short description, optional notes, and line items with description, qty and unit_price in AED. Only include numbers the salesperson stated or that are clearly in the facts; if a price or qty is missing, ask for it in reply and set quote_draft to null. For ordinary questions that are not asking for a quotation, set quote_draft to null. Never claim the quotation was already saved; the salesperson must confirm in the app. " + STYLE,
+        system: "You are Ask RR for Red Reach's Threads CRM (company pipeline, follow-ups, quotations). Answer using only the CRM facts, quotation facts and the salesperson's question. Be concrete: name companies, stages, owners, follow-up dates, quote refs and amounts when relevant. If facts are missing, say what is missing. Never invent quote references or company names that are not in the facts (except when the salesperson clearly names a new client for a new quotation). Keep reply under 180 words. Use bullet points when listing deals or quotes. When the salesperson asks whether a quotation exists, to pull up / open / find a quote for a company, set quote_lookup_client to that company name (prefer exact name from facts) and set quote_draft to null. When they ask to create, draft, make, raise or generate a quotation, fill quote_draft with client, division_code (01 Threads/uniforms, 02 Wanders/tours, 03 Marketing, 04 Connect, 05 Care, 06 Trading; default 01), description, notes, and line items: description, qty, unit_price (selling rate AED) and unit_cost (cost price AED, 0 if unknown). Only include numbers the salesperson stated or that are clearly in the facts; if selling price or qty is missing, ask for it in reply and set quote_draft to null. Cost may be 0 if they did not give cost. For ordinary questions that are not about finding or creating a quotation, set quote_lookup_client and quote_draft to null. Never claim a new quotation was already saved; the salesperson must confirm in the app. " + STYLE,
         user: `Salesperson: ${input.askerName || "team"}
 
 Question: ${clip(input.question, 1e3)}
@@ -213,12 +215,16 @@ function parseCrmAskAnswer(text) {
   try {
     data = JSON.parse(text);
   } catch {
-    return { reply: tidyAiText(text), quoteDraft: null };
+    return { reply: tidyAiText(text), quoteDraft: null, quoteLookupClient: null };
   }
   const obj = data ?? {};
   const reply = tidyAiText(String(obj.reply ?? ""));
+  const lookupRaw = obj.quote_lookup_client;
+  const quoteLookupClient = typeof lookupRaw === "string" && lookupRaw.trim() ? lookupRaw.trim().slice(0, 200) : null;
   const raw = obj.quote_draft;
-  if (!raw || typeof raw !== "object") return { reply: reply || tidyAiText(text), quoteDraft: null };
+  if (!raw || typeof raw !== "object") {
+    return { reply: reply || tidyAiText(text), quoteDraft: null, quoteLookupClient };
+  }
   const draft = raw;
   const client = String(draft.client ?? "").trim().slice(0, 200);
   const division_code = String(draft.division_code ?? "01").trim().slice(0, 2) || "01";
@@ -231,13 +237,26 @@ function parseCrmAskAnswer(text) {
     const lineDescription = String(r.description ?? "").trim().slice(0, 500);
     const qty = Number(r.qty);
     const unit_price = Number(r.unit_price);
+    const unit_cost = Number(r.unit_cost);
     if (!lineDescription || !Number.isFinite(qty) || qty <= 0 || !Number.isFinite(unit_price) || unit_price < 0) continue;
-    items.push({ description: lineDescription, qty, unit_price });
+    items.push({
+      description: lineDescription,
+      qty,
+      unit_price,
+      unit_cost: Number.isFinite(unit_cost) && unit_cost >= 0 ? unit_cost : 0
+    });
   }
-  if (!client || !items.length) return { reply: reply || "I need a client and at least one line item to propose a draft quotation.", quoteDraft: null };
+  if (!client || !items.length) {
+    return {
+      reply: reply || "I need a client and at least one line item to propose a draft quotation.",
+      quoteDraft: null,
+      quoteLookupClient
+    };
+  }
   return {
     reply: reply || `Draft quotation ready for ${client}. Confirm to save it as a Draft.`,
-    quoteDraft: { client, division_code, description, notes, items }
+    quoteDraft: { client, division_code, description, notes, items },
+    quoteLookupClient
   };
 }
 function parseRequirements(text) {

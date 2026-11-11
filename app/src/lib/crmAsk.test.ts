@@ -59,6 +59,8 @@ describe('crm_ask AI request', () => {
     if (!input || input.feature !== 'crm_ask') return
     const req = buildAiRequest(input)
     expect(req.system).toMatch(/quote_draft/)
+    expect(req.system).toMatch(/quote_lookup_client/)
+    expect(req.system).toMatch(/unit_cost/)
     expect(req.system).toMatch(/must confirm/i)
     expect(req.schema).not.toBeNull()
     expect(req.user).toContain("What's overdue?")
