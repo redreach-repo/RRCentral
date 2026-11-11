@@ -35,7 +35,6 @@ export type AiFeature =
   | 'call_notes'
   | 'call_brief'
   | 'update_tidy'
-  | 'crm_ask'
 
 export const AI_FEATURES: { value: AiFeature; label: string }[] = [
   { value: 'ticket_summary', label: 'Ticket summary' },
@@ -44,7 +43,6 @@ export const AI_FEATURES: { value: AiFeature; label: string }[] = [
   { value: 'call_notes', label: 'Requirements from call notes' },
   { value: 'call_brief', label: 'Before the call questions' },
   { value: 'update_tidy', label: 'Weekly update wording' },
-  { value: 'crm_ask', label: 'Ask RR (CRM)' },
 ]
 
 export function isAiFeature(v: unknown): v is AiFeature {
@@ -67,7 +65,6 @@ export type AiInput =
   | { feature: 'call_brief'; accountName: string; accountKind: string; facts: string[] }
   | { feature: 'call_notes'; accountName: string; notes: string; existing: string[] }
   | { feature: 'update_tidy'; accountName: string; text: string }
-  | { feature: 'crm_ask'; askerName: string; question: string; facts: string[] }
 
 export type AiRequest = {
   system: string
@@ -149,64 +146,6 @@ export const QUESTIONS_SCHEMA = {
   required: ['questions'],
   additionalProperties: false,
 } as const
-
-/** Ask RR may answer in prose, look up quotes, and/or propose a draft for confirm. */
-export const CRM_ASK_SCHEMA = {
-  type: 'object',
-  properties: {
-    reply: { type: 'string' },
-    quote_lookup_client: { anyOf: [{ type: 'string' }, { type: 'null' }] },
-    quote_draft: {
-      anyOf: [
-        { type: 'null' },
-        {
-          type: 'object',
-          properties: {
-            client: { type: 'string' },
-            division_code: { type: 'string' },
-            description: { type: 'string' },
-            notes: { type: 'string' },
-            items: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  description: { type: 'string' },
-                  qty: { type: 'number' },
-                  unit_price: { type: 'number' },
-                  unit_cost: { type: 'number' },
-                },
-                required: ['description', 'qty', 'unit_price', 'unit_cost'],
-                additionalProperties: false,
-              },
-            },
-          },
-          required: ['client', 'division_code', 'description', 'notes', 'items'],
-          additionalProperties: false,
-        },
-      ],
-    },
-  },
-  required: ['reply', 'quote_lookup_client', 'quote_draft'],
-  additionalProperties: false,
-} as const
-
-export type AskQuoteLine = { description: string; qty: number; unit_price: number; unit_cost: number }
-
-export type AskQuoteDraft = {
-  client: string
-  division_code: string
-  description: string
-  notes: string
-  items: AskQuoteLine[]
-}
-
-export type CrmAskParsed = {
-  reply: string
-  quoteDraft: AskQuoteDraft | null
-  /** Company name to search existing quotations for (pull up / did we raise). */
-  quoteLookupClient: string | null
-}
 
 /** Reads the before the call answer: at most three short questions. Malformed answers give none. */
 export function parseQuestions(text: string): string[] {
@@ -310,91 +249,11 @@ export function buildAiRequest(input: AiInput): AiRequest {
         maxTokens: 3000,
         schema: REQUIREMENTS_SCHEMA as unknown as Record<string, unknown>,
       }
-    case 'crm_ask':
-      return {
-        system:
-          'You are Ask RR for Red Reach\'s Threads CRM (company pipeline, follow-ups, quotations). ' +
-          'Answer using only the CRM facts, quotation facts (including line unit prices when present) and the salesperson\'s question. ' +
-          'Be concrete: name companies, stages, owners, follow-up dates, quote refs, line descriptions and unit prices when relevant. ' +
-          'If facts are missing, say what is missing. Never invent quote references, prices or company names that are not in the facts ' +
-          '(except when the salesperson clearly names a new client for a new quotation). ' +
-          'Keep reply under 180 words. Use bullet points when listing deals, quotes or line prices. ' +
-          'When the salesperson asks whether a quotation exists, to pull up / open / find a quote for a company, ' +
-          'set quote_lookup_client to that company name (prefer exact name from facts) and set quote_draft to null. ' +
-          'When they ask to create, draft, make, raise or generate a quotation, fill quote_draft with client, division_code ' +
-          '(01 Threads/uniforms, 02 Wanders/tours, 03 Marketing, 04 Connect, 05 Care, 06 Trading; default 01), ' +
-          'description, notes, and line items: description, qty, unit_price (selling rate AED) and unit_cost (cost price AED, 0 if unknown). ' +
-          'Only include numbers the salesperson stated or that are clearly in the facts; if selling price or qty is missing, ' +
-          'ask for it in reply and set quote_draft to null. Cost may be 0 if they did not give cost. ' +
-          'For ordinary questions that are not about finding or creating a quotation, set quote_lookup_client and quote_draft to null. ' +
-          'Never claim a new quotation was already saved; the salesperson must confirm in the app. ' +
-          STYLE,
-        user:
-          `Salesperson: ${input.askerName || 'team'}\n\nQuestion: ${clip(input.question, 1000)}\n\n` +
-          `CRM facts:\n${input.facts.map((f) => `- ${f}`).join('\n')}`,
-        // Haiku 5.5 thinks by default and thinking counts toward max_tokens.
-        // Ask RR disables thinking in the edge function; keep headroom anyway.
-        maxTokens: 4096,
-        schema: CRM_ASK_SCHEMA as unknown as Record<string, unknown>,
-      }
   }
   throw new Error('Unknown AI feature')
 }
 
 export type ProposedRequirement = { title: string; detail: string }
-
-/** Reads Ask RR JSON. Malformed answers become plain text with no quote draft. */
-export function parseCrmAskAnswer(text: string): CrmAskParsed {
-  let data: unknown
-  try {
-    data = JSON.parse(text)
-  } catch {
-    return { reply: tidyAiText(text), quoteDraft: null, quoteLookupClient: null }
-  }
-  const obj = (data ?? {}) as Record<string, unknown>
-  const reply = tidyAiText(String(obj.reply ?? ''))
-  const lookupRaw = obj.quote_lookup_client
-  const quoteLookupClient =
-    typeof lookupRaw === 'string' && lookupRaw.trim() ? lookupRaw.trim().slice(0, 200) : null
-
-  const raw = obj.quote_draft
-  if (!raw || typeof raw !== 'object') {
-    return { reply: reply || tidyAiText(text), quoteDraft: null, quoteLookupClient }
-  }
-  const draft = raw as Record<string, unknown>
-  const client = String(draft.client ?? '').trim().slice(0, 200)
-  const division_code = String(draft.division_code ?? '01').trim().slice(0, 2) || '01'
-  const description = String(draft.description ?? '').trim().slice(0, 500)
-  const notes = String(draft.notes ?? '').trim().slice(0, 2000)
-  const itemsRaw = Array.isArray(draft.items) ? draft.items : []
-  const items: AskQuoteLine[] = []
-  for (const row of itemsRaw.slice(0, 40)) {
-    const r = (row ?? {}) as Record<string, unknown>
-    const lineDescription = String(r.description ?? '').trim().slice(0, 500)
-    const qty = Number(r.qty)
-    const unit_price = Number(r.unit_price)
-    const unit_cost = Number(r.unit_cost)
-    if (!lineDescription || !Number.isFinite(qty) || qty <= 0 || !Number.isFinite(unit_price) || unit_price < 0) continue
-    items.push({
-      description: lineDescription,
-      qty,
-      unit_price,
-      unit_cost: Number.isFinite(unit_cost) && unit_cost >= 0 ? unit_cost : 0,
-    })
-  }
-  if (!client || !items.length) {
-    return {
-      reply: reply || 'I need a client and at least one line item to propose a draft quotation.',
-      quoteDraft: null,
-      quoteLookupClient,
-    }
-  }
-  return {
-    reply: reply || `Draft quotation ready for ${client}. Confirm to save it as a Draft.`,
-    quoteDraft: { client, division_code, description, notes, items },
-    quoteLookupClient,
-  }
-}
 
 /** Reads the call notes answer. Anything malformed becomes an empty list rather than an error. */
 export function parseRequirements(text: string): ProposedRequirement[] {
@@ -553,13 +412,6 @@ export function normaliseAiInput(raw: unknown): AiInput | null {
       const notes = str(r.notes, AI_MAX_INPUT_CHARS)
       if (!notes.trim()) return null
       return { feature: 'call_notes', accountName, notes, existing: strList(r.existing, 200, 200) }
-    }
-    case 'crm_ask': {
-      const question = str(r.question, 1000).trim()
-      // Allow CRM + quote totals + per-line prices for a few matching quotes.
-      const facts = strList(r.facts, 140, 700).filter((f) => f.trim())
-      if (!question || !facts.length) return null
-      return { feature: 'crm_ask', askerName: str(r.askerName, 120), question, facts }
     }
     default:
       return null

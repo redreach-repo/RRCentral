@@ -22,7 +22,6 @@ import {
   buildAiRequest,
   newNumbers,
   normaliseAiInput,
-  parseCrmAskAnswer,
   parseQuestions,
   parseRequirements,
   tidyAiText,
@@ -80,20 +79,15 @@ Deno.serve(withErrorLog("ai-assist", async (req) => {
   const body = (await req.json().catch(() => ({}))) as { account_id?: unknown; input?: unknown }
   const accountId = typeof body.account_id === "string" && UUID.test(body.account_id) ? body.account_id : ""
   const input = normaliseAiInput(body.input)
-  if (!input) return json({ error: "Nothing to work with. Add some text first." }, 400)
+  if (!input || !accountId) return json({ error: "Nothing to work with. Add some text first." }, 400)
 
-  // CRM Ask is read-only over a snapshot the signed-in person already loaded — no account write check.
-  const isCrmAsk = input.feature === "crm_ask"
-  if (!isCrmAsk) {
-    if (!accountId) return json({ error: "Nothing to work with. Add some text first." }, 400)
-    const { data: allowed } = await userDb.rpc("rr_can_write_account", { target: accountId })
-    if (allowed !== true) return json({ error: "You can only use AI help on accounts you can edit" }, 403)
-  }
+  const { data: allowed } = await userDb.rpc("rr_can_write_account", { target: accountId })
+  if (allowed !== true) return json({ error: "You can only use AI help on accounts you can edit" }, 403)
 
   const request = buildAiRequest(input)
   const schema = request.schema
-  // Haiku 5.5 thinks by default; thinking tokens count toward max_tokens and
-  // were emptying Ask RR replies. Disable thinking for these short staff tools.
+  // Haiku 5.5 thinks by default; thinking tokens count toward max_tokens.
+  // Disable thinking for these short staff tools so replies are not cut off.
   const client = new Anthropic({ apiKey, maxRetries: 2, timeout: 120_000 })
   let message: Anthropic.Message
   try {
@@ -131,7 +125,7 @@ Deno.serve(withErrorLog("ai-assist", async (req) => {
   const costUsd = aiCostUsd(message.usage)
   const sb = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
   const { error: logError } = await sb.from("ai_usage_log").insert({
-    account_id: isCrmAsk ? null : accountId,
+    account_id: accountId,
     feature: input.feature,
     model: message.model || AI_MODEL,
     input_tokens: message.usage.input_tokens || 0,
@@ -155,23 +149,6 @@ Deno.serve(withErrorLog("ai-assist", async (req) => {
     const questions = parseQuestions(text)
     if (!questions.length) return json({ error: "AI help came back empty. Please try again." }, 502)
     return json({ text: "", requirements: [], questions, costUsd })
-  }
-  if (input.feature === "crm_ask") {
-    if (message.stop_reason === "max_tokens") {
-      return json({ error: "Ask RR ran out of space for the answer. Please ask a shorter question." }, 502)
-    }
-    const parsed = parseCrmAskAnswer(text)
-    if (!parsed.reply && !parsed.quoteDraft && !parsed.quoteLookupClient) {
-      return json({ error: "AI help came back empty. Please try again." }, 502)
-    }
-    return json({
-      text: parsed.reply,
-      requirements: [],
-      questions: [],
-      quoteDraft: parsed.quoteDraft,
-      quoteLookupClient: parsed.quoteLookupClient,
-      costUsd,
-    })
   }
   text = tidyAiText(text)
   if (!text) return json({ error: "AI help came back empty. Please try again." }, 502)

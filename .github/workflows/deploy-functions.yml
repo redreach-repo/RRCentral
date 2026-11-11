@@ -25,7 +25,6 @@ on:
           - daily-digest
           - client-portal
           - ai-assist
-          - ask-rr-mcp
           - whatsapp-in
           - whatsapp-send
           - support-email-in

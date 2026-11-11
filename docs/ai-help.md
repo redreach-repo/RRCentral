@@ -1,17 +1,14 @@
 # AI help
 
-RR Central uses Claude Haiku (`claude-haiku-5-5`) for AI help. Nothing is
-sent or saved without a person checking it first (CRM Ask answers in chat
-only and never writes to the CRM until you confirm a draft quotation).
+RR Central uses Claude Haiku (`claude-haiku-5-5`) for AI help on accounts.
+Nothing is sent or saved without a person checking it first.
 
 | Where | Button | What it does |
 | --- | --- | --- |
-| Sales CRM (Pipeline, Follow-ups, Quotations, Invoices, Delivery notes, Customer files, Quick add) | **Ask RR** | Chat about overdue follow-ups, companies and pipeline. Can pull up quotations and propose a **Draft quotation**; nothing is saved until you confirm. |
 | Ticket page | **Summarise** | Short summary of the thread: what the client wants, what was done, what is open. Can be saved as an internal note. |
 | Ticket page | **Draft a reply** | Puts a draft reply in the reply box. Internal notes are used for context but never quoted. You edit it, send it as usual and log it. |
 | Monthly report | **Write summary with AI** | Writes the opening summary from the report's numbers. You can edit it before printing. |
 | AI CRM account, Requirements | **From call notes** | Paste call notes, get a list of suggested requirements, tick the ones to add. |
-| Claude Desktop / iPhone | MCP connector **Ask RR** | Same CRM ask / find quotes / create draft tools outside the browser. See [ask-rr-claude.md](./ask-rr-claude.md). |
 
 ## Cost
 
@@ -27,9 +24,7 @@ the buttons show a note that AI help needs the Supabase connection.
 
 ## Setup
 
-1. Run `supabase/migrations/20261104090000_ai_assist.sql` (and
-   `20261204090000_crm_ask.sql` for Ask RR on CRM — needed so usage logging
-   accepts `crm_ask` with a null account).
+1. Run `supabase/migrations/20261104090000_ai_assist.sql`.
 2. Create an API key at console.anthropic.com (Settings, API keys). This is
    a normal API key, not the admin key used by usage import.
 3. In Supabase, Edge Functions, Secrets, add `ANTHROPIC_API_KEY` with that key.
@@ -37,10 +32,6 @@ the buttons show a note that AI help needs the Supabase connection.
 
    GitHub → RRCentral → **Actions** → **Deploy Edge Functions** → **Run workflow** → pick `ai-assist` → **Run workflow**.
    Verify JWT is off for it in `supabase/config.toml`; the function checks the caller itself.
-   After Ask RR changes, redeploy `ai-assist` (and `ask-rr-mcp` if you use Claude connectors).
-
-5. For Claude Mac / iPhone, also set `ASK_RR_MCP_TOKEN` and deploy `ask-rr-mcp`
-   (see [ask-rr-claude.md](./ask-rr-claude.md)).
 
 If the app runs on a domain other than `redreach-repo.github.io` or
 `redreach.ae`, add it to the `ALLOWED_ORIGINS` secret (comma separated).

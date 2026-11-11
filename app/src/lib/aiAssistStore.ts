@@ -1,5 +1,5 @@
 import { db } from './db'
-import type { AiInput, AskQuoteDraft, ProposedRequirement } from './aiAssist'
+import type { AiInput, ProposedRequirement } from './aiAssist'
 import { isMissingRelationError } from './errors'
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseConfig'
 import type { AiUsageLog } from './types'
@@ -8,39 +8,12 @@ export type AiResult = {
   text: string
   requirements: ProposedRequirement[]
   questions: string[]
-  quoteDraft: AskQuoteDraft | null
-  quoteLookupClient: string | null
   costUsd: number
 }
 
 export const AI_LOCAL_MODE = 'AI help works once RR Central is connected to Supabase.'
 
-function asQuoteDraft(raw: unknown): AskQuoteDraft | null {
-  if (!raw || typeof raw !== 'object') return null
-  const d = raw as Record<string, unknown>
-  const client = String(d.client || '').trim()
-  const items = Array.isArray(d.items) ? d.items : []
-  if (!client || !items.length) return null
-  return {
-    client,
-    division_code: String(d.division_code || '01').trim() || '01',
-    description: String(d.description || '').trim(),
-    notes: String(d.notes || '').trim(),
-    items: items
-      .map((row) => {
-        const r = (row || {}) as Record<string, unknown>
-        return {
-          description: String(r.description || '').trim(),
-          qty: Number(r.qty) || 0,
-          unit_price: Number(r.unit_price) || 0,
-          unit_cost: Math.max(0, Number(r.unit_cost) || 0),
-        }
-      })
-      .filter((i) => i.description && i.qty > 0),
-  }
-}
-
-async function invokeAi(body: { account_id: string | null; input: AiInput }): Promise<AiResult> {
+async function invokeAi(body: { account_id: string; input: AiInput }): Promise<AiResult> {
   if (!isSupabaseConfigured()) throw new Error(AI_LOCAL_MODE)
   const { data, error } = await getSupabaseClient().functions.invoke('ai-assist', { body })
   if (error) {
@@ -53,16 +26,11 @@ async function invokeAi(body: { account_id: string | null; input: AiInput }): Pr
     }
     throw new Error(message)
   }
-  const d = (data || {}) as Partial<AiResult> & { quoteDraft?: unknown; quoteLookupClient?: unknown }
+  const d = (data || {}) as Partial<AiResult>
   return {
     text: String(d.text || ''),
     requirements: Array.isArray(d.requirements) ? d.requirements : [],
     questions: Array.isArray(d.questions) ? d.questions.map(String) : [],
-    quoteDraft: asQuoteDraft(d.quoteDraft),
-    quoteLookupClient:
-      typeof d.quoteLookupClient === 'string' && d.quoteLookupClient.trim()
-        ? d.quoteLookupClient.trim()
-        : null,
     costUsd: Number(d.costUsd) || 0,
   }
 }
@@ -70,11 +38,6 @@ async function invokeAi(body: { account_id: string | null; input: AiInput }): Pr
 /** Asks the ai-assist function. It checks the person may edit the account and logs the cost there. */
 export async function runAi(accountId: string, input: AiInput): Promise<AiResult> {
   return invokeAi({ account_id: accountId, input })
-}
-
-/** Read-only Ask RR over a CRM snapshot the signed-in person already loaded. */
-export async function runCrmAsk(input: Extract<AiInput, { feature: 'crm_ask' }>): Promise<AiResult> {
-  return invokeAi({ account_id: null, input })
 }
 
 /** AI use logged on one account, or on every visible account when no id is given, since a date. */
