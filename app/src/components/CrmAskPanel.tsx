@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { ExternalLink, FilePlus2, MessageCircle, Send, Sparkles, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
+import { usePhoneShell } from '../hooks/useMediaQuery'
 import type { AskQuoteDraft } from '../lib/aiAssist'
 import { AI_LOCAL_MODE, runCrmAsk } from '../lib/aiAssistStore'
 import { createAskDraftQuote } from '../lib/askDraftQuote'
@@ -30,37 +32,14 @@ type ChatTurn = {
   quoteHits?: AskQuoteHit[]
 }
 
-const fab: CSSProperties = {
-  ...btnPrimary,
-  position: 'fixed',
-  right: 20,
-  bottom: 20,
-  zIndex: 40,
-  borderRadius: 999,
-  padding: '12px 16px',
-  boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
-}
-
-const panel: CSSProperties = {
-  position: 'fixed',
-  right: 16,
-  bottom: 16,
-  zIndex: 45,
-  width: 'min(420px, calc(100vw - 24px))',
-  maxHeight: 'min(560px, calc(100vh - 32px))',
-  display: 'flex',
-  flexDirection: 'column',
-  background: '#1a1d22',
-  border: `1px solid ${colors.border}`,
-  borderRadius: 16,
-  overflow: 'hidden',
-  boxShadow: '0 16px 40px rgba(0,0,0,0.45)',
-  color: colors.text,
-}
-
 type Props = {
   entries: CrmEntry[]
   owners: AppUser[]
+  /** Controlled open (e.g. header Ask RR button). */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  /** Hide the floating button when a header control already opens the panel. */
+  hideFab?: boolean
 }
 
 function divisionLabel(code: string): string {
@@ -76,12 +55,27 @@ function lineMoney(line: AskQuoteDraft['items'][number]): string {
 /**
  * Ask RR chat: answers from loaded CRM + recent quotes, can pull up existing
  * quotations, and can propose a Draft that is only saved after confirm.
+ * Portaled to document.body so the FAB is never clipped by CRM layout.
  */
-export default function CrmAskPanel({ entries, owners }: Props) {
+export default function CrmAskPanel({
+  entries,
+  owners,
+  open: openProp,
+  onOpenChange,
+  hideFab = false,
+}: Props) {
   const { user } = useAuth()
   const { settings } = useSettings()
   const { showToast } = useToast()
-  const [open, setOpen] = useState(false)
+  const phoneShell = usePhoneShell()
+  const controlled = openProp !== undefined
+  const [openLocal, setOpenLocal] = useState(false)
+  const open = controlled ? Boolean(openProp) : openLocal
+  const setOpen = (next: boolean) => {
+    if (!controlled) setOpenLocal(next)
+    onOpenChange?.(next)
+  }
+
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [creatingKey, setCreatingKey] = useState<number | null>(null)
@@ -104,6 +98,37 @@ export default function CrmAskPanel({ entries, owners }: Props) {
     if (!open) return
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight })
   }, [open, turns, busy, creatingKey])
+
+  const fab: CSSProperties = {
+    ...btnPrimary,
+    position: 'fixed',
+    right: 16,
+    // Sit above the phone bottom nav (≈64px) so Ask RR stays visible.
+    bottom: phoneShell ? 'calc(72px + env(safe-area-inset-bottom, 0px))' : 20,
+    zIndex: 80,
+    borderRadius: 999,
+    padding: '12px 16px',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+  }
+
+  const panel: CSSProperties = {
+    position: 'fixed',
+    right: 16,
+    bottom: phoneShell ? 'calc(72px + env(safe-area-inset-bottom, 0px))' : 16,
+    zIndex: 85,
+    width: 'min(420px, calc(100vw - 24px))',
+    maxHeight: phoneShell
+      ? 'min(560px, calc(100vh - 96px - env(safe-area-inset-bottom, 0px)))'
+      : 'min(560px, calc(100vh - 32px))',
+    display: 'flex',
+    flexDirection: 'column',
+    background: '#1a1d22',
+    border: `1px solid ${colors.border}`,
+    borderRadius: 16,
+    overflow: 'hidden',
+    boxShadow: '0 16px 40px rgba(0,0,0,0.45)',
+    color: colors.text,
+  }
 
   async function ask(question: string) {
     const q = question.trim()
@@ -213,15 +238,9 @@ export default function CrmAskPanel({ entries, owners }: Props) {
     void ask(draft)
   }
 
-  if (!open) {
-    return (
-      <button type="button" style={fab} onClick={() => setOpen(true)} title="Ask RR about your pipeline">
-        <Sparkles size={16} /> Ask RR
-      </button>
-    )
-  }
+  if (typeof document === 'undefined') return null
 
-  return (
+  const ui = open ? (
     <div style={panel} role="dialog" aria-label="Ask RR">
       <div
         style={{
@@ -396,5 +415,11 @@ export default function CrmAskPanel({ entries, owners }: Props) {
         </button>
       </form>
     </div>
+  ) : hideFab ? null : (
+    <button type="button" style={fab} onClick={() => setOpen(true)} title="Ask RR about your pipeline">
+      <Sparkles size={16} /> Ask RR
+    </button>
   )
+
+  return createPortal(ui, document.body)
 }

@@ -20,6 +20,7 @@ import {
   Phone,
   Settings,
   CalendarClock,
+  Sparkles,
 } from 'lucide-react'
 import { db } from '../lib/db'
 import { CRM_OUTCOME_REASONS, NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
@@ -224,6 +225,7 @@ export default function CrmPage() {
   const [sheetTab, setSheetTab] = useState<SheetTab>('overview')
   const [defaultsReady, setDefaultsReady] = useState(false)
   const [calendarSettingsOpen, setCalendarSettingsOpen] = useState(false)
+  const [askRrOpen, setAskRrOpen] = useState(false)
   const compact = useCompactCrm()
 
   const myOwnerName = useMemo(
@@ -1143,6 +1145,18 @@ export default function CrmPage() {
               onClick={() => setCalendarSettingsOpen(true)}
             >
               <Settings size={16} /> {compact ? 'Calendar' : 'Calendar settings'}
+            </button>
+            <button
+              type="button"
+              style={{
+                ...btnPrimary,
+                minHeight: compact ? 44 : undefined,
+                flex: compact ? '1 1 120px' : undefined,
+              }}
+              onClick={() => setAskRrOpen(true)}
+              title="Ask RR about pipeline, quotes, and drafts"
+            >
+              <Sparkles size={16} /> Ask RR
             </button>
             <button
               type="button"
@@ -2207,7 +2221,12 @@ export default function CrmPage() {
         onClose={() => setCalendarSettingsOpen(false)}
       />
 
-      <CrmAskPanel entries={entries} owners={owners} />
+      <CrmAskPanel
+        entries={entries}
+        owners={owners}
+        open={askRrOpen}
+        onOpenChange={setAskRrOpen}
+      />
     </div>
   )
 }
