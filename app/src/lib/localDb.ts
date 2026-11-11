@@ -444,27 +444,39 @@ async function ensureSeeded(): Promise<void> {
     const crmTx = database.transaction('crm', 'readwrite')
     const crmStore = crmTx.objectStore('crm')
     const now = new Date().toISOString()
+    const seedContact = {
+      id: crypto.randomUUID(),
+      name: 'Demo Signatory',
+      email: 'signatory@example.com',
+      phone: MASS_ALLIED.office,
+      role: 'Director',
+    }
     if (existingCrm) {
+      const contacts = Array.isArray(existingCrm.contacts) ? existingCrm.contacts : []
       crmStore.put({
         ...existingCrm,
         company_name: MASS_ALLIED.company_name,
         office_number: String(existingCrm.office_number || '').trim() || MASS_ALLIED.office,
         address: String(existingCrm.address || '').trim() || MASS_ALLIED.address,
         trn: String(existingCrm.trn || '').trim() || MASS_ALLIED.trn,
+        owner: String(existingCrm.owner || '').trim() || 'Jacob',
+        contacts: contacts.length ? contacts : [seedContact],
+        primary_contact: String(existingCrm.primary_contact || '').trim() || seedContact.name,
+        email_phone: String(existingCrm.email_phone || '').trim() || seedContact.email,
         updated_at: now,
       })
     } else {
       crmStore.put({
         id: crypto.randomUUID(),
         company_name: MASS_ALLIED.company_name,
-        primary_contact: '',
-        email_phone: '',
+        primary_contact: seedContact.name,
+        email_phone: seedContact.email,
         mobile_number: '',
         office_number: MASS_ALLIED.office,
         notes: 'Seeded from client letterhead details',
         follow_up_date: null,
         next_action: '',
-        owner: '',
+        owner: 'Jacob',
         company_owner: '',
         address: MASS_ALLIED.address,
         website: '',
@@ -474,7 +486,7 @@ async function ensureSeeded(): Promise<void> {
         outcome_reason: '',
         calendar_event_id: '',
         drive_folder_url: '',
-        contacts: [],
+        contacts: [seedContact],
         created_by: '',
         updated_by: '',
         created_at: now,
