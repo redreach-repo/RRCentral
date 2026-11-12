@@ -178,7 +178,7 @@ export default function AccountsPage() {
           <p style={pageSubtitleStyle}>
             {isStaff
               ? 'The clients, churches and prospects assigned to you.'
-              : 'Every AI CRM client, WorshipHub church and CTRM Next prospect in one list.'}
+              : 'RR Threads, Wanders and other trading clients, plus AI CRM, WorshipHub and CTRM Next.'}
           </p>
         </div>
         {canWrite ? (
@@ -260,7 +260,7 @@ export default function AccountsPage() {
             mine.length === 0
               ? isStaff
                 ? 'Nothing has been assigned to you yet. Ask Alfred to assign an account, or add a prospect you are working on.'
-                : 'Add your first AI CRM client, WorshipHub church or CTRM Next prospect.'
+                : 'Add your first RR Threads client, AI CRM company, WorshipHub church or CTRM Next prospect.'
               : 'Try another type, owner or search.'
           }
           actionLabel={canWrite && mine.length === 0 && !missingTable ? 'Add account' : undefined}
@@ -324,7 +324,7 @@ export default function AccountsPage() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         account={null}
-        defaultType={typeFilter === 'all' ? 'ai_crm_client' : typeFilter}
+        defaultType={typeFilter === 'all' ? 'rr_threads_client' : typeFilter}
         team={team}
         lockedOwnerId={isStaff ? appUserId : undefined}
         canReassign={can(userRole, 'accounts.reassign')}

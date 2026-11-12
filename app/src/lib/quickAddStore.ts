@@ -76,7 +76,7 @@ export async function saveQuickLead(lead: QuickLead, knownRefs: string[], author
   if (lead.pipeline === 'ai_crm') {
     const account = await createAccount(
       {
-        type: 'ai_crm_client',
+        type: 'rr_threads_client',
         name: company,
         industry: '',
         country: '',

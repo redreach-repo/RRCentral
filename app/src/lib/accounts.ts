@@ -12,6 +12,8 @@ import type {
  * (`AC-[code]-[YY][seq]`). Accounts use their own `AC` prefix so they never
  * share a number with RR- quotations or invoices.
  */
+const TRADING_STATUSES = ['prospect', 'quoted', 'active', 'paused', 'ended', 'lost']
+
 export const ACCOUNT_TYPES: {
   value: AccountType
   label: string
@@ -19,6 +21,48 @@ export const ACCOUNT_TYPES: {
   code: string
   statuses: string[]
 }[] = [
+  {
+    value: 'rr_threads_client',
+    label: 'RR Threads client',
+    plural: 'RR Threads clients',
+    code: '01',
+    statuses: TRADING_STATUSES,
+  },
+  {
+    value: 'rr_wanders_client',
+    label: 'RR Wanders client',
+    plural: 'RR Wanders clients',
+    code: '02',
+    statuses: TRADING_STATUSES,
+  },
+  {
+    value: 'rr_marketing_client',
+    label: 'RR Marketing client',
+    plural: 'RR Marketing clients',
+    code: '03',
+    statuses: TRADING_STATUSES,
+  },
+  {
+    value: 'rr_connect_client',
+    label: 'RR Connect client',
+    plural: 'RR Connect clients',
+    code: '04',
+    statuses: TRADING_STATUSES,
+  },
+  {
+    value: 'rr_care_client',
+    label: 'RR Care client',
+    plural: 'RR Care clients',
+    code: '05',
+    statuses: TRADING_STATUSES,
+  },
+  {
+    value: 'rr_trading_client',
+    label: 'RR Trading client',
+    plural: 'RR Trading clients',
+    code: '06',
+    statuses: TRADING_STATUSES,
+  },
   {
     value: 'ai_crm_client',
     label: 'AI CRM client',
@@ -41,6 +85,13 @@ export const ACCOUNT_TYPES: {
     statuses: ['active', 'won', 'lost'],
   },
 ]
+
+/** Map a quotation/invoice division code (01–06) to the matching Account type. */
+export function accountTypeFromDivision(divisionCode: string | null | undefined): AccountType | null {
+  const code = String(divisionCode || '').trim()
+  const hit = ACCOUNT_TYPES.find((t) => t.code === code && t.value.startsWith('rr_'))
+  return hit?.value ?? null
+}
 
 export const ACCOUNT_REFERENCE_PREFIX = 'AC'
 

@@ -854,7 +854,16 @@ export interface WebsiteInquiry {
 }
 
 /** Organisation Red Reach works with (RR Central modules). */
-export type AccountType = 'ai_crm_client' | 'worship_church' | 'ctrm_prospect'
+export type AccountType =
+  | 'rr_threads_client'
+  | 'rr_wanders_client'
+  | 'rr_marketing_client'
+  | 'rr_connect_client'
+  | 'rr_care_client'
+  | 'rr_trading_client'
+  | 'ai_crm_client'
+  | 'worship_church'
+  | 'ctrm_prospect'
 
 export interface Account {
   id: string

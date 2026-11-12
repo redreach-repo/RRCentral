@@ -1,4 +1,4 @@
-import { sameCompany } from './accounts'
+import { accountTypeFromDivision, sameCompany } from './accounts'
 import {
   createAccount,
   getAccount,
@@ -9,7 +9,7 @@ import {
 } from './accountsStore'
 import { flatFieldsFromContacts, hydrateContacts, normalizeContacts, primaryContact } from './contacts'
 import { db } from './db'
-import type { Account, AccountContact, CrmContact, CrmEntry } from './types'
+import type { Account, AccountContact, AccountType, CrmContact, CrmEntry, Quotation } from './types'
 
 function digits(phone: string): string {
   return String(phone || '').replace(/\D/g, '')
@@ -79,8 +79,31 @@ export type CreateAccountFromCrmOpts = {
   createdBy: string
   ownerUserId: string | null
   knownRefs?: string[]
-  /** Default ai_crm_client — general CRM companies land as prospects there. */
+  /**
+   * Account type. When omitted, inferred from the company's latest quotation
+   * division (e.g. 01 → RR Threads). Falls back to RR Threads — not AI CRM —
+   * so uniform / trading companies are not mis-labelled.
+   */
   type?: Account['type']
+}
+
+/** Prefer the latest quotation's division to pick Threads / Wanders / etc. */
+export async function inferAccountTypeForCompany(companyName: string): Promise<AccountType> {
+  const name = companyName.trim()
+  if (!name) return 'rr_threads_client'
+  const { data, error } = await db
+    .from('quotations')
+    .select('division_code, created_at, updated_at')
+    .ilike('client', name)
+    .order('updated_at', { ascending: false })
+    .limit(20)
+  if (error || !data?.length) return 'rr_threads_client'
+  const rows = data as Pick<Quotation, 'division_code' | 'created_at' | 'updated_at'>[]
+  for (const q of rows) {
+    const typed = accountTypeFromDivision(q.division_code)
+    if (typed) return typed
+  }
+  return 'rr_threads_client'
 }
 
 /**
@@ -120,9 +143,11 @@ export async function createAccountFromCrm(
     .filter(Boolean)
     .join('\n')
 
+  const type = opts.type || (await inferAccountTypeForCompany(name))
+
   const account = await createAccount(
     {
-      type: opts.type || 'ai_crm_client',
+      type,
       name,
       industry: '',
       country: '',
