@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import { ArrowLeft, Download, ExternalLink, FileUp, Link2, Mail, MessageCircle, Moon, Paperclip, Printer, Sun, Truck } from 'lucide-react'
+import { ArrowLeft, CloudUpload, Download, ExternalLink, FileUp, Link2, Mail, MessageCircle, Moon, Paperclip, Printer, Sun, Truck } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS, VAT_RATE } from '../lib/config'
 import type { Attachment, Client, CrmContact, CrmEntry, CustomerDocument, DeliveryNote, Invoice, LineItem, Quotation } from '../lib/types'
@@ -59,7 +59,7 @@ import LinkDriveFileModal from '../components/LinkDriveFileModal'
 import SaveToFolderPrompt from '../components/SaveToFolderPrompt'
 import { logActivity } from '../lib/activity'
 import { findCrmByCompany, syncCrmFromQuote } from '../lib/crmSync'
-import { loadCustomerDocuments } from '../lib/customerFiles'
+import { loadCustomerDocuments, uploadPdfToCustomerDrive } from '../lib/customerFiles'
 import { useAuth } from '../contexts/AuthContext'
 import {
   applyMessageTemplate,
@@ -389,6 +389,50 @@ export default function DocumentPage() {
       )
     } catch (e) {
       showToast(errorMessage(e, 'PDF failed'), 'error')
+    } finally {
+      setPdfBusy(false)
+    }
+  }
+
+  async function savePdfToDrive() {
+    if (!sheetRef.current || !doc?.client) return
+    let crmId = crmRecord?.id || ''
+    if (!crmId) {
+      try {
+        const found = await findCrmByCompany(doc.client)
+        crmId = found?.id || ''
+        if (found) setCrmRecord(found)
+      } catch {
+        /* optional */
+      }
+    }
+    if (!crmId) {
+      showToast('Save this company in CRM first, then file the PDF to Google Drive', 'error')
+      return
+    }
+    setPdfBusy(true)
+    try {
+      const { blob, filename } = await elementToPdfBlob(sheetRef.current, {
+        filenameHint: `${title.toLowerCase()}-${displayRef}`,
+        fitToPage,
+      })
+      const bytes = new Uint8Array(await blob.arrayBuffer())
+      const category =
+        docType === 'quote' ? 'quotation' : docType === 'invoice' ? 'invoice' : 'delivery_note'
+      await uploadPdfToCustomerDrive({
+        company: doc.client,
+        crmId,
+        category,
+        title: `${title} ${displayRef}`,
+        filename,
+        bytes,
+        relatedRef: displayRef,
+        uploadedBy: user?.email || '',
+      })
+      await refreshDriveLinks()
+      showToast('PDF saved to Google Drive', 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not save PDF to Google Drive'), 'error')
     } finally {
       setPdfBusy(false)
     }
@@ -1155,6 +1199,9 @@ export default function DocumentPage() {
         </label>
         <ToolbarBtn onClick={() => void downloadPdf()} disabled={pdfBusy}>
           <Download size={14} /> {pdfBusy ? 'Preparing…' : 'Download PDF'}
+        </ToolbarBtn>
+        <ToolbarBtn onClick={() => void savePdfToDrive()} disabled={pdfBusy}>
+          <CloudUpload size={14} /> {pdfBusy ? 'Saving…' : 'Save to Drive'}
         </ToolbarBtn>
         <ToolbarBtn onClick={() => void prepareEmail()} disabled={pdfBusy}>
           <Mail size={14} /> Email PDF

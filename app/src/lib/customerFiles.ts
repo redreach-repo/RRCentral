@@ -578,6 +578,41 @@ export async function loadCustomerFolder(company: string): Promise<CustomerFolde
   return { ...folder, missingDocumentsTable: docsResult.missing }
 }
 
+/**
+ * Upload a PDF (or other bytes) into the client's Google Drive folder and save
+ * the share link on customer_documents so Customer files / the quote sheet see it.
+ */
+export async function uploadPdfToCustomerDrive(opts: {
+  company: string
+  crmId: string
+  category: CustomerDocumentCategory
+  title: string
+  filename: string
+  bytes: Uint8Array
+  relatedRef?: string
+  notes?: string
+  uploadedBy: string
+  contentType?: string
+}): Promise<CustomerDocument> {
+  const { uploadToClientDrive } = await import('./googleDrive')
+  const uploaded = await uploadToClientDrive({
+    crmId: opts.crmId,
+    filename: opts.filename,
+    content: opts.bytes,
+    contentType: opts.contentType || 'application/pdf',
+  })
+  return saveCustomerDriveLink({
+    company: opts.company,
+    crmId: opts.crmId,
+    category: opts.category,
+    title: opts.title,
+    driveUrl: uploaded.url,
+    relatedRef: opts.relatedRef,
+    notes: opts.notes || 'Saved from RR Central PDF',
+    uploadedBy: opts.uploadedBy,
+  })
+}
+
 export async function saveCustomerDriveLink(opts: {
   company: string
   crmId?: string | null

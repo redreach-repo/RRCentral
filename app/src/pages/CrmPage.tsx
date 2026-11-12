@@ -117,6 +117,7 @@ import ContractsVaultPanel from '../components/crm/ContractsVaultPanel'
 import {
   createAccountFromCrm,
   findAccountForCrm,
+  syncCrmContactsToAccount,
   type CrmAccountLink,
 } from '../lib/crmAccountLink'
 
@@ -1098,6 +1099,17 @@ export default function CrmPage() {
       }
 
       await upsertClient(form, contacts)
+
+      // Keep account_contacts in sync when this CRM row is linked to an Account.
+      const linkedAccountId = editing?.account_id || null
+      if (linkedAccountId) {
+        try {
+          await syncCrmContactsToAccount(linkedAccountId, contacts)
+        } catch {
+          // Contact sync is best-effort; the CRM save already succeeded.
+        }
+      }
+
       await logActivity(
         editing ? 'update_crm' : 'create_crm',
         'crm',
@@ -1364,18 +1376,23 @@ export default function CrmPage() {
           ) : followFilter === 'Due' && !search && stageFilter === 'All' ? (
             <>
               <div>Nothing due right now. Nice work.</div>
-              <button
-                type="button"
-                style={btn}
-                onClick={() => {
-                  if (!canViewAll && myOwnerName) setOwnerFilter(myOwnerName)
-                  else setOwnerFilter('All')
-                  setFollowFilter('All')
-                  setStageFilter('All')
-                }}
-              >
-                Show all deals
-              </button>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+                <button
+                  type="button"
+                  style={btnPrimary}
+                  onClick={() => {
+                    if (!canViewAll && myOwnerName) setOwnerFilter(myOwnerName)
+                    else setOwnerFilter('All')
+                    setFollowFilter('All')
+                    setStageFilter('All')
+                  }}
+                >
+                  Show all deals
+                </button>
+                <button type="button" style={btn} onClick={openCreate}>
+                  <Plus size={16} /> Add company
+                </button>
+              </div>
             </>
           ) : (
             <>

@@ -62,10 +62,10 @@ export default function GoogleDriveCard() {
     <div style={{ ...cardStyle, marginBottom: 20 }}>
       <h2 style={sectionTitleStyle}>Google Drive</h2>
       <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
-        Customer and company files live in Google Drive; RR Central keeps the links. Once connected, RR Central makes a
-        folder per client under <strong>RR Central / Customers</strong>, files matched emails and client portal uploads
-        there, and you can paste Google Drive links on quotes, invoices and delivery notes. Share the RR Central folder
-        with your team in Google Drive so they can open the files.
+        All documents live in Google Drive; RR Central only keeps the share links. Once connected, RR Central makes a
+        folder per client under <strong>RR Central / Customers</strong>, files matched emails and portal uploads there,
+        and <strong>Save to Drive</strong> on quotes, invoices and delivery notes uploads the PDF. Company papers sit
+        under <strong>Company documents</strong>. Share the RR Central folder with your team in Drive.
       </p>
       {isLocalMode ? (
         <p style={{ fontSize: 13, color: colors.muted }}>Google Drive needs RR Central connected to Supabase.</p>

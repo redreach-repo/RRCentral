@@ -377,3 +377,62 @@ export function dealTotals(rows: DealRow[]): DealTotals {
 export function dealSources(rows: DealRow[]): string[] {
   return [...new Set(rows.map((r) => r.source).filter(Boolean))].sort((a, b) => a.localeCompare(b))
 }
+
+/** Canonical stage written when a deal is dropped onto a shared board column. */
+export const CRM_STAGE_FOR_COLUMN: Record<BoardColumn, string> = {
+  new: 'Lead',
+  talking: 'Contacted',
+  proposal: 'Quoted',
+  deciding: 'Negotiation',
+  won: 'Won',
+  lost: 'Lost',
+}
+
+export const SALES_STAGE_FOR_COLUMN: Record<BoardColumn, SalesStage> = {
+  new: 'lead',
+  talking: 'discovery_call',
+  proposal: 'quote_sent',
+  deciding: 'quote_sent',
+  won: 'signed',
+  lost: 'lost',
+}
+
+export const CTRM_STAGE_FOR_COLUMN: Record<BoardColumn, CtrmStage> = {
+  new: 'identified',
+  talking: 'contacted',
+  proposal: 'evaluating',
+  deciding: 'decision_pending',
+  won: 'signed',
+  lost: 'lost',
+}
+
+export function targetStageForColumn(pipeline: DealPipeline, column: BoardColumn): string {
+  if (pipeline === 'crm') return CRM_STAGE_FOR_COLUMN[column]
+  if (pipeline === 'sales') return SALES_STAGE_FOR_COLUMN[column]
+  return CTRM_STAGE_FOR_COLUMN[column]
+}
+
+/** Stages the user can pick on the unified board for one pipeline. */
+export function stagesForPipeline(pipeline: DealPipeline): { value: string; label: string }[] {
+  if (pipeline === 'crm') {
+    return ['Lead', 'Contacted', 'Quoted', 'Negotiation', 'Won', 'Lost'].map((s) => ({ value: s, label: s }))
+  }
+  if (pipeline === 'sales') {
+    return (['lead', 'discovery_call', 'quote_sent', 'signed', 'lost'] as SalesStage[]).map((s) => ({
+      value: s,
+      label: salesStageLabel(s),
+    }))
+  }
+  return (
+    [
+      'identified',
+      'contacted',
+      'intro_call_booked',
+      'demo_done',
+      'evaluating',
+      'decision_pending',
+      'signed',
+      'lost',
+    ] as CtrmStage[]
+  ).map((s) => ({ value: s, label: ctrmStageLabel(s) }))
+}

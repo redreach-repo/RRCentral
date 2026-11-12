@@ -6,6 +6,7 @@ import {
   dealTotals,
   filterDeals,
   sortDeals,
+  targetStageForColumn,
   type DealFilters,
   type MyDealsInput,
 } from './myDeals'
@@ -185,5 +186,14 @@ describe('dealAccess per role', () => {
   })
   it('keeps the old CRM and commission from staff', () => {
     expect(dealAccess('staff')).toEqual({ pipelines: ['sales', 'ctrm'], commission: false })
+  })
+})
+
+describe('targetStageForColumn', () => {
+  it('maps shared columns to each pipeline’s canonical stage', () => {
+    expect(targetStageForColumn('crm', 'proposal')).toBe('Quoted')
+    expect(targetStageForColumn('sales', 'talking')).toBe('discovery_call')
+    expect(targetStageForColumn('ctrm', 'deciding')).toBe('decision_pending')
+    expect(targetStageForColumn('sales', 'deciding')).toBe('quote_sent')
   })
 })

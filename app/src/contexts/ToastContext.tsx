@@ -58,10 +58,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({ showToast }), [showToast])
 
-  const topbar = phoneShell ? 56 : 60
-  const stackStyle = {
-    top: `calc(${12 + bannerH}px + env(safe-area-inset-top, 0px) + ${topbar}px)`,
-  }
+  // Phone: sit above the bottom nav (no top offset — that covered the title/bell).
+  // Desktop: sit just under the top bar (+ local-mode banner when present).
+  const stackStyle = phoneShell
+    ? undefined
+    : {
+        top: `calc(${12 + bannerH}px + env(safe-area-inset-top, 0px) + 60px)`,
+      }
 
   return (
     <ToastContext.Provider value={value}>

@@ -225,6 +225,13 @@ export default function SettingsPage() {
     setDraft({ ...settings })
   }, [settings])
 
+  useEffect(() => {
+    const hash = window.location.hash.replace(/^#/, '')
+    if (!hash) return
+    const el = document.getElementById(hash)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
+
   function connectSupabase() {
     const url = supabaseUrl.trim().replace(/\/+$/, '')
     const key = supabaseKey.trim()
@@ -672,7 +679,7 @@ export default function SettingsPage() {
       <h1 style={pageTitleStyle}>Settings</h1>
       <p style={pageSubtitleStyle}>Company details, data storage, and user access</p>
 
-      <div style={{ ...cardStyle, marginBottom: 20 }}>
+      <div id="connect-supabase" style={{ ...cardStyle, marginBottom: 20 }}>
         <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
           <HardDrive size={18} /> Data &amp; storage
         </h2>
@@ -936,7 +943,9 @@ export default function SettingsPage() {
       )}
       {renderSection('System', 'System', SYSTEM_KEYS)}
       <CtrmListsCard />
-      <GoogleDriveCard />
+      <div id="google-drive">
+        <GoogleDriveCard />
+      </div>
       <HubSpotCard />
 
       <div style={{ ...cardStyle, marginBottom: 20 }}>
