@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from 'react'
+import { useEffect, useMemo, useState, type ComponentType } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { WorshipHubIcon } from './worshiphub/WorshipHubIcon'
 import {
@@ -34,6 +34,7 @@ import {
   Timer,
   ClipboardList,
   FileSignature,
+  ScrollText,
   HeartPulse,
   FileBarChart,
   TrendingUp,
@@ -44,6 +45,7 @@ import {
   Send,
   CopyCheck,
   PhoneCall,
+  ChevronDown,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders'
@@ -72,48 +74,66 @@ type NavItem = {
   forStaff?: boolean
 }
 
-type NavGroup = { id: string; label: string; items: NavItem[] }
+type NavGroup = {
+  id: string
+  label: string
+  /** Open by default when no saved preference exists. */
+  defaultOpen?: boolean
+  items: NavItem[]
+}
 
+const NAV_EXPANDED_KEY = 'rrcentral_nav_expanded'
+
+/**
+ * Shorter groups so the left rail is scannable. Pipelines sit with Sales;
+ * delivery/templates and finance analytics are no longer buried under Clients.
+ */
 const navGroups: NavGroup[] = [
   {
     id: 'overview',
     label: 'Overview',
+    defaultOpen: true,
     items: [{ to: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true }],
-  },
-  {
-    id: 'accounts',
-    label: 'Clients and partners',
-    items: [
-      { to: '/accounts', label: 'Accounts', icon: Contact, forStaff: true },
-      { to: '/client-health', label: 'Client health', icon: HeartPulse, forStaff: true },
-      { to: '/client-reports', label: 'Monthly reports', icon: FileBarChart, forStaff: true },
-      { to: '/mrr', label: 'MRR', icon: TrendingUp, minRole: 'manager' },
-      { to: '/duplicates', label: 'Duplicates', icon: CopyCheck, minRole: 'manager' },
-      { to: '/support', label: 'Support', icon: LifeBuoy, forStaff: true },
-      { to: '/deals', label: 'My deals', icon: Briefcase, forStaff: true },
-      { to: '/sales', label: 'AI CRM sales', icon: Target, forStaff: true },
-      { to: '/ctrm', label: 'CTRM Next', icon: Handshake, forStaff: true },
-      { to: '/ctrm-issues', label: 'CTRM issues', icon: MessageSquareWarning, forStaff: true },
-      { to: '/client-updates', label: 'Weekly updates', icon: Send, forStaff: true },
-      { to: '/products', label: 'WorshipHub', icon: WorshipHubIcon, forStaff: true },
-      { to: '/delivery-settings', label: 'Packages and rates', icon: Package, minRole: 'manager' },
-      { to: '/build-templates', label: 'Build templates', icon: ClipboardList, forStaff: true },
-      { to: '/agreement-template', label: 'Agreement template', icon: FileSignature, forStaff: true },
-      { to: '/nda-template', label: 'NDA template', icon: FileSignature, forStaff: true },
-      { to: '/insights', label: 'Utilisation and profit', icon: Gauge, minRole: 'manager' },
-    ],
   },
   {
     id: 'sales',
     label: 'Sales',
+    defaultOpen: true,
     items: [
       { to: '/quick-add', label: 'Quick add', icon: PhoneCall, minRole: 'sales' },
       { to: '/crm', label: 'CRM', icon: Users },
       { to: '/follow-ups', label: 'Follow-ups', icon: CalendarClock },
+      { to: '/deals', label: 'My deals', icon: Briefcase, forStaff: true },
+      { to: '/sales', label: 'Sales pipeline', icon: Target, forStaff: true },
+      { to: '/ctrm', label: 'CTRM Next', icon: Handshake, forStaff: true },
+      { to: '/ctrm-issues', label: 'CTRM issues', icon: MessageSquareWarning, forStaff: true },
       { to: '/quotations', label: 'Quotations', icon: FileText },
       { to: '/invoices', label: 'Invoices', icon: Receipt },
       { to: '/delivery-notes', label: 'Delivery notes', icon: Truck },
       { to: '/customer-files', label: 'Customer files', icon: FolderOpen },
+    ],
+  },
+  {
+    id: 'clients',
+    label: 'Clients',
+    defaultOpen: true,
+    items: [
+      { to: '/accounts', label: 'Accounts', icon: Contact, forStaff: true },
+      { to: '/support', label: 'Support', icon: LifeBuoy, forStaff: true },
+      { to: '/client-health', label: 'Client health', icon: HeartPulse, forStaff: true },
+      { to: '/client-reports', label: 'Monthly reports', icon: FileBarChart, forStaff: true },
+      { to: '/client-updates', label: 'Weekly updates', icon: Send, forStaff: true },
+    ],
+  },
+  {
+    id: 'delivery',
+    label: 'Delivery',
+    items: [
+      { to: '/products', label: 'WorshipHub', icon: WorshipHubIcon, forStaff: true },
+      { to: '/delivery-settings', label: 'Packages', icon: Package, minRole: 'manager' },
+      { to: '/build-templates', label: 'Build templates', icon: ClipboardList, forStaff: true },
+      { to: '/agreement-template', label: 'Agreement', icon: ScrollText, forStaff: true },
+      { to: '/nda-template', label: 'NDA template', icon: FileSignature, forStaff: true },
     ],
   },
   {
@@ -132,9 +152,12 @@ const navGroups: NavGroup[] = [
     label: 'Finance',
     items: [
       { to: '/payments', label: 'Payments', icon: Banknote },
-      { to: '/reports', label: 'Reports', icon: BarChart3 },
       { to: '/expenses', label: 'Expenses', icon: Wallet },
       { to: '/vendors', label: 'Vendors', icon: Building2 },
+      { to: '/reports', label: 'Reports', icon: BarChart3 },
+      { to: '/mrr', label: 'MRR', icon: TrendingUp, minRole: 'manager' },
+      { to: '/insights', label: 'Utilisation', icon: Gauge, minRole: 'manager' },
+      { to: '/duplicates', label: 'Duplicates', icon: CopyCheck, minRole: 'manager' },
     ],
   },
   {
@@ -215,6 +238,44 @@ function isPhonePrimaryActive(pathname: string, to: string, end?: boolean): bool
   return pathname === to || pathname.startsWith(`${to}/`)
 }
 
+function itemMatchesPath(pathname: string, item: NavItem): boolean {
+  if (item.end) return pathname === item.to
+  return pathname === item.to || pathname.startsWith(`${item.to}/`)
+}
+
+function readExpandedPrefs(): Record<string, boolean> | null {
+  try {
+    const raw = localStorage.getItem(NAV_EXPANDED_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Record<string, boolean>
+    return parsed && typeof parsed === 'object' ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function writeExpandedPrefs(next: Record<string, boolean>) {
+  try {
+    localStorage.setItem(NAV_EXPANDED_KEY, JSON.stringify(next))
+  } catch {
+    /* ignore */
+  }
+}
+
+function defaultExpandedMap(pathname: string): Record<string, boolean> {
+  const prefs = readExpandedPrefs()
+  const map: Record<string, boolean> = {}
+  for (const group of navGroups) {
+    const onRoute = group.items.some((item) => itemMatchesPath(pathname, item))
+    if (prefs && Object.prototype.hasOwnProperty.call(prefs, group.id)) {
+      map[group.id] = Boolean(prefs[group.id]) || onRoute
+    } else {
+      map[group.id] = Boolean(group.defaultOpen) || onRoute
+    }
+  }
+  return map
+}
+
 export default function Layout() {
   const { user, userRole, signOut, isLocalMode } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -228,6 +289,47 @@ export default function Layout() {
   // Only roles that write to Finance should top up monthly deductions.
   useRecurringDeductionsSync(Boolean(user) && roleAtLeast(userRole, 'sales'))
   const phoneNav = userRole === 'staff' ? staffPhoneNav : phonePrimaryNav
+
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
+    defaultExpandedMap(location.pathname),
+  )
+
+  useEffect(() => {
+    setExpanded((prev) => {
+      let changed = false
+      const next = { ...prev }
+      for (const group of navGroups) {
+        if (group.items.some((item) => itemMatchesPath(location.pathname, item)) && !next[group.id]) {
+          next[group.id] = true
+          changed = true
+        }
+      }
+      if (changed) writeExpandedPrefs(next)
+      return changed ? next : prev
+    })
+  }, [location.pathname])
+
+  const visibleGroups = useMemo(() => {
+    return navGroups
+      .map((group) => {
+        const items = group.items.filter((item) => {
+          if (userRole === 'staff' && !item.forStaff) return false
+          if (item.roles) return item.roles.includes(userRole)
+          if (item.minRole) return roleAtLeast(userRole, item.minRole)
+          return true
+        })
+        return { ...group, items }
+      })
+      .filter((group) => group.items.length > 0)
+  }, [userRole])
+
+  function toggleGroup(id: string) {
+    setExpanded((prev) => {
+      const next = { ...prev, [id]: !prev[id] }
+      writeExpandedPrefs(next)
+      return next
+    })
+  }
 
   function openReminders() {
     if (reminders.permission === 'default') void reminders.enableNotifications()
@@ -263,7 +365,7 @@ export default function Layout() {
 
       <aside className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
         <div className={styles.brand}>
-          <BrandLogo height={44} className={styles.brandLogo} />
+          <BrandLogo height={40} className={styles.brandLogo} />
           <button
             type="button"
             className={styles.closeBtn}
@@ -274,45 +376,54 @@ export default function Layout() {
           </button>
         </div>
 
-        <nav className={styles.nav}>
-          {navGroups.map((group) => {
-            const items = group.items.filter((item) => {
-              if (userRole === 'staff' && !item.forStaff) return false
-              if (item.roles) return item.roles.includes(userRole)
-              if (item.minRole) return roleAtLeast(userRole, item.minRole)
-              return true
-            })
-            if (!items.length) return null
+        <nav className={styles.nav} aria-label="Main">
+          {visibleGroups.map((group) => {
+            const open = expanded[group.id] !== false
+            const panelId = `nav-group-${group.id}`
             return (
-              <div key={group.id} className={styles.navGroup}>
-                <div className={styles.navGroupLabel}>{group.label}</div>
-                {items.map(({ to, label, icon: Icon, end }) => (
-                  <NavLink
-                    key={`${to}-${label}`}
-                    to={to}
-                    end={end}
-                    className={({ isActive }) =>
-                      `${styles.navItem} ${isActive ? styles.navItemActive : ''}`
-                    }
-                    onClick={() => setSidebarOpen(false)}
-                  >
-                    <Icon size={18} strokeWidth={1.75} />
-                    <span>{label}</span>
-                    {to === '/follow-ups' && reminders.due > 0 && (
-                      <span className={styles.navBadge} aria-label={`${reminders.due} due`}>
-                        {reminders.due > 99 ? '99+' : reminders.due}
-                      </span>
-                    )}
-                  </NavLink>
-                ))}
+              <div
+                key={group.id}
+                className={`${styles.navGroup} ${open ? styles.navGroupOpen : ''}`}
+              >
+                <button
+                  type="button"
+                  className={styles.navGroupToggle}
+                  aria-expanded={open}
+                  aria-controls={panelId}
+                  onClick={() => toggleGroup(group.id)}
+                >
+                  <span className={styles.navGroupLabel}>{group.label}</span>
+                  <ChevronDown
+                    size={14}
+                    className={styles.navGroupChevron}
+                    aria-hidden
+                  />
+                </button>
+                <div id={panelId} className={styles.navGroupItems} hidden={!open}>
+                  {group.items.map(({ to, label, icon: Icon, end }) => (
+                    <NavLink
+                      key={`${to}-${label}`}
+                      to={to}
+                      end={end}
+                      className={({ isActive }) =>
+                        `${styles.navItem} ${isActive ? styles.navItemActive : ''}`
+                      }
+                      onClick={() => setSidebarOpen(false)}
+                    >
+                      <Icon size={17} strokeWidth={1.75} />
+                      <span>{label}</span>
+                      {to === '/follow-ups' && reminders.due > 0 && (
+                        <span className={styles.navBadge} aria-label={`${reminders.due} due`}>
+                          {reminders.due > 99 ? '99+' : reminders.due}
+                        </span>
+                      )}
+                    </NavLink>
+                  ))}
+                </div>
               </div>
             )
           })}
         </nav>
-
-        <div className={styles.sidebarFooter}>
-          <div className={styles.divisionHint}>Multi-division CRM</div>
-        </div>
       </aside>
 
       <div className={styles.main}>
