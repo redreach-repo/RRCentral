@@ -282,7 +282,11 @@ async function fileOne(opts: {
 
   try {
     await ensureClientDriveFolder(entry.id)
-    const lines = await loadLineItems(kind === 'quotation' ? 'quotation' : 'invoice', doc.reference_number || doc.id)
+    const lineRef =
+      kind === 'quotation'
+        ? (doc as Quotation).quote_id || doc.reference_number || doc.id
+        : doc.reference_number || doc.id
+    const lines = await loadLineItems(kind === 'quotation' ? 'Quote' : 'Invoice', lineRef)
     const currency =
       (kind === 'quotation'
         ? (doc as Quotation).currency || (doc as Quotation).quotation_currency
