@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  accountTypeFromDivision,
   canEditAccount,
   documentsForAccount,
   nextAccountReference,
@@ -14,15 +15,24 @@ const may2026 = new Date('2026-05-01T00:00:00Z')
 
 describe('account references', () => {
   it('uses the AC prefix and the vertical code for the type', () => {
+    expect(nextAccountReference('rr_threads_client', [], may2026)).toBe('AC-01-26001')
     expect(nextAccountReference('ai_crm_client', [], may2026)).toBe('AC-07-26001')
     expect(nextAccountReference('worship_church', [], may2026)).toBe('AC-08-26001')
     expect(nextAccountReference('ctrm_prospect', [], may2026)).toBe('AC-09-26001')
   })
 
   it('continues the sequence per type and ignores invoice numbers', () => {
-    const refs = ['AC-07-26001', 'AC-07-26002', 'AC-08-26001', 'RR-07-26009']
+    const refs = ['AC-07-26001', 'AC-07-26002', 'AC-08-26001', 'RR-07-26009', 'AC-01-26001']
     expect(nextAccountReference('ai_crm_client', refs, may2026)).toBe('AC-07-26003')
     expect(nextAccountReference('worship_church', refs, may2026)).toBe('AC-08-26002')
+    expect(nextAccountReference('rr_threads_client', refs, may2026)).toBe('AC-01-26002')
+  })
+
+  it('maps division codes to trading account types', () => {
+    expect(accountTypeFromDivision('01')).toBe('rr_threads_client')
+    expect(accountTypeFromDivision('02')).toBe('rr_wanders_client')
+    expect(accountTypeFromDivision('07')).toBe(null)
+    expect(accountTypeFromDivision('')).toBe(null)
   })
 })
 

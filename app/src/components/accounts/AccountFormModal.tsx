@@ -54,7 +54,7 @@ export default function AccountFormModal({
   open,
   onClose,
   account,
-  defaultType = 'ai_crm_client',
+  defaultType = 'rr_threads_client',
   team,
   lockedOwnerId,
   canReassign,
@@ -128,10 +128,16 @@ export default function AccountFormModal({
           <select
             style={selectStyle}
             value={form.type}
-            disabled={Boolean(account)}
             onChange={(e) => {
               const type = e.target.value as AccountType
-              setForm((f) => ({ ...f, type, status: accountTypeInfo(type).statuses[0] }))
+              setForm((f) => ({
+                ...f,
+                type,
+                // Keep the current status when it is valid for the new type; else first status.
+                status: accountTypeInfo(type).statuses.includes(f.status)
+                  ? f.status
+                  : accountTypeInfo(type).statuses[0],
+              }))
             }}
           >
             {ACCOUNT_TYPES.map((t) => (
