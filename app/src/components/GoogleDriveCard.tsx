@@ -65,7 +65,7 @@ export default function GoogleDriveCard() {
   async function fileAllDocs() {
     if (
       !window.confirm(
-        'File every quotation and invoice into each client’s Google Drive folder? Already-filed docs are skipped. Keep this tab open until it finishes.',
+        'File every quotation and invoice as PDFs into each client’s Google Drive folder? Earlier bulk HTML files will be replaced with PDFs. Keep this tab open until it finishes.',
       )
     ) {
       return
@@ -160,10 +160,9 @@ export default function GoogleDriveCard() {
               }}
             >
               <p style={{ margin: 0, fontSize: 13, color: colors.muted, lineHeight: 1.5 }}>
-                Push every quotation and invoice into the matching client folder under{' '}
-                <strong>RR Central / Customers</strong>. Creates the folder if needed. Skips docs already linked.
-                Files are HTML archives of the stored data (open in Drive; use Save to Drive on a document for the
-                branded PDF).
+                Push every quotation and invoice as <strong>PDFs</strong> into the matching client folder under{' '}
+                <strong>RR Central / Customers</strong>. Creates the folder if needed. Replaces earlier bulk HTML
+                filings. For letterhead branding on one document, open it and use <strong>Save to Drive</strong>.
               </p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
                 <button
