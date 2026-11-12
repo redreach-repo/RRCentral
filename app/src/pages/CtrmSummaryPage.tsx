@@ -65,7 +65,7 @@ export default function CtrmSummaryPage() {
     return (
       <div className={styles.page}>
         <div className={styles.sheet}>
-          {error} <Link to="/ctrm">Back to the pipeline</Link>
+          {error} <Link to="/deals?pipeline=ctrm&view=board">Back to Pipeline</Link>
         </div>
       </div>
     )
@@ -77,7 +77,7 @@ export default function CtrmSummaryPage() {
   return (
     <div className={styles.page}>
       <div className={styles.toolbar}>
-        <Link to="/ctrm">Back to the pipeline</Link>
+        <Link to="/deals?pipeline=ctrm&view=board">Back to Pipeline</Link>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <label style={{ fontSize: 14 }}>
             Week of{' '}
@@ -104,7 +104,8 @@ export default function CtrmSummaryPage() {
 
       {summary.byStage.every((b) => b.count === 0) ? (
         <p className={styles.toolbar} style={{ fontSize: 13 }}>
-          There are no deals yet, so this summary is empty. <Link to="/ctrm">Add the first deal on the pipeline.</Link>
+          There are no deals yet, so this summary is empty.{' '}
+          <Link to="/ctrm">Add the first deal on the CTRM stage board.</Link>
         </p>
       ) : null}
 

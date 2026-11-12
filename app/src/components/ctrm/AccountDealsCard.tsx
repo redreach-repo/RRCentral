@@ -63,8 +63,8 @@ export default function AccountDealsCard({ account, contacts, team, editable, sh
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>CTRM Next deal</h2>
         <div style={{ display: 'flex', gap: 8 }}>
-          <Link to="/ctrm" style={{ color: colors.muted, fontSize: 12 }}>
-            Open the pipeline
+          <Link to="/deals?pipeline=ctrm&view=board" style={{ color: colors.muted, fontSize: 12 }}>
+            Open Pipeline
           </Link>
           {editable && deals.length === 0 ? (
             <button type="button" style={{ ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }} onClick={() => setEditing(null)}>

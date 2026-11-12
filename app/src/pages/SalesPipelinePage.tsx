@@ -311,9 +311,13 @@ export default function SalesPipelinePage() {
     <div style={pageStyle}>
       <div style={toolbarStyle}>
         <div>
-          <h1 style={pageTitleStyle}>AI CRM sales pipeline</h1>
+          <h1 style={pageTitleStyle}>AI CRM stages</h1>
           <p style={pageSubtitleStyle}>
-            Prospects for an AI CRM, from first contact to a signed contract. A quote becomes the contract with Make contract.
+            Move AI CRM deals stage by stage. Day-to-day view lives on{' '}
+            <Link to="/deals?pipeline=sales&view=board" style={{ color: colors.accent }}>
+              Pipeline
+            </Link>
+            . A quote becomes the contract with Make contract.
           </p>
         </div>
         {canWrite && !missingTable ? (
