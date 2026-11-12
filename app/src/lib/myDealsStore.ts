@@ -15,7 +15,7 @@ import {
   type BoardColumn,
   type DealRow,
 } from './myDeals'
-import type { AppUser, CrmEntry, CtrmDeal, CtrmStage, Quotation, SalesDeal, SalesStage, UserRole } from './types'
+import type { AppUser, CrmEntry, CtrmDeal, CtrmStage, Quotation, SalesStage, UserRole } from './types'
 
 async function rows<T>(query: PromiseLike<{ data: unknown; error: unknown }>): Promise<T[]> {
   const { data, error } = await query
