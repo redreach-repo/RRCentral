@@ -24,6 +24,7 @@ import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import ClientBillToFields from '../components/ClientBillToFields'
 import { useClientBillTo } from '../hooks/useClientBillTo'
+import { ensureCompanyFromDocument } from '../lib/ensureCompanyFromDocument'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
 import { logActivity } from '../lib/activity'
@@ -396,13 +397,34 @@ export default function InvoicesPage() {
     }
   }
 
-  /** Address/TRN typed on the form go to the client record, which the invoice prints from. */
+  /** Persist the company into Clients + CRM + Drive folder (best-effort). */
   async function saveBillToForClient(client: string) {
+    const name = client.trim()
+    if (!name) return
     try {
-      const result = await billTo.save(client)
-      if (result === 'created') showToast(`${client} added to Clients`, 'success')
+      const who = user?.email || ''
+      const ensured = await ensureCompanyFromDocument({
+        company: name,
+        address: billTo.draft.address,
+        trn: billTo.draft.trn,
+        owner: who.split('@')[0] || who,
+        userEmail: who,
+        source: 'invoice',
+      })
+      if (ensured.crm === 'created' && ensured.driveFolder === 'created') {
+        showToast(`${name} added to CRM · Google Drive folder ready`, 'success')
+      } else if (ensured.crm === 'created') {
+        showToast(`${name} added to CRM`, 'success')
+      } else if (ensured.client === 'created') {
+        showToast(`${name} added to Clients`, 'success')
+      } else if (ensured.driveFolder === 'created') {
+        showToast(`Google Drive folder ready for ${name}`, 'success')
+      }
+      if (ensured.driveFolder === 'error' && ensured.detail) {
+        showToast(`Company saved; Drive folder: ${ensured.detail}`, 'error')
+      }
     } catch (e) {
-      showToast(errorMessage(e, 'Invoice saved, but the client address/TRN could not be saved'), 'error')
+      showToast(errorMessage(e, 'Invoice saved, but the company could not be added to CRM'), 'error')
     }
   }
 
