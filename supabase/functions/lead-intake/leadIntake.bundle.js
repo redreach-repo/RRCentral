@@ -12,7 +12,50 @@ function normalizePhone(raw, countryCode = "971") {
 }
 
 // src/lib/accounts.ts
+var TRADING_STATUSES = ["prospect", "quoted", "active", "paused", "ended", "lost"];
 var ACCOUNT_TYPES = [
+  {
+    value: "rr_threads_client",
+    label: "RR Threads client",
+    plural: "RR Threads clients",
+    code: "01",
+    statuses: TRADING_STATUSES
+  },
+  {
+    value: "rr_wanders_client",
+    label: "RR Wanders client",
+    plural: "RR Wanders clients",
+    code: "02",
+    statuses: TRADING_STATUSES
+  },
+  {
+    value: "rr_marketing_client",
+    label: "RR Marketing client",
+    plural: "RR Marketing clients",
+    code: "03",
+    statuses: TRADING_STATUSES
+  },
+  {
+    value: "rr_connect_client",
+    label: "RR Connect client",
+    plural: "RR Connect clients",
+    code: "04",
+    statuses: TRADING_STATUSES
+  },
+  {
+    value: "rr_care_client",
+    label: "RR Care client",
+    plural: "RR Care clients",
+    code: "05",
+    statuses: TRADING_STATUSES
+  },
+  {
+    value: "rr_trading_client",
+    label: "RR Trading client",
+    plural: "RR Trading clients",
+    code: "06",
+    statuses: TRADING_STATUSES
+  },
   {
     value: "ai_crm_client",
     label: "AI CRM client",
