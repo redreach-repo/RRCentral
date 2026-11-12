@@ -72,6 +72,8 @@ export interface OwnedDomain {
 
 export interface CrmEntry {
   id: string
+  /** Linked Accounts org of record. Null until linked (name match or Create account). */
+  account_id?: string | null
   company_name: string
   primary_contact: string
   email_phone: string

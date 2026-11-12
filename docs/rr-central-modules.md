@@ -21,10 +21,11 @@ local mode (IndexedDB, `app/src/lib/localDb.ts`) and in the backup export
 | `account_contacts` | People at an account. One can be primary. |
 | `account_activities` | The shared timeline: notes, calls, emails, meetings and system events (stage moves, tickets, contract changes). |
 
-`clients`, `quotations` and `invoices` have a nullable `account_id`.
+`clients`, `quotations`, `invoices` and `crm` have a nullable `account_id`.
 Invoice and quotation numbers (`RR-…`) never change. Link existing rows with
 `supabase/scripts/link-accounts.sql` (dry run first, undo by batch), or one by
-one from the account page.
+one from the CRM sheet / account page. CRM also soft-matches by company name
+until the FK is filled (`20261207090000_crm_account_id.sql`).
 
 ### Client delivery (phase 2, `20261024090000_client_delivery.sql`)
 
