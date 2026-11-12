@@ -9,7 +9,7 @@ export default function DealProgressStrip({ steps }: { steps: DealStep[] }) {
         flexWrap: 'wrap',
         gap: 6,
         alignItems: 'center',
-        margin: '0 0 14px',
+        margin: '0 0 10px',
       }}
       aria-label="Deal progress"
     >

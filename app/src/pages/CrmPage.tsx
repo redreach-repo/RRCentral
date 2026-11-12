@@ -20,6 +20,7 @@ import {
   Phone,
   Settings,
   CalendarClock,
+  ChevronDown,
 } from 'lucide-react'
 import { db } from '../lib/db'
 import { CRM_OUTCOME_REASONS, NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
@@ -222,6 +223,7 @@ export default function CrmPage() {
   const [outcomeNote, setOutcomeNote] = useState('')
   const [outcomeReason, setOutcomeReason] = useState('')
   const [sheetTab, setSheetTab] = useState<SheetTab>('overview')
+  const [sheetMoreOpen, setSheetMoreOpen] = useState(false)
   const [defaultsReady, setDefaultsReady] = useState(false)
   const [calendarSettingsOpen, setCalendarSettingsOpen] = useState(false)
   const compact = useCompactCrm()
@@ -289,6 +291,7 @@ export default function CrmPage() {
       lost_note: entry.lost_note || '',
     })
     setSheetTab('overview')
+    setSheetMoreOpen(false)
     setModalOpen(true)
     setActivityLoading(true)
     void (async () => {
@@ -718,6 +721,7 @@ export default function CrmPage() {
     setForm({ ...emptyForm(), owner: defaultOwner })
     setActivity([])
     setSheetTab('overview')
+    setSheetMoreOpen(false)
     setModalOpen(true)
   }
 
@@ -726,6 +730,7 @@ export default function CrmPage() {
     setEditing(null)
     setForm(emptyForm())
     setActivity([])
+    setSheetMoreOpen(false)
   }
 
   function updateContact(id: string, patch: Partial<CrmContact>) {
@@ -1628,13 +1633,24 @@ export default function CrmPage() {
             </div>
             <form onSubmit={(e) => void handleSave(e)}>
               <div style={modalBody}>
+                {editing ? (
+                  <p className={resp.sheetMeta}>
+                    {[
+                      form.pipeline_stage || 'Lead',
+                      form.owner?.trim() || 'Unassigned',
+                      form.follow_up_date
+                        ? `Follow-up ${format(parseISO(form.follow_up_date), 'dd MMM yyyy')}`
+                        : 'No follow-up date',
+                    ].join(' · ')}
+                  </p>
+                ) : null}
                 {editing ? <DealProgressStrip steps={dealProgress} /> : null}
                 {editing ? (
                   <div className={resp.sheetTabs} role="tablist">
                     {(
                       [
-                        ['overview', 'Overview'],
-                        ['contacts', 'Contacts'],
+                        ['overview', 'Deal'],
+                        ['contacts', 'People'],
                         ['contracts', 'Contracts'],
                         ['activity', 'Activity'],
                       ] as const
@@ -1645,7 +1661,10 @@ export default function CrmPage() {
                         role="tab"
                         aria-selected={sheetTab === id}
                         className={`${resp.sheetTab} ${sheetTab === id ? resp.sheetTabActive : ''}`}
-                        onClick={() => setSheetTab(id)}
+                        onClick={() => {
+                          setSheetTab(id)
+                          setSheetMoreOpen(false)
+                        }}
                       >
                         {tabLabel}
                       </button>
@@ -1653,210 +1672,289 @@ export default function CrmPage() {
                   </div>
                 ) : null}
 
-                {editing ? (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
-                    <button type="button" style={btn} onClick={() => setLogTouchTarget(editing)}>
-                      <MessageSquarePlus size={14} /> Log touch
-                    </button>
-                    <Link
-                      to={`/quotations?client=${encodeURIComponent(editing.company_name)}&new=1`}
-                      style={{ ...btn, textDecoration: 'none' }}
-                    >
-                      <FileText size={14} /> New quote
-                    </Link>
-                    <Link
-                      to={`/customer-files?company=${encodeURIComponent(editing.company_name)}`}
-                      style={{ ...btn, textDecoration: 'none' }}
-                    >
-                      <FolderOpen size={14} /> Files
-                      {folderDocs.length ? ` (${folderDocs.length})` : ''}
-                    </Link>
-                    {editing.drive_folder_url ? (
-                      <a
-                        href={editing.drive_folder_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ ...btn, textDecoration: 'none' }}
-                      >
-                        <ExternalLink size={14} /> Google Drive
-                      </a>
-                    ) : (
-                      <Link
-                        to={`/customer-files?company=${encodeURIComponent(editing.company_name)}`}
-                        style={{ ...btn, textDecoration: 'none', opacity: 0.85 }}
-                        title="Link a Google Drive folder"
-                      >
-                        <FolderOpen size={14} /> Link folder
-                      </Link>
-                    )}
+                {editing && (sheetTab === 'overview' || sheetTab === 'activity') ? (
+                  <div className={resp.sheetActions}>
                     <button
                       type="button"
-                      style={btn}
-                      onClick={() => setLinkFileTarget({ entry: editing, channel: 'email' })}
+                      style={btnPrimary}
+                      onClick={() => setLogTouchTarget(editing)}
                     >
-                      <MessageCircle size={14} /> File chat
+                      <MessageSquarePlus size={14} /> Log touch
                     </button>
+                    {sheetTab === 'overview' ? (
+                      <>
+                        <Link
+                          to={`/quotations?client=${encodeURIComponent(editing.company_name)}&new=1`}
+                          style={{ ...btn, textDecoration: 'none' }}
+                        >
+                          <FileText size={14} /> New quote
+                        </Link>
+                        <div style={{ position: 'relative' }}>
+                          <button
+                            type="button"
+                            style={btn}
+                            aria-expanded={sheetMoreOpen}
+                            onClick={() => setSheetMoreOpen((o) => !o)}
+                          >
+                            Files {folderDocs.length ? `(${folderDocs.length})` : ''}{' '}
+                            <ChevronDown size={14} />
+                          </button>
+                          {sheetMoreOpen ? (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: 'calc(100% + 4px)',
+                                left: 0,
+                                zIndex: 20,
+                                minWidth: 200,
+                                padding: 6,
+                                borderRadius: 10,
+                                border: `1px solid ${colors.border}`,
+                                background: colors.card,
+                                boxShadow: '0 12px 28px rgba(0,0,0,0.45)',
+                                display: 'grid',
+                                gap: 4,
+                              }}
+                            >
+                              <Link
+                                to={`/customer-files?company=${encodeURIComponent(editing.company_name)}`}
+                                style={{ ...btnGhost, textDecoration: 'none', justifyContent: 'flex-start' }}
+                                onClick={() => setSheetMoreOpen(false)}
+                              >
+                                <FolderOpen size={14} /> Customer files
+                              </Link>
+                              {editing.drive_folder_url ? (
+                                <a
+                                  href={editing.drive_folder_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  style={{ ...btnGhost, textDecoration: 'none', justifyContent: 'flex-start' }}
+                                  onClick={() => setSheetMoreOpen(false)}
+                                >
+                                  <ExternalLink size={14} /> Google Drive
+                                </a>
+                              ) : (
+                                <Link
+                                  to={`/customer-files?company=${encodeURIComponent(editing.company_name)}`}
+                                  style={{ ...btnGhost, textDecoration: 'none', justifyContent: 'flex-start' }}
+                                  title="Link a Google Drive folder"
+                                  onClick={() => setSheetMoreOpen(false)}
+                                >
+                                  <FolderOpen size={14} /> Link folder
+                                </Link>
+                              )}
+                              <button
+                                type="button"
+                                style={{ ...btnGhost, justifyContent: 'flex-start' }}
+                                onClick={() => {
+                                  setSheetMoreOpen(false)
+                                  setLinkFileTarget({ entry: editing, channel: 'email' })
+                                }}
+                              >
+                                <MessageCircle size={14} /> File chat
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      </>
+                    ) : null}
                   </div>
                 ) : null}
 
-                <div
-                  style={{
-                    ...formGrid,
-                    display: sheetTab === 'overview' || !editing ? 'grid' : 'none',
-                  }}
-                >
-                  <Field label="Company *">
-                    <input
-                      style={input}
-                      required={sheetTab === 'overview' || !editing}
-                      value={form.company_name}
-                      onChange={(e) => setForm((f) => ({ ...f, company_name: e.target.value }))}
-                    />
-                  </Field>
-                  <Field label="Client business owner">
-                    <input
-                      style={input}
-                      value={form.company_owner}
-                      onChange={(e) => setForm((f) => ({ ...f, company_owner: e.target.value }))}
-                      placeholder="Proprietor / business owner name"
-                    />
-                  </Field>
-                  <Field label="Address">
-                    <input
-                      style={input}
-                      value={form.address}
-                      onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                    />
-                  </Field>
-                  <Field label="Website">
-                    <input
-                      style={input}
-                      value={form.website}
-                      onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
-                      placeholder="www.example.com"
-                    />
-                  </Field>
-                  <Field label="TRN">
-                    <input
-                      style={input}
-                      value={form.trn}
-                      onChange={(e) => setForm((f) => ({ ...f, trn: e.target.value }))}
-                    />
-                  </Field>
-                  <Field label="Follow-up date *">
-                    <input
-                      type="date"
-                      style={input}
-                      value={form.follow_up_date}
-                      required={form.pipeline_stage !== 'Won' && form.pipeline_stage !== 'Lost'}
-                      onChange={(e) => setForm((f) => ({ ...f, follow_up_date: e.target.value }))}
-                    />
-                  </Field>
-                  <Field label="Next action *">
-                    <select
-                      style={input}
-                      value={form.next_action}
-                      required={form.pipeline_stage !== 'Won' && form.pipeline_stage !== 'Lost'}
-                      onChange={(e) => setForm((f) => ({ ...f, next_action: e.target.value }))}
-                    >
-                      <option value="">Select next action…</option>
-                      {NEXT_ACTIONS.map((a) => (
-                        <option key={a} value={a}>
-                          {a}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Sales owner (Red Reach)">
-                    <select
-                      style={input}
-                      value={form.owner}
-                      disabled={!canReassign && Boolean(editing)}
-                      onChange={(e) => setForm((f) => ({ ...f, owner: e.target.value }))}
-                    >
-                      <option value="">—</option>
-                      {owners.map((o) => (
-                        <option key={o.id} value={o.name || o.email}>
-                          {o.name || o.email}
-                        </option>
-                      ))}
-                      {form.owner &&
-                        !owners.some((o) => (o.name || o.email) === form.owner) && (
-                          <option value={form.owner}>{form.owner}</option>
-                        )}
-                    </select>
-                  </Field>
-                  <Field label="Pipeline stage">
-                    <select
-                      style={input}
-                      value={form.pipeline_stage}
-                      onChange={(e) => setForm((f) => ({ ...f, pipeline_stage: e.target.value }))}
-                    >
-                      {PIPELINE_STAGES.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Quote ref">
-                    <input
-                      style={input}
-                      value={form.quote_ref}
-                      onChange={(e) => setForm((f) => ({ ...f, quote_ref: e.target.value }))}
-                      placeholder="RR-01-26001"
-                    />
-                  </Field>
-                  {form.pipeline_stage === 'Lost' ? (
-                    <div style={{ gridColumn: '1 / -1' }}>
-                      <LostReasonFields
-                        idPrefix="crm-form-lost"
-                        code={form.outcome_reason}
-                        note={form.lost_note}
-                        onChange={({ code, note }) => setForm((f) => ({ ...f, outcome_reason: code, lost_note: note }))}
-                      />
+                <div style={{ display: sheetTab === 'overview' || !editing ? 'block' : 'none' }}>
+                  <div className={resp.sheetSection}>
+                    <h4 className={resp.sheetSectionTitle}>Company</h4>
+                    <div style={formGrid}>
+                      <Field label="Company *">
+                        <input
+                          style={input}
+                          required={sheetTab === 'overview' || !editing}
+                          value={form.company_name}
+                          onChange={(e) => setForm((f) => ({ ...f, company_name: e.target.value }))}
+                        />
+                      </Field>
+                      <Field label="Client business owner">
+                        <input
+                          style={input}
+                          value={form.company_owner}
+                          onChange={(e) => setForm((f) => ({ ...f, company_owner: e.target.value }))}
+                          placeholder="Proprietor / business owner name"
+                        />
+                      </Field>
+                      <Field label="Address">
+                        <input
+                          style={input}
+                          value={form.address}
+                          onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                        />
+                      </Field>
+                      <Field label="Website">
+                        <input
+                          style={input}
+                          value={form.website}
+                          onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
+                          placeholder="www.example.com"
+                        />
+                      </Field>
+                      <Field label="TRN">
+                        <input
+                          style={input}
+                          value={form.trn}
+                          onChange={(e) => setForm((f) => ({ ...f, trn: e.target.value }))}
+                        />
+                      </Field>
                     </div>
-                  ) : null}
-                  {form.pipeline_stage === 'Won' && (
-                    <Field label={`${form.pipeline_stage} reason`}>
-                      <select
-                        style={input}
-                        value={form.outcome_reason}
-                        onChange={(e) => setForm((f) => ({ ...f, outcome_reason: e.target.value }))}
+                  </div>
+
+                  <div className={resp.sheetSection}>
+                    <h4 className={resp.sheetSectionTitle}>Pipeline</h4>
+                    <div style={formGrid}>
+                      <Field label="Follow-up date *">
+                        <input
+                          type="date"
+                          style={input}
+                          value={form.follow_up_date}
+                          required={form.pipeline_stage !== 'Won' && form.pipeline_stage !== 'Lost'}
+                          onChange={(e) => setForm((f) => ({ ...f, follow_up_date: e.target.value }))}
+                        />
+                      </Field>
+                      <Field label="Next action *">
+                        <select
+                          style={input}
+                          value={form.next_action}
+                          required={form.pipeline_stage !== 'Won' && form.pipeline_stage !== 'Lost'}
+                          onChange={(e) => setForm((f) => ({ ...f, next_action: e.target.value }))}
+                        >
+                          <option value="">Select next action…</option>
+                          {NEXT_ACTIONS.map((a) => (
+                            <option key={a} value={a}>
+                              {a}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label="Sales owner (Red Reach)">
+                        <select
+                          style={input}
+                          value={form.owner}
+                          disabled={!canReassign && Boolean(editing)}
+                          onChange={(e) => setForm((f) => ({ ...f, owner: e.target.value }))}
+                        >
+                          <option value="">—</option>
+                          {owners.map((o) => (
+                            <option key={o.id} value={o.name || o.email}>
+                              {o.name || o.email}
+                            </option>
+                          ))}
+                          {form.owner &&
+                            !owners.some((o) => (o.name || o.email) === form.owner) && (
+                              <option value={form.owner}>{form.owner}</option>
+                            )}
+                        </select>
+                      </Field>
+                      <Field label="Pipeline stage">
+                        <select
+                          style={input}
+                          value={form.pipeline_stage}
+                          onChange={(e) => setForm((f) => ({ ...f, pipeline_stage: e.target.value }))}
+                        >
+                          {PIPELINE_STAGES.map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label="Quote ref">
+                        <input
+                          style={input}
+                          value={form.quote_ref}
+                          onChange={(e) => setForm((f) => ({ ...f, quote_ref: e.target.value }))}
+                          placeholder="RR-01-26001"
+                        />
+                      </Field>
+                      {form.pipeline_stage === 'Lost' ? (
+                        <div style={{ gridColumn: '1 / -1' }}>
+                          <LostReasonFields
+                            idPrefix="crm-form-lost"
+                            code={form.outcome_reason}
+                            note={form.lost_note}
+                            onChange={({ code, note }) =>
+                              setForm((f) => ({ ...f, outcome_reason: code, lost_note: note }))
+                            }
+                          />
+                        </div>
+                      ) : null}
+                      {form.pipeline_stage === 'Won' && (
+                        <Field label={`${form.pipeline_stage} reason`}>
+                          <select
+                            style={input}
+                            value={form.outcome_reason}
+                            onChange={(e) => setForm((f) => ({ ...f, outcome_reason: e.target.value }))}
+                          >
+                            <option value="">—</option>
+                            {CRM_OUTCOME_REASONS.map((r) => (
+                              <option key={r} value={r}>
+                                {r}
+                              </option>
+                            ))}
+                            {form.outcome_reason &&
+                              !CRM_OUTCOME_REASONS.includes(
+                                form.outcome_reason as (typeof CRM_OUTCOME_REASONS)[number],
+                              ) && (
+                                <option value={form.outcome_reason}>{form.outcome_reason}</option>
+                              )}
+                          </select>
+                          <input
+                            style={{ ...input, marginTop: 8 }}
+                            placeholder="Or type a custom reason"
+                            value={
+                              CRM_OUTCOME_REASONS.includes(
+                                form.outcome_reason as (typeof CRM_OUTCOME_REASONS)[number],
+                              )
+                                ? ''
+                                : form.outcome_reason
+                            }
+                            onChange={(e) => setForm((f) => ({ ...f, outcome_reason: e.target.value }))}
+                          />
+                        </Field>
+                      )}
+                    </div>
+                    <p style={{ margin: '10px 0 0', fontSize: 12, color: colors.muted2 }}>
+                      {isZohoCalendarEnabled(settings)
+                        ? 'Follow-up date syncs to Zoho Calendar.'
+                        : 'Calendar sync is off.'}{' '}
+                      <button
+                        type="button"
+                        onClick={() => setCalendarSettingsOpen(true)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: 0,
+                          color: colors.accent,
+                          cursor: 'pointer',
+                          fontSize: 12,
+                        }}
                       >
-                        <option value="">—</option>
-                        {CRM_OUTCOME_REASONS.map((r) => (
-                          <option key={r} value={r}>
-                            {r}
-                          </option>
-                        ))}
-                        {form.outcome_reason &&
-                          !CRM_OUTCOME_REASONS.includes(
-                            form.outcome_reason as (typeof CRM_OUTCOME_REASONS)[number],
-                          ) && (
-                            <option value={form.outcome_reason}>{form.outcome_reason}</option>
-                          )}
-                      </select>
-                      <input
-                        style={{ ...input, marginTop: 8 }}
-                        placeholder="Or type a custom reason"
-                        value={
-                          CRM_OUTCOME_REASONS.includes(
-                            form.outcome_reason as (typeof CRM_OUTCOME_REASONS)[number],
-                          )
-                            ? ''
-                            : form.outcome_reason
-                        }
-                        onChange={(e) => setForm((f) => ({ ...f, outcome_reason: e.target.value }))}
-                      />
-                    </Field>
-                  )}
+                        Calendar settings
+                      </button>
+                    </p>
+                  </div>
+
+                  <div className={resp.sheetSection}>
+                    <h4 className={resp.sheetSectionTitle}>Notes</h4>
+                    <textarea
+                      style={{ ...input, minHeight: 80, resize: 'vertical' }}
+                      value={form.notes}
+                      onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                      aria-label="Notes"
+                    />
+                  </div>
                 </div>
 
                 <div
                   style={{
                     display: sheetTab === 'contacts' || !editing ? 'block' : 'none',
-                    marginTop: 8,
                     marginBottom: 8,
                   }}
                 >
@@ -1868,7 +1966,9 @@ export default function CrmPage() {
                       marginBottom: 10,
                     }}
                   >
-                    <label style={{ ...label, margin: 0 }}>Contacts</label>
+                    <h4 className={resp.sheetSectionTitle} style={{ margin: 0 }}>
+                      People
+                    </h4>
                     <button type="button" style={btnGhost} onClick={addContact}>
                       <UserPlus size={14} /> Add contact
                     </button>
@@ -1946,47 +2046,18 @@ export default function CrmPage() {
                       </div>
                     ))}
                   </div>
-                  <p style={{ margin: '8px 0 0', fontSize: 12, color: colors.muted2 }}>
-                    {isZohoCalendarEnabled(settings)
-                      ? 'Follow-up date syncs to Zoho Calendar.'
-                      : 'Calendar sync is off.'}{' '}
-                    <button
-                      type="button"
-                      onClick={() => setCalendarSettingsOpen(true)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        padding: 0,
-                        color: colors.accent,
-                        cursor: 'pointer',
-                        fontSize: 12,
-                      }}
-                    >
-                      Calendar settings
-                    </button>
-                  </p>
                 </div>
 
-                <div style={{ display: sheetTab === 'overview' || !editing ? 'block' : 'none' }}>
-                  <Field label="Notes">
-                    <textarea
-                      style={{ ...input, minHeight: 80, resize: 'vertical' }}
-                      value={form.notes}
-                      onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                    />
-                  </Field>
-                </div>
-
-                {editing ? (
-                  <div style={{ marginTop: 16, display: sheetTab === 'contracts' ? 'block' : 'none' }}>
-                    <label style={{ ...label, marginBottom: 8 }}>Contracts & NDAs</label>
+                {editing && sheetTab === 'contracts' ? (
+                  <div>
+                    <h4 className={resp.sheetSectionTitle}>Contracts & NDAs</h4>
                     <ContractsVaultPanel entry={editing} contacts={form.contacts || []} />
                   </div>
                 ) : null}
 
-                {editing ? (
-                  <div style={{ marginTop: 16, display: sheetTab === 'activity' ? 'block' : 'none' }}>
-                    <label style={{ ...label, marginBottom: 8 }}>Activity timeline</label>
+                {editing && sheetTab === 'activity' ? (
+                  <div>
+                    <h4 className={resp.sheetSectionTitle}>Timeline</h4>
                     {activityLoading ? (
                       <p style={{ color: colors.muted, fontSize: 13 }}>Loading activity…</p>
                     ) : activity.length === 0 ? (
@@ -1996,7 +2067,7 @@ export default function CrmPage() {
                     ) : (
                       <div
                         style={{
-                          maxHeight: 320,
+                          maxHeight: 360,
                           overflowY: 'auto',
                           border: `1px solid ${colors.border}`,
                           borderRadius: 10,
