@@ -1,5 +1,6 @@
 import { addActivity, createAccount, logAccountEvent } from './accountsStore'
 import { logActivity } from './activity'
+import { createAccountFromCrm } from './crmAccountLink'
 import { db } from './db'
 import { isMissingRelationError } from './errors'
 import { quickLeadNote, type QuickLeadPipeline, type QuickMatch } from './quickAdd'
@@ -147,5 +148,52 @@ export async function saveQuickLead(lead: QuickLead, knownRefs: string[], author
   })
   if (error) throw error
   await logActivity('create', 'crm', company, 'Quick add lead', author.email, id)
-  return { path: '/crm' }
+
+  // Also create the Accounts org of record so CRM and Clients stay aligned.
+  try {
+    await createAccountFromCrm(
+      {
+        id,
+        company_name: company,
+        primary_contact: lead.name.trim(),
+        email_phone: lead.email.trim(),
+        mobile_number: lead.phone,
+        office_number: '',
+        notes: note,
+        follow_up_date: today,
+        next_action: 'Follow up the call',
+        owner: author.name || '',
+        company_owner: '',
+        address: '',
+        website: '',
+        trn: '',
+        pipeline_stage: 'Lead',
+        quote_ref: '',
+        outcome_reason: '',
+        calendar_event_id: '',
+        contacts: [
+          {
+            id: crypto.randomUUID(),
+            name: lead.name.trim(),
+            email: lead.email.trim(),
+            phone: lead.phone,
+            role: 'Primary',
+          },
+        ],
+        created_by: author.email,
+        updated_by: author.email,
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        createdBy: author.email,
+        ownerUserId: author.appUserId,
+        knownRefs,
+      },
+    )
+  } catch {
+    // CRM lead is saved; account create is best-effort (e.g. missing accounts table).
+  }
+
+  return { path: `/crm?edit=${encodeURIComponent(id)}` }
 }

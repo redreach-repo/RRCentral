@@ -54,7 +54,7 @@ export default function AccountsPage() {
   const [team, setTeam] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
   const [missingTable, setMissingTable] = useState(false)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(() => searchParams.get('q') || '')
   const [ownerFilter, setOwnerFilter] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -63,6 +63,11 @@ export default function AccountsPage() {
   const typeFilter: TypeFilter = ACCOUNT_TYPES.some((t) => t.value === typeParam)
     ? (typeParam as AccountType)
     : 'all'
+
+  useEffect(() => {
+    const q = searchParams.get('q')
+    if (q != null) setSearch(q)
+  }, [searchParams])
 
   const canWrite = can(userRole, 'accounts.write')
   const isStaff = userRole === 'staff'

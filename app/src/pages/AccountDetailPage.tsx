@@ -20,6 +20,7 @@ import FitSheetCard from '../components/ctrm/FitSheetCard'
 import SessionsCard from '../components/ctrm/SessionsCard'
 import CtrmTermsCard from '../components/ctrm/CtrmTermsCard'
 import AccountSalesDealCard from '../components/sales/AccountSalesDealCard'
+import AccountCrmCard from '../components/crm/AccountCrmCard'
 import ChurchProductCard from '../components/worshiphub/ChurchProductCard'
 import { db } from '../lib/db'
 import {
@@ -562,6 +563,8 @@ export default function AccountDetailPage() {
           )}
         </section>
       </div>
+
+      <AccountCrmCard account={account} />
 
       {account.type === 'ai_crm_client' ? (
         <AccountSalesDealCard
