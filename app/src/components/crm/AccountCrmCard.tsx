@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { Users } from 'lucide-react'
-import { findCrmByCompany } from '../../lib/crmSync'
+import { findCrmForAccount } from '../../lib/crmAccountLink'
 import { errorMessage } from '../../lib/errors'
 import type { Account, CrmEntry } from '../../lib/types'
 import {
@@ -25,7 +25,7 @@ export default function AccountCrmCard({ account }: { account: Account }) {
     setError('')
     void (async () => {
       try {
-        const row = await findCrmByCompany(account.name)
+        const row = await findCrmForAccount(account)
         if (!cancelled) setCrm(row)
       } catch (e) {
         if (!cancelled) {

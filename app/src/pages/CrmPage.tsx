@@ -304,7 +304,7 @@ export default function CrmPage() {
           db.from('invoices').select('*').ilike('client', company).order('created_at', { ascending: false }).limit(20),
           loadCustomerDocuments(company).catch(() => [] as CustomerDocument[]),
           canLinkAccounts
-            ? findAccountForCrm(company).catch((): CrmAccountLink => ({ status: 'none' }))
+            ? findAccountForCrm(entry).catch((): CrmAccountLink => ({ status: 'none' }))
             : Promise.resolve({ status: 'none' } as CrmAccountLink),
         ])
         setFolderDocs(folderDocsList)
@@ -757,6 +757,10 @@ export default function CrmPage() {
         createdBy: user?.email || '',
         ownerUserId: ownerMatch?.id || appUserId || null,
       })
+      setEditing((prev) => (prev ? { ...prev, account_id: account.id } : prev))
+      setEntries((rows) =>
+        rows.map((r) => (r.id === editing.id ? { ...r, account_id: account.id } : r)),
+      )
       setAccountLink({ status: 'linked', account })
       showToast(`Account ${account.reference} ready`, 'success')
     } catch (e) {

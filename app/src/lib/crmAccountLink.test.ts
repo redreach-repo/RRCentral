@@ -44,4 +44,9 @@ describe('resolveCrmAccountLink', () => {
     expect(result.status).toBe('ambiguous')
     if (result.status === 'ambiguous') expect(result.accounts.map((x) => x.id).sort()).toEqual(['1', '2'])
   })
+
+  it('ignores legal suffixes the same way rr_normalize_company_name does', () => {
+    const row = account({ id: 'x', name: 'Unify Demo Trading LLC' })
+    expect(resolveCrmAccountLink('Unify Demo Trading L.L.C.', [row]).status).toBe('linked')
+  })
 })

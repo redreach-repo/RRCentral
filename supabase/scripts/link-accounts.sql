@@ -1,6 +1,7 @@
--- Link existing clients, quotations and invoices to accounts.
+-- Link existing clients, quotations, invoices and CRM companies to accounts.
 -- Paste into the Supabase SQL editor one step at a time. Needs
--- migrations/20261023090000_accounts_foundation.sql applied first.
+-- migrations/20261023090000_accounts_foundation.sql and
+-- migrations/20261207090000_crm_account_id.sql applied first.
 --
 -- Matching is by company name after dropping case, punctuation and legal
 -- suffixes (LLC, FZE, Trading, ...). Nothing is renamed: only the empty
