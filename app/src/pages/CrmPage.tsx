@@ -114,6 +114,11 @@ import { errorMessage } from '../lib/errors'
 import QuoteNudgesCard from '../components/quotes/QuoteNudgesCard'
 import SessionFollowUpsCard from '../components/ctrm/SessionFollowUpsCard'
 import ContractsVaultPanel from '../components/crm/ContractsVaultPanel'
+import {
+  createAccountFromCrm,
+  findAccountForCrm,
+  type CrmAccountLink,
+} from '../lib/crmAccountLink'
 
 type CrmForm = {
   company_name: string
@@ -176,12 +181,13 @@ function followUpColor(dateStr: string | null): string {
 }
 
 export default function CrmPage() {
-  const { user, userRole } = useAuth()
+  const { user, userRole, appUserId } = useAuth()
   const { settings } = useSettings()
   const { showToast } = useToast()
   const canViewAll = can(userRole, 'crm.viewAll')
   const canReassign = can(userRole, 'crm.reassignOwner')
   const canDeleteCrm = can(userRole, 'crm.deleteAny')
+  const canLinkAccounts = can(userRole, 'accounts.viewAll') || can(userRole, 'accounts.write')
   const [searchParams, setSearchParams] = useSearchParams()
   const [entries, setEntries] = useState<CrmEntry[]>([])
   const [owners, setOwners] = useState<AppUser[]>([])
@@ -216,6 +222,8 @@ export default function CrmPage() {
   const [rowMenuId, setRowMenuId] = useState<string | null>(null)
   const [defaultsReady, setDefaultsReady] = useState(false)
   const [calendarSettingsOpen, setCalendarSettingsOpen] = useState(false)
+  const [accountLink, setAccountLink] = useState<CrmAccountLink | null>(null)
+  const [accountLinkBusy, setAccountLinkBusy] = useState(false)
   const compact = useCompactCrm()
 
   const myOwnerName = useMemo(
@@ -282,20 +290,25 @@ export default function CrmPage() {
     })
     setSheetTab('overview')
     setCompanyDetailsOpen(false)
+    setAccountLink(null)
     setModalOpen(true)
     setActivityLoading(true)
     void (async () => {
       try {
         const company = entry.company_name
-        const [actRes, actByCrmRes, fuRes, quoteRes, invRes, folderDocsList] = await Promise.all([
+        const [actRes, actByCrmRes, fuRes, quoteRes, invRes, folderDocsList, link] = await Promise.all([
           db.from('activity_log').select('*').order('created_at', { ascending: false }).limit(120),
           db.from('activity_log').select('*').eq('crm_id', entry.id).order('created_at', { ascending: false }).limit(40),
           db.from('follow_up_updates').select('*').eq('crm_id', entry.id).order('created_at', { ascending: false }),
           db.from('quotations').select('*').ilike('client', company).order('created_at', { ascending: false }).limit(20),
           db.from('invoices').select('*').ilike('client', company).order('created_at', { ascending: false }).limit(20),
           loadCustomerDocuments(company).catch(() => [] as CustomerDocument[]),
+          canLinkAccounts
+            ? findAccountForCrm(company).catch((): CrmAccountLink => ({ status: 'none' }))
+            : Promise.resolve({ status: 'none' } as CrmAccountLink),
         ])
         setFolderDocs(folderDocsList)
+        setAccountLink(link)
         setDealQuotes((quoteRes.data || []) as Quotation[])
         setDealInvoices((invRes.data || []) as Invoice[])
         const byCrm = (actByCrmRes.data || []) as ActivityLogEntry[]
@@ -368,11 +381,12 @@ export default function CrmPage() {
       } catch {
         setActivity([])
         setFolderDocs([])
+        setAccountLink({ status: 'none' })
       } finally {
         setActivityLoading(false)
       }
     })()
-  }, [])
+  }, [canLinkAccounts])
 
   useEffect(() => {
     if (!rowMenuId) return
@@ -731,6 +745,25 @@ export default function CrmPage() {
     setForm(emptyForm())
     setActivity([])
     setCompanyDetailsOpen(false)
+    setAccountLink(null)
+  }
+
+  async function handleCreateAccountFromCrm() {
+    if (!editing || accountLinkBusy) return
+    setAccountLinkBusy(true)
+    try {
+      const ownerMatch = owners.find((o) => (o.name || o.email) === (editing.owner || '').trim())
+      const account = await createAccountFromCrm(editing, {
+        createdBy: user?.email || '',
+        ownerUserId: ownerMatch?.id || appUserId || null,
+      })
+      setAccountLink({ status: 'linked', account })
+      showToast(`Account ${account.reference} ready`, 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not create account'), 'error')
+    } finally {
+      setAccountLinkBusy(false)
+    }
   }
 
   function updateContact(id: string, patch: Partial<CrmContact>) {
@@ -1659,6 +1692,66 @@ export default function CrmPage() {
             <form onSubmit={(e) => void handleSave(e)}>
               <div style={modalBody}>
                 {editing ? <DealProgressStrip steps={dealProgress} /> : null}
+                {editing && canLinkAccounts ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      gap: 8,
+                      marginBottom: 12,
+                      padding: '8px 10px',
+                      borderRadius: 10,
+                      border: `1px solid ${colors.border}`,
+                      background: 'rgba(255,255,255,0.03)',
+                      fontSize: 12,
+                      color: colors.muted,
+                    }}
+                  >
+                    {!accountLink || accountLink.status === 'none' ? (
+                      <>
+                        <span style={{ flex: '1 1 160px' }}>No Accounts record yet for this company.</span>
+                        {can(userRole, 'accounts.write') ? (
+                          <button
+                            type="button"
+                            style={{ ...btn, fontSize: 12, padding: '6px 10px' }}
+                            disabled={accountLinkBusy}
+                            onClick={() => void handleCreateAccountFromCrm()}
+                          >
+                            {accountLinkBusy ? 'Creating…' : 'Create account'}
+                          </button>
+                        ) : null}
+                      </>
+                    ) : null}
+                    {accountLink?.status === 'linked' ? (
+                      <>
+                        <span style={{ flex: '1 1 160px' }}>
+                          Account{' '}
+                          <strong style={{ color: colors.text }}>{accountLink.account.reference}</strong>
+                        </span>
+                        <Link
+                          to={`/accounts/${accountLink.account.id}`}
+                          style={{ ...btn, fontSize: 12, padding: '6px 10px', textDecoration: 'none' }}
+                        >
+                          <ExternalLink size={14} /> Open account
+                        </Link>
+                      </>
+                    ) : null}
+                    {accountLink?.status === 'ambiguous' ? (
+                      <>
+                        <span style={{ flex: '1 1 160px' }}>
+                          Several accounts match this name — pick one in Clients → Accounts.
+                        </span>
+                        <Link
+                          to={`/accounts?q=${encodeURIComponent(editing.company_name)}`}
+                          style={{ ...btn, fontSize: 12, padding: '6px 10px', textDecoration: 'none' }}
+                        >
+                          View matches
+                        </Link>
+                      </>
+                    ) : null}
+                  </div>
+                ) : null}
                 {editing ? (
                   <div className={resp.sheetTabs} role="tablist">
                     {(
