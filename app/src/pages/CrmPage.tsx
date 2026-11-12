@@ -14,6 +14,7 @@ import {
   MessageCircle,
   FileText,
   FolderOpen,
+  Receipt,
   MessageSquarePlus,
   LayoutGrid,
   List,
@@ -133,7 +134,7 @@ type CrmForm = {
 
 type FollowFilter = FollowBucket
 
-type SheetTab = 'overview' | 'contacts' | 'contracts' | 'activity'
+type SheetTab = 'overview' | 'contacts' | 'money' | 'files' | 'activity'
 
 const emptyForm = (): CrmForm => ({
   company_name: '',
@@ -211,7 +212,7 @@ export default function CrmPage() {
   const [outcomeNote, setOutcomeNote] = useState('')
   const [outcomeReason, setOutcomeReason] = useState('')
   const [sheetTab, setSheetTab] = useState<SheetTab>('overview')
-  const [sheetMoreOpen, setSheetMoreOpen] = useState(false)
+  const [companyDetailsOpen, setCompanyDetailsOpen] = useState(false)
   const [rowMenuId, setRowMenuId] = useState<string | null>(null)
   const [defaultsReady, setDefaultsReady] = useState(false)
   const [calendarSettingsOpen, setCalendarSettingsOpen] = useState(false)
@@ -280,7 +281,7 @@ export default function CrmPage() {
       lost_note: entry.lost_note || '',
     })
     setSheetTab('overview')
-    setSheetMoreOpen(false)
+    setCompanyDetailsOpen(false)
     setModalOpen(true)
     setActivityLoading(true)
     void (async () => {
@@ -720,7 +721,7 @@ export default function CrmPage() {
     setForm({ ...emptyForm(), owner: defaultOwner })
     setActivity([])
     setSheetTab('overview')
-    setSheetMoreOpen(false)
+    setCompanyDetailsOpen(true)
     setModalOpen(true)
   }
 
@@ -729,7 +730,7 @@ export default function CrmPage() {
     setEditing(null)
     setForm(emptyForm())
     setActivity([])
-    setSheetMoreOpen(false)
+    setCompanyDetailsOpen(false)
   }
 
   function updateContact(id: string, patch: Partial<CrmContact>) {
@@ -1623,26 +1624,40 @@ export default function CrmPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={modalHeader}>
-              <h3 style={{ margin: 0, fontSize: 16, minWidth: 0, wordBreak: 'break-word' }}>
-                {editing ? editing.company_name : 'Add company'}
-              </h3>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <h3 style={{ margin: 0, fontSize: 16, wordBreak: 'break-word' }}>
+                  {editing ? form.company_name || editing.company_name : 'Add company'}
+                </h3>
+                {editing ? (
+                  <p className={resp.sheetMeta} style={{ marginTop: 4, marginBottom: 0 }}>
+                    {[
+                      form.pipeline_stage || 'Lead',
+                      form.owner?.trim() || 'Unassigned',
+                      form.follow_up_date
+                        ? `Follow-up ${format(parseISO(form.follow_up_date), 'dd MMM yyyy')}`
+                        : 'No follow-up',
+                      form.next_action?.trim() || null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                ) : null}
+              </div>
+              {editing ? (
+                <button
+                  type="button"
+                  style={btnPrimary}
+                  onClick={() => setLogTouchTarget(editing)}
+                >
+                  <MessageSquarePlus size={14} /> Log touch
+                </button>
+              ) : null}
               <button type="button" style={btnGhost} onClick={closeModal}>
                 <X size={18} />
               </button>
             </div>
             <form onSubmit={(e) => void handleSave(e)}>
               <div style={modalBody}>
-                {editing ? (
-                  <p className={resp.sheetMeta}>
-                    {[
-                      form.pipeline_stage || 'Lead',
-                      form.owner?.trim() || 'Unassigned',
-                      form.follow_up_date
-                        ? `Follow-up ${format(parseISO(form.follow_up_date), 'dd MMM yyyy')}`
-                        : 'No follow-up date',
-                    ].join(' · ')}
-                  </p>
-                ) : null}
                 {editing ? <DealProgressStrip steps={dealProgress} /> : null}
                 {editing ? (
                   <div className={resp.sheetTabs} role="tablist">
@@ -1650,7 +1665,8 @@ export default function CrmPage() {
                       [
                         ['overview', 'Deal'],
                         ['contacts', 'People'],
-                        ['contracts', 'Contracts'],
+                        ['money', 'Money'],
+                        ['files', 'Files'],
                         ['activity', 'Activity'],
                       ] as const
                     ).map(([id, tabLabel]) => (
@@ -1660,10 +1676,7 @@ export default function CrmPage() {
                         role="tab"
                         aria-selected={sheetTab === id}
                         className={`${resp.sheetTab} ${sheetTab === id ? resp.sheetTabActive : ''}`}
-                        onClick={() => {
-                          setSheetTab(id)
-                          setSheetMoreOpen(false)
-                        }}
+                        onClick={() => setSheetTab(id)}
                       >
                         {tabLabel}
                       </button>
@@ -1671,143 +1684,20 @@ export default function CrmPage() {
                   </div>
                 ) : null}
 
-                {editing && (sheetTab === 'overview' || sheetTab === 'activity') ? (
-                  <div className={resp.sheetActions}>
-                    <button
-                      type="button"
-                      style={btnPrimary}
-                      onClick={() => setLogTouchTarget(editing)}
-                    >
-                      <MessageSquarePlus size={14} /> Log touch
-                    </button>
-                    {sheetTab === 'overview' ? (
-                      <>
-                        <Link
-                          to={`/quotations?client=${encodeURIComponent(editing.company_name)}&new=1`}
-                          style={{ ...btn, textDecoration: 'none' }}
-                        >
-                          <FileText size={14} /> New quote
-                        </Link>
-                        <div style={{ position: 'relative' }}>
-                          <button
-                            type="button"
-                            style={btn}
-                            aria-expanded={sheetMoreOpen}
-                            onClick={() => setSheetMoreOpen((o) => !o)}
-                          >
-                            Files {folderDocs.length ? `(${folderDocs.length})` : ''}{' '}
-                            <ChevronDown size={14} />
-                          </button>
-                          {sheetMoreOpen ? (
-                            <div
-                              style={{
-                                position: 'absolute',
-                                top: 'calc(100% + 4px)',
-                                left: 0,
-                                zIndex: 20,
-                                minWidth: 200,
-                                padding: 6,
-                                borderRadius: 10,
-                                border: `1px solid ${colors.border}`,
-                                background: colors.card,
-                                boxShadow: '0 12px 28px rgba(0,0,0,0.45)',
-                                display: 'grid',
-                                gap: 4,
-                              }}
-                            >
-                              <Link
-                                to={`/customer-files?company=${encodeURIComponent(editing.company_name)}`}
-                                style={{ ...btnGhost, textDecoration: 'none', justifyContent: 'flex-start' }}
-                                onClick={() => setSheetMoreOpen(false)}
-                              >
-                                <FolderOpen size={14} /> Customer files
-                              </Link>
-                              {editing.drive_folder_url ? (
-                                <a
-                                  href={editing.drive_folder_url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  style={{ ...btnGhost, textDecoration: 'none', justifyContent: 'flex-start' }}
-                                  onClick={() => setSheetMoreOpen(false)}
-                                >
-                                  <ExternalLink size={14} /> Google Drive
-                                </a>
-                              ) : (
-                                <Link
-                                  to={`/customer-files?company=${encodeURIComponent(editing.company_name)}`}
-                                  style={{ ...btnGhost, textDecoration: 'none', justifyContent: 'flex-start' }}
-                                  title="Link a Google Drive folder"
-                                  onClick={() => setSheetMoreOpen(false)}
-                                >
-                                  <FolderOpen size={14} /> Link folder
-                                </Link>
-                              )}
-                              <button
-                                type="button"
-                                style={{ ...btnGhost, justifyContent: 'flex-start' }}
-                                onClick={() => {
-                                  setSheetMoreOpen(false)
-                                  setLinkFileTarget({ entry: editing, channel: 'email' })
-                                }}
-                              >
-                                <MessageCircle size={14} /> File chat
-                              </button>
-                            </div>
-                          ) : null}
-                        </div>
-                      </>
-                    ) : null}
-                  </div>
-                ) : null}
-
                 <div style={{ display: sheetTab === 'overview' || !editing ? 'block' : 'none' }}>
                   <div className={resp.sheetSection}>
-                    <h4 className={resp.sheetSectionTitle}>Company</h4>
+                    <h4 className={resp.sheetSectionTitle}>This deal</h4>
                     <div style={formGrid}>
-                      <Field label="Company *">
-                        <input
-                          style={input}
-                          required={sheetTab === 'overview' || !editing}
-                          value={form.company_name}
-                          onChange={(e) => setForm((f) => ({ ...f, company_name: e.target.value }))}
-                        />
-                      </Field>
-                      <Field label="Client business owner">
-                        <input
-                          style={input}
-                          value={form.company_owner}
-                          onChange={(e) => setForm((f) => ({ ...f, company_owner: e.target.value }))}
-                          placeholder="Proprietor / business owner name"
-                        />
-                      </Field>
-                      <Field label="Address">
-                        <input
-                          style={input}
-                          value={form.address}
-                          onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                        />
-                      </Field>
-                      <Field label="Website">
-                        <input
-                          style={input}
-                          value={form.website}
-                          onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
-                          placeholder="www.example.com"
-                        />
-                      </Field>
-                      <Field label="TRN">
-                        <input
-                          style={input}
-                          value={form.trn}
-                          onChange={(e) => setForm((f) => ({ ...f, trn: e.target.value }))}
-                        />
-                      </Field>
-                    </div>
-                  </div>
-
-                  <div className={resp.sheetSection}>
-                    <h4 className={resp.sheetSectionTitle}>Pipeline</h4>
-                    <div style={formGrid}>
+                      {!editing ? (
+                        <Field label="Company *">
+                          <input
+                            style={input}
+                            required
+                            value={form.company_name}
+                            onChange={(e) => setForm((f) => ({ ...f, company_name: e.target.value }))}
+                          />
+                        </Field>
+                      ) : null}
                       <Field label="Follow-up date *">
                         <input
                           type="date"
@@ -1832,7 +1722,7 @@ export default function CrmPage() {
                           ))}
                         </select>
                       </Field>
-                      <Field label="Sales owner (Red Reach)">
+                      <Field label="Sales owner">
                         <select
                           style={input}
                           value={form.owner}
@@ -1851,7 +1741,7 @@ export default function CrmPage() {
                             )}
                         </select>
                       </Field>
-                      <Field label="Pipeline stage">
+                      <Field label="Stage">
                         <select
                           style={input}
                           value={form.pipeline_stage}
@@ -1885,7 +1775,7 @@ export default function CrmPage() {
                         </div>
                       ) : null}
                       {form.pipeline_stage === 'Won' && (
-                        <Field label={`${form.pipeline_stage} reason`}>
+                        <Field label="Won reason">
                           <select
                             style={input}
                             value={form.outcome_reason}
@@ -1943,11 +1833,73 @@ export default function CrmPage() {
                   <div className={resp.sheetSection}>
                     <h4 className={resp.sheetSectionTitle}>Notes</h4>
                     <textarea
-                      style={{ ...input, minHeight: 80, resize: 'vertical' }}
+                      style={{ ...input, minHeight: 72, resize: 'vertical' }}
                       value={form.notes}
                       onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                       aria-label="Notes"
                     />
+                  </div>
+
+                  <div className={resp.sheetSection}>
+                    <button
+                      type="button"
+                      className={resp.sheetDetailsToggle}
+                      aria-expanded={companyDetailsOpen}
+                      onClick={() => setCompanyDetailsOpen((o) => !o)}
+                    >
+                      <span>Company details</span>
+                      <ChevronDown
+                        size={14}
+                        style={{
+                          transform: companyDetailsOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
+                          transition: 'transform 0.15s ease',
+                        }}
+                      />
+                    </button>
+                    {companyDetailsOpen ? (
+                      <div style={formGrid}>
+                        {editing ? (
+                          <Field label="Company *">
+                            <input
+                              style={input}
+                              required={sheetTab === 'overview'}
+                              value={form.company_name}
+                              onChange={(e) => setForm((f) => ({ ...f, company_name: e.target.value }))}
+                            />
+                          </Field>
+                        ) : null}
+                        <Field label="Client business owner">
+                          <input
+                            style={input}
+                            value={form.company_owner}
+                            onChange={(e) => setForm((f) => ({ ...f, company_owner: e.target.value }))}
+                            placeholder="Proprietor / business owner name"
+                          />
+                        </Field>
+                        <Field label="Address">
+                          <input
+                            style={input}
+                            value={form.address}
+                            onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                          />
+                        </Field>
+                        <Field label="Website">
+                          <input
+                            style={input}
+                            value={form.website}
+                            onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
+                            placeholder="www.example.com"
+                          />
+                        </Field>
+                        <Field label="TRN">
+                          <input
+                            style={input}
+                            value={form.trn}
+                            onChange={(e) => setForm((f) => ({ ...f, trn: e.target.value }))}
+                          />
+                        </Field>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
@@ -2047,8 +1999,121 @@ export default function CrmPage() {
                   </div>
                 </div>
 
-                {editing && sheetTab === 'contracts' ? (
+                {editing && sheetTab === 'money' ? (
                   <div>
+                    <div className={resp.sheetActions}>
+                      <Link
+                        to={`/quotations?client=${encodeURIComponent(editing.company_name)}&new=1`}
+                        style={{ ...btnPrimary, textDecoration: 'none' }}
+                      >
+                        <FileText size={14} /> New quote
+                      </Link>
+                      <Link
+                        to={`/invoices?client=${encodeURIComponent(editing.company_name)}`}
+                        style={{ ...btn, textDecoration: 'none' }}
+                      >
+                        <Receipt size={14} /> Invoices
+                      </Link>
+                    </div>
+                    <h4 className={resp.sheetSectionTitle}>Quotations</h4>
+                    {!dealQuotes.length ? (
+                      <p style={{ color: colors.muted2, fontSize: 13, marginTop: 0 }}>No quotations yet.</p>
+                    ) : (
+                      <div className={resp.sheetMoneyList}>
+                        {dealQuotes.slice(0, 12).map((q) => (
+                          <Link
+                            key={q.id}
+                            to={`/quotations?ref=${encodeURIComponent(q.reference_number || q.quote_id || q.id)}`}
+                            className={resp.sheetMoneyRow}
+                          >
+                            <div>
+                              <strong>
+                                {displayDocumentReference({
+                                  referenceNumber: q.reference_number,
+                                  fallbackId: q.quote_id || q.id,
+                                  status: q.status,
+                                })}
+                              </strong>
+                              <div className={resp.sheetMoneyMeta}>
+                                {(q.status || 'draft') +
+                                  ` · ${q.currency || 'AED'} ${Number(q.amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+                              </div>
+                            </div>
+                            <ExternalLink size={14} style={{ opacity: 0.55 }} />
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                    <h4 className={resp.sheetSectionTitle} style={{ marginTop: 18 }}>
+                      Invoices
+                    </h4>
+                    {!dealInvoices.length ? (
+                      <p style={{ color: colors.muted2, fontSize: 13, marginTop: 0 }}>No invoices yet.</p>
+                    ) : (
+                      <div className={resp.sheetMoneyList}>
+                        {dealInvoices.slice(0, 12).map((inv) => (
+                          <Link
+                            key={inv.id}
+                            to={`/invoices`}
+                            className={resp.sheetMoneyRow}
+                            title={inv.reference_number || inv.id}
+                          >
+                            <div>
+                              <strong>
+                                {displayDocumentReference({
+                                  referenceNumber: inv.reference_number,
+                                  fallbackId: inv.id,
+                                  status: inv.status,
+                                })}
+                              </strong>
+                              <div className={resp.sheetMoneyMeta}>
+                                {(inv.status || 'draft') +
+                                  ` · ${inv.currency || 'AED'} ${Number(inv.amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+                              </div>
+                            </div>
+                            <ExternalLink size={14} style={{ opacity: 0.55 }} />
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+
+                {editing && sheetTab === 'files' ? (
+                  <div>
+                    <div className={resp.sheetActions}>
+                      <Link
+                        to={`/customer-files?company=${encodeURIComponent(editing.company_name)}`}
+                        style={{ ...btn, textDecoration: 'none' }}
+                      >
+                        <FolderOpen size={14} /> Customer files
+                        {folderDocs.length ? ` (${folderDocs.length})` : ''}
+                      </Link>
+                      {editing.drive_folder_url ? (
+                        <a
+                          href={editing.drive_folder_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ ...btn, textDecoration: 'none' }}
+                        >
+                          <ExternalLink size={14} /> Drive
+                        </a>
+                      ) : (
+                        <Link
+                          to={`/customer-files?company=${encodeURIComponent(editing.company_name)}`}
+                          style={{ ...btn, textDecoration: 'none' }}
+                        >
+                          <FolderOpen size={14} /> Link folder
+                        </Link>
+                      )}
+                      <button
+                        type="button"
+                        style={btn}
+                        onClick={() => setLinkFileTarget({ entry: editing, channel: 'email' })}
+                      >
+                        <MessageCircle size={14} /> File chat
+                      </button>
+                    </div>
                     <h4 className={resp.sheetSectionTitle}>Contracts & NDAs</h4>
                     <ContractsVaultPanel entry={editing} contacts={form.contacts || []} />
                   </div>
@@ -2056,6 +2121,15 @@ export default function CrmPage() {
 
                 {editing && sheetTab === 'activity' ? (
                   <div>
+                    <div className={resp.sheetActions}>
+                      <button
+                        type="button"
+                        style={btnPrimary}
+                        onClick={() => setLogTouchTarget(editing)}
+                      >
+                        <MessageSquarePlus size={14} /> Log touch
+                      </button>
+                    </div>
                     <h4 className={resp.sheetSectionTitle}>Timeline</h4>
                     {activityLoading ? (
                       <p style={{ color: colors.muted, fontSize: 13 }}>Loading activity…</p>
