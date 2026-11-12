@@ -111,6 +111,7 @@ import {
 import { errorMessage } from '../lib/errors'
 import QuoteNudgesCard from '../components/quotes/QuoteNudgesCard'
 import SessionFollowUpsCard from '../components/ctrm/SessionFollowUpsCard'
+import ContractsVaultPanel from '../components/crm/ContractsVaultPanel'
 
 type CrmForm = {
   company_name: string
@@ -131,7 +132,7 @@ type CrmForm = {
 
 type FollowFilter = FollowBucket
 
-type SheetTab = 'overview' | 'contacts' | 'activity'
+type SheetTab = 'overview' | 'contacts' | 'contracts' | 'activity'
 
 const emptyForm = (): CrmForm => ({
   company_name: '',
@@ -1634,6 +1635,7 @@ export default function CrmPage() {
                       [
                         ['overview', 'Overview'],
                         ['contacts', 'Contacts'],
+                        ['contracts', 'Contracts'],
                         ['activity', 'Activity'],
                       ] as const
                     ).map(([id, tabLabel]) => (
@@ -1974,6 +1976,13 @@ export default function CrmPage() {
                     />
                   </Field>
                 </div>
+
+                {editing ? (
+                  <div style={{ marginTop: 16, display: sheetTab === 'contracts' ? 'block' : 'none' }}>
+                    <label style={{ ...label, marginBottom: 8 }}>Contracts & NDAs</label>
+                    <ContractsVaultPanel entry={editing} contacts={form.contacts || []} />
+                  </div>
+                ) : null}
 
                 {editing ? (
                   <div style={{ marginTop: 16, display: sheetTab === 'activity' ? 'block' : 'none' }}>

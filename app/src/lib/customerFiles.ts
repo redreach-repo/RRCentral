@@ -21,7 +21,7 @@ export const COMMUNICATION_KINDS: {
 ]
 
 export const CUSTOMER_FOLDER_SECTIONS: {
-  id: 'quotation' | 'invoice' | 'delivery_note' | 'communication' | 'purchasing'
+  id: 'quotation' | 'invoice' | 'delivery_note' | 'contracts' | 'communication' | 'purchasing'
   label: string
   hint: string
   uploadButton: string
@@ -29,7 +29,7 @@ export const CUSTOMER_FOLDER_SECTIONS: {
   uploadHint: string
   /** Signed-doc sections use a fixed category; communications pick a kind. */
   mode: 'signed' | 'communication' | 'purchasing'
-  signedCategory?: 'signed_quotation' | 'signed_invoice' | 'signed_delivery_note'
+  signedCategory?: 'signed_quotation' | 'signed_invoice' | 'signed_delivery_note' | 'signed_nda' | 'signed_contract'
 }[] = [
   {
     id: 'quotation',
@@ -60,6 +60,16 @@ export const CUSTOMER_FOLDER_SECTIONS: {
     uploadButton: 'Add signed delivery note',
     uploadTitle: 'Signed delivery note',
     uploadHint: 'Upload the customer-signed DN to Google Drive, then paste the share link.',
+  },
+  {
+    id: 'contracts',
+    label: 'Contracts & NDAs',
+    hint: 'NDAs and agreements signed via RR Central or filed on Google Drive',
+    mode: 'signed',
+    signedCategory: 'signed_nda',
+    uploadButton: 'Add signed NDA / contract',
+    uploadTitle: 'Signed NDA / contract',
+    uploadHint: 'Paste the Google Drive share link for a signed NDA or contract PDF.',
   },
   {
     id: 'communication',
@@ -151,6 +161,11 @@ export function sectionForCategory(category: CustomerDocumentCategory): FolderSe
     case 'delivery_note':
     case 'signed_delivery_note':
       return 'delivery_note'
+    case 'nda':
+    case 'signed_nda':
+    case 'contract':
+    case 'signed_contract':
+      return 'contracts'
     case 'email':
     case 'whatsapp':
     case 'call_notes':
@@ -191,6 +206,12 @@ export function suggestedDocumentTitle(
       return ref ? `Signed ${ref}` : 'Signed invoice'
     case 'signed_delivery_note':
       return ref ? `Signed ${ref}` : 'Signed delivery note'
+    case 'signed_nda':
+      return ref ? `Signed NDA – ${ref}` : co ? `Signed NDA – ${co}` : 'Signed NDA'
+    case 'signed_contract':
+      return ref ? `Signed contract – ${ref}` : co ? `Signed contract – ${co}` : 'Signed contract'
+    case 'nda':
+      return ref ? `NDA – ${ref}` : co ? `NDA – ${co}` : 'NDA'
     case 'email':
       return ref ? `Email – ${ref}` : co ? `Email – ${co}` : 'Email thread'
     case 'whatsapp':
@@ -443,6 +464,7 @@ export function buildCustomerFolder(opts: {
     quotation: [],
     invoice: [],
     delivery_note: [],
+    contracts: [],
     communication: [],
     purchasing: [],
   }
@@ -455,6 +477,7 @@ export function buildCustomerFolder(opts: {
     quotation: bySection.quotation,
     invoice: bySection.invoice,
     delivery_note: bySection.delivery_note,
+    contracts: bySection.contracts,
     communication: bySection.communication,
     purchasing: bySection.purchasing,
   }

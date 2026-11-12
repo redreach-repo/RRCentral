@@ -18,6 +18,8 @@ import QuickAddPage from './pages/QuickAddPage'
 import DeliverySettingsPage from './pages/DeliverySettingsPage'
 import BuildTemplatesPage from './pages/BuildTemplatesPage'
 import AgreementTemplatePage from './pages/AgreementTemplatePage'
+import NdaTemplatePage from './pages/NdaTemplatePage'
+import LegalSignPage from './pages/LegalSignPage'
 import ClientHealthPage from './pages/ClientHealthPage'
 import MrrPage from './pages/MrrPage'
 import AppErrorsPage from './pages/AppErrorsPage'
@@ -93,6 +95,7 @@ export default function App() {
             {/* Clients open this from a private link; no sign in. */}
             <Route path="/portal" element={<ClientPortalPage />} />
             <Route path="/accept" element={<QuoteAcceptPage />} />
+            <Route path="/sign" element={<LegalSignPage />} />
             <Route
               path="/ctrm/summary"
               element={
@@ -138,6 +141,7 @@ export default function App() {
               <Route path="delivery-settings" element={<DeliverySettingsPage />} />
               <Route path="build-templates" element={<BuildTemplatesPage />} />
               <Route path="agreement-template" element={<AgreementTemplatePage />} />
+              <Route path="nda-template" element={<NdaTemplatePage />} />
               <Route path="client-health" element={<ClientHealthPage />} />
               <Route path="client-reports" element={<ClientReportsPage />} />
               <Route path="mrr" element={<MrrPage />} />

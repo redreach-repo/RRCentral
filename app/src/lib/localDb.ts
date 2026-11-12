@@ -7,7 +7,7 @@ import { ALL_SEED_PRODUCTS } from './seedCatalog'
 import { errorMessage } from './errors'
 
 export const DB_NAME = 'rrcentral_local'
-const DB_VERSION = 30
+const DB_VERSION = 31
 
 export const LOCAL_STORES = [
   'app_settings',
@@ -30,6 +30,11 @@ export const LOCAL_STORES = [
   'attachments',
   'customer_documents',
   'company_documents',
+  'nda_templates',
+  'legal_documents',
+  'legal_sign_links',
+  'legal_sign_pdfs',
+  'legal_signatures',
   'activity_log',
   'inventory_movements',
   'customer_payments',
@@ -439,27 +444,39 @@ async function ensureSeeded(): Promise<void> {
     const crmTx = database.transaction('crm', 'readwrite')
     const crmStore = crmTx.objectStore('crm')
     const now = new Date().toISOString()
+    const seedContact = {
+      id: crypto.randomUUID(),
+      name: 'Demo Signatory',
+      email: 'signatory@example.com',
+      phone: MASS_ALLIED.office,
+      role: 'Director',
+    }
     if (existingCrm) {
+      const contacts = Array.isArray(existingCrm.contacts) ? existingCrm.contacts : []
       crmStore.put({
         ...existingCrm,
         company_name: MASS_ALLIED.company_name,
         office_number: String(existingCrm.office_number || '').trim() || MASS_ALLIED.office,
         address: String(existingCrm.address || '').trim() || MASS_ALLIED.address,
         trn: String(existingCrm.trn || '').trim() || MASS_ALLIED.trn,
+        owner: String(existingCrm.owner || '').trim() || 'Jacob',
+        contacts: contacts.length ? contacts : [seedContact],
+        primary_contact: String(existingCrm.primary_contact || '').trim() || seedContact.name,
+        email_phone: String(existingCrm.email_phone || '').trim() || seedContact.email,
         updated_at: now,
       })
     } else {
       crmStore.put({
         id: crypto.randomUUID(),
         company_name: MASS_ALLIED.company_name,
-        primary_contact: '',
-        email_phone: '',
+        primary_contact: seedContact.name,
+        email_phone: seedContact.email,
         mobile_number: '',
         office_number: MASS_ALLIED.office,
         notes: 'Seeded from client letterhead details',
         follow_up_date: null,
         next_action: '',
-        owner: '',
+        owner: 'Jacob',
         company_owner: '',
         address: MASS_ALLIED.address,
         website: '',
@@ -469,7 +486,7 @@ async function ensureSeeded(): Promise<void> {
         outcome_reason: '',
         calendar_event_id: '',
         drive_folder_url: '',
-        contacts: [],
+        contacts: [seedContact],
         created_by: '',
         updated_by: '',
         created_at: now,
@@ -1080,6 +1097,11 @@ export type MigrationDump = {
   attachments?: Row[]
   customer_documents?: Row[]
   company_documents?: Row[]
+  nda_templates?: Row[]
+  legal_documents?: Row[]
+  legal_sign_links?: Row[]
+  legal_sign_pdfs?: Row[]
+  legal_signatures?: Row[]
   activity_log?: Row[]
   inventory_movements?: Row[]
   customer_payments?: Row[]

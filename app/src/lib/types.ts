@@ -121,6 +121,10 @@ export type CustomerDocumentCategory =
   /** @deprecated Kept so older Google Drive rows still load. */
   | 'payment_slip'
   | 'supplier_invoice'
+  | 'nda'
+  | 'signed_nda'
+  | 'contract'
+  | 'signed_contract'
   | 'other'
 
 export interface CustomerDocument {
@@ -958,6 +962,78 @@ export interface AgreementTemplate {
   created_by: string
   created_at: string
   updated_at: string
+}
+
+export type NdaTemplateStatus = AgreementTemplateStatus
+
+/** NDA wording template (same lifecycle as service agreement templates). */
+export interface NdaTemplate {
+  id: string
+  version: number
+  title: string
+  body: string
+  status: NdaTemplateStatus
+  approved_by: string
+  approved_at: string | null
+  approval_note: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export type LegalDocumentStatus = 'draft' | 'sent' | 'signed' | 'expired' | 'void'
+export type LegalDocumentType = 'nda' | 'service_agreement' | 'other'
+
+/** Contracts vault row: NDA / agreement for a CRM company. */
+export interface LegalDocument {
+  id: string
+  company_name: string
+  crm_id: string
+  doc_type: LegalDocumentType
+  title: string
+  status: LegalDocumentStatus
+  party_name: string
+  party_email: string
+  party_company: string
+  template_id: string | null
+  template_version: number | null
+  related_ref: string
+  customer_document_id: string | null
+  drive_url: string
+  unsigned_file_name: string
+  signed_file_name: string
+  created_by: string
+  created_at: string
+  updated_at: string
+  sent_at: string | null
+  signed_at: string | null
+  expires_at: string | null
+  voided_at: string | null
+  notes: string
+}
+
+export interface LegalSignLink {
+  id: string
+  legal_document_id: string
+  label: string
+  created_by: string
+  created_at: string
+  expires_at: string | null
+  revoked_at: string | null
+  last_opened_at: string | null
+  signed_at: string | null
+  signed_name: string
+}
+
+export interface LegalSignature {
+  id: string
+  link_id: string
+  legal_document_id: string
+  signed_name: string
+  signed_date: string
+  signed_at: string
+  ip: string
+  user_agent: string
 }
 
 /** Whether the client joined the monthly report call (feeds the health score). */

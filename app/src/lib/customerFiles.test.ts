@@ -28,6 +28,8 @@ describe('customerFiles', () => {
 
   it('maps signed, communication, and purchasing categories onto folder sections', () => {
     expect(sectionForCategory('signed_quotation')).toBe('quotation')
+    expect(sectionForCategory('signed_nda')).toBe('contracts')
+    expect(sectionForCategory('signed_contract')).toBe('contracts')
     expect(sectionForCategory('signed_invoice')).toBe('invoice')
     expect(sectionForCategory('signed_delivery_note')).toBe('delivery_note')
     expect(sectionForCategory('email')).toBe('communication')
@@ -46,11 +48,12 @@ describe('customerFiles', () => {
     )
   })
 
-  it('exposes five folder sections including Communications and Purchasing', () => {
+  it('exposes folder sections including Contracts, Communications and Purchasing', () => {
     expect(CUSTOMER_FOLDER_SECTIONS.map((s) => s.id)).toEqual([
       'quotation',
       'invoice',
       'delivery_note',
+      'contracts',
       'communication',
       'purchasing',
     ])
