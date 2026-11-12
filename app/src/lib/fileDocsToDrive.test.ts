@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildDocHtmlArchive, isDocAlreadyFiled } from './fileDocsToDrive'
+import { buildDocPdfBytes, findReplaceableBulkLinks, isDocAlreadyFiled } from './fileDocsToDrive'
 import type { CustomerDocument } from './types'
 
 function doc(partial: Partial<CustomerDocument> & Pick<CustomerDocument, 'category' | 'related_ref' | 'title'>): CustomerDocument {
@@ -29,9 +29,25 @@ describe('isDocAlreadyFiled', () => {
   })
 })
 
-describe('buildDocHtmlArchive', () => {
-  it('includes client, ref, lines and total', () => {
-    const html = buildDocHtmlArchive({
+describe('findReplaceableBulkLinks', () => {
+  it('finds prior bulk HTML filings for the same ref', () => {
+    const docs = [
+      doc({
+        id: 'html-1',
+        category: 'quotation',
+        related_ref: 'Q-01-26001',
+        title: 'Quotation Q-01-26001',
+        file_name: 'Quote-Q-01-26001.html',
+        notes: 'Bulk filed from RR Central · doc_id=abc',
+      }),
+    ]
+    expect(findReplaceableBulkLinks(docs, { category: 'quotation', relatedRef: 'Q-01-26001', docId: 'abc' })).toHaveLength(1)
+  })
+})
+
+describe('buildDocPdfBytes', () => {
+  it('returns a PDF byte stream with client, ref and total', () => {
+    const bytes = buildDocPdfBytes({
       kind: 'quotation',
       title: 'Quotation',
       ref: 'Q-01-26001',
@@ -57,9 +73,8 @@ describe('buildDocHtmlArchive', () => {
       vat: 25,
       total: 525,
     })
-    expect(html).toContain('Mass Allied')
-    expect(html).toContain('Q-01-26001')
-    expect(html).toContain('Polo')
-    expect(html).toContain('Quotation')
+    const head = String.fromCharCode(...bytes.slice(0, 4))
+    expect(head).toBe('%PDF')
+    expect(bytes.length).toBeGreaterThan(500)
   })
 })

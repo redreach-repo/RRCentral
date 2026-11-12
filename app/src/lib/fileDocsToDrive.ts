@@ -1,17 +1,16 @@
 /**
- * Bulk-file quotations and invoices into each client's Google Drive folder.
- * Builds a printable HTML archive from the stored data (same pattern as Zoho
- * email filing). Skips docs already linked on customer_documents.
+ * Bulk-file quotations and invoices into each client's Google Drive folder as PDFs.
+ * Rebuilds from stored data + line items. Replaces earlier bulk HTML filings.
  */
 
+import { jsPDF } from 'jspdf'
 import { logActivity } from './activity'
-import { companiesMatch } from './customerFiles'
+import { companiesMatch, deleteCustomerDocument, loadCustomerDocuments, saveCustomerDriveLink } from './customerFiles'
+import { formatMoneyAmount } from './currency'
 import { db } from './db'
 import { displayDocumentReference } from './documents'
 import { errorMessage, isMissingRelationError } from './errors'
 import { ensureClientDriveFolder, uploadToClientDrive } from './googleDrive'
-import { formatMoneyAmount } from './currency'
-import { loadCustomerDocuments, saveCustomerDriveLink } from './customerFiles'
 import { calcTotals, loadLineItems, toDraftItems } from './lineItems'
 import type { CrmEntry, CustomerDocument, CustomerDocumentCategory, Invoice, LineItem, Quotation } from './types'
 
@@ -41,13 +40,30 @@ export type FileDocsProgress = {
   current: string
 }
 
-function escapeHtml(s: string): string {
-  return String(s || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+type DocPdfInput = {
+  kind: FileDocKind
+  title: string
+  ref: string
+  company: string
+  date: string
+  status: string
+  description: string
+  currency: string
+  contactName?: string
+  contactEmail?: string
+  contactPhone?: string
+  paymentStatus?: string
+  notes?: string
+  lines: Pick<LineItem, 'line_no' | 'description' | 'qty' | 'unit_price' | 'amount' | 'vat_amount' | 'line_total' | 'remarks'>[]
+  subtotal: number
+  discount: number
+  vat: number
+  total: number
 }
+
+const INK: [number, number, number] = [20, 20, 20]
+const MUTED: [number, number, number] = [100, 100, 100]
+const BULK_NOTE = 'Bulk filed PDF from RR Central'
 
 function sanitizeFilename(name: string): string {
   return (
@@ -82,104 +98,155 @@ export function isDocAlreadyFiled(
   )
 }
 
-export function buildDocHtmlArchive(opts: {
-  kind: FileDocKind
-  title: string
-  ref: string
-  company: string
-  date: string
-  status: string
-  description: string
-  currency: string
-  contactName?: string
-  contactEmail?: string
-  contactPhone?: string
-  paymentStatus?: string
-  notes?: string
-  lines: Pick<LineItem, 'line_no' | 'description' | 'qty' | 'unit_price' | 'amount' | 'vat_amount' | 'line_total' | 'remarks'>[]
-  subtotal: number
-  discount: number
-  vat: number
-  total: number
-}): string {
-  const rows =
-    opts.lines.length > 0
-      ? opts.lines
-          .map(
-            (l) => `<tr>
-  <td>${l.line_no}</td>
-  <td>${escapeHtml(l.description)}${l.remarks ? `<div class="muted">${escapeHtml(l.remarks)}</div>` : ''}</td>
-  <td class="num">${Number(l.qty || 0)}</td>
-  <td class="num">${escapeHtml(money(l.unit_price, opts.currency))}</td>
-  <td class="num">${escapeHtml(money(l.amount, opts.currency))}</td>
-  <td class="num">${escapeHtml(money(l.vat_amount, opts.currency))}</td>
-  <td class="num">${escapeHtml(money(l.line_total, opts.currency))}</td>
-</tr>`,
-          )
-          .join('\n')
-      : `<tr><td colspan="7" class="muted">No line items — document total ${escapeHtml(money(opts.total, opts.currency))}</td></tr>`
+/** Earlier bulk HTML filings — remove the CRM link so we can file a PDF instead. */
+export function findReplaceableBulkLinks(
+  docs: CustomerDocument[],
+  opts: { category: CustomerDocumentCategory; relatedRef: string; docId: string },
+): CustomerDocument[] {
+  const ref = opts.relatedRef.trim()
+  return docs.filter((d) => {
+    if (d.category !== opts.category) return false
+    const sameRef = Boolean(ref) && (d.related_ref === ref || d.title.includes(ref) || d.related_ref === `draft:${opts.docId}`)
+    const bulk = /bulk filed/i.test(d.notes || '') || /\.html$/i.test(d.file_name || '') || /\.html$/i.test(d.title || '')
+    const byId = (d.notes || '').includes(opts.docId)
+    return (sameRef || byId) && bulk
+  })
+}
 
-  return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8" />
-<title>${escapeHtml(opts.title)} ${escapeHtml(opts.ref)}</title>
-<style>
-  body { font-family: system-ui, sans-serif; max-width: 900px; margin: 24px auto; color: #111; padding: 0 16px; }
-  h1 { font-size: 20px; margin: 0 0 4px; }
-  .sub { color: #555; font-size: 13px; margin-bottom: 16px; }
-  .meta { background: #f4f4f5; padding: 12px 14px; border-radius: 8px; font-size: 13px; line-height: 1.55; margin-bottom: 18px; }
-  .meta strong { display: inline-block; min-width: 110px; color: #555; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { border-bottom: 1px solid #e4e4e7; padding: 8px 6px; text-align: left; vertical-align: top; }
-  th { color: #555; font-weight: 600; }
-  .num { text-align: right; white-space: nowrap; }
-  .muted { color: #71717a; font-size: 12px; }
-  .totals { margin-top: 16px; margin-left: auto; width: 280px; font-size: 13px; }
-  .totals div { display: flex; justify-content: space-between; padding: 4px 0; }
-  .totals .grand { font-weight: 700; border-top: 1px solid #111; margin-top: 6px; padding-top: 8px; }
-  .foot { margin-top: 28px; font-size: 11px; color: #71717a; }
-</style>
-</head>
-<body>
-  <h1>${escapeHtml(opts.title)}</h1>
-  <div class="sub">${escapeHtml(opts.ref)} · filed from RR Central</div>
-  <div class="meta">
-    <div><strong>Client</strong> ${escapeHtml(opts.company)}</div>
-    <div><strong>Date</strong> ${escapeHtml(opts.date || '—')}</div>
-    <div><strong>Status</strong> ${escapeHtml(opts.status || '—')}</div>
-    ${opts.paymentStatus ? `<div><strong>Payment</strong> ${escapeHtml(opts.paymentStatus)}</div>` : ''}
-    ${opts.contactName ? `<div><strong>Contact</strong> ${escapeHtml(opts.contactName)}</div>` : ''}
-    ${opts.contactEmail ? `<div><strong>Email</strong> ${escapeHtml(opts.contactEmail)}</div>` : ''}
-    ${opts.contactPhone ? `<div><strong>Phone</strong> ${escapeHtml(opts.contactPhone)}</div>` : ''}
-    ${opts.description ? `<div><strong>Description</strong> ${escapeHtml(opts.description)}</div>` : ''}
-    ${opts.notes ? `<div><strong>Notes</strong> ${escapeHtml(opts.notes)}</div>` : ''}
-  </div>
-  <table>
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Description</th>
-        <th class="num">Qty</th>
-        <th class="num">Unit</th>
-        <th class="num">Amount</th>
-        <th class="num">VAT</th>
-        <th class="num">Total</th>
-      </tr>
-    </thead>
-    <tbody>
-${rows}
-    </tbody>
-  </table>
-  <div class="totals">
-    <div><span>Subtotal</span><span>${escapeHtml(money(opts.subtotal, opts.currency))}</span></div>
-    ${opts.discount ? `<div><span>Discount</span><span>- ${escapeHtml(money(opts.discount, opts.currency))}</span></div>` : ''}
-    <div><span>VAT</span><span>${escapeHtml(money(opts.vat, opts.currency))}</span></div>
-    <div class="grand"><span>Total</span><span>${escapeHtml(money(opts.total, opts.currency))}</span></div>
-  </div>
-  <p class="foot">Generated by RR Central for Google Drive filing. Open the live document in RR Central for the branded letterhead PDF.</p>
-</body>
-</html>`
+/** Build a searchable A4 PDF of the quote/invoice data. */
+export function buildDocPdfBytes(opts: DocPdfInput): Uint8Array {
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true })
+  const W = 210
+  const H = 297
+  const M = 16
+  const bottom = H - 18
+  let y = M
+
+  const color = (c: [number, number, number]) => pdf.setTextColor(c[0], c[1], c[2])
+  const room = (needed: number) => {
+    if (y + needed <= bottom) return
+    pdf.addPage('a4', 'portrait')
+    y = M
+  }
+  const line = (label: string, value: string) => {
+    if (!value) return
+    room(6)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(9)
+    color(MUTED)
+    pdf.text(label, M, y)
+    pdf.setFont('helvetica', 'normal')
+    color(INK)
+    const wrapped = pdf.splitTextToSize(value, W - 2 * M - 32) as string[]
+    pdf.text(wrapped, M + 32, y)
+    y += Math.max(5, wrapped.length * 4.2) + 1
+  }
+
+  pdf.setFont('helvetica', 'bold')
+  pdf.setFontSize(16)
+  color(INK)
+  pdf.text(opts.title, M, y)
+  y += 7
+  pdf.setFont('helvetica', 'normal')
+  pdf.setFontSize(10)
+  color(MUTED)
+  pdf.text(`${opts.ref} · RR Central`, M, y)
+  y += 8
+
+  line('Client', opts.company)
+  line('Date', opts.date || '—')
+  line('Status', opts.status || '—')
+  if (opts.paymentStatus) line('Payment', opts.paymentStatus)
+  if (opts.contactName) line('Contact', opts.contactName)
+  if (opts.contactEmail) line('Email', opts.contactEmail)
+  if (opts.contactPhone) line('Phone', opts.contactPhone)
+  if (opts.description) line('Description', opts.description)
+  if (opts.notes) line('Notes', opts.notes)
+
+  y += 4
+  room(12)
+  const cols = [
+    { label: '#', x: M, w: 8 },
+    { label: 'Description', x: M + 8, w: 72 },
+    { label: 'Qty', x: M + 80, w: 14 },
+    { label: 'Unit', x: M + 94, w: 24 },
+    { label: 'Amount', x: M + 118, w: 24 },
+    { label: 'VAT', x: M + 142, w: 22 },
+    { label: 'Total', x: M + 164, w: 30 },
+  ]
+  pdf.setFont('helvetica', 'bold')
+  pdf.setFontSize(8)
+  color(MUTED)
+  for (const c of cols) pdf.text(c.label, c.x + (c.label === 'Description' || c.label === '#' ? 0 : c.w), y, {
+    align: c.label === 'Description' || c.label === '#' ? 'left' : 'right',
+  })
+  y += 2
+  pdf.setDrawColor(200)
+  pdf.line(M, y, W - M, y)
+  y += 5
+
+  pdf.setFont('helvetica', 'normal')
+  pdf.setFontSize(8.5)
+  color(INK)
+
+  if (!opts.lines.length) {
+    room(6)
+    pdf.text(`No line items — document total ${money(opts.total, opts.currency)}`, M, y)
+    y += 6
+  } else {
+    for (const row of opts.lines) {
+      const descLines = pdf.splitTextToSize(row.description || '—', cols[1].w) as string[]
+      const rowH = Math.max(5, descLines.length * 4)
+      room(rowH + 2)
+      pdf.text(String(row.line_no || ''), cols[0].x, y)
+      pdf.text(descLines, cols[1].x, y)
+      pdf.text(String(Number(row.qty) || 0), cols[2].x + cols[2].w, y, { align: 'right' })
+      pdf.text(money(row.unit_price, opts.currency), cols[3].x + cols[3].w, y, { align: 'right' })
+      pdf.text(money(row.amount, opts.currency), cols[4].x + cols[4].w, y, { align: 'right' })
+      pdf.text(money(row.vat_amount, opts.currency), cols[5].x + cols[5].w, y, { align: 'right' })
+      pdf.text(money(row.line_total, opts.currency), cols[6].x + cols[6].w, y, { align: 'right' })
+      y += rowH
+      if (row.remarks) {
+        pdf.setFontSize(7.5)
+        color(MUTED)
+        const rem = pdf.splitTextToSize(String(row.remarks), cols[1].w) as string[]
+        room(rem.length * 3.5 + 1)
+        pdf.text(rem, cols[1].x, y)
+        y += rem.length * 3.5
+        pdf.setFontSize(8.5)
+        color(INK)
+      }
+      y += 1.5
+    }
+  }
+
+  y += 4
+  room(28)
+  const tx = W - M
+  const rowTotal = (label: string, value: string, bold = false) => {
+    pdf.setFont('helvetica', bold ? 'bold' : 'normal')
+    pdf.setFontSize(9)
+    color(INK)
+    pdf.text(label, tx - 55, y)
+    pdf.text(value, tx, y, { align: 'right' })
+    y += 5
+  }
+  rowTotal('Subtotal', money(opts.subtotal, opts.currency))
+  if (opts.discount) rowTotal('Discount', `- ${money(opts.discount, opts.currency)}`)
+  rowTotal('VAT', money(opts.vat, opts.currency))
+  pdf.setDrawColor(40)
+  pdf.line(tx - 55, y - 1, tx, y - 1)
+  y += 2
+  rowTotal('Total', money(opts.total, opts.currency), true)
+
+  y = Math.max(y + 8, bottom - 6)
+  pdf.setFont('helvetica', 'normal')
+  pdf.setFontSize(7.5)
+  color(MUTED)
+  pdf.text('Generated by RR Central for Google Drive. Open the document in RR Central for letterhead branding.', M, y)
+
+  const out = pdf.output('arraybuffer')
+  return new Uint8Array(out)
 }
 
 function findCrmForClient(client: string, crm: CrmEntry[]): CrmEntry | null {
@@ -244,6 +311,7 @@ async function fileOne(opts: {
     status: doc.status,
   })
   const category: CustomerDocumentCategory = kind === 'quotation' ? 'quotation' : 'invoice'
+  const relatedRef = ref === 'DRAFT' ? `draft:${doc.id}` : ref
 
   if (!company) {
     return { kind, id: doc.id, ref, company: '', status: 'skipped', detail: 'No client name' }
@@ -272,11 +340,25 @@ async function fileOne(opts: {
     opts.docsByCompany.set(entry.company_name, docs)
   }
 
-  if (isDocAlreadyFiled(docs, { category, relatedRef: ref }) && ref !== 'DRAFT') {
+  // Replace earlier bulk HTML (or any prior bulk file) with a PDF.
+  const replaceable = findReplaceableBulkLinks(docs, { category, relatedRef, docId: doc.id })
+  for (const old of replaceable) {
+    if (!old.id.startsWith('temp-')) {
+      try {
+        await deleteCustomerDocument(old.id)
+      } catch {
+        // Continue; we still upload the PDF.
+      }
+    }
+    docs = docs.filter((d) => d.id !== old.id)
+  }
+  opts.docsByCompany.set(entry.company_name, docs)
+
+  // Keep real signed copies / manual links; only skip when a non-bulk PDF/link already exists.
+  if (isDocAlreadyFiled(docs, { category, relatedRef }) && ref !== 'DRAFT') {
     return { kind, id: doc.id, ref, company: entry.company_name, status: 'skipped', detail: 'Already filed' }
   }
-  // Drafts: skip duplicates by id in related_ref / notes
-  if (ref === 'DRAFT' && docs.some((d) => d.category === category && d.notes.includes(doc.id))) {
+  if (ref === 'DRAFT' && docs.some((d) => d.category === category && d.notes.includes(doc.id) && !/bulk filed/i.test(d.notes))) {
     return { kind, id: doc.id, ref, company: entry.company_name, status: 'skipped', detail: 'Already filed' }
   }
 
@@ -294,7 +376,7 @@ async function fileOne(opts: {
     const totals = totalsFor(kind, doc, lines)
     const q = kind === 'quotation' ? (doc as Quotation) : null
     const inv = kind === 'invoice' ? (doc as Invoice) : null
-    const html = buildDocHtmlArchive({
+    const bytes = buildDocPdfBytes({
       kind,
       title: kind === 'quotation' ? 'Quotation' : 'Invoice',
       ref,
@@ -307,20 +389,19 @@ async function fileOne(opts: {
       contactEmail: q?.contact_email,
       contactPhone: q?.contact_phone,
       paymentStatus: inv ? `${inv.payment_status || ''}${inv.payment_terms ? ` · ${inv.payment_terms}` : ''}` : undefined,
-      notes: inv?.notes || '',
+      notes: inv?.notes || q?.notes || '',
       lines,
       ...totals,
     })
 
-    const filename = `${kind === 'quotation' ? 'Quote' : 'Invoice'}-${sanitizeFilename(ref === 'DRAFT' ? doc.id.slice(0, 8) : ref)}.html`
+    const filename = `${kind === 'quotation' ? 'Quote' : 'Invoice'}-${sanitizeFilename(ref === 'DRAFT' ? doc.id.slice(0, 8) : ref)}.pdf`
     const uploaded = await uploadToClientDrive({
       crmId: entry.id,
       filename,
-      content: html,
-      contentType: 'text/html;charset=utf-8',
+      content: bytes,
+      contentType: 'application/pdf',
     })
 
-    const relatedRef = ref === 'DRAFT' ? `draft:${doc.id}` : ref
     await saveCustomerDriveLink({
       company: entry.company_name,
       crmId: entry.id,
@@ -328,7 +409,7 @@ async function fileOne(opts: {
       title: `${kind === 'quotation' ? 'Quotation' : 'Invoice'} ${ref}`,
       driveUrl: uploaded.url,
       relatedRef,
-      notes: `Bulk filed from RR Central · doc_id=${doc.id}`,
+      notes: `${BULK_NOTE} · doc_id=${doc.id}`,
       uploadedBy,
     })
 
@@ -336,7 +417,7 @@ async function fileOne(opts: {
       'file_doc_drive',
       'customer_document',
       entry.company_name,
-      `${kind} ${ref}`,
+      `${kind} ${ref} (PDF)`,
       uploadedBy,
       entry.id,
     )
@@ -350,7 +431,7 @@ async function fileOne(opts: {
       file_name: filename,
       drive_url: uploaded.url,
       related_ref: relatedRef,
-      notes: `doc_id=${doc.id}`,
+      notes: `${BULK_NOTE} · doc_id=${doc.id}`,
       storage_provider: 'google_drive',
       uploaded_by: uploadedBy,
       uploaded_at: new Date().toISOString(),
@@ -362,7 +443,7 @@ async function fileOne(opts: {
       ref,
       company: entry.company_name,
       status: 'filed',
-      detail: 'Filed to Google Drive',
+      detail: replaceable.length ? 'Replaced HTML with PDF' : 'Filed PDF to Google Drive',
       driveUrl: uploaded.url,
     }
   } catch (e) {
@@ -372,14 +453,13 @@ async function fileOne(opts: {
       ref,
       company: entry.company_name,
       status: 'error',
-      detail: errorMessage(e, 'Could not file to Google Drive'),
+      detail: errorMessage(e, 'Could not file PDF to Google Drive'),
     }
   }
 }
 
 /**
- * Push every quotation and invoice into the matching CRM client's Drive folder.
- * Call from Settings while Drive is connected. Reports progress via onProgress.
+ * Push every quotation and invoice into the matching CRM client's Drive folder as PDFs.
  */
 export async function fileQuotesAndInvoicesToDrive(opts: {
   uploadedBy: string
