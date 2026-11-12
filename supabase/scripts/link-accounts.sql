@@ -1,7 +1,12 @@
 -- Link existing clients, quotations, invoices and CRM companies to accounts.
 -- Paste into the Supabase SQL editor one step at a time. Needs
--- migrations/20261023090000_accounts_foundation.sql and
--- migrations/20261207090000_crm_account_id.sql applied first.
+-- migrations/20261023090000_accounts_foundation.sql,
+-- migrations/20261207090000_crm_account_id.sql, and
+-- migrations/20261207100000_link_accounts_gen_random_uuid.sql applied first.
+--
+-- If you already applied the CRM account_id migration and hit
+-- "uuid_generate_v4() does not exist", run
+-- migrations/20261207100000_link_accounts_gen_random_uuid.sql then retry.
 --
 -- Matching is by company name after dropping case, punctuation and legal
 -- suffixes (LLC, FZE, Trading, ...). Nothing is renamed: only the empty
