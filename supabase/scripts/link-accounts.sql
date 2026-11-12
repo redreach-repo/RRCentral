@@ -5,8 +5,8 @@
 -- migrations/20261207100000_link_accounts_gen_random_uuid.sql applied first.
 --
 -- If you already applied the CRM account_id migration and hit
--- "uuid_generate_v4() does not exist", run that gen_random_uuid migration
--- (or: create extension if not exists pgcrypto;) then retry the dry run.
+-- "uuid_generate_v4() does not exist", run
+-- migrations/20261207100000_link_accounts_gen_random_uuid.sql then retry.
 --
 -- Matching is by company name after dropping case, punctuation and legal
 -- suffixes (LLC, FZE, Trading, ...). Nothing is renamed: only the empty

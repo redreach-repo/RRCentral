@@ -1,8 +1,7 @@
 -- rr_link_accounts used uuid_generate_v4() from uuid-ossp. Some projects never
 -- enabled that extension (or it is not on search_path). Prefer gen_random_uuid()
--- which ships with PostgreSQL 13+ / pgcrypto on Supabase.
-
-create extension if not exists pgcrypto;
+-- which is built into PostgreSQL 13+ (no extension create — installing pgcrypto
+-- into public breaks Supabase catch-up checks that expect extensions.crypt).
 
 create or replace function public.rr_link_accounts(p_dry_run boolean default true)
 returns table (
