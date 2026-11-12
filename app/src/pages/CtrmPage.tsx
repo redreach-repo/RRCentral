@@ -316,9 +316,13 @@ export default function CtrmPage() {
     <div style={pageStyle}>
       <div style={toolbarStyle}>
         <div>
-          <h1 style={pageTitleStyle}>CTRM Next pipeline</h1>
+          <h1 style={pageTitleStyle}>CTRM Next stages</h1>
           <p style={pageSubtitleStyle}>
-            Companies being introduced to CTRM Next. Kept apart from client delivery and finance.
+            Move CTRM Next introductions stage by stage. Day-to-day view lives on{' '}
+            <Link to="/deals?pipeline=ctrm&view=board" style={{ color: colors.accent }}>
+              Pipeline
+            </Link>
+            . Kept apart from client delivery and finance.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>

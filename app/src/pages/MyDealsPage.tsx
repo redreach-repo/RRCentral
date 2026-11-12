@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { Briefcase, Columns3, List } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -60,33 +60,46 @@ const nice = (iso: string | null) => (iso ? format(parseISO(iso), 'd MMM') : '-'
 
 function readView(): 'table' | 'board' {
   try {
-    return localStorage.getItem(VIEW_KEY) === 'board' ? 'board' : 'table'
+    const stored = localStorage.getItem(VIEW_KEY)
+    if (stored === 'table' || stored === 'board') return stored
   } catch {
-    return 'table'
+    // ignore
   }
+  return 'board'
+}
+
+function pipelineFromQuery(raw: string | null, allowed: DealPipeline[]): DealFilters['pipeline'] {
+  if (raw === 'crm' || raw === 'sales' || raw === 'ctrm') {
+    return allowed.includes(raw) ? raw : 'all'
+  }
+  return 'all'
 }
 
 /**
- * Every deal in one place: the original CRM, AI CRM sales and CTRM Next,
- * as a table or a board. Deals are moved on their own pages; each row links
- * there. Starts on the signed in person's own deals.
+ * One pipeline board for CRM, AI CRM sales, and CTRM Next.
+ * Stage moves still happen on each deal's own page; this is the single place to see them.
  */
 export default function MyDealsPage() {
   const { userRole, appUserId } = useAuth()
   const { settings } = useSettings()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const access = dealAccess(userRole)
   const [deals, setDeals] = useState<DealRow[]>([])
   const [team, setTeam] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [view, setView] = useState<'table' | 'board'>(readView)
-  const [filters, setFilters] = useState<DealFilters>({
+  const [view, setView] = useState<'table' | 'board'>(() => {
+    const q = searchParams.get('view')
+    if (q === 'board' || q === 'table') return q
+    return readView()
+  })
+  const [filters, setFilters] = useState<DealFilters>(() => ({
     owner: appUserId || 'all',
-    pipeline: 'all',
+    pipeline: pipelineFromQuery(searchParams.get('pipeline'), access.pipelines),
     source: 'all',
     division: 'all',
     showClosed: false,
-  })
-  const access = dealAccess(userRole)
+  }))
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -110,19 +123,40 @@ export default function MyDealsPage() {
     if (appUserId) setFilters((f) => (f.owner === 'all' ? { ...f, owner: appUserId } : f))
   }, [appUserId])
 
-  function changeView(next: 'table' | 'board') {
-    setView(next)
+  useEffect(() => {
+    const nextPipeline = pipelineFromQuery(searchParams.get('pipeline'), access.pipelines)
+    const nextView = searchParams.get('view')
+    setFilters((f) => (f.pipeline === nextPipeline ? f : { ...f, pipeline: nextPipeline }))
+    if (nextView === 'board' || nextView === 'table') setView(nextView)
+  }, [searchParams, access.pipelines])
+
+  function changeView(nextView: 'table' | 'board') {
+    setView(nextView)
     try {
-      localStorage.setItem(VIEW_KEY, next)
+      localStorage.setItem(VIEW_KEY, nextView)
     } catch {
       // Remembering the view is only a convenience.
     }
+    const params = new URLSearchParams(searchParams)
+    params.set('view', nextView)
+    setSearchParams(params, { replace: true })
   }
 
   const shown = useMemo(() => sortDeals(filterDeals(deals, filters)), [deals, filters])
   const totals = dealTotals(shown)
   const sources = useMemo(() => dealSources(deals), [deals])
-  const set = (patch: Partial<DealFilters>) => setFilters((f) => ({ ...f, ...patch }))
+  const set = (patch: Partial<DealFilters>) => {
+    setFilters((f) => ({ ...f, ...patch }))
+    if (patch.pipeline !== undefined) {
+      const next = new URLSearchParams(searchParams)
+      if (patch.pipeline === 'all') next.delete('pipeline')
+      else next.set('pipeline', patch.pipeline)
+      setSearchParams(next, { replace: true })
+    }
+  }
+
+  const manageStagesHref =
+    filters.pipeline === 'sales' ? '/sales' : filters.pipeline === 'ctrm' ? '/ctrm' : null
 
   const filterBar = (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 12 }}>
@@ -301,9 +335,17 @@ export default function MyDealsPage() {
     <div style={pageStyle}>
       <div style={toolbarStyle}>
         <div>
-          <h1 style={pageTitleStyle}>My deals</h1>
+          <h1 style={pageTitleStyle}>Pipeline</h1>
           <p style={pageSubtitleStyle}>
-            {access.pipelines.map((p) => PIPELINE_LABELS[p]).join(', ')} deals in one list. Open a deal to move it on its own page.
+            CRM, AI CRM sales, and CTRM Next in one board. Open a deal to change its stage.
+            {manageStagesHref ? (
+              <>
+                {' '}
+                <Link to={manageStagesHref} style={{ color: colors.accent }}>
+                  Open stage board
+                </Link>
+              </>
+            ) : null}
           </p>
         </div>
       </div>
