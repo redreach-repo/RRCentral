@@ -64,6 +64,7 @@ import {
 import { STANDARD_SIZES, emptySizeBreakdown, sumSizes } from '../lib/sizes'
 import { commitStockForInvoice, releaseStockForQuote, reserveStockForQuote } from '../lib/inventory'
 import { syncCrmFromQuote } from '../lib/crmSync'
+import { ensureCompanyFromDocument } from '../lib/ensureCompanyFromDocument'
 import { formatAED } from '../lib/money'
 import {
   generateReference,
@@ -684,8 +685,36 @@ export default function QuotationsPage() {
       await updateSetting(OFFSET_VAT_SETTING_KEY, JSON.stringify(nextFlags))
       step = 'logging activity'
       await logActivity('save_quote', 'quotation', 'DRAFT', `${payload.client} · Draft`, who)
-      step = 'saving the client address and TRN'
-      if ((await billTo.save(payload.client)) === 'created') showToast(`${payload.client} added to Clients`, 'success')
+      step = 'saving the company (Clients, CRM, Drive)'
+      if (payload.client.trim()) {
+        try {
+          const ensured = await ensureCompanyFromDocument({
+            company: payload.client,
+            address: billTo.draft.address,
+            trn: billTo.draft.trn,
+            contactName: form.contact_name,
+            contactEmail: form.contact_email,
+            contactPhone: form.contact_phone,
+            owner: who.split('@')[0] || who,
+            userEmail: who,
+            source: 'quotation',
+          })
+          if (ensured.crm === 'created' && ensured.driveFolder === 'created') {
+            showToast(`${payload.client} added to CRM · Google Drive folder ready`, 'success')
+          } else if (ensured.crm === 'created') {
+            showToast(`${payload.client} added to CRM`, 'success')
+          } else if (ensured.client === 'created') {
+            showToast(`${payload.client} added to Clients`, 'success')
+          } else if (ensured.driveFolder === 'created') {
+            showToast(`Google Drive folder ready for ${payload.client}`, 'success')
+          }
+          if (ensured.driveFolder === 'error' && ensured.detail) {
+            showToast(`Company saved; Drive folder: ${ensured.detail}`, 'error')
+          }
+        } catch (e) {
+          showToast(errorMessage(e, 'Draft saved, but the company could not be added to CRM'), 'error')
+        }
+      }
       if (lineSave.imagesDropped) {
         showToast(
           'Draft saved, but product images were dropped — apply the line_item_image DB migration, then re-save.',
