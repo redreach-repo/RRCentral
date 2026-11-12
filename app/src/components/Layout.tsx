@@ -45,7 +45,7 @@ import {
   Send,
   CopyCheck,
   PhoneCall,
-  ChevronDown,
+  Wrench,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders'
@@ -66,57 +66,61 @@ type NavItem = {
   label: string
   icon: ComponentType<{ size?: number; strokeWidth?: number }>
   end?: boolean
-  /** Minimum role required (admin > manager > sales). */
+  /** Optional sub-heading inside the active section panel. */
+  section?: string
   minRole?: UserRole
-  /** If set, only these roles see the item (overrides minRole). */
   roles?: UserRole[]
-  /** Shown to the restricted `staff` role (VA, freelancers). Everything else is hidden from them. */
   forStaff?: boolean
 }
 
 type NavGroup = {
   id: string
   label: string
-  /** Open by default when no saved preference exists. */
-  defaultOpen?: boolean
+  icon: ComponentType<{ size?: number; strokeWidth?: number }>
   items: NavItem[]
 }
 
-const NAV_EXPANDED_KEY = 'rrcentral_nav_expanded'
+const NAV_SECTION_KEY = 'rrcentral_nav_section'
 
 /**
- * Shorter groups so the left rail is scannable. Pipelines sit with Sales;
- * delivery/templates and finance analytics are no longer buried under Clients.
+ * Section rail: pick a category on the icon strip, then only that
+ * category’s links appear in the panel. Never stacks every group at once.
  */
 const navGroups: NavGroup[] = [
   {
     id: 'overview',
     label: 'Overview',
-    defaultOpen: true,
+    icon: LayoutDashboard,
     items: [{ to: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true }],
   },
   {
     id: 'sales',
     label: 'Sales',
-    defaultOpen: true,
+    icon: Users,
     items: [
-      { to: '/quick-add', label: 'Quick add', icon: PhoneCall, minRole: 'sales' },
-      { to: '/crm', label: 'CRM', icon: Users },
-      { to: '/follow-ups', label: 'Follow-ups', icon: CalendarClock },
-      { to: '/deals', label: 'My deals', icon: Briefcase, forStaff: true },
-      { to: '/sales', label: 'Sales pipeline', icon: Target, forStaff: true },
-      { to: '/ctrm', label: 'CTRM Next', icon: Handshake, forStaff: true },
-      { to: '/ctrm-issues', label: 'CTRM issues', icon: MessageSquareWarning, forStaff: true },
-      { to: '/quotations', label: 'Quotations', icon: FileText },
-      { to: '/invoices', label: 'Invoices', icon: Receipt },
-      { to: '/delivery-notes', label: 'Delivery notes', icon: Truck },
-      { to: '/customer-files', label: 'Customer files', icon: FolderOpen },
+      { to: '/quick-add', label: 'Quick add', icon: PhoneCall, minRole: 'sales', section: 'Work' },
+      { to: '/crm', label: 'CRM', icon: Users, section: 'Work' },
+      { to: '/follow-ups', label: 'Follow-ups', icon: CalendarClock, section: 'Work' },
+      { to: '/deals', label: 'My deals', icon: Briefcase, forStaff: true, section: 'Work' },
+      { to: '/sales', label: 'Sales pipeline', icon: Target, forStaff: true, section: 'Pipelines' },
+      { to: '/ctrm', label: 'CTRM Next', icon: Handshake, forStaff: true, section: 'Pipelines' },
+      {
+        to: '/ctrm-issues',
+        label: 'CTRM issues',
+        icon: MessageSquareWarning,
+        forStaff: true,
+        section: 'Pipelines',
+      },
+      { to: '/quotations', label: 'Quotations', icon: FileText, section: 'Documents' },
+      { to: '/invoices', label: 'Invoices', icon: Receipt, section: 'Documents' },
+      { to: '/delivery-notes', label: 'Delivery notes', icon: Truck, section: 'Documents' },
+      { to: '/customer-files', label: 'Customer files', icon: FolderOpen, section: 'Documents' },
     ],
   },
   {
     id: 'clients',
     label: 'Clients',
-    defaultOpen: true,
+    icon: Contact,
     items: [
       { to: '/accounts', label: 'Accounts', icon: Contact, forStaff: true },
       { to: '/support', label: 'Support', icon: LifeBuoy, forStaff: true },
@@ -128,6 +132,7 @@ const navGroups: NavGroup[] = [
   {
     id: 'delivery',
     label: 'Delivery',
+    icon: Package,
     items: [
       { to: '/products', label: 'WorshipHub', icon: WorshipHubIcon, forStaff: true },
       { to: '/delivery-settings', label: 'Packages', icon: Package, minRole: 'manager' },
@@ -139,6 +144,7 @@ const navGroups: NavGroup[] = [
   {
     id: 'ops',
     label: 'Operations',
+    icon: Wrench,
     items: [
       { to: '/app/wanders', label: 'Wanders', icon: Plane },
       { to: '/catalog', label: 'Catalog', icon: Package },
@@ -150,6 +156,7 @@ const navGroups: NavGroup[] = [
   {
     id: 'finance',
     label: 'Finance',
+    icon: Banknote,
     items: [
       { to: '/payments', label: 'Payments', icon: Banknote },
       { to: '/expenses', label: 'Expenses', icon: Wallet },
@@ -163,6 +170,7 @@ const navGroups: NavGroup[] = [
   {
     id: 'admin',
     label: 'Admin',
+    icon: Settings,
     items: [
       { to: '/settings', label: 'Settings', icon: Settings, minRole: 'admin' },
       {
@@ -220,7 +228,6 @@ const titleByPath: { match: (path: string) => boolean; title: string }[] = [
   { match: (p) => p.startsWith('/system-check'), title: 'System check' },
 ]
 
-/** Primary destinations for phone / foldable bottom nav (big phones included). */
 const phonePrimaryNav: { to: string; label: string; icon: typeof LayoutDashboard; end?: boolean }[] = [
   { to: '/app', label: 'Home', icon: LayoutDashboard, end: true },
   { to: '/crm', label: 'CRM', icon: Users },
@@ -243,37 +250,36 @@ function itemMatchesPath(pathname: string, item: NavItem): boolean {
   return pathname === item.to || pathname.startsWith(`${item.to}/`)
 }
 
-function readExpandedPrefs(): Record<string, boolean> | null {
+function sectionForPath(pathname: string): string {
+  for (const group of navGroups) {
+    if (group.items.some((item) => itemMatchesPath(pathname, item))) return group.id
+  }
+  return 'sales'
+}
+
+function readSavedSection(): string | null {
   try {
-    const raw = localStorage.getItem(NAV_EXPANDED_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as Record<string, boolean>
-    return parsed && typeof parsed === 'object' ? parsed : null
+    return localStorage.getItem(NAV_SECTION_KEY)
   } catch {
     return null
   }
 }
 
-function writeExpandedPrefs(next: Record<string, boolean>) {
+function writeSavedSection(id: string) {
   try {
-    localStorage.setItem(NAV_EXPANDED_KEY, JSON.stringify(next))
+    localStorage.setItem(NAV_SECTION_KEY, id)
   } catch {
     /* ignore */
   }
 }
 
-function defaultExpandedMap(pathname: string): Record<string, boolean> {
-  const prefs = readExpandedPrefs()
-  const map: Record<string, boolean> = {}
-  for (const group of navGroups) {
-    const onRoute = group.items.some((item) => itemMatchesPath(pathname, item))
-    if (prefs && Object.prototype.hasOwnProperty.call(prefs, group.id)) {
-      map[group.id] = Boolean(prefs[group.id]) || onRoute
-    } else {
-      map[group.id] = Boolean(group.defaultOpen) || onRoute
-    }
-  }
-  return map
+function filterItems(items: NavItem[], userRole: UserRole): NavItem[] {
+  return items.filter((item) => {
+    if (userRole === 'staff' && !item.forStaff) return false
+    if (item.roles) return item.roles.includes(userRole)
+    if (item.minRole) return roleAtLeast(userRole, item.minRole)
+    return true
+  })
 }
 
 export default function Layout() {
@@ -286,49 +292,43 @@ export default function Layout() {
   const { timer, now } = useRunningTimer(user?.email)
   useFridayHoursReminder(Boolean(user) && userRole !== 'viewer', reminders.permission)
   useContractBillingSync(Boolean(user) && can(userRole, 'delivery.contracts'))
-  // Only roles that write to Finance should top up monthly deductions.
   useRecurringDeductionsSync(Boolean(user) && roleAtLeast(userRole, 'sales'))
   const phoneNav = userRole === 'staff' ? staffPhoneNav : phonePrimaryNav
 
-  const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
-    defaultExpandedMap(location.pathname),
-  )
-
-  useEffect(() => {
-    setExpanded((prev) => {
-      let changed = false
-      const next = { ...prev }
-      for (const group of navGroups) {
-        if (group.items.some((item) => itemMatchesPath(location.pathname, item)) && !next[group.id]) {
-          next[group.id] = true
-          changed = true
-        }
-      }
-      if (changed) writeExpandedPrefs(next)
-      return changed ? next : prev
-    })
-  }, [location.pathname])
-
   const visibleGroups = useMemo(() => {
     return navGroups
-      .map((group) => {
-        const items = group.items.filter((item) => {
-          if (userRole === 'staff' && !item.forStaff) return false
-          if (item.roles) return item.roles.includes(userRole)
-          if (item.minRole) return roleAtLeast(userRole, item.minRole)
-          return true
-        })
-        return { ...group, items }
-      })
+      .map((group) => ({ ...group, items: filterItems(group.items, userRole) }))
       .filter((group) => group.items.length > 0)
   }, [userRole])
 
-  function toggleGroup(id: string) {
-    setExpanded((prev) => {
-      const next = { ...prev, [id]: !prev[id] }
-      writeExpandedPrefs(next)
-      return next
+  const [activeSection, setActiveSection] = useState(() => {
+    const fromPath = sectionForPath(location.pathname)
+    const saved = readSavedSection()
+    if (saved && navGroups.some((g) => g.id === saved)) return saved
+    return fromPath
+  })
+
+  useEffect(() => {
+    const fromPath = sectionForPath(location.pathname)
+    setActiveSection((prev) => {
+      if (prev === fromPath) return prev
+      writeSavedSection(fromPath)
+      return fromPath
     })
+  }, [location.pathname])
+
+  const activeGroup =
+    visibleGroups.find((g) => g.id === activeSection) || visibleGroups[0] || null
+
+  function selectSection(id: string) {
+    setActiveSection(id)
+    writeSavedSection(id)
+    const group = visibleGroups.find((g) => g.id === id)
+    // Single-destination sections jump straight there.
+    if (group?.items.length === 1) {
+      navigate(group.items[0].to)
+      setSidebarOpen(false)
+    }
   }
 
   function openReminders() {
@@ -364,66 +364,85 @@ export default function Layout() {
       )}
 
       <aside className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
-        <div className={styles.brand}>
-          <BrandLogo height={40} className={styles.brandLogo} />
-          <button
-            type="button"
-            className={styles.closeBtn}
-            aria-label="Close sidebar"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <X size={18} />
-          </button>
+        <div className={styles.rail} aria-label="Sections">
+          <div className={styles.railBrand} title="RED REACH Central">
+            <BrandLogo height={22} className={styles.railLogo} />
+          </div>
+          <div className={styles.railButtons} role="tablist" aria-orientation="vertical">
+            {visibleGroups.map((group) => {
+              const Icon = group.icon
+              const selected = activeGroup?.id === group.id
+              const hasDue =
+                group.id === 'sales' &&
+                group.items.some((i) => i.to === '/follow-ups') &&
+                reminders.due > 0
+              return (
+                <button
+                  key={group.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  aria-controls="nav-section-panel"
+                  aria-label={group.label}
+                  title={group.label}
+                  className={`${styles.railBtn} ${selected ? styles.railBtnActive : ''}`}
+                  onClick={() => selectSection(group.id)}
+                >
+                  <Icon size={19} strokeWidth={selected ? 2.15 : 1.75} />
+                  {hasDue ? <span className={styles.railDot} aria-hidden /> : null}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
-        <nav className={styles.nav} aria-label="Main">
-          {visibleGroups.map((group) => {
-            const open = expanded[group.id] !== false
-            const panelId = `nav-group-${group.id}`
-            return (
-              <div
-                key={group.id}
-                className={`${styles.navGroup} ${open ? styles.navGroupOpen : ''}`}
-              >
-                <button
-                  type="button"
-                  className={styles.navGroupToggle}
-                  aria-expanded={open}
-                  aria-controls={panelId}
-                  onClick={() => toggleGroup(group.id)}
-                >
-                  <span className={styles.navGroupLabel}>{group.label}</span>
-                  <ChevronDown
-                    size={14}
-                    className={styles.navGroupChevron}
-                    aria-hidden
-                  />
-                </button>
-                <div id={panelId} className={styles.navGroupItems} hidden={!open}>
-                  {group.items.map(({ to, label, icon: Icon, end }) => (
-                    <NavLink
-                      key={`${to}-${label}`}
-                      to={to}
-                      end={end}
-                      className={({ isActive }) =>
-                        `${styles.navItem} ${isActive ? styles.navItemActive : ''}`
-                      }
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      <Icon size={17} strokeWidth={1.75} />
-                      <span>{label}</span>
-                      {to === '/follow-ups' && reminders.due > 0 && (
-                        <span className={styles.navBadge} aria-label={`${reminders.due} due`}>
-                          {reminders.due > 99 ? '99+' : reminders.due}
-                        </span>
-                      )}
-                    </NavLink>
-                  ))}
+        <div className={styles.panel} id="nav-section-panel" role="tabpanel">
+          <div className={styles.panelHeader}>
+            <div>
+              <p className={styles.panelEyebrow}>RED REACH</p>
+              <h2 className={styles.panelTitle}>{activeGroup?.label || 'Menu'}</h2>
+            </div>
+            <button
+              type="button"
+              className={styles.closeBtn}
+              aria-label="Close sidebar"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <nav className={styles.panelNav} aria-label={activeGroup?.label || 'Section'}>
+            {(activeGroup?.items || []).map((item, idx, items) => {
+              const Icon = item.icon
+              const prevSection = idx > 0 ? items[idx - 1]?.section : undefined
+              const showSection = Boolean(item.section && item.section !== prevSection)
+              return (
+                <div key={`${item.to}-${item.label}`}>
+                  {showSection ? (
+                    <div className={styles.panelSectionLabel}>{item.section}</div>
+                  ) : null}
+                  <NavLink
+                    to={item.to}
+                    end={item.end}
+                    className={({ isActive }) =>
+                      `${styles.navItem} ${isActive ? styles.navItemActive : ''}`
+                    }
+                    onClick={() => setSidebarOpen(false)}
+                  >
+                    <Icon size={16} strokeWidth={1.75} />
+                    <span>{item.label}</span>
+                    {item.to === '/follow-ups' && reminders.due > 0 && (
+                      <span className={styles.navBadge} aria-label={`${reminders.due} due`}>
+                        {reminders.due > 99 ? '99+' : reminders.due}
+                      </span>
+                    )}
+                  </NavLink>
                 </div>
-              </div>
-            )
-          })}
-        </nav>
+              )
+            })}
+          </nav>
+        </div>
       </aside>
 
       <div className={styles.main}>
