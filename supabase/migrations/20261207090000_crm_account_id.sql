@@ -27,7 +27,7 @@ language plpgsql
 set search_path = public
 as $$
 declare
-  v_batch uuid := case when p_dry_run then null else uuid_generate_v4() end;
+  v_batch uuid := case when p_dry_run then null else gen_random_uuid() end;
 begin
   create temp table if not exists rr_link_candidates (
     kind text, table_name text, row_id uuid, row_label text,
