@@ -95,7 +95,7 @@ function sectionToMode(section: FolderSection): LinkDriveFileMode {
 }
 
 export default function CustomerFilesPage() {
-  const { user } = useAuth()
+  const { user, isLocalMode } = useAuth()
   const { showToast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const compact = useCompactCrm()
@@ -256,13 +256,48 @@ export default function CustomerFilesPage() {
     <div style={pageStyle}>
       <div style={toolbarStyle}>
         <div>
-          <h1 style={pageTitleStyle}>Customer files</h1>
+          <h1 style={pageTitleStyle}>Google Drive</h1>
           <p style={pageSubtitleStyle}>
-            One folder per customer — quotes, invoices, delivery notes, communications, purchasing,
-            and signed Google Drive copies
+            Every customer document lives in Google Drive. RR Central keeps the folder links — quotes,
+            invoices, delivery notes, communications, purchasing, and signed copies.
           </p>
         </div>
+        {drive.connected && drive.customers_url ? (
+          <a
+            href={drive.customers_url}
+            target="_blank"
+            rel="noreferrer"
+            style={{ ...buttonSecondaryStyle, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            <ExternalLink size={14} /> Open Customers in Drive
+          </a>
+        ) : null}
       </div>
+
+      {isLocalMode ? (
+        <div style={{ ...cardStyle, marginBottom: 16, borderColor: colors.warn }}>
+          <strong style={{ color: colors.warn }}>Connect Supabase first</strong>
+          <p style={{ margin: '8px 0 0', color: colors.muted, fontSize: 14, lineHeight: 1.5 }}>
+            Google Drive needs cloud mode.{' '}
+            <Link to="/settings#connect-supabase" style={{ color: colors.accent }}>
+              Settings → Connect Supabase
+            </Link>
+            , then connect Google Drive.
+          </p>
+        </div>
+      ) : !drive.connected ? (
+        <div style={{ ...cardStyle, marginBottom: 16, borderColor: colors.warn }}>
+          <strong style={{ color: colors.warn }}>Connect Google Drive</strong>
+          <p style={{ margin: '8px 0 0', color: colors.muted, fontSize: 14, lineHeight: 1.5 }}>
+            An admin connects Google Drive once in{' '}
+            <Link to="/settings#google-drive" style={{ color: colors.accent }}>
+              Settings → Google Drive
+            </Link>
+            . Then RR Central makes a folder per client under <strong>RR Central / Customers</strong>, and
+            Save to Drive on quotes and invoices files the PDF there.
+          </p>
+        </div>
+      ) : null}
 
       {missingTable ? (
         <div style={{ ...cardStyle, marginBottom: 16, borderColor: colors.warn }}>

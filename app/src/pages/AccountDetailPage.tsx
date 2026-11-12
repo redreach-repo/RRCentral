@@ -21,6 +21,7 @@ import SessionsCard from '../components/ctrm/SessionsCard'
 import CtrmTermsCard from '../components/ctrm/CtrmTermsCard'
 import AccountSalesDealCard from '../components/sales/AccountSalesDealCard'
 import AccountCrmCard from '../components/crm/AccountCrmCard'
+import { syncAccountContactsToCrm } from '../lib/crmAccountLink'
 import ChurchProductCard from '../components/worshiphub/ChurchProductCard'
 import { db } from '../lib/db'
 import {
@@ -238,8 +239,13 @@ export default function AccountDetailPage() {
         contactModal.id,
       )
       if (!contactModal.id) await logAccountEvent(account.id, `Contact added: ${form.name.trim()}`, author)
-      setContactModal(null)
       const [c, t] = await Promise.all([listContacts(account.id), listActivities(account.id)])
+      try {
+        await syncAccountContactsToCrm(account, c)
+      } catch {
+        // CRM sync is best-effort after the account contact save.
+      }
+      setContactModal(null)
       setContacts(c)
       setTimeline(t)
     } catch (e) {

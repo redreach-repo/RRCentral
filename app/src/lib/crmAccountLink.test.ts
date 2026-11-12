@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveCrmAccountLink } from './crmAccountLink'
+import { contactMatchKey, resolveCrmAccountLink } from './crmAccountLink'
 import type { Account } from './types'
 
 function account(partial: Partial<Account> & Pick<Account, 'id' | 'name'>): Account {
@@ -48,5 +48,14 @@ describe('resolveCrmAccountLink', () => {
   it('ignores legal suffixes the same way rr_normalize_company_name does', () => {
     const row = account({ id: 'x', name: 'Unify Demo Trading LLC' })
     expect(resolveCrmAccountLink('Unify Demo Trading L.L.C.', [row]).status).toBe('linked')
+  })
+})
+
+describe('contactMatchKey', () => {
+  it('prefers email, then phone digits, then name', () => {
+    expect(contactMatchKey({ email: 'A@RedReach.ae', phone: '0501234567', name: 'Ali' })).toBe('e:a@redreach.ae')
+    expect(contactMatchKey({ email: '', phone: '+971 50 123 4567', name: 'Ali' })).toBe('p:971501234567')
+    expect(contactMatchKey({ email: '', phone: '12', name: ' Ali ' })).toBe('n:ali')
+    expect(contactMatchKey({ email: '', phone: '', name: '' })).toBe('')
   })
 })

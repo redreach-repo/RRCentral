@@ -1,8 +1,33 @@
 import { sameCompany } from './accounts'
-import { createAccount, getAccount, listAccounts, logAccountEvent, saveContact } from './accountsStore'
-import { hydrateContacts, primaryContact } from './contacts'
+import {
+  createAccount,
+  getAccount,
+  listAccounts,
+  listContacts,
+  logAccountEvent,
+  saveContact,
+} from './accountsStore'
+import { flatFieldsFromContacts, hydrateContacts, normalizeContacts, primaryContact } from './contacts'
 import { db } from './db'
-import type { Account, CrmEntry } from './types'
+import type { Account, AccountContact, CrmContact, CrmEntry } from './types'
+
+function digits(phone: string): string {
+  return String(phone || '').replace(/\D/g, '')
+}
+
+/** Match key for syncing CRM contacts ↔ account_contacts (email, else phone, else name). */
+export function contactMatchKey(c: { email?: string; phone?: string; name?: string }): string {
+  const email = String(c.email || '')
+    .trim()
+    .toLowerCase()
+  if (email) return `e:${email}`
+  const phone = digits(String(c.phone || ''))
+  if (phone.length >= 7) return `p:${phone}`
+  const name = String(c.name || '')
+    .trim()
+    .toLowerCase()
+  return name ? `n:${name}` : ''
+}
 
 export type CrmAccountLink =
   | { status: 'linked'; account: Account }
@@ -144,4 +169,72 @@ export async function findCrmForAccount(account: Pick<Account, 'id' | 'name'>): 
   const rows = data as CrmEntry[]
   const exact = rows.find((r) => sameCompany(r.company_name, account.name))
   return exact || null
+}
+
+/**
+ * Push CRM sheet contacts into account_contacts (upsert by email/phone/name).
+ * Best-effort: no-ops when there is no linked account or the table is missing.
+ */
+export async function syncCrmContactsToAccount(
+  accountId: string,
+  contacts: CrmContact[],
+): Promise<void> {
+  const list = normalizeContacts(contacts)
+  if (!accountId || !list.length) return
+  const existing = await listContacts(accountId)
+  const byKey = new Map(existing.map((c) => [contactMatchKey(c), c]))
+  const primary = primaryContact(list)
+
+  for (const c of list) {
+    const key = contactMatchKey(c)
+    if (!key || !c.name.trim()) continue
+    const match = byKey.get(key)
+    await saveContact(
+      accountId,
+      {
+        name: c.name.trim(),
+        role: c.role || 'Other',
+        email: c.email || '',
+        phone: c.phone || '',
+        whatsapp: c.phone || '',
+        is_primary: Boolean(primary && primary.id === c.id),
+      },
+      match?.id,
+    )
+  }
+}
+
+/**
+ * Push account_contacts back onto the linked CRM row's contacts jsonb (+ flat fields).
+ */
+export async function syncAccountContactsToCrm(
+  account: Pick<Account, 'id' | 'name'>,
+  accountContacts?: AccountContact[],
+): Promise<void> {
+  const crm = await findCrmForAccount(account)
+  if (!crm) return
+  const rows = accountContacts ?? (await listContacts(account.id))
+  if (!rows.length) return
+
+  const contacts: CrmContact[] = rows.map((c) => ({
+    id: c.id,
+    name: c.name,
+    email: c.email || '',
+    phone: c.phone || c.whatsapp || '',
+    role: c.is_primary ? 'Primary' : c.role || 'Other',
+  }))
+  const flat = flatFieldsFromContacts(contacts)
+  const { error } = await db
+    .from('crm')
+    .update({
+      contacts,
+      ...flat,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', crm.id)
+  if (error) {
+    const msg = String((error as { message?: string }).message || error)
+    if (/contacts|column/i.test(msg)) return
+    throw error
+  }
 }

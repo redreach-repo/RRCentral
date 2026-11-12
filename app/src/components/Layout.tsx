@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ComponentType } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { WorshipHubIcon } from './worshiphub/WorshipHubIcon'
 import {
   Bell,
@@ -103,7 +103,7 @@ const navGroups: NavGroup[] = [
       { to: '/quotations', label: 'Quotations', icon: FileText, section: 'Documents' },
       { to: '/invoices', label: 'Invoices', icon: Receipt, section: 'Documents' },
       { to: '/delivery-notes', label: 'Delivery notes', icon: Truck, section: 'Documents' },
-      { to: '/customer-files', label: 'Customer files', icon: FolderOpen, section: 'Documents' },
+      { to: '/customer-files', label: 'Google Drive', icon: FolderOpen, section: 'Documents' },
     ],
   },
   {
@@ -207,7 +207,7 @@ const titleByPath: { match: (path: string) => boolean; title: string }[] = [
   { match: (p) => p.startsWith('/quotations'), title: 'Quotations' },
   { match: (p) => p.startsWith('/invoices'), title: 'Invoices' },
   { match: (p) => p.startsWith('/delivery-notes'), title: 'Delivery notes' },
-  { match: (p) => p.startsWith('/customer-files'), title: 'Customer files' },
+  { match: (p) => p.startsWith('/customer-files'), title: 'Google Drive' },
   { match: (p) => p.startsWith('/app/wanders'), title: 'Wanders' },
   { match: (p) => p.startsWith('/catalog'), title: 'Catalog' },
   { match: (p) => p.startsWith('/inventory'), title: 'Inventory' },
@@ -345,10 +345,15 @@ export default function Layout() {
       <div className={styles.ambient} aria-hidden />
       {isLocalMode && (
         <div className={styles.localBanner} role="alert">
-          <strong>Cloud disconnected — your CRM data is safe in Supabase.</strong> This browser is in
-          Local mode (empty). Go to <strong>Settings → Connect Supabase</strong>: URL{' '}
-          <code>https://pszjylxrpvlumldtptrr.supabase.co</code> + the <strong>anon</strong> key from
-          Supabase → Project Settings → API, then Connect &amp; reload.
+          <strong>Local mode.</strong> CRM data stays in Supabase — this browser is empty until you{' '}
+          <Link to="/settings#connect-supabase" style={{ color: 'inherit', textDecoration: 'underline' }}>
+            Connect Supabase
+          </Link>{' '}
+          (URL <code>https://pszjylxrpvlumldtptrr.supabase.co</code> + anon key), then{' '}
+          <Link to="/settings#google-drive" style={{ color: 'inherit', textDecoration: 'underline' }}>
+            Google Drive
+          </Link>
+          .
         </div>
       )}
       {sidebarOpen && (

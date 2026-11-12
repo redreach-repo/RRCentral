@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type DragEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { Briefcase, Columns3, List } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
+import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
+import Modal from '../components/Modal'
 import { DIVISIONS } from '../lib/config'
+import { LOST_REASONS } from '../lib/dealRules'
 import { errorMessage } from '../lib/errors'
 import { formatAED } from '../lib/money'
 import {
@@ -16,15 +19,22 @@ import {
   dealTotals,
   filterDeals,
   sortDeals,
+  stagesForPipeline,
+  targetStageForColumn,
+  type BoardColumn,
   type DealFilters,
   type DealPipeline,
   type DealRow,
 } from '../lib/myDeals'
-import { loadMyDeals } from '../lib/myDealsStore'
+import { loadMyDeals, moveMyDeal } from '../lib/myDealsStore'
 import type { AppUser } from '../lib/types'
 import {
+  buttonPrimaryStyle,
+  buttonSecondaryStyle,
   cardStyle,
   colors,
+  inputStyle,
+  labelStyle,
   pageStyle,
   pageSubtitleStyle,
   pageTitleStyle,
@@ -75,19 +85,31 @@ function pipelineFromQuery(raw: string | null, allowed: DealPipeline[]): DealFil
   return 'all'
 }
 
+type PendingMove = {
+  deal: DealRow
+  stage: string
+  kind: 'won' | 'lost'
+}
+
 /**
  * One pipeline board for CRM, AI CRM sales, and CTRM Next.
- * Stage moves still happen on each deal's own page; this is the single place to see them.
+ * Drag a card (or pick a stage) to move it; Won/Lost asks for a reason.
  */
 export default function MyDealsPage() {
-  const { userRole, appUserId } = useAuth()
+  const { user, userRole, appUserId } = useAuth()
   const { settings } = useSettings()
+  const { showToast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const access = dealAccess(userRole)
   const [deals, setDeals] = useState<DealRow[]>([])
   const [team, setTeam] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [busyKey, setBusyKey] = useState<string | null>(null)
+  const [dragKey, setDragKey] = useState<string | null>(null)
+  const [pending, setPending] = useState<PendingMove | null>(null)
+  const [outcomeReason, setOutcomeReason] = useState('')
+  const [lostNote, setLostNote] = useState('')
   const [view, setView] = useState<'table' | 'board'>(() => {
     const q = searchParams.get('view')
     if (q === 'board' || q === 'table') return q
@@ -100,6 +122,11 @@ export default function MyDealsPage() {
     division: 'all',
     showClosed: false,
   }))
+
+  const author = useMemo(
+    () => ({ appUserId: appUserId || null, email: user?.email || '' }),
+    [appUserId, user?.email],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -153,6 +180,46 @@ export default function MyDealsPage() {
       else next.set('pipeline', patch.pipeline)
       setSearchParams(next, { replace: true })
     }
+  }
+
+  async function applyMove(deal: DealRow, stage: string, opts: { outcomeReason?: string; lostNote?: string } = {}) {
+    if (stage === deal.stage) return
+    setBusyKey(deal.key)
+    try {
+      const result = await moveMyDeal(deal, { stage }, author, opts)
+      showToast(`${deal.account} → ${result.stageLabel}`, 'success')
+      setPending(null)
+      setOutcomeReason('')
+      setLostNote('')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not move the deal'), 'error')
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
+  function requestMove(deal: DealRow, stage: string) {
+    if (!stage || stage === deal.stage) return
+    const lower = stage.toLowerCase()
+    if (lower === 'lost' || stage === 'Lost') {
+      setPending({ deal, stage, kind: 'lost' })
+      setOutcomeReason('')
+      setLostNote('')
+      return
+    }
+    if (stage === 'Won' || (deal.pipeline === 'crm' && lower === 'won')) {
+      setPending({ deal, stage: 'Won', kind: 'won' })
+      setOutcomeReason('')
+      setLostNote('')
+      return
+    }
+    void applyMove(deal, stage)
+  }
+
+  function requestColumnMove(deal: DealRow, column: BoardColumn) {
+    if (deal.column === column) return
+    requestMove(deal, targetStageForColumn(deal.pipeline, column))
   }
 
   const manageStagesHref =
@@ -267,7 +334,21 @@ export default function MyDealsPage() {
                 <span style={PIPELINE_CHIPS[d.pipeline]}>{PIPELINE_LABELS[d.pipeline]}</span>{' '}
                 <span style={{ color: colors.muted }}>{d.deal}</span>
               </td>
-              <td style={tdStyle}>{d.stageLabel}</td>
+              <td style={tdStyle}>
+                <select
+                  aria-label={`Stage for ${d.account}`}
+                  style={{ ...selectStyle, maxWidth: 160 }}
+                  value={d.stage}
+                  disabled={busyKey === d.key}
+                  onChange={(e) => requestMove(d, e.target.value)}
+                >
+                  {stagesForPipeline(d.pipeline).map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </td>
               <td style={{ ...tdStyle, textAlign: 'right' }}>{money(d.value)}</td>
               <td style={{ ...tdStyle, textAlign: 'right' }}>{money(d.weighted)}</td>
               <td style={tdStyle}>{nextCell(d)}</td>
@@ -288,31 +369,65 @@ export default function MyDealsPage() {
           const inColumn = shown.filter((d) => d.column === c.value)
           const sum = dealTotals(inColumn)
           return (
-            <div key={c.value} data-column={c.value} style={{ ...cardStyle, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div
+              key={c.value}
+              data-column={c.value}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault()
+                const key = e.dataTransfer.getData('text/deal-key') || dragKey
+                const deal = shown.find((d) => d.key === key)
+                if (deal) requestColumnMove(deal, c.value)
+                setDragKey(null)
+              }}
+              style={{ ...cardStyle, padding: 10, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 120 }}
+            >
               <div style={{ fontSize: 12, fontWeight: 700 }}>
                 {c.label} <span style={{ color: colors.muted2, fontWeight: 400 }}>{inColumn.length}</span>
                 {sum.weighted ? <div style={{ fontWeight: 400, color: colors.muted }}>{formatAED(sum.weighted)} weighted</div> : null}
               </div>
               {inColumn.map((d) => (
-                <Link
+                <div
                   key={d.key}
-                  to={d.link}
+                  draggable={busyKey !== d.key}
+                  onDragStart={(e: DragEvent) => {
+                    setDragKey(d.key)
+                    e.dataTransfer.setData('text/deal-key', d.key)
+                    e.dataTransfer.effectAllowed = 'move'
+                  }}
+                  onDragEnd={() => setDragKey(null)}
                   style={{
                     display: 'grid',
-                    gap: 4,
+                    gap: 6,
                     padding: 10,
                     borderRadius: 10,
-                    textDecoration: 'none',
                     color: colors.text,
                     background: 'rgba(255,255,255,0.05)',
                     border: `1px solid ${d.overdue ? 'rgba(239,68,68,0.5)' : colors.border}`,
+                    opacity: dragKey === d.key || busyKey === d.key ? 0.55 : 1,
+                    cursor: 'grab',
                   }}
                 >
-                  <span style={{ fontWeight: 600, fontSize: 14 }}>{d.account}</span>
+                  <Link to={d.link} style={{ color: colors.text, fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>
+                    {d.account}
+                  </Link>
                   <span style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                     <span style={PIPELINE_CHIPS[d.pipeline]}>{PIPELINE_LABELS[d.pipeline]}</span>
-                    <span style={chip('rgba(255,255,255,0.08)', colors.muted)}>{d.stageLabel}</span>
                   </span>
+                  <select
+                    aria-label={`Stage for ${d.account}`}
+                    style={{ ...selectStyle, width: '100%', fontSize: 12 }}
+                    value={d.stage}
+                    disabled={busyKey === d.key}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => requestMove(d, e.target.value)}
+                  >
+                    {stagesForPipeline(d.pipeline).map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
                   {d.value !== null ? (
                     <span style={{ fontSize: 12 }}>
                       {formatAED(d.value)} <span style={{ color: colors.muted }}>({money(d.weighted)} weighted)</span>
@@ -322,8 +437,11 @@ export default function MyDealsPage() {
                   <span style={{ fontSize: 11, color: colors.muted2 }}>
                     {d.owner_label || 'Nobody'}, {d.days_in_stage} days in stage
                   </span>
-                </Link>
+                </div>
               ))}
+              {inColumn.length === 0 ? (
+                <div style={{ fontSize: 12, color: colors.muted2, padding: '8px 2px' }}>Drop deals here</div>
+              ) : null}
             </div>
           )
         })}
@@ -337,12 +455,12 @@ export default function MyDealsPage() {
         <div>
           <h1 style={pageTitleStyle}>Pipeline</h1>
           <p style={pageSubtitleStyle}>
-            CRM, AI CRM sales, and CTRM Next in one board. Open a deal to change its stage.
+            CRM, AI CRM sales, and CTRM Next in one board. Drag a card or change its stage here.
             {manageStagesHref ? (
               <>
                 {' '}
                 <Link to={manageStagesHref} style={{ color: colors.accent }}>
-                  Open stage board
+                  Open detailed stage board
                 </Link>
               </>
             ) : null}
@@ -374,6 +492,77 @@ export default function MyDealsPage() {
       ) : (
         board
       )}
+
+      <Modal
+        open={Boolean(pending)}
+        title={pending?.kind === 'lost' ? 'Mark deal lost' : 'Mark deal won'}
+        onClose={() => {
+          setPending(null)
+          setOutcomeReason('')
+          setLostNote('')
+        }}
+        width={420}
+      >
+        {pending ? (
+          <div style={{ display: 'grid', gap: 12 }}>
+            <p style={{ margin: 0, color: colors.muted, fontSize: 14, lineHeight: 1.45 }}>
+              {pending.deal.account} · {PIPELINE_LABELS[pending.deal.pipeline]}
+            </p>
+            <div>
+              <label style={labelStyle}>{pending.kind === 'lost' ? 'Why lost' : 'Won reason'}</label>
+              <select
+                style={selectStyle}
+                value={outcomeReason}
+                onChange={(e) => setOutcomeReason(e.target.value)}
+              >
+                <option value="">Pick a reason…</option>
+                {LOST_REASONS.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {pending.kind === 'lost' ? (
+              <div>
+                <label style={labelStyle}>Note</label>
+                <input
+                  style={inputStyle}
+                  value={lostNote}
+                  onChange={(e) => setLostNote(e.target.value)}
+                  placeholder="Short note"
+                />
+              </div>
+            ) : null}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button
+                type="button"
+                style={buttonSecondaryStyle}
+                onClick={() => {
+                  setPending(null)
+                  setOutcomeReason('')
+                  setLostNote('')
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                style={buttonPrimaryStyle}
+                disabled={busyKey === pending.deal.key}
+                onClick={() =>
+                  void applyMove(pending.deal, pending.stage, {
+                    outcomeReason,
+                    lostNote: pending.kind === 'lost' ? lostNote : undefined,
+                  })
+                }
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   )
 }

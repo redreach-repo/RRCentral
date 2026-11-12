@@ -12,18 +12,18 @@
   left: auto;
 }
 
-/* Phone / foldable shell: full width; leave room above bottom nav */
+/* Phone / foldable shell: full width above the bottom nav (not under the title bar) */
 .stackPhone {
+  top: auto;
   right: max(12px, env(safe-area-inset-right, 0px));
   left: max(12px, env(safe-area-inset-left, 0px));
   width: auto;
   max-width: none;
   bottom: calc(72px + env(safe-area-inset-bottom, 0px));
-  max-height: calc(
-    100dvh - 56px - 72px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 48px
-  );
+  max-height: min(40dvh, 280px);
   overflow: hidden;
   align-items: stretch;
+  flex-direction: column-reverse;
 }
 
 @media (max-width: 640px) {
