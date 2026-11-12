@@ -207,7 +207,7 @@ const titleByPath: { match: (path: string) => boolean; title: string }[] = [
   { match: (p) => p.startsWith('/sales'), title: 'AI CRM sales pipeline' },
   { match: (p) => p.startsWith('/deals'), title: 'My deals' },
   { match: (p) => p.startsWith('/products'), title: 'WorshipHub' },
-  { match: (p) => p.startsWith('/crm'), title: 'CRM' },
+  { match: (p) => p.startsWith('/crm'), title: 'My Day' },
   { match: (p) => p.startsWith('/follow-ups'), title: 'Follow-ups' },
   { match: (p) => p.startsWith('/quotations'), title: 'Quotations' },
   { match: (p) => p.startsWith('/invoices'), title: 'Invoices' },
@@ -324,8 +324,10 @@ export default function Layout() {
     setActiveSection(id)
     writeSavedSection(id)
     const group = visibleGroups.find((g) => g.id === id)
-    // Single-destination sections jump straight there.
-    if (group?.items.length === 1) {
+    if (!group?.items.length) return
+    const alreadyHere = group.items.some((item) => itemMatchesPath(location.pathname, item))
+    // Jump to the section’s first page when leaving another section (or Overview).
+    if (!alreadyHere) {
       navigate(group.items[0].to)
       setSidebarOpen(false)
     }
