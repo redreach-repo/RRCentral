@@ -68,6 +68,9 @@ describe('customerFiles', () => {
     expect(companiesMatch('Maxtherm LLC', 'Maxtherm')).toBe(true)
     expect(companiesMatch('Jose Maria Mora', 'jose maria mora')).toBe(true)
     expect(companiesMatch('Acme', 'Beta Trading')).toBe(false)
+    // Quote bill-to often glues words; CRM may keep spaces (ReadyMix vs Ready Mix).
+    expect(companiesMatch('Sharjah Ready Mix', 'Sharjah ReadyMix Concrete')).toBe(true)
+    expect(companiesMatch('Sharjah ReadyMix Concrete', 'Sharjah Ready Mix')).toBe(true)
   })
 
   it('groups CRM docs, signed copies, communications, and purchasing; hides payment slips', () => {

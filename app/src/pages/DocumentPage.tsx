@@ -59,6 +59,7 @@ import LinkDriveFileModal from '../components/LinkDriveFileModal'
 import SaveToFolderPrompt from '../components/SaveToFolderPrompt'
 import { logActivity } from '../lib/activity'
 import { findCrmByCompany, syncCrmFromQuote } from '../lib/crmSync'
+import { ensureCompanyFromDocument } from '../lib/ensureCompanyFromDocument'
 import { loadCustomerDocuments, uploadPdfToCustomerDrive } from '../lib/customerFiles'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -406,8 +407,34 @@ export default function DocumentPage() {
         /* optional */
       }
     }
+    // Quote bill-to may not match CRM yet (or CRM was never created). Ensure the
+    // company exists, then look up again — Drive filing needs a CRM row.
     if (!crmId) {
-      showToast('Save this company in CRM first, then file the PDF to Google Drive', 'error')
+      try {
+        const ensured = await ensureCompanyFromDocument({
+          company: doc.client,
+          address: billTo.address,
+          trn: billTo.trn,
+          contactName: billTo.primaryContact,
+          contactEmail: billTo.email,
+          contactPhone: billTo.phone,
+          owner: user?.email?.split('@')[0] || '',
+          userEmail: user?.email || '',
+          source: docType === 'quote' ? 'quotation' : docType === 'invoice' ? 'invoice' : 'delivery_note',
+          ensureDriveFolder: true,
+        })
+        crmId = ensured.crmId || ''
+        if (crmId) {
+          const found = await findCrmByCompany(doc.client)
+          if (found) setCrmRecord(found)
+        }
+      } catch (e) {
+        showToast(errorMessage(e, 'Could not save this company in CRM'), 'error')
+        return
+      }
+    }
+    if (!crmId) {
+      showToast('Could not find or create this company in CRM', 'error')
       return
     }
     setPdfBusy(true)
