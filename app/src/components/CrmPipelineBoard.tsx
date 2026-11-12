@@ -13,7 +13,6 @@ type Props = {
   compact?: boolean
   onOpen: (entry: CrmEntry) => void
   onMoveStage: (entry: CrmEntry, stage: string) => void
-  onLogTouch: (entry: CrmEntry) => void
   renderActions: (entry: CrmEntry) => ReactNode
 }
 
@@ -33,14 +32,12 @@ function DealCard({
   busy,
   onOpen,
   onMoveStage,
-  onLogTouch,
   renderActions,
 }: {
   row: CrmEntry
   busy: boolean
   onOpen: (entry: CrmEntry) => void
   onMoveStage: (entry: CrmEntry, stage: string) => void
-  onLogTouch: (entry: CrmEntry) => void
   renderActions: (entry: CrmEntry) => ReactNode
 }) {
   const contacts = hydrateContacts(row)
@@ -74,12 +71,7 @@ function DealCard({
           </option>
         ))}
       </select>
-      <div className={resp.cardActions}>
-        <button type="button" className={resp.boardLogBtn} onClick={() => onLogTouch(row)}>
-          Log touch
-        </button>
-        {renderActions(row)}
-      </div>
+      <div className={resp.cardActions}>{renderActions(row)}</div>
     </article>
   )
 }
@@ -90,7 +82,6 @@ export default function CrmPipelineBoard({
   compact,
   onOpen,
   onMoveStage,
-  onLogTouch,
   renderActions,
 }: Props) {
   const counts = useMemo(() => {
@@ -138,7 +129,6 @@ export default function CrmPipelineBoard({
                 busy={busyId === row.id}
                 onOpen={onOpen}
                 onMoveStage={onMoveStage}
-                onLogTouch={onLogTouch}
                 renderActions={renderActions}
               />
             ))
@@ -167,7 +157,6 @@ export default function CrmPipelineBoard({
                 busy={busyId === row.id}
                 onOpen={onOpen}
                 onMoveStage={onMoveStage}
-                onLogTouch={onLogTouch}
                 renderActions={renderActions}
               />
             ))

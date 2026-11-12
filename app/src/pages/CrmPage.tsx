@@ -19,8 +19,8 @@ import {
   List,
   Phone,
   Settings,
-  CalendarClock,
   ChevronDown,
+  MoreHorizontal,
 } from 'lucide-react'
 import { db } from '../lib/db'
 import { CRM_OUTCOME_REASONS, NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
@@ -152,18 +152,6 @@ const emptyForm = (): CrmForm => ({
   lost_note: '',
 })
 
-const chip = (active: boolean): CSSProperties => ({
-  ...btnGhost,
-  fontSize: 12,
-  padding: '8px 12px',
-  borderRadius: 8,
-  border: `1px solid ${active ? colors.accent : colors.border}`,
-  background: active ? `${colors.accent}22` : 'transparent',
-  color: active ? colors.text : colors.muted,
-  fontWeight: active ? 700 : 500,
-  minHeight: 36,
-})
-
 const compactSelect: CSSProperties = {
   ...input,
   padding: '8px 10px',
@@ -224,6 +212,7 @@ export default function CrmPage() {
   const [outcomeReason, setOutcomeReason] = useState('')
   const [sheetTab, setSheetTab] = useState<SheetTab>('overview')
   const [sheetMoreOpen, setSheetMoreOpen] = useState(false)
+  const [rowMenuId, setRowMenuId] = useState<string | null>(null)
   const [defaultsReady, setDefaultsReady] = useState(false)
   const [calendarSettingsOpen, setCalendarSettingsOpen] = useState(false)
   const compact = useCompactCrm()
@@ -385,6 +374,20 @@ export default function CrmPage() {
   }, [])
 
   useEffect(() => {
+    if (!rowMenuId) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setRowMenuId(null)
+    }
+    const onPointer = () => setRowMenuId(null)
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('pointerdown', onPointer)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('pointerdown', onPointer)
+    }
+  }, [rowMenuId])
+
+  useEffect(() => {
     const editId = searchParams.get('edit')
     const stage = searchParams.get('stage')
     const follow = searchParams.get('follow')
@@ -409,13 +412,9 @@ export default function CrmPage() {
     if (view === 'board' || view === 'list') setViewMode(view)
 
     if (!defaultsReady && !loading && !hasFilterParams) {
+      // My Day–first: land on overdue + today for the signed-in owner.
       if (myOwnerName) setOwnerFilter(myOwnerName)
-      // Prefer My Day (Due) only when there are due deals; else show All so empty CRM isn't stuck.
-      const scoped = myOwnerName
-        ? entries.filter((e) => (e.owner || '').trim() === myOwnerName)
-        : entries
-      const dueCount = scoped.filter((e) => matchesFollowFilter(e, 'Due')).length
-      setFollowFilter(dueCount > 0 ? 'Due' : 'All')
+      setFollowFilter('Due')
       setDefaultsReady(true)
     } else if (!defaultsReady && !loading && hasFilterParams) {
       if (!canViewAll && myOwnerName) setOwnerFilter(myOwnerName)
@@ -799,6 +798,7 @@ export default function CrmPage() {
   function renderCrmRowActions(row: CrmEntry, opts?: { compactPrimary?: boolean }) {
     const phone = primaryContact(hydrateContacts(row))?.phone || row.mobile_number || row.office_number || ''
     const compactPrimary = Boolean(opts?.compactPrimary)
+    const menuOpen = rowMenuId === row.id
     const primaryBtn: CSSProperties = {
       ...btnGhost,
       minHeight: 40,
@@ -811,101 +811,134 @@ export default function CrmPage() {
       flex: '1 1 auto',
       justifyContent: 'center',
     }
+    const iconBtn = compactPrimary ? primaryBtn : btnGhost
 
-    if (compactPrimary) {
-      return (
-        <>
-          <button type="button" style={primaryBtn} onClick={() => setLogTouchTarget(row)}>
-            <MessageSquarePlus size={14} /> Log
-          </button>
-          {phone ? (
-            <a
-              href={`tel:${phone.replace(/\s+/g, '')}`}
-              style={{ ...primaryBtn, textDecoration: 'none' }}
+    const overflow = (
+      <div style={{ position: 'relative' }}>
+        <button
+          type="button"
+          style={iconBtn}
+          title="More actions"
+          aria-expanded={menuOpen}
+          aria-haspopup="menu"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation()
+            setRowMenuId((id) => (id === row.id ? null : row.id))
+          }}
+        >
+          <MoreHorizontal size={14} />
+          {compactPrimary ? ' More' : null}
+        </button>
+        {menuOpen ? (
+          <div
+            role="menu"
+            style={{
+              position: 'absolute',
+              right: 0,
+              bottom: 'calc(100% + 4px)',
+              zIndex: 30,
+              minWidth: 180,
+              padding: 6,
+              borderRadius: 10,
+              border: `1px solid ${colors.border}`,
+              background: colors.card,
+              boxShadow: '0 12px 28px rgba(0,0,0,0.45)',
+              display: 'grid',
+              gap: 2,
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Link
+              role="menuitem"
+              to={`/quotations?client=${encodeURIComponent(row.company_name)}&new=1`}
+              style={{ ...btnGhost, textDecoration: 'none', justifyContent: 'flex-start' }}
+              onClick={() => setRowMenuId(null)}
+            >
+              <FileText size={14} /> New quote
+            </Link>
+            <button
+              type="button"
+              role="menuitem"
+              style={{ ...btnGhost, justifyContent: 'flex-start' }}
               onClick={() => {
-                void logActivity('call_crm', 'crm', row.company_name, phone, user?.email || '', row.id)
+                setRowMenuId(null)
+                setEmailTarget(row)
               }}
             >
-              <Phone size={14} /> Call
-            </a>
-          ) : null}
-          <button
-            type="button"
-            style={primaryBtn}
-            disabled={quickBusyId === row.id}
-            onClick={() => void openWhatsAppFollowUp(row)}
-          >
-            <MessageCircle size={14} /> WhatsApp
-          </button>
-          <button
-            type="button"
-            style={primaryBtn}
-            title="Reschedule follow-up"
-            onClick={() => setLogTouchTarget(row)}
-          >
-            <CalendarClock size={14} /> Reschedule
-          </button>
-          <button type="button" style={btnGhost} onClick={() => openEdit(row)} title="Edit">
-            <Pencil size={14} />
-          </button>
-          {canDeleteCrm ? (
-            <button type="button" style={btnGhost} onClick={() => setDeleteTarget(row)} title="Delete">
-              <Trash2 size={14} />
+              <Mail size={14} /> Email
             </button>
-          ) : null}
-        </>
-      )
-    }
+            <button
+              type="button"
+              role="menuitem"
+              style={{ ...btnGhost, justifyContent: 'flex-start' }}
+              disabled={quickBusyId === row.id}
+              onClick={() => {
+                setRowMenuId(null)
+                void openWhatsAppFollowUp(row)
+              }}
+            >
+              <MessageCircle size={14} /> WhatsApp
+            </button>
+            {canDeleteCrm ? (
+              <button
+                type="button"
+                role="menuitem"
+                style={{ ...btnGhost, justifyContent: 'flex-start', color: colors.danger }}
+                onClick={() => {
+                  setRowMenuId(null)
+                  setDeleteTarget(row)
+                }}
+              >
+                <Trash2 size={14} /> Delete
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    )
 
     return (
       <>
         <button
           type="button"
-          style={btnGhost}
+          style={iconBtn}
           title="Log touch"
-          onClick={() => setLogTouchTarget(row)}
+          onClick={() => {
+            setRowMenuId(null)
+            setLogTouchTarget(row)
+          }}
         >
           <MessageSquarePlus size={14} />
+          {compactPrimary ? ' Log' : null}
         </button>
         {phone ? (
           <a
             href={`tel:${phone.replace(/\s+/g, '')}`}
-            style={{ ...btnGhost, display: 'inline-flex', textDecoration: 'none' }}
+            style={{ ...iconBtn, textDecoration: 'none' }}
             title="Call"
             onClick={() => {
               void logActivity('call_crm', 'crm', row.company_name, phone, user?.email || '', row.id)
             }}
           >
             <Phone size={14} />
+            {compactPrimary ? ' Call' : null}
           </a>
         ) : null}
-        <Link
-          to={`/quotations?client=${encodeURIComponent(row.company_name)}&new=1`}
-          style={{ ...btnGhost, display: 'inline-flex', textDecoration: 'none' }}
-          title="Create quote"
-        >
-          <FileText size={14} />
-        </Link>
-        <button type="button" style={btnGhost} onClick={() => setEmailTarget(row)} title="Email">
-          <Mail size={14} />
-        </button>
         <button
           type="button"
-          style={btnGhost}
-          title="WhatsApp follow-up"
-          disabled={quickBusyId === row.id}
-          onClick={() => void openWhatsAppFollowUp(row)}
+          style={iconBtn}
+          title="Open"
+          onClick={() => {
+            setRowMenuId(null)
+            openEdit(row)
+          }}
         >
-          <MessageCircle size={14} />
-        </button>
-        <button type="button" style={btnGhost} onClick={() => openEdit(row)} title="Edit">
           <Pencil size={14} />
+          {compactPrimary ? ' Open' : null}
         </button>
-        {canDeleteCrm ? (
-          <button type="button" style={btnGhost} onClick={() => setDeleteTarget(row)} title="Delete">
-            <Trash2 size={14} />
-          </button>
-        ) : null}
+        {overflow}
       </>
     )
   }
@@ -1111,56 +1144,23 @@ export default function CrmPage() {
   return (
     <div style={page}>
       <PageHeader
-        title="Pipeline"
+        title="My Day"
         subtitle={
           compact
-            ? 'My Day = overdue + today. Tap a deal to log the next touch.'
-            : 'My Day opens overdue & today by default. Log every touch. Switch to board when you need the full funnel.'
+            ? 'Overdue + today. Log the next touch, then move on.'
+            : 'Start with what is due. Switch to All deals when you need the full funnel.'
         }
         actions={
-          <div
-            className={compact ? resp.toolbar : undefined}
-            style={
-              compact
-                ? { marginBottom: 0, width: '100%' }
-                : { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }
-            }
+          <button
+            type="button"
+            style={{
+              ...btnPrimary,
+              minHeight: compact ? 44 : undefined,
+            }}
+            onClick={openCreate}
           >
-            <div className={resp.viewToggle} role="group" aria-label="CRM view">
-              <button
-                type="button"
-                aria-pressed={viewMode === 'list'}
-                onClick={() => setViewMode('list')}
-              >
-                <List size={14} /> List
-              </button>
-              <button
-                type="button"
-                aria-pressed={viewMode === 'board'}
-                onClick={() => setViewMode('board')}
-              >
-                <LayoutGrid size={14} /> Board
-              </button>
-            </div>
-            <button
-              type="button"
-              style={{ ...btn, minHeight: compact ? 42 : undefined, flex: compact ? '1 1 auto' : undefined }}
-              onClick={() => setCalendarSettingsOpen(true)}
-            >
-              <Settings size={16} /> {compact ? 'Calendar' : 'Calendar settings'}
-            </button>
-            <button
-              type="button"
-              style={{
-                ...btnPrimary,
-                minHeight: compact ? 44 : undefined,
-                flex: compact ? '1 1 140px' : undefined,
-              }}
-              onClick={openCreate}
-            >
-              <Plus size={16} /> Add company
-            </button>
-          </div>
+            <Plus size={16} /> Add company
+          </button>
         }
       />
 
@@ -1176,7 +1176,7 @@ export default function CrmPage() {
       {error && <div style={errorBanner}>{error}</div>}
 
       <div className={resp.stickyFilters}>
-        <div className={resp.dueStrip}>
+        <div className={resp.dueStripCompact}>
           <button
             type="button"
             className={`${resp.dueTile} ${ownerFilter === myOwnerName && followFilter === 'Due' ? resp.dueTileActive : ''}`}
@@ -1184,6 +1184,7 @@ export default function CrmPage() {
               if (myOwnerName) setOwnerFilter(myOwnerName)
               setFollowFilter('Due')
               setStageFilter('All')
+              setSearch('')
             }}
           >
             <span className={resp.dueTileValue} style={{ color: colors.warn }}>
@@ -1193,37 +1194,13 @@ export default function CrmPage() {
           </button>
           <button
             type="button"
-            className={`${resp.dueTile} ${followFilter === 'Overdue' ? resp.dueTileActive : ''}`}
-            onClick={() => setFollowFilter('Overdue')}
-          >
-            <span className={resp.dueTileValue} style={{ color: colors.danger }}>
-              {dueCounts.overdue}
-            </span>
-            <span className={resp.dueTileLabel}>Overdue</span>
-          </button>
-          <button
-            type="button"
-            className={`${resp.dueTile} ${followFilter === 'Today' ? resp.dueTileActive : ''}`}
-            onClick={() => setFollowFilter('Today')}
-          >
-            <span className={resp.dueTileValue} style={{ color: colors.warn }}>
-              {dueCounts.today}
-            </span>
-            <span className={resp.dueTileLabel}>Today</span>
-          </button>
-          <button
-            type="button"
-            className={`${resp.dueTile} ${followFilter === 'Upcoming' ? resp.dueTileActive : ''}`}
-            onClick={() => setFollowFilter('Upcoming')}
-          >
-            <span className={resp.dueTileValue} style={{ color: colors.success }}>
-              {dueCounts.upcoming}
-            </span>
-            <span className={resp.dueTileLabel}>Upcoming</span>
-          </button>
-          <button
-            type="button"
-            className={`${resp.dueTile} ${ownerFilter === 'All' && followFilter === 'All' && stageFilter === 'All' ? resp.dueTileActive : ''}`}
+            className={`${resp.dueTile} ${
+              followFilter === 'All' &&
+              stageFilter === 'All' &&
+              (canViewAll ? ownerFilter === 'All' : Boolean(myOwnerName) && ownerFilter === myOwnerName)
+                ? resp.dueTileActive
+                : ''
+            }`}
             onClick={() => {
               if (!canViewAll) {
                 if (myOwnerName) setOwnerFilter(myOwnerName)
@@ -1264,12 +1241,12 @@ export default function CrmPage() {
             />
           </div>
           <select
-            style={{ ...input, flex: '0 1 180px', maxWidth: compact ? '100%' : 180 }}
+            style={{ ...input, flex: '0 1 160px', maxWidth: compact ? '100%' : 160 }}
             value={ownerFilter}
             onChange={(e) => setOwnerFilter(e.target.value)}
             title="Sales owner"
           >
-            {canViewAll ? <option value="All">All sales owners</option> : null}
+            {canViewAll ? <option value="All">All owners</option> : null}
             {myOwnerName ? <option value={myOwnerName}>Me ({myOwnerName})</option> : null}
             {canViewAll ? <option value="Unassigned">Unassigned</option> : null}
             {canViewAll
@@ -1282,37 +1259,46 @@ export default function CrmPage() {
                   ))
               : null}
           </select>
-        </div>
-      </div>
-
-      <div className={compact ? resp.chipScroll : resp.chipRow} role="toolbar" aria-label="Pipeline stage">
-        <button type="button" style={chip(stageFilter === 'All')} onClick={() => setStageFilter('All')}>
-          All stages ({stageCounts.All || 0})
-        </button>
-        {PIPELINE_STAGES.map((s) => (
-          <button
-            key={s}
-            type="button"
-            style={chip(stageFilter === s)}
-            onClick={() => setStageFilter(s)}
+          <select
+            style={{ ...input, flex: '0 1 150px', maxWidth: compact ? '100%' : 150 }}
+            value={stageFilter}
+            onChange={(e) => setStageFilter(e.target.value)}
+            title="Pipeline stage"
           >
-            {s} ({stageCounts[s] || 0})
+            <option value="All">All stages</option>
+            {PIPELINE_STAGES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+                {stageCounts[s] ? ` (${stageCounts[s]})` : ''}
+              </option>
+            ))}
+          </select>
+          <div className={resp.viewToggle} role="group" aria-label="CRM view">
+            <button
+              type="button"
+              aria-pressed={viewMode === 'list'}
+              onClick={() => setViewMode('list')}
+            >
+              <List size={14} /> List
+            </button>
+            <button
+              type="button"
+              aria-pressed={viewMode === 'board'}
+              onClick={() => setViewMode('board')}
+            >
+              <LayoutGrid size={14} /> Board
+            </button>
+          </div>
+          <button
+            type="button"
+            style={btn}
+            onClick={() => setCalendarSettingsOpen(true)}
+            title="Calendar settings"
+          >
+            <Settings size={16} />
+            {compact ? null : ' Calendar'}
           </button>
-        ))}
-      </div>
-
-      <div className={compact ? resp.chipScroll : resp.chipRow} role="toolbar" aria-label="Follow-up filter">
-        {(['All', 'Due', 'Overdue', 'Today', 'Upcoming', 'None'] as FollowFilter[]).map((f) => (
-          <button key={f} type="button" style={chip(followFilter === f)} onClick={() => setFollowFilter(f)}>
-            {f === 'All'
-              ? 'Any follow-up'
-              : f === 'Due'
-                ? compact
-                  ? 'Due'
-                  : 'Due (overdue + today)'
-                : f}
-          </button>
-        ))}
+        </div>
       </div>
 
       {loading ? (
@@ -1337,7 +1323,23 @@ export default function CrmPage() {
                 <Plus size={16} /> Add your first company
               </button>
             </>
-          ) : search || stageFilter !== 'All' || ownerFilter !== 'All' || followFilter !== 'All' ? (
+          ) : followFilter === 'Due' && !search && stageFilter === 'All' ? (
+            <>
+              <div>Nothing due right now. Nice work.</div>
+              <button
+                type="button"
+                style={btn}
+                onClick={() => {
+                  if (!canViewAll && myOwnerName) setOwnerFilter(myOwnerName)
+                  else setOwnerFilter('All')
+                  setFollowFilter('All')
+                  setStageFilter('All')
+                }}
+              >
+                Show all deals
+              </button>
+            </>
+          ) : (
             <>
               <div>No companies match your filters.</div>
               <button
@@ -1351,11 +1353,9 @@ export default function CrmPage() {
                   setSearch('')
                 }}
               >
-                Show all deals
+                Clear filters
               </button>
             </>
-          ) : (
-            'No companies match your filters. Try My Day or All deals above.'
           )}
         </div>
       ) : viewMode === 'board' ? (
@@ -1365,7 +1365,6 @@ export default function CrmPage() {
           compact={compact}
           onOpen={openEdit}
           onMoveStage={(row, stage) => void quickPatch(row, { pipeline_stage: stage })}
-          onLogTouch={setLogTouchTarget}
           renderActions={(row) => renderCrmRowActions(row, { compactPrimary: compact })}
         />
       ) : compact ? (
