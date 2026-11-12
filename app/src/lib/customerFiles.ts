@@ -361,6 +361,10 @@ export function companiesMatch(a: string, b: string): boolean {
   const sb = stripLegalSuffixes(nb)
   if (sa && sb && sa === sb) return true
   if (sa.length >= 5 && sb.length >= 5 && (sa.includes(sb) || sb.includes(sa))) return true
+  // "ReadyMix" vs "Ready Mix" — compare with spaces removed so glued words still match.
+  const ca = sa.replace(/\s+/g, '')
+  const cb = sb.replace(/\s+/g, '')
+  if (ca.length >= 5 && cb.length >= 5 && (ca.includes(cb) || cb.includes(ca))) return true
   return false
 }
 
