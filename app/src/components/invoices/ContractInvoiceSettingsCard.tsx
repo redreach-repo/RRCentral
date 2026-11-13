@@ -9,6 +9,7 @@ import {
   DEFAULT_CONTRACT_INVOICE_TERMS,
 } from '../../lib/contractBilling'
 import { errorMessage } from '../../lib/errors'
+import { parseContractInvoiceSettings } from '../../lib/schemas/contractInvoiceSettings'
 import { buttonPrimaryStyle, cardStyle, colors, fieldStyle, formGridStyle, labelStyle, sectionTitleStyle, selectStyle } from '../../lib/uiStyles'
 
 /** Which division and payment terms automatic contract invoices use. */
@@ -25,10 +26,15 @@ export default function ContractInvoiceSettingsCard() {
   }, [settings])
 
   async function save() {
+    const parsed = parseContractInvoiceSettings({ division, terms })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
     setSaving(true)
     try {
-      await updateSetting(CONTRACT_INVOICE_DIVISION_KEY, division)
-      await updateSetting(CONTRACT_INVOICE_TERMS_KEY, terms)
+      await updateSetting(CONTRACT_INVOICE_DIVISION_KEY, parsed.data.division)
+      await updateSetting(CONTRACT_INVOICE_TERMS_KEY, parsed.data.terms)
       showToast('Contract invoice settings saved', 'success')
     } catch (e) {
       showToast(errorMessage(e, 'Could not save the settings'), 'error')
