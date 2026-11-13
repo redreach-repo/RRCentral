@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod NDA template
+**Current milestone:** Continuous backlog — M1 Zod Drive link modal
 
 ## Shipped this turn
 
-- Zod `parseNdaDraftForm` + `parseNdaApproveForm` for NDA wording / lawyer approval
+- Zod `parseLinkDriveFileForm` for Google Drive share links (company, URL, title)
 
 ## Already on main
 
-- Continuous backlog Zod through agreement · M3 route soft-hide · M3a demo prep · QTSP · `pipeline_deals_v`
+- Continuous backlog Zod through NDA template · M3 route soft-hide · M3a demo prep · QTSP · `pipeline_deals_v`
 
 ## Still open (agent queue)
 
