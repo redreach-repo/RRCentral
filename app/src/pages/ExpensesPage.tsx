@@ -4,6 +4,7 @@ import { FileUp, Paperclip, Plus, Wallet } from 'lucide-react'
 import ExpenseRowActions from '../components/expenses/ExpenseRowActions'
 import { db } from '../lib/db'
 import { PAYMENT_METHODS, VAT_RATE } from '../lib/config'
+import { EXPENSE_CATEGORIES, parseExpenseForm } from '../lib/schemas/expense'
 import type { Attachment, Expense, Quotation, Vendor } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { canViewField } from '../lib/fieldPermissions'
@@ -49,19 +50,7 @@ import {
 } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
-const CATEGORIES = [
-  'Uniforms / Cost of goods',
-  'Office',
-  'Travel',
-  'Marketing',
-  'Salary',
-  'Rent',
-  'Utilities',
-  'Supplies',
-  'Shipping',
-  'Professional fees',
-  'Other',
-]
+const CATEGORIES = [...EXPENSE_CATEGORIES]
 
 type ExpenseForm = {
   date: string
@@ -382,30 +371,32 @@ export default function ExpensesPage() {
   }
 
   async function save() {
-    if (!form.vendor.trim()) {
-      showToast('Vendor is required', 'error')
+    const parsed = parseExpenseForm(form)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setSaving(true)
     try {
-      const parts = !form.charges_vat
-        ? applyNoVat(form.amount > 0 ? form.amount : form.amount_ex_vat)
-        : form.amount_ex_vat > 0 || form.vat_amount > 0
+      const f = parsed.data
+      const parts = !f.charges_vat
+        ? applyNoVat(f.amount > 0 ? f.amount : f.amount_ex_vat)
+        : f.amount_ex_vat > 0 || f.vat_amount > 0
           ? {
-              amount_ex_vat: round2(form.amount_ex_vat),
-              vat_amount: round2(form.vat_amount),
+              amount_ex_vat: round2(f.amount_ex_vat),
+              vat_amount: round2(f.vat_amount),
               amount:
-                form.amount > 0
-                  ? round2(form.amount)
-                  : round2(form.amount_ex_vat + form.vat_amount),
+                f.amount > 0
+                  ? round2(f.amount)
+                  : round2(f.amount_ex_vat + f.vat_amount),
             }
-          : applyVatInclusive(form.amount, vatRate)
+          : applyVatInclusive(f.amount, vatRate)
 
-      const quoteRef = form.quote_ref.trim()
+      const quoteRef = f.quote_ref
       const autoDescription = quoteRef
-        ? formatSupplierExpenseDescription(form.vendor, quoteRef)
+        ? formatSupplierExpenseDescription(f.vendor, quoteRef)
         : ''
-      const extraNotes = form.notes
+      const extraNotes = f.notes
         .split(/\n/)
         .map((l) => l.trim())
         .filter((l) => l && !/^payment to\b/i.test(l))
@@ -414,20 +405,20 @@ export default function ExpensesPage() {
         ? extraNotes
           ? `${autoDescription}\n${extraNotes}`
           : autoDescription
-        : form.notes.trim()
+        : f.notes.trim()
 
       const payload = {
-        date: form.date || null,
-        vendor: form.vendor.trim(),
-        category: form.category,
+        date: f.date || null,
+        vendor: f.vendor,
+        category: f.category,
         amount: parts.amount,
         amount_ex_vat: parts.amount_ex_vat,
         vat_amount: parts.vat_amount,
-        payment_method: form.payment_method,
-        references_text: quoteRef || form.references_text.trim(),
+        payment_method: f.payment_method,
+        references_text: quoteRef || f.references_text,
         notes,
         quote_ref: quoteRef,
-        supplier_invoice_no: form.supplier_invoice_no.trim(),
+        supplier_invoice_no: f.supplier_invoice_no,
       }
 
       let expenseId = editing?.id || ''
