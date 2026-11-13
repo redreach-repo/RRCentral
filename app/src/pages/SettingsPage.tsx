@@ -57,6 +57,7 @@ import {
   type CustomFieldDefinition,
   type CustomFieldType,
 } from '../lib/customFields'
+import { parseCustomFieldDefinitionForm } from '../lib/schemas/customFieldDefinition'
 import {
   clearSupabaseRuntimeConfig,
   getSupabaseRuntimeConfig,
@@ -451,22 +452,23 @@ export default function SettingsPage() {
   }
 
   async function saveCustomField() {
-    if (!customFieldForm.label.trim()) {
-      showToast('Label is required', 'error')
+    const parsed = parseCustomFieldDefinitionForm(customFieldForm)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setBusy(true)
     try {
       await saveCustomFieldDefinition(
         {
-          object_type: customFieldForm.object_type,
-          field_key: editingCustomField?.field_key || slugifyFieldKey(customFieldForm.label),
-          label: customFieldForm.label,
-          field_type: customFieldForm.field_type,
-          options: parseSelectOptions(customFieldForm.optionsText),
-          required: customFieldForm.required,
-          sort_order: customFieldForm.sort_order,
-          active: customFieldForm.active,
+          object_type: parsed.data.object_type,
+          field_key: editingCustomField?.field_key || slugifyFieldKey(parsed.data.label),
+          label: parsed.data.label,
+          field_type: parsed.data.field_type,
+          options: parsed.data.options,
+          required: parsed.data.required,
+          sort_order: parsed.data.sort_order,
+          active: parsed.data.active,
         },
         editingCustomField?.id,
       )
