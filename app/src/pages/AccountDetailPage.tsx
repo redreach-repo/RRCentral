@@ -11,6 +11,7 @@ import Modal from '../components/Modal'
 import StatusPill from '../components/StatusPill'
 import AccountFormModal from '../components/accounts/AccountFormModal'
 import DeliveryPanel from '../components/accounts/DeliveryPanel'
+import AccountCustomFieldsCard from '../components/accounts/AccountCustomFieldsCard'
 import CallBriefButton from '../components/accounts/CallBriefButton'
 import ClientExportButton from '../components/accounts/ClientExportButton'
 import PortalLinksCard from '../components/accounts/PortalLinksCard'
@@ -459,6 +460,12 @@ export default function AccountDetailPage() {
           </div>
         ) : null}
       </div>
+
+      <AccountCustomFieldsCard
+        accountId={account.id}
+        editable={editable && userRole !== 'viewer'}
+        onToast={showToast}
+      />
 
       <div style={tabBarStyle} role="tablist" aria-label="Account sections">
         {visibleTabs.map((t) => (

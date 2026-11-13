@@ -42,3 +42,11 @@ No database migrations. Documentation and `brand-assets/` only.
 
 **Rollback**
 - Forward-only preferred. Drop new tables/function only after confirming no production allocates depend on them; app falls back to client-side `generateReference`.
+
+## M2 — `20261213150000_custom_field_seeds.sql`
+
+**What**
+- Seeds three account custom fields for Red Reach (preferred carrier, billing notes, NDA on file)
+
+**Rollback**
+- Delete those definition rows by `field_key` if needed; values cascade.
