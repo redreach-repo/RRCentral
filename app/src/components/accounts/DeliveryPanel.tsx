@@ -63,6 +63,7 @@ import { getUsageSource, saveUsageSource } from '../../lib/usageImportStore'
 import { canViewField } from '../../lib/fieldPermissions'
 import { can } from '../../lib/permissions'
 import { errorMessage } from '../../lib/errors'
+import { parseTimeEntryForm } from '../../lib/schemas/timeEntry'
 import { formatAED } from '../../lib/money'
 import { FORGOTTEN_TIMER_HOURS, elapsedHours, elapsedLabel, hoursLabel, timerHours } from '../../lib/timeTracking'
 import type {
@@ -398,17 +399,14 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
 
   async function submitHours(e?: FormEvent) {
     e?.preventDefault()
-    const hours = Number(hoursForm.hours)
-    if (!Number.isFinite(hours) || hours <= 0 || hours > 24) {
-      showToast('Enter hours between 0.25 and 24', 'error')
+    const parsed = parseTimeEntryForm(hoursForm)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
+    const { date, hours, category, note } = parsed.data
     await run(async () => {
-      await addTimeEntry(
-        account.id,
-        { date: hoursForm.date, hours, category: hoursForm.category, note: hoursForm.note.trim() },
-        author,
-      )
+      await addTimeEntry(account.id, { date, hours, category, note }, author)
       setHoursForm((f) => ({ ...f, hours: '', note: '' }))
       showToast(`${hours}h logged`, 'success')
     }, 'Could not log the hours')
