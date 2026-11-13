@@ -24,7 +24,7 @@ import {
   stageLabel,
 } from '../lib/ctrm'
 import { listCommissions, listDeals, logTouch, saveDealForm, updateDeal } from '../lib/ctrmStore'
-import { can } from '../lib/permissions'
+import { canViewField } from '../lib/fieldPermissions'
 import { lostText, stageMoveProblem } from '../lib/dealRules'
 import { errorMessage } from '../lib/errors'
 import { formatAED } from '../lib/money'
@@ -73,7 +73,7 @@ export default function CtrmPage() {
   const view = searchParams.get('view') === 'table' ? 'table' : 'board'
   const region = searchParams.get('region') || 'all'
   const owner = searchParams.get('owner') || 'all'
-  const showCommission = can(userRole, 'ctrm.commission')
+  const showCommission = canViewField(userRole, 'ctrm.commission')
   const author = useMemo(() => ({ appUserId, email: user?.email || '' }), [appUserId, user?.email])
 
   const load = useCallback(async () => {
