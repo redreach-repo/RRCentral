@@ -81,4 +81,14 @@ No database migrations. Documentation and `brand-assets/` only.
 **Rollback**
 - Delete those definition rows by `object_type` + `field_key`; values cascade.
 
+## M2 — `20261213190000_crm_quote_saved_views_seeds.sql`
+
+**What**
+- Seeds shared CRM views (My Day, All deals, Board, Unassigned)
+- Seeds shared Quotations views (All / Drafts / Sent / Awarded)
+
+**Rollback**
+- Delete by `module_id` in (`crm`,`quotations`) and those names.
+
+
 

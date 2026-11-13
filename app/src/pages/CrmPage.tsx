@@ -74,6 +74,12 @@ import WebsiteInquiriesPanel from '../site/components/WebsiteInquiriesPanel'
 import CrmLogTouchModal, { type LogTouchPayload } from '../components/CrmLogTouchModal'
 import CrmPipelineBoard from '../components/CrmPipelineBoard'
 import CustomFieldsCard from '../components/CustomFieldsCard'
+import SavedViewsBar from '../components/SavedViewsBar'
+import {
+  crmFiltersEqual,
+  normalizeCrmFilters,
+  type CrmViewFilters,
+} from '../lib/savedViews'
 import CalendarSettingsModal from '../components/CalendarSettingsModal'
 import { useCompactCrm } from '../hooks/useMediaQuery'
 import resp from '../styles/crmResponsive.module.css'
@@ -233,6 +239,57 @@ export default function CrmPage() {
   const myOwnerName = useMemo(
     () => resolveSalesOwnerName(user?.email, owners),
     [user?.email, owners],
+  )
+
+  const currentCrmViewFilters = useMemo(
+    () =>
+      normalizeCrmFilters({
+        q: search,
+        stage: stageFilter,
+        owner: ownerFilter,
+        follow: followFilter,
+        view: viewMode,
+      }),
+    [search, stageFilter, ownerFilter, followFilter, viewMode],
+  )
+
+  const applyCrmViewFilters = useCallback(
+    (raw: Record<string, unknown>) => {
+      const f = raw as CrmViewFilters
+      const nextStage = String(f.stage || 'All')
+      const nextOwner = String(f.owner || 'All')
+      const nextFollow = String(f.follow || 'All')
+      const nextView = f.view === 'board' ? 'board' : 'list'
+      const nextQ = String(f.q || '')
+      setStageFilter(nextStage)
+      setOwnerFilter(
+        !canViewAll && myOwnerName && (nextOwner === 'All' || !nextOwner)
+          ? myOwnerName
+          : nextOwner,
+      )
+      setFollowFilter(
+        nextFollow === 'Due' ||
+          nextFollow === 'Overdue' ||
+          nextFollow === 'Today' ||
+          nextFollow === 'Upcoming' ||
+          nextFollow === 'None' ||
+          nextFollow === 'All'
+          ? nextFollow
+          : 'All',
+      )
+      setViewMode(nextView)
+      setSearch(nextQ)
+      setDefaultsReady(true)
+      const params = new URLSearchParams()
+      if (nextStage !== 'All') params.set('stage', nextStage)
+      if (nextOwner !== 'All') {
+        params.set('owner', nextOwner === myOwnerName ? 'me' : nextOwner)
+      }
+      if (nextFollow !== 'All') params.set('follow', nextFollow)
+      if (nextView !== 'list') params.set('view', nextView)
+      setSearchParams(params, { replace: true })
+    },
+    [canViewAll, myOwnerName, setSearchParams],
   )
 
   const teamForCalendar = useMemo(
@@ -1092,6 +1149,16 @@ export default function CrmPage() {
       {error && <div style={errorBanner}>{error}</div>}
 
       <div className={resp.stickyFilters}>
+        <SavedViewsBar
+          moduleId="crm"
+          filters={currentCrmViewFilters}
+          ownerUserId={appUserId}
+          canWrite={userRole !== 'viewer'}
+          applyDefaultOnLoad={false}
+          onApply={applyCrmViewFilters}
+          onToast={showToast}
+          filtersEqual={(a, b) => crmFiltersEqual(a as CrmViewFilters, b as CrmViewFilters)}
+        />
         <div className={resp.dueStripCompact}>
           <button
             type="button"
