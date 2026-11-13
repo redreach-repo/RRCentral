@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** M1 leftover (Zod payments forms)
+**Current milestone:** M1 leftover (Zod supplier invoice)
 
 ## Shipped this turn
 
-- Zod parsers for customer payment, refund, and supplier commitment on Payments
+- Zod `parseSupplierInvoiceForm` on quote supplier invoice (vendor, total, Drive link)
 
 ## Already on main
 
-- M0–M4 · M1 leftovers (forms Zod through CTRM deal, field-mask) · M5 through clause-tag spawn
+- M0–M4 · M1 leftovers (forms Zod through payments, field-mask) · M5 through clause-tag spawn
 
 ## Still open
 
