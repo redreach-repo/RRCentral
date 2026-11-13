@@ -19,7 +19,10 @@ Merge green PRs bottom-up. Prefer this order so STATUS conflicts stay small:
 10. **#309** — Zod account contact + timeline note  
 11. **#310** — Zod insights capacity  
 12. **#311** — Zod CRM Won/Lost outcome  
-13. **#312+** — Remaining overnight Zod leftovers (invoice payment, supabase connect, …)
+13. **#312** — Zod Wanders deal + terms  
+14. **#313** — Zod invoice payment  
+15. **#314** — Zod Supabase connect  
+16. **#315** — this STATUS (merge last, or skip if another PR already refreshed STATUS)
 
 If a PR shows a STATUS-only conflict after an earlier merge, keep **this PR’s** milestone block.
 
