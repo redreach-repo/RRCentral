@@ -41,6 +41,7 @@ import type { UserRole } from '../lib/types'
 import { APP_MODULES, itemMatchesPath, moduleIdForPath, titleForPath } from '../modules/nav'
 import type { ModuleNavItem } from '../modules/registry'
 import BrandLogo from './BrandLogo'
+import CommandPalette from './CommandPalette'
 import ErrorBoundary from './ErrorBoundary'
 import styles from './Layout.module.css'
 
@@ -117,6 +118,7 @@ export default function Layout() {
   const { companies, activeCompanyId, setActiveCompanyId, activeCompany } = useTenant()
   const { t } = useI18n()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [commandOpen, setCommandOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const phoneShell = usePhoneShell()
@@ -140,6 +142,17 @@ export default function Layout() {
     const seed = saved && navGroups.some((g) => g.id === saved) ? saved : fromPath
     return Array.from(new Set([fromPath, seed].filter(Boolean)))
   })
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setCommandOpen((open) => !open)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   useEffect(() => {
     writeSavedSection(pathSection)
@@ -420,6 +433,7 @@ export default function Layout() {
 
         <main className={styles.content}>
           <ErrorBoundary key={location.pathname}>
+            <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} />
             <Outlet />
           </ErrorBoundary>
         </main>

@@ -1,21 +1,20 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M3 Pipeline write façade sheet fields
+**Current milestone:** Continuous backlog — Cmd+K jump palette
 
 ## Shipped this turn
 
-- M3 `patchMyDeal` expands to notes + CRM quote_ref + sales/CTRM source from Pipeline
+- Cmd/Ctrl+K command palette jumps to any nav page the signed-in role can open
 
 ## Already on main
 
-- Continuous backlog Zod through delivery contracts · M3 route soft-hide · M3a demo prep · QTSP · `pipeline_deals_v`
+- Continuous backlog through M3 Pipeline façade notes · Zod contracts · Guide CRM pack · QTSP · `pipeline_deals_v`
 
 ## Still open (agent queue)
 
-1. More M1 Zod  
-2. Further M3 façade / inventory metrics  
-3. Demo env hooks after Alfred provisions  
+1. More M1 Zod (open PRs)  
+2. Demo env hooks after Alfred provisions  
 
 ## Still externally blocked
 
