@@ -6,6 +6,7 @@ import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import StatusPill from '../components/StatusPill'
 import AccountFormModal from '../components/accounts/AccountFormModal'
+import SavedViewsBar from '../components/SavedViewsBar'
 import {
   ACCOUNT_TYPES,
   accountStatusLabel,
@@ -13,6 +14,11 @@ import {
   accountTypeLabel,
   visibleAccounts,
 } from '../lib/accounts'
+import {
+  accountsFiltersEqual,
+  normalizeAccountsFilters,
+  type AccountsViewFilters,
+} from '../lib/savedViews'
 import {
   type AccountInput,
   type ContactInput,
@@ -27,20 +33,11 @@ import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
 import type { Account, AccountContact, AccountType, AppUser } from '../lib/types'
 import {
-  buttonPrimaryStyle,
   cardStyle,
   colors,
-  inputStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
-  tableStyle,
-  tableWrapStyle,
-  tdStyle,
-  thStyle,
-  toolbarStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 type TypeFilter = 'all' | AccountType
 
@@ -54,8 +51,8 @@ export default function AccountsPage() {
   const [team, setTeam] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
   const [missingTable, setMissingTable] = useState(false)
-  const [search, setSearch] = useState('')
-  const [ownerFilter, setOwnerFilter] = useState('all')
+  const [search, setSearch] = useState(() => searchParams.get('q') || '')
+  const [ownerFilter, setOwnerFilter] = useState(() => searchParams.get('owner') || 'all')
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -63,6 +60,42 @@ export default function AccountsPage() {
   const typeFilter: TypeFilter = ACCOUNT_TYPES.some((t) => t.value === typeParam)
     ? (typeParam as AccountType)
     : 'all'
+
+  const hasUrlFilters = Boolean(
+    searchParams.get('q') || searchParams.get('type') || searchParams.get('owner'),
+  )
+
+  const currentViewFilters = useMemo(
+    () =>
+      normalizeAccountsFilters({
+        q: search,
+        type: typeFilter,
+        owner: ownerFilter,
+      }),
+    [search, typeFilter, ownerFilter],
+  )
+
+  const applyViewFilters = useCallback(
+    (raw: Record<string, unknown>) => {
+      const f = raw as AccountsViewFilters
+      const params = new URLSearchParams()
+      const nextType = String(f.type || 'all')
+      const nextOwner = String(f.owner || 'all')
+      const nextQ = String(f.q || '')
+      if (nextType !== 'all') params.set('type', nextType)
+      if (nextOwner !== 'all') params.set('owner', nextOwner)
+      if (nextQ) params.set('q', nextQ)
+      setSearch(nextQ)
+      setOwnerFilter(nextOwner)
+      setSearchParams(params, { replace: true })
+    },
+    [setSearchParams],
+  )
+
+  useEffect(() => {
+    const q = searchParams.get('q')
+    if (q != null) setSearch(q)
+  }, [searchParams])
 
   const canWrite = can(userRole, 'accounts.write')
   const isStaff = userRole === 'staff'
@@ -128,6 +161,18 @@ export default function AccountsPage() {
     const params = new URLSearchParams(searchParams)
     if (next === 'all') params.delete('type')
     else params.set('type', next)
+    if (ownerFilter !== 'all') params.set('owner', ownerFilter)
+    else params.delete('owner')
+    if (search.trim()) params.set('q', search.trim())
+    else params.delete('q')
+    setSearchParams(params, { replace: true })
+  }
+
+  function setOwner(next: string) {
+    setOwnerFilter(next)
+    const params = new URLSearchParams(searchParams)
+    if (next === 'all') params.delete('owner')
+    else params.set('owner', next)
     setSearchParams(params, { replace: true })
   }
 
@@ -166,27 +211,28 @@ export default function AccountsPage() {
     typeFilter === 'all' ? 'New account' : `New ${accountTypeInfo(typeFilter).label}`
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Accounts</h1>
-          <p style={pageSubtitleStyle}>
+          <p className={docsStyles.kicker}>Clients</p>
+          <h1 className={docsStyles.title}>Accounts</h1>
+          <p className={docsStyles.subtitle}>
             {isStaff
               ? 'The clients, churches and prospects assigned to you.'
-              : 'Every AI CRM client, WorshipHub church and CTRM Next prospect in one list.'}
+              : 'RR Threads, Wanders and other trading clients, plus AI CRM, WorshipHub and CTRM Next.'}
           </p>
         </div>
         {canWrite ? (
           <button
             type="button"
-            style={buttonPrimaryStyle}
+            className={docsStyles.newBtn}
             onClick={() => setModalOpen(true)}
             disabled={missingTable}
           >
             <Plus size={16} /> {newLabel}
           </button>
         ) : null}
-      </div>
+      </header>
 
       {missingTable ? (
         <div style={{ ...cardStyle, color: colors.muted, lineHeight: 1.55, marginBottom: 16 }}>
@@ -196,42 +242,48 @@ export default function AccountsPage() {
         </div>
       ) : null}
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-        {(['all', ...ACCOUNT_TYPES.map((t) => t.value)] as TypeFilter[]).map((t) => {
-          const active = t === typeFilter
-          return (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setType(t)}
-              style={{
-                padding: '7px 12px',
-                borderRadius: 999,
-                fontSize: 13,
-                cursor: 'pointer',
-                border: `1px solid ${active ? colors.accent : colors.border}`,
-                background: active ? 'rgba(232,93,4,0.16)' : 'rgba(255,255,255,0.04)',
-                color: active ? colors.text : colors.muted,
-              }}
-            >
-              {t === 'all' ? 'All' : accountTypeInfo(t).plural} ({counts[t] ?? 0})
-            </button>
-          )
-        })}
-      </div>
+      <SavedViewsBar
+        moduleId="accounts"
+        filters={currentViewFilters}
+        ownerUserId={appUserId}
+        canWrite={canWrite}
+        applyDefaultOnLoad={!hasUrlFilters}
+        onApply={applyViewFilters}
+        onToast={showToast}
+        filtersEqual={(a, b) =>
+          accountsFiltersEqual(a as AccountsViewFilters, b as AccountsViewFilters)
+        }
+      />
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
+      <div className={docsStyles.controls}>
+        <div className={docsStyles.tabs} role="tablist" aria-label="Account type">
+          {(['all', ...ACCOUNT_TYPES.map((t) => t.value)] as TypeFilter[]).map((t) => {
+            const active = t === typeFilter
+            return (
+              <button
+                key={t}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                className={active ? docsStyles.tabActive : docsStyles.tab}
+                onClick={() => setType(t)}
+              >
+                {t === 'all' ? 'All' : accountTypeInfo(t).plural} ({counts[t] ?? 0})
+              </button>
+            )
+          })}
+        </div>
         <input
-          style={{ ...inputStyle, maxWidth: 320 }}
+          className={docsStyles.search}
           placeholder="Search name, reference, contact"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
         {!isStaff ? (
           <select
-            style={{ ...selectStyle, maxWidth: 220 }}
+            style={{ ...selectStyle, maxWidth: 200, height: 40 }}
             value={ownerFilter}
-            onChange={(e) => setOwnerFilter(e.target.value)}
+            onChange={(e) => setOwner(e.target.value)}
             aria-label="Owner"
           >
             <option value="all">Any owner</option>
@@ -246,32 +298,34 @@ export default function AccountsPage() {
       </div>
 
       {loading ? (
-        <div style={{ ...cardStyle, color: colors.muted }}>Loading accounts…</div>
+        <div className={docsStyles.loading}>Loading accounts…</div>
       ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={<Contact size={22} />}
-          title={mine.length === 0 ? 'No accounts yet' : 'Nothing matches'}
-          subtitle={
-            mine.length === 0
-              ? isStaff
-                ? 'Nothing has been assigned to you yet. Ask Alfred to assign an account, or add a prospect you are working on.'
-                : 'Add your first AI CRM client, WorshipHub church or CTRM Next prospect.'
-              : 'Try another type, owner or search.'
-          }
-          actionLabel={canWrite && mine.length === 0 && !missingTable ? 'Add account' : undefined}
-          onAction={() => setModalOpen(true)}
-        />
+        <div className={docsStyles.empty}>
+          <EmptyState
+            icon={<Contact size={22} />}
+            title={mine.length === 0 ? 'No accounts yet' : 'Nothing matches'}
+            subtitle={
+              mine.length === 0
+                ? isStaff
+                  ? 'Nothing has been assigned to you yet. Ask Alfred to assign an account, or add a prospect you are working on.'
+                  : 'Add your first RR Threads client, AI CRM company, WorshipHub church or CTRM Next prospect.'
+                : 'Try another type, owner or search.'
+            }
+            actionLabel={canWrite && mine.length === 0 && !missingTable ? 'Add account' : undefined}
+            onAction={() => setModalOpen(true)}
+          />
+        </div>
       ) : (
-        <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
-          <div style={tableWrapStyle}>
-            <table style={tableStyle}>
+        <div className={docsStyles.tableShell}>
+          <div className={docsStyles.tableWrap}>
+            <table className={docsStyles.table}>
               <thead>
                 <tr>
-                  <th style={thStyle}>Account</th>
-                  <th style={thStyle}>Type</th>
-                  <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Main contact</th>
-                  <th style={thStyle}>Owner</th>
+                  <th>Account</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Main contact</th>
+                  <th>Owner</th>
                 </tr>
               </thead>
               <tbody>
@@ -283,29 +337,29 @@ export default function AccountsPage() {
                       onClick={() => navigate(`/accounts/${a.id}`)}
                       style={{ cursor: 'pointer' }}
                     >
-                      <td style={tdStyle}>
-                        <div style={{ fontWeight: 600 }}>{a.name}</div>
-                        <div style={{ fontSize: 11, color: colors.muted2 }}>
+                      <td className={docsStyles.clientCell}>
+                        <div className={docsStyles.ref}>{a.name}</div>
+                        <div className={docsStyles.meta}>
                           {[a.reference, a.city].filter(Boolean).join(', ')}
                         </div>
                       </td>
-                      <td style={tdStyle}>{accountTypeLabel(a.type)}</td>
-                      <td style={tdStyle}>
+                      <td>{accountTypeLabel(a.type)}</td>
+                      <td>
                         <StatusPill status={accountStatusLabel(a.status)} />
                       </td>
-                      <td style={tdStyle}>
+                      <td>
                         {contact ? (
                           <>
                             <div>{contact.name}</div>
-                            <div style={{ fontSize: 11, color: colors.muted2 }}>
+                            <div className={docsStyles.meta}>
                               {contact.email || contact.phone}
                             </div>
                           </>
                         ) : (
-                          <span style={{ color: colors.muted2 }}>None yet</span>
+                          <span className={docsStyles.meta}>None yet</span>
                         )}
                       </td>
-                      <td style={tdStyle}>{ownerName(a.owner_user_id)}</td>
+                      <td>{ownerName(a.owner_user_id)}</td>
                     </tr>
                   )
                 })}
@@ -319,7 +373,7 @@ export default function AccountsPage() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         account={null}
-        defaultType={typeFilter === 'all' ? 'ai_crm_client' : typeFilter}
+        defaultType={typeFilter === 'all' ? 'rr_threads_client' : typeFilter}
         team={team}
         lockedOwnerId={isStaff ? appUserId : undefined}
         canReassign={can(userRole, 'accounts.reassign')}

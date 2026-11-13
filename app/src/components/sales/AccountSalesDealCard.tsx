@@ -87,8 +87,8 @@ export default function AccountSalesDealCard({ account, team, editable, canContr
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Sales deal</h2>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <Link to="/sales" style={{ color: colors.muted, fontSize: 12 }}>
-            Open the pipeline
+          <Link to="/deals?pipeline=sales&view=board" style={{ color: colors.muted, fontSize: 12 }}>
+            Open Pipeline
           </Link>
           {editable && deals.length === 0 ? (
             <button type="button" style={{ ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }} onClick={() => setEditing(null)}>

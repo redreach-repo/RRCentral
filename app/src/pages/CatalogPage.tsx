@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, ExternalLink, FileText, Package, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { Download, ExternalLink, FileText, Package, Plus, RefreshCw } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS, FABRIC_OPTIONS } from '../lib/config'
 import { BRAND_CATALOGUES, catalogueUrl } from '../lib/catalogues'
@@ -9,6 +9,7 @@ import type { Product } from '../lib/types'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
+import SimpleRowActions from '../components/SimpleRowActions'
 import { formatAED } from '../lib/money'
 import {
   buttonDangerStyle,
@@ -19,19 +20,17 @@ import {
   fieldStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
-  toolbarStyle,
   formGridStyle,
   sectionTitleStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 import { errorMessage } from '../lib/errors'
+import { parseCatalogProductForm } from '../lib/schemas/catalogProduct'
 
 type ProductForm = {
   sku: string
@@ -77,6 +76,7 @@ export default function CatalogPage() {
   const [saving, setSaving] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
+  const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -140,16 +140,15 @@ export default function CatalogPage() {
   }
 
   async function save() {
-    if (!form.name.trim()) {
-      showToast('Name is required', 'error')
+    const parsed = parseCatalogProductForm(form)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setSaving(true)
     try {
       const payload = {
-        ...form,
-        name: form.name.trim(),
-        sku: form.sku.trim(),
+        ...parsed.data,
         updated_at: new Date().toISOString(),
       }
       if (editing) {
@@ -237,16 +236,18 @@ export default function CatalogPage() {
   }, [divisionFilter])
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Catalog</h1>
-          <p style={pageSubtitleStyle}>Brand catalogues and products across divisions</p>
+          <p className={docsStyles.kicker}>Operations</p>
+          <h1 className={docsStyles.title}>Catalog</h1>
+          <p className={docsStyles.subtitle}>Brand catalogues and products across divisions</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
             type="button"
-            style={buttonSecondaryStyle}
+            className={docsStyles.newBtn}
+            style={{ background: 'rgba(255,255,255,0.08)' }}
             disabled={syncing}
             onClick={() => void syncCatalogueSkus()}
             title="Load / refresh RR Threads catalogue SKUs"
@@ -255,18 +256,19 @@ export default function CatalogPage() {
           </button>
           <button
             type="button"
-            style={buttonSecondaryStyle}
+            className={docsStyles.newBtn}
+            style={{ background: 'rgba(255,255,255,0.08)' }}
             disabled={syncing}
             onClick={() => void syncDivisionServices()}
             title="Load Marketing, Connect (Konekt+) and Trading service rows"
           >
             <RefreshCw size={16} /> Load Marketing / Connect / Trading
           </button>
-          <button type="button" style={buttonPrimaryStyle} onClick={openCreate}>
+          <button type="button" className={docsStyles.newBtn} onClick={openCreate}>
             <Plus size={16} /> Add product
           </button>
         </div>
-      </div>
+      </header>
 
       {visibleCatalogues.length > 0 ? (
         <div style={{ marginBottom: 24 }}>
@@ -413,12 +415,12 @@ export default function CatalogPage() {
                       </button>
                     </td>
                     <td style={tdStyle}>
-                      <button type="button" style={buttonSecondaryStyle} onClick={() => openEdit(p)}>
-                        <Pencil size={14} />
-                      </button>{' '}
-                      <button type="button" style={buttonDangerStyle} onClick={() => setDeleteTarget(p)}>
-                        <Trash2 size={14} />
-                      </button>
+                      <SimpleRowActions
+                        expanded={actionsOpenId === p.id}
+                        onToggle={() => setActionsOpenId((id) => (id === p.id ? null : p.id))}
+                        onEdit={() => openEdit(p)}
+                        onDelete={() => setDeleteTarget(p)}
+                      />
                     </td>
                   </tr>
                 ))}

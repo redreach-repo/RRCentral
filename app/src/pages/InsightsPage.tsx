@@ -19,6 +19,7 @@ import {
   utilisation,
   type ClientTrend,
 } from '../lib/insights'
+import { canViewField } from '../lib/fieldPermissions'
 import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
 import { formatAED } from '../lib/money'
@@ -29,15 +30,13 @@ import {
   cardStyle,
   colors,
   inputStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   sectionTitleStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 const MONTHS = 6
 
@@ -67,7 +66,7 @@ export default function InsightsPage() {
   const { showToast } = useToast()
   const [data, setData] = useState<Data | null>(null)
   const [capacityDraft, setCapacityDraft] = useState('')
-  const allowed = can(userRole, 'delivery.profitability')
+  const allowed = canViewField(userRole, 'delivery.profitability')
   const canChange = can(userRole, 'delivery.packages')
   const rates = useMemo(() => ratesFromSettings(settings), [settings])
   const capacity = capacityFromSettings(settings)
@@ -126,7 +125,7 @@ export default function InsightsPage() {
 
   if (!allowed) {
     return (
-      <div style={pageStyle}>
+      <div className={docsStyles.page}>
         <EmptyState icon={<Gauge size={22} />} title="Managers and admins only" />
       </div>
     )
@@ -135,12 +134,17 @@ export default function InsightsPage() {
   const maxHours = use ? Math.max(capacity, ...use.months.map((m) => m.hours)) : capacity
 
   return (
-    <div style={pageStyle}>
-      <h1 style={pageTitleStyle}>Utilisation and profit</h1>
-      <p style={pageSubtitleStyle}>
-        How much of your delivery time is used, so you know when to hire, and how each client's profit moves month to
-        month. Amounts exclude VAT.
-      </p>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
+        <div>
+          <p className={docsStyles.kicker}>Finance</p>
+          <h1 className={docsStyles.title}>Utilisation and profit</h1>
+          <p className={docsStyles.subtitle}>
+            How much of your delivery time is used, so you know when to hire, and how each client's profit moves month to
+            month. Amounts exclude VAT.
+          </p>
+        </div>
+      </header>
 
       {!use ? (
         <p style={{ color: colors.muted }}>Loading</p>

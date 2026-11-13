@@ -16,17 +16,15 @@ import {
   colors,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
-  toolbarStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 import { errorMessage } from '../lib/errors'
+import { parseInventoryAdjust } from '../lib/schemas/inventoryAdjust'
 
 export default function InventoryPage() {
   const { user } = useAuth()
@@ -94,17 +92,21 @@ export default function InventoryPage() {
 
   async function saveAdjust() {
     if (!adjustTarget?.sku) return
-    const n = Number(delta)
-    if (!Number.isFinite(n) || n === 0) {
-      showToast('Enter a non-zero quantity', 'error')
+    const parsed = parseInventoryAdjust({
+      sku: adjustTarget.sku,
+      delta,
+      reason: reason || 'manual_adjust',
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setBusy(true)
     try {
       await adjustStock({
-        sku: adjustTarget.sku,
-        qtyDelta: n,
-        reason: reason || 'manual_adjust',
+        sku: parsed.data.sku,
+        qtyDelta: parsed.data.qtyDelta,
+        reason: parsed.data.reason,
         userEmail: user?.email || '',
       })
       showToast('Stock updated', 'success')
@@ -121,20 +123,27 @@ export default function InventoryPage() {
   const brand = (code: string) => DIVISIONS.find((d) => d.code === code)?.brand || code
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Inventory</h1>
-          <p style={pageSubtitleStyle}>
+          <p className={docsStyles.kicker}>Operations</p>
+          <h1 className={docsStyles.title}>Inventory</h1>
+          <p className={docsStyles.subtitle}>
             Manual stock by SKU · available = on hand − reserved
             {lowCount > 0 ? ` · ${lowCount} low stock` : ''}
             . Sync pulls catalogue SKUs; quote/catalog stock hooks are not automatic yet.
           </p>
         </div>
-        <button type="button" style={buttonSecondaryStyle} disabled={busy} onClick={() => void syncSkus()}>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          style={{ background: 'rgba(255,255,255,0.08)' }}
+          disabled={busy}
+          onClick={() => void syncSkus()}
+        >
           <RefreshCw size={16} /> Sync catalogue SKUs
         </button>
-      </div>
+      </header>
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
         <select

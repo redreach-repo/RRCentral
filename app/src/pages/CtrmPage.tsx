@@ -24,7 +24,7 @@ import {
   stageLabel,
 } from '../lib/ctrm'
 import { listCommissions, listDeals, logTouch, saveDealForm, updateDeal } from '../lib/ctrmStore'
-import { can } from '../lib/permissions'
+import { canViewField } from '../lib/fieldPermissions'
 import { lostText, stageMoveProblem } from '../lib/dealRules'
 import { errorMessage } from '../lib/errors'
 import { formatAED } from '../lib/money'
@@ -34,17 +34,14 @@ import {
   buttonSecondaryStyle,
   cardStyle,
   colors,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   sectionTitleStyle,
   selectStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
-  toolbarStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 const chip = (bg: string, color: string): CSSProperties => ({
   display: 'inline-flex',
@@ -76,7 +73,7 @@ export default function CtrmPage() {
   const view = searchParams.get('view') === 'table' ? 'table' : 'board'
   const region = searchParams.get('region') || 'all'
   const owner = searchParams.get('owner') || 'all'
-  const showCommission = can(userRole, 'ctrm.commission')
+  const showCommission = canViewField(userRole, 'ctrm.commission')
   const author = useMemo(() => ({ appUserId, email: user?.email || '' }), [appUserId, user?.email])
 
   const load = useCallback(async () => {
@@ -313,24 +310,53 @@ export default function CtrmPage() {
   }
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>CTRM Next pipeline</h1>
-          <p style={pageSubtitleStyle}>
-            Companies being introduced to CTRM Next. Kept apart from client delivery and finance.
+          <p className={docsStyles.kicker}>Sales · Work</p>
+          <h1 className={docsStyles.title}>CTRM detail</h1>
+          <p className={docsStyles.subtitle}>
+            Fine-grained CTRM Next stages, regions, and commission. Day-to-day chasing lives on Pipeline.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <Link to="/ctrm/summary" style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}>
+          <Link
+            to="/ctrm/summary"
+            className={docsStyles.newBtn}
+            style={{ textDecoration: 'none', background: 'rgba(255,255,255,0.08)' }}
+          >
             Weekly summary
           </Link>
           {canWrite ? (
-            <button type="button" style={buttonPrimaryStyle} onClick={() => setEditing({ deal: null })}>
+            <button type="button" className={docsStyles.newBtn} onClick={() => setEditing({ deal: null })}>
               <Plus size={16} /> New deal
             </button>
           ) : null}
         </div>
+      </header>
+
+      <div
+        role="status"
+        style={{
+          ...cardStyle,
+          marginBottom: 12,
+          padding: '12px 14px',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 10,
+          alignItems: 'center',
+        }}
+      >
+        <span style={{ flex: '1 1 220px', fontSize: 13, color: colors.muted, lineHeight: 1.45 }}>
+          Prefer <strong style={{ color: colors.text }}>Pipeline</strong> for the shared board. Use this page for
+          CTRM-only filters, weekly summary, and commission detail.
+        </span>
+        <Link
+          to="/deals?pipeline=ctrm&view=board"
+          style={{ ...buttonPrimaryStyle, textDecoration: 'none' }}
+        >
+          Open Pipeline
+        </Link>
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>

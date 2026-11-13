@@ -60,8 +60,14 @@ import { listAiUsage } from '../../lib/aiAssistStore'
 import { listContractInvoices, runContractBilling, skipSetupInvoice } from '../../lib/contractBillingStore'
 import { editedByHand } from '../../lib/usageImport'
 import { getUsageSource, saveUsageSource } from '../../lib/usageImportStore'
+import { canViewField } from '../../lib/fieldPermissions'
 import { can } from '../../lib/permissions'
 import { errorMessage } from '../../lib/errors'
+import { parseDeliveryContractForm } from '../../lib/schemas/deliveryContract'
+import { parseDeliveryRequirementForm } from '../../lib/schemas/deliveryRequirement'
+import { parseTimeEntryForm } from '../../lib/schemas/timeEntry'
+import { parseUsageMonthForm } from '../../lib/schemas/usageMonth'
+import { parseUsageSourceForm } from '../../lib/schemas/usageSource'
 import { formatAED } from '../../lib/money'
 import { FORGOTTEN_TIMER_HOURS, elapsedHours, elapsedLabel, hoursLabel, timerHours } from '../../lib/timeTracking'
 import type {
@@ -204,7 +210,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
 
   const canContracts = can(userRole, 'delivery.contracts')
   const compact = useCompactCrm()
-  const seesProfit = can(userRole, 'delivery.profitability')
+  const seesProfit = canViewField(userRole, 'delivery.profitability')
   const { timer, now, start: startTimer, clear: clearTimer } = useRunningTimer(author.email)
   const timerHere = timer?.accountId === account.id
 
@@ -221,7 +227,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
         getUsageSource(account.id).catch(() => null),
       ])
       setUsageSource(src)
-      if (can(userRole, 'delivery.profitability')) {
+      if (canViewField(userRole, 'delivery.profitability')) {
         const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
         const ai = await listAiUsage(account.id, monthStart.toISOString()).catch(() => [])
         setAssistUsd(assistCostInMonth(ai, account.id, monthKey(new Date())))
@@ -349,27 +355,18 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
 
   async function submitContract() {
     if (!contractForm) return
-    const f = contractForm.form
+    const parsed = parseDeliveryContractForm(contractForm.form)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
+    const f = parsed.data
     const isNew = !contractForm.id
     const before = contracts.find((c) => c.id === contractForm.id)
     const switchedOn = Boolean(f.auto_invoice) && !isNew && !before?.auto_invoice
     let raised = 0
     await run(async () => {
-      const contractId = await saveContract(
-        account.id,
-        {
-          ...f,
-          monthly_fee: Number(f.monthly_fee) || 0,
-          setup_fee: Number(f.setup_fee) || 0,
-          setup_fee_paid: Number(f.setup_fee_paid) || 0,
-          discount_percent: Number(f.discount_percent) || 0,
-          discount_months_left: Math.max(0, Math.floor(Number(f.discount_months_left) || 0)),
-          term_start: f.term_start || null,
-          term_end: f.term_end || null,
-          billing_from: f.auto_invoice ? f.billing_from || null : null,
-        },
-        contractForm.id,
-      )
+      const contractId = await saveContract(account.id, f, contractForm.id)
       if (f.auto_invoice) {
         // A running contract switched on later starts with monthly invoices;
         // its setup fee was already handled by hand.
@@ -384,7 +381,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
       await logAccountEvent(
         account.id,
         isNew
-          ? `Contract added: ${name}, option ${f.option}, ${formatAED(Number(f.monthly_fee) || 0)} a month`
+          ? `Contract added: ${name}, option ${f.option}, ${formatAED(f.monthly_fee)} a month`
           : `Contract updated: ${name}, option ${f.option}, status ${f.status}`,
         author,
       )
@@ -397,17 +394,14 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
 
   async function submitHours(e?: FormEvent) {
     e?.preventDefault()
-    const hours = Number(hoursForm.hours)
-    if (!Number.isFinite(hours) || hours <= 0 || hours > 24) {
-      showToast('Enter hours between 0.25 and 24', 'error')
+    const parsed = parseTimeEntryForm(hoursForm)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
+    const { date, hours, category, note } = parsed.data
     await run(async () => {
-      await addTimeEntry(
-        account.id,
-        { date: hoursForm.date, hours, category: hoursForm.category, note: hoursForm.note.trim() },
-        author,
-      )
+      await addTimeEntry(account.id, { date, hours, category, note }, author)
       setHoursForm((f) => ({ ...f, hours: '', note: '' }))
       showToast(`${hours}h logged`, 'success')
     }, 'Could not log the hours')
@@ -466,16 +460,26 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
 
   async function submitSource() {
     if (!sourceForm) return
+    const parsed = parseUsageSourceForm(sourceForm)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
     await run(async () => {
-      await saveUsageSource(account.id, sourceForm, usageSource, author.email)
+      await saveUsageSource(account.id, parsed.data, usageSource, author.email)
       setSourceForm(null)
       showToast('Usage import links saved', 'success')
     }, 'Could not save the usage links')
   }
 
   async function submitUsage() {
+    const parsed = parseUsageMonthForm(usageForm)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
     await run(async () => {
-      await saveUsage(account.id, usageMonth, usageForCalc, usageRow)
+      await saveUsage(account.id, usageMonth, parsed.data, usageRow)
       showToast(`Usage saved for ${monthLabel(usageMonth)}`, 'success')
     }, 'Could not save usage')
   }
@@ -502,13 +506,18 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
 
   async function addRequirement(e: FormEvent) {
     e.preventDefault()
-    if (!reqForm.title.trim()) return
+    const parsed = parseDeliveryRequirementForm(reqForm)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
+    const { title, detail } = parsed.data
     await run(async () => {
       await saveRequirement(
         account.id,
         {
-          title: reqForm.title.trim(),
-          detail: reqForm.detail.trim(),
+          title,
+          detail,
           status: 'open',
           source: '',
           is_change_request: signedOff,
@@ -516,7 +525,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
         author.email,
       )
       if (signedOff) {
-        await logAccountEvent(account.id, `Change request raised: ${reqForm.title.trim()}`, author)
+        await logAccountEvent(account.id, `Change request raised: ${title}`, author)
       }
       setReqForm({ title: '', detail: '' })
     }, 'Could not add the requirement')
@@ -873,7 +882,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
                       aria-label="Delete entry"
                       onClick={() => void run(() => deleteTimeEntry(t.id), 'Could not delete the entry')}
                     >
-                      <Trash2 size={12} />
+                      <Trash2 size={12} /> Remove
                     </button>
                   ) : null}
                 </li>
@@ -1149,7 +1158,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
                         void run(() => deleteRequirement(r.id), 'Could not delete the requirement')
                       }
                     >
-                      <Trash2 size={12} />
+                      <Trash2 size={12} /> Remove
                     </button>
                   </div>
                 ) : (

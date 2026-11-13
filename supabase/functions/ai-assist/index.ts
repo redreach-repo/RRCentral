@@ -79,15 +79,16 @@ Deno.serve(withErrorLog("ai-assist", async (req) => {
   const body = (await req.json().catch(() => ({}))) as { account_id?: unknown; input?: unknown }
   const accountId = typeof body.account_id === "string" && UUID.test(body.account_id) ? body.account_id : ""
   const input = normaliseAiInput(body.input)
-  if (!accountId || !input) return json({ error: "Nothing to work with. Add some text first." }, 400)
+  if (!input || !accountId) return json({ error: "Nothing to work with. Add some text first." }, 400)
 
-  // May they work on this account?
   const { data: allowed } = await userDb.rpc("rr_can_write_account", { target: accountId })
   if (allowed !== true) return json({ error: "You can only use AI help on accounts you can edit" }, 403)
 
   const request = buildAiRequest(input)
   const schema = request.schema
-  const client = new Anthropic({ apiKey, maxRetries: 2, timeout: 60_000 })
+  // Haiku 5.5 thinks by default; thinking tokens count toward max_tokens.
+  // Disable thinking for these short staff tools so replies are not cut off.
+  const client = new Anthropic({ apiKey, maxRetries: 2, timeout: 120_000 })
   let message: Anthropic.Message
   try {
     message = await client.messages.create({
@@ -95,6 +96,7 @@ Deno.serve(withErrorLog("ai-assist", async (req) => {
       max_tokens: request.maxTokens,
       system: request.system,
       messages: [{ role: "user", content: request.user }],
+      thinking: { type: "disabled" },
       output_config: {
         effort: "low",
         ...(schema ? { format: { type: "json_schema", schema } } : {}),
@@ -108,8 +110,15 @@ Deno.serve(withErrorLog("ai-assist", async (req) => {
       return json({ error: "AI help is busy. Please try again in a minute." }, 429)
     }
     if (e instanceof Anthropic.APIError) {
-      return json({ error: "AI help is not available right now. Please try again." }, 502)
+      const detail = String(e.message || "").replace(/\s+/g, " ").trim().slice(0, 180)
+      console.error("ai-assist Anthropic APIError", e.status, detail)
+      return json({
+        error: detail
+          ? `AI help failed (${e.status || "error"}): ${detail}`
+          : "AI help is not available right now. Please try again.",
+      }, 502)
     }
+    console.error("ai-assist Anthropic unreachable", e instanceof Error ? e.message : e)
     return json({ error: "AI help could not be reached. Please try again." }, 502)
   }
 

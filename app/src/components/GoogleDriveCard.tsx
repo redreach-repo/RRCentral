@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { ExternalLink, Loader2, Plug } from 'lucide-react'
+import { CloudUpload, ExternalLink, Loader2, Plug } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { useDriveStatus } from '../hooks/useDriveStatus'
 import { errorMessage } from '../lib/errors'
+import { fileQuotesAndInvoicesToDrive, type FileDocsSummary } from '../lib/fileDocsToDrive'
 import { disconnectDrive, startDriveConnect } from '../lib/googleDrive'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../lib/uiStyles'
 
@@ -14,10 +15,13 @@ const linkBtn = { ...buttonSecondaryStyle, display: 'inline-flex', alignItems: '
  * RR Central / Customers / <client> folders, files emails and portal uploads there.
  */
 export default function GoogleDriveCard() {
-  const { userRole, isLocalMode } = useAuth()
+  const { user, userRole, isLocalMode } = useAuth()
   const { showToast } = useToast()
   const { status, loading, error, reload } = useDriveStatus()
   const [busy, setBusy] = useState(false)
+  const [filing, setFiling] = useState(false)
+  const [progress, setProgress] = useState('')
+  const [lastRun, setLastRun] = useState<FileDocsSummary | null>(null)
   const isAdmin = userRole === 'admin'
 
   // Google sends the admin back here with ?drive=connected or ?drive=error.
@@ -58,14 +62,44 @@ export default function GoogleDriveCard() {
     }
   }
 
+  async function fileAllDocs() {
+    if (
+      !window.confirm(
+        'File every quotation and invoice as PDFs into each client’s Google Drive folder? Earlier bulk HTML files will be replaced with PDFs. Keep this tab open until it finishes.',
+      )
+    ) {
+      return
+    }
+    setFiling(true)
+    setProgress('Starting…')
+    setLastRun(null)
+    try {
+      const summary = await fileQuotesAndInvoicesToDrive({
+        uploadedBy: user?.email || '',
+        onProgress: (p) => setProgress(`${p.done + 1}/${p.total}: ${p.current}`),
+      })
+      setLastRun(summary)
+      setProgress('')
+      showToast(
+        `Drive filing done: ${summary.filed} filed, ${summary.skipped} skipped, ${summary.errors} errors`,
+        summary.errors ? 'error' : 'success',
+      )
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not file documents to Google Drive'), 'error')
+      setProgress('')
+    } finally {
+      setFiling(false)
+    }
+  }
+
   return (
     <div style={{ ...cardStyle, marginBottom: 20 }}>
       <h2 style={sectionTitleStyle}>Google Drive</h2>
       <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
-        Customer and company files live in Google Drive; RR Central keeps the links. Once connected, RR Central makes a
-        folder per client under <strong>RR Central / Customers</strong>, files matched emails and client portal uploads
-        there, and you can paste Google Drive links on quotes, invoices and delivery notes. Share the RR Central folder
-        with your team in Google Drive so they can open the files.
+        All documents live in Google Drive; RR Central only keeps the share links. Once connected, RR Central makes a
+        folder per client under <strong>RR Central / Customers</strong>, files matched emails and portal uploads there,
+        and <strong>Save to Drive</strong> on quotes, invoices and delivery notes uploads the PDF. Company papers sit
+        under <strong>Company documents</strong>. Share the RR Central folder with your team in Drive.
       </p>
       {isLocalMode ? (
         <p style={{ fontSize: 13, color: colors.muted }}>Google Drive needs RR Central connected to Supabase.</p>
@@ -84,34 +118,81 @@ export default function GoogleDriveCard() {
           <code style={{ overflowWrap: 'anywhere' }}>{status.redirect_uri || '…/functions/v1/google-drive'}</code>
         </p>
       ) : status.connected ? (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-          <span style={{ fontSize: 13, color: colors.success, marginRight: 8 }}>
-            Connected{status.account_email ? ` as ${status.account_email}` : ''}
-          </span>
-          {status.root_url ? (
-            <a href={status.root_url} target="_blank" rel="noreferrer" style={linkBtn}>
-              <ExternalLink size={14} /> RR Central folder
-            </a>
-          ) : null}
-          {status.customers_url ? (
-            <a href={status.customers_url} target="_blank" rel="noreferrer" style={linkBtn}>
-              <ExternalLink size={14} /> Customers
-            </a>
-          ) : null}
-          {status.company_url ? (
-            <a href={status.company_url} target="_blank" rel="noreferrer" style={linkBtn}>
-              <ExternalLink size={14} /> Company documents
-            </a>
-          ) : null}
-          {isAdmin ? (
-            <>
-              <button type="button" style={buttonSecondaryStyle} disabled={busy} onClick={() => void connect()}>
-                Reconnect
-              </button>
-              <button type="button" style={buttonSecondaryStyle} disabled={busy} onClick={() => void disconnect()}>
-                Disconnect
-              </button>
-            </>
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+            <span style={{ fontSize: 13, color: colors.success, marginRight: 8 }}>
+              Connected{status.account_email ? ` as ${status.account_email}` : ''}
+            </span>
+            {status.root_url ? (
+              <a href={status.root_url} target="_blank" rel="noreferrer" style={linkBtn}>
+                <ExternalLink size={14} /> RR Central folder
+              </a>
+            ) : null}
+            {status.customers_url ? (
+              <a href={status.customers_url} target="_blank" rel="noreferrer" style={linkBtn}>
+                <ExternalLink size={14} /> Customers
+              </a>
+            ) : null}
+            {status.company_url ? (
+              <a href={status.company_url} target="_blank" rel="noreferrer" style={linkBtn}>
+                <ExternalLink size={14} /> Company documents
+              </a>
+            ) : null}
+            {isAdmin ? (
+              <>
+                <button type="button" style={buttonSecondaryStyle} disabled={busy || filing} onClick={() => void connect()}>
+                  Reconnect
+                </button>
+                <button type="button" style={buttonSecondaryStyle} disabled={busy || filing} onClick={() => void disconnect()}>
+                  Disconnect
+                </button>
+              </>
+            ) : null}
+          </div>
+
+          {isAdmin || userRole === 'manager' || userRole === 'sales' ? (
+            <div
+              style={{
+                borderTop: `1px solid ${colors.border}`,
+                paddingTop: 12,
+                display: 'grid',
+                gap: 8,
+              }}
+            >
+              <p style={{ margin: 0, fontSize: 13, color: colors.muted, lineHeight: 1.5 }}>
+                Push every quotation and invoice as <strong>PDFs</strong> into the matching client folder under{' '}
+                <strong>RR Central / Customers</strong>. Creates the folder if needed. Replaces earlier bulk HTML
+                filings. For letterhead branding on one document, open it and use <strong>Save to Drive</strong>.
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                <button
+                  type="button"
+                  style={{ ...buttonPrimaryStyle, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  disabled={filing || busy}
+                  onClick={() => void fileAllDocs()}
+                >
+                  {filing ? <Loader2 size={14} className="spin" /> : <CloudUpload size={14} />}
+                  {filing ? 'Filing…' : 'File all quotes & invoices to Drive'}
+                </button>
+                {progress ? <span style={{ fontSize: 12, color: colors.muted }}>{progress}</span> : null}
+              </div>
+              {lastRun ? (
+                <p style={{ margin: 0, fontSize: 12, color: colors.muted }}>
+                  Last run: {lastRun.scanned} scanned · {lastRun.filed} filed · {lastRun.skipped} skipped ·{' '}
+                  {lastRun.errors} errors
+                  {lastRun.results.some((r) => r.status === 'error') ? (
+                    <>
+                      <br />
+                      {lastRun.results
+                        .filter((r) => r.status === 'error')
+                        .slice(0, 5)
+                        .map((r) => `${r.ref || r.id}: ${r.detail}`)
+                        .join(' · ')}
+                    </>
+                  ) : null}
+                </p>
+              ) : null}
+            </div>
           ) : null}
         </div>
       ) : isAdmin ? (

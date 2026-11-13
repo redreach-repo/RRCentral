@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import CtrmListsCard from '../components/ctrm/CtrmListsCard'
+import GmailCalendarCard from '../components/GmailCalendarCard'
 import GoogleDriveCard from '../components/GoogleDriveCard'
+import M365MailCalendarCard from '../components/M365MailCalendarCard'
 import HubSpotCard from '../components/HubSpotCard'
-import { Download, HardDrive, Pencil, Plus, Trash2, Upload, Plug } from 'lucide-react'
+import PipelineDetailNavCard from '../components/settings/PipelineDetailNavCard'
+import PipelinesSettingsCard from '../components/settings/PipelinesSettingsCard'
+import WorkflowRunsCard from '../components/settings/WorkflowRunsCard'
+import WorkflowsSettingsCard from '../components/settings/WorkflowsSettingsCard'
+import { Download, HardDrive, Plus, Trash2, Upload, Plug } from 'lucide-react'
+import SimpleRowActions from '../components/SimpleRowActions'
 import { db, currentAuthMode } from '../lib/db'
 import type { AppUser, CompanyDocument, CompanyDocumentCategory, UserRole } from '../lib/types'
 import TwoStepCard from '../components/security/TwoStepCard'
@@ -17,9 +24,16 @@ import {
 import { clearLocalData, DB_NAME } from '../lib/localDb'
 import { downloadCentralBackup } from '../lib/centralBackup'
 import { importCloudDumpFromFile } from '../lib/importCloudDump'
+import {
+  DEFAULT_MAIL_CALENDAR_PROVIDER,
+  MAIL_CALENDAR_PROVIDER_SETTING_KEY,
+  listMailCalendarProviderOptions,
+  resolveMailCalendarProviderId,
+} from '../lib/mailCalendar'
 import { testZohoConnection } from '../lib/zoho'
-import { isAllowedLoginEmail, loginEmailDomainError } from '../lib/allowedLoginEmail'
 import { authApi, MIN_PASSWORD_LENGTH } from '../lib/authApi'
+import { parseAppUserForm } from '../lib/schemas/appUser'
+import { parseChangePassword } from '../lib/schemas/changePassword'
 import {
   COMPANY_DOC_CATEGORIES,
   companyDocCategoryLabel,
@@ -28,6 +42,23 @@ import {
   saveCompanyDocument,
 } from '../lib/companyDocs'
 import { can, ROLE_DESCRIPTIONS, ROLE_LABELS, USER_ROLES } from '../lib/permissions'
+import {
+  listNumberingSequences,
+  previewNextReference,
+  type NumberingSequence,
+} from '../lib/numbering'
+import {
+  CUSTOM_FIELD_OBJECTS,
+  CUSTOM_FIELD_TYPES,
+  listAllCustomFieldDefinitions,
+  parseSelectOptions,
+  saveCustomFieldDefinition,
+  setCustomFieldDefinitionActive,
+  slugifyFieldKey,
+  type CustomFieldDefinition,
+  type CustomFieldType,
+} from '../lib/customFields'
+import { parseCustomFieldDefinitionForm } from '../lib/schemas/customFieldDefinition'
 import {
   clearSupabaseRuntimeConfig,
   getSupabaseRuntimeConfig,
@@ -162,6 +193,10 @@ const ZOHO_KEYS = [
   { key: 'zohoMailEnabled', label: 'Mail send + inbox (yes/no)' },
 ] as const
 
+const MAIL_CALENDAR_PROVIDER_KEYS = [
+  { key: MAIL_CALENDAR_PROVIDER_SETTING_KEY, label: 'Mail & calendar provider' },
+] as const
+
 type UserForm = {
   email: string
   name: string
@@ -207,6 +242,24 @@ export default function SettingsPage() {
     expires_on: '',
   })
   const [deleteCompanyDoc, setDeleteCompanyDoc] = useState<CompanyDocument | null>(null)
+  const [userActionsId, setUserActionsId] = useState<string | null>(null)
+  const [docActionsId, setDocActionsId] = useState<string | null>(null)
+  const [numberingRows, setNumberingRows] = useState<NumberingSequence[]>([])
+  const [numberingLoading, setNumberingLoading] = useState(false)
+  const [customFields, setCustomFields] = useState<CustomFieldDefinition[]>([])
+  const [customFieldsLoading, setCustomFieldsLoading] = useState(false)
+  const [customFieldOpen, setCustomFieldOpen] = useState(false)
+  const [editingCustomField, setEditingCustomField] = useState<CustomFieldDefinition | null>(null)
+  const [customFieldForm, setCustomFieldForm] = useState({
+    object_type: 'account',
+    label: '',
+    field_type: 'text' as CustomFieldType,
+    optionsText: '',
+    required: false,
+    sort_order: 0,
+    active: true,
+  })
+  const [customFieldActionsId, setCustomFieldActionsId] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const backupRef = useRef<HTMLInputElement>(null)
   const cloudBackupRef = useRef<HTMLInputElement>(null)
@@ -224,6 +277,13 @@ export default function SettingsPage() {
   useEffect(() => {
     setDraft({ ...settings })
   }, [settings])
+
+  useEffect(() => {
+    const hash = window.location.hash.replace(/^#/, '')
+    if (!hash) return
+    const el = document.getElementById(hash)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
 
   function connectSupabase() {
     const url = supabaseUrl.trim().replace(/\/+$/, '')
@@ -275,9 +335,39 @@ export default function SettingsPage() {
     }
   }, [showToast])
 
+  const loadNumbering = useCallback(async () => {
+    setNumberingLoading(true)
+    try {
+      setNumberingRows(await listNumberingSequences())
+    } catch {
+      setNumberingRows([])
+    } finally {
+      setNumberingLoading(false)
+    }
+  }, [])
+
+  const loadCustomFields = useCallback(async () => {
+    setCustomFieldsLoading(true)
+    try {
+      setCustomFields(await listAllCustomFieldDefinitions())
+    } catch {
+      setCustomFields([])
+    } finally {
+      setCustomFieldsLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (can(userRole, 'users.manage')) void loadUsers()
   }, [userRole, loadUsers])
+
+  useEffect(() => {
+    void loadNumbering()
+  }, [loadNumbering])
+
+  useEffect(() => {
+    if (can(userRole, 'settings.manage') || can(userRole, 'users.manage')) void loadCustomFields()
+  }, [userRole, loadCustomFields])
 
   useEffect(() => {
     if (can(userRole, 'settings.manage')) void loadCompanyDocs()
@@ -329,6 +419,78 @@ export default function SettingsPage() {
       await loadCompanyDocs()
     } catch (e) {
       showToast(errorMessage(e, 'Save failed'), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function openCustomFieldCreate() {
+    setEditingCustomField(null)
+    setCustomFieldForm({
+      object_type: 'account',
+      label: '',
+      field_type: 'text',
+      optionsText: '',
+      required: false,
+      sort_order: customFields.length,
+      active: true,
+    })
+    setCustomFieldOpen(true)
+  }
+
+  function openCustomFieldEdit(row: CustomFieldDefinition) {
+    setEditingCustomField(row)
+    setCustomFieldForm({
+      object_type: row.object_type,
+      label: row.label,
+      field_type: row.field_type,
+      optionsText: parseSelectOptions(row.options).join('\n'),
+      required: row.required,
+      sort_order: row.sort_order,
+      active: row.active,
+    })
+    setCustomFieldOpen(true)
+  }
+
+  async function saveCustomField() {
+    const parsed = parseCustomFieldDefinitionForm(customFieldForm)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
+    setBusy(true)
+    try {
+      await saveCustomFieldDefinition(
+        {
+          object_type: parsed.data.object_type,
+          field_key: editingCustomField?.field_key || slugifyFieldKey(parsed.data.label),
+          label: parsed.data.label,
+          field_type: parsed.data.field_type,
+          options: parsed.data.options,
+          required: parsed.data.required,
+          sort_order: parsed.data.sort_order,
+          active: parsed.data.active,
+        },
+        editingCustomField?.id,
+      )
+      showToast(editingCustomField ? 'Field updated' : 'Field added', 'success')
+      setCustomFieldOpen(false)
+      await loadCustomFields()
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not save custom field'), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function toggleCustomFieldActive(row: CustomFieldDefinition) {
+    setBusy(true)
+    try {
+      await setCustomFieldDefinitionActive(row.id, !row.active)
+      showToast(row.active ? 'Field deactivated' : 'Field activated', 'success')
+      await loadCustomFields()
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not update field'), 'error')
     } finally {
       setBusy(false)
     }
@@ -447,17 +609,14 @@ export default function SettingsPage() {
   }
 
   async function handleChangeMyPassword() {
-    if (newPassword.length < MIN_PASSWORD_LENGTH) {
-      showToast(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`, 'error')
-      return
-    }
-    if (newPassword !== confirmPassword) {
-      showToast('Passwords do not match', 'error')
+    const parsed = parseChangePassword({ newPassword, confirmPassword })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setChangingPassword(true)
     try {
-      await changePassword(newPassword)
+      await changePassword(parsed.data.newPassword)
       setNewPassword('')
       setConfirmPassword('')
       showToast('Password updated', 'success')
@@ -470,7 +629,7 @@ export default function SettingsPage() {
 
   if (!can(userRole, 'settings.manage')) {
     return (
-      <div style={pageStyle}>
+      <div style={pageStyle} id="account">
         <h1 style={pageTitleStyle}>Account</h1>
         <p style={pageSubtitleStyle}>Change the password you use to sign in.</p>
         <TwoStepCard />
@@ -529,13 +688,22 @@ export default function SettingsPage() {
   }
 
 
+  const sectionDomId: Record<string, string> = {
+    Company: 'company',
+    Bank: 'bank',
+    'Quote settings': 'quote-settings',
+    'Division formats': 'division-formats',
+    Wanders: 'wanders',
+    System: 'system',
+  }
+
   function renderSection(
     title: string,
     sectionId: string,
     keys: readonly { key: string; label: string }[],
   ) {
     return (
-      <div style={{ ...cardStyle, marginBottom: 20 }}>
+      <div id={sectionDomId[sectionId]} style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
         <h2 style={sectionTitleStyle}>{title}</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
           {keys.map(({ key, label }) => (
@@ -582,31 +750,19 @@ export default function SettingsPage() {
   }
 
   async function saveUser() {
-    if (!userForm.email.trim()) {
-      showToast('Email is required', 'error')
+    const parsed = parseAppUserForm({
+      ...userForm,
+      editing: Boolean(editingUser),
+      localMode: isLocalMode,
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
-    if (!isAllowedLoginEmail(userForm.email)) {
-      showToast(loginEmailDomainError(userForm.email), 'error')
-      return
-    }
-    const password = userForm.password.trim()
-    if (!editingUser && !isLocalMode && !password) {
-      showToast(`Set an initial password (min ${MIN_PASSWORD_LENGTH} characters)`, 'error')
-      return
-    }
-    if (password && password.length < MIN_PASSWORD_LENGTH) {
-      showToast(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`, 'error')
-      return
-    }
+    const { email, name, role, active, password } = parsed.data
     setBusy(true)
     try {
-      const payload = {
-        email: userForm.email.trim().toLowerCase(),
-        name: userForm.name.trim(),
-        role: userForm.role,
-        active: userForm.active,
-      }
+      const payload = { email, name, role, active }
       if (editingUser) {
         const { error } = await db.from('app_users').update(payload).eq('id', editingUser.id)
         if (error) throw error
@@ -615,11 +771,7 @@ export default function SettingsPage() {
         if (error) throw error
       }
       if (password && authApi.adminSetPassword) {
-        const { error: pwdError } = await authApi.adminSetPassword(
-          payload.email,
-          password,
-          payload.name,
-        )
+        const { error: pwdError } = await authApi.adminSetPassword(email, password, name)
         if (pwdError) throw new Error(pwdError.message)
       }
       showToast(password ? 'User saved and password set' : 'User saved', 'success')
@@ -651,8 +803,8 @@ export default function SettingsPage() {
   async function handleTestZoho() {
     setTestingZoho(true)
     try {
-      // Persist draft Zoho keys first so test uses latest values
-      for (const { key } of ZOHO_KEYS) {
+      // Persist draft provider + Zoho keys first so test uses latest values
+      for (const { key } of [...MAIL_CALENDAR_PROVIDER_KEYS, ...ZOHO_KEYS]) {
         const value = draft[key] ?? settings[key] ?? ''
         if ((settings[key] ?? '') !== value) {
           await updateSetting(key, value)
@@ -667,12 +819,83 @@ export default function SettingsPage() {
     }
   }
 
+  const tocItems = [
+    { id: 'connect-supabase', label: 'Data & storage' },
+    { id: 'company', label: 'Company' },
+    { id: 'company-documents', label: 'Documents' },
+    { id: 'bank', label: 'Bank' },
+    { id: 'quote-settings', label: 'Quotes' },
+    { id: 'numbering', label: 'Numbering' },
+    { id: 'custom-fields', label: 'Custom fields' },
+    { id: 'pipelines', label: 'Pipelines' },
+    { id: 'workflows', label: 'Workflows' },
+    { id: 'workflow-runs', label: 'Workflow runs' },
+    { id: 'division-formats', label: 'Division formats' },
+    { id: 'wanders', label: 'Wanders' },
+    { id: 'system', label: 'System' },
+    { id: 'ctrm-lists', label: 'CTRM lists' },
+    { id: 'google-drive', label: 'Google Drive' },
+    { id: 'hubspot', label: 'HubSpot' },
+    { id: 'messages', label: 'Messages' },
+    { id: 'zoho', label: 'Zoho' },
+    ...(currentAuthMode() === 'local' ? [{ id: 'sheets-import', label: 'Sheets import' }] : []),
+    { id: 'two-step', label: 'Two-step' },
+    { id: 'account', label: 'Password' },
+    { id: 'users', label: 'Users' },
+  ]
+
+  function jumpToSection(id: string) {
+    const el = document.getElementById(id)
+    if (!el) return
+    window.history.replaceState(null, '', `#${id}`)
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   return (
     <div style={pageStyle}>
       <h1 style={pageTitleStyle}>Settings</h1>
       <p style={pageSubtitleStyle}>Company details, data storage, and user access</p>
 
-      <div style={{ ...cardStyle, marginBottom: 20 }}>
+      <nav
+        aria-label="Settings sections"
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 6,
+          padding: '10px 0 16px',
+          marginBottom: 8,
+          position: 'sticky',
+          top: 56,
+          zIndex: 5,
+          background: 'linear-gradient(180deg, #0f1216 70%, rgba(15,18,22,0))',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+        }}
+      >
+        {tocItems.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => jumpToSection(item.id)}
+            style={{
+              appearance: 'none',
+              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'rgba(255,255,255,0.04)',
+              color: 'rgba(242,244,247,0.78)',
+              fontSize: 12,
+              fontWeight: 600,
+              padding: '6px 10px',
+              borderRadius: 999,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
+      <div id="connect-supabase" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
         <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
           <HardDrive size={18} /> Data &amp; storage
         </h2>
@@ -832,7 +1055,7 @@ export default function SettingsPage() {
 
       {renderSection('Company info', 'Company', COMPANY_KEYS)}
 
-      <div style={{ ...cardStyle, marginBottom: 20 }}>
+      <div id="company-documents" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
         <div
           style={{
             display: 'flex',
@@ -899,20 +1122,12 @@ export default function SettingsPage() {
                       )}
                     </td>
                     <td style={tdStyle}>
-                      <button
-                        type="button"
-                        style={buttonSecondaryStyle}
-                        onClick={() => openCompanyDocEdit(doc)}
-                      >
-                        <Pencil size={14} />
-                      </button>{' '}
-                      <button
-                        type="button"
-                        style={buttonDangerStyle}
-                        onClick={() => setDeleteCompanyDoc(doc)}
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      <SimpleRowActions
+                        expanded={docActionsId === doc.id}
+                        onToggle={() => setDocActionsId((id) => (id === doc.id ? null : doc.id))}
+                        onEdit={() => openCompanyDocEdit(doc)}
+                        onDelete={() => setDeleteCompanyDoc(doc)}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -924,6 +1139,160 @@ export default function SettingsPage() {
 
       {renderSection('Bank details', 'Bank', BANK_KEYS)}
       {renderSection('Quote / Invoice settings', 'Quote settings', QUOTE_KEYS)}
+
+      <div id="numbering" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Document numbering</h2>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={numberingLoading}
+            onClick={() => void loadNumbering()}
+          >
+            {numberingLoading ? 'Loading…' : 'Refresh'}
+          </button>
+        </div>
+        <p style={{ margin: '8px 0 14px', fontSize: 13, color: colors.muted, lineHeight: 1.45 }}>
+          Counters live in the database (M2). Quotes and invoices share one RR sequence per division.
+          Next finalize/save allocates atomically when cloud is connected.
+        </p>
+        {numberingRows.length === 0 ? (
+          <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>
+            {numberingLoading
+              ? 'Loading sequences…'
+              : 'No sequences yet — apply the M2 migration, or finalize a document to create one.'}
+          </p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr>
+                  {['Type', 'Division', 'Prefix', 'Year', 'Last', 'Next'].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        textAlign: 'left',
+                        padding: '8px 10px',
+                        borderBottom: `1px solid ${colors.border}`,
+                        color: colors.muted,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {numberingRows.map((row) => (
+                  <tr key={row.id}>
+                    <td style={{ padding: '8px 10px', borderBottom: `1px solid ${colors.border}` }}>
+                      {row.doc_type}
+                    </td>
+                    <td style={{ padding: '8px 10px', borderBottom: `1px solid ${colors.border}` }}>
+                      {row.division_code}
+                    </td>
+                    <td style={{ padding: '8px 10px', borderBottom: `1px solid ${colors.border}` }}>
+                      {row.prefix}
+                    </td>
+                    <td style={{ padding: '8px 10px', borderBottom: `1px solid ${colors.border}` }}>
+                      {row.year_yy}
+                    </td>
+                    <td style={{ padding: '8px 10px', borderBottom: `1px solid ${colors.border}` }}>
+                      {row.last_seq}
+                    </td>
+                    <td
+                      style={{
+                        padding: '8px 10px',
+                        borderBottom: `1px solid ${colors.border}`,
+                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                      }}
+                    >
+                      {previewNextReference(row)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div id="custom-fields" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Custom fields</h2>
+          {can(userRole, 'settings.manage') ? (
+            <button type="button" style={buttonPrimaryStyle} onClick={openCustomFieldCreate}>
+              <Plus size={16} style={{ marginRight: 6 }} />
+              Add field
+            </button>
+          ) : null}
+        </div>
+        <p style={{ margin: '8px 0 14px', fontSize: 13, color: colors.muted, lineHeight: 1.45 }}>
+          Tenant-defined fields on accounts, CRM leads, and quotations. Values are stored separately
+          from core columns.
+        </p>
+        {customFieldsLoading ? (
+          <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>Loading…</p>
+        ) : customFields.length === 0 ? (
+          <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>
+            No custom fields yet. Add one for Accounts to see it on account pages.
+          </p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>Object</th>
+                  <th style={thStyle}>Label</th>
+                  <th style={thStyle}>Key</th>
+                  <th style={thStyle}>Type</th>
+                  <th style={thStyle}>Status</th>
+                  <th style={thStyle}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {customFields.map((row) => (
+                  <tr key={row.id}>
+                    <td style={tdStyle}>
+                      {CUSTOM_FIELD_OBJECTS.find((o) => o.value === row.object_type)?.label ||
+                        row.object_type}
+                    </td>
+                    <td style={tdStyle}>
+                      {row.label}
+                      {row.required ? ' *' : ''}
+                    </td>
+                    <td style={{ ...tdStyle, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+                      {row.field_key}
+                    </td>
+                    <td style={tdStyle}>{row.field_type}</td>
+                    <td style={tdStyle}>{row.active ? 'Active' : 'Off'}</td>
+                    <td style={tdStyle}>
+                      {can(userRole, 'settings.manage') ? (
+                        <SimpleRowActions
+                          expanded={customFieldActionsId === row.id}
+                          onToggle={() =>
+                            setCustomFieldActionsId((id) => (id === row.id ? null : row.id))
+                          }
+                          onEdit={() => openCustomFieldEdit(row)}
+                          onDelete={() => void toggleCustomFieldActive(row)}
+                          deleteLabel={row.active ? 'Deactivate' : 'Activate'}
+                        />
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <PipelinesSettingsCard />
+      <PipelineDetailNavCard />
+      <WorkflowsSettingsCard />
+      <WorkflowRunsCard />
+
       {renderSection(
         'Division quotation formats (editable titles, closings, Connect partner name)',
         'Division formats',
@@ -935,11 +1304,17 @@ export default function SettingsPage() {
         WANDERS_KEYS,
       )}
       {renderSection('System', 'System', SYSTEM_KEYS)}
-      <CtrmListsCard />
-      <GoogleDriveCard />
-      <HubSpotCard />
+      <div id="ctrm-lists" style={{ scrollMarginTop: 72 }}>
+        <CtrmListsCard />
+      </div>
+      <div id="google-drive" style={{ scrollMarginTop: 72 }}>
+        <GoogleDriveCard />
+      </div>
+      <div id="hubspot" style={{ scrollMarginTop: 72 }}>
+        <HubSpotCard />
+      </div>
 
-      <div style={{ ...cardStyle, marginBottom: 20 }}>
+      <div id="messages" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
         <h2 style={sectionTitleStyle}>Message templates</h2>
         <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
           Tokens: <code>{'{{ref}}'}</code>, <code>{'{{client}}'}</code>, <code>{'{{contact}}'}</code>,{' '}
@@ -978,10 +1353,43 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <div style={{ ...cardStyle, marginBottom: 20 }}>
+      <div id="zoho" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
         <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Plug size={18} /> Zoho Calendar &amp; Mail
+          <Plug size={18} /> Mail &amp; calendar
         </h2>
+        <div style={{ ...fieldStyle, maxWidth: 360, marginBottom: 14 }}>
+          <label style={labelStyle} htmlFor="mailCalendarProvider">
+            Provider
+          </label>
+          <select
+            id="mailCalendarProvider"
+            style={inputStyle}
+            value={resolveMailCalendarProviderId({
+              ...settings,
+              ...draft,
+              [MAIL_CALENDAR_PROVIDER_SETTING_KEY]:
+                draft[MAIL_CALENDAR_PROVIDER_SETTING_KEY] ??
+                settings[MAIL_CALENDAR_PROVIDER_SETTING_KEY] ??
+                DEFAULT_MAIL_CALENDAR_PROVIDER,
+            })}
+            onChange={(e) =>
+              setDraft((d) => ({ ...d, [MAIL_CALENDAR_PROVIDER_SETTING_KEY]: e.target.value }))
+            }
+          >
+            {listMailCalendarProviderOptions().map((opt) => (
+              <option key={opt.id} value={opt.id} disabled={!opt.available}>
+                {opt.available
+                  ? opt.label
+                  : `${opt.label} — ${opt.unavailableReason || 'Coming later'}`}
+              </option>
+            ))}
+          </select>
+          <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted2, lineHeight: 1.45 }}>
+            Zoho, Gmail, or Microsoft 365. Connect the provider below before selecting it. M365
+            includes inbox (Phase B). Gmail inbox still Phase B (CASA). IMAP deferred — see
+            COMPLIANCE_NOTES.
+          </p>
+        </div>
         {can(userRole, 'settings.manage') &&
         (draft.zohoPostHardeningRotationAck ?? settings.zohoPostHardeningRotationAck ?? 'no') !==
           'yes' &&
@@ -1023,6 +1431,7 @@ export default function SettingsPage() {
             </div>
           </div>
         ) : null}
+        <h3 style={{ ...sectionTitleStyle, fontSize: 15, margin: '4px 0 8px' }}>Zoho credentials</h3>
         <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.55 }}>
           Connect Zoho so CRM follow-ups sync to Calendar, you can send mail from CRM, and your{' '}
           <strong>Zoho mail</strong> (Inbox + Sent) appears on the Dashboard matched to CRM companies.
@@ -1101,10 +1510,12 @@ export default function SettingsPage() {
           <button
             type="button"
             style={buttonPrimaryStyle}
-            disabled={savingSection === 'Zoho' || settingsLoading}
-            onClick={() => void saveSection(ZOHO_KEYS, 'Zoho')}
+            disabled={savingSection === 'Mail & calendar' || settingsLoading}
+            onClick={() =>
+              void saveSection([...MAIL_CALENDAR_PROVIDER_KEYS, ...ZOHO_KEYS], 'Mail & calendar')
+            }
           >
-            {savingSection === 'Zoho' ? 'Saving…' : 'Save Zoho settings'}
+            {savingSection === 'Mail & calendar' ? 'Saving…' : 'Save mail & calendar'}
           </button>
           <button
             type="button"
@@ -1113,13 +1524,16 @@ export default function SettingsPage() {
             onClick={() => void handleTestZoho()}
           >
             <Plug size={14} />
-            {testingZoho ? 'Testing…' : 'Test connection'}
+            {testingZoho ? 'Testing…' : 'Test Zoho connection'}
           </button>
         </div>
       </div>
 
+      <GmailCalendarCard />
+      <M365MailCalendarCard />
+
       {currentAuthMode() === 'local' && (
-        <div style={{ ...cardStyle, marginBottom: 20 }}>
+        <div id="sheets-import" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
           <h2 style={sectionTitleStyle}>Import Google Sheets data</h2>
           <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
             Pull your existing CRM, quotes, invoices, and catalog from an Apps Script migration
@@ -1147,9 +1561,11 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <TwoStepCard />
+      <div id="two-step" style={{ scrollMarginTop: 72 }}>
+        <TwoStepCard />
+      </div>
 
-      <div style={{ ...cardStyle, marginBottom: 20 }}>
+      <div style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }} id="account">
         <h2 style={sectionTitleStyle}>My password</h2>
         <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
           Change the password you use to sign in to Central. Minimum {MIN_PASSWORD_LENGTH} characters.
@@ -1189,7 +1605,7 @@ export default function SettingsPage() {
         </button>
       </div>
 
-      <div style={cardStyle}>
+      <div id="users" style={{ ...cardStyle, scrollMarginTop: 72 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
           <div>
             <h2 style={{ ...sectionTitleStyle, margin: 0 }}>User management</h2>
@@ -1222,12 +1638,12 @@ export default function SettingsPage() {
                   <td style={tdStyle}>{u.role}</td>
                   <td style={tdStyle}>{u.active ? 'Yes' : 'No'}</td>
                   <td style={tdStyle}>
-                    <button type="button" style={buttonSecondaryStyle} onClick={() => openUserEdit(u)}>
-                      <Pencil size={14} />
-                    </button>{' '}
-                    <button type="button" style={buttonDangerStyle} onClick={() => setDeleteUser(u)}>
-                      <Trash2 size={14} />
-                    </button>
+                    <SimpleRowActions
+                      expanded={userActionsId === u.id}
+                      onToggle={() => setUserActionsId((id) => (id === u.id ? null : u.id))}
+                      onEdit={() => openUserEdit(u)}
+                      onDelete={() => setDeleteUser(u)}
+                    />
                   </td>
                 </tr>
               ))}
@@ -1417,6 +1833,116 @@ export default function SettingsPage() {
             onClick={() => void confirmDeleteCompanyDoc()}
           >
             Remove
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={customFieldOpen}
+        title={editingCustomField ? 'Edit custom field' : 'Add custom field'}
+        onClose={() => setCustomFieldOpen(false)}
+        width={480}
+      >
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Object</label>
+            <select
+              style={selectStyle}
+              value={customFieldForm.object_type}
+              disabled={Boolean(editingCustomField)}
+              onChange={(e) =>
+                setCustomFieldForm((f) => ({ ...f, object_type: e.target.value }))
+              }
+            >
+              {CUSTOM_FIELD_OBJECTS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Label</label>
+            <input
+              style={inputStyle}
+              value={customFieldForm.label}
+              onChange={(e) => setCustomFieldForm((f) => ({ ...f, label: e.target.value }))}
+              placeholder="Preferred carrier"
+            />
+            {!editingCustomField ? (
+              <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted }}>
+                Key will be <code>{slugifyFieldKey(customFieldForm.label) || 'field'}</code>
+              </p>
+            ) : (
+              <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted }}>
+                Key <code>{editingCustomField.field_key}</code> stays fixed
+              </p>
+            )}
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Type</label>
+            <select
+              style={selectStyle}
+              value={customFieldForm.field_type}
+              onChange={(e) =>
+                setCustomFieldForm((f) => ({
+                  ...f,
+                  field_type: e.target.value as CustomFieldType,
+                }))
+              }
+            >
+              {CUSTOM_FIELD_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {customFieldForm.field_type === 'select' ||
+          customFieldForm.field_type === 'multiselect' ? (
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Options (one per line)</label>
+              <textarea
+                style={{ ...inputStyle, minHeight: 96, resize: 'vertical' }}
+                value={customFieldForm.optionsText}
+                onChange={(e) =>
+                  setCustomFieldForm((f) => ({ ...f, optionsText: e.target.value }))
+                }
+              />
+            </div>
+          ) : null}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+            <input
+              type="checkbox"
+              checked={customFieldForm.required}
+              onChange={(e) =>
+                setCustomFieldForm((f) => ({ ...f, required: e.target.checked }))
+              }
+            />
+            Required
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+            <input
+              type="checkbox"
+              checked={customFieldForm.active}
+              onChange={(e) =>
+                setCustomFieldForm((f) => ({ ...f, active: e.target.checked }))
+              }
+            />
+            Active
+          </label>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+          <button type="button" style={buttonSecondaryStyle} onClick={() => setCustomFieldOpen(false)}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            style={buttonPrimaryStyle}
+            disabled={busy}
+            onClick={() => void saveCustomField()}
+          >
+            {busy ? 'Saving…' : 'Save field'}
           </button>
         </div>
       </Modal>

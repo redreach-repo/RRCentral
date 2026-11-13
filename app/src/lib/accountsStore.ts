@@ -1,6 +1,7 @@
 import { db } from './db'
 import { errorCode, isMissingRelationError } from './errors'
-import { nextAccountReference } from './accounts'
+import { ACCOUNT_REFERENCE_PREFIX, accountTypeInfo } from './accounts'
+import { allocateReference } from './numbering'
 import type {
   Account,
   AccountActivity,
@@ -51,10 +52,17 @@ export async function createAccount(
   // Staff only see their own accounts, so the next number can already be taken.
   for (let attempt = 0; attempt < 5; attempt++) {
     const now = new Date().toISOString()
+    const code = accountTypeInfo(input.type as AccountType).code
+    const reference = await allocateReference({
+      docType: 'account',
+      divisionCode: code,
+      prefix: ACCOUNT_REFERENCE_PREFIX,
+      existingRefs: refs,
+    })
     const row: Account = {
       ...input,
       id: crypto.randomUUID(),
-      reference: nextAccountReference(input.type as AccountType, refs),
+      reference,
       created_by: createdBy,
       created_at: now,
       updated_at: now,

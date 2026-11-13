@@ -1,172 +1,250 @@
 .page {
   animation: fadeUp 0.4s ease both;
-}
-
-/*
-  Desktop / laptop: Schedule full-width, then KPIs spread across (stacked).
-  Fold / wide phone only (~700–1099px): Schedule + KPIs side by side.
-*/
-.topGrid {
   display: flex;
   flex-direction: column;
-  gap: 0;
-  margin-bottom: 0;
+  gap: 28px;
+  padding-bottom: 32px;
 }
 
-.topSchedule {
-  min-width: 0;
-}
-
-.topKpis {
-  min-width: 0;
-}
-
-.kpiGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
-  gap: 14px;
-  margin-bottom: 24px;
-}
-
-/* Mid-width fold / large phone landscape only — not desktop */
-@container crm-main (min-width: 700px) and (max-width: 1099px) {
-  .topGrid {
-    display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.9fr);
-    gap: 16px;
-    align-items: start;
-    margin-bottom: 8px;
-  }
-
-  .topSchedule :global(> div) {
-    margin-bottom: 0 !important;
-    height: 100%;
-  }
-
-  .topKpis .kpiGrid {
-    margin-bottom: 0;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
-  }
-
-  .topKpis .kpiValue {
-    white-space: normal;
-    font-size: 1.1rem;
-  }
-}
-
-/* Laptops & desktops: roomy KPI strip across the full width */
-@container crm-main (min-width: 1100px) {
-  .kpiGrid {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
-  }
-
-  .kpiValue {
-    white-space: nowrap;
-    overflow: visible;
-    text-overflow: unset;
-  }
-}
-
-@media (max-width: 640px) {
-  .kpiGrid {
-    grid-template-columns: 1fr;
-    gap: 10px;
-    margin-bottom: 18px;
-  }
-
-  .kpi {
-    padding: 14px;
-  }
-
-  .kpiValue {
-    font-size: 1.15rem;
-    white-space: normal;
-  }
-
-  .panel {
-    padding: 14px;
-    margin-bottom: 16px;
-  }
-
-  .stageChip {
-    min-width: calc(50% - 6px);
-    flex: 1 1 calc(50% - 6px);
-  }
-}
-
-.kpi {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-  min-width: 0;
-  padding: 18px;
-  border-radius: 14px;
+/* —— Today focus (first composition) —— */
+.hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.03) 100%);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
-  transition:
-    transform 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
+  padding: clamp(22px, 3vw, 32px);
+  background:
+    radial-gradient(ellipse 80% 90% at 100% 0%, rgba(232, 93, 4, 0.22), transparent 55%),
+    radial-gradient(ellipse 60% 70% at 0% 100%, rgba(255, 255, 255, 0.04), transparent 50%),
+    linear-gradient(160deg, rgba(28, 30, 34, 0.95) 0%, rgba(18, 20, 23, 0.98) 100%);
+  animation: fadeUp 0.45s ease both;
+}
+
+.heroEyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  margin: 0 0 10px;
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: clamp(1.6rem, 2.4vw, 2.05rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: #fff;
+}
+
+.heroTitle em {
+  font-style: normal;
+  color: #e85d04;
+}
+
+.heroLead {
+  margin: 10px 0 0;
+  max-width: 42ch;
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.heroPrimary,
+.heroSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 650;
   text-decoration: none;
-  color: inherit;
+  transition:
+    transform 0.18s ease,
+    background 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.heroPrimary {
+  background: #e85d04;
+  color: #fff;
+  border: 1px solid transparent;
+}
+
+.heroPrimary:hover {
+  transform: translateY(-1px);
+  background: #f06a14;
+}
+
+.heroSecondary {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.heroSecondary:hover {
+  border-color: rgba(232, 93, 4, 0.4);
+  color: #fff;
+}
+
+.heroStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 28px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.heroStat {
+  min-width: 0;
+}
+
+.heroStatValue {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+.heroStatValueWarn {
+  color: #f97316;
+}
+
+.heroStatValueOk {
+  color: #86efac;
+}
+
+.heroStatLabel {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 2px;
+}
+
+/* —— Section shells —— */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   animation: fadeUp 0.5s ease both;
 }
 
-.kpi:hover {
-  transform: translateY(-2px);
-  border-color: rgba(232, 93, 4, 0.35);
-  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
-}
-
-.kpiIcon {
-  width: 40px;
-  height: 40px;
-  border-radius: 11px;
+.sectionHead {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.kpiLabel {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.55);
-  margin-bottom: 4px;
-}
-
-.kpiValue {
-  font-size: 1.25rem;
+.sectionTitle {
+  margin: 0;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: -0.02em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
 }
 
-.kpiHint {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
-  margin-top: 4px;
+.sectionLink {
+  font-size: 12px;
+  color: #e85d04;
+  text-decoration: none;
+  font-weight: 600;
 }
 
-.panel {
-  margin-bottom: 24px;
-  padding: 20px;
+.sectionLink:hover {
+  text-decoration: underline;
+}
+
+/* —— Money strip —— */
+.moneyRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.moneyCard {
+  position: relative;
+  padding: 18px 18px 16px;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
-  animation: fadeUp 0.55s ease both;
+  background: rgba(255, 255, 255, 0.035);
+  min-width: 0;
+  transition: border-color 0.18s ease;
 }
 
-.panelTitle {
-  font-size: 15px;
-  font-weight: 650;
-  margin: 0 0 14px;
-  letter-spacing: -0.01em;
+.moneyCard:hover {
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
+.moneyLabel {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 6px;
+}
+
+.moneyValue {
+  font-size: clamp(1.2rem, 2vw, 1.55rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  word-break: break-word;
+}
+
+.moneyHint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  margin-top: 6px;
+}
+
+/* —— Work pulse (quotes / deals / invoices) —— */
+.pulseRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.pulseLink {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.18);
+  transition:
+    border-color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.pulseLink:hover {
+  border-color: rgba(232, 93, 4, 0.4);
+  transform: translateY(-1px);
+}
+
+.pulseValue {
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.pulseLabel {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 2px;
+}
+
+/* —— Stage strip —— */
 .stageRow {
   display: flex;
   flex-wrap: wrap;
@@ -177,32 +255,161 @@
   text-decoration: none;
   color: inherit;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 12px 14px;
-  min-width: 92px;
+  border-radius: 999px;
+  padding: 8px 14px;
   background: rgba(255, 255, 255, 0.03);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
   transition:
     border-color 0.18s ease,
-    background 0.18s ease,
-    transform 0.18s ease;
+    background 0.18s ease;
 }
 
 .stageChip:hover {
   border-color: rgba(232, 93, 4, 0.4);
   background: rgba(232, 93, 4, 0.1);
-  transform: translateY(-1px);
 }
 
 .stageLabel {
-  font-size: 11px;
+  font-size: 12px;
   color: rgba(255, 255, 255, 0.5);
-  margin-bottom: 4px;
 }
 
 .stageCount {
-  font-size: 1.35rem;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: -0.02em;
+}
+
+/* —— Surface panels —— */
+.surface {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.035);
+  padding: 18px;
+}
+
+.surfaceTitle {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.attentionToggle {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.035);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.attentionToggle:hover {
+  background: rgba(255, 255, 255, 0.055);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.attentionToggleCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.attentionHint {
+  font-size: 12px;
+  color: rgba(242, 244, 247, 0.5);
+}
+
+.attentionStack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.attentionStack > :global(*) {
+  margin-bottom: 0 !important;
+}
+
+.dual {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.docList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.docRow {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 13px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.docRow:last-child {
+  border-bottom: none;
+}
+
+.docRow:hover {
+  color: #fff;
+}
+
+.docMuted {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+}
+
+.docAmount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  text-align: right;
+}
+
+.note {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(232, 93, 4, 0.35);
+  background: rgba(232, 93, 4, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.note a {
+  color: #e85d04;
+  font-weight: 600;
+}
+
+.footNote {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  line-height: 1.45;
 }
 
 @keyframes fadeUp {
@@ -216,29 +423,38 @@
   }
 }
 
-@media (max-width: 640px) {
-  .kpiGrid {
+@media (max-width: 900px) {
+  .moneyRow {
     grid-template-columns: 1fr;
-    gap: 10px;
-    margin-bottom: 18px;
   }
 
-  .kpi {
-    padding: 14px;
+  .pulseRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .kpiValue {
-    font-size: 1.15rem;
-    white-space: normal;
+  .dual {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .heroActions {
+    flex-direction: column;
   }
 
-  .panel {
-    padding: 14px;
-    margin-bottom: 16px;
+  .heroPrimary,
+  .heroSecondary {
+    justify-content: center;
+    width: 100%;
   }
 
-  .stageChip {
-    min-width: calc(50% - 6px);
-    flex: 1 1 calc(50% - 6px);
+  .docRow {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 4px 10px;
+  }
+
+  .docAmount,
+  .docRow :nth-child(4) {
+    grid-column: 2;
   }
 }

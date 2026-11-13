@@ -5,6 +5,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { listTeam } from '../../lib/accountsStore'
 import { errorMessage } from '../../lib/errors'
 import { canSetLeadOwners, DEFAULT_LEAD_WHATSAPP, LEAD_OWNER_KEYS, LEAD_WHATSAPP_KEY } from '../../lib/leadIntake'
+import { parseLeadIntakeForm } from '../../lib/schemas/leadIntake'
 import type { AppUser } from '../../lib/types'
 import { buttonPrimaryStyle, cardStyle, colors, fieldStyle, formGridStyle, inputStyle, labelStyle, sectionTitleStyle } from '../../lib/uiStyles'
 
@@ -36,21 +37,17 @@ export default function LeadIntakeSettingsCard() {
   const sellers = team.filter((u) => u.role === 'admin' || u.role === 'manager' || u.role === 'sales')
 
   async function save() {
-    if (mode === 'round_robin' && pool.length === 0) {
-      showToast('Tick at least one person for the round robin', 'error')
-      return
-    }
-    const digits = whatsapp.replace(/\D/g, '')
-    if (whatsapp && digits.length < 8) {
-      showToast('Enter the WhatsApp number with the country code, for example 971501234567', 'error')
+    const parsed = parseLeadIntakeForm({ mode, fixed, pool, whatsapp })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setSaving(true)
     try {
-      await updateSetting(LEAD_OWNER_KEYS.mode, mode)
-      await updateSetting(LEAD_OWNER_KEYS.fixed, fixed)
-      await updateSetting(LEAD_OWNER_KEYS.pool, pool.join(','))
-      await updateSetting(LEAD_WHATSAPP_KEY, digits)
+      await updateSetting(LEAD_OWNER_KEYS.mode, parsed.data.mode)
+      await updateSetting(LEAD_OWNER_KEYS.fixed, parsed.data.fixed)
+      await updateSetting(LEAD_OWNER_KEYS.pool, parsed.data.pool.join(','))
+      await updateSetting(LEAD_WHATSAPP_KEY, parsed.data.whatsappDigits)
       showToast('Lead settings saved', 'success')
     } catch (e) {
       showToast(errorMessage(e, 'Could not save the settings'), 'error')

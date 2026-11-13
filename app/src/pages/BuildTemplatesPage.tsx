@@ -21,7 +21,8 @@ import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
 import { hoursLabel } from '../lib/timeTracking'
 import type { BuildStageKey, BuildTemplate, BuildTemplateItem, BuildTemplateItemKind, DeliveryPackage, GoLiveOwner } from '../lib/types'
-import { GO_LIVE_OWNERS, dueDaysProblem, ownerLabel } from '../lib/goLive'
+import { GO_LIVE_OWNERS, ownerLabel } from '../lib/goLive'
+import { parseBuildTemplateForm, parseBuildTemplateItemForm } from '../lib/schemas/buildTemplate'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -31,12 +32,10 @@ import {
   formGridStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   sectionTitleStyle,
   selectStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 const smallBtn: CSSProperties = { ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }
 const rowStyle: CSSProperties = {
@@ -114,18 +113,18 @@ export default function BuildTemplatesPage() {
 
   async function saveTemplate() {
     if (!templateForm) return
-    const name = templateForm.name.trim()
-    if (!name) {
-      showToast('Give the template a name', 'error')
+    const parsed = parseBuildTemplateForm(templateForm)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     const existing = templates.find((t) => t.id === templateForm.id)
     const input = {
-      code: existing?.code ?? codeFromName(name, templates),
-      name,
-      description: templateForm.description.trim(),
-      package_id: templateForm.package_id || null,
-      active: templateForm.active,
+      code: existing?.code ?? codeFromName(parsed.data.name, templates),
+      name: parsed.data.name,
+      description: parsed.data.description,
+      package_id: parsed.data.package_id,
+      active: parsed.data.active,
     }
     await run(async () => {
       const id = templateForm.copyOf
@@ -133,36 +132,26 @@ export default function BuildTemplatesPage() {
         : await saveBuildTemplate(input, templateForm.id)
       setSelectedId(id)
       setTemplateForm(null)
-      showToast(`${name} saved`, 'success')
+      showToast(`${parsed.data.name} saved`, 'success')
     }, 'Could not save the template')
   }
 
   async function saveItem() {
     if (!itemForm || !selected) return
-    const title = itemForm.title.trim()
-    const hours = itemForm.hours.trim() === '' ? 0 : Number(itemForm.hours)
-    if (!title) {
-      showToast('Add a title', 'error')
-      return
-    }
-    if (!Number.isFinite(hours) || hours < 0) {
-      showToast('Hours must be a number', 'error')
-      return
-    }
-    const daysProblem = itemForm.kind === 'golive' ? dueDaysProblem(itemForm.dueDays) : null
-    if (daysProblem) {
-      showToast(daysProblem, 'error')
+    const parsed = parseBuildTemplateItemForm(itemForm)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     const existing = selectedItems.find((i) => i.id === itemForm.id)
     const input: TemplateItemInput = {
-      kind: itemForm.kind,
-      stage: itemForm.kind === 'config' ? null : itemForm.stage,
-      title,
-      detail: itemForm.detail.trim(),
-      est_hours: itemForm.kind === 'task' ? hours : 0,
-      owner: itemForm.owner,
-      due_days: itemForm.kind === 'golive' ? Number(itemForm.dueDays) : null,
+      kind: parsed.data.kind,
+      stage: parsed.data.stage,
+      title: parsed.data.title,
+      detail: parsed.data.detail,
+      est_hours: parsed.data.est_hours,
+      owner: parsed.data.owner,
+      due_days: parsed.data.due_days,
       sort: existing?.sort ?? selectedItems.reduce((max, i) => Math.max(max, i.sort), 0) + 1,
     }
     await run(async () => {
@@ -202,7 +191,7 @@ export default function BuildTemplatesPage() {
         {canEdit ? (
           <span style={{ display: 'flex', gap: 6 }}>
             <button type="button" style={smallBtn} aria-label={`Edit ${i.title}`} onClick={() => openItem(i.kind, i)}>
-              <Pencil size={12} />
+              <Pencil size={12} /> Edit
             </button>
             <button
               type="button"
@@ -214,7 +203,7 @@ export default function BuildTemplatesPage() {
                 void run(() => deleteTemplateItem(i.id), 'Could not delete the line')
               }
             >
-              <Trash2 size={12} />
+              <Trash2 size={12} /> Remove
             </button>
           </span>
         ) : null}
@@ -223,11 +212,12 @@ export default function BuildTemplatesPage() {
   }
 
   return (
-    <div style={pageStyle}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Build templates</h1>
-          <p style={pageSubtitleStyle}>
+          <p className={docsStyles.kicker}>Delivery</p>
+          <h1 className={docsStyles.title}>Build templates</h1>
+          <p className={docsStyles.subtitle}>
             A ready build checklist and starter configuration for each package. On a client, Start from template copies
             the checklist into their build and the starter configuration into their requirements. Changes here apply to
             the next client, not to builds already started.
@@ -236,13 +226,13 @@ export default function BuildTemplatesPage() {
         {canEdit ? (
           <button
             type="button"
-            style={buttonPrimaryStyle}
+            className={docsStyles.newBtn}
             onClick={() => setTemplateForm({ name: '', description: '', package_id: '', active: true })}
           >
             <Plus size={14} /> New template
           </button>
         ) : null}
-      </div>
+      </header>
 
       {templates.length === 0 ? (
         <EmptyState

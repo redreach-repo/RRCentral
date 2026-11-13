@@ -73,6 +73,7 @@ export type InvoiceLineRow = {
   remarks: string
   sku: string
   sizes_json: null
+  image_data: string
 }
 
 /** The line_items rows for a planned invoice (the same rows the invoice editor saves). */
@@ -96,6 +97,7 @@ export function invoiceLineRows(reference: string, plan: PlannedInvoice, vatRate
       remarks: '',
       sku: '',
       sizes_json: null,
+      image_data: '',
     }
   })
 }

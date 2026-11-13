@@ -2,6 +2,9 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { SettingsProvider } from './contexts/SettingsContext'
 import { ToastProvider } from './contexts/ToastContext'
+import { TenantProvider } from './contexts/TenantContext'
+import { I18nProvider } from './contexts/I18nContext'
+import GuidePage from './pages/GuidePage'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
@@ -18,6 +21,10 @@ import QuickAddPage from './pages/QuickAddPage'
 import DeliverySettingsPage from './pages/DeliverySettingsPage'
 import BuildTemplatesPage from './pages/BuildTemplatesPage'
 import AgreementTemplatePage from './pages/AgreementTemplatePage'
+import NdaTemplatePage from './pages/NdaTemplatePage'
+import ClauseLibraryPage from './pages/ClauseLibraryPage'
+import ObligationsBoardPage from './pages/ObligationsBoardPage'
+import LegalSignPage from './pages/LegalSignPage'
 import ClientHealthPage from './pages/ClientHealthPage'
 import MrrPage from './pages/MrrPage'
 import AppErrorsPage from './pages/AppErrorsPage'
@@ -73,7 +80,9 @@ function HomeRoute() {
 export default function App() {
   return (
     <AuthProvider>
+      <I18nProvider>
       <SettingsProvider>
+        <TenantProvider>
         <ToastProvider>
           <Routes>
             <Route path="/" element={<Navigate to="/login" replace />} />
@@ -93,6 +102,7 @@ export default function App() {
             {/* Clients open this from a private link; no sign in. */}
             <Route path="/portal" element={<ClientPortalPage />} />
             <Route path="/accept" element={<QuoteAcceptPage />} />
+            <Route path="/sign" element={<LegalSignPage />} />
             <Route
               path="/ctrm/summary"
               element={
@@ -133,11 +143,15 @@ export default function App() {
               }
             >
               <Route path="app" element={<HomeRoute />} />
+              <Route path="guide" element={<GuidePage />} />
               <Route path="accounts" element={<AccountsPage />} />
               <Route path="accounts/:id" element={<AccountDetailPage />} />
               <Route path="delivery-settings" element={<DeliverySettingsPage />} />
               <Route path="build-templates" element={<BuildTemplatesPage />} />
               <Route path="agreement-template" element={<AgreementTemplatePage />} />
+              <Route path="nda-template" element={<NdaTemplatePage />} />
+              <Route path="clause-library" element={<ClauseLibraryPage />} />
+              <Route path="obligations" element={<ObligationsBoardPage />} />
               <Route path="client-health" element={<ClientHealthPage />} />
               <Route path="client-reports" element={<ClientReportsPage />} />
               <Route path="mrr" element={<MrrPage />} />
@@ -175,7 +189,9 @@ export default function App() {
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </ToastProvider>
+        </TenantProvider>
       </SettingsProvider>
+      </I18nProvider>
     </AuthProvider>
   )
 }

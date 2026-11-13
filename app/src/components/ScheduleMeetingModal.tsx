@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import Modal from './Modal'
 import type { AppUser, CrmEntry } from '../lib/types'
-import { createTeamMeetingOnZoho, type ZohoSettings } from '../lib/zoho'
+import { getCalendarProvider, type ProviderSettings } from '../lib/mailCalendar'
 import { mergeAttendeeEmails } from '../lib/calendarAttendees'
 import {
   buttonPrimaryStyle,
@@ -14,11 +14,12 @@ import {
   labelStyle,
 } from '../lib/uiStyles'
 import { errorMessage } from '../lib/errors'
+import { parseScheduleMeetingForm } from '../lib/schemas/scheduleMeeting'
 
 type Props = {
   open: boolean
   onClose: () => void
-  settings: ZohoSettings
+  settings: ProviderSettings
   team: AppUser[]
   crmEntries: CrmEntry[]
   defaultCrmId?: string
@@ -62,39 +63,33 @@ export default function ScheduleMeetingModal({
   }
 
   async function save() {
-    if (!title.trim()) {
-      setError('Title is required')
-      return
-    }
-    if (!date) {
-      setError('Date is required')
-      return
-    }
     const attendeeEmails = mergeAttendeeEmails(selectedTeam)
-    if (!attendeeEmails.length) {
-      setError('Select at least one team member to invite')
-      return
-    }
-    const [hourStr, minuteStr] = time.split(':')
-    const startHour = Number(hourStr)
-    const startMinute = Number(minuteStr) || 0
-    if (!Number.isFinite(startHour)) {
-      setError('Invalid start time')
+    const parsed = parseScheduleMeetingForm({
+      title,
+      date,
+      time,
+      duration,
+      location,
+      notes,
+      attendeeEmails,
+    })
+    if (!parsed.ok) {
+      setError(parsed.error)
       return
     }
 
     setSaving(true)
     setError('')
     try {
-      await createTeamMeetingOnZoho(settings, {
-        title: title.trim(),
-        date,
-        startHour,
-        startMinute,
-        durationMinutes: Number(duration) || 30,
-        location,
-        description: notes.trim(),
-        attendeeEmails,
+      await getCalendarProvider(settings).createTeamMeeting(settings, {
+        title: parsed.data.title,
+        date: parsed.data.date,
+        startHour: parsed.data.startHour,
+        startMinute: parsed.data.startMinute,
+        durationMinutes: parsed.data.durationMinutes,
+        location: parsed.data.location,
+        description: parsed.data.description,
+        attendeeEmails: parsed.data.attendeeEmails,
         crmCompany: selectedCrm?.company_name,
       })
       onCreated()

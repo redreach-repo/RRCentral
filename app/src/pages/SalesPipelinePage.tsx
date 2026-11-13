@@ -34,13 +34,10 @@ import {
   buttonSecondaryStyle,
   cardStyle,
   colors,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   sectionTitleStyle,
   selectStyle,
-  toolbarStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 const chip = (bg: string, color: string): CSSProperties => ({
   display: 'inline-flex',
@@ -308,19 +305,44 @@ export default function SalesPipelinePage() {
   const quotedMonthly = totals.find((t) => t.stage === 'quote_sent')
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>AI CRM sales pipeline</h1>
-          <p style={pageSubtitleStyle}>
-            Prospects for an AI CRM, from first contact to a signed contract. A quote becomes the contract with Make contract.
+          <p className={docsStyles.kicker}>Sales · Work</p>
+          <h1 className={docsStyles.title}>AI CRM detail</h1>
+          <p className={docsStyles.subtitle}>
+            Fine-grained AI CRM stages and Make contract. Day-to-day chasing lives on Pipeline.
           </p>
         </div>
         {canWrite && !missingTable ? (
-          <button type="button" style={buttonPrimaryStyle} onClick={() => setEditing({ deal: null })}>
+          <button type="button" className={docsStyles.newBtn} onClick={() => setEditing({ deal: null })}>
             <Plus size={16} /> New deal
           </button>
         ) : null}
+      </header>
+
+      <div
+        role="status"
+        style={{
+          ...cardStyle,
+          marginBottom: 12,
+          padding: '12px 14px',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 10,
+          alignItems: 'center',
+        }}
+      >
+        <span style={{ flex: '1 1 220px', fontSize: 13, color: colors.muted, lineHeight: 1.45 }}>
+          Prefer <strong style={{ color: colors.text }}>Pipeline</strong> for the shared board across CRM, AI CRM,
+          and CTRM. Use this page when you need the detailed AI CRM stage board or Make contract.
+        </span>
+        <Link
+          to="/deals?pipeline=sales&view=board"
+          style={{ ...buttonPrimaryStyle, textDecoration: 'none' }}
+        >
+          Open Pipeline
+        </Link>
       </div>
 
       {missingTable ? (

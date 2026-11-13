@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 import Modal from '../Modal'
+import EditorSectionTabs, {
+  editorPanelStyle,
+  type EditorSection,
+} from '../EditorSectionTabs'
+import { useToast } from '../../contexts/ToastContext'
 import { ACCOUNT_TYPES, accountStatusLabel, accountTypeInfo } from '../../lib/accounts'
 import type { AccountInput, ContactInput } from '../../lib/accountsStore'
+import { parseAccountForm } from '../../lib/schemas/account'
 import type { Account, AccountType, AppUser } from '../../lib/types'
 import {
   buttonPrimaryStyle,
@@ -54,7 +60,7 @@ export default function AccountFormModal({
   open,
   onClose,
   account,
-  defaultType = 'ai_crm_client',
+  defaultType = 'rr_threads_client',
   team,
   lockedOwnerId,
   canReassign,
@@ -62,10 +68,13 @@ export default function AccountFormModal({
   saving,
   onSave,
 }: Props) {
+  const { showToast } = useToast()
   const [form, setForm] = useState<Form>(() => emptyForm(defaultType, defaultOwnerId))
+  const [editorSection, setEditorSection] = useState<EditorSection>('basics')
 
   useEffect(() => {
     if (!open) return
+    setEditorSection('basics')
     if (account) {
       setForm({
         type: account.type,
@@ -94,44 +103,51 @@ export default function AccountFormModal({
   const ownerLocked = Boolean(lockedOwnerId) || (Boolean(account) && !canReassign)
 
   function submit() {
-    const input: AccountInput = {
+    const parsed = parseAccountForm({
       type: form.type,
-      name: form.name.trim(),
-      industry: form.industry.trim(),
-      country: form.country.trim(),
-      city: form.city.trim(),
-      website: form.website.trim(),
+      name: form.name,
+      industry: form.industry,
+      country: form.country,
+      city: form.city,
+      website: form.website,
       status: form.status,
       owner_user_id: lockedOwnerId ?? form.owner_user_id ?? null,
-      source: form.source.trim(),
-      notes: form.notes.trim(),
+      source: form.source,
+      notes: form.notes,
+      contactName: form.contactName,
+      contactEmail: form.contactEmail,
+      contactPhone: form.contactPhone,
+      editing: Boolean(account),
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
     }
-    const contact: ContactInput | null =
-      !account && form.contactName.trim()
-        ? {
-            name: form.contactName.trim(),
-            role: '',
-            email: form.contactEmail.trim(),
-            phone: form.contactPhone.trim(),
-            whatsapp: form.contactPhone.trim(),
-            is_primary: true,
-          }
-        : null
-    onSave(input, contact)
+    onSave(parsed.data.input, parsed.data.contact)
   }
+
+  const sections: EditorSection[] = account ? ['basics', 'notes'] : ['basics', 'lines', 'notes']
 
   return (
     <Modal open={open} onClose={onClose} title={account ? 'Edit account' : 'New account'} width={640}>
+      <EditorSectionTabs value={editorSection} onChange={setEditorSection} sections={sections} />
+      <div style={editorPanelStyle(editorSection === 'basics')}>
       <div style={formGridStyle}>
         <div style={fieldStyle}>
           <label style={labelStyle}>Type</label>
           <select
             style={selectStyle}
             value={form.type}
-            disabled={Boolean(account)}
             onChange={(e) => {
               const type = e.target.value as AccountType
-              setForm((f) => ({ ...f, type, status: accountTypeInfo(type).statuses[0] }))
+              setForm((f) => ({
+                ...f,
+                type,
+                // Keep the current status when it is valid for the new type; else first status.
+                status: accountTypeInfo(type).statuses.includes(f.status)
+                  ? f.status
+                  : accountTypeInfo(type).statuses[0],
+              }))
             }}
           >
             {ACCOUNT_TYPES.map((t) => (
@@ -211,6 +227,42 @@ export default function AccountFormModal({
           onChange={(e) => set('website', e.target.value)}
         />
       </div>
+      </div>
+
+      <div style={editorPanelStyle(editorSection === 'lines')}>
+        <div style={{ fontSize: 13, fontWeight: 600, margin: '6px 0 10px' }}>
+          Main contact <span style={{ color: colors.muted2, fontWeight: 400 }}>(optional)</span>
+        </div>
+        <div style={formGridStyle}>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Name</label>
+            <input
+              style={inputStyle}
+              value={form.contactName}
+              onChange={(e) => set('contactName', e.target.value)}
+            />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Email</label>
+            <input
+              style={inputStyle}
+              type="email"
+              value={form.contactEmail}
+              onChange={(e) => set('contactEmail', e.target.value)}
+            />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Phone or WhatsApp</label>
+            <input
+              style={inputStyle}
+              value={form.contactPhone}
+              onChange={(e) => set('contactPhone', e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div style={editorPanelStyle(editorSection === 'notes')}>
       <div style={fieldStyle}>
         <label style={labelStyle}>Notes</label>
         <textarea
@@ -219,41 +271,7 @@ export default function AccountFormModal({
           onChange={(e) => set('notes', e.target.value)}
         />
       </div>
-
-      {!account ? (
-        <>
-          <div style={{ fontSize: 13, fontWeight: 600, margin: '6px 0 10px' }}>
-            Main contact <span style={{ color: colors.muted2, fontWeight: 400 }}>(optional)</span>
-          </div>
-          <div style={formGridStyle}>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Name</label>
-              <input
-                style={inputStyle}
-                value={form.contactName}
-                onChange={(e) => set('contactName', e.target.value)}
-              />
-            </div>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Email</label>
-              <input
-                style={inputStyle}
-                type="email"
-                value={form.contactEmail}
-                onChange={(e) => set('contactEmail', e.target.value)}
-              />
-            </div>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Phone or WhatsApp</label>
-              <input
-                style={inputStyle}
-                value={form.contactPhone}
-                onChange={(e) => set('contactPhone', e.target.value)}
-              />
-            </div>
-          </div>
-        </>
-      ) : null}
+      </div>
 
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
         <button type="button" style={buttonSecondaryStyle} onClick={onClose} disabled={saving}>

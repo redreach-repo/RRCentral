@@ -13,7 +13,8 @@ import { HOURS_ALERT_MESSAGE, hoursAlert, monthLabel, ratesFromSettings, renewal
 import { listAiUsage } from '../../lib/aiAssistStore'
 import { currentContract, listContracts, listPackages, listTimeEntries, listUsage } from '../../lib/deliveryStore'
 import { formatAED } from '../../lib/money'
-import { can, roleAtLeast } from '../../lib/permissions'
+import { canViewField } from '../../lib/fieldPermissions'
+import { roleAtLeast } from '../../lib/permissions'
 import { listDueReminders } from '../../lib/contractBillingStore'
 import { slaState } from '../../lib/sla'
 import { clientsWithoutHoursThisWeek, isHoursReminderDay } from '../../lib/timeTracking'
@@ -54,7 +55,7 @@ export default function ModuleAlertsCard() {
   const { userRole } = useAuth()
   const { settings } = useSettings()
   const rates = useMemo(() => ratesFromSettings(settings), [settings])
-  const seesMoney = can(userRole, 'delivery.profitability')
+  const seesMoney = canViewField(userRole, 'delivery.profitability')
   const chasesPayments = roleAtLeast(userRole, 'sales')
   const reviewsChurches = userRole === 'admin' || userRole === 'manager'
   const [data, setData] = useState<Data | null>(null)
@@ -236,6 +237,20 @@ export default function ModuleAlertsCard() {
 
   if (!data) return null
 
+  const showCtrm = data.overdueDeals.length > 0 || data.staleDeals.length > 0
+  const panels = [
+    data.clients.length > 0,
+    Boolean(data.noHours?.length),
+    Boolean(data.reminders?.length),
+    data.newTickets.length > 0,
+    data.tickets.length > 0,
+    showCtrm,
+    Boolean(data.joins?.length),
+    data.churches.length > 0,
+    Boolean(data.costs),
+  ]
+  if (!panels.some(Boolean)) return null
+
   return (
     <div
       style={{
@@ -245,30 +260,53 @@ export default function ModuleAlertsCard() {
         marginBottom: 16,
       }}
     >
-      <Panel icon={<Briefcase size={18} />} title="AI CRM clients" link="/accounts?type=ai_crm_client" lines={data.clients}
-        empty="No client is over hours or due for renewal in the next 60 days." />
-      {data.noHours ? (
-        <Panel icon={<Clock size={18} />} title="Friday check: hours this week" link="/accounts?type=ai_crm_client"
-          lines={data.noHours} empty="Every client on a running contract has hours logged this week." />
+      {data.clients.length > 0 ? (
+        <Panel icon={<Briefcase size={18} />} title="AI CRM clients" link="/accounts?type=ai_crm_client" lines={data.clients} />
       ) : null}
-      {data.reminders ? (
-        <Panel icon={<BellRing size={18} />} title="Payment reminders due" link="/invoices" lines={data.reminders}
-          empty="No invoice is 3, 7 or 14 days late without a reminder." />
+      {data.noHours && data.noHours.length > 0 ? (
+        <Panel
+          icon={<Clock size={18} />}
+          title="Friday check: hours this week"
+          link="/accounts?type=ai_crm_client"
+          lines={data.noHours}
+        />
       ) : null}
-      <Panel icon={<Inbox size={18} />} title="New support tickets" link="/support" lines={data.newTickets}
-        empty="No new tickets waiting to be picked up." />
-      <Panel icon={<LifeBuoy size={18} />} title="Tickets near or past their reply time" link="/support" lines={data.tickets}
-        empty="Every open ticket is on time." />
-      <Panel icon={<Handshake size={18} />} title="CTRM Next" link="/ctrm" lines={[]} empty="">
-        <SubList label="Next action overdue" lines={data.overdueDeals} empty="No overdue next actions." />
-        <SubList label="No touch in 14 days" lines={data.staleDeals} empty="No stale deals." />
-      </Panel>
-      {data.joins ? (
-        <Panel icon={<UserPlus size={18} />} title="Churches asking to join WorshipHub" link="/products" lines={data.joins}
-          empty="No church is waiting for review." onChurchChanged={() => setReloadKey((k) => k + 1)} />
+      {data.reminders && data.reminders.length > 0 ? (
+        <Panel icon={<BellRing size={18} />} title="Payment reminders due" link="/invoices" lines={data.reminders} />
       ) : null}
-      <Panel icon={<Church size={18} />} title="WorshipHub churches" link="/products" lines={data.churches}
-        empty="No church has a billing problem or a renewal in the next 60 days." />
+      {data.newTickets.length > 0 ? (
+        <Panel icon={<Inbox size={18} />} title="New support tickets" link="/support" lines={data.newTickets} />
+      ) : null}
+      {data.tickets.length > 0 ? (
+        <Panel
+          icon={<LifeBuoy size={18} />}
+          title="Tickets near or past their reply time"
+          link="/support"
+          lines={data.tickets}
+        />
+      ) : null}
+      {showCtrm ? (
+        <Panel icon={<Handshake size={18} />} title="CTRM Next" link="/ctrm" lines={[]}>
+          {data.overdueDeals.length > 0 ? (
+            <SubList label="Next action overdue" lines={data.overdueDeals} />
+          ) : null}
+          {data.staleDeals.length > 0 ? (
+            <SubList label="No touch in 14 days" lines={data.staleDeals} />
+          ) : null}
+        </Panel>
+      ) : null}
+      {data.joins && data.joins.length > 0 ? (
+        <Panel
+          icon={<UserPlus size={18} />}
+          title="Churches asking to join WorshipHub"
+          link="/products"
+          lines={data.joins}
+          onChurchChanged={() => setReloadKey((k) => k + 1)}
+        />
+      ) : null}
+      {data.churches.length > 0 ? (
+        <Panel icon={<Church size={18} />} title="WorshipHub churches" link="/products" lines={data.churches} />
+      ) : null}
       {data.costs ? <CostsPanel costs={data.costs} /> : null}
     </div>
   )
@@ -279,7 +317,6 @@ function Panel({
   title,
   link,
   lines,
-  empty,
   children,
   onChurchChanged,
 }: {
@@ -287,7 +324,6 @@ function Panel({
   title: string
   link: string
   lines: Line[]
-  empty: string
   children?: ReactNode
   /** Lines with a WorshipHub church get its review buttons; called after one is used. */
   onChurchChanged?: () => void
@@ -302,24 +338,24 @@ function Panel({
           Open
         </Link>
       </div>
-      {children ?? <Lines lines={lines} empty={empty} onChurchChanged={onChurchChanged} />}
+      {children ?? <Lines lines={lines} onChurchChanged={onChurchChanged} />}
     </section>
   )
 }
 
-function SubList({ label, lines, empty }: { label: string; lines: Line[]; empty: string }) {
+function SubList({ label, lines }: { label: string; lines: Line[] }) {
   return (
     <div style={{ marginBottom: 10 }}>
       <div style={{ fontSize: 12, color: colors.muted2, marginBottom: 4 }}>
         {label} ({lines.length})
       </div>
-      <Lines lines={lines} empty={empty} />
+      <Lines lines={lines} />
     </div>
   )
 }
 
-function Lines({ lines, empty, onChurchChanged }: { lines: Line[]; empty: string; onChurchChanged?: () => void }) {
-  if (lines.length === 0) return <p style={{ color: colors.muted, fontSize: 13, margin: 0 }}>{empty}</p>
+function Lines({ lines, onChurchChanged }: { lines: Line[]; onChurchChanged?: () => void }) {
+  if (lines.length === 0) return null
   return (
     <ul style={{ margin: 0, paddingLeft: 18, color: colors.muted, fontSize: 13, lineHeight: 1.55 }}>
       {lines.slice(0, 6).map((l) => (

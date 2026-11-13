@@ -34,3 +34,42 @@ if [[ $rls_rc -ne 0 ]] || grep -q "RLS TEST FAILED\|ERROR:" /tmp/rls_test_out.tx
   exit 1
 fi
 echo "RLS tests passed"
+
+echo "Running tenant isolation tests…"
+set +e
+"${PSQL[@]}" -d "$DB" -f tests/tenant_isolation_test.sql > /tmp/tenant_test_out.txt 2>&1
+tenant_rc=$?
+set -e
+sed -n "s/.*NOTICE:  //p" /tmp/tenant_test_out.txt || true
+if [[ $tenant_rc -ne 0 ]] || grep -q "TENANT TEST FAILED\|ERROR:" /tmp/tenant_test_out.txt; then
+  echo "Tenant isolation tests failed — full output:" >&2
+  cat /tmp/tenant_test_out.txt >&2
+  exit 1
+fi
+echo "Tenant isolation tests passed"
+
+echo "Running numbering tests…"
+set +e
+"${PSQL[@]}" -d "$DB" -f tests/numbering_test.sql > /tmp/numbering_test_out.txt 2>&1
+numbering_rc=$?
+set -e
+sed -n "s/.*NOTICE:  //p" /tmp/numbering_test_out.txt || true
+if [[ $numbering_rc -ne 0 ]] || grep -q "NUMBERING TEST FAILED\|ERROR:" /tmp/numbering_test_out.txt; then
+  echo "Numbering tests failed — full output:" >&2
+  cat /tmp/numbering_test_out.txt >&2
+  exit 1
+fi
+echo "Numbering tests passed"
+
+echo "Running pipelines tests…"
+set +e
+"${PSQL[@]}" -d "$DB" -f tests/pipelines_test.sql > /tmp/pipelines_test_out.txt 2>&1
+pipelines_rc=$?
+set -e
+sed -n "s/.*NOTICE:  //p" /tmp/pipelines_test_out.txt || true
+if [[ $pipelines_rc -ne 0 ]] || grep -q "PIPELINES TEST FAILED\|ERROR:" /tmp/pipelines_test_out.txt; then
+  echo "Pipelines tests failed — full output:" >&2
+  cat /tmp/pipelines_test_out.txt >&2
+  exit 1
+fi
+echo "Pipelines tests passed"

@@ -29,7 +29,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 10 | Contract invoices each morning | `contract-invoices` |
 | 11 | Daily watchdog | `watchdog` |
 | 12 | One tap payment reminders | `payment-reminder` |
-| 13 | My deals | none (app and SQL only) |
+| 13 | Pipeline | none (app and SQL only) |
 | 14 | Next step and lost reason | none (app and SQL only) |
 | 15 | Website and WhatsApp leads | `lead-intake` |
 | 16 | Quote accept links | `quote-accept` |
@@ -224,10 +224,10 @@ approved). Nothing is recorded when sending fails, so you can press again once f
 
 ---
 
-## 13. My deals
+## 13. Pipeline
 
 **Trigger.** Run the "Wave 3: My deals" SQL from the copy page once. Sign in as yourself and open
-**Sales → My deals**.
+**Sales → Pipeline**.
 
 **You should see.** Your open deals from the CRM, AI CRM sales and CTRM Next in one table, with value,
 weighted value, next action and days in stage. Switch to **Board** to see them by stage. Pick

@@ -27,9 +27,6 @@ import {
   downloadCsv,
   escapeCsv,
   inputStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
   tableStyle,
   tableWrapStyle,
@@ -37,6 +34,7 @@ import {
   thStyle,
   toolbarStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 const OPERATION_LABEL: Record<AuditEntry['operation'], string> = {
   INSERT: 'Created',
@@ -172,7 +170,7 @@ export default function AuditLogPage() {
 
   if (!can(userRole, 'audit.read')) {
     return (
-      <div style={pageStyle}>
+      <div className={docsStyles.page}>
         <EmptyState title="Admins only" subtitle="Ask an admin if you need to see the audit trail." />
       </div>
     )
@@ -180,7 +178,7 @@ export default function AuditLogPage() {
 
   if (!isAuditAvailable()) {
     return (
-      <div style={pageStyle}>
+      <div className={docsStyles.page}>
         <EmptyState
           icon={<ShieldCheck size={28} />}
           title="Audit trail runs in cloud mode"
@@ -191,12 +189,17 @@ export default function AuditLogPage() {
   }
 
   return (
-    <div style={pageStyle}>
-      <h2 style={pageTitleStyle}>Audit log</h2>
-      <p style={pageSubtitleStyle}>
-        Every create, change and delete on key records, who did it and what changed. Recorded by the database,
-        so it cannot be edited from the app. Secrets are hidden.
-      </p>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
+        <div>
+          <p className={docsStyles.kicker}>Admin</p>
+          <h1 className={docsStyles.title}>Audit log</h1>
+          <p className={docsStyles.subtitle}>
+            Every create, change and delete on key records, who did it and what changed. Recorded by the database,
+            so it cannot be edited from the app. Secrets are hidden.
+          </p>
+        </div>
+      </header>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         {(['', 'contracts', 'prices', 'commission'] as const).map((f) => (

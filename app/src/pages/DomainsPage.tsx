@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { ExternalLink, Globe, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ExternalLink, Globe, Plus } from 'lucide-react'
 import { db } from '../lib/db'
 import type { OwnedDomain, OwnedDomainBillingCycle, OwnedDomainStatus } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
+import SimpleRowActions from '../components/SimpleRowActions'
 import { logActivity } from '../lib/activity'
 import { errorMessage, isMissingRelationError } from '../lib/errors'
 import { formatAED } from '../lib/money'
@@ -16,8 +17,8 @@ import {
   DOMAIN_STATUSES,
   domainStatusLabel,
   listOwnedDomainsResult,
-  normalizeDomainName,
 } from '../lib/domains'
+import { parseDomainForm } from '../lib/schemas/domain'
 import {
   buttonDangerStyle,
   buttonPrimaryStyle,
@@ -28,16 +29,13 @@ import {
   formGridStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
-  toolbarStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 type DomainForm = {
   domain_name: string
@@ -99,6 +97,7 @@ export default function DomainsPage() {
   const [form, setForm] = useState<DomainForm>(emptyForm())
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<OwnedDomain | null>(null)
+  const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
   const [missingTable, setMissingTable] = useState(false)
 
   const load = useCallback(async () => {
@@ -163,11 +162,12 @@ export default function DomainsPage() {
   }
 
   async function save() {
-    const domain_name = normalizeDomainName(form.domain_name)
-    if (!domain_name || !domain_name.includes('.')) {
-      showToast('Enter a valid domain (e.g. redreach.ae)', 'error')
+    const parsed = parseDomainForm(form)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
+    const domain_name = parsed.data.domain_name
     const duplicate = domains.find(
       (d) => d.domain_name.toLowerCase() === domain_name && d.id !== editing?.id,
     )
@@ -177,29 +177,22 @@ export default function DomainsPage() {
     }
     setSaving(true)
     try {
-      const costRaw = form.cost_aed.trim()
-      const cost_aed = costRaw === '' ? null : Number(costRaw)
-      if (costRaw !== '' && !Number.isFinite(cost_aed)) {
-        showToast('Renewal cost must be a number', 'error')
-        setSaving(false)
-        return
-      }
       const payload = {
         domain_name,
-        registrar: form.registrar.trim(),
-        registrar_account: form.registrar_account.trim(),
-        status: form.status,
-        registered_on: form.registered_on || null,
-        expires_on: form.expires_on || null,
-        auto_renew: form.auto_renew,
-        dns_provider: form.dns_provider.trim(),
-        nameservers: form.nameservers.trim(),
-        hosting_provider: form.hosting_provider.trim(),
-        website_url: form.website_url.trim(),
-        managed_by: form.managed_by.trim(),
-        cost_aed,
-        billing_cycle: form.billing_cycle,
-        notes: form.notes.trim(),
+        registrar: parsed.data.registrar,
+        registrar_account: parsed.data.registrar_account,
+        status: parsed.data.status,
+        registered_on: parsed.data.registered_on || null,
+        expires_on: parsed.data.expires_on || null,
+        auto_renew: parsed.data.auto_renew,
+        dns_provider: parsed.data.dns_provider,
+        nameservers: parsed.data.nameservers,
+        hosting_provider: parsed.data.hosting_provider,
+        website_url: parsed.data.website_url,
+        managed_by: parsed.data.managed_by,
+        cost_aed: parsed.data.cost_aed,
+        billing_cycle: parsed.data.billing_cycle,
+        notes: parsed.data.notes,
         active: true,
         updated_at: new Date().toISOString(),
       }
@@ -265,19 +258,25 @@ export default function DomainsPage() {
   }
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Domains</h1>
-          <p style={pageSubtitleStyle}>
+          <p className={docsStyles.kicker}>Operations</p>
+          <h1 className={docsStyles.title}>Domains</h1>
+          <p className={docsStyles.subtitle}>
             Track every domain you own — registrar, renewals, DNS, and hosting. Renewal alerts show
             on the dashboard when expiry is within 90 days.
           </p>
         </div>
-        <button type="button" style={buttonPrimaryStyle} onClick={openCreate} disabled={missingTable}>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          onClick={openCreate}
+          disabled={missingTable}
+        >
           <Plus size={16} /> Add domain
         </button>
-      </div>
+      </header>
 
       {missingTable ? (
         <div style={{ ...cardStyle, color: colors.muted, lineHeight: 1.55, marginBottom: 16 }}>
@@ -406,16 +405,12 @@ export default function DomainsPage() {
                         ) : null}
                       </td>
                       <td style={tdStyle}>
-                        <button type="button" style={buttonSecondaryStyle} onClick={() => openEdit(d)}>
-                          <Pencil size={14} />
-                        </button>{' '}
-                        <button
-                          type="button"
-                          style={buttonDangerStyle}
-                          onClick={() => setDeleteTarget(d)}
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <SimpleRowActions
+                          expanded={actionsOpenId === d.id}
+                          onToggle={() => setActionsOpenId((id) => (id === d.id ? null : d.id))}
+                          onEdit={() => openEdit(d)}
+                          onDelete={() => setDeleteTarget(d)}
+                        />
                       </td>
                     </tr>
                   )

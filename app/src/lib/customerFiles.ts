@@ -21,7 +21,7 @@ export const COMMUNICATION_KINDS: {
 ]
 
 export const CUSTOMER_FOLDER_SECTIONS: {
-  id: 'quotation' | 'invoice' | 'delivery_note' | 'communication' | 'purchasing'
+  id: 'quotation' | 'invoice' | 'delivery_note' | 'contracts' | 'communication' | 'purchasing'
   label: string
   hint: string
   uploadButton: string
@@ -29,7 +29,7 @@ export const CUSTOMER_FOLDER_SECTIONS: {
   uploadHint: string
   /** Signed-doc sections use a fixed category; communications pick a kind. */
   mode: 'signed' | 'communication' | 'purchasing'
-  signedCategory?: 'signed_quotation' | 'signed_invoice' | 'signed_delivery_note'
+  signedCategory?: 'signed_quotation' | 'signed_invoice' | 'signed_delivery_note' | 'signed_nda' | 'signed_contract'
 }[] = [
   {
     id: 'quotation',
@@ -60,6 +60,16 @@ export const CUSTOMER_FOLDER_SECTIONS: {
     uploadButton: 'Add signed delivery note',
     uploadTitle: 'Signed delivery note',
     uploadHint: 'Upload the customer-signed DN to Google Drive, then paste the share link.',
+  },
+  {
+    id: 'contracts',
+    label: 'Contracts & NDAs',
+    hint: 'NDAs and agreements signed via RR Central or filed on Google Drive',
+    mode: 'signed',
+    signedCategory: 'signed_nda',
+    uploadButton: 'Add signed NDA / contract',
+    uploadTitle: 'Signed NDA / contract',
+    uploadHint: 'Paste the Google Drive share link for a signed NDA or contract PDF.',
   },
   {
     id: 'communication',
@@ -151,6 +161,11 @@ export function sectionForCategory(category: CustomerDocumentCategory): FolderSe
     case 'delivery_note':
     case 'signed_delivery_note':
       return 'delivery_note'
+    case 'nda':
+    case 'signed_nda':
+    case 'contract':
+    case 'signed_contract':
+      return 'contracts'
     case 'email':
     case 'whatsapp':
     case 'call_notes':
@@ -191,6 +206,12 @@ export function suggestedDocumentTitle(
       return ref ? `Signed ${ref}` : 'Signed invoice'
     case 'signed_delivery_note':
       return ref ? `Signed ${ref}` : 'Signed delivery note'
+    case 'signed_nda':
+      return ref ? `Signed NDA – ${ref}` : co ? `Signed NDA – ${co}` : 'Signed NDA'
+    case 'signed_contract':
+      return ref ? `Signed contract – ${ref}` : co ? `Signed contract – ${co}` : 'Signed contract'
+    case 'nda':
+      return ref ? `NDA – ${ref}` : co ? `NDA – ${co}` : 'NDA'
     case 'email':
       return ref ? `Email – ${ref}` : co ? `Email – ${co}` : 'Email thread'
     case 'whatsapp':
@@ -340,6 +361,10 @@ export function companiesMatch(a: string, b: string): boolean {
   const sb = stripLegalSuffixes(nb)
   if (sa && sb && sa === sb) return true
   if (sa.length >= 5 && sb.length >= 5 && (sa.includes(sb) || sb.includes(sa))) return true
+  // "ReadyMix" vs "Ready Mix" — compare with spaces removed so glued words still match.
+  const ca = sa.replace(/\s+/g, '')
+  const cb = sb.replace(/\s+/g, '')
+  if (ca.length >= 5 && cb.length >= 5 && (ca.includes(cb) || cb.includes(ca))) return true
   return false
 }
 
@@ -443,6 +468,7 @@ export function buildCustomerFolder(opts: {
     quotation: [],
     invoice: [],
     delivery_note: [],
+    contracts: [],
     communication: [],
     purchasing: [],
   }
@@ -455,6 +481,7 @@ export function buildCustomerFolder(opts: {
     quotation: bySection.quotation,
     invoice: bySection.invoice,
     delivery_note: bySection.delivery_note,
+    contracts: bySection.contracts,
     communication: bySection.communication,
     purchasing: bySection.purchasing,
   }
@@ -553,6 +580,41 @@ export async function loadCustomerFolder(company: string): Promise<CustomerFolde
   })
 
   return { ...folder, missingDocumentsTable: docsResult.missing }
+}
+
+/**
+ * Upload a PDF (or other bytes) into the client's Google Drive folder and save
+ * the share link on customer_documents so Customer files / the quote sheet see it.
+ */
+export async function uploadPdfToCustomerDrive(opts: {
+  company: string
+  crmId: string
+  category: CustomerDocumentCategory
+  title: string
+  filename: string
+  bytes: Uint8Array
+  relatedRef?: string
+  notes?: string
+  uploadedBy: string
+  contentType?: string
+}): Promise<CustomerDocument> {
+  const { uploadToClientDrive } = await import('./googleDrive')
+  const uploaded = await uploadToClientDrive({
+    crmId: opts.crmId,
+    filename: opts.filename,
+    content: opts.bytes,
+    contentType: opts.contentType || 'application/pdf',
+  })
+  return saveCustomerDriveLink({
+    company: opts.company,
+    crmId: opts.crmId,
+    category: opts.category,
+    title: opts.title,
+    driveUrl: uploaded.url,
+    relatedRef: opts.relatedRef,
+    notes: opts.notes || 'Saved from RR Central PDF',
+    uploadedBy: opts.uploadedBy,
+  })
 }
 
 export async function saveCustomerDriveLink(opts: {

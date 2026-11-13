@@ -72,6 +72,8 @@ export interface OwnedDomain {
 
 export interface CrmEntry {
   id: string
+  /** Linked Accounts org of record. Null until linked (name match or Create account). */
+  account_id?: string | null
   company_name: string
   primary_contact: string
   email_phone: string
@@ -121,6 +123,10 @@ export type CustomerDocumentCategory =
   /** @deprecated Kept so older Google Drive rows still load. */
   | 'payment_slip'
   | 'supplier_invoice'
+  | 'nda'
+  | 'signed_nda'
+  | 'contract'
+  | 'signed_contract'
   | 'other'
 
 export interface CustomerDocument {
@@ -174,6 +180,13 @@ export interface Quotation {
   /** Linked account (RR Central modules). Null until linked. */
   account_id?: string | null
   client: string
+  /**
+   * Contact person chosen for this quote when the company has several contacts.
+   * Shown as Attn on the printable quotation. Empty = no specific contact.
+   */
+  contact_name?: string
+  contact_email?: string
+  contact_phone?: string
   vertical: string
   reference_number: string
   date: string | null
@@ -401,6 +414,11 @@ export interface LineItem {
   sku?: string
   /** Optional size breakdown JSON, e.g. { S: 2, M: 4 }. */
   sizes_json?: string | Record<string, number> | null
+  /**
+   * Optional compressed product image (data URL or https).
+   * Empty / missing = do not show any image on the quotation.
+   */
+  image_data?: string
   created_at: string
 }
 
@@ -836,7 +854,16 @@ export interface WebsiteInquiry {
 }
 
 /** Organisation Red Reach works with (RR Central modules). */
-export type AccountType = 'ai_crm_client' | 'worship_church' | 'ctrm_prospect'
+export type AccountType =
+  | 'rr_threads_client'
+  | 'rr_wanders_client'
+  | 'rr_marketing_client'
+  | 'rr_connect_client'
+  | 'rr_care_client'
+  | 'rr_trading_client'
+  | 'ai_crm_client'
+  | 'worship_church'
+  | 'ctrm_prospect'
 
 export interface Account {
   id: string
@@ -946,6 +973,123 @@ export interface AgreementTemplate {
   created_by: string
   created_at: string
   updated_at: string
+}
+
+export type NdaTemplateStatus = AgreementTemplateStatus
+
+/** NDA wording template (same lifecycle as service agreement templates). */
+export interface NdaTemplate {
+  id: string
+  version: number
+  title: string
+  body: string
+  status: NdaTemplateStatus
+  approved_by: string
+  approved_at: string | null
+  approval_note: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+/** Follow-through item on the M5 obligations board. */
+export type ContractObligationOwner = 'red_reach' | 'counterparty' | 'both'
+export type ContractObligationStatus = 'open' | 'done' | 'cancelled'
+
+export interface ContractObligation {
+  id: string
+  company_name: string
+  crm_id: string
+  legal_document_id: string | null
+  title: string
+  description: string
+  owner_party: ContractObligationOwner
+  due_date: string | null
+  status: ContractObligationStatus
+  completed_at: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+/** Reusable clause in the M5 contract clause library. */
+export type ContractClauseCategory =
+  | 'confidentiality'
+  | 'obligations'
+  | 'term'
+  | 'liability'
+  | 'general'
+  | 'other'
+
+export type ContractClauseStatus = 'draft' | 'active' | 'retired'
+
+export interface ContractClause {
+  id: string
+  clause_key: string
+  title: string
+  body: string
+  category: ContractClauseCategory
+  status: ContractClauseStatus
+  sort_order: number
+  notes: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export type LegalDocumentStatus = 'draft' | 'sent' | 'signed' | 'expired' | 'void'
+export type LegalDocumentType = 'nda' | 'service_agreement' | 'other'
+
+/** Contracts vault row: NDA / agreement for a CRM company. */
+export interface LegalDocument {
+  id: string
+  company_name: string
+  crm_id: string
+  doc_type: LegalDocumentType
+  title: string
+  status: LegalDocumentStatus
+  party_name: string
+  party_email: string
+  party_company: string
+  template_id: string | null
+  template_version: number | null
+  related_ref: string
+  customer_document_id: string | null
+  drive_url: string
+  unsigned_file_name: string
+  signed_file_name: string
+  created_by: string
+  created_at: string
+  updated_at: string
+  sent_at: string | null
+  signed_at: string | null
+  expires_at: string | null
+  voided_at: string | null
+  notes: string
+}
+
+export interface LegalSignLink {
+  id: string
+  legal_document_id: string
+  label: string
+  created_by: string
+  created_at: string
+  expires_at: string | null
+  revoked_at: string | null
+  last_opened_at: string | null
+  signed_at: string | null
+  signed_name: string
+}
+
+export interface LegalSignature {
+  id: string
+  link_id: string
+  legal_document_id: string
+  signed_name: string
+  signed_date: string
+  signed_at: string
+  ip: string
+  user_agent: string
 }
 
 /** Whether the client joined the monthly report call (feeds the health score). */
@@ -1175,8 +1319,16 @@ export interface SalesDeal {
 /** One AI request made from RR Central, logged against the account (ai_usage_log). */
 export interface AiUsageLog {
   id: string
-  account_id: string
-  feature: 'ticket_summary' | 'ticket_reply' | 'report_summary' | 'call_notes'
+  /** Null for CRM Ask (not tied to a client account). */
+  account_id: string | null
+  feature:
+    | 'ticket_summary'
+    | 'ticket_reply'
+    | 'report_summary'
+    | 'call_notes'
+    | 'call_brief'
+    | 'update_tidy'
+    | 'crm_ask'
   model: string
   input_tokens: number
   output_tokens: number

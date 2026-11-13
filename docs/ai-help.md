@@ -1,7 +1,7 @@
 # AI help
 
-RR Central uses Claude Haiku (`claude-haiku-5-5`) for four jobs. Nothing is
-sent or saved without a person checking it first.
+RR Central uses Claude Haiku (`claude-haiku-5-5`) for AI help on accounts.
+Nothing is sent or saved without a person checking it first.
 
 | Where | Button | What it does |
 | --- | --- | --- |

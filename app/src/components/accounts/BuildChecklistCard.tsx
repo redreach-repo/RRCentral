@@ -14,6 +14,7 @@ import {
 } from '../../lib/buildTemplatesStore'
 import { errorMessage } from '../../lib/errors'
 import { isGoLive } from '../../lib/goLive'
+import { parseBuildTaskForm } from '../../lib/schemas/buildTask'
 import { hoursLabel } from '../../lib/timeTracking'
 import type { BuildStageKey, BuildTask, BuildTemplate, DeliveryPackage, Requirement } from '../../lib/types'
 import {
@@ -118,15 +119,17 @@ export default function BuildChecklistCard({
 
   async function addTask(e: FormEvent) {
     e.preventDefault()
-    const title = form.title.trim()
-    if (!title) return
-    const hours = form.hours.trim() === '' ? 0 : Number(form.hours)
-    if (!Number.isFinite(hours) || hours < 0) {
-      showToast('Hours must be a number', 'error')
+    const parsed = parseBuildTaskForm(form)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     await run(async () => {
-      await addBuildTask(accountId, { stage: form.stage, title, detail: '', est_hours: hours }, tasks)
+      await addBuildTask(
+        accountId,
+        { stage: parsed.data.stage, title: parsed.data.title, detail: '', est_hours: parsed.data.est_hours },
+        tasks,
+      )
       setForm((f) => ({ ...f, title: '', hours: '' }))
     }, 'Could not add the task')
   }
@@ -229,7 +232,7 @@ export default function BuildChecklistCard({
                         void run(() => deleteBuildTask(t.id), 'Could not delete the task')
                       }
                     >
-                      <Trash2 size={12} />
+                      <Trash2 size={12} /> Remove
                     </button>
                   ) : null}
                 </li>

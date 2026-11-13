@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { NO_TRADE_DATA_NOTE } from '../../lib/ctrmIssues'
 import Modal from '../Modal'
+import { useToast } from '../../contexts/ToastContext'
 import { accountTypeLabel } from '../../lib/accounts'
+import { parseTicketForm } from '../../lib/schemas/ticket'
 import { TICKET_CHANNELS, TICKET_PRIORITIES } from '../../lib/support'
 import type { Account, AccountContact, AppUser, TicketChannel, TicketPriority } from '../../lib/types'
 import {
@@ -52,6 +54,7 @@ export default function TicketFormModal({
   saving,
   onSave,
 }: Props) {
+  const { showToast } = useToast()
   const [accountId, setAccountId] = useState(lockedAccountId ?? '')
   const [contactId, setContactId] = useState('')
   const [subject, setSubject] = useState('')
@@ -79,15 +82,20 @@ export default function TicketFormModal({
       <form
         onSubmit={(e) => {
           e.preventDefault()
-          onSave({
+          const parsed = parseTicketForm({
             accountId,
             contactId: contactId || null,
-            subject: subject.trim(),
+            subject,
             details,
             channel,
             priority,
             assigneeUserId: assignee || null,
           })
+          if (!parsed.ok) {
+            showToast(parsed.error, 'error')
+            return
+          }
+          onSave(parsed.data)
         }}
       >
         <div style={formGridStyle}>

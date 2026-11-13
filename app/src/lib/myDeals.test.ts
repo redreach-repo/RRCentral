@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyMyDealPatchLocal,
   buildDealRows,
+  crmDealLink,
+  crmOwnerText,
   dealAccess,
   dealSources,
   dealTotals,
   filterDeals,
   sortDeals,
+  targetStageForColumn,
   type DealFilters,
+  type DealRow,
   type MyDealsInput,
 } from './myDeals'
 
@@ -34,9 +39,11 @@ function input(over: Partial<MyDealsInput> = {}): MyDealsInput {
         next_action: 'Follow up on quote',
         follow_up_date: '2026-11-18',
         quote_ref: '',
+        notes: 'Quoted last week',
         updated_at: '2026-11-10T08:00:00Z',
         created_at: '2026-10-01T08:00:00Z',
         stage_changed_at: '2026-11-05T08:00:00Z',
+        account_id: null,
       },
     ],
     salesDeals: [
@@ -48,6 +55,7 @@ function input(over: Partial<MyDealsInput> = {}): MyDealsInput {
         owner_user_id: 'u-alfred',
         next_action: 'Call back',
         next_action_date: '2026-11-25',
+        notes: '',
         monthly_fee: 1000,
         setup_fee: 2000,
         discount_percent: 0,
@@ -67,6 +75,7 @@ function input(over: Partial<MyDealsInput> = {}): MyDealsInput {
         owner_user_id: null,
         next_action: 'Chase decision',
         next_action_date: null,
+        notes: 'Waiting on legal',
         company_type: 'trading_house',
         created_at: '2026-09-01T08:00:00Z',
         stage_changed_at: null,
@@ -91,12 +100,21 @@ function input(over: Partial<MyDealsInput> = {}): MyDealsInput {
 const all: DealFilters = { owner: 'all', pipeline: 'all', source: 'all', division: 'all', showClosed: false }
 const byKey = (rows: ReturnType<typeof buildDealRows>) => new Map(rows.map((r) => [r.key, r]))
 
+describe('crmDealLink', () => {
+  it('opens Accounts when linked and the CRM sheet when not', () => {
+    expect(crmDealLink('c1', null)).toBe('/crm?edit=c1')
+    expect(crmDealLink('c1', '')).toBe('/crm?edit=c1')
+    expect(crmDealLink('c1', 'a9')).toBe('/accounts/a9')
+  })
+})
+
 describe('buildDealRows', () => {
   it('puts the three pipelines in one list with value, weighted value and days in stage', () => {
     const rows = byKey(buildDealRows(input()))
     const crm = rows.get('crm:c1')!
     expect(crm).toMatchObject({
       account: 'Mass Allied Freighters L.L.C',
+      account_id: null,
       deal: 'RR-01-26003',
       stageLabel: 'Quoted',
       column: 'proposal',
@@ -135,6 +153,22 @@ describe('buildDealRows', () => {
     )
     expect(rows.find((r) => r.id === 'c1')).toMatchObject({ open: false, value: 4535, weighted: 4535, column: 'won' })
     expect(rows.find((r) => r.id === 'c2')).toMatchObject({ value: null, weighted: null, owner_user_id: null, owner_label: 'Nobody' })
+  })
+
+  it('bridges linked CRM rows to Accounts (name, source, link)', () => {
+    const rows = byKey(
+      buildDealRows(
+        input({
+          crm: [{ ...input().crm[0], account_id: 'a1' }],
+        }),
+      ),
+    )
+    expect(rows.get('crm:c1')).toMatchObject({
+      account_id: 'a1',
+      account: 'Clinic LLC',
+      source: 'Referral',
+      link: '/accounts/a1',
+    })
   })
 
   it('falls back to older dates for days in stage on rows saved before the stage clock', () => {
@@ -185,5 +219,64 @@ describe('dealAccess per role', () => {
   })
   it('keeps the old CRM and commission from staff', () => {
     expect(dealAccess('staff')).toEqual({ pipelines: ['sales', 'ctrm'], commission: false })
+  })
+})
+
+describe('targetStageForColumn', () => {
+  it('maps shared columns to each pipeline’s canonical stage', () => {
+    expect(targetStageForColumn('crm', 'proposal')).toBe('Quoted')
+    expect(targetStageForColumn('sales', 'talking')).toBe('discovery_call')
+    expect(targetStageForColumn('ctrm', 'deciding')).toBe('decision_pending')
+    expect(targetStageForColumn('sales', 'deciding')).toBe('quote_sent')
+  })
+})
+
+describe('write façade helpers', () => {
+  it('maps owner user id to CRM free-text name', () => {
+    expect(crmOwnerText('u-sara', users)).toBe('Sara')
+    expect(crmOwnerText(null, users)).toBe('')
+    expect(crmOwnerText('missing', users)).toBe('')
+  })
+
+  it('overlays next step and owner on a DealRow', () => {
+    const deal: DealRow = {
+      key: 'crm:c1',
+      pipeline: 'crm',
+      id: 'c1',
+      account: 'Acme',
+      account_id: null,
+      deal: 'CRM',
+      stage: 'Quoted',
+      stageLabel: 'Quoted',
+      column: 'proposal',
+      open: true,
+      value: null,
+      weighted: null,
+      next_action: 'Old',
+      next_action_date: '2026-11-01',
+      overdue: true,
+      days_in_stage: 2,
+      owner_user_id: 'u-sara',
+      owner_label: 'Sara',
+      source: '',
+      notes: 'Was warm',
+      quote_ref: 'RR-01',
+      division: '',
+      link: '/crm?edit=c1',
+    }
+    expect(
+      applyMyDealPatchLocal(deal, {
+        next_action: 'Call again',
+        owner_user_id: 'u-alfred',
+        notes: 'Left voicemail',
+        quote_ref: 'RR-02',
+      }),
+    ).toMatchObject({
+      next_action: 'Call again',
+      next_action_date: '2026-11-01',
+      owner_user_id: 'u-alfred',
+      notes: 'Left voicemail',
+      quote_ref: 'RR-02',
+    })
   })
 })

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { differenceInCalendarDays, format, parseISO, startOfMonth, subMonths } from 'date-fns'
 import { Download } from 'lucide-react'
 import { db } from '../lib/db'
@@ -46,15 +46,13 @@ import {
   escapeCsv,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 import { errorMessage } from '../lib/errors'
 import { buildStatement, entriesLabel, quarterRange, signedAmount, signedVat, statementCsv, statementPdf } from '../lib/statementReport'
 import { downloadBlob } from '../lib/documents'
@@ -73,12 +71,6 @@ import {
 } from '../lib/salesReports'
 
 type Tab = 'answers' | 'cashflow' | 'winrate' | 'aging' | 'pnl' | 'vat' | 'statement' | 'funnel' | 'fx'
-
-const tabStyle = (active: boolean): CSSProperties => ({
-  ...buttonSecondaryStyle,
-  background: active ? colors.accent : 'rgba(255,255,255,0.06)',
-  borderColor: active ? colors.accent : colors.border,
-})
 
 export default function ReportsPage() {
   const { showToast } = useToast()
@@ -586,49 +578,91 @@ export default function ReportsPage() {
   }, [])
 
   return (
-    <div style={pageStyle}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Reports</h1>
-          <p style={pageSubtitleStyle}>VAT, sales answers, cash flow, aging, multi-currency, and P&L — income excludes not-awarded quotes</p>
+          <p className={docsStyles.kicker}>Finance</p>
+          <h1 className={docsStyles.title}>Reports</h1>
+          <p className={docsStyles.subtitle}>
+            VAT, sales answers, cash flow, aging, multi-currency, and P&L — income excludes not-awarded
+            quotes
+          </p>
         </div>
-        <button type="button" style={buttonPrimaryStyle} onClick={exportCsv} disabled={loading}>
+        <button type="button" className={docsStyles.newBtn} onClick={exportCsv} disabled={loading}>
           <Download size={16} /> Export CSV
         </button>
-      </div>
+      </header>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
-        <button type="button" style={tabStyle(tab === 'vat')} onClick={() => setTab('vat')}>
-          VAT report
-        </button>
-        <button type="button" style={tabStyle(tab === 'answers')} onClick={() => setTab('answers')}>
-          Sales answers
-        </button>
-        <button type="button" style={tabStyle(tab === 'cashflow')} onClick={() => setTab('cashflow')}>
-          Cash flow, 90 days
-        </button>
-        {seesProfit && (
-          <button type="button" style={tabStyle(tab === 'statement')} onClick={() => setTab('statement')}>
-            Income &amp; expenses
+      <div className={docsStyles.controls}>
+        <div className={docsStyles.tabs} role="tablist" aria-label="Report views">
+          <button
+            type="button"
+            className={tab === 'vat' ? docsStyles.tabActive : docsStyles.tab}
+            onClick={() => setTab('vat')}
+          >
+            VAT report
           </button>
-        )}
-        <button type="button" style={tabStyle(tab === 'fx')} onClick={() => setTab('fx')}>
-          Multi-currency
-        </button>
-        <button type="button" style={tabStyle(tab === 'funnel')} onClick={() => setTab('funnel')}>
-          CRM funnel
-        </button>
-        <button type="button" style={tabStyle(tab === 'winrate')} onClick={() => setTab('winrate')}>
-          Win rate by division
-        </button>
-        <button type="button" style={tabStyle(tab === 'aging')} onClick={() => setTab('aging')}>
-          Invoice aging
-        </button>
-        {seesProfit && (
-          <button type="button" style={tabStyle(tab === 'pnl')} onClick={() => setTab('pnl')}>
-            Monthly P&L
+          <button
+            type="button"
+            className={tab === 'answers' ? docsStyles.tabActive : docsStyles.tab}
+            onClick={() => setTab('answers')}
+          >
+            Sales answers
           </button>
-        )}
+          <button
+            type="button"
+            className={tab === 'cashflow' ? docsStyles.tabActive : docsStyles.tab}
+            onClick={() => setTab('cashflow')}
+          >
+            Cash flow, 90 days
+          </button>
+          {seesProfit ? (
+            <button
+              type="button"
+              className={tab === 'statement' ? docsStyles.tabActive : docsStyles.tab}
+              onClick={() => setTab('statement')}
+            >
+              Income &amp; expenses
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className={tab === 'fx' ? docsStyles.tabActive : docsStyles.tab}
+            onClick={() => setTab('fx')}
+          >
+            Multi-currency
+          </button>
+          <button
+            type="button"
+            className={tab === 'funnel' ? docsStyles.tabActive : docsStyles.tab}
+            onClick={() => setTab('funnel')}
+          >
+            CRM funnel
+          </button>
+          <button
+            type="button"
+            className={tab === 'winrate' ? docsStyles.tabActive : docsStyles.tab}
+            onClick={() => setTab('winrate')}
+          >
+            Win rate by division
+          </button>
+          <button
+            type="button"
+            className={tab === 'aging' ? docsStyles.tabActive : docsStyles.tab}
+            onClick={() => setTab('aging')}
+          >
+            Invoice aging
+          </button>
+          {seesProfit ? (
+            <button
+              type="button"
+              className={tab === 'pnl' ? docsStyles.tabActive : docsStyles.tab}
+              onClick={() => setTab('pnl')}
+            >
+              Monthly P&L
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {loading ? (

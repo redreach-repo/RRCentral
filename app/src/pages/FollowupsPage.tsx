@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { addDays, differenceInCalendarDays, format, parseISO, startOfDay } from 'date-fns'
-import { Bell, CalendarClock, Mail, MessageSquarePlus, MessageCircle, Phone, Settings } from 'lucide-react'
+import { Bell, CalendarClock, Settings } from 'lucide-react'
+import FollowUpCardActions from '../components/followups/FollowUpCardActions'
 import { useCompactCrm } from '../hooks/useMediaQuery'
 import resp from '../styles/crmResponsive.module.css'
 import { db } from '../lib/db'
 import { NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
-import { crmMoveProblem } from '../lib/dealRules'
 import type { AppUser, CrmEntry } from '../lib/types'
+import { parseFollowupUpdateForm } from '../lib/schemas/followupUpdate'
 import { resolveOwnerEmails } from '../lib/calendarAttendees'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
@@ -30,12 +31,7 @@ import {
   DEFAULT_WHATSAPP_FOLLOWUP_QUOTE,
   loadFollowUpDocument,
 } from '../lib/followUpMessage'
-import {
-  deleteZohoCalendarEvent,
-  isZohoCalendarEnabled,
-  isZohoMailEnabled,
-  syncFollowUpToZohoCalendar,
-} from '../lib/zoho'
+import { getCalendarProvider, getMailProvider } from '../lib/mailCalendar'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -43,11 +39,9 @@ import {
   colors,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   sectionTitleStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 import { logActivity } from '../lib/activity'
 import { errorMessage } from '../lib/errors'
 
@@ -76,6 +70,7 @@ export default function FollowupsPage() {
   const [updateNextAction, setUpdateNextAction] = useState('')
   const [updateClearDate, setUpdateClearDate] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
   const [emailTarget, setEmailTarget] = useState<CrmEntry | null>(null)
   const [calendarSettingsOpen, setCalendarSettingsOpen] = useState(false)
 
@@ -169,11 +164,11 @@ export default function FollowupsPage() {
         updated_at: new Date().toISOString(),
       }
 
-      if (isZohoCalendarEnabled(settings)) {
+      if (getCalendarProvider(settings).isEnabled(settings)) {
         try {
           const contacts = hydrateContacts(entry)
           const p = primaryContact(contacts)
-          const eventId = await syncFollowUpToZohoCalendar(settings, {
+          const eventId = await getCalendarProvider(settings).syncFollowUp(settings, {
             company: entry.company_name,
             nextAction: entry.next_action,
             owner: entry.owner,
@@ -190,7 +185,7 @@ export default function FollowupsPage() {
         } catch (calErr) {
           showToast(
             calErr instanceof Error
-              ? `Snoozed locally; Zoho Calendar: ${calErr.message}`
+              ? `Snoozed locally; calendar: ${calErr.message}`
               : 'Snoozed locally; calendar sync failed',
             'error',
           )
@@ -212,13 +207,13 @@ export default function FollowupsPage() {
   async function clearFollowUp(entry: CrmEntry) {
     setBusyId(entry.id)
     try {
-      if (isZohoCalendarEnabled(settings) && entry.calendar_event_id) {
+      if (getCalendarProvider(settings).isEnabled(settings) && entry.calendar_event_id) {
         try {
-          await deleteZohoCalendarEvent(settings, entry.calendar_event_id)
+          await getCalendarProvider(settings).deleteEvent(settings, entry.calendar_event_id)
         } catch (calErr) {
           showToast(
             calErr instanceof Error
-              ? `Cleared locally; Zoho Calendar: ${calErr.message}`
+              ? `Cleared locally; calendar: ${calErr.message}`
               : 'Cleared locally; calendar delete failed',
             'error',
           )
@@ -246,26 +241,26 @@ export default function FollowupsPage() {
   }
 
   async function saveUpdate() {
-    if (!updateTarget || !updateText.trim()) return
-    const moveProblem = crmMoveProblem(
-      updateTarget,
-      {
-        pipeline_stage: updateStage || updateTarget.pipeline_stage,
-        next_action: updateNextAction || updateTarget.next_action,
-        follow_up_date: updateClearDate ? null : updateFollowDate || updateTarget.follow_up_date,
-      },
-      { askedForReason: false },
-    )
-    if (moveProblem) {
-      showToast(moveProblem, 'error')
+    if (!updateTarget) return
+    const parsed = parseFollowupUpdateForm({
+      update_text: updateText,
+      pipeline_stage: updateStage,
+      next_action: updateNextAction,
+      follow_up_date: updateFollowDate,
+      clearDate: updateClearDate,
+      entry: updateTarget,
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
+    const upd = parsed.data
     setBusyId(updateTarget.id)
     try {
       const { error: err } = await db.from('follow_up_updates').insert({
         crm_id: updateTarget.id,
         company: updateTarget.company_name,
-        update_text: updateText.trim(),
+        update_text: upd.update_text,
         user_email: user?.email || '',
       })
       if (err) throw err
@@ -274,24 +269,24 @@ export default function FollowupsPage() {
         updated_by: user?.email || '',
         updated_at: new Date().toISOString(),
       }
-      if (updateStage) patch.pipeline_stage = updateStage
-      if (updateNextAction) patch.next_action = updateNextAction
+      if (upd.pipeline_stage) patch.pipeline_stage = upd.pipeline_stage
+      if (upd.next_action) patch.next_action = upd.next_action
 
       let nextDate: string | null | undefined
-      if (updateClearDate) {
+      if (upd.clearDate) {
         nextDate = null
         patch.follow_up_date = null
-      } else if (updateFollowDate) {
-        nextDate = updateFollowDate
-        patch.follow_up_date = updateFollowDate
+      } else if (upd.follow_up_date) {
+        nextDate = upd.follow_up_date
+        patch.follow_up_date = upd.follow_up_date
       }
 
-      if (isZohoCalendarEnabled(settings) && nextDate !== undefined) {
+      if (getCalendarProvider(settings).isEnabled(settings) && nextDate !== undefined) {
         try {
           const contacts = hydrateContacts(updateTarget)
           const p = primaryContact(contacts)
           if (nextDate) {
-            const eventId = await syncFollowUpToZohoCalendar(settings, {
+            const eventId = await getCalendarProvider(settings).syncFollowUp(settings, {
               company: updateTarget.company_name,
               nextAction: (patch.next_action as string) || updateTarget.next_action,
               owner: updateTarget.owner,
@@ -306,13 +301,13 @@ export default function FollowupsPage() {
             })
             if (eventId) patch.calendar_event_id = eventId
           } else if (updateTarget.calendar_event_id) {
-            await deleteZohoCalendarEvent(settings, updateTarget.calendar_event_id)
+            await getCalendarProvider(settings).deleteEvent(settings, updateTarget.calendar_event_id)
             patch.calendar_event_id = ''
           }
         } catch (calErr) {
           showToast(
             calErr instanceof Error
-              ? `Saved locally; Zoho Calendar: ${calErr.message}`
+              ? `Saved locally; calendar: ${calErr.message}`
               : 'Saved locally; calendar sync failed',
             'error',
           )
@@ -328,7 +323,7 @@ export default function FollowupsPage() {
         'followup_update',
         'crm',
         updateTarget.company_name,
-        updateText.trim().slice(0, 120),
+        upd.update_text.slice(0, 120),
         user?.email || '',
         updateTarget.id,
       )
@@ -358,18 +353,6 @@ export default function FollowupsPage() {
         ? `${p?.name || '—'} +${contacts.length - 1}`
         : p?.name || entry.primary_contact || '—'
 
-    const actionStyle = compact
-      ? {
-          ...buttonSecondaryStyle,
-          minHeight: 40,
-          padding: '8px 10px',
-          fontSize: 12,
-          fontWeight: 650,
-          flex: '1 1 auto',
-          justifyContent: 'center' as const,
-        }
-      : buttonSecondaryStyle
-
     const openUpdate = () => {
       setUpdateTarget(entry)
       setUpdateText('')
@@ -378,6 +361,20 @@ export default function FollowupsPage() {
       setUpdateNextAction(entry.next_action || '')
       setUpdateClearDate(false)
     }
+
+    const actions = (
+      <FollowUpCardActions
+        entry={entry}
+        expanded={actionsOpenId === entry.id}
+        onToggle={() => setActionsOpenId((id) => (id === entry.id ? null : entry.id))}
+        busy={busy}
+        onSnooze={(row) => void snooze(row)}
+        onClear={(row) => void clearFollowUp(row)}
+        onEmail={(row) => setEmailTarget(row)}
+        onWhatsApp={(row) => void openFollowUpWhatsApp(row)}
+        onUpdate={() => openUpdate()}
+      />
+    )
 
     if (compact) {
       return (
@@ -398,6 +395,7 @@ export default function FollowupsPage() {
               <div className={resp.cardMeta}>
                 {contactLabel} · {entry.next_action || 'No action'}
                 {entry.owner ? ` · ${entry.owner}` : ''}
+                {phone ? ` · ${phone}` : ''}
               </div>
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -411,30 +409,7 @@ export default function FollowupsPage() {
               </div>
             </div>
           </div>
-          <div className={resp.cardActions}>
-            <button type="button" style={actionStyle} disabled={busy} onClick={openUpdate}>
-              <MessageSquarePlus size={14} /> Log
-            </button>
-            {phone ? (
-              <a
-                href={`tel:${phone.replace(/\s+/g, '')}`}
-                style={{ ...actionStyle, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
-              >
-                <Phone size={14} /> Call
-              </a>
-            ) : null}
-            <button
-              type="button"
-              style={actionStyle}
-              disabled={busy}
-              onClick={() => void openFollowUpWhatsApp(entry)}
-            >
-              <MessageCircle size={14} /> WhatsApp
-            </button>
-            <button type="button" style={actionStyle} disabled={busy} onClick={() => void snooze(entry)}>
-              +7d
-            </button>
-          </div>
+          <div className={resp.cardActions}>{actions}</div>
         </article>
       )
     }
@@ -476,58 +451,34 @@ export default function FollowupsPage() {
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button type="button" style={buttonSecondaryStyle} disabled={busy} onClick={() => void snooze(entry)}>
-            Snooze +7d
-          </button>
-          <button type="button" style={buttonSecondaryStyle} disabled={busy} onClick={() => void clearFollowUp(entry)}>
-            Clear
-          </button>
-          <button
-            type="button"
-            style={buttonSecondaryStyle}
-            disabled={busy}
-            onClick={() => setEmailTarget(entry)}
-          >
-            <Mail size={14} /> Email
-          </button>
-          <button
-            type="button"
-            style={buttonSecondaryStyle}
-            disabled={busy}
-            onClick={() => void openFollowUpWhatsApp(entry)}
-          >
-            <MessageCircle size={14} /> WhatsApp
-          </button>
-          <button type="button" style={buttonSecondaryStyle} disabled={busy} onClick={openUpdate}>
-            <MessageSquarePlus size={14} /> Add Update
-          </button>
-        </div>
+        {actions}
       </div>
     )
   }
 
   return (
-    <div style={pageStyle}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Follow-ups</h1>
-          <p style={{ ...pageSubtitleStyle, marginBottom: 0 }}>
+          <p className={docsStyles.kicker}>Sales · Work</p>
+          <h1 className={docsStyles.title}>Follow-ups</h1>
+          <p className={docsStyles.subtitle}>
             Overdue and upcoming CRM actions
-            {isZohoCalendarEnabled(settings) ? ' · Zoho Calendar sync on' : ''}
+            {getCalendarProvider(settings).isEnabled(settings) ? ` · ${getCalendarProvider(settings).label} Calendar sync on` : ''}
+            . Click Actions on a card for snooze, clear, or outreach.
           </p>
         </div>
-        <button type="button" style={buttonSecondaryStyle} onClick={() => setCalendarSettingsOpen(true)}>
-          <Settings size={14} /> Calendar settings
+        <button type="button" className={docsStyles.newBtn} style={{ background: 'rgba(255,255,255,0.08)' }} onClick={() => setCalendarSettingsOpen(true)}>
+          <Settings size={16} /> Calendar
         </button>
-      </div>
+      </header>
 
       {error ? (
         <div style={{ ...cardStyle, color: colors.danger, marginBottom: 16 }}>{error}</div>
       ) : null}
 
       {loading ? (
-        <div style={{ ...cardStyle, color: colors.muted }}>Loading follow-ups…</div>
+        <div className={docsStyles.loading}>Loading follow-ups…</div>
       ) : (
         <>
           <section style={{ marginBottom: 28 }}>
@@ -535,7 +486,9 @@ export default function FollowupsPage() {
               <Bell size={16} color={colors.danger} /> Overdue ({overdue.length})
             </h2>
             {overdue.length === 0 ? (
-              <EmptyState title="No overdue follow-ups" subtitle="You're caught up on past due items." />
+              <div className={docsStyles.empty}>
+                <EmptyState title="No overdue follow-ups" subtitle="You're caught up on past due items." />
+              </div>
             ) : (
               <div className={compact ? resp.listStack : undefined} style={compact ? undefined : { display: 'grid', gap: 12 }}>
                 {overdue.map((e) => renderCard(e, 'overdue'))}
@@ -548,7 +501,9 @@ export default function FollowupsPage() {
               <CalendarClock size={16} color={colors.success} /> Upcoming (14 days) ({upcoming.length})
             </h2>
             {upcoming.length === 0 ? (
-              <EmptyState title="No upcoming follow-ups" subtitle="Nothing scheduled in the next two weeks." />
+              <div className={docsStyles.empty}>
+                <EmptyState title="No upcoming follow-ups" subtitle="Nothing scheduled in the next two weeks." />
+              </div>
             ) : (
               <div className={compact ? resp.listStack : undefined} style={compact ? undefined : { display: 'grid', gap: 12 }}>
                 {upcoming.map((e) => renderCard(e, 'upcoming'))}
@@ -671,7 +626,7 @@ export default function FollowupsPage() {
           company: settings.companyName || 'Red Reach Middle East FZE',
           contact: emailTarget ? primaryContact(hydrateContacts(emailTarget))?.name || 'team' : 'team',
         })}
-        zohoEnabled={isZohoMailEnabled(settings)}
+        zohoEnabled={getMailProvider(settings).isEnabled(settings)}
         onClose={() => setEmailTarget(null)}
       />
 

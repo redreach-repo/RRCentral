@@ -1,14 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { FileUp, Paperclip, Pencil, Plus, Trash2, Wallet } from 'lucide-react'
+import { FileUp, Paperclip, Plus, Wallet } from 'lucide-react'
+import ExpenseRowActions from '../components/expenses/ExpenseRowActions'
 import { db } from '../lib/db'
 import { PAYMENT_METHODS, VAT_RATE } from '../lib/config'
+import { EXPENSE_CATEGORIES, parseExpenseForm } from '../lib/schemas/expense'
 import type { Attachment, Expense, Quotation, Vendor } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
+import { canViewField } from '../lib/fieldPermissions'
 import { can } from '../lib/permissions'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
+import EditorSectionTabs, {
+  editorPanelStyle,
+  type EditorSection,
+} from '../components/EditorSectionTabs'
 import EmptyState from '../components/EmptyState'
 import { formatAED } from '../lib/money'
 import { logActivity } from '../lib/activity'
@@ -38,31 +45,12 @@ import {
   fieldStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
-  tableStyle,
-  tableWrapStyle,
-  tdStyle,
-  thStyle,
-  toolbarStyle,
   formGridStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
-const CATEGORIES = [
-  'Uniforms / Cost of goods',
-  'Office',
-  'Travel',
-  'Marketing',
-  'Salary',
-  'Rent',
-  'Utilities',
-  'Supplies',
-  'Shipping',
-  'Professional fees',
-  'Other',
-]
+const CATEGORIES = [...EXPENSE_CATEGORIES]
 
 type ExpenseForm = {
   date: string
@@ -116,6 +104,7 @@ function applyExVat(exclusive: number, rate: number): Pick<ExpenseForm, 'amount'
 
 export default function ExpensesPage() {
   const { user, userRole } = useAuth()
+  const showVendorTrn = canViewField(userRole, 'vendor.trn')
   const { settings } = useSettings()
   const { showToast } = useToast()
   const vatRate = Number(settings.vatRate || VAT_RATE) || VAT_RATE
@@ -128,12 +117,14 @@ export default function ExpensesPage() {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [open, setOpen] = useState(false)
+  const [editorSection, setEditorSection] = useState<EditorSection>('basics')
   const [editing, setEditing] = useState<Expense | null>(null)
   const [form, setForm] = useState<ExpenseForm>(emptyForm())
   const [saving, setSaving] = useState(false)
   const [parsing, setParsing] = useState(false)
   const [parseHint, setParseHint] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Expense | null>(null)
+  const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [driveLinkUrl, setDriveLinkUrl] = useState('')
   const [driveLinkTitle, setDriveLinkTitle] = useState('')
@@ -380,30 +371,32 @@ export default function ExpensesPage() {
   }
 
   async function save() {
-    if (!form.vendor.trim()) {
-      showToast('Vendor is required', 'error')
+    const parsed = parseExpenseForm(form)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setSaving(true)
     try {
-      const parts = !form.charges_vat
-        ? applyNoVat(form.amount > 0 ? form.amount : form.amount_ex_vat)
-        : form.amount_ex_vat > 0 || form.vat_amount > 0
+      const f = parsed.data
+      const parts = !f.charges_vat
+        ? applyNoVat(f.amount > 0 ? f.amount : f.amount_ex_vat)
+        : f.amount_ex_vat > 0 || f.vat_amount > 0
           ? {
-              amount_ex_vat: round2(form.amount_ex_vat),
-              vat_amount: round2(form.vat_amount),
+              amount_ex_vat: round2(f.amount_ex_vat),
+              vat_amount: round2(f.vat_amount),
               amount:
-                form.amount > 0
-                  ? round2(form.amount)
-                  : round2(form.amount_ex_vat + form.vat_amount),
+                f.amount > 0
+                  ? round2(f.amount)
+                  : round2(f.amount_ex_vat + f.vat_amount),
             }
-          : applyVatInclusive(form.amount, vatRate)
+          : applyVatInclusive(f.amount, vatRate)
 
-      const quoteRef = form.quote_ref.trim()
+      const quoteRef = f.quote_ref
       const autoDescription = quoteRef
-        ? formatSupplierExpenseDescription(form.vendor, quoteRef)
+        ? formatSupplierExpenseDescription(f.vendor, quoteRef)
         : ''
-      const extraNotes = form.notes
+      const extraNotes = f.notes
         .split(/\n/)
         .map((l) => l.trim())
         .filter((l) => l && !/^payment to\b/i.test(l))
@@ -412,20 +405,20 @@ export default function ExpensesPage() {
         ? extraNotes
           ? `${autoDescription}\n${extraNotes}`
           : autoDescription
-        : form.notes.trim()
+        : f.notes.trim()
 
       const payload = {
-        date: form.date || null,
-        vendor: form.vendor.trim(),
-        category: form.category,
+        date: f.date || null,
+        vendor: f.vendor,
+        category: f.category,
         amount: parts.amount,
         amount_ex_vat: parts.amount_ex_vat,
         vat_amount: parts.vat_amount,
-        payment_method: form.payment_method,
-        references_text: quoteRef || form.references_text.trim(),
+        payment_method: f.payment_method,
+        references_text: quoteRef || f.references_text,
         notes,
         quote_ref: quoteRef,
-        supplier_invoice_no: form.supplier_invoice_no.trim(),
+        supplier_invoice_no: f.supplier_invoice_no,
       }
 
       let expenseId = editing?.id || ''
@@ -552,71 +545,81 @@ export default function ExpensesPage() {
   }
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Expenses</h1>
-          <p style={pageSubtitleStyle}>
-            Vendor bills, uniform supplier invoices, receipts — and spend in finance reports.
-            Monthly Bank (210), Cursor (78.09), and Zoom (54.14) sync from Aug 2026 here.
+          <p className={docsStyles.kicker}>Finance</p>
+          <h1 className={docsStyles.title}>Expenses</h1>
+          <p className={docsStyles.subtitle}>
+            Vendor bills, supplier invoices, and receipts. Click Actions on a row to edit or delete.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
             type="button"
-            style={buttonSecondaryStyle}
+            className={docsStyles.newBtn}
+            style={{ background: 'rgba(255,255,255,0.08)' }}
             onClick={() => void syncRecurring().then(() => load())}
           >
-            Sync monthly deductions
+            Sync monthly
           </button>
-          <button type="button" style={buttonSecondaryStyle} onClick={openCreateSupplierInvoice}>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'rgba(255,255,255,0.08)' }}
+            onClick={openCreateSupplierInvoice}
+          >
             <FileUp size={16} /> Supplier invoice
           </button>
-          <button type="button" style={buttonPrimaryStyle} onClick={openCreate}>
+          <button type="button" className={docsStyles.newBtn} onClick={openCreate}>
             <Plus size={16} /> Add expense
           </button>
         </div>
-      </div>
+      </header>
 
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
-        <div>
-          <label style={labelStyle}>From</label>
-          <input type="date" style={inputStyle} value={from} onChange={(e) => setFrom(e.target.value)} />
+      <div className={docsStyles.controls}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div>
+            <label style={labelStyle}>From</label>
+            <input type="date" style={inputStyle} value={from} onChange={(e) => setFrom(e.target.value)} />
+          </div>
+          <div>
+            <label style={labelStyle}>To</label>
+            <input type="date" style={inputStyle} value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
         </div>
-        <div>
-          <label style={labelStyle}>To</label>
-          <input type="date" style={inputStyle} value={to} onChange={(e) => setTo(e.target.value)} />
-        </div>
-        <div style={{ ...cardStyle, padding: '10px 16px', marginLeft: 'auto' }}>
+        <div style={{ ...cardStyle, padding: '10px 16px' }}>
           <div style={{ fontSize: 12, color: colors.muted }}>Filtered total</div>
           <div style={{ fontWeight: 700, fontSize: 18 }}>{formatAED(total)}</div>
         </div>
       </div>
 
       {loading ? (
-        <div style={{ ...cardStyle, color: colors.muted }}>Loading expenses…</div>
+        <div className={docsStyles.loading}>Loading expenses…</div>
       ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={<Wallet size={22} />}
-          title="No expenses"
-          subtitle="Upload a supplier PDF or add spend by vendor."
-          actionLabel="Supplier invoice"
-          onAction={openCreateSupplierInvoice}
-        />
+        <div className={docsStyles.empty}>
+          <EmptyState
+            icon={<Wallet size={22} />}
+            title="No expenses"
+            subtitle="Upload a supplier PDF or add spend by vendor."
+            actionLabel="Supplier invoice"
+            onAction={openCreateSupplierInvoice}
+          />
+        </div>
       ) : (
-        <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
-          <div style={tableWrapStyle}>
-            <table style={tableStyle}>
+        <div className={docsStyles.tableShell}>
+          <div className={docsStyles.tableWrap}>
+            <table className={docsStyles.table}>
               <thead>
                 <tr>
-                  <th style={thStyle}>Date</th>
-                  <th style={thStyle}>Vendor</th>
-                  <th style={thStyle}>Category</th>
-                  <th style={thStyle}>Ex-VAT</th>
-                  <th style={thStyle}>VAT paid</th>
-                  <th style={thStyle}>Total</th>
-                  <th style={thStyle}>Quote</th>
-                  <th style={thStyle}></th>
+                  <th>Date</th>
+                  <th>Vendor</th>
+                  <th>Category</th>
+                  <th>Ex-VAT</th>
+                  <th>VAT paid</th>
+                  <th>Total</th>
+                  <th>Quote</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -624,42 +627,32 @@ export default function ExpensesPage() {
                   const parts = expenseVatParts(e, vatRate)
                   return (
                     <tr key={e.id}>
-                      <td style={tdStyle}>
+                      <td>
                         {e.date ? format(parseISO(e.date.slice(0, 10)), 'dd MMM yyyy') : '—'}
                       </td>
-                      <td style={tdStyle}>
-                        {e.vendor}
+                      <td className={docsStyles.clientCell}>
+                        <div className={docsStyles.ref}>{e.vendor}</div>
                         {e.supplier_invoice_no ? (
-                          <div style={{ fontSize: 11, color: colors.muted2 }}>{e.supplier_invoice_no}</div>
+                          <div className={docsStyles.meta}>{e.supplier_invoice_no}</div>
                         ) : null}
                         {e.quote_ref || /^payment to\b/i.test(String(e.notes || '')) ? (
-                          <div style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
-                            {expenseReportDescription(e)}
-                          </div>
+                          <div className={docsStyles.meta}>{expenseReportDescription(e)}</div>
                         ) : null}
                       </td>
-                      <td style={tdStyle}>{e.category || '—'}</td>
-                      <td style={tdStyle}>{formatAED(parts.exclusive)}</td>
-                      <td style={tdStyle}>{formatAED(parts.vat)}</td>
-                      <td style={tdStyle}>{formatAED(parts.inclusive)}</td>
-                      <td style={tdStyle}>{e.quote_ref || e.references_text || '—'}</td>
-                      <td style={tdStyle}>
-                        <button type="button" style={buttonSecondaryStyle} onClick={() => openEdit(e)}>
-                          <Pencil size={14} />
-                        </button>
-                        {can(userRole, 'expense.delete') && (
-                          <>
-                            {' '}
-                            <button
-                              type="button"
-                              style={buttonDangerStyle}
-                              onClick={() => setDeleteTarget(e)}
-                              aria-label="Delete expense"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </>
-                        )}
+                      <td>{e.category || '—'}</td>
+                      <td className={docsStyles.amount}>{formatAED(parts.exclusive)}</td>
+                      <td className={docsStyles.amount}>{formatAED(parts.vat)}</td>
+                      <td className={docsStyles.amount}>{formatAED(parts.inclusive)}</td>
+                      <td>{e.quote_ref || e.references_text || '—'}</td>
+                      <td className={docsStyles.actionsCell}>
+                        <ExpenseRowActions
+                          expense={e}
+                          expanded={actionsOpenId === e.id}
+                          onToggle={() => setActionsOpenId((id) => (id === e.id ? null : e.id))}
+                          canDelete={can(userRole, 'expense.delete')}
+                          onEdit={openEdit}
+                          onDelete={setDeleteTarget}
+                        />
                       </td>
                     </tr>
                   )
@@ -676,6 +669,12 @@ export default function ExpensesPage() {
         onClose={() => setOpen(false)}
         width={640}
       >
+        <EditorSectionTabs
+          value={editorSection}
+          onChange={setEditorSection}
+          sections={['basics', 'terms', 'notes']}
+        />
+        <div style={editorPanelStyle(editorSection === 'basics')}>
         <div style={fieldStyle}>
           <label style={labelStyle}>
             <FileUp size={12} style={{ marginRight: 4 }} />
@@ -799,7 +798,7 @@ export default function ExpensesPage() {
                     }}
                   >
                     {v.company_name}
-                    {v.trn ? (
+                    {showVendorTrn && v.trn ? (
                       <span style={{ color: colors.muted2, marginLeft: 8 }}>TRN {v.trn}</span>
                     ) : null}
                   </button>
@@ -814,6 +813,11 @@ export default function ExpensesPage() {
               . Saving also registers a new company name automatically.
             </p>
           </div>
+        </div>
+        </div>
+
+        <div style={editorPanelStyle(editorSection === 'terms')}>
+        <div style={formGridStyle}>
           <div style={fieldStyle}>
             <label style={labelStyle}>Category</label>
             <select
@@ -991,7 +995,9 @@ export default function ExpensesPage() {
             </div>
           </div>
         ) : null}
+        </div>
 
+        <div style={editorPanelStyle(editorSection === 'notes')}>
         <div style={fieldStyle}>
           <label style={labelStyle}>Notes</label>
           <textarea
@@ -1021,8 +1027,9 @@ export default function ExpensesPage() {
             </ul>
           </div>
         ) : null}
+        </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setOpen(false)}>
             Cancel
           </button>

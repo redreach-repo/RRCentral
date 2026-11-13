@@ -75,6 +75,19 @@ describe('billToLines', () => {
     expect(billToLines(party).map((l) => l.kind)).toEqual(['address', 'trn', 'contact', 'email', 'phone'])
   })
 
+  it('can omit contact lines when the quote already has an Attn person', () => {
+    const party: BillToParty = {
+      companyName: 'Green Cement',
+      primaryContact: 'Murugavenkatan Shanmugam',
+      email: 'murugan.venkat@greencem.ae',
+      phone: '+971502752576',
+      address: '',
+      trn: '',
+    }
+    expect(billToLines(party, { includeContact: false })).toEqual([])
+    expect(billToLines(party, { includeContact: false }).some((l) => l.kind === 'contact')).toBe(false)
+  })
+
   it('leaves out missing address and TRN without blank lines', () => {
     const party: BillToParty = { companyName: 'Acme', primaryContact: '', email: '', phone: '', address: ' \n ', trn: '' }
     expect(billToLines(party)).toEqual([])

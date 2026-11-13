@@ -2,6 +2,7 @@ import { differenceInCalendarDays, format, parseISO } from 'date-fns'
 import { normalizeCompanyName } from './accounts'
 import { stageLabel as ctrmStageLabel, isOpenDeal as isOpenCtrmDeal } from './ctrm'
 import { PIPELINE_WEIGHTS } from './mrr'
+import { canViewField } from './fieldPermissions'
 import { can } from './permissions'
 import { isOpenSalesDeal, quoteFirstYear, salesStageLabel } from './salesPipeline'
 import type {
@@ -38,7 +39,7 @@ export type DealPipeline = 'crm' | 'sales' | 'ctrm'
 export function dealAccess(role: UserRole | null | undefined): { pipelines: DealPipeline[]; commission: boolean } {
   return {
     pipelines: can(role, 'legacy.access') ? ['crm', 'sales', 'ctrm'] : ['sales', 'ctrm'],
-    commission: can(role, 'ctrm.commission'),
+    commission: canViewField(role, 'ctrm.commission'),
   }
 }
 
@@ -142,6 +143,10 @@ export type DealRow = {
   /** The owner's name, or the CRM owner text when no team login matches it. */
   owner_label: string
   source: string
+  /** Sheet notes from the native deal row. */
+  notes: string
+  /** CRM quotation reference (empty on sales / CTRM). */
+  quote_ref: string
   /** Division code (01 to 06), or '' when it has none. */
   division: string
   link: string
@@ -153,7 +158,17 @@ export type MyDealsInput = {
   accounts: Pick<Account, 'id' | 'name' | 'source'>[]
   crm: (Pick<
     CrmEntry,
-    'id' | 'company_name' | 'owner' | 'pipeline_stage' | 'next_action' | 'follow_up_date' | 'quote_ref' | 'updated_at' | 'created_at'
+    | 'id'
+    | 'company_name'
+    | 'owner'
+    | 'pipeline_stage'
+    | 'next_action'
+    | 'follow_up_date'
+    | 'quote_ref'
+    | 'notes'
+    | 'updated_at'
+    | 'created_at'
+    | 'account_id'
   > & { stage_changed_at?: string | null })[]
   salesDeals: (Pick<
     SalesDeal,
@@ -164,6 +179,7 @@ export type MyDealsInput = {
     | 'owner_user_id'
     | 'next_action'
     | 'next_action_date'
+    | 'notes'
     | 'monthly_fee'
     | 'setup_fee'
     | 'discount_percent'
@@ -174,7 +190,16 @@ export type MyDealsInput = {
   > & { stage_changed_at?: string | null })[]
   ctrmDeals: (Pick<
     CtrmDeal,
-    'id' | 'account_id' | 'stage' | 'source' | 'owner_user_id' | 'next_action' | 'next_action_date' | 'company_type' | 'created_at'
+    | 'id'
+    | 'account_id'
+    | 'stage'
+    | 'source'
+    | 'owner_user_id'
+    | 'next_action'
+    | 'next_action_date'
+    | 'notes'
+    | 'company_type'
+    | 'created_at'
   > & { stage_changed_at?: string | null })[]
   ctrmStageChanges: Pick<CtrmStageChange, 'deal_id' | 'to_stage' | 'changed_at'>[]
   /** Empty for roles that may not see commission (RLS returns none anyway). */
@@ -198,6 +223,12 @@ function daysSince(iso: string | null | undefined, now: Date): number {
 function quoteAed(q: Pick<Quotation, 'amount' | 'base_amount'>): number {
   const base = Number(q.base_amount)
   return base > 0 ? base : Number(q.amount) || 0
+}
+
+/** M3 bridge: linked CRM rows open Accounts; unlinked stay on the CRM sheet. */
+export function crmDealLink(crmId: string, accountId: string | null | undefined): string {
+  const aid = String(accountId || '').trim()
+  return aid ? `/accounts/${aid}` : `/crm?edit=${crmId}`
 }
 
 export function buildDealRows(input: MyDealsInput): DealRow[] {
@@ -233,12 +264,14 @@ export function buildDealRows(input: MyDealsInput): DealRow[] {
     const login = userByName.get(String(c.owner || '').trim().toLowerCase())
     const division = (byRef || counted[0] || quotes[0])?.division_code || ''
     const weight = CRM_STAGE_WEIGHTS[stage] ?? 0
+    const accountId = c.account_id ? String(c.account_id) : null
+    const accountName = (accountId && account.get(accountId)?.name) || c.company_name || 'CRM lead'
     rows.push({
       key: `crm:${c.id}`,
       pipeline: 'crm',
       id: c.id,
-      account: c.company_name || 'CRM lead',
-      account_id: null,
+      account: accountName,
+      account_id: accountId,
       deal: counted.length ? counted.map((q) => q.reference_number).join(', ') : c.quote_ref || 'CRM lead',
       stage,
       stageLabel: stage,
@@ -252,9 +285,11 @@ export function buildDealRows(input: MyDealsInput): DealRow[] {
       days_in_stage: daysSince(c.stage_changed_at || c.updated_at || c.created_at, now),
       owner_user_id: login?.id ?? null,
       owner_label: login ? login.name : String(c.owner || ''),
-      source: '',
+      source: (accountId && account.get(accountId)?.source) || '',
+      notes: c.notes || '',
+      quote_ref: c.quote_ref || '',
       division,
-      link: `/crm?edit=${c.id}`,
+      link: crmDealLink(c.id, accountId),
     })
   }
 
@@ -285,6 +320,8 @@ export function buildDealRows(input: MyDealsInput): DealRow[] {
       days_in_stage: daysSince(since, now),
       ...owner(d.owner_user_id),
       source: d.source || account.get(d.account_id)?.source || '',
+      notes: d.notes || '',
+      quote_ref: '',
       division: input.salesDivision,
       link: `/accounts/${d.account_id}`,
     })
@@ -322,6 +359,8 @@ export function buildDealRows(input: MyDealsInput): DealRow[] {
       days_in_stage: daysSince(d.stage_changed_at || movedAt.get(`${d.id}:${d.stage}`) || d.created_at, now),
       ...owner(d.owner_user_id),
       source: d.source || account.get(d.account_id)?.source || '',
+      notes: d.notes || '',
+      quote_ref: '',
       division: '',
       link: `/accounts/${d.account_id}`,
     })
@@ -373,7 +412,110 @@ export function dealTotals(rows: DealRow[]): DealTotals {
   }
 }
 
+/**
+ * Shared writable fields on the unified Pipeline. Values stay pipeline-native
+ * (quotes / commission); create/delete stay on the native screens.
+ */
+export type MyDealPatch = {
+  next_action?: string
+  next_action_date?: string | null
+  /** Team user id; CRM maps this to the free-text `owner` name. */
+  owner_user_id?: string | null
+  /** Deal / CRM sheet notes (all pipelines). */
+  notes?: string
+  /** CRM sheet only: quotation reference on the My Day row. */
+  quote_ref?: string
+  /** Sales / CTRM sheet only: lead source. */
+  source?: string
+}
+
+/** Resolve CRM's free-text owner from a team user id (or clear when null). */
+export function crmOwnerText(
+  ownerUserId: string | null | undefined,
+  users: Pick<AppUser, 'id' | 'name'>[],
+): string {
+  if (ownerUserId == null || ownerUserId === '') return ''
+  const u = users.find((x) => x.id === ownerUserId)
+  return u?.name?.trim() || ''
+}
+
+/**
+ * Merge a unified patch onto a DealRow for open-deal validation before write.
+ * Does not invent missing fields — only overlays what the patch sets.
+ */
+export function applyMyDealPatchLocal(deal: DealRow, patch: MyDealPatch): DealRow {
+  return {
+    ...deal,
+    next_action: patch.next_action !== undefined ? patch.next_action : deal.next_action,
+    next_action_date:
+      patch.next_action_date !== undefined ? patch.next_action_date : deal.next_action_date,
+    owner_user_id: patch.owner_user_id !== undefined ? patch.owner_user_id : deal.owner_user_id,
+    source: patch.source !== undefined ? patch.source : deal.source,
+    notes: patch.notes !== undefined ? patch.notes : deal.notes,
+    quote_ref: patch.quote_ref !== undefined ? patch.quote_ref : deal.quote_ref,
+  }
+}
+
 /** The distinct sources on the rows, for the filter. */
 export function dealSources(rows: DealRow[]): string[] {
   return [...new Set(rows.map((r) => r.source).filter(Boolean))].sort((a, b) => a.localeCompare(b))
+}
+
+/** Canonical stage written when a deal is dropped onto a shared board column. */
+export const CRM_STAGE_FOR_COLUMN: Record<BoardColumn, string> = {
+  new: 'Lead',
+  talking: 'Contacted',
+  proposal: 'Quoted',
+  deciding: 'Negotiation',
+  won: 'Won',
+  lost: 'Lost',
+}
+
+export const SALES_STAGE_FOR_COLUMN: Record<BoardColumn, SalesStage> = {
+  new: 'lead',
+  talking: 'discovery_call',
+  proposal: 'quote_sent',
+  deciding: 'quote_sent',
+  won: 'signed',
+  lost: 'lost',
+}
+
+export const CTRM_STAGE_FOR_COLUMN: Record<BoardColumn, CtrmStage> = {
+  new: 'identified',
+  talking: 'contacted',
+  proposal: 'evaluating',
+  deciding: 'decision_pending',
+  won: 'signed',
+  lost: 'lost',
+}
+
+export function targetStageForColumn(pipeline: DealPipeline, column: BoardColumn): string {
+  if (pipeline === 'crm') return CRM_STAGE_FOR_COLUMN[column]
+  if (pipeline === 'sales') return SALES_STAGE_FOR_COLUMN[column]
+  return CTRM_STAGE_FOR_COLUMN[column]
+}
+
+/** Stages the user can pick on the unified board for one pipeline. */
+export function stagesForPipeline(pipeline: DealPipeline): { value: string; label: string }[] {
+  if (pipeline === 'crm') {
+    return ['Lead', 'Contacted', 'Quoted', 'Negotiation', 'Won', 'Lost'].map((s) => ({ value: s, label: s }))
+  }
+  if (pipeline === 'sales') {
+    return (['lead', 'discovery_call', 'quote_sent', 'signed', 'lost'] as SalesStage[]).map((s) => ({
+      value: s,
+      label: salesStageLabel(s),
+    }))
+  }
+  return (
+    [
+      'identified',
+      'contacted',
+      'intro_call_booked',
+      'demo_done',
+      'evaluating',
+      'decision_pending',
+      'signed',
+      'lost',
+    ] as CtrmStage[]
+  ).map((s) => ({ value: s, label: ctrmStageLabel(s) }))
 }

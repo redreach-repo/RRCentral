@@ -1,19 +1,16 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { buildDivisionPipeline } from '../lib/divisionPipeline'
 import { Link } from 'react-router-dom'
 import {
-  AlertTriangle,
-  FileText,
+  ArrowRight,
+  CalendarClock,
+  ChevronDown,
+  ChevronUp,
   FolderOpen,
   Globe,
-  Receipt,
   Shield,
-  TrendingDown,
-  TrendingUp,
-  Users,
-  Wallet,
 } from 'lucide-react'
-import { format, parseISO, startOfDay, startOfMonth } from 'date-fns'
+import { format, isToday, parseISO, startOfDay, startOfMonth } from 'date-fns'
 import { db } from '../lib/db'
 import { PIPELINE_STAGES } from '../lib/config'
 import type {
@@ -34,7 +31,6 @@ import {
   sumRecognizedIncome,
 } from '../lib/finance'
 import { loadDeletedInvoiceRefs, reconcileInvoiceFinance } from '../lib/invoiceFinance'
-import { displayDocumentReference } from '../lib/documents'
 import { listCompanyDocuments } from '../lib/companyDocs'
 import { companyDocAlertLabel, companyDocExpiryAlerts } from '../lib/companyDocAlerts'
 import { listOwnedDomains } from '../lib/domains'
@@ -56,10 +52,8 @@ import ZohoInboxPanel from '../components/ZohoInboxPanel'
 import {
   cardStyle,
   colors,
-  dualPanelGridStyle,
   formatMoney,
   pageStyle,
-  sectionTitleStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
@@ -67,52 +61,6 @@ import {
 } from '../lib/uiStyles'
 import dash from './DashboardPage.module.css'
 import { errorMessage } from '../lib/errors'
-
-interface KpiCardProps {
-  label: string
-  value: string
-  icon: ReactNode
-  accent?: string
-  hint?: string
-  to?: string
-  delay?: number
-}
-
-function KpiCard({
-  label,
-  value,
-  icon,
-  accent = colors.accent,
-  hint,
-  to,
-  delay = 0,
-}: KpiCardProps) {
-  const inner = (
-    <div
-      className={dash.kpi}
-      style={{
-        background: `linear-gradient(135deg, ${accent}20 0%, rgba(255,255,255,0.04) 58%)`,
-        animationDelay: `${delay}ms`,
-      }}
-    >
-      <div className={dash.kpiIcon} style={{ background: `${accent}22`, color: accent }}>
-        {icon}
-      </div>
-      <div style={{ minWidth: 0 }}>
-        <div className={dash.kpiLabel}>{label}</div>
-        <div className={dash.kpiValue}>{value}</div>
-        {hint ? <div className={dash.kpiHint}>{hint}</div> : null}
-      </div>
-    </div>
-  )
-  return to ? (
-    <Link to={to} style={{ textDecoration: 'none', color: 'inherit', minWidth: 0 }}>
-      {inner}
-    </Link>
-  ) : (
-    inner
-  )
-}
 
 export default function DashboardPage() {
   const { userRole } = useAuth()
@@ -128,6 +76,7 @@ export default function DashboardPage() {
   const [companyDocs, setCompanyDocs] = useState<CompanyDocument[]>([])
   const [ownedDomains, setOwnedDomains] = useState<OwnedDomain[]>([])
   const [followUpSyncNote, setFollowUpSyncNote] = useState('')
+  const [attentionOpen, setAttentionOpen] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -249,6 +198,19 @@ export default function DashboardPage() {
     }).length
   }, [crm])
 
+  const dueTodayFollowUps = useMemo(() => {
+    return crm.filter((c) => {
+      if (!c.follow_up_date) return false
+      try {
+        return isToday(parseISO(c.follow_up_date.slice(0, 10)))
+      } catch {
+        return false
+      }
+    }).length
+  }, [crm])
+
+  const myDayCount = overdueFollowUps + dueTodayFollowUps
+
   const pipelineCounts = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const s of PIPELINE_STAGES) counts[s] = 0
@@ -317,404 +279,431 @@ export default function DashboardPage() {
     )
   }
 
+  const weekday = format(new Date(), 'EEEE')
+  const heroLine =
+    myDayCount > 0
+      ? myDayCount === 1
+        ? 'One follow-up needs you.'
+        : `${myDayCount} follow-ups need you.`
+      : 'Nothing overdue or due today. Nice work.'
+
   return (
     <div className={dash.page} style={pageStyle}>
-      <PageHeader
-        title="Dashboard"
-        subtitle={
-          <>
-            This month ({monthLabel}) — income only counts paid / awarded invoices, not lost quotes
-          </>
-        }
-      />
-
-      {followUpSyncNote ? (
-        <div
-          style={{
-            ...cardStyle,
-            marginBottom: 14,
-            borderColor: 'rgba(232, 93, 4, 0.35)',
-            color: colors.muted,
-            fontSize: 13,
-            lineHeight: 1.45,
-          }}
-        >
-          {followUpSyncNote}{' '}
-          <Link to="/crm?follow=Due" style={{ color: colors.accent }}>
-            Open due follow-ups
+      <section className={dash.hero} aria-label="Today">
+        <p className={dash.heroEyebrow}>{weekday} · Red Reach Central</p>
+        <h1 className={dash.heroTitle}>
+          {myDayCount > 0 ? (
+            <>
+              Start with <em>My Day</em>
+            </>
+          ) : (
+            <>Your board is clear</>
+          )}
+        </h1>
+        <p className={dash.heroLead}>{heroLine} Income below counts paid and awarded invoices only.</p>
+        <div className={dash.heroActions}>
+          <Link to="/crm?follow=Due&owner=me" className={dash.heroPrimary}>
+            <CalendarClock size={16} /> Open My Day
+          </Link>
+          <Link to="/deals?view=board" className={dash.heroSecondary}>
+            Pipeline <ArrowRight size={14} />
+          </Link>
+          <Link to="/quotations" className={dash.heroSecondary}>
+            Quotations
           </Link>
         </div>
-      ) : null}
-
-      <div className={dash.topGrid}>
-        <div className={dash.topSchedule}>
-          <ZohoCalendarPanel crmEntries={crm} />
-        </div>
-        <div className={dash.topKpis}>
-          <div className={dash.kpiGrid}>
-            <KpiCard
-              label={`Income · ${monthLabel}`}
-              value={formatMoney(monthIncome)}
-              icon={<TrendingUp size={18} />}
-              accent="#22c55e"
-              hint={`YTD paid ${formatMoney(ytdIncome)}`}
-              delay={40}
-            />
-            <KpiCard
-              label={`Expenses · ${monthLabel}`}
-              value={formatMoney(monthExpenses)}
-              icon={<TrendingDown size={18} />}
-              accent="#ef4444"
-              hint={`YTD ${formatMoney(ytdExpenses)}`}
-              delay={80}
-            />
-            <KpiCard
-              label={`Net · ${monthLabel}`}
-              value={formatMoney(monthNet)}
-              icon={<Wallet size={18} />}
-              accent={monthNet >= 0 ? '#22c55e' : '#ef4444'}
-              delay={120}
-            />
-            <KpiCard
-              label="Open Quotes"
-              value={String(openQuotes)}
-              icon={<FileText size={18} />}
-              accent="#60a5fa"
-              hint="Draft / Finalized / Sent"
-              delay={160}
-            />
-            <KpiCard
-              label="Open CRM deals"
-              value={String(openPipeline)}
-              icon={<Users size={18} />}
-              accent="#fb923c"
-              hint="Not Won / Lost"
-              to="/crm"
-              delay={200}
-            />
-            <KpiCard
-              label="Pending Invoices"
-              value={String(pendingInvoices)}
-              icon={<Receipt size={18} />}
-              accent="#facc15"
-              delay={240}
-            />
-            <KpiCard
-              label="Overdue Follow-ups"
-              value={String(overdueFollowUps)}
-              icon={<AlertTriangle size={18} />}
-              accent="#f97316"
-              to="/crm?follow=Due&owner=me"
-              delay={280}
-            />
+        <div className={dash.heroStats}>
+          <div className={dash.heroStat}>
+            <div className={`${dash.heroStatValue} ${overdueFollowUps ? dash.heroStatValueWarn : ''}`}>
+              {overdueFollowUps}
+            </div>
+            <div className={dash.heroStatLabel}>Overdue</div>
+          </div>
+          <div className={dash.heroStat}>
+            <div className={dash.heroStatValue}>{dueTodayFollowUps}</div>
+            <div className={dash.heroStatLabel}>Due today</div>
+          </div>
+          <div className={dash.heroStat}>
+            <div className={dash.heroStatValue}>{openPipeline}</div>
+            <div className={dash.heroStatLabel}>Open deals</div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <NewLeadsCard />
-
-      <WatchdogCard />
-      <NoNextStepCard />
-
-      <ModuleAlertsCard />
-      <CtrmRenewalsCard />
-
-      {domainAlerts.length > 0 || ownedDomains.length > 0 ? (
-        <div style={{ ...cardStyle, marginBottom: 16 }}>
-          <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Globe size={18} /> Domain renewals
-          </h2>
-          {domainAlerts.length === 0 ? (
-            <p style={{ color: colors.muted2, fontSize: 13, margin: 0, lineHeight: 1.45 }}>
-              {ownedDomains.length} domain{ownedDomains.length === 1 ? '' : 's'} tracked — none expiring
-              in the next 90 days.
-            </p>
-          ) : (
-            <ul style={{ margin: 0, paddingLeft: 18, color: colors.muted, fontSize: 13, lineHeight: 1.55 }}>
-              {domainAlerts.slice(0, 8).map((a) => (
-                <li key={a.id} style={{ marginBottom: 6 }}>
-                  <strong style={{ color: a.severity === 'overdue' ? colors.danger : colors.text }}>
-                    {a.domainName}
-                  </strong>{' '}
-                  · {domainAlertLabel(a)}
-                  {a.registrar ? ` · ${a.registrar}` : ''}
-                  {a.autoRenew ? ' · auto-renew' : ''}
-                </li>
-              ))}
-            </ul>
-          )}
-          <p style={{ margin: '12px 0 0', fontSize: 12 }}>
-            <Link to="/domains" style={{ color: colors.accent }}>
-              Manage domains
-            </Link>
-          </p>
-        </div>
+      {followUpSyncNote ? (
+        <p className={dash.note}>
+          {followUpSyncNote}{' '}
+          <Link to="/crm?follow=Due">Open due follow-ups</Link>
+        </p>
       ) : null}
 
-      {showCompanyVault ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginBottom: 16 }}>
-          <div style={cardStyle}>
-            <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Shield size={18} /> Company document expiry
-            </h2>
-            {docAlerts.length === 0 ? (
-              <p style={{ color: colors.muted2, fontSize: 13, margin: 0, lineHeight: 1.45 }}>
-                No trade license / VAT certificates expiring in the next 60 days.
-              </p>
-            ) : (
-              <ul style={{ margin: 0, paddingLeft: 18, color: colors.muted, fontSize: 13, lineHeight: 1.55 }}>
-                {docAlerts.map((a) => (
-                  <li key={a.id} style={{ marginBottom: 6 }}>
-                    <strong style={{ color: a.severity === 'overdue' ? colors.danger : colors.text }}>
-                      {a.title}
-                    </strong>{' '}
-                    · {a.categoryLabel} · {companyDocAlertLabel(a)}
-                    {a.driveUrl ? (
-                      <>
-                        {' '}
-                        ·{' '}
-                        <a href={a.driveUrl} target="_blank" rel="noreferrer" style={{ color: colors.accent }}>
-                          Open
-                        </a>
-                      </>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p style={{ margin: '12px 0 0', fontSize: 12 }}>
-              <Link to="/settings" style={{ color: colors.accent }}>
-                Manage in Settings
-              </Link>
-            </p>
+      <section className={dash.section} aria-label="This month">
+        <div className={dash.sectionHead}>
+          <h2 className={dash.sectionTitle}>This month · {monthLabel}</h2>
+          <Link to="/reports" className={dash.sectionLink}>
+            Reports
+          </Link>
+        </div>
+        <div className={dash.moneyRow}>
+          <div className={dash.moneyCard}>
+            <div className={dash.moneyLabel}>Income</div>
+            <div className={dash.moneyValue} style={{ color: colors.success }}>
+              {formatMoney(monthIncome)}
+            </div>
+            <div className={dash.moneyHint}>YTD paid {formatMoney(ytdIncome)}</div>
           </div>
-          <div style={cardStyle}>
-            <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <FolderOpen size={18} /> Company vault
-            </h2>
-            <p style={{ color: colors.muted2, fontSize: 13, margin: '0 0 10px', lineHeight: 1.45 }}>
-              Trade license, VAT certificate, and other company papers (Google Drive links).
-            </p>
-            {companyVaultRoot ? (
-              <p style={{ margin: '0 0 10px', fontSize: 13 }}>
-                <a href={companyVaultRoot} target="_blank" rel="noreferrer" style={{ color: colors.accent }}>
-                  Open company Google Drive folder
-                </a>
-              </p>
-            ) : (
-              <p style={{ color: colors.muted2, fontSize: 12, margin: '0 0 10px' }}>
-                Connect Google Drive in Settings to show a quick link here.
-              </p>
-            )}
-            {companyDocs.length === 0 ? (
-              <p style={{ color: colors.muted2, fontSize: 13, margin: 0 }}>No documents linked yet.</p>
-            ) : (
-              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.55 }}>
-                {companyDocs.slice(0, 8).map((d) => (
-                  <li key={d.id}>
-                    {d.drive_url ? (
-                      <a href={d.drive_url} target="_blank" rel="noreferrer" style={{ color: colors.accent }}>
-                        {d.title || d.category}
-                      </a>
-                    ) : (
-                      d.title || d.category
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p style={{ margin: '12px 0 0', fontSize: 12 }}>
-              <Link to="/settings" style={{ color: colors.accent }}>
-                Add or edit documents
-              </Link>
-            </p>
+          <div className={dash.moneyCard}>
+            <div className={dash.moneyLabel}>Expenses</div>
+            <div className={dash.moneyValue} style={{ color: colors.danger }}>
+              {formatMoney(monthExpenses)}
+            </div>
+            <div className={dash.moneyHint}>YTD {formatMoney(ytdExpenses)}</div>
+          </div>
+          <div className={dash.moneyCard}>
+            <div className={dash.moneyLabel}>Net</div>
+            <div
+              className={dash.moneyValue}
+              style={{ color: monthNet >= 0 ? colors.success : colors.danger }}
+            >
+              {formatMoney(monthNet)}
+            </div>
+            <div className={dash.moneyHint}>Income − expenses</div>
           </div>
         </div>
-      ) : null}
+      </section>
 
-      <div className={dash.panel}>
-        <h2 className={dash.panelTitle}>CRM pipeline</h2>
+      <section className={dash.section} aria-label="Schedule">
+        <div className={dash.sectionHead}>
+          <h2 className={dash.sectionTitle}>Schedule</h2>
+          <Link to="/follow-ups" className={dash.sectionLink}>
+            All follow-ups
+          </Link>
+        </div>
+        <ZohoCalendarPanel crmEntries={crm} />
+      </section>
+
+      <section className={dash.section} aria-label="Pipeline">
+        <div className={dash.sectionHead}>
+          <h2 className={dash.sectionTitle}>Pipeline</h2>
+          <Link to="/crm" className={dash.sectionLink}>
+            Open My Day
+          </Link>
+        </div>
+        <div className={dash.pulseRow}>
+          <Link to="/quotations" className={dash.pulseLink}>
+            <div className={dash.pulseValue}>{openQuotes}</div>
+            <div className={dash.pulseLabel}>Open quotes</div>
+          </Link>
+          <Link to="/crm" className={dash.pulseLink}>
+            <div className={dash.pulseValue}>{openPipeline}</div>
+            <div className={dash.pulseLabel}>Open deals</div>
+          </Link>
+          <Link to="/invoices" className={dash.pulseLink}>
+            <div className={dash.pulseValue}>{pendingInvoices}</div>
+            <div className={dash.pulseLabel}>Pending invoices</div>
+          </Link>
+          <Link to="/crm?follow=Due&owner=me" className={dash.pulseLink}>
+            <div className={dash.pulseValue}>{overdueFollowUps}</div>
+            <div className={dash.pulseLabel}>Overdue follow-ups</div>
+          </Link>
+        </div>
         <div className={dash.stageRow}>
           {PIPELINE_STAGES.map((s) => (
-            <Link
-              key={s}
-              to={`/crm?stage=${encodeURIComponent(s)}`}
-              className={dash.stageChip}
-            >
-              <div className={dash.stageLabel}>{s}</div>
-              <div className={dash.stageCount}>{pipelineCounts[s] || 0}</div>
+            <Link key={s} to={`/crm?stage=${encodeURIComponent(s)}`} className={dash.stageChip}>
+              <span className={dash.stageLabel}>{s}</span>
+              <span className={dash.stageCount}>{pipelineCounts[s] || 0}</span>
             </Link>
           ))}
         </div>
-      </div>
+      </section>
 
-      <div className={dash.panel}>
-        <h2 className={dash.panelTitle}>Pipeline &amp; conversion by division</h2>
-        <div style={tableWrapStyle}>
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th style={thStyle}>Division</th>
-                <th style={thStyle}>Open quotes</th>
-                <th style={thStyle}>Open amount</th>
-                <th style={thStyle}>Awarded</th>
-                <th style={thStyle}>Awarded amount</th>
-                <th style={thStyle}>Win rate</th>
-                <th style={thStyle}>Avg won deal</th>
-                <th style={thStyle}>Invoiced</th>
-                <th style={thStyle}>Outstanding</th>
-              </tr>
-            </thead>
-            <tbody>
-              {divisionBreakdown.map((d) => (
-                <tr key={d.code}>
-                  <td style={tdStyle}>
-                    <span style={{ color: colors.muted2, marginRight: 8 }}>{d.code}</span>
-                    {d.brand}
-                  </td>
-                  <td style={tdStyle}>{d.openCount}</td>
-                  <td style={tdStyle}>{formatMoney(d.openAmount)}</td>
-                  <td style={tdStyle}>{d.awardedCount}</td>
-                  <td style={tdStyle}>{formatMoney(d.awardedAmount)}</td>
-                  <td style={tdStyle} title={`${d.awardedCount} won · ${d.lostCount} lost/expired`}>
-                    {d.winRate === null ? '—' : `${Math.round(d.winRate * 100)}%`}
-                  </td>
-                  <td style={tdStyle}>{d.avgWonAmount ? formatMoney(d.avgWonAmount) : '—'}</td>
-                  <td style={tdStyle}>{formatMoney(d.invoicedAmount)}</td>
-                  <td style={{ ...tdStyle, color: d.outstandingAmount ? colors.warn : undefined }}>
-                    {formatMoney(d.outstandingAmount)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p style={{ margin: '10px 0 0', fontSize: 12, color: colors.muted }}>
-          Win rate = awarded ÷ (awarded + not awarded + expired). Invoiced excludes draft and cancelled invoices;
-          outstanding is what is still unpaid. Invoice division comes from its reference (RR-01-… = division 01).
-        </p>
-      </div>
-
-      <div style={{ ...dualPanelGridStyle, marginBottom: 24 }}>
-        <div style={cardStyle}>
-          <h2 style={sectionTitleStyle}>Recent Quotes</h2>
-          {recentQuotes.length === 0 ? (
-            <EmptyState title="No quotes yet" subtitle="New quotations will appear here." />
-          ) : (
-            <div style={tableWrapStyle}>
-              <table style={tableStyle}>
-                <thead>
-                  <tr>
-                    <th style={thStyle}>Date</th>
-                    <th style={thStyle}>Ref</th>
-                    <th style={thStyle}>Client</th>
-                    <th style={thStyle}>Amount</th>
-                    <th style={thStyle}>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentQuotes.map((q) => (
-                    <tr key={q.id}>
-                      <td style={tdStyle}>
-                        {q.date ? format(parseISO(q.date.slice(0, 10)), 'dd MMM yyyy') : '—'}
-                      </td>
-                      <td style={tdStyle}>
-                        {displayDocumentReference({
-                          referenceNumber: q.reference_number,
-                          fallbackId: q.quote_id,
-                          status: q.status,
-                        })}
-                      </td>
-                      <td style={tdStyle}>{q.client || '—'}</td>
-                      <td style={tdStyle}>{formatMoney(q.amount)}</td>
-                      <td style={tdStyle}>
-                        <StatusPill status={q.status} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        <div style={cardStyle}>
-          <h2 style={sectionTitleStyle}>Recent Invoices</h2>
-          {recentInvoices.length === 0 ? (
-            <EmptyState title="No invoices yet" subtitle="New invoices will appear here." />
-          ) : (
-            <div style={tableWrapStyle}>
-              <table style={tableStyle}>
-                <thead>
-                  <tr>
-                    <th style={thStyle}>Date</th>
-                    <th style={thStyle}>Ref</th>
-                    <th style={thStyle}>Client</th>
-                    <th style={thStyle}>Amount</th>
-                    <th style={thStyle}>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentInvoices.map((inv) => (
-                    <tr key={inv.id}>
-                      <td style={tdStyle}>
-                        {inv.date ? format(parseISO(inv.date.slice(0, 10)), 'dd MMM yyyy') : '—'}
-                      </td>
-                      <td style={tdStyle}>{inv.reference_number || '—'}</td>
-                      <td style={tdStyle}>{inv.client || '—'}</td>
-                      <td style={tdStyle}>{formatMoney(inv.amount)}</td>
-                      <td style={tdStyle}>
-                        <StatusPill status={inv.payment_status || inv.status} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div style={{ ...cardStyle, marginBottom: 16 }}>
-        <h2 style={sectionTitleStyle}>Sales owner workload</h2>
-        {ownerWorkload.length === 0 ? (
-          <EmptyState title="No CRM owners yet" subtitle="Assign sales owners on CRM companies." />
-        ) : (
-          <div style={tableWrapStyle}>
-            <table style={tableStyle}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>Owner</th>
-                  <th style={thStyle}>Open deals</th>
-                  <th style={thStyle}>Overdue</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ownerWorkload.map((r) => (
-                  <tr key={r.owner}>
-                    <td style={tdStyle}>
-                      <Link
-                        to={`/crm?owner=${encodeURIComponent(r.owner)}`}
-                        style={{ color: colors.accent, textDecoration: 'none' }}
-                      >
-                        {r.owner}
-                      </Link>
-                    </td>
-                    <td style={tdStyle}>{r.open}</td>
-                    <td style={{ ...tdStyle, color: r.overdue ? colors.danger : colors.muted }}>
-                      {r.overdue}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <section className={dash.section} aria-label="Needs attention">
+        <button
+          type="button"
+          className={dash.attentionToggle}
+          aria-expanded={attentionOpen}
+          onClick={() => setAttentionOpen((v) => !v)}
+        >
+          <span className={dash.attentionToggleCopy}>
+            <span className={dash.sectionTitle}>Needs attention</span>
+            <span className={dash.attentionHint}>
+              Leads, watchdog, next steps, modules, renewals
+            </span>
+          </span>
+          {attentionOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        </button>
+        {attentionOpen ? (
+          <div className={dash.attentionStack}>
+            <NewLeadsCard />
+            <WatchdogCard />
+            <NoNextStepCard />
+            <ModuleAlertsCard />
+            <CtrmRenewalsCard />
+            {domainAlerts.length > 0 || ownedDomains.length > 0 ? (
+              <div className={dash.surface}>
+                <h3 className={dash.surfaceTitle} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Globe size={16} /> Domain renewals
+                </h3>
+                {domainAlerts.length === 0 ? (
+                  <p style={{ color: colors.muted2, fontSize: 13, margin: 0, lineHeight: 1.45 }}>
+                    {ownedDomains.length} domain{ownedDomains.length === 1 ? '' : 's'} tracked — none
+                    expiring in the next 90 days.
+                  </p>
+                ) : (
+                  <ul style={{ margin: 0, paddingLeft: 18, color: colors.muted, fontSize: 13, lineHeight: 1.55 }}>
+                    {domainAlerts.slice(0, 8).map((a) => (
+                      <li key={a.id} style={{ marginBottom: 6 }}>
+                        <strong style={{ color: a.severity === 'overdue' ? colors.danger : colors.text }}>
+                          {a.domainName}
+                        </strong>{' '}
+                        · {domainAlertLabel(a)}
+                        {a.registrar ? ` · ${a.registrar}` : ''}
+                        {a.autoRenew ? ' · auto-renew' : ''}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p style={{ margin: '12px 0 0', fontSize: 12 }}>
+                  <Link to="/domains" style={{ color: colors.accent }}>
+                    Manage domains
+                  </Link>
+                </p>
+              </div>
+            ) : null}
           </div>
-        )}
-      </div>
+        ) : null}
+      </section>
 
-      <div style={{ marginTop: 16 }}>
+      <section className={dash.section} aria-label="Recent documents">
+        <div className={dash.sectionHead}>
+          <h2 className={dash.sectionTitle}>Recent</h2>
+        </div>
+        <div className={dash.dual}>
+          <div className={dash.surface}>
+            <div className={dash.sectionHead}>
+              <h3 className={dash.surfaceTitle} style={{ margin: 0 }}>
+                Quotes
+              </h3>
+              <Link to="/quotations" className={dash.sectionLink}>
+                All
+              </Link>
+            </div>
+            {recentQuotes.length === 0 ? (
+              <EmptyState title="No quotes yet" subtitle="New quotations will appear here." />
+            ) : (
+              <ul className={dash.docList}>
+                {recentQuotes.map((q) => (
+                  <li key={q.id}>
+                    <Link to={`/quotations?ref=${encodeURIComponent(q.reference_number || q.id)}`} className={dash.docRow}>
+                      <span className={dash.docMuted}>
+                        {q.date ? format(parseISO(q.date.slice(0, 10)), 'dd MMM') : '—'}
+                      </span>
+                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {q.client || '—'}
+                      </span>
+                      <span className={dash.docAmount}>{formatMoney(q.amount)}</span>
+                      <StatusPill status={q.status} />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className={dash.surface}>
+            <div className={dash.sectionHead}>
+              <h3 className={dash.surfaceTitle} style={{ margin: 0 }}>
+                Invoices
+              </h3>
+              <Link to="/invoices" className={dash.sectionLink}>
+                All
+              </Link>
+            </div>
+            {recentInvoices.length === 0 ? (
+              <EmptyState title="No invoices yet" subtitle="New invoices will appear here." />
+            ) : (
+              <ul className={dash.docList}>
+                {recentInvoices.map((inv) => (
+                  <li key={inv.id}>
+                    <div className={dash.docRow}>
+                      <span className={dash.docMuted}>
+                        {inv.date ? format(parseISO(inv.date.slice(0, 10)), 'dd MMM') : '—'}
+                      </span>
+                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {inv.client || '—'}
+                      </span>
+                      <span className={dash.docAmount}>{formatMoney(inv.amount)}</span>
+                      <StatusPill status={inv.payment_status || inv.status} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className={dash.section} aria-label="Team and divisions">
+        <div className={dash.sectionHead}>
+          <h2 className={dash.sectionTitle}>Team &amp; divisions</h2>
+        </div>
+        <div className={dash.dual}>
+          <div className={dash.surface}>
+            <h3 className={dash.surfaceTitle}>Owner workload</h3>
+            {ownerWorkload.length === 0 ? (
+              <EmptyState title="No CRM owners yet" subtitle="Assign sales owners on CRM companies." />
+            ) : (
+              <div style={tableWrapStyle}>
+                <table style={tableStyle}>
+                  <thead>
+                    <tr>
+                      <th style={thStyle}>Owner</th>
+                      <th style={thStyle}>Open</th>
+                      <th style={thStyle}>Overdue</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ownerWorkload.map((r) => (
+                      <tr key={r.owner}>
+                        <td style={tdStyle}>
+                          <Link
+                            to={`/crm?owner=${encodeURIComponent(r.owner)}`}
+                            style={{ color: colors.accent, textDecoration: 'none' }}
+                          >
+                            {r.owner}
+                          </Link>
+                        </td>
+                        <td style={tdStyle}>{r.open}</td>
+                        <td style={{ ...tdStyle, color: r.overdue ? colors.danger : colors.muted }}>
+                          {r.overdue}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+          <div className={dash.surface}>
+            <h3 className={dash.surfaceTitle}>By division</h3>
+            <div style={tableWrapStyle}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Division</th>
+                    <th style={thStyle}>Open</th>
+                    <th style={thStyle}>Win</th>
+                    <th style={thStyle}>Outstanding</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {divisionBreakdown.map((d) => (
+                    <tr key={d.code}>
+                      <td style={tdStyle}>
+                        <span style={{ color: colors.muted2, marginRight: 6 }}>{d.code}</span>
+                        {d.brand}
+                      </td>
+                      <td style={tdStyle}>{d.openCount}</td>
+                      <td style={tdStyle}>{d.winRate === null ? '—' : `${Math.round(d.winRate * 100)}%`}</td>
+                      <td style={{ ...tdStyle, color: d.outstandingAmount ? colors.warn : undefined }}>
+                        {formatMoney(d.outstandingAmount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className={dash.footNote}>
+              Win rate = awarded ÷ (awarded + not awarded + expired). Outstanding is unpaid invoiced amount.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {showCompanyVault ? (
+        <section className={dash.section} aria-label="Company vault">
+          <div className={dash.sectionHead}>
+            <h2 className={dash.sectionTitle}>Company</h2>
+            <Link to="/settings" className={dash.sectionLink}>
+              Settings
+            </Link>
+          </div>
+          <div className={dash.dual}>
+            <div className={dash.surface}>
+              <h3 className={dash.surfaceTitle} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Shield size={16} /> Document expiry
+              </h3>
+              {docAlerts.length === 0 ? (
+                <p style={{ color: colors.muted2, fontSize: 13, margin: 0, lineHeight: 1.45 }}>
+                  No trade license / VAT certificates expiring in the next 60 days.
+                </p>
+              ) : (
+                <ul style={{ margin: 0, paddingLeft: 18, color: colors.muted, fontSize: 13, lineHeight: 1.55 }}>
+                  {docAlerts.map((a) => (
+                    <li key={a.id} style={{ marginBottom: 6 }}>
+                      <strong style={{ color: a.severity === 'overdue' ? colors.danger : colors.text }}>
+                        {a.title}
+                      </strong>{' '}
+                      · {a.categoryLabel} · {companyDocAlertLabel(a)}
+                      {a.driveUrl ? (
+                        <>
+                          {' '}
+                          ·{' '}
+                          <a href={a.driveUrl} target="_blank" rel="noreferrer" style={{ color: colors.accent }}>
+                            Open
+                          </a>
+                        </>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className={dash.surface}>
+              <h3 className={dash.surfaceTitle} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <FolderOpen size={16} /> Vault
+              </h3>
+              <p style={{ color: colors.muted2, fontSize: 13, margin: '0 0 10px', lineHeight: 1.45 }}>
+                Trade license, VAT certificate, and other company papers.
+              </p>
+              {companyVaultRoot ? (
+                <p style={{ margin: '0 0 10px', fontSize: 13 }}>
+                  <a href={companyVaultRoot} target="_blank" rel="noreferrer" style={{ color: colors.accent }}>
+                    Open company Google Drive folder
+                  </a>
+                </p>
+              ) : (
+                <p style={{ color: colors.muted2, fontSize: 12, margin: '0 0 10px' }}>
+                  Connect Google Drive in Settings for a quick link here.
+                </p>
+              )}
+              {companyDocs.length === 0 ? (
+                <p style={{ color: colors.muted2, fontSize: 13, margin: 0 }}>No documents linked yet.</p>
+              ) : (
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.55 }}>
+                  {companyDocs.slice(0, 6).map((d) => (
+                    <li key={d.id}>
+                      {d.drive_url ? (
+                        <a href={d.drive_url} target="_blank" rel="noreferrer" style={{ color: colors.accent }}>
+                          {d.title || d.category}
+                        </a>
+                      ) : (
+                        d.title || d.category
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      <section className={dash.section} aria-label="Mail">
+        <div className={dash.sectionHead}>
+          <h2 className={dash.sectionTitle}>Mail</h2>
+        </div>
         <ZohoInboxPanel crmEntries={crm} />
-      </div>
+      </section>
     </div>
   )
 }

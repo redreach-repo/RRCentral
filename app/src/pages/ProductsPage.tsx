@@ -14,16 +14,12 @@ import { fetchLiveTenants, listChurchProfiles, saveChurchProfile, type LiveResul
 import { errorMessage } from '../lib/errors'
 import type { Account, WorshipChurchProfile, WorshipTenant } from '../lib/types'
 import {
-  buttonPrimaryStyle,
   buttonSecondaryStyle,
   cardStyle,
   colors,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   sectionTitleStyle,
-  toolbarStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 /** Products Red Reach runs and supports. Today that is WorshipHub. */
 export default function ProductsPage() {
@@ -138,23 +134,30 @@ export default function ProductsPage() {
       : ''
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>WorshipHub</h1>
-          <p style={pageSubtitleStyle}>
+          <p className={docsStyles.kicker}>Delivery</p>
+          <h1 className={docsStyles.title}>WorshipHub</h1>
+          <p className={docsStyles.subtitle}>
             WorshipHub churches that Red Reach runs and supports. Member and visitor data stays in WorshipHub.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button type="button" style={buttonSecondaryStyle} onClick={() => void refreshLive()} disabled={!live}>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'rgba(255,255,255,0.08)' }}
+            onClick={() => void refreshLive()}
+            disabled={!live}
+          >
             <RefreshCw size={15} /> Refresh
           </button>
-          <Link to="/accounts?type=worship_church" style={{ ...buttonPrimaryStyle, textDecoration: 'none' }}>
+          <Link to="/accounts?type=worship_church" className={docsStyles.newBtn} style={{ textDecoration: 'none' }}>
             <Plus size={16} /> Add a church
           </Link>
         </div>
-      </div>
+      </header>
 
       {connectionProblem ? (
         <section style={{ ...cardStyle, marginBottom: 16 }} aria-label="WorshipHub connection">

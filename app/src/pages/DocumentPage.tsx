@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import { ArrowLeft, Download, ExternalLink, FileUp, Link2, Mail, MessageCircle, Moon, Paperclip, Printer, Sun, Truck } from 'lucide-react'
+import { ArrowLeft, CloudUpload, Download, ExternalLink, FileUp, Link2, Mail, MessageCircle, Moon, Paperclip, Printer, Sun, Truck } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS, VAT_RATE } from '../lib/config'
 import type { Attachment, Client, CrmContact, CrmEntry, CustomerDocument, DeliveryNote, Invoice, LineItem, Quotation } from '../lib/types'
@@ -61,7 +61,8 @@ import LinkDriveFileModal from '../components/LinkDriveFileModal'
 import SaveToFolderPrompt from '../components/SaveToFolderPrompt'
 import { logActivity } from '../lib/activity'
 import { findCrmByCompany, syncCrmFromQuote } from '../lib/crmSync'
-import { loadCustomerDocuments } from '../lib/customerFiles'
+import { ensureCompanyFromDocument } from '../lib/ensureCompanyFromDocument'
+import { loadCustomerDocuments, uploadPdfToCustomerDrive } from '../lib/customerFiles'
 import { useAuth } from '../contexts/AuthContext'
 import {
   applyMessageTemplate,
@@ -400,6 +401,76 @@ export default function DocumentPage() {
     }
   }
 
+  async function savePdfToDrive() {
+    if (!sheetRef.current || !doc?.client) return
+    let crmId = crmRecord?.id || ''
+    if (!crmId) {
+      try {
+        const found = await findCrmByCompany(doc.client)
+        crmId = found?.id || ''
+        if (found) setCrmRecord(found)
+      } catch {
+        /* optional */
+      }
+    }
+    // Quote bill-to may not match CRM yet (or CRM was never created). Ensure the
+    // company exists, then look up again — Drive filing needs a CRM row.
+    if (!crmId) {
+      try {
+        const ensured = await ensureCompanyFromDocument({
+          company: doc.client,
+          address: billTo.address,
+          trn: billTo.trn,
+          contactName: billTo.primaryContact,
+          contactEmail: billTo.email,
+          contactPhone: billTo.phone,
+          owner: user?.email?.split('@')[0] || '',
+          userEmail: user?.email || '',
+          source: docType === 'quote' ? 'quotation' : docType === 'invoice' ? 'invoice' : 'delivery_note',
+          ensureDriveFolder: true,
+        })
+        crmId = ensured.crmId || ''
+        if (crmId) {
+          const found = await findCrmByCompany(doc.client)
+          if (found) setCrmRecord(found)
+        }
+      } catch (e) {
+        showToast(errorMessage(e, 'Could not save this company in CRM'), 'error')
+        return
+      }
+    }
+    if (!crmId) {
+      showToast('Could not find or create this company in CRM', 'error')
+      return
+    }
+    setPdfBusy(true)
+    try {
+      const { blob, filename } = await elementToPdfBlob(sheetRef.current, {
+        filenameHint: `${title.toLowerCase()}-${displayRef}`,
+        fitToPage,
+      })
+      const bytes = new Uint8Array(await blob.arrayBuffer())
+      const category =
+        docType === 'quote' ? 'quotation' : docType === 'invoice' ? 'invoice' : 'delivery_note'
+      await uploadPdfToCustomerDrive({
+        company: doc.client,
+        crmId,
+        category,
+        title: `${title} ${displayRef}`,
+        filename,
+        bytes,
+        relatedRef: displayRef,
+        uploadedBy: user?.email || '',
+      })
+      await refreshDriveLinks()
+      showToast('PDF saved to Google Drive', 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not save PDF to Google Drive'), 'error')
+    } finally {
+      setPdfBusy(false)
+    }
+  }
+
   async function refreshDriveLinks() {
     const clientName = doc?.client || ''
     if (!clientName) return
@@ -461,16 +532,17 @@ export default function DocumentPage() {
 
   async function shareWhatsApp() {
     const p = primaryContact(emailContacts)
-    const phone = p?.phone || client?.mobile || ''
+    const contactName = quote?.contact_name || p?.name || client?.primary_contact || ''
+    const phone = quote?.contact_phone || p?.phone || client?.mobile || ''
     const company = settings.companyName || 'Red Reach Middle East FZE'
     const text = applyMessageTemplate(settings.whatsappQuoteMessage || DEFAULT_WHATSAPP_QUOTE, {
-      contactGreeting: p?.name || client?.primary_contact ? ` ${p?.name || client?.primary_contact}` : '',
+      contactGreeting: contactName ? ` ${contactName}` : '',
       titleLower: title.toLowerCase(),
       ref: displayRef,
       amount: isDeliveryNote ? goodsQtyLabel : money(summary.total),
       company,
       client: doc?.client || '',
-      contact: p?.name || client?.primary_contact || 'team',
+      contact: contactName || 'team',
       validUntil: validUntil ? format(new Date(validUntil), 'dd MMM yyyy') : '',
     })
     const url = buildWhatsAppUrl(phone, text, settings.whatsappCountryCode || '971')
@@ -553,7 +625,8 @@ export default function DocumentPage() {
     ref: displayRef,
     company: settings.companyName || 'Red Reach Middle East FZE',
     client: doc?.client || '',
-    contact: primaryContact(emailContacts)?.name || client?.primary_contact || 'team',
+    contact:
+      quote?.contact_name || primaryContact(emailContacts)?.name || client?.primary_contact || 'team',
     amount: isDeliveryNote ? goodsQtyLabel : money(summary.total),
     validUntil: validUntil ? format(new Date(validUntil), 'dd MMM yyyy') : '',
     validUntilLine: validUntil && docType === 'quote' ? `\nValid until: ${format(new Date(validUntil), 'dd MMM yyyy')}` : '',
@@ -679,7 +752,19 @@ export default function DocumentPage() {
           </h3>
           <p style={{ margin: 0, lineHeight: 1.5, fontSize: 14 }}>
             <strong>{billTo.companyName || doc.client}</strong>
-            {billToLines(billTo).map((line, i) => (
+            {quote?.contact_name ? (
+              <span>
+                <br />
+                Attn: {quote.contact_name}
+                {quote.contact_email ? ` · ${quote.contact_email}` : ''}
+                {quote.contact_phone ? ` · ${quote.contact_phone}` : ''}
+              </span>
+            ) : null}
+            {billToLines(billTo, {
+              // Quotation already shows the chosen contact as Attn — don't also
+              // print the client's other primary contact underneath.
+              includeContact: !quote?.contact_name,
+            }).map((line, i) => (
               <span key={`${line.kind}-${i}`}>
                 <br />
                 {line.text}
@@ -1148,6 +1233,9 @@ export default function DocumentPage() {
         <ToolbarBtn onClick={() => void downloadPdf()} disabled={pdfBusy}>
           <Download size={14} /> {pdfBusy ? 'Preparing…' : 'Download PDF'}
         </ToolbarBtn>
+        <ToolbarBtn onClick={() => void savePdfToDrive()} disabled={pdfBusy}>
+          <CloudUpload size={14} /> {pdfBusy ? 'Saving…' : 'Save to Drive'}
+        </ToolbarBtn>
         <ToolbarBtn onClick={() => void prepareEmail()} disabled={pdfBusy}>
           <Mail size={14} /> Email PDF
         </ToolbarBtn>
@@ -1384,7 +1472,24 @@ export default function DocumentPage() {
       <EmailComposeModal
         open={emailOpen}
         companyName={doc.client || ''}
-        contacts={emailContacts}
+        contacts={
+          quote?.contact_name || quote?.contact_email
+            ? [
+                {
+                  id: 'quote-contact',
+                  name: quote.contact_name || 'Contact',
+                  email: quote.contact_email || '',
+                  phone: quote.contact_phone || '',
+                  role: 'Primary',
+                },
+                ...emailContacts.filter(
+                  (c) =>
+                    c.email.toLowerCase() !== String(quote.contact_email || '').toLowerCase() &&
+                    c.name.toLowerCase() !== String(quote.contact_name || '').toLowerCase(),
+                ),
+              ]
+            : emailContacts
+        }
         defaultSubject={applyMessageTemplate(
           settings.emailQuoteSubject || DEFAULT_EMAIL_QUOTE_SUBJECT,
           emailVars,
@@ -1482,8 +1587,38 @@ function renderLineCell(col: QuoteColumnId, it: LineItem, showSku: boolean): Rea
       return it.line_no
     case 'sku':
       return showSku ? it.sku || '—' : '—'
-    case 'description':
-      return it.description
+    case 'description': {
+      const image = String(it.image_data || '').trim()
+      if (!image) return it.description
+      return (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 8,
+          }}
+        >
+          <img
+            src={image}
+            alt=""
+            width={48}
+            height={48}
+            decoding="sync"
+            data-line-image="1"
+            style={{
+              width: 48,
+              height: 48,
+              objectFit: 'cover',
+              borderRadius: 3,
+              border: '1px solid #ddd',
+              flexShrink: 0,
+              background: '#fff',
+            }}
+          />
+          <span style={{ minWidth: 0 }}>{it.description}</span>
+        </div>
+      )
+    }
     case 'sizes':
       return formatSizes(it.sizes_json)
     case 'qty':

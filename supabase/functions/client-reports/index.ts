@@ -116,12 +116,13 @@ async function reportFor(sb: SupabaseClient, account: { id: string; name: string
 
 async function draftSummary(apiKey: string, accountName: string, month: string, facts: string[]) {
   const request = buildAiRequest({ feature: "report_summary", accountName, monthLabel: monthLabelOf(month), facts })
-  const client = new Anthropic({ apiKey, maxRetries: 2, timeout: 60_000 })
+  const client = new Anthropic({ apiKey, maxRetries: 2, timeout: 120_000 })
   const message = await client.messages.create({
     model: AI_MODEL,
     max_tokens: request.maxTokens,
     system: request.system,
     messages: [{ role: "user", content: request.user }],
+    thinking: { type: "disabled" },
     output_config: { effort: "low" },
   })
   let text = ""

@@ -1999,7 +1999,8 @@ function invoiceLineRows(reference, plan, vatRate) {
       line_total: round23(amount + vat_amount),
       remarks: "",
       sku: "",
-      sizes_json: null
+      sizes_json: null,
+      image_data: ""
     };
   });
 }

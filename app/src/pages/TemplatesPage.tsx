@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FilePlus2, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { FilePlus2, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS } from '../lib/config'
 import type { QuoteTemplate } from '../lib/types'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
+import SimpleRowActions from '../components/SimpleRowActions'
 import { newDraftLine, type DraftLineItem } from '../lib/lineItems'
 import { syncSeedTemplates } from '../lib/syncTemplates'
 import { formatAED } from '../lib/money'
@@ -19,18 +20,16 @@ import {
   fieldStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
-  toolbarStyle,
   formGridStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 import { errorMessage } from '../lib/errors'
+import { parseQuoteTemplateForm } from '../lib/schemas/quoteTemplate'
 
 type TemplateForm = {
   name: string
@@ -77,6 +76,7 @@ export default function TemplatesPage() {
   const [saving, setSaving] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<QuoteTemplate | null>(null)
+  const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -116,26 +116,18 @@ export default function TemplatesPage() {
   }
 
   async function save() {
-    if (!form.name.trim()) {
-      showToast('Name is required', 'error')
+    const parsed = parseQuoteTemplateForm(form)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setSaving(true)
     try {
-      const items_json = form.items
-        .filter((i) => i.description.trim() || i.unit_price)
-        .map((i) => ({
-          description: i.description.trim(),
-          qty: Number(i.qty) || 0,
-          unit_price: Number(i.unit_price) || 0,
-          remarks: i.remarks || '',
-          sku: i.sku || '',
-        }))
       const payload = {
-        name: form.name.trim(),
-        division_code: form.division_code,
-        description: form.description.trim(),
-        items_json,
+        name: parsed.data.name,
+        division_code: parsed.data.division_code,
+        description: parsed.data.description,
+        items_json: parsed.data.items_json,
       }
       if (editing) {
         const { error } = await db.from('quote_templates').update(payload).eq('id', editing.id)
@@ -186,26 +178,28 @@ export default function TemplatesPage() {
   const brand = (code: string) => DIVISIONS.find((d) => d.code === code)?.brand || code
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Templates</h1>
-          <p style={pageSubtitleStyle}>Reusable quotation line-item sets</p>
+          <p className={docsStyles.kicker}>Operations</p>
+          <h1 className={docsStyles.title}>Templates</h1>
+          <p className={docsStyles.subtitle}>Reusable quotation line-item sets</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
             type="button"
-            style={buttonSecondaryStyle}
+            className={docsStyles.newBtn}
+            style={{ background: 'rgba(255,255,255,0.08)' }}
             disabled={syncing}
             onClick={() => void syncSkuTemplates()}
           >
             <RefreshCw size={16} /> {syncing ? 'Syncing…' : 'Load SKU templates'}
           </button>
-          <button type="button" style={buttonPrimaryStyle} onClick={openCreate}>
+          <button type="button" className={docsStyles.newBtn} onClick={openCreate}>
             <Plus size={16} /> New template
           </button>
         </div>
-      </div>
+      </header>
 
       {loading ? (
         <div style={{ ...cardStyle, color: colors.muted }}>Loading templates…</div>
@@ -233,7 +227,7 @@ export default function TemplatesPage() {
                       <div style={{ fontSize: 13, color: colors.muted2, marginTop: 6 }}>{t.description}</div>
                     ) : null}
                   </div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                     <button
                       type="button"
                       style={buttonPrimaryStyle}
@@ -241,12 +235,12 @@ export default function TemplatesPage() {
                     >
                       Create quote
                     </button>
-                    <button type="button" style={buttonSecondaryStyle} onClick={() => openEdit(t)}>
-                      <Pencil size={14} />
-                    </button>
-                    <button type="button" style={buttonDangerStyle} onClick={() => setDeleteTarget(t)}>
-                      <Trash2 size={14} />
-                    </button>
+                    <SimpleRowActions
+                      expanded={actionsOpenId === t.id}
+                      onToggle={() => setActionsOpenId((id) => (id === t.id ? null : t.id))}
+                      onEdit={() => openEdit(t)}
+                      onDelete={() => setDeleteTarget(t)}
+                    />
                   </div>
                 </div>
               </div>

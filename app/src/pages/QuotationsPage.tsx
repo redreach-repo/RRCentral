@@ -1,19 +1,7 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, Fragment } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState, Fragment } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import {
-  Copy,
-  ExternalLink,
-  FilePlus2,
-  FileUp,
-  GitBranch,
-  Pencil,
-  Plus,
-  Receipt,
-  RotateCcw,
-  Trash2,
-  Truck,
-} from 'lucide-react'
+import { FilePlus2, Plus, Trash2 } from 'lucide-react'
 import { db } from '../lib/db'
 import {
   DELIVERY_TERMS,
@@ -22,17 +10,39 @@ import {
   QUOTE_STATUSES,
   VAT_RATE,
 } from '../lib/config'
-import type { Client, Product, Quotation, QuoteTemplate, Vendor } from '../lib/types'
+import type { Client, CrmContact, CrmEntry, Product, Quotation, QuoteTemplate, Vendor } from '../lib/types'
+import {
+  contactsForCompany,
+  contactToQuoteFields,
+  EMPTY_QUOTE_CONTACT,
+  quoteContactLabel,
+  resolveQuoteContactSelection,
+  shouldShowQuoteContactPicker,
+} from '../lib/quoteContact'
 import { useAuth } from '../contexts/AuthContext'
 import { can } from '../lib/permissions'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
+import EditorSectionTabs, {
+  editorPanelStyle,
+  type EditorSection,
+} from '../components/EditorSectionTabs'
+import LineItemImageField from '../components/LineItemImageField'
+import CustomFieldsCard from '../components/CustomFieldsCard'
+import SavedViewsBar from '../components/SavedViewsBar'
 import ClientBillToFields from '../components/ClientBillToFields'
+import {
+  normalizeQuotationsFilters,
+  quotationsFiltersEqual,
+  type QuotationsViewFilters,
+} from '../lib/savedViews'
 import { useClientBillTo } from '../hooks/useClientBillTo'
 import SupplierInvoiceModal from '../components/quotations/SupplierInvoiceModal'
+import QuoteRowActions from '../components/quotations/QuoteRowActions'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
+import qStyles from '../styles/docsList.module.css'
 import { logActivity } from '../lib/activity'
 import {
   calcTotals,
@@ -55,20 +65,15 @@ import {
 import { STANDARD_SIZES, emptySizeBreakdown, sumSizes } from '../lib/sizes'
 import { commitStockForInvoice, releaseStockForQuote, reserveStockForQuote } from '../lib/inventory'
 import { syncCrmFromQuote } from '../lib/crmSync'
+import { ensureCompanyFromDocument } from '../lib/ensureCompanyFromDocument'
 import { formatAED } from '../lib/money'
-import {
-  generateReference,
-  formatRevisionReference,
-  parseBaseReference,
-} from '../lib/referenceNumber'
+import { formatRevisionReference, parseBaseReference } from '../lib/referenceNumber'
+import { allocateReference } from '../lib/numbering'
+import { parseQuotationForm } from '../lib/schemas/quotation'
 import { sortByDateDesc } from '../lib/finance'
 import { isQuotePastValidity, quoteValidUntil } from '../lib/documents'
 import { errorMessage, isUndefinedColumnError } from '../lib/errors'
-import {
-  canCreateDeliveryNoteFromQuote,
-  createDeliveryNoteFromQuote,
-  matchQuoteForDeliveryNote,
-} from '../lib/deliveryNotes'
+import { createDeliveryNoteFromQuote, matchQuoteForDeliveryNote } from '../lib/deliveryNotes'
 import { resolveDealRef } from '../lib/dealQuotes'
 import { registerLineItemSkus } from '../lib/skuRegistry'
 import { listVendors } from '../lib/vendors'
@@ -93,15 +98,11 @@ import {
   fieldStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
-  toolbarStyle,
   formGridStyle,
 } from '../lib/uiStyles'
 
@@ -109,6 +110,11 @@ type StatusTab = 'All' | 'Draft' | 'Finalized' | 'Sent' | 'Awarded'
 
 interface QuoteForm {
   client: string
+  /** Selected CRM/client contact id for the picker (not persisted). */
+  contact_id: string
+  contact_name: string
+  contact_email: string
+  contact_phone: string
   division_code: string
   description: string
   payment_terms: string
@@ -141,6 +147,8 @@ interface QuoteForm {
 
 const emptyForm = (defaults?: Partial<QuoteForm>): QuoteForm => ({
   client: '',
+  contact_id: '',
+  ...EMPTY_QUOTE_CONTACT,
   division_code: '01',
   description: '',
   payment_terms: '',
@@ -169,15 +177,8 @@ const emptyForm = (defaults?: Partial<QuoteForm>): QuoteForm => ({
   ...defaults,
 })
 
-const tabBtn = (active: boolean): CSSProperties => ({
-  ...buttonSecondaryStyle,
-  background: active ? colors.accent : 'rgba(255,255,255,0.06)',
-  borderColor: active ? colors.accent : colors.border,
-  padding: '8px 14px',
-})
-
 export default function QuotationsPage() {
-  const { user, userRole } = useAuth()
+  const { user, userRole, appUserId } = useAuth()
   const { settings, updateSetting } = useSettings()
   const { showToast } = useToast()
   const navigate = useNavigate()
@@ -186,12 +187,29 @@ export default function QuotationsPage() {
 
   const [quotes, setQuotes] = useState<Quotation[]>([])
   const [clients, setClients] = useState<Client[]>([])
+  const [crmRows, setCrmRows] = useState<CrmEntry[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<StatusTab>('All')
   const [search, setSearch] = useState('')
+
+  const currentQuoteViewFilters = useMemo(
+    () => normalizeQuotationsFilters({ q: search, status: tab }),
+    [search, tab],
+  )
+
+  const applyQuoteViewFilters = useCallback((raw: Record<string, unknown>) => {
+    const f = raw as QuotationsViewFilters
+    const nextStatus = String(f.status || 'All') as StatusTab
+    const allowed: StatusTab[] = ['All', 'Draft', 'Finalized', 'Sent', 'Awarded']
+    setTab(allowed.includes(nextStatus) ? nextStatus : 'All')
+    setSearch(String(f.q || ''))
+  }, [])
+  /** Only one row’s action panel open at a time — keeps the table scannable. */
+  const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
+  const [editorSection, setEditorSection] = useState<EditorSection>('basics')
   const [editing, setEditing] = useState<Quotation | null>(null)
   const [form, setForm] = useState<QuoteForm>(emptyForm())
   const billTo = useClientBillTo(clients)
@@ -222,15 +240,21 @@ export default function QuotationsPage() {
     setLoading(true)
     try {
       await ensureDivisionCataloguesSeeded().catch(() => undefined)
-      const [qRes, cRes, pRes, vendorRows] = await Promise.all([
+      const [qRes, cRes, crmRes, pRes, vendorRows] = await Promise.all([
         db.from('quotations').select('*').order('created_at', { ascending: false }),
         db.from('clients').select('*').order('company_name'),
+        db
+          .from('crm')
+          .select('id, company_name, primary_contact, email_phone, mobile_number, office_number, contacts')
+          .order('company_name'),
         db.from('products').select('*').eq('active', true).order('name'),
         listVendors().catch(() => [] as Vendor[]),
       ])
       if (qRes.error) throw qRes.error
       if (cRes.error) throw cRes.error
       if (pRes.error) throw pRes.error
+      setClients((cRes.data || []) as Client[])
+      setCrmRows((crmRes.data || []) as CrmEntry[])
       setProducts((pRes.data || []) as Product[])
       setVendors(vendorRows)
 
@@ -291,13 +315,38 @@ export default function QuotationsPage() {
       }
 
       setQuotes(rows)
-      setClients((cRes.data || []) as Client[])
     } catch (e) {
       showToast(errorMessage(e, 'Failed to load quotations'), 'error')
     } finally {
       setLoading(false)
     }
   }, [showToast, settings.quoteValidityDays])
+
+  const companyContacts = useMemo(
+    () => contactsForCompany(form.client, { clients, crm: crmRows }),
+    [form.client, clients, crmRows],
+  )
+
+  const contactFieldsForClient = useCallback(
+    (
+      company: string,
+      saved?: Partial<Pick<Quotation, 'contact_name' | 'contact_email' | 'contact_phone'>> | null,
+    ) => {
+      const list = contactsForCompany(company, { clients, crm: crmRows })
+      const picked = resolveQuoteContactSelection(list, saved)
+      return { contact_id: picked.contactId, ...picked.fields }
+    },
+    [clients, crmRows],
+  )
+
+  function selectQuoteContact(contactId: string, list: CrmContact[] = companyContacts) {
+    const hit = list.find((c) => c.id === contactId) || null
+    setForm((f) => ({
+      ...f,
+      contact_id: contactId,
+      ...contactToQuoteFields(hit),
+    }))
+  }
 
   useEffect(() => {
     void load()
@@ -326,9 +375,12 @@ export default function QuotationsPage() {
     const division = searchParams.get('division')
     if (!wantNew || loading) return
     setEditing(null)
+    billTo.reset()
+    if (client) billTo.prefillFor(client)
     setForm(
       emptyForm({
         client: client || '',
+        ...contactFieldsForClient(client || ''),
         division_code: division === '02' ? '02' : '01',
         payment_terms: settings.paymentTerms || PAYMENT_TERMS[0],
         delivery_terms: settings.deliveryTerms || DELIVERY_TERMS[0],
@@ -343,9 +395,9 @@ export default function QuotationsPage() {
           : {}),
       }),
     )
-    setEditorOpen(true)
+    setEditorSection('basics'); setEditorOpen(true)
     setSearchParams({}, { replace: true })
-  }, [searchParams, loading, setSearchParams, settings])
+  }, [searchParams, loading, setSearchParams, settings, clients, crmRows, contactFieldsForClient, billTo])
 
   useEffect(() => {
     const templateId = searchParams.get('template')
@@ -390,7 +442,7 @@ export default function QuotationsPage() {
           items,
         }),
       )
-      setEditorOpen(true)
+      setEditorSection('basics'); setEditorOpen(true)
       setSearchParams({}, { replace: true })
     })()
   }, [searchParams, loading, setSearchParams, settings])
@@ -446,7 +498,7 @@ export default function QuotationsPage() {
         moq: settings.moqDefault || '50',
       }),
     )
-    setEditorOpen(true)
+    setEditorSection('basics'); setEditorOpen(true)
   }
 
   async function openEdit(q: Quotation) {
@@ -455,8 +507,10 @@ export default function QuotationsPage() {
       const items = await loadLineItems('Quote', q.quote_id)
       billTo.reset()
       billTo.prefillFor(q.client || '')
+      const contact = contactFieldsForClient(q.client || '', q)
       setForm({
         client: q.client || '',
+        ...contact,
         division_code: q.division_code || '01',
         description: q.description || '',
         payment_terms: q.payment_terms || '',
@@ -483,7 +537,7 @@ export default function QuotationsPage() {
         discount_amount: Number(q.discount_amount) || 0,
         offset_vat: quoteOffsetsVat(q, settings),
       })
-      setEditorOpen(true)
+      setEditorSection('basics'); setEditorOpen(true)
     } catch (e) {
       showToast(errorMessage(e, 'Failed to load line items'), 'error')
     }
@@ -497,18 +551,38 @@ export default function QuotationsPage() {
   }
 
   async function saveDraft() {
-    if (!form.client.trim() && !form.items.some((i) => i.description.trim())) {
-      showToast('Add a client or line items before saving', 'error')
+    const parsed = parseQuotationForm({
+      client: form.client,
+      contact_name: form.contact_name,
+      contact_email: form.contact_email,
+      contact_phone: form.contact_phone,
+      division_code: form.division_code,
+      description: form.description,
+      payment_terms: form.payment_terms,
+      delivery_terms: form.delivery_terms,
+      moq: form.moq,
+      notes: form.notes,
+      date: form.date,
+      quotation_currency: form.quotation_currency,
+      payment_currency: form.payment_currency,
+      fx_rate: Number(form.fx_rate) || 0,
+      discount_percent: Number(form.discount_percent) || 0,
+      discount_amount: Number(form.discount_amount) || 0,
+      has_line_items: form.items.some((i) => i.description.trim()),
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
+    const f = parsed.data
     setSaving(true)
     // Which step failed is shown in the error, so problems can be diagnosed from a screenshot.
     let step = 'preparing the quote'
     try {
       const amount = totals.total
-      const vertical = divisionBrand(form.division_code)
+      const vertical = divisionBrand(f.division_code)
       const quoteId = editing?.quote_id || makeQuoteId()
-      const fxRate = Number(form.fx_rate) || 1
+      const fxRate = Number(f.fx_rate) || 1
       const baseAmount = toBaseAmount(amount, fxRate)
       const lineCostDoc = totals.cost
       const lineCostBase = toBaseAmount(lineCostDoc, fxRate)
@@ -516,9 +590,9 @@ export default function QuotationsPage() {
       const supplierCostBase =
         lineCostDoc > 0 ? lineCostBase : Number(form.supplier_cost_base) || 0
       const currencyFields = {
-        currency: form.quotation_currency,
-        quotation_currency: form.quotation_currency,
-        payment_currency: form.payment_currency,
+        currency: f.quotation_currency,
+        quotation_currency: f.quotation_currency,
+        payment_currency: f.payment_currency,
         supplier_currency: form.supplier_currency,
         booking_currency: form.booking_currency,
         fx_rate: fxRate,
@@ -537,18 +611,21 @@ export default function QuotationsPage() {
         estimated_gross_profit_base: revenueBase - supplierCostBase,
       }
       const payload = {
-        client: form.client.trim(),
+        client: f.client,
+        contact_name: f.contact_name,
+        contact_email: f.contact_email,
+        contact_phone: f.contact_phone,
         vertical,
-        division_code: form.division_code,
-        description: form.description.trim(),
-        payment_terms: form.payment_terms,
-        delivery_terms: form.delivery_terms,
-        moq: form.moq,
-        notes: form.notes,
-        date: form.date || null,
+        division_code: f.division_code,
+        description: f.description,
+        payment_terms: f.payment_terms,
+        delivery_terms: f.delivery_terms,
+        moq: f.moq,
+        notes: f.notes,
+        date: f.date || null,
         amount,
-        discount_percent: form.offset_vat ? 0 : Number(form.discount_percent) || 0,
-        discount_amount: form.offset_vat ? 0 : Number(form.discount_amount) || 0,
+        discount_percent: form.offset_vat ? 0 : f.discount_percent,
+        discount_amount: form.offset_vat ? 0 : f.discount_amount,
         offset_vat: form.offset_vat,
         quote_id: quoteId,
         updated_by: who,
@@ -556,10 +633,21 @@ export default function QuotationsPage() {
         ...currencyFields,
       }
 
-      if (form.quotation_currency !== BASE_CURRENCY || fxRate !== 1) {
+      const stripOptionalQuoteColumns = <T extends Record<string, unknown>>(row: T) => {
+        const {
+          offset_vat: _o,
+          contact_name: _n,
+          contact_email: _e,
+          contact_phone: _p,
+          ...rest
+        } = row
+        return rest
+      }
+
+      if (f.quotation_currency !== BASE_CURRENCY || fxRate !== 1) {
         step = 'saving the FX rate'
         await approveFxRate({
-          from: form.quotation_currency,
+          from: f.quotation_currency,
           rate: fxRate,
           rateDate: form.fx_rate_date,
           approvedBy: who,
@@ -571,8 +659,10 @@ export default function QuotationsPage() {
       if (editing) {
         const { error } = await db.from('quotations').update(payload).eq('id', editing.id)
         if (error && isUndefinedColumnError(error)) {
-          const { offset_vat: _omit, ...withoutFlag } = payload
-          const retry = await db.from('quotations').update(withoutFlag).eq('id', editing.id)
+          const retry = await db
+            .from('quotations')
+            .update(stripOptionalQuoteColumns(payload))
+            .eq('id', editing.id)
           if (retry.error) throw retry.error
         } else if (error) throw error
       } else {
@@ -588,10 +678,8 @@ export default function QuotationsPage() {
         }
         const { error } = await db.from('quotations').insert(insertRow)
         if (error && isUndefinedColumnError(error)) {
-          // Databases without the offset_vat column (migration 20260924180942) — the
-          // flag is also kept in app_settings, so save the quote without it.
-          const { offset_vat: _omit, ...withoutFlag } = insertRow
-          const retry = await db.from('quotations').insert(withoutFlag)
+          // Older DBs may lack offset_vat / contact_* — save without those columns.
+          const retry = await db.from('quotations').insert(stripOptionalQuoteColumns(insertRow))
           if (retry.error) throw retry.error
         } else if (error) throw error
       }
@@ -604,7 +692,7 @@ export default function QuotationsPage() {
         `quotation ${editing?.reference_number || quoteId}`,
       )
       step = 'saving line items'
-      await saveLineItems('Quote', quoteId, registered.items, vatRate)
+      const lineSave = await saveLineItems('Quote', quoteId, registered.items, vatRate)
       const flagIds = [quoteId, editing?.id, editing?.reference_number].filter(
         (v): v is string => Boolean(v),
       )
@@ -617,14 +705,49 @@ export default function QuotationsPage() {
       await updateSetting(OFFSET_VAT_SETTING_KEY, JSON.stringify(nextFlags))
       step = 'logging activity'
       await logActivity('save_quote', 'quotation', 'DRAFT', `${payload.client} · Draft`, who)
-      step = 'saving the client address and TRN'
-      if ((await billTo.save(payload.client)) === 'created') showToast(`${payload.client} added to Clients`, 'success')
-      showToast(
-        registered.added
-          ? `Draft saved · ${registered.added} new item${registered.added === 1 ? '' : 's'} added to the catalog`
-          : 'Draft saved',
-        'success',
-      )
+      step = 'saving the company (Clients, CRM, Drive)'
+      if (payload.client.trim()) {
+        try {
+          const ensured = await ensureCompanyFromDocument({
+            company: payload.client,
+            address: billTo.draft.address,
+            trn: billTo.draft.trn,
+            contactName: form.contact_name,
+            contactEmail: form.contact_email,
+            contactPhone: form.contact_phone,
+            owner: who.split('@')[0] || who,
+            userEmail: who,
+            source: 'quotation',
+          })
+          if (ensured.crm === 'created' && ensured.driveFolder === 'created') {
+            showToast(`${payload.client} added to CRM · Google Drive folder ready`, 'success')
+          } else if (ensured.crm === 'created') {
+            showToast(`${payload.client} added to CRM`, 'success')
+          } else if (ensured.client === 'created') {
+            showToast(`${payload.client} added to Clients`, 'success')
+          } else if (ensured.driveFolder === 'created') {
+            showToast(`Google Drive folder ready for ${payload.client}`, 'success')
+          }
+          if (ensured.driveFolder === 'error' && ensured.detail) {
+            showToast(`Company saved; Drive folder: ${ensured.detail}`, 'error')
+          }
+        } catch (e) {
+          showToast(errorMessage(e, 'Draft saved, but the company could not be added to CRM'), 'error')
+        }
+      }
+      if (lineSave.imagesDropped) {
+        showToast(
+          'Draft saved, but product images were dropped — apply the line_item_image DB migration, then re-save.',
+          'error',
+        )
+      } else {
+        showToast(
+          registered.added
+            ? `Draft saved · ${registered.added} new item${registered.added === 1 ? '' : 's'} added to the catalog`
+            : 'Draft saved',
+          'success',
+        )
+      }
       setEditorOpen(false)
       await load()
     } catch (e) {
@@ -644,7 +767,14 @@ export default function QuotationsPage() {
     try {
       const { data: allRefs } = await db.from('quotations').select('reference_number')
       const refs = ((allRefs || []) as { reference_number: string }[]).map((r) => r.reference_number)
-      const reference = generateReference(q.division_code || '01', refs, quotePrefix)
+      const { data: invRefs } = await db.from('invoices').select('reference_number')
+      const irefs = ((invRefs || []) as { reference_number: string }[]).map((r) => r.reference_number)
+      const reference = await allocateReference({
+        docType: 'quotation',
+        divisionCode: q.division_code || '01',
+        prefix: quotePrefix,
+        existingRefs: [...refs, ...irefs],
+      })
       const validityDays = Number(settings.quoteValidityDays || 14) || 14
       const validUntil = quoteValidUntil(q.date || format(new Date(), 'yyyy-MM-dd'), validityDays)
       const { error } = await db
@@ -1154,125 +1284,97 @@ export default function QuotationsPage() {
     .filter((c) => c.company_name.toLowerCase().includes(form.client.toLowerCase()))
     .slice(0, 8)
 
+  function quoteMeta(q: Quotation): string {
+    const bits: string[] = []
+    if (q.valid_until && q.reference_number) {
+      bits.push(`Valid until ${format(new Date(q.valid_until), 'dd MMM yyyy')}`)
+    }
+    const deal = resolveDealRef(q)
+    if (deal && deal !== (q.reference_number || q.quote_id)) bits.push(`Deal ${deal}`)
+    else if (
+      q.deal_ref &&
+      quotes.some((o) => o.id !== q.id && resolveDealRef(o) === resolveDealRef(q))
+    ) {
+      bits.push(`Deal ${resolveDealRef(q)} · branched`)
+    }
+    return bits.join(' · ')
+  }
+
   function renderQuoteActions(q: Quotation) {
     return (
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-        <button type="button" style={buttonSecondaryStyle} onClick={() => void openEdit(q)} title="Edit">
-          <Pencil size={14} />
-        </button>
-        {(q.reference_number || q.id) && (
-          <Link
-            to={`/document/quote/${q.id}`}
-            style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}
-            title="View / email PDF"
-          >
-            <ExternalLink size={14} /> {compact ? '' : 'PDF / Email'}
-          </Link>
-        )}
-        {q.status === 'Draft' && (
-          <button type="button" style={buttonPrimaryStyle} disabled={saving} onClick={() => void finalize(q)}>
-            Finalize
-          </button>
-        )}
-        {q.status === 'Finalized' && (
-          <>
-            <button type="button" style={buttonSecondaryStyle} disabled={saving} onClick={() => void undoFinalize(q)} title="Undo finalize">
-              <RotateCcw size={14} />
-            </button>
-            <button type="button" style={buttonSecondaryStyle} disabled={saving} onClick={() => void revise(q)}>
-              Revise
-            </button>
-          </>
-        )}
-        {['Finalized', 'Sent', 'Accepted', 'Awarded'].includes(q.status) && (
-          <button
-            type="button"
-            style={buttonSecondaryStyle}
-            onClick={() => {
-              setOutcomeTarget(q)
-              setOutcomeStatus('Awarded')
-              setOutcomeReason(q.outcome_reason || '')
-            }}
-          >
-            Outcome
-          </button>
-        )}
-        {q.status === 'Awarded' && q.reference_number && (
-          <button
-            type="button"
-            style={buttonPrimaryStyle}
-            onClick={() => {
-              setConvertTarget(q)
-              setDepositPct('100')
-            }}
-          >
-            <Receipt size={14} /> Invoice
-          </button>
-        )}
-        {canCreateDeliveryNoteFromQuote(q) && (
-          <button
-            type="button"
-            style={buttonSecondaryStyle}
-            title="Create delivery note from this quotation"
-            onClick={() => setDnTarget(q)}
-          >
-            <Truck size={14} /> {compact ? '' : 'Delivery note'}
-          </button>
-        )}
-        <button
-          type="button"
-          style={buttonSecondaryStyle}
-          title="Store supplier invoice on this quotation"
-          onClick={() => void openSupplierInvoice(q)}
-        >
-          <FileUp size={14} /> {compact ? '' : 'Supplier invoice'}
-        </button>
-        {(q.reference_number || q.deal_ref) && q.status !== 'Superseded' ? (
-          <button
-            type="button"
-            style={buttonSecondaryStyle}
-            disabled={saving}
-            title="Branch for partial delivery — same supplier invoice / deal, new customer quote"
-            onClick={() => void branchQuote(q)}
-          >
-            <GitBranch size={14} /> {compact ? '' : 'Branch'}
-          </button>
-        ) : null}
-        <button type="button" style={buttonSecondaryStyle} disabled={saving} onClick={() => void duplicate(q)} title="Duplicate">
-          <Copy size={14} />
-        </button>
-        {canDeleteQuote ? (
-          <button type="button" style={buttonDangerStyle} onClick={() => setDeleteTarget(q)} title="Delete">
-            <Trash2 size={14} />
-          </button>
-        ) : null}
-      </div>
+      <QuoteRowActions
+        quote={q}
+        expanded={actionsOpenId === q.id}
+        onToggle={() => setActionsOpenId((id) => (id === q.id ? null : q.id))}
+        saving={saving}
+        canDelete={canDeleteQuote}
+        onEdit={(row) => void openEdit(row)}
+        onFinalize={(row) => void finalize(row)}
+        onUndoFinalize={(row) => void undoFinalize(row)}
+        onRevise={(row) => void revise(row)}
+        onOutcome={(row) => {
+          setOutcomeTarget(row)
+          setOutcomeStatus('Awarded')
+          setOutcomeReason(row.outcome_reason || '')
+        }}
+        onInvoice={(row) => {
+          setConvertTarget(row)
+          setDepositPct('100')
+        }}
+        onDeliveryNote={(row) => setDnTarget(row)}
+        onSupplierInvoice={(row) => void openSupplierInvoice(row)}
+        onBranch={(row) => void branchQuote(row)}
+        onDuplicate={(row) => void duplicate(row)}
+        onDelete={(row) => setDeleteTarget(row)}
+      />
     )
   }
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={qStyles.page}>
+      <header className={qStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Quotations</h1>
-          <p style={pageSubtitleStyle}>Create, revise, and track quotations</p>
+          <p className={qStyles.kicker}>Sales documents</p>
+          <h1 className={qStyles.title}>Quotations</h1>
+          <p className={qStyles.subtitle}>
+            Create, revise, and track quotations. Click Actions on a row to reveal every option.
+          </p>
         </div>
-        <button type="button" style={buttonPrimaryStyle} onClick={() => void openCreate()}>
+        <button type="button" className={qStyles.newBtn} onClick={() => void openCreate()}>
           <Plus size={16} /> New quotation
         </button>
-      </div>
+      </header>
 
-      <div className={resp.toolbar} style={{ marginBottom: 16 }}>
-        <div className={compact ? resp.chipScroll : resp.chipRow} style={{ marginBottom: 0, flex: 1 }}>
+      <SavedViewsBar
+        moduleId="quotations"
+        filters={currentQuoteViewFilters}
+        ownerUserId={appUserId}
+        canWrite={userRole !== 'viewer'}
+        applyDefaultOnLoad={
+          !searchParams.get('client') && !searchParams.get('ref') && !searchParams.get('quote')
+        }
+        onApply={applyQuoteViewFilters}
+        onToast={showToast}
+        filtersEqual={(a, b) =>
+          quotationsFiltersEqual(a as QuotationsViewFilters, b as QuotationsViewFilters)
+        }
+      />
+
+      <div className={qStyles.controls}>
+        <div className={qStyles.tabs}>
           {(['All', 'Draft', 'Finalized', 'Sent', 'Awarded'] as StatusTab[]).map((t) => (
-            <button key={t} type="button" style={tabBtn(tab === t)} onClick={() => setTab(t)}>
+            <button
+              key={t}
+              type="button"
+              className={tab === t ? qStyles.tabActive : qStyles.tab}
+              onClick={() => setTab(t)}
+            >
               {t}
             </button>
           ))}
         </div>
         <input
-          className={resp.toolbarSearch}
-          style={{ ...inputStyle, maxWidth: compact ? '100%' : 260 }}
+          className={qStyles.search}
           placeholder="Search client / ref…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -1280,94 +1382,58 @@ export default function QuotationsPage() {
       </div>
 
       {loading ? (
-        <div style={{ ...cardStyle, color: colors.muted }}>Loading quotations…</div>
+        <div className={qStyles.loading}>Loading quotations…</div>
       ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={<FilePlus2 size={22} />}
-          title="No quotations"
-          subtitle="Create a draft or filter a different status."
-          actionLabel="New quotation"
-          onAction={() => void openCreate()}
-        />
-      ) : compact ? (
-        <div className={resp.listStack}>
-          {filtered.map((q) => (
-            <article key={q.id} className={resp.card}>
-              <div className={resp.cardTop}>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div className={resp.cardTitle} style={{ cursor: 'default' }}>
-                    {q.reference_number || <span style={{ color: colors.muted2 }}>DRAFT</span>}
-                  </div>
-                  <div className={resp.cardMeta}>
-                    {q.client || '—'}
-                    {' · '}
-                    {q.vertical || divisionBrand(q.division_code)}
-                    {q.date ? ` · ${format(new Date(q.date), 'dd MMM yyyy')}` : ''}
-                  </div>
-                  {q.valid_until && q.reference_number ? (
-                    <div className={resp.cardMeta}>Valid until {format(new Date(q.valid_until), 'dd MMM yyyy')}</div>
-                  ) : null}
-                </div>
-                <StatusPill status={q.status} />
-              </div>
-              <div className={resp.cardMeta} style={{ fontSize: 15, fontWeight: 650, color: colors.text }}>
-                {formatAED(q.amount)}
-              </div>
-              <div className={resp.cardActions}>{renderQuoteActions(q)}</div>
-            </article>
-          ))}
+        <div className={qStyles.empty}>
+          <EmptyState
+            icon={<FilePlus2 size={22} />}
+            title="No quotations"
+            subtitle="Create a draft or filter a different status."
+            actionLabel="New quotation"
+            onAction={() => void openCreate()}
+          />
         </div>
       ) : (
-        <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
-          <div style={tableWrapStyle}>
-            <table style={tableStyle}>
+        <div className={qStyles.tableShell}>
+          <div className={qStyles.tableWrap}>
+            <table className={qStyles.table}>
               <thead>
                 <tr>
-                  <th style={thStyle}>Reference</th>
-                  <th style={thStyle}>Client</th>
-                  <th style={thStyle}>Division</th>
-                  <th style={thStyle}>Date</th>
-                  <th style={thStyle}>Amount</th>
-                  <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Actions</th>
+                  <th className={qStyles.colRef}>Reference</th>
+                  <th className={qStyles.colClient}>Client</th>
+                  <th className={qStyles.colDivision}>Division</th>
+                  <th className={qStyles.colDate}>Date</th>
+                  <th className={qStyles.colAmount}>Amount</th>
+                  <th className={qStyles.colStatus}>Status</th>
+                  <th className={qStyles.colActions} style={{ textAlign: 'right' }}>
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((q) => (
-                  <tr key={q.id}>
-                    <td style={tdStyle}>
-                      <div style={{ fontWeight: 600 }}>
-                        {q.reference_number || <span style={{ color: colors.muted2 }}>DRAFT</span>}
+                  <tr
+                    key={q.id}
+                    className={actionsOpenId === q.id ? qStyles.rowExpanded : undefined}
+                  >
+                    <td className={qStyles.colRef}>
+                      <div className={qStyles.ref}>
+                        {q.reference_number || <span className={qStyles.refMuted}>DRAFT</span>}
                       </div>
-                      {q.valid_until && q.reference_number ? (
-                        <div style={{ fontSize: 11, color: colors.muted2 }}>
-                          Valid until {format(new Date(q.valid_until), 'dd MMM yyyy')}
-                        </div>
-                      ) : null}
-                      {resolveDealRef(q) &&
-                      resolveDealRef(q) !== (q.reference_number || q.quote_id) ? (
-                        <div style={{ fontSize: 11, color: colors.muted2 }}>
-                          Deal {resolveDealRef(q)}
-                        </div>
-                      ) : q.deal_ref &&
-                        quotes.some(
-                          (o) => o.id !== q.id && resolveDealRef(o) === resolveDealRef(q),
-                        ) ? (
-                        <div style={{ fontSize: 11, color: colors.muted2 }}>
-                          Deal {resolveDealRef(q)} · branched
-                        </div>
-                      ) : null}
+                      {quoteMeta(q) ? <div className={qStyles.meta}>{quoteMeta(q)}</div> : null}
                     </td>
-                    <td style={tdStyle}>{q.client || '—'}</td>
-                    <td style={tdStyle}>{q.vertical || divisionBrand(q.division_code)}</td>
-                    <td style={tdStyle}>
+                    <td className={`${qStyles.colClient} ${qStyles.clientCell}`}>{q.client || '—'}</td>
+                    <td className={qStyles.colDivision}>{q.vertical || divisionBrand(q.division_code)}</td>
+                    <td className={qStyles.colDate}>
                       {q.date ? format(new Date(q.date), 'dd MMM yyyy') : '—'}
                     </td>
-                    <td style={tdStyle}>{formatAED(q.amount)}</td>
-                    <td style={tdStyle}>
+                    <td className={`${qStyles.colAmount} ${qStyles.amount}`}>{formatAED(q.amount)}</td>
+                    <td className={qStyles.colStatus}>
                       <StatusPill status={q.status} />
                     </td>
-                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{renderQuoteActions(q)}</td>
+                    <td className={`${qStyles.colActions} ${qStyles.actionsCell}`}>
+                      {renderQuoteActions(q)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1382,6 +1448,9 @@ export default function QuotationsPage() {
         onClose={() => setEditorOpen(false)}
         width={920}
       >
+        <EditorSectionTabs value={editorSection} onChange={setEditorSection} />
+
+        <div style={editorPanelStyle(editorSection === 'basics')}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: 12 }}>
           <div style={{ ...fieldStyle, position: 'relative' }}>
             <label style={labelStyle}>Client *</label>
@@ -1389,8 +1458,13 @@ export default function QuotationsPage() {
               style={inputStyle}
               value={form.client}
               onChange={(e) => {
-                setForm((f) => ({ ...f, client: e.target.value }))
-                billTo.prefillFor(e.target.value)
+                const name = e.target.value
+                setForm((f) => ({
+                  ...f,
+                  client: name,
+                  ...contactFieldsForClient(name),
+                }))
+                billTo.prefillFor(name)
                 setClientSuggest(true)
               }}
               onFocus={() => setClientSuggest(true)}
@@ -1428,7 +1502,11 @@ export default function QuotationsPage() {
                       fontSize: 13,
                     }}
                     onMouseDown={() => {
-                      setForm((f) => ({ ...f, client: c.company_name }))
+                      setForm((f) => ({
+                        ...f,
+                        client: c.company_name,
+                        ...contactFieldsForClient(c.company_name),
+                      }))
                       billTo.prefillFor(c.company_name)
                       setClientSuggest(false)
                     }}
@@ -1439,6 +1517,30 @@ export default function QuotationsPage() {
               </div>
             )}
           </div>
+          {shouldShowQuoteContactPicker(companyContacts) ? (
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Contact person *</label>
+              <select
+                style={selectStyle}
+                value={form.contact_id}
+                onChange={(e) => selectQuoteContact(e.target.value)}
+              >
+                {companyContacts.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {quoteContactLabel(c)}
+                  </option>
+                ))}
+              </select>
+              <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted }}>
+                This company has {companyContacts.length} contacts — choose who this quotation is for.
+              </p>
+            </div>
+          ) : companyContacts.length === 1 ? (
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Contact person</label>
+              <input style={inputStyle} value={quoteContactLabel(companyContacts[0])} readOnly />
+            </div>
+          ) : null}
           <div style={fieldStyle}>
             <label style={labelStyle}>Division</label>
             <select
@@ -1533,6 +1635,9 @@ export default function QuotationsPage() {
           />
         </div>
 
+        </div>
+
+        <div style={editorPanelStyle(editorSection === 'lines')}>
         <div
           style={{
             marginTop: 8,
@@ -1625,6 +1730,10 @@ export default function QuotationsPage() {
                           <span style={{ fontSize: 11, color: colors.muted2 }}>SKU {it.sku}</span>
                         ) : null}
                       </div>
+                      <LineItemImageField
+                        value={it.image_data}
+                        onChange={(image_data) => updateItem(it.key, { image_data })}
+                      />
                     </div>
                     <div className={resp.cardField}>
                       <label>Qty</label>
@@ -1750,6 +1859,10 @@ export default function QuotationsPage() {
                             <span style={{ fontSize: 11, color: colors.muted2 }}>SKU {it.sku}</span>
                           ) : null}
                         </div>
+                        <LineItemImageField
+                          value={it.image_data}
+                          onChange={(image_data) => updateItem(it.key, { image_data })}
+                        />
                       </td>
                       <td style={{ ...tdStyle, width: 80 }}>
                         <input
@@ -1919,6 +2032,8 @@ export default function QuotationsPage() {
           </div>
         </div>
 
+        </div>
+
         <div
           style={{
             marginTop: 16,
@@ -1980,6 +2095,7 @@ export default function QuotationsPage() {
           </div>
         </div>
 
+        <div style={editorPanelStyle(editorSection === 'terms')}>
         <div
           style={{
             marginTop: 18,
@@ -2172,6 +2288,9 @@ export default function QuotationsPage() {
           </div>
         </div>
 
+        </div>
+
+        <div style={editorPanelStyle(editorSection === 'notes')}>
         <div style={fieldStyle}>
           <label style={labelStyle}>Notes</label>
           <textarea
@@ -2179,6 +2298,20 @@ export default function QuotationsPage() {
             value={form.notes}
             onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
           />
+        </div>
+        {editing?.id ? (
+          <CustomFieldsCard
+            objectType="quotation"
+            recordId={String(editing.id)}
+            editable={userRole !== 'viewer'}
+            onToast={showToast}
+            framed={false}
+          />
+        ) : (
+          <p style={{ margin: '12px 0 0', fontSize: 12, color: colors.muted }}>
+            Save the draft once to edit quotation custom fields.
+          </p>
+        )}
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>

@@ -60,66 +60,43 @@
 }
 
 .sidebar {
-  width: 240px;
+  width: 256px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   background: linear-gradient(
     180deg,
-    rgba(26, 29, 34, 0.96) 0%,
-    rgba(22, 25, 30, 0.98) 100%
+    rgba(24, 27, 32, 0.98) 0%,
+    rgba(18, 20, 24, 0.99) 100%
   );
-  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(16px);
   z-index: 50;
 }
 
-.brand {
+.sideBrand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 18px 16px 16px;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px 14px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.brandLogo {
   flex-shrink: 0;
+}
+
+.sideLogo {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  width: auto;
   max-width: 168px;
-}
-
-.brandMark {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: #fff;
-  background: linear-gradient(135deg, #e85d04 0%, #c2410c 100%);
-  box-shadow: 0 4px 14px rgba(232, 93, 4, 0.35);
-}
-
-.brandName {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  line-height: 1.1;
-}
-
-.brandSub {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.45);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  margin-top: 2px;
 }
 
 .closeBtn {
   display: none;
-  margin-left: auto;
+  flex-shrink: 0;
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: rgba(255, 255, 255, 0.7);
@@ -130,46 +107,166 @@
   cursor: pointer;
 }
 
-.nav {
+.sideNav {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 14px 12px 16px;
+  gap: 2px;
+  padding: 10px 8px 18px;
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-.navGroup {
-  display: flex;
+.phoneShortcuts {
+  display: none;
   flex-direction: column;
-  gap: 3px;
+  gap: 8px;
+  margin: 0 2px 12px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.navGroupLabel {
+.phoneShortcutsLabel {
+  margin: 0 4px;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.phoneShortcutsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.phoneShortcut {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.phoneShortcut:hover,
+.phoneShortcut:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.phoneShortcutActive {
+  border-color: rgba(232, 93, 4, 0.45);
+  background: rgba(232, 93, 4, 0.12);
+  color: #ffb56a;
+}
+
+.sideGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sideGroupBtn {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.sideGroupBtn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+
+.sideGroupBtnActive {
+  color: #ffb56a;
+}
+
+.sideGroupBtnOpen {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sideGroupBtnActive.sideGroupBtnOpen {
+  background: rgba(232, 93, 4, 0.14);
+  color: #ffb56a;
+}
+
+.sideGroupLabel {
+  flex: 1;
+  min-width: 0;
+}
+
+.sideChevron {
+  flex-shrink: 0;
+  opacity: 0.45;
+  transition: transform 0.18s ease, opacity 0.15s ease;
+}
+
+.sideChevronOpen {
+  transform: rotate(180deg);
+  opacity: 0.75;
+}
+
+.sideItems {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 0 8px 8px;
+  margin: 0 0 4px 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.panelSectionLabel {
+  margin: 8px 8px 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   color: rgba(255, 255, 255, 0.32);
-  padding: 4px 12px 6px;
+}
+
+.panelSectionLabel:first-child {
+  margin-top: 2px;
 }
 
 .navItem {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 9px 12px;
-  border-radius: 10px;
-  color: rgba(255, 255, 255, 0.62);
+  gap: 9px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.58);
   text-decoration: none;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 500;
   transition:
-    background 0.18s ease,
-    color 0.18s ease,
-    border-color 0.18s ease,
-    transform 0.18s ease;
+    background 0.15s ease,
+    color 0.15s ease;
   border: 1px solid transparent;
 }
 
@@ -192,21 +289,10 @@
 }
 
 .navItemActive {
-  background: rgba(232, 93, 4, 0.16);
-  color: #ff9f4a;
-  border-color: rgba(232, 93, 4, 0.32);
-  box-shadow: inset 3px 0 0 #e85d04;
-}
-
-.sidebarFooter {
-  padding: 16px 18px 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.divisionHint {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.35);
-  letter-spacing: 0.03em;
+  background: rgba(232, 93, 4, 0.18);
+  color: #ffb56a;
+  border-color: transparent;
+  font-weight: 600;
 }
 
 .main {
@@ -271,6 +357,45 @@
 
 .signOutLabel {
   display: inline;
+}
+
+.companySwitcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.companySwitcherLabel {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  white-space: nowrap;
+}
+
+.companySelect {
+  max-width: 200px;
+  min-width: 120px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.companySelect:hover,
+.companySelect:focus {
+  border-color: rgba(232, 135, 42, 0.45);
+  outline: none;
+}
+
+.companySelect option {
+  color: #1a1a1a;
+  background: #fff;
 }
 
 .topbarRight {
@@ -458,7 +583,7 @@
   top: 0;
   left: 0;
   bottom: 0;
-  width: min(300px, 88vw);
+  width: min(320px, 92vw);
   transform: translateX(-100%);
   transition: transform 0.22s ease;
   box-shadow: 8px 0 32px rgba(0, 0, 0, 0.45);
@@ -477,12 +602,25 @@
   display: grid;
 }
 
+.shellPhone .phoneShortcuts {
+  display: flex;
+}
+
 .shellPhone .menuBtn {
   display: none;
 }
 
 .shellPhone .userEmail {
   display: none;
+}
+
+.shellPhone .companySwitcherLabel {
+  display: none;
+}
+
+.shellPhone .companySelect {
+  max-width: 140px;
+  min-width: 96px;
 }
 
 .shellPhone .topbar {
@@ -586,7 +724,7 @@
     top: 0;
     left: 0;
     bottom: 0;
-    width: min(280px, 86vw);
+    width: min(320px, 92vw);
     transform: translateX(-100%);
     transition: transform 0.22s ease;
     box-shadow: 8px 0 32px rgba(0, 0, 0, 0.45);

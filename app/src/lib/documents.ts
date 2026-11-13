@@ -334,6 +334,59 @@ function prepareCloneForA4Capture(cloned: HTMLElement) {
   }
 }
 
+/** Wait until line-item (and letterhead) images are decoded so PDF capture is not blank. */
+export async function waitForElementImages(root: HTMLElement): Promise<void> {
+  const imgs = Array.from(root.querySelectorAll('img'))
+  await Promise.all(
+    imgs.map(async (img) => {
+      if (img.complete && img.naturalWidth > 0) return
+      try {
+        await img.decode()
+      } catch {
+        // Broken / empty src — leave blank rather than blocking PDF.
+      }
+    }),
+  )
+}
+
+/**
+ * html2canvas often drops <img> in its clone (especially data: URLs).
+ * Re-paint each image from the live DOM onto a canvas and swap it in the clone.
+ */
+export function embedImagesIntoPdfClone(sourceRoot: HTMLElement, clonedRoot: HTMLElement): void {
+  const sourceImgs = Array.from(sourceRoot.querySelectorAll('img'))
+  const cloneImgs = Array.from(clonedRoot.querySelectorAll('img'))
+  const doc = clonedRoot.ownerDocument || document
+
+  for (let i = 0; i < cloneImgs.length; i++) {
+    const live = sourceImgs[i]
+    const clone = cloneImgs[i]
+    if (!live || !clone) continue
+    if (!live.complete || live.naturalWidth <= 0) continue
+
+    const canvas = doc.createElement('canvas')
+    canvas.width = live.naturalWidth
+    canvas.height = live.naturalHeight
+    const ctx = canvas.getContext('2d')
+    if (!ctx) continue
+    try {
+      ctx.drawImage(live, 0, 0)
+    } catch {
+      continue
+    }
+
+    // Keep the same layout box the <img> had in the clone.
+    const style = clone.getAttribute('style') || ''
+    canvas.setAttribute('style', style)
+    canvas.style.display = clone.style.display || 'block'
+    canvas.style.width = clone.style.width || `${clone.width || 48}px`
+    canvas.style.height = clone.style.height || `${clone.height || 48}px`
+    canvas.style.objectFit = clone.style.objectFit || 'cover'
+    canvas.style.flexShrink = clone.style.flexShrink || '0'
+    clone.replaceWith(canvas)
+  }
+}
+
 function addCanvasPage(
   pdf: jsPDF,
   canvas: HTMLCanvasElement,
@@ -361,12 +414,15 @@ async function pagesToPdf(pages: HTMLElement[]): Promise<jsPDF> {
     compress: true,
   })
   for (const [index, page] of pages.entries()) {
+    await waitForElementImages(page)
     const canvas = await html2canvas(page, {
       scale: 2,
       useCORS: true,
       backgroundColor: '#ffffff',
       logging: false,
+      imageTimeout: 15000,
       onclone(_doc, cloned) {
+        embedImagesIntoPdfClone(page, cloned)
         prepareCloneForA4Capture(cloned)
         fitCloneToA4ByCompressingWhitespace(cloned)
       },
@@ -392,13 +448,17 @@ export async function elementToPdfBlob(
   // Default ON — invoices/quotes should prefer one A4 unless explicitly disabled.
   const fitToPage = opts?.fitToPage !== false
 
+  await waitForElementImages(element)
   const canvas = await html2canvas(element, {
     scale: 2,
     useCORS: true,
     backgroundColor: '#ffffff',
     logging: false,
+    imageTimeout: 15000,
     // Style the clone — never shrink the live preview, never clip rails/totals.
+    // Re-embed <img> pixels first — html2canvas often blanks data: line photos.
     onclone(_doc, cloned) {
+      embedImagesIntoPdfClone(element, cloned)
       prepareCloneForA4Capture(cloned)
       if (fitToPage) {
         fitCloneToA4ByCompressingWhitespace(cloned)

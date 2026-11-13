@@ -6,12 +6,7 @@ import type { AppUser, CrmEntry } from '../lib/types'
 import { useSettings } from '../contexts/SettingsContext'
 import { db } from '../lib/db'
 import { hydrateContacts, primaryContact } from '../lib/contacts'
-import {
-  isZohoCalendarEnabled,
-  isZohoConfigured,
-  listZohoCalendarEvents,
-  zohoCalendarWebUrl,
-} from '../lib/zoho'
+import { getCalendarProvider } from '../lib/mailCalendar'
 import { enrichCalendarEvents, type CalendarEventRow } from '../lib/zohoCalendarMatch'
 import { buildScheduleRows, type ScheduleKind, type ScheduleRow } from '../lib/scheduleBoard'
 import { useCompactCrm } from '../hooks/useMediaQuery'
@@ -70,8 +65,9 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
   const [daysAhead, setDaysAhead] = useState(14)
   const [filter, setFilter] = useState<Filter>('all')
 
-  const enabled = isZohoCalendarEnabled(settings)
-  const configured = isZohoConfigured(settings)
+  const calendar = getCalendarProvider(settings)
+  const enabled = calendar.isEnabled(settings)
+  const configured = calendar.isConfigured(settings)
 
   const loadTeam = useCallback(async () => {
     const { data, error: teamErr } = await db
@@ -93,7 +89,7 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
     try {
       const start = startOfDay(new Date())
       const end = addDays(start, daysAhead)
-      const events = await listZohoCalendarEvents(settings, { start, end })
+      const events = await calendar.listEvents(settings, { start, end })
       setCalendarEvents(enrichCalendarEvents(events, crmEntries))
     } catch (e) {
       setCalendarEvents([])
@@ -101,7 +97,7 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [enabled, settings, crmEntries, daysAhead])
+  }, [enabled, settings, crmEntries, daysAhead, calendar])
 
   useEffect(() => {
     void loadTeam()
@@ -202,7 +198,7 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
           </select>
           {configured && enabled ? (
             <a
-              href={zohoCalendarWebUrl(settings)}
+              href={calendar.webUrl(settings)}
               target="_blank"
               rel="noreferrer"
               style={{

@@ -7,7 +7,8 @@ import { accountWeights, dismissPair, loadDuplicateData, mergePair, type Duplica
 import { errorMessage } from '../lib/errors'
 import { roleAtLeast } from '../lib/permissions'
 import type { Account, AccountContact } from '../lib/types'
-import { buttonDangerStyle, buttonSecondaryStyle, cardStyle, colors, pageStyle, pageSubtitleStyle, pageTitleStyle } from '../lib/uiStyles'
+import { buttonDangerStyle, buttonSecondaryStyle, cardStyle, colors } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 const smallBtn = { ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 13 }
 const muted = { color: colors.muted, fontSize: 13 }
@@ -48,9 +49,14 @@ export default function DuplicatesPage() {
 
   if (!roleAtLeast(userRole, 'manager')) {
     return (
-      <div style={pageStyle}>
-        <h1 style={pageTitleStyle}>Duplicates</h1>
-        <p style={muted}>Only managers and admins can merge duplicates.</p>
+      <div className={docsStyles.page}>
+        <header className={docsStyles.hero}>
+          <div>
+            <p className={docsStyles.kicker}>Finance</p>
+            <h1 className={docsStyles.title}>Duplicates</h1>
+            <p className={docsStyles.subtitle}>Only managers and admins can merge duplicates.</p>
+          </div>
+        </header>
       </div>
     )
   }
@@ -77,12 +83,17 @@ export default function DuplicatesPage() {
   }
 
   return (
-    <div style={pageStyle}>
-      <h1 style={pageTitleStyle}>Duplicates</h1>
-      <p style={pageSubtitleStyle}>
-        Accounts and contacts that share a phone, an email, a website or a very similar name. Merging moves everything on the
-        duplicate (timeline, contacts, tickets, quotes, invoices, deals) to the one you keep, then removes the duplicate.
-      </p>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
+        <div>
+          <p className={docsStyles.kicker}>Finance</p>
+          <h1 className={docsStyles.title}>Duplicates</h1>
+          <p className={docsStyles.subtitle}>
+            Accounts and contacts that share a phone, an email, a website or a very similar name. Merging moves everything on the
+            duplicate (timeline, contacts, tickets, quotes, invoices, deals) to the one you keep, then removes the duplicate.
+          </p>
+        </div>
+      </header>
       <div style={{ display: 'flex', gap: 8, margin: '12px 0 16px' }}>
         <button type="button" style={tab(kind === 'account')} onClick={() => (setKind('account'), setOpen(null))}>
           Accounts ({pairs.account.length})

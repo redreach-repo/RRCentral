@@ -1,12 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { Building2, ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Building2, ExternalLink, Plus } from 'lucide-react'
+import VendorRowActions from '../components/vendors/VendorRowActions'
 import { db } from '../lib/db'
 import type { Attachment, Expense, Vendor } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
+import { canEditField, canViewField } from '../lib/fieldPermissions'
+import { parseVendorForm } from '../lib/schemas/vendor'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
+import EditorSectionTabs, {
+  editorPanelStyle,
+  type EditorSection,
+} from '../components/EditorSectionTabs'
 import { logActivity } from '../lib/activity'
 import { errorMessage, isMissingRelationError } from '../lib/errors'
 import { expenseVatParts } from '../lib/finance'
@@ -26,15 +34,12 @@ import {
   formGridStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
-  toolbarStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 type VendorForm = {
   company_name: string
@@ -67,16 +72,24 @@ function isHttpUrl(url: string): boolean {
 }
 
 export default function VendorsPage() {
-  const { user } = useAuth()
+  const { user, appUserId, userRole } = useAuth()
   const { showToast } = useToast()
+  const showTrn = canViewField(userRole, 'vendor.trn')
+  const editTrn = canEditField(userRole, 'vendor.trn')
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const vendorViewFilters = useMemo(() => {
+    const q = search.trim()
+    return q ? { q } : {}
+  }, [search])
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Vendor | null>(null)
   const [form, setForm] = useState<VendorForm>(emptyForm())
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Vendor | null>(null)
+  const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
+  const [editorSection, setEditorSection] = useState<EditorSection>('basics')
   const [missingTable, setMissingTable] = useState(false)
   const [vendorInvoices, setVendorInvoices] = useState<Expense[]>([])
   const [invoiceAttachments, setInvoiceAttachments] = useState<Attachment[]>([])
@@ -158,6 +171,7 @@ export default function VendorsPage() {
     setForm(emptyForm())
     setVendorInvoices([])
     setInvoiceAttachments([])
+    setEditorSection('basics')
     setOpen(true)
   }
 
@@ -175,28 +189,24 @@ export default function VendorsPage() {
       payment_terms: v.payment_terms || '',
       notes: v.notes || '',
     })
+    setEditorSection('basics')
     setOpen(true)
     void loadVendorInvoices(v.company_name)
   }
 
   async function save() {
-    if (!form.company_name.trim()) {
-      showToast('Company name is required', 'error')
+    const parsed = parseVendorForm({
+      ...form,
+      trn: editTrn ? form.trn : editing?.trn || '',
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setSaving(true)
     try {
       const payload = {
-        company_name: form.company_name.trim(),
-        primary_contact: form.primary_contact.trim(),
-        email: form.email.trim(),
-        mobile: form.mobile.trim(),
-        office: form.office.trim(),
-        address: form.address.trim(),
-        trn: form.trn.trim(),
-        website: form.website.trim(),
-        payment_terms: form.payment_terms.trim(),
-        notes: form.notes.trim(),
+        ...parsed.data,
         active: true,
         updated_at: new Date().toISOString(),
       }
@@ -257,30 +267,46 @@ export default function VendorsPage() {
   }
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Vendors</h1>
-          <p style={pageSubtitleStyle}>
-            Register suppliers you buy from (uniforms, goods). Pick them when saving a supplier
-            invoice — you do not need a vendor number.
+          <p className={docsStyles.kicker}>Finance</p>
+          <h1 className={docsStyles.title}>Vendors</h1>
+          <p className={docsStyles.subtitle}>
+            Register suppliers you buy from. Pick them when saving a supplier invoice — no vendor
+            number needed.
           </p>
         </div>
-        <button type="button" style={buttonPrimaryStyle} onClick={openCreate} disabled={missingTable}>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          onClick={openCreate}
+          disabled={missingTable}
+        >
           <Plus size={16} /> Register vendor
         </button>
-      </div>
+      </header>
 
       {missingTable ? (
-        <div style={{ ...cardStyle, color: colors.muted, lineHeight: 1.55 }}>
+        <div style={{ ...cardStyle, color: colors.muted, lineHeight: 1.55, marginBottom: 16 }}>
           The <code>vendors</code> table is not on this database yet. Run{' '}
           <code>supabase/migrations/20260924203122_vendors.sql</code> in the Supabase SQL editor, then refresh.
         </div>
       ) : null}
 
-      <div style={{ marginBottom: 16 }}>
+      <SavedViewsBar
+        moduleId="vendors"
+        filters={vendorViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => setSearch(String(f.q || ''))}
+        onToast={showToast}
+      />
+
+      <div className={docsStyles.controls}>
         <input
-          style={{ ...inputStyle, maxWidth: 360 }}
+          className={docsStyles.search}
           placeholder="Search company, contact, TRN…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -288,56 +314,51 @@ export default function VendorsPage() {
       </div>
 
       {loading ? (
-        <div style={{ ...cardStyle, color: colors.muted }}>Loading vendors…</div>
+        <div className={docsStyles.loading}>Loading vendors…</div>
       ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={<Building2 size={22} />}
-          title="No vendors yet"
-          subtitle="Register the supplier company from your invoice (name, TRN, contact)."
-          actionLabel="Register vendor"
-          onAction={openCreate}
-        />
+        <div className={docsStyles.empty}>
+          <EmptyState
+            icon={<Building2 size={22} />}
+            title="No vendors yet"
+            subtitle="Register the supplier company from your invoice (name, TRN, contact)."
+            actionLabel="Register vendor"
+            onAction={openCreate}
+          />
+        </div>
       ) : (
-        <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
-          <div style={tableWrapStyle}>
-            <table style={tableStyle}>
+        <div className={docsStyles.tableShell}>
+          <div className={docsStyles.tableWrap}>
+            <table className={docsStyles.table}>
               <thead>
                 <tr>
-                  <th style={thStyle}>Company</th>
-                  <th style={thStyle}>Contact</th>
-                  <th style={thStyle}>TRN</th>
-                  <th style={thStyle}>Phone / email</th>
-                  <th style={thStyle}></th>
+                  <th>Company</th>
+                  <th>Contact</th>
+                  {showTrn ? <th>TRN</th> : null}
+                  <th>Phone / email</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((v) => (
                   <tr key={v.id}>
-                    <td style={tdStyle}>
-                      <div style={{ fontWeight: 600 }}>{v.company_name}</div>
-                      {v.address ? (
-                        <div style={{ fontSize: 11, color: colors.muted2 }}>{v.address}</div>
-                      ) : null}
+                    <td className={docsStyles.clientCell}>
+                      <div className={docsStyles.ref}>{v.company_name}</div>
+                      {v.address ? <div className={docsStyles.meta}>{v.address}</div> : null}
                     </td>
-                    <td style={tdStyle}>{v.primary_contact || '—'}</td>
-                    <td style={tdStyle}>{v.trn || '—'}</td>
-                    <td style={tdStyle}>
+                    <td>{v.primary_contact || '—'}</td>
+                    {showTrn ? <td>{v.trn || '—'}</td> : null}
+                    <td>
                       {v.mobile || v.office || '—'}
-                      {v.email ? (
-                        <div style={{ fontSize: 11, color: colors.muted2 }}>{v.email}</div>
-                      ) : null}
+                      {v.email ? <div className={docsStyles.meta}>{v.email}</div> : null}
                     </td>
-                    <td style={tdStyle}>
-                      <button type="button" style={buttonSecondaryStyle} onClick={() => openEdit(v)}>
-                        <Pencil size={14} />
-                      </button>{' '}
-                      <button
-                        type="button"
-                        style={buttonDangerStyle}
-                        onClick={() => setDeleteTarget(v)}
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                    <td className={docsStyles.actionsCell}>
+                      <VendorRowActions
+                        vendor={v}
+                        expanded={actionsOpenId === v.id}
+                        onToggle={() => setActionsOpenId((id) => (id === v.id ? null : v.id))}
+                        onEdit={openEdit}
+                        onDelete={setDeleteTarget}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -353,6 +374,12 @@ export default function VendorsPage() {
         onClose={() => setOpen(false)}
         width={editing ? 760 : 640}
       >
+        <EditorSectionTabs
+          value={editorSection}
+          onChange={setEditorSection}
+          sections={editing ? ['basics', 'terms', 'notes', 'lines'] : ['basics', 'terms', 'notes']}
+        />
+        <div style={editorPanelStyle(editorSection === 'basics')}>
         <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.45 }}>
           Enter the supplier’s <strong style={{ color: colors.text }}>company name</strong> as it
           appears on their tax invoice. There is no separate vendor number — the invoice number
@@ -376,15 +403,19 @@ export default function VendorsPage() {
               onChange={(e) => setForm((f) => ({ ...f, primary_contact: e.target.value }))}
             />
           </div>
-          <div style={fieldStyle}>
-            <label style={labelStyle}>TRN</label>
-            <input
-              style={inputStyle}
-              value={form.trn}
-              onChange={(e) => setForm((f) => ({ ...f, trn: e.target.value }))}
-              placeholder="UAE tax registration number"
-            />
-          </div>
+          {showTrn ? (
+            <div style={fieldStyle}>
+              <label style={labelStyle}>TRN</label>
+              <input
+                style={inputStyle}
+                value={form.trn}
+                onChange={(e) => setForm((f) => ({ ...f, trn: e.target.value }))}
+                placeholder="UAE tax registration number"
+                disabled={!editTrn}
+                readOnly={!editTrn}
+              />
+            </div>
+          ) : null}
           <div style={fieldStyle}>
             <label style={labelStyle}>Email</label>
             <input
@@ -425,6 +456,10 @@ export default function VendorsPage() {
               onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
             />
           </div>
+        </div>
+        </div>
+
+        <div style={editorPanelStyle(editorSection === 'terms')}>
           <div style={fieldStyle}>
             <label style={labelStyle}>Payment terms</label>
             <input
@@ -435,6 +470,8 @@ export default function VendorsPage() {
             />
           </div>
         </div>
+
+        <div style={editorPanelStyle(editorSection === 'notes')}>
         <div style={fieldStyle}>
           <label style={labelStyle}>Notes</label>
           <textarea
@@ -443,8 +480,10 @@ export default function VendorsPage() {
             onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
           />
         </div>
+        </div>
 
         {editing ? (
+          <div style={editorPanelStyle(editorSection === 'lines')}>
           <div style={{ marginTop: 8, marginBottom: 16 }}>
             <div
               style={{
@@ -545,9 +584,10 @@ export default function VendorsPage() {
               </div>
             )}
           </div>
+          </div>
         ) : null}
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setOpen(false)}>
             Cancel
           </button>

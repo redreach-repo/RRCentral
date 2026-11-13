@@ -28,7 +28,13 @@ export const AI_PRICES = {
 /** Longest text sent in one request. Long threads keep the first message and the latest ones. */
 export const AI_MAX_INPUT_CHARS = 60_000
 
-export type AiFeature = 'ticket_summary' | 'ticket_reply' | 'report_summary' | 'call_notes' | 'call_brief' | 'update_tidy'
+export type AiFeature =
+  | 'ticket_summary'
+  | 'ticket_reply'
+  | 'report_summary'
+  | 'call_notes'
+  | 'call_brief'
+  | 'update_tidy'
 
 export const AI_FEATURES: { value: AiFeature; label: string }[] = [
   { value: 'ticket_summary', label: 'Ticket summary' },
@@ -243,7 +249,8 @@ export function buildAiRequest(input: AiInput): AiRequest {
         maxTokens: 3000,
         schema: REQUIREMENTS_SCHEMA as unknown as Record<string, unknown>,
       }
-  }  throw new Error('Unknown AI feature')
+  }
+  throw new Error('Unknown AI feature')
 }
 
 export type ProposedRequirement = { title: string; detail: string }
@@ -289,7 +296,7 @@ export function tidyAiText(text: string): string {
     .trim()
 }
 
-export type AiUsageRow = { account_id: string; cost_usd: number | string; created_at: string }
+export type AiUsageRow = { account_id: string | null; cost_usd: number | string; created_at: string }
 
 /** RR Central AI spend on one account in one month (`YYYY-MM`), USD. */
 export function assistCostInMonth(rows: AiUsageRow[], accountId: string, month: string): number {
