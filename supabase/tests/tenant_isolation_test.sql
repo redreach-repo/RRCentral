@@ -145,4 +145,9 @@ end $$;
 
 reset role;
 
+-- Leave no active non-@redreach.ae logins behind (catch_up_check_test expects OK).
+update public.app_users
+set active = false
+where lower(email) = 'admin@demo-b.test';
+
 select pg_temp.expect(true, 'tenant isolation suite complete');
