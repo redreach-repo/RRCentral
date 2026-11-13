@@ -10,19 +10,23 @@
 | Canvas assent capture | Exists — **not** AdES/QES; client copy states this |
 | Clause library | `/clause-library` CRUD |
 | Compose into templates | Insert active clauses into NDA + agreement draft editors |
-| Obligations board | Missing → next |
+| Obligations board | `/obligations` — open/done/cancelled follow-through |
 | TDRA QTSP integration | Not started → Phase B after ask |
 
-## Slice 4 (this milestone step)
+## Slice 5 (this milestone step)
 
-- `formatClauseForTemplate` / `insertTextAtCursor` helpers + tests
-- NDA template + Agreement template: insert active clauses at cursor; link to library
-- **No** QTSP; **no** obligations board yet
+- Migration `contract_obligations` (staff RLS) + Zod + store
+- `/obligations` board with filters, overdue highlight, mark done
+- **No** QTSP
 
 ## Later
 
-1. Obligations board
+1. Auto-create obligations from signed docs / clause tags
 2. Phase B QTSP after Alfred approves a licensed vendor
+
+## Ops
+
+1. Apply `20261214100000_contract_obligations.sql`
 
 ## Rules
 
