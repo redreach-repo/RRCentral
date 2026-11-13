@@ -10,7 +10,7 @@
 | AI CRM sales | `sales_deals` | `/sales` | Required `account_id` |
 | CTRM Next | `ctrm_deals` | `/ctrm` | Required `account_id` |
 
-`/deals` already boards all three via `myDeals.ts` (adapter only; writes stay native).
+`/deals` boards all three via `myDeals.ts` (read adapter) and writes through `myDealsStore` (`moveMyDeal` / `patchMyDeal`).
 
 ## Slice 1 (done)
 
@@ -19,17 +19,24 @@
 - Unlinked CRM deals stay on `/crm?edit=`
 - Docs only — **no** table merge / drops
 
-## Slice 2 (this milestone step)
+## Slice 2 (done)
 
 - `planCrmAccountBackfill` / `applyUniqueCrmAccountLinks` — unique soft-match only
 - `/deals` nudge banner: link unique matches; open CRM for ambiguous / none
 - Per-deal CRM sheet linker unchanged (create account / open / view matches)
 - **No** create-all, **no** table merge / drops
 
+## Slice 3 (this milestone step)
+
+- Write façade: `moveMyDeal` (stage) + `patchMyDeal` (next step / owner)
+- `/deals` next-step click → shared modal; routes to native tables
+- CRM owner maps `owner_user_id` → free-text `owner` name
+- Native `/crm` `/sales` `/ctrm` pages keep their own forms
+- **No** table merge / drops
+
 ## Later slices (not yet)
 
-1. Single write façade over the three tables
-2. Retire duplicate list pages / schema consolidate (**ask before destructive SQL**)
+1. Retire duplicate list pages / schema consolidate (**ask before destructive SQL**)
 
 ## Rules
 

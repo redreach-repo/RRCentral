@@ -5,18 +5,23 @@ import { listAccounts, listTeam } from './accountsStore'
 import { listCommissions, listDeals as listCtrmDeals, listStageChanges, updateDeal } from './ctrmStore'
 import { listSalesDeals, updateSalesDeal } from './salesPipelineStore'
 import { CONTRACT_INVOICE_DIVISION_KEY, DEFAULT_CONTRACT_INVOICE_DIVISION } from './contractBilling'
-import { crmMoveProblem, isLostReason } from './dealRules'
+import { crmMoveProblem, isLostReason, stageMoveProblem } from './dealRules'
 import { dealProblem } from './ctrm'
 import { salesDealProblem } from './salesPipeline'
 import { planCrmAccountBackfill, type CrmLinkPlan } from './crmAccountLink'
 import {
+  applyMyDealPatchLocal,
   buildDealRows,
+  crmOwnerText,
   dealAccess,
   targetStageForColumn,
   type BoardColumn,
   type DealRow,
+  type MyDealPatch,
 } from './myDeals'
 import type { AppUser, CrmEntry, CtrmDeal, CtrmStage, Quotation, SalesStage, UserRole } from './types'
+
+export type { MyDealPatch } from './myDeals'
 
 async function rows<T>(query: PromiseLike<{ data: unknown; error: unknown }>): Promise<T[]> {
   const { data, error } = await query
@@ -218,4 +223,115 @@ async function moveCtrmDeal(
     author,
   )
   return { stageLabel: stage }
+}
+
+/**
+ * M3 write façade: patch next step / owner on any Pipeline deal.
+ * Routes to the native table; does not merge schemas or touch deal value.
+ */
+export async function patchMyDeal(
+  deal: DealRow,
+  patch: MyDealPatch,
+  author: MoveAuthor,
+): Promise<void> {
+  const keys = Object.keys(patch).filter((k) => (patch as Record<string, unknown>)[k] !== undefined)
+  if (!keys.length) return
+
+  const merged = applyMyDealPatchLocal(deal, {
+    ...patch,
+    next_action: patch.next_action !== undefined ? patch.next_action.trim() : undefined,
+  })
+  if (deal.open) {
+    const problem = stageMoveProblem({
+      open: true,
+      lost: false,
+      next_action: merged.next_action,
+      next_action_date: merged.next_action_date,
+    })
+    if (problem) throw new Error(problem)
+  }
+
+  if (deal.pipeline === 'crm') {
+    await patchCrmDeal(deal, patch, author)
+    return
+  }
+  if (deal.pipeline === 'sales') {
+    await patchSalesDeal(deal, patch, author)
+    return
+  }
+  await patchCtrmDeal(deal, patch, author)
+}
+
+async function patchCrmDeal(deal: DealRow, patch: MyDealPatch, author: MoveAuthor): Promise<void> {
+  const { data, error } = await db.from('crm').select('*').eq('id', deal.id).maybeSingle()
+  if (error) throw error
+  const entry = data as CrmEntry | null
+  if (!entry) throw new Error('CRM deal not found')
+
+  const team = await listTeam()
+  const payload: Record<string, unknown> = {
+    updated_by: author.email,
+    updated_at: new Date().toISOString(),
+  }
+  if (patch.next_action !== undefined) payload.next_action = patch.next_action.trim()
+  if (patch.next_action_date !== undefined) payload.follow_up_date = patch.next_action_date
+  if (patch.owner_user_id !== undefined) payload.owner = crmOwnerText(patch.owner_user_id, team)
+
+  const { error: upd } = await db.from('crm').update(payload).eq('id', deal.id)
+  if (upd) throw upd
+  await logActivity(
+    'quick_update_crm',
+    'crm',
+    entry.company_name,
+    Object.keys(payload)
+      .filter((k) => k !== 'updated_by' && k !== 'updated_at')
+      .map((k) => `${k}=${String(payload[k] ?? '')}`)
+      .join(', ') || 'patch',
+    author.email,
+    deal.id,
+  )
+}
+
+async function patchSalesDeal(deal: DealRow, patch: MyDealPatch, author: MoveAuthor): Promise<void> {
+  const { rows } = await listSalesDeals()
+  const row = rows.find((d) => d.id === deal.id)
+  if (!row) throw new Error('Sales deal not found')
+
+  const next = {
+    ...row,
+    next_action: patch.next_action !== undefined ? patch.next_action.trim() : row.next_action,
+    next_action_date:
+      patch.next_action_date !== undefined ? patch.next_action_date : row.next_action_date,
+    owner_user_id: patch.owner_user_id !== undefined ? patch.owner_user_id : row.owner_user_id,
+  }
+  const problem = salesDealProblem(next)
+  if (problem) throw new Error(problem)
+
+  const storePatch: Parameters<typeof updateSalesDeal>[1] = {}
+  if (patch.next_action !== undefined) storePatch.next_action = patch.next_action.trim()
+  if (patch.next_action_date !== undefined) storePatch.next_action_date = patch.next_action_date
+  if (patch.owner_user_id !== undefined) storePatch.owner_user_id = patch.owner_user_id
+  await updateSalesDeal(row, storePatch, author)
+}
+
+async function patchCtrmDeal(deal: DealRow, patch: MyDealPatch, author: MoveAuthor): Promise<void> {
+  const rows = await listCtrmDeals()
+  const row = rows.find((d) => d.id === deal.id) as CtrmDeal | undefined
+  if (!row) throw new Error('CTRM deal not found')
+
+  const next = {
+    ...row,
+    next_action: patch.next_action !== undefined ? patch.next_action.trim() : row.next_action,
+    next_action_date:
+      patch.next_action_date !== undefined ? patch.next_action_date : row.next_action_date,
+    owner_user_id: patch.owner_user_id !== undefined ? patch.owner_user_id : row.owner_user_id,
+  }
+  const problem = dealProblem(next)
+  if (problem) throw new Error(problem)
+
+  const storePatch: Parameters<typeof updateDeal>[1] = {}
+  if (patch.next_action !== undefined) storePatch.next_action = patch.next_action.trim()
+  if (patch.next_action_date !== undefined) storePatch.next_action_date = patch.next_action_date
+  if (patch.owner_user_id !== undefined) storePatch.owner_user_id = patch.owner_user_id
+  await updateDeal(row, storePatch, author)
 }
