@@ -48,6 +48,64 @@ export function accountsFiltersEqual(a: AccountsViewFilters, b: AccountsViewFilt
   )
 }
 
+export type CrmViewFilters = {
+  q?: string
+  stage?: string
+  owner?: string
+  follow?: string
+  view?: string
+}
+
+export function normalizeCrmFilters(input: {
+  q: string
+  stage: string
+  owner: string
+  follow: string
+  view: string
+}): CrmViewFilters {
+  const out: CrmViewFilters = {}
+  const q = input.q.trim()
+  if (q) out.q = q
+  if (input.stage && input.stage !== 'All') out.stage = input.stage
+  if (input.owner && input.owner !== 'All') out.owner = input.owner
+  if (input.follow && input.follow !== 'All') out.follow = input.follow
+  if (input.view && input.view !== 'list') out.view = input.view
+  return out
+}
+
+export function crmFiltersEqual(a: CrmViewFilters, b: CrmViewFilters): boolean {
+  return (
+    (a.q || '') === (b.q || '') &&
+    (a.stage || 'All') === (b.stage || 'All') &&
+    (a.owner || 'All') === (b.owner || 'All') &&
+    (a.follow || 'All') === (b.follow || 'All') &&
+    (a.view || 'list') === (b.view || 'list')
+  )
+}
+
+export type QuotationsViewFilters = {
+  q?: string
+  status?: string
+}
+
+export function normalizeQuotationsFilters(input: {
+  q: string
+  status: string
+}): QuotationsViewFilters {
+  const out: QuotationsViewFilters = {}
+  const q = input.q.trim()
+  if (q) out.q = q
+  if (input.status && input.status !== 'All') out.status = input.status
+  return out
+}
+
+export function quotationsFiltersEqual(
+  a: QuotationsViewFilters,
+  b: QuotationsViewFilters,
+): boolean {
+  return (a.q || '') === (b.q || '') && (a.status || 'All') === (b.status || 'All')
+}
+
 export async function listSavedViews(moduleId: string): Promise<SavedView[]> {
   const { data, error } = await db
     .from('saved_views')

@@ -30,7 +30,13 @@ import EditorSectionTabs, {
 } from '../components/EditorSectionTabs'
 import LineItemImageField from '../components/LineItemImageField'
 import CustomFieldsCard from '../components/CustomFieldsCard'
+import SavedViewsBar from '../components/SavedViewsBar'
 import ClientBillToFields from '../components/ClientBillToFields'
+import {
+  normalizeQuotationsFilters,
+  quotationsFiltersEqual,
+  type QuotationsViewFilters,
+} from '../lib/savedViews'
 import { useClientBillTo } from '../hooks/useClientBillTo'
 import SupplierInvoiceModal from '../components/quotations/SupplierInvoiceModal'
 import QuoteRowActions from '../components/quotations/QuoteRowActions'
@@ -171,7 +177,7 @@ const emptyForm = (defaults?: Partial<QuoteForm>): QuoteForm => ({
 })
 
 export default function QuotationsPage() {
-  const { user, userRole } = useAuth()
+  const { user, userRole, appUserId } = useAuth()
   const { settings, updateSetting } = useSettings()
   const { showToast } = useToast()
   const navigate = useNavigate()
@@ -186,6 +192,19 @@ export default function QuotationsPage() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<StatusTab>('All')
   const [search, setSearch] = useState('')
+
+  const currentQuoteViewFilters = useMemo(
+    () => normalizeQuotationsFilters({ q: search, status: tab }),
+    [search, tab],
+  )
+
+  const applyQuoteViewFilters = useCallback((raw: Record<string, unknown>) => {
+    const f = raw as QuotationsViewFilters
+    const nextStatus = String(f.status || 'All') as StatusTab
+    const allowed: StatusTab[] = ['All', 'Draft', 'Finalized', 'Sent', 'Awarded']
+    setTab(allowed.includes(nextStatus) ? nextStatus : 'All')
+    setSearch(String(f.q || ''))
+  }, [])
   /** Only one row’s action panel open at a time — keeps the table scannable. */
   const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
@@ -1304,6 +1323,21 @@ export default function QuotationsPage() {
           <Plus size={16} /> New quotation
         </button>
       </header>
+
+      <SavedViewsBar
+        moduleId="quotations"
+        filters={currentQuoteViewFilters}
+        ownerUserId={appUserId}
+        canWrite={userRole !== 'viewer'}
+        applyDefaultOnLoad={
+          !searchParams.get('client') && !searchParams.get('ref') && !searchParams.get('quote')
+        }
+        onApply={applyQuoteViewFilters}
+        onToast={showToast}
+        filtersEqual={(a, b) =>
+          quotationsFiltersEqual(a as QuotationsViewFilters, b as QuotationsViewFilters)
+        }
+      />
 
       <div className={qStyles.controls}>
         <div className={qStyles.tabs}>
