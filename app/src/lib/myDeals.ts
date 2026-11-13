@@ -153,7 +153,16 @@ export type MyDealsInput = {
   accounts: Pick<Account, 'id' | 'name' | 'source'>[]
   crm: (Pick<
     CrmEntry,
-    'id' | 'company_name' | 'owner' | 'pipeline_stage' | 'next_action' | 'follow_up_date' | 'quote_ref' | 'updated_at' | 'created_at'
+    | 'id'
+    | 'company_name'
+    | 'owner'
+    | 'pipeline_stage'
+    | 'next_action'
+    | 'follow_up_date'
+    | 'quote_ref'
+    | 'updated_at'
+    | 'created_at'
+    | 'account_id'
   > & { stage_changed_at?: string | null })[]
   salesDeals: (Pick<
     SalesDeal,
@@ -200,6 +209,12 @@ function quoteAed(q: Pick<Quotation, 'amount' | 'base_amount'>): number {
   return base > 0 ? base : Number(q.amount) || 0
 }
 
+/** M3 bridge: linked CRM rows open Accounts; unlinked stay on the CRM sheet. */
+export function crmDealLink(crmId: string, accountId: string | null | undefined): string {
+  const aid = String(accountId || '').trim()
+  return aid ? `/accounts/${aid}` : `/crm?edit=${crmId}`
+}
+
 export function buildDealRows(input: MyDealsInput): DealRow[] {
   const { now } = input
   const userName = new Map(input.users.map((u) => [u.id, u.name || u.email]))
@@ -233,12 +248,14 @@ export function buildDealRows(input: MyDealsInput): DealRow[] {
     const login = userByName.get(String(c.owner || '').trim().toLowerCase())
     const division = (byRef || counted[0] || quotes[0])?.division_code || ''
     const weight = CRM_STAGE_WEIGHTS[stage] ?? 0
+    const accountId = c.account_id ? String(c.account_id) : null
+    const accountName = (accountId && account.get(accountId)?.name) || c.company_name || 'CRM lead'
     rows.push({
       key: `crm:${c.id}`,
       pipeline: 'crm',
       id: c.id,
-      account: c.company_name || 'CRM lead',
-      account_id: null,
+      account: accountName,
+      account_id: accountId,
       deal: counted.length ? counted.map((q) => q.reference_number).join(', ') : c.quote_ref || 'CRM lead',
       stage,
       stageLabel: stage,
@@ -252,9 +269,9 @@ export function buildDealRows(input: MyDealsInput): DealRow[] {
       days_in_stage: daysSince(c.stage_changed_at || c.updated_at || c.created_at, now),
       owner_user_id: login?.id ?? null,
       owner_label: login ? login.name : String(c.owner || ''),
-      source: '',
+      source: (accountId && account.get(accountId)?.source) || '',
       division,
-      link: `/crm?edit=${c.id}`,
+      link: crmDealLink(c.id, accountId),
     })
   }
 
