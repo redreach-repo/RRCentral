@@ -8,10 +8,11 @@
 - Signing an NDA/agreement opens default obligations on the board (idempotent)
 - Helper + tests bundled into `legal-sign`
 - Plan: `docs/M5_CONTRACTS_ESIGN.md`
+- Includes vault obligations UI already on main (#245)
 
 ## Already on main
 
-- M0–M4 · M1 leftovers · M5 slices 1–5
+- M0–M4 · M1 leftovers · M5 slices 1–5 · vault obligations (#245)
 
 ## Still open
 

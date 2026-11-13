@@ -10,7 +10,8 @@
 | Canvas assent capture | Exists — **not** AdES/QES; client copy states this |
 | Clause library | `/clause-library` CRUD |
 | Compose into templates | Insert active clauses into NDA + agreement draft editors |
-| Obligations board | `/obligations` |
+| Obligations board | `/obligations` — open/done/cancelled follow-through |
+| Vault obligations | CRM Contracts tab: list / quick-add / mark done |
 | Spawn on sign | `legal-sign` opens default obligations when a doc is signed |
 | TDRA QTSP integration | Not started → Phase B after ask |
 
