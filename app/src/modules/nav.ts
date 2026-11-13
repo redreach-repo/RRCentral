@@ -154,7 +154,7 @@ function navItemPath(to: string): string {
   return to.split('#')[0] || to
 }
 
-function itemMatchesPath(pathname: string, item: ModuleNavItem): boolean {
+export function itemMatchesPath(pathname: string, item: ModuleNavItem): boolean {
   const base = navItemPath(item.to)
   if (item.end) return pathname === base
   return pathname === base || pathname.startsWith(`${base}/`)
