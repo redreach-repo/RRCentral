@@ -7,8 +7,8 @@ import { useCompactCrm } from '../hooks/useMediaQuery'
 import resp from '../styles/crmResponsive.module.css'
 import { db } from '../lib/db'
 import { NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
-import { crmMoveProblem } from '../lib/dealRules'
 import type { AppUser, CrmEntry } from '../lib/types'
+import { parseFollowupUpdateForm } from '../lib/schemas/followupUpdate'
 import { resolveOwnerEmails } from '../lib/calendarAttendees'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
@@ -241,26 +241,26 @@ export default function FollowupsPage() {
   }
 
   async function saveUpdate() {
-    if (!updateTarget || !updateText.trim()) return
-    const moveProblem = crmMoveProblem(
-      updateTarget,
-      {
-        pipeline_stage: updateStage || updateTarget.pipeline_stage,
-        next_action: updateNextAction || updateTarget.next_action,
-        follow_up_date: updateClearDate ? null : updateFollowDate || updateTarget.follow_up_date,
-      },
-      { askedForReason: false },
-    )
-    if (moveProblem) {
-      showToast(moveProblem, 'error')
+    if (!updateTarget) return
+    const parsed = parseFollowupUpdateForm({
+      update_text: updateText,
+      pipeline_stage: updateStage,
+      next_action: updateNextAction,
+      follow_up_date: updateFollowDate,
+      clearDate: updateClearDate,
+      entry: updateTarget,
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
+    const upd = parsed.data
     setBusyId(updateTarget.id)
     try {
       const { error: err } = await db.from('follow_up_updates').insert({
         crm_id: updateTarget.id,
         company: updateTarget.company_name,
-        update_text: updateText.trim(),
+        update_text: upd.update_text,
         user_email: user?.email || '',
       })
       if (err) throw err
@@ -269,16 +269,16 @@ export default function FollowupsPage() {
         updated_by: user?.email || '',
         updated_at: new Date().toISOString(),
       }
-      if (updateStage) patch.pipeline_stage = updateStage
-      if (updateNextAction) patch.next_action = updateNextAction
+      if (upd.pipeline_stage) patch.pipeline_stage = upd.pipeline_stage
+      if (upd.next_action) patch.next_action = upd.next_action
 
       let nextDate: string | null | undefined
-      if (updateClearDate) {
+      if (upd.clearDate) {
         nextDate = null
         patch.follow_up_date = null
-      } else if (updateFollowDate) {
-        nextDate = updateFollowDate
-        patch.follow_up_date = updateFollowDate
+      } else if (upd.follow_up_date) {
+        nextDate = upd.follow_up_date
+        patch.follow_up_date = upd.follow_up_date
       }
 
       if (getCalendarProvider(settings).isEnabled(settings) && nextDate !== undefined) {
@@ -323,7 +323,7 @@ export default function FollowupsPage() {
         'followup_update',
         'crm',
         updateTarget.company_name,
-        updateText.trim().slice(0, 120),
+        upd.update_text.slice(0, 120),
         user?.email || '',
         updateTarget.id,
       )

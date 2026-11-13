@@ -5,6 +5,7 @@ import Modal from './Modal'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { errorMessage } from '../lib/errors'
+import { parseCalendarSettingsForm } from '../lib/schemas/calendarSettings'
 import {
   isZohoConfigured,
   listZohoCalendars,
@@ -85,11 +86,16 @@ export default function CalendarSettingsModal({ open, onClose, onSaved }: Props)
   }, [open, configured]) // eslint-disable-line react-hooks/exhaustive-deps -- load once on open
 
   async function save() {
+    const parsed = parseCalendarSettingsForm({ enabled, domain, calendarUid })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
     setSaving(true)
     try {
-      await updateSetting('zohoCalendarEnabled', enabled)
-      await updateSetting('zohoCalendarDomain', domain.trim() || 'https://calendar.zoho.com')
-      await updateSetting('zohoCalendarUid', calendarUid.trim())
+      await updateSetting('zohoCalendarEnabled', parsed.data.enabled)
+      await updateSetting('zohoCalendarDomain', parsed.data.domain)
+      await updateSetting('zohoCalendarUid', parsed.data.calendarUid)
       showToast('Calendar settings saved', 'success')
       onSaved?.()
       onClose()

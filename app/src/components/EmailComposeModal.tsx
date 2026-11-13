@@ -16,6 +16,7 @@ import {
   colors,
 } from '../lib/uiStyles'
 import { errorMessage } from '../lib/errors'
+import { parseEmailComposeForm } from '../lib/schemas/emailCompose'
 
 type Props = {
   open: boolean
@@ -59,23 +60,20 @@ export default function EmailComposeModal({
   }, [open, contacts, emails, defaultSubject, defaultBody, companyName, settings.companyName])
 
   async function handleSend() {
-    if (!to.trim()) {
-      showToast('Choose a recipient email', 'error')
+    const parsed = parseEmailComposeForm({ to, subject, body })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setSending(true)
     try {
       if (zohoEnabled) {
-        await getMailProvider(settings).sendMail(settings, {
-          to: to.trim(),
-          subject: subject.trim(),
-          body: body.trim(),
-        })
+        await getMailProvider(settings).sendMail(settings, parsed.data)
         showToast('Email sent via Zoho Mail', 'success')
         await onSent?.()
         onClose()
       } else {
-        openMailto(to.trim(), subject.trim(), body.trim())
+        openMailto(parsed.data.to, parsed.data.subject, parsed.data.body)
         showToast('Opened mail client (Zoho Mail not enabled)', 'success')
         await onSent?.()
         onClose()
@@ -88,11 +86,12 @@ export default function EmailComposeModal({
   }
 
   function handleMailtoFallback() {
-    if (!to.trim()) {
-      showToast('Choose a recipient email', 'error')
+    const parsed = parseEmailComposeForm({ to, subject, body })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
-    openMailto(to.trim(), subject.trim(), body.trim())
+    openMailto(parsed.data.to, parsed.data.subject, parsed.data.body)
   }
 
   return (

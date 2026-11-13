@@ -27,4 +27,10 @@ describe('fieldPermissions', () => {
     expect(keys).not.toContain('finance.profit')
     expect(keys).not.toContain('delivery.profitability')
   })
+
+  it('gates delivery.profitability like finance.profit roles', () => {
+    expect(canViewField('admin', 'delivery.profitability')).toBe(true)
+    expect(canViewField('manager', 'delivery.profitability')).toBe(true)
+    expect(canViewField('sales', 'delivery.profitability')).toBe(false)
+  })
 })

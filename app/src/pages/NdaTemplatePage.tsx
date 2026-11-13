@@ -7,6 +7,7 @@ import { useToast } from '../contexts/ToastContext'
 import { formatClauseForTemplate, insertTextAtCursor } from '../lib/clauseCompose'
 import { listContractClauses } from '../lib/clauseLibraryStore'
 import { errorMessage } from '../lib/errors'
+import { parseNdaApproveForm, parseNdaDraftForm } from '../lib/schemas/ndaTemplate'
 import { can } from '../lib/permissions'
 import {
   DEFAULT_NDA_BODY,
@@ -263,13 +264,24 @@ export default function NdaTemplatePage() {
                 type="button"
                 style={btnPrimary}
                 disabled={busy || !dirty}
-                onClick={() =>
+                onClick={() => {
+                  const parsed = parseNdaDraftForm({ title, body })
+                  if (!parsed.ok) {
+                    showToast(parsed.error, 'error')
+                    return
+                  }
                   void run(
-                    () => saveNdaDraft({ title, body }, user?.email || '', templates, selected?.id),
+                    () =>
+                      saveNdaDraft(
+                        { title: parsed.data.title, body: parsed.data.body },
+                        user?.email || '',
+                        templates,
+                        selected?.id,
+                      ),
                     'Could not save',
                     'Draft saved',
                   )
-                }
+                }}
               >
                 Save draft
               </button>
@@ -346,8 +358,26 @@ export default function NdaTemplatePage() {
                 style={btnPrimary}
                 disabled={busy}
                 onClick={() => {
+                  const parsed = parseNdaApproveForm({
+                    approvedBy: approving.by,
+                    approvedOn: approving.on,
+                    note: approving.note,
+                  })
+                  if (!parsed.ok) {
+                    showToast(parsed.error, 'error')
+                    return
+                  }
                   void run(
-                    () => approveNdaTemplate(selected.id, { approvedBy: approving.by, approvedOn: approving.on, note: approving.note }, templates),
+                    () =>
+                      approveNdaTemplate(
+                        selected.id,
+                        {
+                          approvedBy: parsed.data.approvedBy,
+                          approvedOn: parsed.data.approvedOn,
+                          note: parsed.data.note,
+                        },
+                        templates,
+                      ),
                     'Could not approve',
                     'NDA template approved',
                   ).then(() => setApproving(null))

@@ -132,6 +132,7 @@ type DocRow = {
   party_name: string
   party_email: string
   party_company: string
+  template_id: string | null
 }
 
 Deno.serve(withErrorLog("legal-sign", async (req) => {
@@ -290,6 +291,20 @@ Deno.serve(withErrorLog("legal-sign", async (req) => {
       .eq("id", doc.id)
 
     try {
+      let templateBody = ""
+      if (doc.template_id) {
+        const table = doc.doc_type === "service_agreement" ? "agreement_templates" : "nda_templates"
+        const { data: tpl } = await sb.from(table).select("body").eq("id", doc.template_id).maybeSingle()
+        templateBody = typeof tpl?.body === "string" ? tpl.body : ""
+        if (!templateBody && table === "agreement_templates") {
+          const { data: ndaTpl } = await sb
+            .from("nda_templates")
+            .select("body")
+            .eq("id", doc.template_id)
+            .maybeSingle()
+          templateBody = typeof ndaTpl?.body === "string" ? ndaTpl.body : ""
+        }
+      }
       const seeds = defaultObligationsOnSign({
         company_name: doc.company_name || "",
         crm_id: doc.crm_id || "",
@@ -297,6 +312,7 @@ Deno.serve(withErrorLog("legal-sign", async (req) => {
         doc_type: doc.doc_type || "nda",
         signed_at: signedAt,
         created_by: "legal-sign",
+        template_body: templateBody,
       })
       if (seeds.length) {
         const { count } = await sb

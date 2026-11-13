@@ -17,8 +17,8 @@ import {
   DOMAIN_STATUSES,
   domainStatusLabel,
   listOwnedDomainsResult,
-  normalizeDomainName,
 } from '../lib/domains'
+import { parseDomainForm } from '../lib/schemas/domain'
 import {
   buttonDangerStyle,
   buttonPrimaryStyle,
@@ -162,11 +162,12 @@ export default function DomainsPage() {
   }
 
   async function save() {
-    const domain_name = normalizeDomainName(form.domain_name)
-    if (!domain_name || !domain_name.includes('.')) {
-      showToast('Enter a valid domain (e.g. redreach.ae)', 'error')
+    const parsed = parseDomainForm(form)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
+    const domain_name = parsed.data.domain_name
     const duplicate = domains.find(
       (d) => d.domain_name.toLowerCase() === domain_name && d.id !== editing?.id,
     )
@@ -176,29 +177,22 @@ export default function DomainsPage() {
     }
     setSaving(true)
     try {
-      const costRaw = form.cost_aed.trim()
-      const cost_aed = costRaw === '' ? null : Number(costRaw)
-      if (costRaw !== '' && !Number.isFinite(cost_aed)) {
-        showToast('Renewal cost must be a number', 'error')
-        setSaving(false)
-        return
-      }
       const payload = {
         domain_name,
-        registrar: form.registrar.trim(),
-        registrar_account: form.registrar_account.trim(),
-        status: form.status,
-        registered_on: form.registered_on || null,
-        expires_on: form.expires_on || null,
-        auto_renew: form.auto_renew,
-        dns_provider: form.dns_provider.trim(),
-        nameservers: form.nameservers.trim(),
-        hosting_provider: form.hosting_provider.trim(),
-        website_url: form.website_url.trim(),
-        managed_by: form.managed_by.trim(),
-        cost_aed,
-        billing_cycle: form.billing_cycle,
-        notes: form.notes.trim(),
+        registrar: parsed.data.registrar,
+        registrar_account: parsed.data.registrar_account,
+        status: parsed.data.status,
+        registered_on: parsed.data.registered_on || null,
+        expires_on: parsed.data.expires_on || null,
+        auto_renew: parsed.data.auto_renew,
+        dns_provider: parsed.data.dns_provider,
+        nameservers: parsed.data.nameservers,
+        hosting_provider: parsed.data.hosting_provider,
+        website_url: parsed.data.website_url,
+        managed_by: parsed.data.managed_by,
+        cost_aed: parsed.data.cost_aed,
+        billing_cycle: parsed.data.billing_cycle,
+        notes: parsed.data.notes,
         active: true,
         updated_at: new Date().toISOString(),
       }

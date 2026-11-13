@@ -1,23 +1,23 @@
 # RRCRM status
 
-**Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** M5 contracts / e-sign (slice 6 — spawn obligations on sign)
+**Last updated:** 14 November 2026 (Asia/Dubai)  
+**Current milestone:** M5 contracts / e-sign (slice 6–7) + M3 Pipeline backlog
 
-## Shipped this turn (M5 slice 6)
+## Shipped this turn
 
-- Signing an NDA/agreement opens default obligations on the board (idempotent)
-- Helper + tests bundled into `legal-sign`
-- Plan: `docs/M5_CONTRACTS_ESIGN.md`
-- Includes vault obligations UI already on main (#245)
+- Signing an NDA/agreement opens default (+ clause-tag) obligations on the board (idempotent); helper bundled into `legal-sign` (see `docs/M5_CONTRACTS_ESIGN.md`)
+- Vault obligations UI on main (#245); M3 `patchMyDeal` façade fields on main
 
 ## Already on main
 
-- M0–M4 · M1 leftovers · M5 slices 1–5 · vault obligations (#245)
+- M0–M4 · M1 Zod backlog · M5 slices 1–5+clause spawn · vault obligations · QTSP scaffold · `pipeline_deals_v`
 
-## Still open
+## Still open (agent queue)
 
-**M5 next:** richer spawn rules; QTSP only after ask  
-**M4 hold:** Gmail Phase B (CASA); IMAP only if a real need  
-**M1 leftovers:** more Zod; expand field mask; missing logos (need assets)  
-**M3 hold:** schema consolidate (**ask**) · **M3a** demo (ask Alfred)  
-**Open §19 decisions** — do not guess
+1. More M1 Zod  
+2. M3 façade / inventory metrics UI  
+3. Demo env hooks after Alfred provisions  
+
+## Still externally blocked
+
+- CASA · logos · §19 · paid QTSP · M3a Supabase (Alfred)

@@ -21,7 +21,8 @@ import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
 import { hoursLabel } from '../lib/timeTracking'
 import type { BuildStageKey, BuildTemplate, BuildTemplateItem, BuildTemplateItemKind, DeliveryPackage, GoLiveOwner } from '../lib/types'
-import { GO_LIVE_OWNERS, dueDaysProblem, ownerLabel } from '../lib/goLive'
+import { GO_LIVE_OWNERS, ownerLabel } from '../lib/goLive'
+import { parseBuildTemplateForm, parseBuildTemplateItemForm } from '../lib/schemas/buildTemplate'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -112,18 +113,18 @@ export default function BuildTemplatesPage() {
 
   async function saveTemplate() {
     if (!templateForm) return
-    const name = templateForm.name.trim()
-    if (!name) {
-      showToast('Give the template a name', 'error')
+    const parsed = parseBuildTemplateForm(templateForm)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     const existing = templates.find((t) => t.id === templateForm.id)
     const input = {
-      code: existing?.code ?? codeFromName(name, templates),
-      name,
-      description: templateForm.description.trim(),
-      package_id: templateForm.package_id || null,
-      active: templateForm.active,
+      code: existing?.code ?? codeFromName(parsed.data.name, templates),
+      name: parsed.data.name,
+      description: parsed.data.description,
+      package_id: parsed.data.package_id,
+      active: parsed.data.active,
     }
     await run(async () => {
       const id = templateForm.copyOf
@@ -131,36 +132,26 @@ export default function BuildTemplatesPage() {
         : await saveBuildTemplate(input, templateForm.id)
       setSelectedId(id)
       setTemplateForm(null)
-      showToast(`${name} saved`, 'success')
+      showToast(`${parsed.data.name} saved`, 'success')
     }, 'Could not save the template')
   }
 
   async function saveItem() {
     if (!itemForm || !selected) return
-    const title = itemForm.title.trim()
-    const hours = itemForm.hours.trim() === '' ? 0 : Number(itemForm.hours)
-    if (!title) {
-      showToast('Add a title', 'error')
-      return
-    }
-    if (!Number.isFinite(hours) || hours < 0) {
-      showToast('Hours must be a number', 'error')
-      return
-    }
-    const daysProblem = itemForm.kind === 'golive' ? dueDaysProblem(itemForm.dueDays) : null
-    if (daysProblem) {
-      showToast(daysProblem, 'error')
+    const parsed = parseBuildTemplateItemForm(itemForm)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     const existing = selectedItems.find((i) => i.id === itemForm.id)
     const input: TemplateItemInput = {
-      kind: itemForm.kind,
-      stage: itemForm.kind === 'config' ? null : itemForm.stage,
-      title,
-      detail: itemForm.detail.trim(),
-      est_hours: itemForm.kind === 'task' ? hours : 0,
-      owner: itemForm.owner,
-      due_days: itemForm.kind === 'golive' ? Number(itemForm.dueDays) : null,
+      kind: parsed.data.kind,
+      stage: parsed.data.stage,
+      title: parsed.data.title,
+      detail: parsed.data.detail,
+      est_hours: parsed.data.est_hours,
+      owner: parsed.data.owner,
+      due_days: parsed.data.due_days,
       sort: existing?.sort ?? selectedItems.reduce((max, i) => Math.max(max, i.sort), 0) + 1,
     }
     await run(async () => {

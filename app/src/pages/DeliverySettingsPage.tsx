@@ -15,6 +15,7 @@ import { DEFAULT_DELIVERY_RATES, DELIVERY_RATE_KEYS, type DeliveryRates, ratesFr
 import { listPackages, updatePackage } from '../lib/deliveryStore'
 import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
+import { parseDeliveryPackageForm, parseDeliveryRatesForm } from '../lib/schemas/deliverySettings'
 import type { DeliveryPackage } from '../lib/types'
 import {
   buttonPrimaryStyle,
@@ -96,20 +97,26 @@ export default function DeliverySettingsPage() {
 
   async function savePackage(p: DeliveryPackage) {
     const d = drafts[p.id]
-    const patch: Partial<DeliveryPackage> = { name: d.name.trim() || p.name, support_response: d.support_response.trim() }
-    for (const f of PACKAGE_FIELDS) {
-      const raw = d[f.key].trim()
-      if (raw === '' && f.optional) {
-        ;(patch as Record<string, unknown>)[f.key] = null
-        continue
-      }
-      const n = Number(raw)
-      if (!Number.isFinite(n) || n < 0) {
-        showToast(`${f.label} must be a number`, 'error')
-        return
-      }
-      ;(patch as Record<string, unknown>)[f.key] = n
+    const parsed = parseDeliveryPackageForm({
+      name: d.name,
+      support_response: d.support_response,
+      monthly_fee_a: d.monthly_fee_a,
+      setup_fee_b: d.setup_fee_b,
+      monthly_fee_b: d.monthly_fee_b,
+      target_hours: d.target_hours,
+      build_hours_target: d.build_hours_target,
+      included_whatsapp: d.included_whatsapp,
+      support_response_days: d.support_response_days,
+      ai_cap_usd: d.ai_cap_usd,
+      included_lead_credits_usd: d.included_lead_credits_usd,
+      tool_cost_aed: d.tool_cost_aed,
+      fallbackName: p.name,
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
     }
+    const patch: Partial<DeliveryPackage> = parsed.data
     setSaving(p.id)
     try {
       await updatePackage(p.id, patch)
@@ -123,12 +130,23 @@ export default function DeliverySettingsPage() {
   }
 
   async function saveRates() {
+    const parsed = parseDeliveryRatesForm({
+      marketingRateAed: rateDraft.marketingRateAed,
+      serviceRateAed: rateDraft.serviceRateAed,
+      aiMarkupPercent: rateDraft.aiMarkupPercent,
+      leadMarkupPercent: rateDraft.leadMarkupPercent,
+      internalHourlyRateAed: rateDraft.internalHourlyRateAed,
+      usdToAed: rateDraft.usdToAed,
+      fixedMonthlyCostAed: rateDraft.fixedMonthlyCostAed,
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
     setSaving('rates')
     try {
       for (const f of RATE_FIELDS) {
-        const n = Number(rateDraft[f.key])
-        if (!Number.isFinite(n) || n < 0) throw new Error(`${f.label} must be a number`)
-        await updateSetting(DELIVERY_RATE_KEYS[f.key], String(n))
+        await updateSetting(DELIVERY_RATE_KEYS[f.key], String(parsed.data[f.key]))
       }
       showToast('Rates saved', 'success')
     } catch (e) {
