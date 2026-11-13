@@ -30,7 +30,7 @@ Status key: **exists** · **partial** · **missing**
 | Shell: Inbox/Sales/… areas, Cmd+K, AI button | partial | Accordion nav exists; restructure shell in M1 |
 | Company switcher | partial | M1 top-bar switcher; multi-company ops still thin |
 | EN+AR RTL | partial | M1 `I18nContext` + dir; catalogs incomplete |
-| PWA installable | partial | Manifest/icons exist historically; regenerate from brand mark in M1 branding |
+| PWA installable | partial | Icons + maskable safe-zone from brand mark; theme `#C8321A`; still missing division logos |
 | Brand kits per tenant/company/BU | partial | M1 `brand_kits` + `app/public/brand`; missing Boost/Care/Trading assets |
 | In-app guide `/guide` | partial | M1 route shell; content packs later |
 
