@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** M1 leftover (Zod invoice form)
+**Current milestone:** M1 leftover (Zod quotation form)
 
 ## Shipped this turn
 
-- Zod `parseInvoiceForm` on invoice save (client, date, VAT mode / custom %)
+- Zod `parseQuotationForm` on quotation draft save (client/lines, email, FX, discounts)
 
 ## Already on main
 
-- M0–M4 · M1 leftovers (Quick Add / vendor / expense / CRM Zod, field-mask) · M5 through clause-tag spawn
+- M0–M4 · M1 leftovers (Quick Add / vendor / expense / CRM / invoice Zod, field-mask) · M5 through clause-tag spawn
 
 ## Still open
 
