@@ -15,7 +15,7 @@ export type SalesDealFormInput = {
   next_action: string
   next_action_date: string | null
   lost_reason: string
-  lost_reason_code: string
+  lost_reason_code?: string
   notes: string
   discovery_call_date: string | null
   package_id: string | null
@@ -50,7 +50,7 @@ export const salesDealFormSchema = z
     next_action: z.string(),
     next_action_date: optionalYmd,
     lost_reason: z.string(),
-    lost_reason_code: z.string(),
+    lost_reason_code: z.string().optional().default(''),
     notes: z.string(),
     discovery_call_date: optionalYmd,
     package_id: z.string().nullable(),
