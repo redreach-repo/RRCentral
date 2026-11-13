@@ -1,20 +1,30 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** M1 leftover (Zod supplier invoice)
+**Current milestone:** Continuous backlog (unlocked) — M3a demo prep
 
 ## Shipped this turn
 
-- Zod `parseSupplierInvoiceForm` on quote supplier invoice (vendor, total, Drive link)
+- M3a demo prep doc (`docs/M3A_DEMO.md`) — checklist only; Alfred still provisions project
 
 ## Already on main
 
-- M0–M4 · M1 leftovers (forms Zod through payments, field-mask) · M5 through clause-tag spawn
+- M0–M4 · M1 leftovers · M5 through clause-tag spawn
 
-## Still open
+## In flight (other PRs)
 
-**M5 next:** QTSP only after ask  
-**M4 hold:** Gmail Phase B (CASA); IMAP only if a real need  
-**M1 leftovers:** more Zod; missing logos (need assets)  
-**M3 hold:** schema consolidate (**ask**) · **M3a** demo (ask Alfred)  
-**Open §19 decisions** — do not guess
+- Zod batch + QTSP scaffold stack
+
+## Still open (agent queue)
+
+1. More M1 Zod
+2. M3 schema consolidate (non-destructive first slices)
+3. Demo env hooks after Alfred provisions
+
+## Still externally blocked
+
+- **Gmail Phase B** — CASA  
+- **Division logos** — need assets  
+- **§19 decisions** — do not invent  
+- **Paid QTSP vendor** — Alfred  
+- **2nd Supabase for M3a** — Alfred  

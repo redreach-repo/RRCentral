@@ -40,10 +40,10 @@
 - Prefer-Pipeline banners on detail boards; My Day hero links to Pipeline
 - Routes and tables kept — **no** redirects that break bookmarks, **no** schema drops
 
-## Later (ask first)
+## Later (unlocked — still careful)
 
-1. Schema consolidate / drop duplicate list routes (**ask before destructive SQL**)
-2. M3a demo project (Alfred)
+1. Schema consolidate / drop duplicate list routes — **unlocked**, but still **no destructive SQL** until a dedicated migrate PR with dual-write + cutover plan
+2. M3a demo project — prep in `docs/M3A_DEMO.md`; **Alfred provisions** the Supabase project
 
 ## Rules
 
