@@ -1,10 +1,9 @@
 /**
- * M1 Zod starter: login credentials validation shared by LoginPage (and tests).
- * Domain rule stays in allowedLoginEmail — schema composes it.
+ * M1 Zod: login credentials validation shared by LoginPage (and tests).
  */
 import { z } from 'zod'
-import { isAllowedLoginEmail, loginEmailDomainError, normalizeEmail } from '../allowedLoginEmail'
 import { MIN_PASSWORD_LENGTH } from '../authApi'
+import { companyEmailSchema, firstZodError, passwordMinMessage } from './common'
 
 export type LoginCredentialsInput = {
   email: string
@@ -22,25 +21,16 @@ export function loginCredentialsSchema(opts: { localMode?: boolean } = {}) {
   const localMode = Boolean(opts.localMode)
   return z
     .object({
-      email: z
-        .string()
-        .trim()
-        .min(1, 'Enter your email')
-        .email('Enter a valid email')
-        .transform((v) => normalizeEmail(v))
-        .refine((v) => isAllowedLoginEmail(v), {
-          message: loginEmailDomainError(),
-        }),
+      email: companyEmailSchema,
       password: z.string(),
     })
     .superRefine((val, ctx) => {
-      // Local mode historically skips min-length (HTML required={!isLocalMode}).
       if (localMode) return
       if (!val.password || val.password.length < MIN_PASSWORD_LENGTH) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['password'],
-          message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+          message: passwordMinMessage(),
         })
       }
     })
@@ -57,6 +47,5 @@ export function parseLoginCredentials(
   if (result.success) {
     return { ok: true, data: { email: result.data.email, password: result.data.password } }
   }
-  const first = result.error.issues[0]
-  return { ok: false, error: first?.message || 'Check your email and password' }
+  return { ok: false, error: firstZodError(result.error, 'Check your email and password') }
 }
