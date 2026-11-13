@@ -25,6 +25,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useSettings } from '../contexts/SettingsContext'
 import { useTenant } from '../contexts/TenantContext'
 import { useI18n } from '../contexts/I18nContext'
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders'
@@ -35,6 +36,7 @@ import { elapsedLabel } from '../lib/timeTracking'
 import { useRecurringDeductionsSync } from '../hooks/useRecurringDeductionsSync'
 import { usePhoneShell } from '../hooks/useMediaQuery'
 import { can, roleAtLeast } from '../lib/permissions'
+import { shouldHidePipelineDetailNavItem } from '../lib/pipelineDetailNav'
 import type { UserRole } from '../lib/types'
 import { APP_MODULES, itemMatchesPath, moduleIdForPath, titleForPath } from '../modules/nav'
 import type { ModuleNavItem } from '../modules/registry'
@@ -95,17 +97,23 @@ function writeSavedSection(id: string) {
   }
 }
 
-function filterItems(items: NavItem[], userRole: UserRole): NavItem[] {
+function filterItems(
+  items: NavItem[],
+  userRole: UserRole,
+  settings: Record<string, string | undefined>,
+): NavItem[] {
   return items.filter((item) => {
     if (userRole === 'staff' && !item.forStaff) return false
     if (item.roles) return item.roles.includes(userRole)
     if (item.minRole) return roleAtLeast(userRole, item.minRole)
+    if (shouldHidePipelineDetailNavItem(item.to, settings, userRole)) return false
     return true
   })
 }
 
 export default function Layout() {
   const { user, userRole, signOut, isLocalMode } = useAuth()
+  const { settings } = useSettings()
   const { companies, activeCompanyId, setActiveCompanyId, activeCompany } = useTenant()
   const { t } = useI18n()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -121,9 +129,9 @@ export default function Layout() {
 
   const visibleGroups = useMemo(() => {
     return navGroups
-      .map((group) => ({ ...group, items: filterItems(group.items, userRole) }))
+      .map((group) => ({ ...group, items: filterItems(group.items, userRole, settings) }))
       .filter((group) => group.items.length > 0)
-  }, [userRole])
+  }, [userRole, settings])
 
   const pathSection = moduleIdForPath(location.pathname)
   const [expandedIds, setExpandedIds] = useState<string[]>(() => {
@@ -200,8 +208,8 @@ export default function Layout() {
 
   const visiblePhoneShortcuts = useMemo(() => {
     const primaryPaths = new Set(phoneNav.map((item) => item.to))
-    return filterItems(phoneShortcuts, userRole).filter((item) => !primaryPaths.has(item.to))
-  }, [phoneNav, userRole])
+    return filterItems(phoneShortcuts, userRole, settings).filter((item) => !primaryPaths.has(item.to))
+  }, [phoneNav, userRole, settings])
 
   return (
     <div className={`${styles.shell} ${phoneShell ? styles.shellPhone : ''}`}>

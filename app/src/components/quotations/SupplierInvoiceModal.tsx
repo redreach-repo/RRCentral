@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { FileUp } from 'lucide-react'
 import Modal from '../Modal'
+import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
+import { canViewField } from '../../lib/fieldPermissions'
 import { PAYMENT_METHODS } from '../../lib/config'
 import type { Attachment, Expense, Quotation, Vendor } from '../../lib/types'
 import { logActivity } from '../../lib/activity'
@@ -16,7 +18,6 @@ import {
   loadQuoteSupplierInvoiceAttachments,
   saveSupplierInvoiceForQuote,
 } from '../../lib/supplierInvoiceStore'
-import { isDriveShareUrl } from '../../lib/customerFiles'
 import { resolveDealRef } from '../../lib/dealQuotes'
 import {
   buttonPrimaryStyle,
@@ -30,6 +31,7 @@ import {
   selectStyle,
 } from '../../lib/uiStyles'
 import { errorMessage } from '../../lib/errors'
+import { parseSupplierInvoiceForm } from '../../lib/schemas/supplierInvoice'
 
 type Props = {
   /** Quotation to record a supplier invoice for; null keeps the dialog closed. */
@@ -44,6 +46,8 @@ type Props = {
 /** Record the supplier's invoice (cost + VAT) against a quotation's deal. */
 export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onClose, onSaved }: Props) {
   const { showToast } = useToast()
+  const { userRole } = useAuth()
+  const showVendorTrn = canViewField(userRole, 'vendor.trn')
   const supplierInvoiceTarget = quote
   const [saving, setSaving] = useState(false)
   const [supplierInvoiceForm, setSupplierInvoiceForm] = useState({
@@ -182,46 +186,37 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
 
   async function saveSupplierInvoice() {
     if (!supplierInvoiceTarget) return
-    if (!supplierInvoiceForm.vendor.trim()) {
-      showToast('Vendor is required', 'error')
+    const parsed = parseSupplierInvoiceForm({
+      ...supplierInvoiceForm,
+      drive_url: supplierInvoiceDriveUrl,
+      drive_title: supplierInvoiceDriveTitle,
+      existing_drive_url: supplierInvoiceAttachments[0]?.url,
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
-    if (!supplierInvoiceForm.amount && !supplierInvoiceForm.amount_ex_vat) {
-      showToast('Enter the supplier invoice total', 'error')
-      return
-    }
-    const linkUrl = supplierInvoiceDriveUrl.trim()
-    // A link saved before the move (old WorkDrive) may stay; new links are Google Drive.
-    if (linkUrl && !isDriveShareUrl(linkUrl) && linkUrl !== supplierInvoiceAttachments[0]?.url) {
-      showToast('Use a Google Drive share link', 'error')
-      return
-    }
+    const form = parsed.data
+    const linkUrl = form.drive_url
     setSaving(true)
     try {
       let amount_ex_vat: number
       let vat_amount: number
       let amount: number
-      if (!supplierInvoiceForm.charges_vat) {
-        amount = round2(
-          supplierInvoiceForm.amount > 0
-            ? supplierInvoiceForm.amount
-            : supplierInvoiceForm.amount_ex_vat,
-        )
+      if (!form.charges_vat) {
+        amount = round2(form.amount > 0 ? form.amount : form.amount_ex_vat)
         amount_ex_vat = amount
         vat_amount = 0
       } else {
         amount_ex_vat =
-          supplierInvoiceForm.amount_ex_vat > 0
-            ? round2(supplierInvoiceForm.amount_ex_vat)
-            : round2(supplierInvoiceForm.amount / (1 + vatRate))
+          form.amount_ex_vat > 0
+            ? round2(form.amount_ex_vat)
+            : round2(form.amount / (1 + vatRate))
         vat_amount =
-          supplierInvoiceForm.vat_amount > 0
-            ? round2(supplierInvoiceForm.vat_amount)
-            : round2(Math.max(0, supplierInvoiceForm.amount - amount_ex_vat))
-        amount =
-          supplierInvoiceForm.amount > 0
-            ? round2(supplierInvoiceForm.amount)
-            : round2(amount_ex_vat + vat_amount)
+          form.vat_amount > 0
+            ? round2(form.vat_amount)
+            : round2(Math.max(0, form.amount - amount_ex_vat))
+        amount = form.amount > 0 ? round2(form.amount) : round2(amount_ex_vat + vat_amount)
       }
 
       const result = await saveSupplierInvoiceForQuote({
@@ -229,21 +224,18 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
         driveLink: linkUrl
           ? {
               url: linkUrl,
-              title:
-                supplierInvoiceDriveTitle.trim() ||
-                supplierInvoiceForm.supplier_invoice_no.trim() ||
-                'Supplier invoice',
+              title: form.drive_title || form.supplier_invoice_no || 'Supplier invoice',
             }
           : null,
         uploadedBy: who,
-        vendor: supplierInvoiceForm.vendor,
-        date: supplierInvoiceForm.date || null,
+        vendor: form.vendor,
+        date: form.date || null,
         amount,
         amount_ex_vat,
         vat_amount,
-        payment_method: supplierInvoiceForm.payment_method,
-        notes: supplierInvoiceForm.notes,
-        supplier_invoice_no: supplierInvoiceForm.supplier_invoice_no,
+        payment_method: form.payment_method,
+        notes: form.notes,
+        supplier_invoice_no: form.supplier_invoice_no,
         expenseId: supplierInvoiceExpenses[0]?.id,
         vatRate,
       })
@@ -251,7 +243,7 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
         'save_supplier_invoice',
         'quotation',
         result.quoteRef,
-        `${supplierInvoiceForm.vendor} · ${formatAED(amount)}`,
+        `${form.vendor} · ${formatAED(amount)}`,
         who,
       )
       showToast(
@@ -376,7 +368,7 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
                   }}
                 >
                   {v.company_name}
-                  {v.trn ? (
+                  {showVendorTrn && v.trn ? (
                     <span style={{ color: colors.muted2, marginLeft: 8 }}>TRN {v.trn}</span>
                   ) : null}
                 </button>

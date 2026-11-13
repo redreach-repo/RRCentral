@@ -7,8 +7,9 @@ import EditorSectionTabs, {
 } from '../EditorSectionTabs'
 import LostReasonFields from '../deals/LostReasonFields'
 import { formatAED } from '../../lib/money'
-import { SALES_STAGES, quoteFirstYear, quoteFromPackage, salesDealProblem } from '../../lib/salesPipeline'
+import { SALES_STAGES, quoteFirstYear, quoteFromPackage } from '../../lib/salesPipeline'
 import type { SalesDealInput } from '../../lib/salesPipelineStore'
+import { parseSalesDealForm } from '../../lib/schemas/salesDeal'
 import type { Account, AppUser, DeliveryPackage, SalesDeal, SalesStage } from '../../lib/types'
 import {
   buttonPrimaryStyle,
@@ -108,16 +109,12 @@ export default function SalesDealFormModal({
 
   function submit() {
     if (!v) return
-    if (!v.accountId && !v.newCompany.trim()) {
-      setError('Pick the company, or type a new one')
+    const parsed = parseSalesDealForm({ ...v, contract_id: deal?.contract_id ?? null })
+    if (!parsed.ok) {
+      setError(parsed.error)
       return
     }
-    const problem = salesDealProblem({ ...v, contract_id: deal?.contract_id ?? null })
-    if (problem) {
-      setError(problem)
-      return
-    }
-    onSave(v)
+    onSave({ ...v, ...parsed.data })
   }
 
   return (

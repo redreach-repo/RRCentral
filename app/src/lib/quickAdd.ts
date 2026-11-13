@@ -55,7 +55,7 @@ export const QUICK_LEAD_PIPELINES: { value: QuickLeadPipeline; label: string }[]
   { value: 'crm', label: 'CRM (other desks)' },
 ]
 
-/** Why a new lead cannot be saved yet, or null. */
+/** Why a new lead cannot be saved yet, or null. Prefer parseQuickLeadForm at save sites. */
 export function quickLeadProblem(input: { phone: string; name: string; email?: string }, countryCode = '971'): string | null {
   if (!phoneKey(input.phone, countryCode)) return 'Type the phone number first'
   if (input.name.trim().length < 2) return 'Add a name'

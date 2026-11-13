@@ -29,6 +29,7 @@ import {
 } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 import { errorMessage } from '../lib/errors'
+import { parseQuoteTemplateForm } from '../lib/schemas/quoteTemplate'
 
 type TemplateForm = {
   name: string
@@ -115,26 +116,18 @@ export default function TemplatesPage() {
   }
 
   async function save() {
-    if (!form.name.trim()) {
-      showToast('Name is required', 'error')
+    const parsed = parseQuoteTemplateForm(form)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setSaving(true)
     try {
-      const items_json = form.items
-        .filter((i) => i.description.trim() || i.unit_price)
-        .map((i) => ({
-          description: i.description.trim(),
-          qty: Number(i.qty) || 0,
-          unit_price: Number(i.unit_price) || 0,
-          remarks: i.remarks || '',
-          sku: i.sku || '',
-        }))
       const payload = {
-        name: form.name.trim(),
-        division_code: form.division_code,
-        description: form.description.trim(),
-        items_json,
+        name: parsed.data.name,
+        division_code: parsed.data.division_code,
+        description: parsed.data.description,
+        items_json: parsed.data.items_json,
       }
       if (editing) {
         const { error } = await db.from('quote_templates').update(payload).eq('id', editing.id)

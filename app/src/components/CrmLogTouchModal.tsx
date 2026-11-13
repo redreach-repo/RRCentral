@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { addDays, format } from 'date-fns'
 import Modal from './Modal'
 import { NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
+import { parseCrmLogTouchForm } from '../lib/schemas/crmLogTouch'
 import type { CrmEntry } from '../lib/types'
 import {
   buttonPrimaryStyle,
@@ -55,14 +56,15 @@ export default function CrmLogTouchModal({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!text.trim()) return
-    await onSave({
-      text: text.trim(),
-      follow_up_date: clearDate ? null : followDate || null,
+    const parsed = parseCrmLogTouchForm({
+      text,
+      follow_up_date: followDate,
       clearDate,
       pipeline_stage: stage,
       next_action: nextAction,
     })
+    if (!parsed.ok) return
+    await onSave(parsed.data)
   }
 
   return (

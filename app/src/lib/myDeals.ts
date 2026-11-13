@@ -143,6 +143,10 @@ export type DealRow = {
   /** The owner's name, or the CRM owner text when no team login matches it. */
   owner_label: string
   source: string
+  /** Sheet notes from the native deal row. */
+  notes: string
+  /** CRM quotation reference (empty on sales / CTRM). */
+  quote_ref: string
   /** Division code (01 to 06), or '' when it has none. */
   division: string
   link: string
@@ -161,6 +165,7 @@ export type MyDealsInput = {
     | 'next_action'
     | 'follow_up_date'
     | 'quote_ref'
+    | 'notes'
     | 'updated_at'
     | 'created_at'
     | 'account_id'
@@ -174,6 +179,7 @@ export type MyDealsInput = {
     | 'owner_user_id'
     | 'next_action'
     | 'next_action_date'
+    | 'notes'
     | 'monthly_fee'
     | 'setup_fee'
     | 'discount_percent'
@@ -184,7 +190,16 @@ export type MyDealsInput = {
   > & { stage_changed_at?: string | null })[]
   ctrmDeals: (Pick<
     CtrmDeal,
-    'id' | 'account_id' | 'stage' | 'source' | 'owner_user_id' | 'next_action' | 'next_action_date' | 'company_type' | 'created_at'
+    | 'id'
+    | 'account_id'
+    | 'stage'
+    | 'source'
+    | 'owner_user_id'
+    | 'next_action'
+    | 'next_action_date'
+    | 'notes'
+    | 'company_type'
+    | 'created_at'
   > & { stage_changed_at?: string | null })[]
   ctrmStageChanges: Pick<CtrmStageChange, 'deal_id' | 'to_stage' | 'changed_at'>[]
   /** Empty for roles that may not see commission (RLS returns none anyway). */
@@ -271,6 +286,8 @@ export function buildDealRows(input: MyDealsInput): DealRow[] {
       owner_user_id: login?.id ?? null,
       owner_label: login ? login.name : String(c.owner || ''),
       source: (accountId && account.get(accountId)?.source) || '',
+      notes: c.notes || '',
+      quote_ref: c.quote_ref || '',
       division,
       link: crmDealLink(c.id, accountId),
     })
@@ -303,6 +320,8 @@ export function buildDealRows(input: MyDealsInput): DealRow[] {
       days_in_stage: daysSince(since, now),
       ...owner(d.owner_user_id),
       source: d.source || account.get(d.account_id)?.source || '',
+      notes: d.notes || '',
+      quote_ref: '',
       division: input.salesDivision,
       link: `/accounts/${d.account_id}`,
     })
@@ -340,6 +359,8 @@ export function buildDealRows(input: MyDealsInput): DealRow[] {
       days_in_stage: daysSince(d.stage_changed_at || movedAt.get(`${d.id}:${d.stage}`) || d.created_at, now),
       ...owner(d.owner_user_id),
       source: d.source || account.get(d.account_id)?.source || '',
+      notes: d.notes || '',
+      quote_ref: '',
       division: '',
       link: `/accounts/${d.account_id}`,
     })
@@ -400,6 +421,12 @@ export type MyDealPatch = {
   next_action_date?: string | null
   /** Team user id; CRM maps this to the free-text `owner` name. */
   owner_user_id?: string | null
+  /** Deal / CRM sheet notes (all pipelines). */
+  notes?: string
+  /** CRM sheet only: quotation reference on the My Day row. */
+  quote_ref?: string
+  /** Sales / CTRM sheet only: lead source. */
+  source?: string
 }
 
 /** Resolve CRM's free-text owner from a team user id (or clear when null). */
@@ -423,6 +450,9 @@ export function applyMyDealPatchLocal(deal: DealRow, patch: MyDealPatch): DealRo
     next_action_date:
       patch.next_action_date !== undefined ? patch.next_action_date : deal.next_action_date,
     owner_user_id: patch.owner_user_id !== undefined ? patch.owner_user_id : deal.owner_user_id,
+    source: patch.source !== undefined ? patch.source : deal.source,
+    notes: patch.notes !== undefined ? patch.notes : deal.notes,
+    quote_ref: patch.quote_ref !== undefined ? patch.quote_ref : deal.quote_ref,
   }
 }
 

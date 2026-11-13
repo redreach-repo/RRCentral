@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
-import { renewalInfo, renewalText, termsProblem } from '../../lib/ctrmRenewals'
+import { renewalInfo, renewalText } from '../../lib/ctrmRenewals'
 import { listTerms, saveTerms, type TermsDraft } from '../../lib/ctrmTermsStore'
 import { errorMessage } from '../../lib/errors'
+import { parseCtrmTermsForm } from '../../lib/schemas/ctrmTerms'
 import { roleAtLeast } from '../../lib/permissions'
 import type { Account, CtrmClientTerms } from '../../lib/types'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, fieldStyle, inputStyle, labelStyle, sectionTitleStyle } from '../../lib/uiStyles'
@@ -42,12 +43,15 @@ export default function CtrmTermsCard({ account, editable, author }: { account: 
 
   async function save() {
     if (!draft) return
-    const next = { contract_start: draft.contract_start || null, renewal_date: draft.renewal_date || null, notice_days: Number(draft.notice || 0) }
-    const problem = termsProblem(next)
-    if (problem) return showToast(problem, 'error')
+    const parsed = parseCtrmTermsForm({
+      contract_start: draft.contract_start || null,
+      renewal_date: draft.renewal_date || null,
+      notice: draft.notice,
+    })
+    if (!parsed.ok) return showToast(parsed.error, 'error')
     setSaving(true)
     try {
-      await saveTerms(account.id, terms, next, author)
+      await saveTerms(account.id, terms, parsed.data, author)
       showToast('Contract dates saved', 'success')
       setDraft(null)
       await load()

@@ -98,6 +98,9 @@ type PendingPatch = {
   next_action: string
   next_action_date: string
   owner_user_id: string
+  notes: string
+  quote_ref: string
+  source: string
 }
 
 /**
@@ -260,6 +263,9 @@ export default function MyDealsPage() {
       next_action: deal.next_action || '',
       next_action_date: deal.next_action_date || '',
       owner_user_id: deal.owner_user_id || '',
+      notes: deal.notes || '',
+      quote_ref: deal.quote_ref || '',
+      source: deal.source || '',
     })
   }
 
@@ -267,15 +273,18 @@ export default function MyDealsPage() {
     if (!pendingPatch) return
     setBusyKey(pendingPatch.deal.key)
     try {
-      await patchMyDeal(
-        pendingPatch.deal,
-        {
-          next_action: pendingPatch.next_action,
-          next_action_date: pendingPatch.next_action_date || null,
-          owner_user_id: pendingPatch.owner_user_id || null,
-        },
-        author,
-      )
+      const patch: Parameters<typeof patchMyDeal>[1] = {
+        next_action: pendingPatch.next_action,
+        next_action_date: pendingPatch.next_action_date || null,
+        owner_user_id: pendingPatch.owner_user_id || null,
+        notes: pendingPatch.notes,
+      }
+      if (pendingPatch.deal.pipeline === 'crm') {
+        patch.quote_ref = pendingPatch.quote_ref
+      } else {
+        patch.source = pendingPatch.source
+      }
+      await patchMyDeal(pendingPatch.deal, patch, author)
       showToast(`Updated ${pendingPatch.deal.account}`, 'success')
       setPendingPatch(null)
       await load()
@@ -783,6 +792,40 @@ export default function MyDealsPage() {
                 ))}
               </select>
             </div>
+            <div>
+              <label style={labelStyle}>Notes</label>
+              <textarea
+                style={{ ...inputStyle, minHeight: 72, resize: 'vertical' }}
+                value={pendingPatch.notes}
+                onChange={(e) => setPendingPatch((p) => (p ? { ...p, notes: e.target.value } : p))}
+                placeholder="Sheet notes"
+              />
+            </div>
+            {pendingPatch.deal.pipeline === 'crm' ? (
+              <div>
+                <label style={labelStyle}>Quote ref</label>
+                <input
+                  style={inputStyle}
+                  value={pendingPatch.quote_ref}
+                  onChange={(e) =>
+                    setPendingPatch((p) => (p ? { ...p, quote_ref: e.target.value } : p))
+                  }
+                  placeholder="RR-…"
+                />
+              </div>
+            ) : (
+              <div>
+                <label style={labelStyle}>Source</label>
+                <input
+                  style={inputStyle}
+                  value={pendingPatch.source}
+                  onChange={(e) =>
+                    setPendingPatch((p) => (p ? { ...p, source: e.target.value } : p))
+                  }
+                  placeholder="LinkedIn, referral…"
+                />
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button type="button" style={buttonSecondaryStyle} onClick={() => setPendingPatch(null)}>
                 Cancel

@@ -12,40 +12,43 @@
 
 `/deals` (**Pipeline**) boards all three via `myDeals.ts` and writes through `myDealsStore` (`moveMyDeal` / `patchMyDeal`).
 
-## Slice 1 (done)
+## Slice 1–4 (done)
 
-- Pass `crm.account_id` through `/deals` rows
-- Linked CRM deals open `/accounts/:id` (sheet still available via “Open sheet”)
-- Unlinked CRM deals stay on `/crm?edit=`
-- Docs only — **no** table merge / drops
+Soft-retire lists, account link backfill, write façade — see git history. Routes and tables kept.
 
-## Slice 2 (done)
+## Slice 5 — schema consolidate plan (unlocked, non-destructive first)
 
-- `planCrmAccountBackfill` / `applyUniqueCrmAccountLinks` — unique soft-match only
-- `/deals` nudge banner: link unique matches; open CRM for ambiguous / none
-- Per-deal CRM sheet linker unchanged (create account / open / view matches)
-- **No** create-all, **no** table merge / drops
+**Unlocked** for planning. **No DROP TABLE / route deletes in this slice.**
 
-## Slice 3 (done)
+### Why not one table yet
 
-- Write façade: `moveMyDeal` (stage) + `patchMyDeal` (next step / owner)
-- `/deals` next-step click → shared modal; routes to native tables
-- CRM owner maps `owner_user_id` → free-text `owner` name
-- Native `/crm` `/sales` `/ctrm` pages keep their own forms
-- **No** table merge / drops
+| Concern | Detail |
+|---------|--------|
+| Shape mismatch | `crm` is company-centric My Day rows; `sales_deals` / `ctrm_deals` are account-linked deals with different stages |
+| CTRM commissions | `ctrm_deal_commissions` must stay isolated from weekly summary |
+| Fit sheet / sessions / terms | CTRM-only side tables keyed by account / deal |
+| §B.3 workflows | Must keep My Day briefing, Pipeline board, native detail forms working |
 
-## Slice 4 (this milestone step) — soft-retire lists
+### Cutover phases
 
-- Nav: **Pipeline** first under Sales · Work; `/sales` / `/ctrm` relabeled **AI CRM detail** / **CTRM detail**
-- Prefer-Pipeline banners on detail boards; My Day hero links to Pipeline
-- Routes and tables kept — **no** redirects that break bookmarks, **no** schema drops
+1. **Inventory + invariants (docs/tests)** — assert every open deal has next action/date rules; CRM `account_id` coverage metrics
+2. **Read model (done)** — SQL view `pipeline_deals_v` unions crm / sales_deals / ctrm_deals for reporting only (`security_invoker`, no commission, no writes)
+3. **Dual-write experiment** — new deals created from Pipeline write native table only (already true); façade covers next step / owner / notes plus CRM `quote_ref` and sales/CTRM `source` from Pipeline “Next step”
+4. **Route soft-hide (done)** — Settings → Pipeline detail nav (`hidePipelineDetailNav=yes`) hides `/sales` `/ctrm` from non-admin sidebar; URLs kept
+5. **Destructive merge** — **separate PR + explicit approve** before any `DROP` or forced redirects
 
-## Later (ask first)
+### Explicitly deferred
 
-1. Schema consolidate / drop duplicate list routes (**ask before destructive SQL**)
-2. M3a demo project (Alfred)
+- Dropping `crm` / `sales_deals` / `ctrm_deals`
+- Redirecting `/crm` → `/deals` for bookmarks
+- Merging commission columns into a shared deals table
+
+## M3a
+
+Prep: `docs/M3A_DEMO.md`. Alfred provisions the second Supabase project.
 
 ## Rules
 
 - Do not break §B.3 RR Central workflows during M3
-- M3a demo project is a separate ask (Alfred)
+- No destructive SQL without a dedicated cutover PR
+- M3a project credentials are an Alfred action

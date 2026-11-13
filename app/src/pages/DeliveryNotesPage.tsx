@@ -39,6 +39,7 @@ import {
   loadSignedDeliveryNoteAttachments,
 } from '../lib/signedDeliveryNotes'
 import { errorMessage } from '../lib/errors'
+import { parseDeliveryNoteForm } from '../lib/schemas/deliveryNote'
 import { type DraftLineItem } from '../lib/lineItems'
 import { sortByDateDesc } from '../lib/finance'
 import {
@@ -239,16 +240,30 @@ export default function DeliveryNotesPage() {
 
   async function saveNote() {
     if (!editing) return
+    const parsed = parseDeliveryNoteForm({
+      delivery_date: form.delivery_date,
+      status: form.status,
+      delivery_terms: form.delivery_terms,
+      ship_to: form.ship_to,
+      notes: form.notes,
+      received_by: form.received_by,
+      vehicle_notes: form.vehicle_notes,
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
+    const f = parsed.data
     setSaving(true)
     try {
       await updateDeliveryNote(editing.id, {
-        delivery_date: form.delivery_date || null,
-        status: form.status,
-        delivery_terms: form.delivery_terms,
-        ship_to: form.ship_to,
-        notes: form.notes,
-        received_by: form.received_by,
-        vehicle_notes: form.vehicle_notes,
+        delivery_date: f.delivery_date || null,
+        status: f.status,
+        delivery_terms: f.delivery_terms,
+        ship_to: f.ship_to,
+        notes: f.notes,
+        received_by: f.received_by,
+        vehicle_notes: f.vehicle_notes,
         updated_by: who,
         updated_at: new Date().toISOString(),
       })
