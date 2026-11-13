@@ -150,7 +150,7 @@ export default function ContractsVaultPanel({
     return (
       <p style={{ fontSize: 13, color: colors.muted, margin: '12px 0' }}>
         Run <code>supabase/migrations/20261206120000_legal_documents.sql</code> in the Supabase SQL editor to enable
-        the contracts vault and NDA e-sign.
+        the contracts vault and NDA signing links (assent capture — not UAE QES).
       </p>
     )
   }

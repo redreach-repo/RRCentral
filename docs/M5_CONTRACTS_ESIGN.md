@@ -7,21 +7,20 @@
 | Capability | Implementation |
 |------------|----------------|
 | NDA vault + send link | Exists (`legal-documents.md`, `/sign`, `legal-sign`) |
-| Canvas assent capture | Exists — **not** AdES/QES |
-| Clause library / obligations | Missing → M5 |
+| Canvas assent capture | Exists — **not** AdES/QES; client copy states this |
+| Clause library / obligations | Missing → next slices |
 | TDRA QTSP integration | Not started → Phase B after ask |
 
-## Slice 1 (this milestone step)
+## Slice 2 (this milestone step)
 
-- Conclude UAE e-sign / trust services assessment in `COMPLIANCE_NOTES.md`
-- Binding: Phase A = keep canvas as evidence; Phase B = QTSP when legal effect required (**ask** before paid vendor)
-- **No QTSP code** in this slice
+- `/sign` + vault/template copy audit: assent / signing-record language; explicit **not QES**
+- Shared blurb constants + unit test in `legalDocuments`
+- **No QTSP code**
 
 ## Later
 
 1. Clause library + obligations board (product)
-2. UI copy audit so `/sign` never claims qualified / handwritten-equivalent
-3. Phase B QTSP integration after Alfred approves a licensed vendor
+2. Phase B QTSP integration after Alfred approves a licensed vendor
 
 ## Rules
 

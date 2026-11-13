@@ -122,8 +122,9 @@ export default function NdaTemplatePage() {
       <div>
         <h1 style={pageTitleStyle}>NDA template</h1>
         <p style={pageSubtitleStyle}>
-          Lawyer-approved wording for NDAs sent from the CRM contracts vault. Clients sign via a private link; the
-          signed PDF is filed to Google Drive automatically when Drive is connected.
+          Lawyer-approved wording for NDAs sent from the CRM contracts vault. Clients capture assent via a private
+          link (electronic signing record — not a UAE Qualified E-Signature). The signed PDF is filed to Google Drive
+          when Drive is connected.
         </p>
       </div>
 
