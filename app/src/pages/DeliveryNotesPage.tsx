@@ -11,6 +11,10 @@ import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
+import EditorSectionTabs, {
+  editorPanelStyle,
+  type EditorSection,
+} from '../components/EditorSectionTabs'
 import LinkDriveFileModal from '../components/LinkDriveFileModal'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
@@ -96,6 +100,7 @@ export default function DeliveryNotesPage() {
   const [quotePick, setQuotePick] = useState('')
   const [quoteFilter, setQuoteFilter] = useState('')
   const [editing, setEditing] = useState<DeliveryNote | null>(null)
+  const [editorSection, setEditorSection] = useState<EditorSection>('basics')
   const [form, setForm] = useState<NoteForm>(emptyForm())
   const [signedAttachments, setSignedAttachments] = useState<Attachment[]>([])
   const [linkSignedOpen, setLinkSignedOpen] = useState(false)
@@ -103,6 +108,7 @@ export default function DeliveryNotesPage() {
 
   function closeEdit() {
     setEditing(null)
+    setEditorSection('basics')
     setSignedAttachments([])
     setLinkSignedOpen(false)
   }
@@ -204,6 +210,7 @@ export default function DeliveryNotesPage() {
   async function openEdit(note: DeliveryNote) {
     try {
       const items = await loadDeliveryNoteLineItems(note.reference_number)
+      setEditorSection('basics')
       setEditing(note)
             setForm({
         delivery_date: (note.delivery_date || note.date || '').slice(0, 10),
@@ -445,6 +452,12 @@ export default function DeliveryNotesPage() {
           Based on quotation <strong style={{ color: colors.text }}>{editing?.quote_ref}</strong>
           {editing?.client ? ` · ${editing.client}` : ''}
         </p>
+        <EditorSectionTabs
+          value={editorSection}
+          onChange={setEditorSection}
+          sections={['basics', 'lines', 'notes']}
+        />
+        <div style={editorPanelStyle(editorSection === 'basics')}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
           <div style={fieldStyle}>
             <label style={labelStyle}>Delivery date</label>
@@ -511,6 +524,9 @@ export default function DeliveryNotesPage() {
             />
           </div>
         </div>
+        </div>
+
+        <div style={editorPanelStyle(editorSection === 'lines')}>
         <div style={{ margin: '8px 0 6px', fontWeight: 600, fontSize: 13 }}>Quantities delivered</div>
         <div style={tableWrapStyle}>
           <table style={tableStyle}>
@@ -555,6 +571,9 @@ export default function DeliveryNotesPage() {
         <p style={{ color: colors.muted2, fontSize: 12 }}>
           Total qty {deliveryNoteTotalQty(form.items)} · prices are never printed on delivery notes
         </p>
+        </div>
+
+        <div style={editorPanelStyle(editorSection === 'notes')}>
         <div style={fieldStyle}>
           <label style={labelStyle}>Notes</label>
           <textarea
@@ -606,7 +625,9 @@ export default function DeliveryNotesPage() {
             </ul>
           </div>
         ) : null}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
           <button type="button" style={buttonSecondaryStyle} onClick={closeEdit}>
             Cancel
           </button>

@@ -339,9 +339,21 @@ export default function Layout() {
   })()
 
   const hideTopbarTitle =
-    ['/app', '/quotations', '/invoices', '/delivery-notes', '/follow-ups', '/customer-files'].includes(
-      location.pathname,
-    ) || location.pathname.startsWith('/accounts')
+    [
+      '/app',
+      '/crm',
+      '/deals',
+      '/sales',
+      '/ctrm',
+      '/quotations',
+      '/invoices',
+      '/delivery-notes',
+      '/follow-ups',
+      '/customer-files',
+      '/expenses',
+      '/vendors',
+      '/payments',
+    ].includes(location.pathname) || location.pathname.startsWith('/accounts')
 
   const primaryActive = phoneNav.some((item) =>
     isPhonePrimaryActive(location.pathname, item.to, item.end),

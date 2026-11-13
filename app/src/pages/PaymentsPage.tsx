@@ -35,17 +35,14 @@ import {
   formGridStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
-  toolbarStyle,
   sectionTitleStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 import { PAYMENT_METHODS } from '../lib/config'
 import { errorMessage } from '../lib/errors'
 
@@ -335,19 +332,21 @@ export default function PaymentsPage() {
   const list = wandersQuotes.length ? wandersQuotes : quotes
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Multi-currency payments</h1>
-          <p style={pageSubtitleStyle}>
-            RR Wanders bookings — quotation, payment and supplier currencies may all differ. Original
-            FC amounts are never overwritten.
+          <p className={docsStyles.kicker}>Finance</p>
+          <h1 className={docsStyles.title}>Payments</h1>
+          <p className={docsStyles.subtitle}>
+            RR Wanders multi-currency bookings — quotation, payment and supplier currencies may
+            differ. Original FC amounts are never overwritten.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
             type="button"
-            style={buttonSecondaryStyle}
+            className={docsStyles.newBtn}
+            style={{ background: 'rgba(255,255,255,0.08)' }}
             disabled={!selected}
             onClick={() => {
               setRequestForm({
@@ -364,7 +363,8 @@ export default function PaymentsPage() {
           </button>
           <button
             type="button"
-            style={buttonSecondaryStyle}
+            className={docsStyles.newBtn}
+            style={{ background: 'rgba(255,255,255,0.08)' }}
             disabled={!selected}
             onClick={() => {
               setSupplierForm({
@@ -384,7 +384,7 @@ export default function PaymentsPage() {
           </button>
           <button
             type="button"
-            style={buttonPrimaryStyle}
+            className={docsStyles.newBtn}
             disabled={!selected}
             onClick={() => {
               setForm(emptyPay(selected))
@@ -394,7 +394,7 @@ export default function PaymentsPage() {
             <Plus size={16} /> Record payment
           </button>
         </div>
-      </div>
+      </header>
 
       <div style={{ ...cardStyle, marginBottom: 16 }}>
         <label style={labelStyle}>Booking / quotation</label>

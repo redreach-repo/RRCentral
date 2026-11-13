@@ -27,15 +27,12 @@ import {
   formGridStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
-  toolbarStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 type VendorForm = {
   company_name: string
@@ -259,30 +256,36 @@ export default function VendorsPage() {
   }
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Vendors</h1>
-          <p style={pageSubtitleStyle}>
-            Register suppliers you buy from (uniforms, goods). Pick them when saving a supplier
-            invoice — you do not need a vendor number.
+          <p className={docsStyles.kicker}>Finance</p>
+          <h1 className={docsStyles.title}>Vendors</h1>
+          <p className={docsStyles.subtitle}>
+            Register suppliers you buy from. Pick them when saving a supplier invoice — no vendor
+            number needed.
           </p>
         </div>
-        <button type="button" style={buttonPrimaryStyle} onClick={openCreate} disabled={missingTable}>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          onClick={openCreate}
+          disabled={missingTable}
+        >
           <Plus size={16} /> Register vendor
         </button>
-      </div>
+      </header>
 
       {missingTable ? (
-        <div style={{ ...cardStyle, color: colors.muted, lineHeight: 1.55 }}>
+        <div style={{ ...cardStyle, color: colors.muted, lineHeight: 1.55, marginBottom: 16 }}>
           The <code>vendors</code> table is not on this database yet. Run{' '}
           <code>supabase/migrations/20260924203122_vendors.sql</code> in the Supabase SQL editor, then refresh.
         </div>
       ) : null}
 
-      <div style={{ marginBottom: 16 }}>
+      <div className={docsStyles.controls}>
         <input
-          style={{ ...inputStyle, maxWidth: 360 }}
+          className={docsStyles.search}
           placeholder="Search company, contact, TRN…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -290,46 +293,44 @@ export default function VendorsPage() {
       </div>
 
       {loading ? (
-        <div style={{ ...cardStyle, color: colors.muted }}>Loading vendors…</div>
+        <div className={docsStyles.loading}>Loading vendors…</div>
       ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={<Building2 size={22} />}
-          title="No vendors yet"
-          subtitle="Register the supplier company from your invoice (name, TRN, contact)."
-          actionLabel="Register vendor"
-          onAction={openCreate}
-        />
+        <div className={docsStyles.empty}>
+          <EmptyState
+            icon={<Building2 size={22} />}
+            title="No vendors yet"
+            subtitle="Register the supplier company from your invoice (name, TRN, contact)."
+            actionLabel="Register vendor"
+            onAction={openCreate}
+          />
+        </div>
       ) : (
-        <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
-          <div style={tableWrapStyle}>
-            <table style={tableStyle}>
+        <div className={docsStyles.tableShell}>
+          <div className={docsStyles.tableWrap}>
+            <table className={docsStyles.table}>
               <thead>
                 <tr>
-                  <th style={thStyle}>Company</th>
-                  <th style={thStyle}>Contact</th>
-                  <th style={thStyle}>TRN</th>
-                  <th style={thStyle}>Phone / email</th>
-                  <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
+                  <th>Company</th>
+                  <th>Contact</th>
+                  <th>TRN</th>
+                  <th>Phone / email</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((v) => (
                   <tr key={v.id}>
-                    <td style={tdStyle}>
-                      <div style={{ fontWeight: 600 }}>{v.company_name}</div>
-                      {v.address ? (
-                        <div style={{ fontSize: 11, color: colors.muted2 }}>{v.address}</div>
-                      ) : null}
+                    <td className={docsStyles.clientCell}>
+                      <div className={docsStyles.ref}>{v.company_name}</div>
+                      {v.address ? <div className={docsStyles.meta}>{v.address}</div> : null}
                     </td>
-                    <td style={tdStyle}>{v.primary_contact || '—'}</td>
-                    <td style={tdStyle}>{v.trn || '—'}</td>
-                    <td style={tdStyle}>
+                    <td>{v.primary_contact || '—'}</td>
+                    <td>{v.trn || '—'}</td>
+                    <td>
                       {v.mobile || v.office || '—'}
-                      {v.email ? (
-                        <div style={{ fontSize: 11, color: colors.muted2 }}>{v.email}</div>
-                      ) : null}
+                      {v.email ? <div className={docsStyles.meta}>{v.email}</div> : null}
                     </td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>
+                    <td className={docsStyles.actionsCell}>
                       <VendorRowActions
                         vendor={v}
                         expanded={actionsOpenId === v.id}
