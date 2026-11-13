@@ -11,7 +11,7 @@
 
 RR Central is a **single-tenant** operations suite for Red Reach Middle East FZE. It already covers CRM/pipelines, quotes→invoices→delivery notes, accounts/delivery/support, finance lists, Drive, WhatsApp/email intake, NDA e-sign, contract auto-billing, WorshipHub, Wanders, and Tee Tribe shop — with **89 public tables, all RLS-enabled**.
 
-It is **not** yet a multi-tenant subscription platform. There is no `tenant_id`, no customization layer, no double-entry ledger, no HR/payroll, no full mail sync beyond Zoho Mail/Calendar proxy, and TypeScript `strict` is off in the main app.
+It is **not** yet a multi-tenant subscription platform. There is no `tenant_id`, no customization layer, no double-entry ledger, no HR/payroll, and no full mail sync beyond Zoho Mail/Calendar proxy. TypeScript `strict` is on in the main app.
 
 **M0 RLS criterion:** pass — every `CREATE TABLE` in `supabase/migrations` has RLS enabled. Two tables intentionally have RLS with **no policies** (deny-all to anon/authenticated; service-role only): `drive_connection`, `worship_setup_log`.
 
@@ -21,7 +21,7 @@ It is **not** yet a multi-tenant subscription platform. There is no `tenant_id`,
 
 | Layer | Today |
 |-------|--------|
-| Web | Vite + React SPA, TypeScript (app `strict` **not** enabled; Tee Tribe package uses `strict: true`) |
+| Web | Vite + React SPA, TypeScript (`strict: true` in app and Tee Tribe) |
 | Auth | Supabase Auth email/password when configured; else IndexedDB **local mode** |
 | DB | Supabase Postgres + RLS; migrations applied by hand / CI |
 | Jobs | `pg_cron` + `pg_net` → Edge Functions with cron secrets; browser fallback for contract billing |
@@ -208,7 +208,7 @@ GitHub Actions: nightly DB backup (`backup.yml`).
 | Fireflies | Paste ID |
 | CTRM issues | Thin ticket grouper |
 | Wanders | Rich schema; less polish than Threads docs path |
-| TypeScript | App not `strict: true` |
+| TypeScript | App `strict: true` (M1 leftover closed) |
 | No Arabic/RTL | English only UI strings |
 | No module registry / workflows / custom fields | Hardcoded entities |
 | Red Reach–specific in core | WorshipHub, Tee Tribe, Wanders, CTRM commissions mixed into shared SPA |
