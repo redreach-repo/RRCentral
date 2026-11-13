@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import CtrmListsCard from '../components/ctrm/CtrmListsCard'
+import GmailCalendarCard from '../components/GmailCalendarCard'
 import GoogleDriveCard from '../components/GoogleDriveCard'
 import HubSpotCard from '../components/HubSpotCard'
 import PipelinesSettingsCard from '../components/settings/PipelinesSettingsCard'
@@ -1379,8 +1380,8 @@ export default function SettingsPage() {
             ))}
           </select>
           <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted2, lineHeight: 1.45 }}>
-            Zoho is active today. Gmail Phase A (send + calendar) is approved in Compliance notes —
-            wire OAuth next; inbox (Phase B) needs restricted-scope verification. M365 / IMAP later.
+            Zoho or Gmail (Phase A: send + calendar). Connect Gmail in the card below before selecting
+            it. Inbox on Gmail is Phase B. M365 / IMAP later.
           </p>
         </div>
         {can(userRole, 'settings.manage') &&
@@ -1521,6 +1522,8 @@ export default function SettingsPage() {
           </button>
         </div>
       </div>
+
+      <GmailCalendarCard />
 
       {currentAuthMode() === 'local' && (
         <div id="sheets-import" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
