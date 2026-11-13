@@ -17,7 +17,7 @@ Status key: **exists** · **partial** · **missing**
 | Trusted logic in Edge/DB not only browser | partial | Ledger/payroll/permissions must move server-side in M1+ |
 | Zod validation everywhere | partial | Login, password, app-user, account, ticket form schemas; keep expanding forms/API |
 | Module registry manifests | partial | M1 `APP_MODULES` in `modules/nav.ts`; Layout consumes manifests — flags/permissions next |
-| Domain events / `event_outbox` | partial | M1 table + RLS; workers not yet consuming |
+| Domain events / `event_outbox` | partial | M1 table + RLS; `enqueueDomainEvent` via `logActivity`; workers not yet consuming |
 | Public REST API + webhooks | missing | M11 (or earlier for partners) |
 | Exact money `numeric` / no float | partial | SQL numeric exists; TS `number`+round — fix path in M7 |
 | Tenant / company / BU model | partial | M1 tables + seed + `tenant_id` retrofit; company switcher live |
