@@ -29,6 +29,7 @@ import {
 } from '../lib/agreementStore'
 import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
+import { parseAgreementApproveForm, parseAgreementDraftForm } from '../lib/schemas/agreementTemplate'
 import type { AgreementTemplate, ContractClause } from '../lib/types'
 import {
   buttonPrimaryStyle,
@@ -218,13 +219,24 @@ export default function AgreementTemplatePage() {
                     type="button"
                     style={smallBtn}
                     disabled={busy || !body.trim() || (Boolean(selected) && !dirty)}
-                    onClick={() =>
+                    onClick={() => {
+                      const parsed = parseAgreementDraftForm({ title, body })
+                      if (!parsed.ok) {
+                        showToast(parsed.error, 'error')
+                        return
+                      }
                       void run(
-                        () => saveAgreementDraft({ title, body }, author, templates, selected?.id),
+                        () =>
+                          saveAgreementDraft(
+                            { title: parsed.data.title, body: parsed.data.body },
+                            author,
+                            templates,
+                            selected?.id,
+                          ),
                         'Could not save the template',
                         selected ? 'Draft saved' : 'Saved as version 1',
                       )
-                    }
+                    }}
                   >
                     <Save size={12} /> {selected ? 'Save draft' : 'Save as a draft'}
                   </button>
@@ -381,8 +393,26 @@ export default function AgreementTemplatePage() {
           <form
             onSubmit={(e) => {
               e.preventDefault()
+              const parsed = parseAgreementApproveForm({
+                approvedBy: approving.by,
+                approvedOn: approving.on,
+                note: approving.note,
+              })
+              if (!parsed.ok) {
+                showToast(parsed.error, 'error')
+                return
+              }
               void run(
-                () => approveAgreementTemplate(selected.id, { approvedBy: approving.by, approvedOn: approving.on, note: approving.note }, templates),
+                () =>
+                  approveAgreementTemplate(
+                    selected.id,
+                    {
+                      approvedBy: parsed.data.approvedBy,
+                      approvedOn: parsed.data.approvedOn,
+                      note: parsed.data.note,
+                    },
+                    templates,
+                  ),
                 'Could not approve the template',
                 `Version ${selected.version} is approved and in use`,
               ).then(() => setApproving(null))

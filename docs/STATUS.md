@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod build templates
+**Current milestone:** Continuous backlog — M1 Zod agreement template
 
 ## Shipped this turn
 
-- Zod `parseBuildTemplateForm` + `parseBuildTemplateItemForm` for build templates and lines
+- Zod `parseAgreementDraftForm` + `parseAgreementApproveForm` for service agreement wording / lawyer approval
 
 ## Already on main
 
-- Continuous backlog Zod through quote templates · M3a demo prep · QTSP scaffold · `pipeline_deals_v`
+- Continuous backlog Zod through build templates · M3a demo prep · QTSP scaffold · `pipeline_deals_v`
 
 ## Still open (agent queue)
 
