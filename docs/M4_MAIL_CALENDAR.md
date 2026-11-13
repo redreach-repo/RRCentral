@@ -9,29 +9,22 @@
 | Send | Zoho **or** Gmail **or** M365 (Phase A) |
 | Inbox / Sent | Zoho; Gmail/M365 inbox = Phase B |
 | Calendar / follow-up / meetings | Zoho **or** Google Calendar **or** Microsoft Graph calendar |
-| Settings provider switch | Zoho + Gmail + M365 selectable |
+| Settings provider switch | Zoho + Gmail + M365 selectable; IMAP listed but unavailable |
 | OAuth | `gmail-calendar`, `m365-mail-calendar` Edge Functions + connection tables |
 
-## Slice 7 (this milestone step)
+## Slice 8 (this milestone step)
 
-- `m365_connection` migration + `m365-mail-calendar` Edge Function
-- Client `lib/m365MailCalendarApi.ts` + M365 mail/calendar adapters
-- Settings **Microsoft 365** connect card; M365 selectable in provider switch
-- Phase A scopes only: `Mail.Send` + `Calendars.ReadWrite`
+- Conclude **IMAP / other** compliance assessment in `COMPLIANCE_NOTES.md`
+- Keep IMAP unavailable in Settings; reason points at compliance note
+- **No IMAP OAuth or password client code**
 
 ## Later
 
-1. Gmail / M365 Phase B inbox (`gmail.readonly` / `Mail.Read`)
-2. IMAP
-
-## Ops (M365)
-
-1. Entra app: secrets `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` (optional `MICROSOFT_TENANT_ID`)
-2. Redirect URI `…/functions/v1/m365-mail-calendar`
-3. `npx supabase functions deploy m365-mail-calendar`
-4. Apply migration `20261113170000_m365_connection.sql`
+1. Gmail / M365 Phase B inbox (`gmail.readonly` / `Mail.Read`) when gates allow
+2. Generic IMAP only if a real non-API mailbox need appears
 
 ## Rules
 
-- Do not break Zoho or Gmail Phase A
+- Do not break Zoho, Gmail Phase A, or M365 Phase A
+- Prefer Gmail API / Graph over IMAP for those hosts
 - No inbox restricted scopes until Phase B prerequisites in `COMPLIANCE_NOTES.md`

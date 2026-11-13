@@ -12,6 +12,7 @@ Findings from official sources go here **before** shipping tax, payroll, e-sign,
 | UAE e-invoicing timeline / format | not started | — | — | Design invoice model for accredited provider |
 | Google restricted Gmail scopes assessment | **concluded** | See § Gmail below | 13 Nov 2026 | Phase A **implemented** (`gmail.send` + `calendar.events` via `gmail-calendar` Edge Function). Phase B inbox (`gmail.readonly`) still blocked until restricted verification + CASA plan. |
 | Microsoft 365 Graph mail/calendar assessment | **concluded** | See § M365 below | 13 Nov 2026 | Phase A **implemented** (`Mail.Send` + `Calendars.ReadWrite` via `m365-mail-calendar`). Phase B `Mail.Read` later. Prefer delegated over application permissions. |
+| IMAP / other mail hosts assessment | **concluded** | See § IMAP below | 13 Nov 2026 | Prefer Gmail API / Microsoft Graph over IMAP. Gmail IMAP needs restricted `mail.google.com`; M365 IMAP basic auth is dead. Generic IMAP deferred until a real non-Gmail/M365 customer need. |
 | Data residency (UAE hosting options) | not started | — | — | Decide before first external customer / M13 |
 
 Do not rely on model memory for legal or tax rules.
@@ -86,8 +87,43 @@ Avoid **application** `Mail.Send` / `Mail.Read` / `Calendars.ReadWrite` for the 
 2. **Phase B (later):** Add delegated **`Mail.Read`** for inbox/sent matching after Phase A is stable; document tenant admin-consent expectations and publisher verification for multi-tenant use.
 3. **Publisher verification:** Plan Entra publisher verification before asking external tenants to consent; internal/single-tenant Red Reach use can proceed under Testing / admin consent.
 4. **Settings switcher:** M365 is selectable; Connect card must succeed before APIs work.
-5. **IMAP:** Still deferred.
+5. **IMAP:** Assessed separately — see § IMAP below (prefer Graph over IMAP for Microsoft mailboxes).
 
 ### Explicit non-claims
 
 - This note does **not** assert that an Entra app is publisher-verified or consented in any external customer tenant.
+
+---
+
+## IMAP / other mail hosts (M4) — assessment
+
+**Purpose:** Decide whether RR Central should ship a generic IMAP (+ SMTP) provider after Zoho / Gmail API / Microsoft Graph Phase A, and what auth model would be allowed.
+
+### Official sources (checked 13 Nov 2026, Asia/Dubai)
+
+1. [Transition from less secure apps to OAuth (Google Workspace)](https://knowledge.workspace.google.com/admin/sync/transition-from-less-secure-apps-to-oauth) — password / “less secure app” access to Gmail IMAP/SMTP turned off for Google Accounts (timeline through **14 Mar 2025** / Workspace LSA cutover). New connections must use OAuth (app passwords only in narrow device cases).
+2. [Gmail XOAUTH2 for IMAP/POP/SMTP](https://developers.google.com/workspace/gmail/imap/xoauth2-protocol) — IMAP OAuth uses SASL `XOAUTH2`; required scope is **`https://mail.google.com/`**. Google directs apps that do not need full mail scope to **migrate to the Gmail API** with granular scopes instead.
+3. [Deprecation of Basic authentication in Exchange Online](https://learn.microsoft.com/en-us/exchange/clients-and-mobile-in-exchange-online/deprecation-of-basic-authentication-exchange-online) — Basic auth for IMAP/POP (and related protocols) is **disabled in all tenants** and cannot be re-enabled.
+4. [Authenticate IMAP/POP/SMTP with OAuth (Exchange Online)](https://learn.microsoft.com/en-us/exchange/client-developer/legacy-protocols/how-to-authenticate-an-imap-pop-smtp-application-by-using-oauth) — modern auth uses SASL XOAUTH2 with scopes such as `https://outlook.office.com/IMAP.AccessAsUser.All` and `SMTP.Send`.
+5. [RFC 7628 — SASL OAUTHBEARER](https://datatracker.ietf.org/doc/html/rfc7628) — interoperable bearer auth for IMAP/SMTP on non-Google/Microsoft hosts (TLS required in practice).
+
+### Matrix for RR Central
+
+| Host class | Password / app-password IMAP | OAuth IMAP | Prefer instead |
+|------------|------------------------------|------------|----------------|
+| Gmail / Google Workspace | **Blocked** (LSA off) | Needs restricted `mail.google.com` (+ verification / CASA if proxied) | Existing **Gmail API** Phase A; Phase B `gmail.readonly` only after CASA plan |
+| Microsoft 365 / Exchange Online | **Blocked** (basic auth off) | Possible via IMAP OAuth scopes | Existing **Microsoft Graph** Phase A; Phase B `Mail.Read` |
+| Other hosts (cPanel, Yahoo, self-hosted, etc.) | Possible but stores secrets; MFA/app-password friction | OAUTHBEARER where the host supports it | Only if a paying workflow cannot use Zoho/Gmail/M365 |
+
+### Decision (binding for M4)
+
+1. **Do not ship an IMAP adapter in the next implementation slice.** Keep Settings **IMAP / other** unavailable.
+2. **Prefer APIs over IMAP** for Gmail and Microsoft 365 — Graph/Gmail already cover send + calendar; inbox should come from Phase B API scopes, not IMAP.
+3. **Never** request Gmail’s `https://mail.google.com/` solely to speak IMAP when Gmail API scopes suffice (aligns with § Gmail least-privilege).
+4. **Generic IMAP** (password or OAUTHBEARER) stays **deferred** until a concrete customer mailbox cannot use Zoho, Gmail, or M365. If that need appears: Edge-held secrets only, TLS required, no browser-stored passwords, and a written threat model before coding.
+5. **Next M4 implementation priority after this note:** Gmail/M365 **Phase B inbox** (when compliance gates allow) — not IMAP.
+
+### Explicit non-claims
+
+- This note does **not** assert that RR Central will never support IMAP; it only defers it.
+- No IMAP client, connection table, or Edge Function ships in this assessment-only slice.

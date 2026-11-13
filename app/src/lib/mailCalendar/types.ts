@@ -35,7 +35,7 @@ export const MAIL_CALENDAR_PROVIDER_OPTIONS: readonly ProviderOption[] = [
     id: 'imap',
     label: 'IMAP / other',
     available: false,
-    unavailableReason: 'Deferred — assess after M365 Phase A',
+    unavailableReason: 'Deferred — prefer Gmail/M365 APIs; see COMPLIANCE_NOTES',
   },
 ] as const
 
