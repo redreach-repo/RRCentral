@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod Drive link modal
+**Current milestone:** Continuous backlog — M1 Zod Fireflies meeting link
 
 ## Shipped this turn
 
-- Zod `parseLinkDriveFileForm` for Google Drive share links (company, URL, title)
+- Zod `parseFirefliesMeetingInput` for Fireflies link/ID before fetch
 
 ## Already on main
 
-- Continuous backlog Zod through NDA template · M3 route soft-hide · M3a demo prep · QTSP · `pipeline_deals_v`
+- Continuous backlog Zod through Drive link · M3 route soft-hide · M3a demo prep · QTSP · `pipeline_deals_v`
 
 ## Still open (agent queue)
 
