@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
 import { errorMessage } from '../../lib/errors'
 import { can } from '../../lib/permissions'
+import { parseWorkflowDefinitionForm } from '../../lib/schemas/workflowDefinition'
 import {
   buildApprovalStep,
   buildNotifyStep,
@@ -116,29 +117,30 @@ export default function WorkflowsSettingsCard() {
   }
 
   async function save() {
-    if (!form.name.trim()) {
-      showToast('Name is required', 'error')
+    const parsed = parseWorkflowDefinitionForm(form)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setBusy(true)
     try {
       const trigger_config =
-        form.trigger_type === 'stage_enter'
-          ? { pipeline_key: form.pipeline_key.trim(), stage_key: form.stage_key.trim() }
+        parsed.data.trigger_type === 'stage_enter'
+          ? { pipeline_key: parsed.data.pipeline_key, stage_key: parsed.data.stage_key }
           : {}
       const steps = [
-        buildApprovalStep({ name: 'Approval', approverRole: form.approver_role.trim() || 'admin' }),
-        buildNotifyStep({ name: 'Notify', message: form.notify_message.trim() }),
+        buildApprovalStep({ name: 'Approval', approverRole: parsed.data.approver_role }),
+        buildNotifyStep({ name: 'Notify', message: parsed.data.notify_message }),
       ]
       await saveWorkflowDefinition(
         {
-          workflow_key: editing?.workflow_key || slugifyWorkflowKey(form.name),
-          name: form.name,
-          description: form.description,
-          trigger_type: form.trigger_type,
+          workflow_key: editing?.workflow_key || slugifyWorkflowKey(parsed.data.name),
+          name: parsed.data.name,
+          description: parsed.data.description,
+          trigger_type: parsed.data.trigger_type,
           trigger_config,
           steps,
-          active: form.active,
+          active: parsed.data.active,
         },
         editing?.id,
       )
