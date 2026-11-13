@@ -536,13 +536,22 @@ export default function SettingsPage() {
   }
 
 
+  const sectionDomId: Record<string, string> = {
+    Company: 'company',
+    Bank: 'bank',
+    'Quote settings': 'quote-settings',
+    'Division formats': 'division-formats',
+    Wanders: 'wanders',
+    System: 'system',
+  }
+
   function renderSection(
     title: string,
     sectionId: string,
     keys: readonly { key: string; label: string }[],
   ) {
     return (
-      <div style={{ ...cardStyle, marginBottom: 20 }}>
+      <div id={sectionDomId[sectionId]} style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
         <h2 style={sectionTitleStyle}>{title}</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
           {keys.map(({ key, label }) => (
@@ -674,12 +683,78 @@ export default function SettingsPage() {
     }
   }
 
+  const tocItems = [
+    { id: 'connect-supabase', label: 'Data & storage' },
+    { id: 'company', label: 'Company' },
+    { id: 'company-documents', label: 'Documents' },
+    { id: 'bank', label: 'Bank' },
+    { id: 'quote-settings', label: 'Quotes' },
+    { id: 'division-formats', label: 'Division formats' },
+    { id: 'wanders', label: 'Wanders' },
+    { id: 'system', label: 'System' },
+    { id: 'ctrm-lists', label: 'CTRM lists' },
+    { id: 'google-drive', label: 'Google Drive' },
+    { id: 'hubspot', label: 'HubSpot' },
+    { id: 'messages', label: 'Messages' },
+    { id: 'zoho', label: 'Zoho' },
+    ...(currentAuthMode() === 'local' ? [{ id: 'sheets-import', label: 'Sheets import' }] : []),
+    { id: 'two-step', label: 'Two-step' },
+    { id: 'account', label: 'Password' },
+    { id: 'users', label: 'Users' },
+  ]
+
+  function jumpToSection(id: string) {
+    const el = document.getElementById(id)
+    if (!el) return
+    window.history.replaceState(null, '', `#${id}`)
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   return (
     <div style={pageStyle}>
       <h1 style={pageTitleStyle}>Settings</h1>
       <p style={pageSubtitleStyle}>Company details, data storage, and user access</p>
 
-      <div id="connect-supabase" style={{ ...cardStyle, marginBottom: 20 }}>
+      <nav
+        aria-label="Settings sections"
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 6,
+          padding: '10px 0 16px',
+          marginBottom: 8,
+          position: 'sticky',
+          top: 56,
+          zIndex: 5,
+          background: 'linear-gradient(180deg, #0f1216 70%, rgba(15,18,22,0))',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+        }}
+      >
+        {tocItems.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => jumpToSection(item.id)}
+            style={{
+              appearance: 'none',
+              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'rgba(255,255,255,0.04)',
+              color: 'rgba(242,244,247,0.78)',
+              fontSize: 12,
+              fontWeight: 600,
+              padding: '6px 10px',
+              borderRadius: 999,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
+      <div id="connect-supabase" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
         <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
           <HardDrive size={18} /> Data &amp; storage
         </h2>
@@ -839,7 +914,7 @@ export default function SettingsPage() {
 
       {renderSection('Company info', 'Company', COMPANY_KEYS)}
 
-      <div style={{ ...cardStyle, marginBottom: 20 }}>
+      <div id="company-documents" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
         <div
           style={{
             display: 'flex',
@@ -942,13 +1017,17 @@ export default function SettingsPage() {
         WANDERS_KEYS,
       )}
       {renderSection('System', 'System', SYSTEM_KEYS)}
-      <CtrmListsCard />
-      <div id="google-drive">
+      <div id="ctrm-lists" style={{ scrollMarginTop: 72 }}>
+        <CtrmListsCard />
+      </div>
+      <div id="google-drive" style={{ scrollMarginTop: 72 }}>
         <GoogleDriveCard />
       </div>
-      <HubSpotCard />
+      <div id="hubspot" style={{ scrollMarginTop: 72 }}>
+        <HubSpotCard />
+      </div>
 
-      <div style={{ ...cardStyle, marginBottom: 20 }}>
+      <div id="messages" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
         <h2 style={sectionTitleStyle}>Message templates</h2>
         <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
           Tokens: <code>{'{{ref}}'}</code>, <code>{'{{client}}'}</code>, <code>{'{{contact}}'}</code>,{' '}
@@ -987,7 +1066,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <div style={{ ...cardStyle, marginBottom: 20 }}>
+      <div id="zoho" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
         <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
           <Plug size={18} /> Zoho Calendar &amp; Mail
         </h2>
@@ -1128,7 +1207,7 @@ export default function SettingsPage() {
       </div>
 
       {currentAuthMode() === 'local' && (
-        <div style={{ ...cardStyle, marginBottom: 20 }}>
+        <div id="sheets-import" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
           <h2 style={sectionTitleStyle}>Import Google Sheets data</h2>
           <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
             Pull your existing CRM, quotes, invoices, and catalog from an Apps Script migration
@@ -1156,9 +1235,11 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <TwoStepCard />
+      <div id="two-step" style={{ scrollMarginTop: 72 }}>
+        <TwoStepCard />
+      </div>
 
-      <div style={{ ...cardStyle, marginBottom: 20 }} id="account">
+      <div style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }} id="account">
         <h2 style={sectionTitleStyle}>My password</h2>
         <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
           Change the password you use to sign in to Central. Minimum {MIN_PASSWORD_LENGTH} characters.
@@ -1198,7 +1279,7 @@ export default function SettingsPage() {
         </button>
       </div>
 
-      <div style={cardStyle}>
+      <div id="users" style={{ ...cardStyle, scrollMarginTop: 72 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
           <div>
             <h2 style={{ ...sectionTitleStyle, margin: 0 }}>User management</h2>
