@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M3 Pipeline inventory metrics + UI
+**Current milestone:** Continuous backlog — M1 Zod Pipeline next-step patch
 
 ## Shipped this turn
 
-- M3 phase-1 helpers + Pipeline board digest for CRM link coverage / open-deal health
+- Zod `parseMyDealPatchForm` for Pipeline Next step (open-deal action/date rules)
 
 ## Already on main
 
@@ -13,7 +13,7 @@
 
 ## Still open (agent queue)
 
-1. More M1 Zod (#301+)  
+1. Merge #301–#303 queue  
 2. Demo env hooks after Alfred provisions  
 
 ## Still externally blocked
