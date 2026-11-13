@@ -94,7 +94,10 @@ export function processSteps(
   context: WorkflowRunContext
   error_message: string
 } {
-  let ctx = { ...context, notifications: [...(context.notifications || [])] }
+  let ctx: WorkflowRunContext = {
+    ...context,
+    notifications: [...(context.notifications || [])],
+  }
   let i = Math.max(0, startIndex)
 
   while (i < steps.length) {
@@ -119,7 +122,10 @@ export function processSteps(
 
     if (step.type === 'notify') {
       const message = String(step.config.message || step.name || 'Notification')
-      ctx.notifications = [...(ctx.notifications || []), message]
+      ctx = {
+        ...ctx,
+        notifications: [...(ctx.notifications || []), message],
+      }
       ctx = appendLog(ctx, {
         index: i,
         type: step.type,
