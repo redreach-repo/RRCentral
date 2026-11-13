@@ -9,7 +9,13 @@
 
 ## Already on main
 
-- Continuous backlog Zod through go-live/build task (and prior slices)
+- Continuous backlog Zod through go-live/build · M3 consolidate plan · `pipeline_deals_v`
+
+## Still open (agent queue)
+
+1. More M1 Zod  
+2. M3 dual-write / route soft-hide later  
+3. Demo env hooks after Alfred provisions  
 
 ## Still externally blocked
 
