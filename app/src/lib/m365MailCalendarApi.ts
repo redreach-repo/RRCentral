@@ -1,5 +1,5 @@
 /**
- * Microsoft 365 Phase A client (Mail.Send + Calendars.ReadWrite).
+ * Microsoft 365 Phase A+B client (Mail.Send + Mail.Read + Calendars.ReadWrite).
  * Tokens stay in the m365-mail-calendar Edge Function.
  */
 
@@ -9,6 +9,8 @@ import type {
   CalendarInfo,
   FollowUpEventInput,
   ListEventsOpts,
+  ListMailOpts,
+  MailMessage,
   ProviderSettings,
   SendMailOpts,
   TeamMeetingInput,
@@ -97,12 +99,33 @@ export async function sendM365Mail(settings: ProviderSettings, opts: SendMailOpt
   })
 }
 
-export async function listM365Inbox(): Promise<never> {
-  throw new Error('Microsoft 365 inbox is Phase B (Mail.Read). Use Zoho/Gmail send-only or wait for Phase B.')
+export async function listM365Inbox(
+  settings: ProviderSettings,
+  opts?: ListMailOpts,
+): Promise<MailMessage[]> {
+  if (!isM365MailEnabled(settings)) {
+    throw new Error('Microsoft 365 mail is disabled — connect M365 in Settings')
+  }
+  const res = await callM365<{ messages: MailMessage[] }>({
+    action: 'listInbox',
+    limit: opts?.limit,
+    status: opts?.status || 'all',
+  })
+  return res.messages || []
 }
 
-export async function listM365Sent(): Promise<never> {
-  throw new Error('Microsoft 365 Sent is Phase B (Mail.Read). Use Zoho/Gmail send-only or wait for Phase B.')
+export async function listM365Sent(
+  settings: ProviderSettings,
+  opts?: { limit?: number },
+): Promise<MailMessage[]> {
+  if (!isM365MailEnabled(settings)) {
+    throw new Error('Microsoft 365 mail is disabled — connect M365 in Settings')
+  }
+  const res = await callM365<{ messages: MailMessage[] }>({
+    action: 'listSent',
+    limit: opts?.limit,
+  })
+  return res.messages || []
 }
 
 export async function listM365Calendars(settings: ProviderSettings): Promise<CalendarInfo[]> {

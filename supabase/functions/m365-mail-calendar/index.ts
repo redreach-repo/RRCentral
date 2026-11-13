@@ -1,8 +1,8 @@
-// Microsoft 365 Phase A for RR Central (Mail.Send + Calendars.ReadWrite).
+// Microsoft 365 Phase A+B for RR Central (Mail.Send + Mail.Read + Calendars.ReadWrite).
 // Verify JWT is off — Microsoft's OAuth callback is a plain GET; other calls check auth in code.
 //
-//   POST { action: "status" | "connect" | "disconnect" | "sendMail" | "syncFollowUp" |
-//                  "deleteEvent" | "createTeamMeeting" | "listEvents" | "listCalendars" }
+//   POST { action: "status" | "connect" | "disconnect" | "sendMail" | "listInbox" | "listSent" |
+//                  "syncFollowUp" | "deleteEvent" | "createTeamMeeting" | "listEvents" | "listCalendars" }
 //   GET  ?code=…&state=…   Microsoft callback
 //
 // Secrets: MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, optional MICROSOFT_TENANT_ID.
@@ -16,6 +16,7 @@ import {
   deleteM365Event,
   exchangeM365Code,
   listM365Events,
+  listM365FolderMessages,
   loadM365Connection,
   m365AccessToken,
   m365AccountEmail,
@@ -180,7 +181,7 @@ Deno.serve(withErrorLog("m365-mail-calendar", async (req) => {
       connected: Boolean(app && conn),
       account_email: conn?.account_email || "",
       redirect_uri: redirectUri,
-      scopes: "Mail.Send + Calendars.ReadWrite (Phase A)",
+      scopes: "Mail.Send + Mail.Read + Calendars.ReadWrite (Phase A+B)",
     })
   }
 
@@ -228,6 +229,19 @@ Deno.serve(withErrorLog("m365-mail-calendar", async (req) => {
         fromAddress: body.fromAddress ? String(body.fromAddress) : undefined,
       })
       return json({ ok: true })
+    }
+
+    if (action === "listInbox" || action === "listSent") {
+      const token = await requireToken()
+      const limit = typeof body.limit === "number" ? body.limit : Number(body.limit) || 25
+      const statusRaw = String(body.status || "all")
+      const status = statusRaw === "read" || statusRaw === "unread" ? statusRaw : "all"
+      const messages = await listM365FolderMessages(token, {
+        folder: action === "listSent" ? "sentitems" : "inbox",
+        limit,
+        status: action === "listSent" ? "all" : status,
+      })
+      return json({ messages })
     }
 
     if (action === "syncFollowUp") {

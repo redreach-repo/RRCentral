@@ -6,25 +6,31 @@
 
 | Capability | Implementation |
 |------------|----------------|
-| Send | Zoho **or** Gmail **or** M365 (Phase A) |
-| Inbox / Sent | Zoho; Gmail/M365 inbox = Phase B |
+| Send | Zoho **or** Gmail **or** M365 |
+| Inbox / Sent | Zoho **or** M365 (Phase B); Gmail inbox still blocked on CASA |
 | Calendar / follow-up / meetings | Zoho **or** Google Calendar **or** Microsoft Graph calendar |
 | Settings provider switch | Zoho + Gmail + M365 selectable; IMAP listed but unavailable |
 | OAuth | `gmail-calendar`, `m365-mail-calendar` Edge Functions + connection tables |
 
-## Slice 8 (this milestone step)
+## Slice 9 (this milestone step)
 
-- Conclude **IMAP / other** compliance assessment in `COMPLIANCE_NOTES.md`
-- Keep IMAP unavailable in Settings; reason points at compliance note
-- **No IMAP OAuth or password client code**
+- M365 Phase B: add delegated `Mail.Read`; `listInbox` / `listSent` via Graph
+- Reconnect required for accounts that connected on Phase A scopes only
+- Gmail Phase B still deferred (restricted `gmail.readonly` + CASA)
 
 ## Later
 
-1. Gmail / M365 Phase B inbox (`gmail.readonly` / `Mail.Read`) when gates allow
+1. Gmail Phase B inbox when restricted verification + CASA plan allow
 2. Generic IMAP only if a real non-API mailbox need appears
+
+## Ops (M365 Phase B)
+
+1. Redeploy `m365-mail-calendar` after merge
+2. Disconnect + Connect Microsoft 365 in Settings to grant `Mail.Read`
+3. Select Microsoft 365 as the mail/calendar provider
 
 ## Rules
 
-- Do not break Zoho, Gmail Phase A, or M365 Phase A
-- Prefer Gmail API / Graph over IMAP for those hosts
-- No inbox restricted scopes until Phase B prerequisites in `COMPLIANCE_NOTES.md`
+- Do not break Zoho or Gmail Phase A
+- Prefer Gmail API / Graph over IMAP
+- No Gmail `gmail.readonly` until Phase B prerequisites in `COMPLIANCE_NOTES.md`

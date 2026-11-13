@@ -42,7 +42,7 @@ Status key: **exists** · **partial** · **missing**
 |--------|--------|--------------|
 | 6.1 Core platform | partial | Users/settings/audit/2-step exist; MFA passkeys/SSO missing → M1 |
 | 6.2 CRM and sales | partial | Strong ops CRM; three pipelines; Pipeline-first soft-retire (M3 slice 4); schema merge later (ask) |
-| 6.3 Email and calendar | partial | Zoho + Gmail/M365 Phase A; inbox Phase B; IMAP assessed & deferred (prefer APIs) |
+| 6.3 Email and calendar | partial | Zoho + Gmail Phase A + M365 Phase A/B (incl. inbox); Gmail inbox still CASA-gated; IMAP deferred |
 | 6.4 Contracts and e-sign | partial | Agreement/NDA + `/sign` sealed PDF path; no clause library/obligations board → M5 |
 | 6.5 HR | missing | M6 |
 | 6.6 Payroll | missing | M8 UAE pack |
@@ -61,7 +61,7 @@ Status key: **exists** · **partial** · **missing**
 
 | Requirement | Status | Step |
 |-------------|--------|------|
-| Mail providers (Zoho→Gmail→M365→IMAP) | partial | Zoho + Gmail/M365 Phase A; IMAP compliance concluded (deferred); Phase B inbox later |
+| Mail providers (Zoho→Gmail→M365→IMAP) | partial | Zoho + Gmail Phase A + M365 Phase A/B; Gmail Phase B later; IMAP deferred |
 | AI gateway + tools-as-user + pgvector | partial | `ai-assist` Edge; no gateway/retrieval/action queue → M10 (light from M4) |
 | AI human approval queue | missing | M10 |
 | Field-level encryption (salary, IBAN, tokens) | missing | M1 for tokens; M6/M8 for HR fields |

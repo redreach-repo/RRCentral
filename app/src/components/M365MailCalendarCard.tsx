@@ -42,7 +42,7 @@ export default function M365MailCalendarCard() {
     const params = new URLSearchParams(window.location.search)
     const result = params.get('m365')
     if (!result) return
-    if (result === 'connected') showToast('Microsoft 365 connected (send + calendar)', 'success')
+    if (result === 'connected') showToast('Microsoft 365 connected (send + inbox + calendar)', 'success')
     else showToast(params.get('reason') || 'Microsoft 365 was not connected', 'error')
     params.delete('m365')
     params.delete('reason')
@@ -82,10 +82,11 @@ export default function M365MailCalendarCard() {
         <Plug size={18} /> Microsoft 365
       </h2>
       <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.55 }}>
-        Phase A: send mail and sync follow-ups / meetings with delegated{' '}
+        Phase A+B: send, inbox/sent, and calendar with delegated{' '}
         <code style={{ color: '#ff9f4a' }}>Mail.Send</code> +{' '}
-        <code style={{ color: '#ff9f4a' }}>Calendars.ReadWrite</code>. Inbox needs Phase B (
-        <code style={{ color: '#ff9f4a' }}>Mail.Read</code>). Set Edge secrets{' '}
+        <code style={{ color: '#ff9f4a' }}>Mail.Read</code> +{' '}
+        <code style={{ color: '#ff9f4a' }}>Calendars.ReadWrite</code>. If you connected before
+        Phase B, disconnect and connect again to grant <code>Mail.Read</code>. Set Edge secrets{' '}
         <code>MICROSOFT_CLIENT_ID</code> / <code>MICROSOFT_CLIENT_SECRET</code> (optional{' '}
         <code>MICROSOFT_TENANT_ID</code>, default <code>common</code>). Add redirect URI{' '}
         <code style={{ color: '#ff9f4a' }}>
