@@ -14,6 +14,7 @@ import {
 } from '../../lib/buildTemplatesStore'
 import { errorMessage } from '../../lib/errors'
 import { GO_LIVE_OWNERS, goLiveProgress, goLiveSteps, isOverdue, ownerLabel } from '../../lib/goLive'
+import { parseGoLiveStepForm } from '../../lib/schemas/goLiveStep'
 import type { AppUser, BuildStageKey, BuildTask, GoLiveOwner } from '../../lib/types'
 import { buttonSecondaryStyle, cardStyle, colors, inputStyle, sectionTitleStyle, selectStyle } from '../../lib/uiStyles'
 
@@ -80,9 +81,13 @@ export default function GoLiveCard({
 
   async function add(e: FormEvent) {
     e.preventDefault()
-    if (!form.title.trim()) return
+    const parsed = parseGoLiveStepForm(form)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
     await run(async () => {
-      await addGoLiveStep(accountId, { stage: form.stage, title: form.title.trim(), owner: form.owner, due_date: form.due || null }, tasks)
+      await addGoLiveStep(accountId, parsed.data, tasks)
       setForm((f) => ({ ...f, title: '', due: '' }))
     }, 'Could not add the step')
   }
