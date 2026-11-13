@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** M1 leftover (Zod delivery note form)
+**Current milestone:** M1 leftover (Zod inventory adjust)
 
 ## Shipped this turn
 
-- Zod `parseDeliveryNoteForm` on delivery note edit (status, date)
+- Zod `parseInventoryAdjust` on inventory stock adjust (non-zero qty, reason)
 
 ## Already on main
 
-- M0–M4 · M1 leftovers (forms Zod through domains, field-mask) · M5 through clause-tag spawn
+- M0–M4 · M1 leftovers (forms Zod through delivery notes, field-mask) · M5 through clause-tag spawn
 
 ## Still open
 
