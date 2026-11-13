@@ -31,7 +31,7 @@ import SupplierInvoiceModal from '../components/quotations/SupplierInvoiceModal'
 import QuoteRowActions from '../components/quotations/QuoteRowActions'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
-import qStyles from './QuotationsPage.module.css'
+import qStyles from '../styles/docsList.module.css'
 import { logActivity } from '../lib/activity'
 import {
   calcTotals,

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import { Copy, CreditCard, ExternalLink, Pencil, Plus, Trash2, Wallet } from 'lucide-react'
-import { canMakePayLink } from '../lib/invoicePayLink'
+import { Plus, Trash2, Wallet } from 'lucide-react'
 import { getInvoicePayLink } from '../lib/invoicePayLinkStore'
+import InvoiceRowActions from '../components/invoices/InvoiceRowActions'
+import docsStyles from '../styles/docsList.module.css'
 import { db } from '../lib/db'
 import {
   DELIVERY_TERMS,
@@ -57,20 +58,15 @@ import {
   buttonDangerStyle,
   buttonPrimaryStyle,
   buttonSecondaryStyle,
-  cardStyle,
   colors,
   fieldStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
-  toolbarStyle,
 } from '../lib/uiStyles'
 import { errorMessage } from '../lib/errors'
 
@@ -178,6 +174,7 @@ export default function InvoicesPage() {
         ? { vat_mode: 'standard', vat_percent: vatRateToPercent(standard) }
         : { vat_mode: 'custom', vat_percent: vatRateToPercent(rate) }
   const [payTab, setPayTab] = useState<'All' | 'Pending' | 'Partial' | 'Paid'>('All')
+  const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
   const compact = useCompactCrm()
   const [searchParams, setSearchParams] = useSearchParams()
   const accountFilter = searchParams.get('account') || ''
@@ -663,57 +660,19 @@ export default function InvoicesPage() {
 
   function renderInvoiceActions(inv: Invoice) {
     return (
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-        <button type="button" style={buttonSecondaryStyle} onClick={() => void openEdit(inv)}>
-          <Pencil size={14} />
-        </button>
-        <Link
-          to={`/document/invoice/${inv.id}`}
-          style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}
-        >
-          <ExternalLink size={14} />
-        </Link>
-        {!isCancelledInvoice(inv) && effectiveInvoicePaymentStatus(inv) !== 'Paid' && (
-          <button type="button" style={buttonPrimaryStyle} onClick={() => void openPayment(inv)}>
-            Pay
-          </button>
-        )}
-        {canMakePayLink(userRole) &&
-          inv.reference_number &&
-          !isCancelledInvoice(inv) &&
-          String(inv.status).toLowerCase() !== 'draft' &&
-          effectiveInvoicePaymentStatus(inv) !== 'Paid' && (
-            <button
-              type="button"
-              style={buttonSecondaryStyle}
-              disabled={saving}
-              title="Card payment link for what is still owed"
-              onClick={() => void copyPayLink(inv)}
-            >
-              <CreditCard size={14} /> Card link
-            </button>
-          )}
-        {can(userRole, 'invoice.markPaid') &&
-          !isCancelledInvoice(inv) &&
-          effectiveInvoicePaymentStatus(inv) !== 'Paid' && (
-            <button type="button" style={buttonSecondaryStyle} disabled={saving} onClick={() => void markPaid(inv)}>
-              Mark paid
-            </button>
-          )}
-        <button type="button" style={buttonSecondaryStyle} onClick={() => void duplicate(inv)}>
-          <Copy size={14} />
-        </button>
-        {can(userRole, 'invoice.delete') && (
-          <button
-            type="button"
-            style={buttonDangerStyle}
-            onClick={() => setDeleteTarget(inv)}
-            aria-label="Delete invoice"
-          >
-            <Trash2 size={14} />
-          </button>
-        )}
-      </div>
+      <InvoiceRowActions
+        invoice={inv}
+        expanded={actionsOpenId === inv.id}
+        onToggle={() => setActionsOpenId((id) => (id === inv.id ? null : inv.id))}
+        saving={saving}
+        userRole={userRole}
+        onEdit={(row) => void openEdit(row)}
+        onPay={(row) => void openPayment(row)}
+        onCopyPayLink={(row) => void copyPayLink(row)}
+        onMarkPaid={(row) => void markPaid(row)}
+        onDuplicate={(row) => void duplicate(row)}
+        onDelete={(row) => setDeleteTarget(row)}
+      />
     )
   }
 
@@ -734,16 +693,19 @@ export default function InvoicesPage() {
   const filterAccount = accountFilter ? accountById.get(accountFilter) : undefined
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Invoices</h1>
-          <p style={pageSubtitleStyle}>Billing and payment tracking</p>
+          <p className={docsStyles.kicker}>Sales documents</p>
+          <h1 className={docsStyles.title}>Invoices</h1>
+          <p className={docsStyles.subtitle}>
+            Billing and payment tracking. Click Actions on a row to reveal every option.
+          </p>
         </div>
-        <button type="button" style={buttonPrimaryStyle} onClick={openCreate}>
+        <button type="button" className={docsStyles.newBtn} onClick={openCreate}>
           <Plus size={16} /> New invoice
         </button>
-      </div>
+      </header>
 
       {roleAtLeast(userRole, 'sales') ? <PaymentRemindersCard /> : null}
 
@@ -764,16 +726,13 @@ export default function InvoicesPage() {
         </p>
       ) : null}
 
-      <div className={resp.toolbar} style={{ marginBottom: 16 }}>
-        <div className={compact ? resp.chipScroll : resp.chipRow} style={{ marginBottom: 0, flex: 1 }}>
+      <div className={docsStyles.controls}>
+        <div className={docsStyles.tabs}>
           {(['All', 'Pending', 'Partial', 'Paid'] as const).map((t) => (
             <button
               key={t}
               type="button"
-              style={{
-                ...buttonSecondaryStyle,
-                ...(payTab === t ? { borderColor: colors.accent, color: colors.accent } : null),
-              }}
+              className={payTab === t ? docsStyles.tabActive : docsStyles.tab}
               onClick={() => setPayTab(t)}
             >
               {t}
@@ -781,8 +740,7 @@ export default function InvoicesPage() {
           ))}
         </div>
         <input
-          className={resp.toolbarSearch}
-          style={{ ...inputStyle, maxWidth: compact ? '100%' : 320 }}
+          className={docsStyles.search}
           placeholder="Search client / ref…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -790,76 +748,62 @@ export default function InvoicesPage() {
       </div>
 
       {loading ? (
-        <div style={{ ...cardStyle, color: colors.muted }}>Loading invoices…</div>
+        <div className={docsStyles.loading}>Loading invoices…</div>
       ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={<Wallet size={22} />}
-          title="No invoices"
-          subtitle="Convert an awarded quote or create an invoice."
-          actionLabel="New invoice"
-          onAction={openCreate}
-        />
-      ) : compact ? (
-        <div className={resp.listStack}>
-          {filtered.map((inv) => (
-            <article key={inv.id} className={resp.card}>
-              <div className={resp.cardTop}>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div className={resp.cardTitle} style={{ cursor: 'default' }}>
-                    {inv.reference_number || '—'}
-                  </div>
-                  <div className={resp.cardMeta}>{invoiceKindLabel(inv.reference_number)}</div>
-                  <div className={resp.cardMeta}>
-                    {clientCell(inv)}
-                    {inv.date ? ` · ${format(new Date(inv.date), 'dd MMM yyyy')}` : ''}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
-                  <StatusPill status={inv.status} />
-                  <StatusPill status={effectiveInvoicePaymentStatus(inv)} />
-                </div>
-              </div>
-              <div className={resp.cardMeta} style={{ fontSize: 15, fontWeight: 650, color: colors.text }}>
-                {formatAED(inv.amount)}
-              </div>
-              <div className={resp.cardActions}>{renderInvoiceActions(inv)}</div>
-            </article>
-          ))}
+        <div className={docsStyles.empty}>
+          <EmptyState
+            icon={<Wallet size={22} />}
+            title="No invoices"
+            subtitle="Convert an awarded quote or create an invoice."
+            actionLabel="New invoice"
+            onAction={openCreate}
+          />
         </div>
       ) : (
-        <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
-          <div style={tableWrapStyle}>
-            <table style={tableStyle}>
+        <div className={docsStyles.tableShell}>
+          <div className={docsStyles.tableWrap}>
+            <table className={docsStyles.table}>
               <thead>
                 <tr>
-                  <th style={thStyle}>Reference</th>
-                  <th style={thStyle}>Client</th>
-                  <th style={thStyle}>Date</th>
-                  <th style={thStyle}>Amount</th>
-                  <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Payment</th>
-                  <th style={thStyle}>Actions</th>
+                  <th className={docsStyles.colRef}>Reference</th>
+                  <th className={docsStyles.colClient}>Client</th>
+                  <th className={docsStyles.colDate}>Date</th>
+                  <th className={docsStyles.colAmount}>Amount</th>
+                  <th className={docsStyles.colStatus}>Status</th>
+                  <th className={docsStyles.colStatus}>Payment</th>
+                  <th className={docsStyles.colActions} style={{ textAlign: 'right' }}>
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((inv) => (
-                  <tr key={inv.id}>
-                    <td style={tdStyle}>
-                      <strong>{inv.reference_number || '—'}</strong>
-                      <div style={{ fontSize: 12, color: colors.muted }}>{invoiceKindLabel(inv.reference_number)}</div>
+                  <tr
+                    key={inv.id}
+                    className={actionsOpenId === inv.id ? docsStyles.rowExpanded : undefined}
+                  >
+                    <td className={docsStyles.colRef}>
+                      <div className={docsStyles.ref}>{inv.reference_number || '—'}</div>
+                      <div className={docsStyles.meta}>{invoiceKindLabel(inv.reference_number)}</div>
                     </td>
-                    <td style={tdStyle}>{clientCell(inv)}</td>
-                    <td style={tdStyle}>
+                    <td className={`${docsStyles.colClient} ${docsStyles.clientCell}`}>
+                      {clientCell(inv)}
+                    </td>
+                    <td className={docsStyles.colDate}>
                       {inv.date ? format(new Date(inv.date), 'dd MMM yyyy') : '—'}
                     </td>
-                    <td style={tdStyle}>{formatAED(inv.amount)}</td>
-                    <td style={tdStyle}>
+                    <td className={`${docsStyles.colAmount} ${docsStyles.amount}`}>
+                      {formatAED(inv.amount)}
+                    </td>
+                    <td className={docsStyles.colStatus}>
                       <StatusPill status={inv.status} />
                     </td>
-                    <td style={tdStyle}>
+                    <td className={docsStyles.colStatus}>
                       <StatusPill status={effectiveInvoicePaymentStatus(inv)} />
                     </td>
-                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{renderInvoiceActions(inv)}</td>
+                    <td className={`${docsStyles.colActions} ${docsStyles.actionsCell}`}>
+                      {renderInvoiceActions(inv)}
+                    </td>
                   </tr>
                 ))}
               </tbody>

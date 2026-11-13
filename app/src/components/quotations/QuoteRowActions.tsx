@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import type { Quotation } from '../../lib/types'
 import { canCreateDeliveryNoteFromQuote } from '../../lib/deliveryNotes'
-import styles from './QuoteRowActions.module.css'
+import styles from '../../styles/rowActions.module.css'
 
 export type QuoteRowActionsProps = {
   quote: Quotation
