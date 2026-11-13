@@ -30,6 +30,11 @@ import {
 } from '../lib/companyDocs'
 import { can, ROLE_DESCRIPTIONS, ROLE_LABELS, USER_ROLES } from '../lib/permissions'
 import {
+  listNumberingSequences,
+  previewNextReference,
+  type NumberingSequence,
+} from '../lib/numbering'
+import {
   clearSupabaseRuntimeConfig,
   getSupabaseRuntimeConfig,
   saveSupabaseRuntimeConfig,
@@ -210,6 +215,8 @@ export default function SettingsPage() {
   const [deleteCompanyDoc, setDeleteCompanyDoc] = useState<CompanyDocument | null>(null)
   const [userActionsId, setUserActionsId] = useState<string | null>(null)
   const [docActionsId, setDocActionsId] = useState<string | null>(null)
+  const [numberingRows, setNumberingRows] = useState<NumberingSequence[]>([])
+  const [numberingLoading, setNumberingLoading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const backupRef = useRef<HTMLInputElement>(null)
   const cloudBackupRef = useRef<HTMLInputElement>(null)
@@ -285,9 +292,24 @@ export default function SettingsPage() {
     }
   }, [showToast])
 
+  const loadNumbering = useCallback(async () => {
+    setNumberingLoading(true)
+    try {
+      setNumberingRows(await listNumberingSequences())
+    } catch {
+      setNumberingRows([])
+    } finally {
+      setNumberingLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (can(userRole, 'users.manage')) void loadUsers()
   }, [userRole, loadUsers])
+
+  useEffect(() => {
+    void loadNumbering()
+  }, [loadNumbering])
 
   useEffect(() => {
     if (can(userRole, 'settings.manage')) void loadCompanyDocs()
@@ -692,6 +714,7 @@ export default function SettingsPage() {
     { id: 'company-documents', label: 'Documents' },
     { id: 'bank', label: 'Bank' },
     { id: 'quote-settings', label: 'Quotes' },
+    { id: 'numbering', label: 'Numbering' },
     { id: 'division-formats', label: 'Division formats' },
     { id: 'wanders', label: 'Wanders' },
     { id: 'system', label: 'System' },
@@ -1001,6 +1024,85 @@ export default function SettingsPage() {
 
       {renderSection('Bank details', 'Bank', BANK_KEYS)}
       {renderSection('Quote / Invoice settings', 'Quote settings', QUOTE_KEYS)}
+
+      <div id="numbering" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Document numbering</h2>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={numberingLoading}
+            onClick={() => void loadNumbering()}
+          >
+            {numberingLoading ? 'Loading…' : 'Refresh'}
+          </button>
+        </div>
+        <p style={{ margin: '8px 0 14px', fontSize: 13, color: colors.muted, lineHeight: 1.45 }}>
+          Counters live in the database (M2). Quotes and invoices share one RR sequence per division.
+          Next finalize/save allocates atomically when cloud is connected.
+        </p>
+        {numberingRows.length === 0 ? (
+          <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>
+            {numberingLoading
+              ? 'Loading sequences…'
+              : 'No sequences yet — apply the M2 migration, or finalize a document to create one.'}
+          </p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr>
+                  {['Type', 'Division', 'Prefix', 'Year', 'Last', 'Next'].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        textAlign: 'left',
+                        padding: '8px 10px',
+                        borderBottom: `1px solid ${colors.border}`,
+                        color: colors.muted,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {numberingRows.map((row) => (
+                  <tr key={row.id}>
+                    <td style={{ padding: '8px 10px', borderBottom: `1px solid ${colors.border}` }}>
+                      {row.doc_type}
+                    </td>
+                    <td style={{ padding: '8px 10px', borderBottom: `1px solid ${colors.border}` }}>
+                      {row.division_code}
+                    </td>
+                    <td style={{ padding: '8px 10px', borderBottom: `1px solid ${colors.border}` }}>
+                      {row.prefix}
+                    </td>
+                    <td style={{ padding: '8px 10px', borderBottom: `1px solid ${colors.border}` }}>
+                      {row.year_yy}
+                    </td>
+                    <td style={{ padding: '8px 10px', borderBottom: `1px solid ${colors.border}` }}>
+                      {row.last_seq}
+                    </td>
+                    <td
+                      style={{
+                        padding: '8px 10px',
+                        borderBottom: `1px solid ${colors.border}`,
+                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                      }}
+                    >
+                      {previewNextReference(row)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {renderSection(
         'Division quotation formats (editable titles, closings, Connect partner name)',
         'Division formats',

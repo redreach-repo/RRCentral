@@ -47,3 +47,16 @@ if [[ $tenant_rc -ne 0 ]] || grep -q "TENANT TEST FAILED\|ERROR:" /tmp/tenant_te
   exit 1
 fi
 echo "Tenant isolation tests passed"
+
+echo "Running numbering tests…"
+set +e
+"${PSQL[@]}" -d "$DB" -f tests/numbering_test.sql > /tmp/numbering_test_out.txt 2>&1
+numbering_rc=$?
+set -e
+sed -n "s/.*NOTICE:  //p" /tmp/numbering_test_out.txt || true
+if [[ $numbering_rc -ne 0 ]] || grep -q "NUMBERING TEST FAILED\|ERROR:" /tmp/numbering_test_out.txt; then
+  echo "Numbering tests failed — full output:" >&2
+  cat /tmp/numbering_test_out.txt >&2
+  exit 1
+fi
+echo "Numbering tests passed"

@@ -60,11 +60,8 @@ import { commitStockForInvoice, releaseStockForQuote, reserveStockForQuote } fro
 import { syncCrmFromQuote } from '../lib/crmSync'
 import { ensureCompanyFromDocument } from '../lib/ensureCompanyFromDocument'
 import { formatAED } from '../lib/money'
-import {
-  generateReference,
-  formatRevisionReference,
-  parseBaseReference,
-} from '../lib/referenceNumber'
+import { formatRevisionReference, parseBaseReference } from '../lib/referenceNumber'
+import { allocateReference } from '../lib/numbering'
 import { sortByDateDesc } from '../lib/finance'
 import { isQuotePastValidity, quoteValidUntil } from '../lib/documents'
 import { errorMessage, isUndefinedColumnError } from '../lib/errors'
@@ -729,7 +726,14 @@ export default function QuotationsPage() {
     try {
       const { data: allRefs } = await db.from('quotations').select('reference_number')
       const refs = ((allRefs || []) as { reference_number: string }[]).map((r) => r.reference_number)
-      const reference = generateReference(q.division_code || '01', refs, quotePrefix)
+      const { data: invRefs } = await db.from('invoices').select('reference_number')
+      const irefs = ((invRefs || []) as { reference_number: string }[]).map((r) => r.reference_number)
+      const reference = await allocateReference({
+        docType: 'quotation',
+        divisionCode: q.division_code || '01',
+        prefix: quotePrefix,
+        existingRefs: [...refs, ...irefs],
+      })
       const validityDays = Number(settings.quoteValidityDays || 14) || 14
       const validUntil = quoteValidUntil(q.date || format(new Date(), 'yyyy-MM-dd'), validityDays)
       const { error } = await db

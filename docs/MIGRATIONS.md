@@ -28,3 +28,17 @@ No database migrations. Documentation and `brand-assets/` only.
 **Risks**
 - Any code path that inserts rows with an explicit foreign `tenant_id` will fail RLS (intended).
 - Deploy migration before or with the app release that selects `app_users.tenant_id` (client falls back if column missing).
+
+## M2 — `20261213140000_customization_layer.sql`
+
+**What**
+- `numbering_sequences` seeded from existing invoice/quotation/DN/account refs
+- `rr_allocate_reference(doc_type, division_code, prefix)` — atomic, tenant-scoped; quotes+invoices share one RR counter
+- `custom_field_definitions` / `custom_field_values` / `saved_views` (foundation tables + RLS)
+- Restrictive tenant isolation on new tables
+
+**Dry-run / tests**
+- `bash supabase/tests/run.sh` includes `numbering_test.sql`
+
+**Rollback**
+- Forward-only preferred. Drop new tables/function only after confirming no production allocates depend on them; app falls back to client-side `generateReference`.
