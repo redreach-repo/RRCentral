@@ -15,7 +15,7 @@ Status key: **exists** · **partial** · **missing**
 |-------------|--------|------------------------|
 | Vite+React SPA on Supabase | exists | Keep; do not rewrite framework |
 | Trusted logic in Edge/DB not only browser | partial | Ledger/payroll/permissions must move server-side in M1+ |
-| Zod validation everywhere | partial | Login + change-password + app-user schemas; keep expanding forms/API |
+| Zod validation everywhere | partial | Login, password, app-user, account form schemas; keep expanding forms/API |
 | Module registry manifests | partial | M1 `APP_MODULES` in `modules/nav.ts`; Layout consumes manifests — flags/permissions next |
 | Domain events / `event_outbox` | partial | M1 table + RLS; workers not yet consuming |
 | Public REST API + webhooks | missing | M11 (or earlier for partners) |
