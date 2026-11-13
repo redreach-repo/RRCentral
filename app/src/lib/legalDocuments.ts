@@ -6,8 +6,13 @@
 import { addDays, format, parseISO } from 'date-fns'
 import { hashPortalToken, isPortalToken, newPortalToken } from './clientPortal'
 
-export { defaultObligationsOnSign } from './obligationSpawn'
+export {
+  CLAUSE_SPAWN_RULES,
+  defaultObligationsOnSign,
+  obligationsFromClauseKeys,
+} from './obligationSpawn'
 export type { SpawnObligationInput, SpawnObligationRow } from './obligationSpawn'
+export { clauseKeysFromText, clauseMarker } from './clauseCompose'
 
 export {
   hashPortalToken as hashLegalSignToken,
