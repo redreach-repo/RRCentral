@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Modal from '../Modal'
-import { BILLING_STATUSES, churchDetailsProblem } from '../../lib/worshiphub'
+import { BILLING_STATUSES } from '../../lib/worshiphub'
+import { parseChurchDetailsForm } from '../../lib/schemas/churchDetails'
 import type { ChurchDetailsInput } from '../../lib/worshiphubStore'
 import type { WorshipBillingStatus, WorshipChurchProfile } from '../../lib/types'
 import {
@@ -52,20 +53,13 @@ export default function ChurchDetailsModal({ open, onClose, profile, saving, onS
 
   function submit() {
     if (!d) return
-    const clean = { ...d, tenant_slug: d.tenant_slug.trim().toLowerCase(), admin_url: d.admin_url.trim() }
-    const problem = churchDetailsProblem(clean)
-    if (problem) {
-      setError(problem)
+    const parsed = parseChurchDetailsForm(d)
+    if (!parsed.ok) {
+      setError(parsed.error)
       return
     }
-    onSave({
-      ...clean,
-      plan: clean.plan.trim(),
-      modules: [...new Set(clean.modules.split(',').map((m) => m.trim()).filter(Boolean))],
-      whatsapp_conversations: clean.whatsapp_conversations.trim() ? Number(clean.whatsapp_conversations) : null,
-      renewal_date: clean.renewal_date || null,
-      notes: clean.notes.trim(),
-    })
+    setError('')
+    onSave(parsed.data)
   }
 
   return (
