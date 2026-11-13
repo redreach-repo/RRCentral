@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { differenceInCalendarDays, format, parseISO, startOfMonth, subMonths } from 'date-fns'
 import { Download } from 'lucide-react'
 import { db } from '../lib/db'
