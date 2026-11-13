@@ -7,6 +7,10 @@
 
 - SQL view `pipeline_deals_v` (crm ∪ sales_deals ∪ ctrm_deals, security_invoker, no commission)
 
+## Already on main
+
+- Continuous backlog Zod through go-live/build task · M3 consolidate plan
+
 ## Still open (agent queue)
 
 1. More M1 Zod  
