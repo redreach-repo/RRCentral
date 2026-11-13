@@ -90,8 +90,9 @@ export default function GmailCalendarCard() {
         Phase A: send mail and sync follow-ups / meetings with{' '}
         <code style={{ color: '#ff9f4a' }}>gmail.send</code> +{' '}
         <code style={{ color: '#ff9f4a' }}>calendar.events</code> only. Inbox / Sent need Phase B
-        (restricted scopes) — see Compliance notes. Uses the same Google Cloud OAuth client as Drive
-        (<code>GOOGLE_CLIENT_ID</code> / <code>GOOGLE_CLIENT_SECRET</code>). Add redirect URI{' '}
+        (restricted scopes) — see Compliance notes. Prefer{' '}
+        <code>GOOGLE_MAIL_CLIENT_ID</code> / <code>GOOGLE_MAIL_CLIENT_SECRET</code>; falls back to
+        Drive&apos;s <code>GOOGLE_CLIENT_ID</code> / <code>GOOGLE_CLIENT_SECRET</code>. Add redirect URI{' '}
         <code style={{ color: '#ff9f4a' }}>{status.redirect_uri || '…/functions/v1/gmail-calendar'}</code>{' '}
         in Google Cloud Console, then deploy{' '}
         <code style={{ color: '#ff9f4a' }}>npx supabase functions deploy gmail-calendar</code>.

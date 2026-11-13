@@ -25,7 +25,7 @@ import {
   gmailAccessToken,
   gmailAccountEmail,
   gmailConsentUrl,
-  googleApp,
+  gmailGoogleApp,
   listPrimaryEvents,
   loadGmailConnection,
   sendGmailMessage,
@@ -97,7 +97,7 @@ Deno.serve(withErrorLog("gmail-calendar", async (req) => {
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || ""
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
   if (!supabaseUrl || !anonKey || !serviceKey) return json({ error: "Server misconfigured" }, 500)
-  const app = googleApp()
+  const app = gmailGoogleApp()
   const redirectUri = `${supabaseUrl.replace(/\/$/, "")}/functions/v1/gmail-calendar`
   const sb = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 

@@ -1,10 +1,20 @@
-// Gmail send + Google Calendar (Phase A). Same Google Cloud OAuth client as Drive
-// (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET), separate refresh token in gmail_connection.
+// Gmail send + Google Calendar (Phase A). Prefer dedicated
+// GOOGLE_MAIL_CLIENT_ID / GOOGLE_MAIL_CLIENT_SECRET; fall back to Drive's
+// GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET. Refresh token lives in gmail_connection.
 // Scopes are sensitive only — no gmail.readonly (Phase B / COMPLIANCE_NOTES).
 import type { SupabaseClient } from "jsr:@supabase/supabase-js@2"
 import { googleApp } from "./googleDrive.ts"
 
-export { googleApp }
+/** OAuth client for Gmail/Calendar — dedicated secrets first, then Drive secrets. */
+export function gmailGoogleApp(): { clientId: string; clientSecret: string } | null {
+  const mailId = (Deno.env.get("GOOGLE_MAIL_CLIENT_ID") || "").trim()
+  const mailSecret = (Deno.env.get("GOOGLE_MAIL_CLIENT_SECRET") || "").trim()
+  if (mailId && mailSecret) return { clientId: mailId, clientSecret: mailSecret }
+  return googleApp()
+}
+
+/** @deprecated Prefer gmailGoogleApp — kept for callers that still import googleApp. */
+export { gmailGoogleApp as googleApp }
 
 export const GMAIL_CALENDAR_SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",

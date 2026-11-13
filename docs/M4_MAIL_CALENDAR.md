@@ -34,7 +34,7 @@
 
 ## Ops
 
-1. Same secrets as Drive: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+1. Prefer `GOOGLE_MAIL_CLIENT_ID` / `GOOGLE_MAIL_CLIENT_SECRET` (falls back to Drive’s `GOOGLE_CLIENT_*`)
 2. Add redirect URI `…/functions/v1/gmail-calendar` in Google Cloud Console
 3. `npx supabase functions deploy gmail-calendar`
 4. Apply migration `20261113160000_gmail_connection.sql`
