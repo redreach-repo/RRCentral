@@ -12,22 +12,24 @@
 | Compose into templates | Insert active clauses into NDA + agreement draft editors |
 | Obligations board | `/obligations` — open/done/cancelled follow-through |
 | Vault obligations | CRM Contracts tab: list / quick-add / mark done |
-| Spawn on sign | [#244](https://github.com/redreach-repo/RRCentral/pull/244) (open) — default rows after `/sign` |
+| Spawn on sign | `legal-sign` opens default obligations when a doc is signed |
+| Clause-tag spawn | Template `<!-- rr-clause:key -->` markers drive extra duties |
 | TDRA QTSP integration | Not started → Phase B after ask |
 
-## Slice 7 (this milestone step)
+## Slice 8 (this milestone step)
 
-- Contracts vault panel: open obligations for the company + quick-add + mark done
-- Link to full `/obligations` board
+- Clause inserts stamp `<!-- rr-clause:key -->` markers
+- On sign: read linked template body → match keys → spawn keyed obligations (+ defaults)
+- Unit tests for key detection and keyed spawn rules
 
 ## Later
 
-1. Merge spawn-on-sign (#244) + richer spawn rules
-2. Phase B QTSP after Alfred approves a licensed vendor
+1. Phase B QTSP after Alfred approves a licensed vendor
 
 ## Ops
 
-1. Apply `20261214100000_contract_obligations.sql`
+1. Apply `contract_obligations` migration if not already
+2. Redeploy `legal-sign` after merge
 
 ## Rules
 
