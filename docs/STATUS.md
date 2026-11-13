@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog (unlocked) — M3a demo prep
+**Current milestone:** Continuous backlog — M1 Zod lead intake
 
 ## Shipped this turn
 
-- M3a demo prep doc (`docs/M3A_DEMO.md`) — checklist only; Alfred still provisions project
+- Zod `parseLeadIntakeForm` for new-lead owner mode / pool / WhatsApp number
 
 ## Already on main
 
-- Continuous backlog Zod through message templates · QTSP scaffold · go-live/build · M3 plan · `pipeline_deals_v`
+- Continuous backlog Zod through message templates · M3a demo prep · QTSP scaffold · `pipeline_deals_v`
 
 ## Still open (agent queue)
 
