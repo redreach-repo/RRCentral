@@ -390,6 +390,41 @@ export function dealTotals(rows: DealRow[]): DealTotals {
   }
 }
 
+/**
+ * Shared writable fields on the unified Pipeline. Values stay pipeline-native
+ * (quotes / commission); create/delete stay on the native screens.
+ */
+export type MyDealPatch = {
+  next_action?: string
+  next_action_date?: string | null
+  /** Team user id; CRM maps this to the free-text `owner` name. */
+  owner_user_id?: string | null
+}
+
+/** Resolve CRM's free-text owner from a team user id (or clear when null). */
+export function crmOwnerText(
+  ownerUserId: string | null | undefined,
+  users: Pick<AppUser, 'id' | 'name'>[],
+): string {
+  if (ownerUserId == null || ownerUserId === '') return ''
+  const u = users.find((x) => x.id === ownerUserId)
+  return u?.name?.trim() || ''
+}
+
+/**
+ * Merge a unified patch onto a DealRow for open-deal validation before write.
+ * Does not invent missing fields — only overlays what the patch sets.
+ */
+export function applyMyDealPatchLocal(deal: DealRow, patch: MyDealPatch): DealRow {
+  return {
+    ...deal,
+    next_action: patch.next_action !== undefined ? patch.next_action : deal.next_action,
+    next_action_date:
+      patch.next_action_date !== undefined ? patch.next_action_date : deal.next_action_date,
+    owner_user_id: patch.owner_user_id !== undefined ? patch.owner_user_id : deal.owner_user_id,
+  }
+}
+
 /** The distinct sources on the rows, for the filter. */
 export function dealSources(rows: DealRow[]): string[] {
   return [...new Set(rows.map((r) => r.source).filter(Boolean))].sort((a, b) => a.localeCompare(b))

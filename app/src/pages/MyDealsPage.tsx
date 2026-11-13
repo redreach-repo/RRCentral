@@ -30,7 +30,7 @@ import {
   type DealPipeline,
   type DealRow,
 } from '../lib/myDeals'
-import { loadMyDeals, moveMyDeal } from '../lib/myDealsStore'
+import { loadMyDeals, moveMyDeal, patchMyDeal } from '../lib/myDealsStore'
 import { can } from '../lib/permissions'
 import type { AppUser } from '../lib/types'
 import {
@@ -93,6 +93,13 @@ type PendingMove = {
   kind: 'won' | 'lost'
 }
 
+type PendingPatch = {
+  deal: DealRow
+  next_action: string
+  next_action_date: string
+  owner_user_id: string
+}
+
 /**
  * One pipeline board for CRM, AI CRM sales, and CTRM Next.
  * Drag a card (or pick a stage) to move it; Won/Lost asks for a reason.
@@ -113,6 +120,7 @@ export default function MyDealsPage() {
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [dragKey, setDragKey] = useState<string | null>(null)
   const [pending, setPending] = useState<PendingMove | null>(null)
+  const [pendingPatch, setPendingPatch] = useState<PendingPatch | null>(null)
   const [outcomeReason, setOutcomeReason] = useState('')
   const [lostNote, setLostNote] = useState('')
   const [linkBusy, setLinkBusy] = useState(false)
@@ -246,6 +254,38 @@ export default function MyDealsPage() {
     requestMove(deal, targetStageForColumn(deal.pipeline, column))
   }
 
+  function openPatch(deal: DealRow) {
+    setPendingPatch({
+      deal,
+      next_action: deal.next_action || '',
+      next_action_date: deal.next_action_date || '',
+      owner_user_id: deal.owner_user_id || '',
+    })
+  }
+
+  async function savePatch() {
+    if (!pendingPatch) return
+    setBusyKey(pendingPatch.deal.key)
+    try {
+      await patchMyDeal(
+        pendingPatch.deal,
+        {
+          next_action: pendingPatch.next_action,
+          next_action_date: pendingPatch.next_action_date || null,
+          owner_user_id: pendingPatch.owner_user_id || null,
+        },
+        author,
+      )
+      showToast(`Updated ${pendingPatch.deal.account}`, 'success')
+      setPendingPatch(null)
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not update the deal'), 'error')
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
   const manageStagesHref =
     filters.pipeline === 'sales' ? '/sales' : filters.pipeline === 'ctrm' ? '/ctrm' : null
 
@@ -323,12 +363,31 @@ export default function MyDealsPage() {
   )
 
   const nextCell = (d: DealRow) => (
-    <>
+    <button
+      type="button"
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation()
+        openPatch(d)
+      }}
+      style={{
+        display: 'inline',
+        padding: 0,
+        margin: 0,
+        border: 'none',
+        background: 'transparent',
+        color: 'inherit',
+        font: 'inherit',
+        textAlign: 'left',
+        cursor: 'pointer',
+      }}
+      title="Edit next step"
+    >
       {d.next_action || <span style={{ color: colors.muted2 }}>No next step</span>}
       {d.next_action_date ? (
         <span style={{ color: d.overdue ? colors.danger : colors.muted, marginLeft: 6 }}>{nice(d.next_action_date)}</span>
       ) : null}
-    </>
+    </button>
   )
 
   const table = (
@@ -666,6 +725,73 @@ export default function MyDealsPage() {
                     lostNote: pending.kind === 'lost' ? lostNote : undefined,
                   })
                 }
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={Boolean(pendingPatch)}
+        title="Next step"
+        onClose={() => setPendingPatch(null)}
+        width={420}
+      >
+        {pendingPatch ? (
+          <div style={{ display: 'grid', gap: 12 }}>
+            <p style={{ margin: 0, color: colors.muted, fontSize: 14, lineHeight: 1.45 }}>
+              {pendingPatch.deal.account} · {PIPELINE_LABELS[pendingPatch.deal.pipeline]}
+            </p>
+            <div>
+              <label style={labelStyle}>Next action</label>
+              <input
+                style={inputStyle}
+                value={pendingPatch.next_action}
+                onChange={(e) =>
+                  setPendingPatch((p) => (p ? { ...p, next_action: e.target.value } : p))
+                }
+                placeholder="What happens next"
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Date</label>
+              <input
+                type="date"
+                style={inputStyle}
+                value={pendingPatch.next_action_date}
+                onChange={(e) =>
+                  setPendingPatch((p) => (p ? { ...p, next_action_date: e.target.value } : p))
+                }
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Owner</label>
+              <select
+                style={selectStyle}
+                value={pendingPatch.owner_user_id}
+                onChange={(e) =>
+                  setPendingPatch((p) => (p ? { ...p, owner_user_id: e.target.value } : p))
+                }
+              >
+                <option value="">Nobody</option>
+                {team.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name || u.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button type="button" style={buttonSecondaryStyle} onClick={() => setPendingPatch(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                style={buttonPrimaryStyle}
+                disabled={busyKey === pendingPatch.deal.key}
+                onClick={() => void savePatch()}
               >
                 Save
               </button>

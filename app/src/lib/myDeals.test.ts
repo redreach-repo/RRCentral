@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyMyDealPatchLocal,
   buildDealRows,
   crmDealLink,
+  crmOwnerText,
   dealAccess,
   dealSources,
   dealTotals,
@@ -9,6 +11,7 @@ import {
   sortDeals,
   targetStageForColumn,
   type DealFilters,
+  type DealRow,
   type MyDealsInput,
 } from './myDeals'
 
@@ -222,5 +225,44 @@ describe('targetStageForColumn', () => {
     expect(targetStageForColumn('sales', 'talking')).toBe('discovery_call')
     expect(targetStageForColumn('ctrm', 'deciding')).toBe('decision_pending')
     expect(targetStageForColumn('sales', 'deciding')).toBe('quote_sent')
+  })
+})
+
+describe('write façade helpers', () => {
+  it('maps owner user id to CRM free-text name', () => {
+    expect(crmOwnerText('u-sara', users)).toBe('Sara')
+    expect(crmOwnerText(null, users)).toBe('')
+    expect(crmOwnerText('missing', users)).toBe('')
+  })
+
+  it('overlays next step and owner on a DealRow', () => {
+    const deal: DealRow = {
+      key: 'crm:c1',
+      pipeline: 'crm',
+      id: 'c1',
+      account: 'Acme',
+      account_id: null,
+      deal: 'CRM',
+      stage: 'Quoted',
+      stageLabel: 'Quoted',
+      column: 'proposal',
+      open: true,
+      value: null,
+      weighted: null,
+      next_action: 'Old',
+      next_action_date: '2026-11-01',
+      overdue: true,
+      days_in_stage: 2,
+      owner_user_id: 'u-sara',
+      owner_label: 'Sara',
+      source: '',
+      division: '',
+      link: '/crm?edit=c1',
+    }
+    expect(applyMyDealPatchLocal(deal, { next_action: 'Call again', owner_user_id: 'u-alfred' })).toMatchObject({
+      next_action: 'Call again',
+      next_action_date: '2026-11-01',
+      owner_user_id: 'u-alfred',
+    })
   })
 })
