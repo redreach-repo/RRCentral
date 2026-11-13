@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod Fireflies meeting link
+**Current milestone:** Continuous backlog — M1 Zod client weekly updates
 
 ## Shipped this turn
 
-- Zod `parseFirefliesMeetingInput` for Fireflies link/ID before fetch
+- Zod `parseClientUpdateBody` for weekly client update save/send
 
 ## Already on main
 
-- Continuous backlog Zod through saved views · M3 route soft-hide · M3a demo prep · QTSP · `pipeline_deals_v`
+- Continuous backlog Zod through Fireflies · M3 route soft-hide · M3a demo prep · QTSP · `pipeline_deals_v`
 
 ## Still open (agent queue)
 
