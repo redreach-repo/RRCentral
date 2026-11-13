@@ -1,20 +1,21 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** M1 leftovers (Zod account form)
+**Current milestone:** M4 mail/calendar (slice 1 — Zoho façade)
 
-## Shipped this turn (M1 Zod account)
+## Shipped this turn (M4 slice 1)
 
-- `lib/schemas/account.ts` — company name, type/status pair, optional website + contact email
-- `AccountFormModal` validates via Zod before save
+- `lib/mailCalendar` provider façade (Zoho-only getters + adapters)
+- Compose / Inbox / Calendar / Schedule Meeting call sites use the façade
+- Plan: `docs/M4_MAIL_CALENDAR.md`; Gmail scopes assessment started in `COMPLIANCE_NOTES.md`
 
 ## Already on main
 
-- M0–M3 · M1 nav · TS strict · PWA · Zod login/user · field-permissions foundation
+- M0–M3 · M1 leftovers (nav, TS strict, PWA, Zod, field-permissions)
 
 ## Still open
 
-**M1 leftovers:** more Zod forms; expand field mask; missing logos (need assets)  
+**M4 next:** Settings provider switch; Gmail adapter (after compliance); follow-up sync via façade  
+**M1 leftovers:** more Zod; expand field mask; missing logos (need assets)  
 **M3 hold:** schema consolidate (**ask**) · **M3a** demo (ask Alfred)  
-**Next after M1 leftovers:** **M4** mail/calendar expansion  
 **Open §19 decisions** — do not guess
