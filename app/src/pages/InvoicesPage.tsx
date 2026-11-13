@@ -35,7 +35,7 @@ import EmptyState from '../components/EmptyState'
 import { logActivity } from '../lib/activity'
 import { formatAED } from '../lib/money'
 import { invoiceKindLabel } from '../lib/documentRefs'
-import { generateReference } from '../lib/referenceNumber'
+import { allocateReference } from '../lib/numbering'
 import { getDivisionQuoteFormat } from '../lib/divisionQuoteFormats'
 import { registerLineItemSkus } from '../lib/skuRegistry'
 import {
@@ -333,7 +333,12 @@ export default function InvoicesPage() {
         const refs = ((allRefs || []) as { reference_number: string }[]).map((r) => r.reference_number)
         const { data: quoteRefs } = await db.from('quotations').select('reference_number')
         const qrefs = ((quoteRefs || []) as { reference_number: string }[]).map((r) => r.reference_number)
-        reference = generateReference(divisionCode, [...refs, ...qrefs], invoicePrefix)
+        reference = await allocateReference({
+          docType: 'invoice',
+          divisionCode,
+          prefix: invoicePrefix,
+          existingRefs: [...refs, ...qrefs],
+        })
       }
       if (!reference) {
         reference = `INV-DRAFT-${Date.now()}`

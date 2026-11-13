@@ -3,6 +3,7 @@ import { logActivity } from './activity'
 import { findClientByCompany } from './clientLookup'
 import { isInternalDraftId } from './documents'
 import { generateReference } from './referenceNumber'
+import { allocateReference } from './numbering'
 import { loadLineItems, newDraftLine, toDraftItems, type DraftLineItem } from './lineItems'
 import {
   insertDeliveryNote,
@@ -174,11 +175,12 @@ export async function createDeliveryNoteFromQuote(opts: {
   const drafts = draftsFromQuoteLines(items, opts.quote)
 
   const refs = await listDeliveryNoteRefs()
-  const referenceNumber = nextDeliveryNoteReference(
-    opts.quote.division_code,
-    refs,
-    opts.prefix || 'DN',
-  )
+  const referenceNumber = await allocateReference({
+    docType: 'delivery_note',
+    divisionCode: opts.quote.division_code || '01',
+    prefix: opts.prefix || 'DN',
+    existingRefs: refs,
+  })
 
   let shipTo = opts.shipTo || ''
   if (!shipTo && opts.quote.client) {

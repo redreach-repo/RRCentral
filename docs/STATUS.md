@@ -1,37 +1,25 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** M1 Platform core (in progress)
+**Current milestone:** M2 Customization layer (in progress)
 
-## Shipped this turn (M1 platform slice)
+## Shipped this turn (M2 numbering + customization foundation)
 
-- `supabase/migrations/20261213120000_platform_tenancy.sql` — `tenants` / `companies` / `business_units` / `brand_kits` / `event_outbox`; Red Reach seeded as tenant one; `tenant_id` stamped on all public business tables; RESTRICTIVE RLS isolation + `rr_my_tenant_id()` / `rr_same_tenant()`
-- `supabase/tests/tenant_isolation_test.sql` — cross-tenant CRM/vendor/user isolation (wired into `tests/run.sh`)
-- Company switcher in Layout top bar (`TenantContext`)
-- Brand kit types + CSS vars; assets served from `app/public/brand/` (seeded from `brand-assets/`)
-- Module registry skeleton (`app/src/modules/registry.ts`) + Guide route `/guide`
-- EN/AR i18n skeleton (`I18nContext` + RTL `dir`)
+- `supabase/migrations/20261213140000_customization_layer.sql` — `numbering_sequences`, `custom_field_definitions` / `custom_field_values`, `saved_views`, `rr_allocate_reference()`
+- Quotes / invoices / delivery notes / accounts allocate via RPC (client falls back to max+1)
+- Settings → **Numbering** table (live counters + next preview)
+- `supabase/tests/numbering_test.sql` wired into `run.sh`
 
-## Decisions recorded
+## Already on main (M1)
 
-- **Job runner (M0):** keep **pg_cron + Supabase Edge Functions** (+ existing browser contract-billing fallback).
-- **Stack:** keep Vite + React + Supabase + Stripe; no framework rewrite.
-- **M1 tenancy approach:** additive columns + RESTRICTIVE policies (existing permissive policies kept). Single-tenant production backfills to Red Reach; isolation proven with a second demo tenant in CI SQL.
+- Tenancy + restrictive RLS + company switcher + brand kits + i18n skeleton + `/guide`
 
-## Still open on M1 (next slices)
+## Still open
 
-- Move Layout `navGroups` fully into module manifests (registry currently parallel)
-- Record-level / field-level permission masks
-- Zod standardization on forms
-- TypeScript `strict` on main app (fix-forward)
-- PWA icons regenerated from brand mark
-- Demo Supabase project timing (Alfred)
-- Missing brand assets: Boost / Care / Trading logos, SVGs, light variants
+**M2 next slices:** custom field UI on records, saved views in list pages, pipelines/workflows as data, labels/dashboards  
+**M1 leftovers:** move Layout nav fully into module manifests; field permissions; Zod; TS strict; PWA mark regen; missing Boost/Care/Trading logos  
+**Open §19 decisions** — do not guess
 
-## Open decisions (flagged — do not guess)
+## Next after M2 close
 
-See Master Spec §19 (name, residency, pricing, e-sign level, pilots, AI providers, reviewers, demo style, Arabic in demo).
-
-## Next milestone after M1 close
-
-**M2** Customization layer (fields, pipelines, objects, workflows, templates, views, numbering).
+**M3** CRM unify (dual models → one).
