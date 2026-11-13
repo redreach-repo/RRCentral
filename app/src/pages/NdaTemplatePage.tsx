@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { Link } from 'react-router-dom'
 import { CheckCircle2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
+import { formatClauseForTemplate, insertTextAtCursor } from '../lib/clauseCompose'
+import { listContractClauses } from '../lib/clauseLibraryStore'
 import { errorMessage } from '../lib/errors'
+import { parseNdaApproveForm, parseNdaDraftForm } from '../lib/schemas/ndaTemplate'
 import { can } from '../lib/permissions'
 import {
   DEFAULT_NDA_BODY,
@@ -23,7 +27,7 @@ import {
 } from '../lib/ndaTemplateStore'
 import { btn, btnGhost, btnPrimary, colors, input } from '../lib/pageStyles'
 import { pageStyle, pageSubtitleStyle, pageTitleStyle } from '../lib/uiStyles'
-import type { NdaTemplate } from '../lib/types'
+import type { ContractClause, NdaTemplate } from '../lib/types'
 
 function downloadBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob)
@@ -55,6 +59,7 @@ export default function NdaTemplatePage() {
   const [body, setBody] = useState(DEFAULT_NDA_BODY)
   const [busy, setBusy] = useState(false)
   const [approving, setApproving] = useState<{ by: string; on: string; note: string } | null>(null)
+  const [clauses, setClauses] = useState<ContractClause[]>([])
   const textRef = useRef<HTMLTextAreaElement>(null)
 
   const load = useCallback(
@@ -73,6 +78,12 @@ export default function NdaTemplatePage() {
   useEffect(() => {
     void load().catch((e) => showToast(errorMessage(e, 'Could not load NDA templates'), 'error'))
   }, [load, showToast])
+
+  useEffect(() => {
+    void listContractClauses()
+      .then((r) => setClauses(r.rows.filter((c) => c.status === 'active')))
+      .catch(() => setClauses([]))
+  }, [])
 
   const selected = templates.find((t) => t.id === selectedId) ?? null
   const inUse = templateInUse(templates)
@@ -105,16 +116,25 @@ export default function NdaTemplatePage() {
     }
   }
 
-  function insert(key: string) {
+  function insertAtCursor(piece: string) {
     const el = textRef.current
-    const token = `{{${key}}}`
-    if (!el) {
-      setBody((b) => b + token)
-      return
-    }
-    const start = el.selectionStart ?? body.length
-    const end = el.selectionEnd ?? start
-    setBody(body.slice(0, start) + token + body.slice(end))
+    const start = el?.selectionStart ?? body.length
+    const end = el?.selectionEnd ?? start
+    const next = insertTextAtCursor(body, piece, start, end)
+    setBody(next.text)
+    requestAnimationFrame(() => {
+      if (!textRef.current) return
+      textRef.current.focus()
+      textRef.current.setSelectionRange(next.cursor, next.cursor)
+    })
+  }
+
+  function insert(key: string) {
+    insertAtCursor(`{{${key}}}`)
+  }
+
+  function insertClause(clause: ContractClause) {
+    insertAtCursor(formatClauseForTemplate(clause))
   }
 
   return (
@@ -122,8 +142,9 @@ export default function NdaTemplatePage() {
       <div>
         <h1 style={pageTitleStyle}>NDA template</h1>
         <p style={pageSubtitleStyle}>
-          Lawyer-approved wording for NDAs sent from the CRM contracts vault. Clients sign via a private link; the
-          signed PDF is filed to Google Drive automatically when Drive is connected.
+          Lawyer-approved wording for NDAs sent from the CRM contracts vault. Clients capture assent via a private
+          link (electronic signing record — not a UAE Qualified E-Signature). The signed PDF is filed to Google Drive
+          when Drive is connected.
         </p>
       </div>
 
@@ -209,6 +230,31 @@ export default function NdaTemplatePage() {
               </button>
             ))}
           </div>
+          <div style={{ display: 'grid', gap: 6 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+              <span style={{ fontSize: 12, color: colors.muted }}>Insert clause</span>
+              <Link to="/clause-library" style={{ fontSize: 12, color: colors.accent }}>
+                Manage library
+              </Link>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {clauses.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  style={btnGhost}
+                  disabled={!editing}
+                  title={c.clause_key}
+                  onClick={() => insertClause(c)}
+                >
+                  {c.title}
+                </button>
+              ))}
+              {!clauses.length ? (
+                <span style={{ fontSize: 12, color: colors.muted }}>No active clauses — add some in the clause library.</span>
+              ) : null}
+            </div>
+          </div>
           {unknown.length ? (
             <p style={{ margin: 0, fontSize: 12, color: colors.warn }}>Unknown placeholders: {unknown.join(', ')}</p>
           ) : null}
@@ -218,13 +264,24 @@ export default function NdaTemplatePage() {
                 type="button"
                 style={btnPrimary}
                 disabled={busy || !dirty}
-                onClick={() =>
+                onClick={() => {
+                  const parsed = parseNdaDraftForm({ title, body })
+                  if (!parsed.ok) {
+                    showToast(parsed.error, 'error')
+                    return
+                  }
                   void run(
-                    () => saveNdaDraft({ title, body }, user?.email || '', templates, selected?.id),
+                    () =>
+                      saveNdaDraft(
+                        { title: parsed.data.title, body: parsed.data.body },
+                        user?.email || '',
+                        templates,
+                        selected?.id,
+                      ),
                     'Could not save',
                     'Draft saved',
                   )
-                }
+                }}
               >
                 Save draft
               </button>
@@ -301,8 +358,26 @@ export default function NdaTemplatePage() {
                 style={btnPrimary}
                 disabled={busy}
                 onClick={() => {
+                  const parsed = parseNdaApproveForm({
+                    approvedBy: approving.by,
+                    approvedOn: approving.on,
+                    note: approving.note,
+                  })
+                  if (!parsed.ok) {
+                    showToast(parsed.error, 'error')
+                    return
+                  }
                   void run(
-                    () => approveNdaTemplate(selected.id, { approvedBy: approving.by, approvedOn: approving.on, note: approving.note }, templates),
+                    () =>
+                      approveNdaTemplate(
+                        selected.id,
+                        {
+                          approvedBy: parsed.data.approvedBy,
+                          approvedOn: parsed.data.approvedOn,
+                          note: parsed.data.note,
+                        },
+                        templates,
+                      ),
                     'Could not approve',
                     'NDA template approved',
                   ).then(() => setApproving(null))

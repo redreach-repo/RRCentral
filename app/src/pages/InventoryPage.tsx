@@ -24,6 +24,7 @@ import {
 } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 import { errorMessage } from '../lib/errors'
+import { parseInventoryAdjust } from '../lib/schemas/inventoryAdjust'
 
 export default function InventoryPage() {
   const { user } = useAuth()
@@ -91,17 +92,21 @@ export default function InventoryPage() {
 
   async function saveAdjust() {
     if (!adjustTarget?.sku) return
-    const n = Number(delta)
-    if (!Number.isFinite(n) || n === 0) {
-      showToast('Enter a non-zero quantity', 'error')
+    const parsed = parseInventoryAdjust({
+      sku: adjustTarget.sku,
+      delta,
+      reason: reason || 'manual_adjust',
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setBusy(true)
     try {
       await adjustStock({
-        sku: adjustTarget.sku,
-        qtyDelta: n,
-        reason: reason || 'manual_adjust',
+        sku: parsed.data.sku,
+        qtyDelta: parsed.data.qtyDelta,
+        reason: parsed.data.reason,
         userEmail: user?.email || '',
       })
       showToast('Stock updated', 'success')

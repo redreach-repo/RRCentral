@@ -6,14 +6,7 @@ import type { CrmEntry } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
-import {
-  isZohoConfigured,
-  isZohoMailEnabled,
-  listZohoInboxMessages,
-  listZohoSentMessages,
-  zohoMailWebUrl,
-  type ZohoInboxMessage,
-} from '../lib/zoho'
+import { getMailProvider, type MailMessage } from '../lib/mailCalendar'
 import { attachCrmMatches, type InboxRow } from '../lib/zohoInboxMatch'
 import { useDriveStatus } from '../hooks/useDriveStatus'
 import { archiveSetupHint, scanAndFileCrmEmails } from '../lib/zohoEmailArchive'
@@ -52,8 +45,9 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
   const [filter, setFilter] = useState<Filter>('all')
   const [lastScan, setLastScan] = useState('')
 
-  const enabled = isZohoMailEnabled(settings)
-  const configured = isZohoConfigured(settings)
+  const mail = getMailProvider(settings)
+  const enabled = mail.isEnabled(settings)
+  const configured = mail.isConfigured(settings)
   const driveOn = useDriveStatus().status.connected
 
   const load = useCallback(async () => {
@@ -61,11 +55,11 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
     setLoading(true)
     setError('')
     try {
-      let messages: ZohoInboxMessage[]
+      let messages: MailMessage[]
       if (mailbox === 'sent') {
-        messages = await listZohoSentMessages(settings, { limit: 30 })
+        messages = await mail.listSent(settings, { limit: 30 })
       } else {
-        messages = await listZohoInboxMessages(settings, { limit: 30, status: 'all' })
+        messages = await mail.listInbox(settings, { limit: 30, status: 'all' })
       }
       setRows(attachCrmMatches(messages, crmEntries))
     } catch (e) {
@@ -74,7 +68,7 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [enabled, settings, crmEntries, mailbox])
+  }, [enabled, settings, crmEntries, mailbox, mail])
 
   useEffect(() => {
     if (!enabled) return
@@ -186,7 +180,7 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           <a
-            href={zohoMailWebUrl(settings)}
+            href={mail.webUrl(settings)}
             target="_blank"
             rel="noreferrer"
             style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}

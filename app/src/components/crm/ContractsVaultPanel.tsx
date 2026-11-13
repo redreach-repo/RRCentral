@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Copy, ExternalLink, FileSignature, Plus, Send } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useSettings } from '../../contexts/SettingsContext'
@@ -17,8 +18,23 @@ import { LEGAL_SIGN_STATE_LABELS, legalDocLabel, legalSignLinkState } from '../.
 import { buildNda, ndaFooter, templateInUse } from '../../lib/nda'
 import { blobToBase64, ndaPdf } from '../../lib/ndaPdf'
 import { listNdaTemplates } from '../../lib/ndaTemplateStore'
+import { obligationIsOverdue, obligationOwnerLabel } from '../../lib/obligationBoard'
+import {
+  filterOpenObligations,
+  listObligationsForCompany,
+  saveContractObligation,
+  setObligationStatus,
+} from '../../lib/obligationBoardStore'
+import { parseObligationForm } from '../../lib/schemas/obligation'
 import { btn, btnGhost, btnPrimary, colors, input } from '../../lib/pageStyles'
-import type { CrmContact, CrmEntry, LegalDocument, LegalSignLink, NdaTemplate } from '../../lib/types'
+import type {
+  ContractObligation,
+  CrmContact,
+  CrmEntry,
+  LegalDocument,
+  LegalSignLink,
+  NdaTemplate,
+} from '../../lib/types'
 
 function appBaseUrl(): string {
   const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
@@ -43,17 +59,25 @@ export default function ContractsVaultPanel({
   const [partyEmail, setPartyEmail] = useState('')
   const [lastLinkUrl, setLastLinkUrl] = useState('')
   const [linksByDoc, setLinksByDoc] = useState<Record<string, LegalSignLink[]>>({})
+  const [obligations, setObligations] = useState<ContractObligation[]>([])
+  const [missingObligations, setMissingObligations] = useState(false)
+  const [newDuty, setNewDuty] = useState('')
+  const [newDue, setNewDue] = useState('')
 
   const approved = useMemo(() => templateInUse(templates), [templates])
+  const openDuties = useMemo(() => filterOpenObligations(obligations), [obligations])
 
   const load = useCallback(async () => {
-    const [{ rows: docs, missingTable: missing }, tpl] = await Promise.all([
+    const [{ rows: docs, missingTable: missing }, tpl, obl] = await Promise.all([
       listLegalDocuments(entry.company_name),
       listNdaTemplates(),
+      listObligationsForCompany({ companyName: entry.company_name, crmId: entry.id }),
     ])
     setRows(docs)
     setMissingTable(missing || tpl.missingTable)
     setTemplates(tpl.rows)
+    setObligations(obl.rows)
+    setMissingObligations(obl.missingTable)
     const map: Record<string, LegalSignLink[]> = {}
     await Promise.all(
       docs.slice(0, 20).map(async (d) => {
@@ -61,7 +85,7 @@ export default function ContractsVaultPanel({
       }),
     )
     setLinksByDoc(map)
-  }, [entry.company_name])
+  }, [entry.company_name, entry.id])
 
   useEffect(() => {
     void load().catch((e) => showToast(errorMessage(e, 'Could not load contracts.'), 'error'))
@@ -150,7 +174,7 @@ export default function ContractsVaultPanel({
     return (
       <p style={{ fontSize: 13, color: colors.muted, margin: '12px 0' }}>
         Run <code>supabase/migrations/20261206120000_legal_documents.sql</code> in the Supabase SQL editor to enable
-        the contracts vault and NDA e-sign.
+        the contracts vault and NDA signing links (assent capture — not UAE QES).
       </p>
     )
   }
@@ -222,6 +246,99 @@ export default function ContractsVaultPanel({
           >
             <Copy size={14} /> Copy link
           </button>
+        </div>
+      ) : null}
+
+      {!missingObligations ? (
+        <div
+          style={{
+            marginBottom: 14,
+            padding: 10,
+            border: `1px solid ${colors.border}`,
+            borderRadius: 8,
+            background: colors.card,
+            display: 'grid',
+            gap: 8,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <strong style={{ fontSize: 13 }}>Open obligations</strong>
+            <Link to="/obligations" style={{ fontSize: 12, color: colors.accent }}>
+              Full board
+            </Link>
+          </div>
+          {openDuties.length ? (
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, display: 'grid', gap: 4 }}>
+              {openDuties.slice(0, 8).map((o) => (
+                <li key={o.id}>
+                  {o.title}
+                  <span style={{ color: colors.muted }}>
+                    {' '}
+                    · {obligationOwnerLabel(o.owner_party)}
+                    {o.due_date ? ` · due ${o.due_date}` : ''}
+                    {obligationIsOverdue(o) ? ' · overdue' : ''}
+                  </span>{' '}
+                  <button
+                    type="button"
+                    style={{ ...btnGhost, padding: '1px 6px', fontSize: 11 }}
+                    disabled={busy}
+                    onClick={() =>
+                      void setObligationStatus(o.id, 'done')
+                        .then(load)
+                        .then(() => showToast('Obligation marked done', 'success'))
+                        .catch((e) => showToast(errorMessage(e), 'error'))
+                    }
+                  >
+                    Done
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p style={{ margin: 0, fontSize: 12, color: colors.muted }}>No open obligations for this company.</p>
+          )}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+            <input
+              style={{ ...input, flex: '1 1 160px' }}
+              placeholder="New obligation title"
+              value={newDuty}
+              onChange={(e) => setNewDuty(e.target.value)}
+            />
+            <input style={{ ...input, width: 140 }} type="date" value={newDue} onChange={(e) => setNewDue(e.target.value)} />
+            <button
+              type="button"
+              style={btn}
+              disabled={busy || !newDuty.trim()}
+              onClick={() => {
+                const parsed = parseObligationForm({
+                  company_name: entry.company_name,
+                  crm_id: entry.id,
+                  legal_document_id: null,
+                  title: newDuty,
+                  description: '',
+                  owner_party: 'red_reach',
+                  due_date: newDue || null,
+                  status: 'open',
+                })
+                if (!parsed.ok) {
+                  showToast(parsed.error, 'error')
+                  return
+                }
+                setBusy(true)
+                void saveContractObligation(parsed.data, user?.email || '')
+                  .then(() => {
+                    setNewDuty('')
+                    setNewDue('')
+                    showToast('Obligation added', 'success')
+                    return load()
+                  })
+                  .catch((e) => showToast(errorMessage(e, 'Could not add obligation'), 'error'))
+                  .finally(() => setBusy(false))
+              }}
+            >
+              Add
+            </button>
+          </div>
         </div>
       ) : null}
 

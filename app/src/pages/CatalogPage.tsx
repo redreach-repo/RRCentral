@@ -30,6 +30,7 @@ import {
 } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 import { errorMessage } from '../lib/errors'
+import { parseCatalogProductForm } from '../lib/schemas/catalogProduct'
 
 type ProductForm = {
   sku: string
@@ -139,16 +140,15 @@ export default function CatalogPage() {
   }
 
   async function save() {
-    if (!form.name.trim()) {
-      showToast('Name is required', 'error')
+    const parsed = parseCatalogProductForm(form)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setSaving(true)
     try {
       const payload = {
-        ...form,
-        name: form.name.trim(),
-        sku: form.sku.trim(),
+        ...parsed.data,
         updated_at: new Date().toISOString(),
       }
       if (editing) {

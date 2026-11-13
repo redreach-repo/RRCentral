@@ -1,26 +1,22 @@
 # RRCRM status
 
-**Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** M2 Customization layer (in progress)
+**Last updated:** 14 November 2026 (Asia/Dubai)  
+**Current milestone:** Continuous backlog — M3 Pipeline write façade sheet fields
 
-## Shipped this turn (M2 custom fields UI)
+## Shipped this turn
 
-- Settings → **Custom fields** — create / edit / activate definitions (account, CRM, quotation objects)
-- Account detail — **Custom fields** card (view / edit values)
-- Seed definitions for Red Reach accounts: Preferred carrier, Billing notes, NDA on file
-- `customFields` store: slugify, coerce, load/save values
+- M3 `patchMyDeal` expands to notes + CRM quote_ref + sales/CTRM source from Pipeline
 
 ## Already on main
 
-- M1 tenancy / switcher / brand / i18n / guide
-- M2 numbering sequences + `rr_allocate_reference` + Settings Numbering
+- Continuous backlog Zod through delivery contracts · M3 route soft-hide · M3a demo prep · QTSP · `pipeline_deals_v`
 
-## Still open
+## Still open (agent queue)
 
-**M2 next:** saved views on list pages, pipelines/workflows as data, CRM/quote custom field surfaces  
-**M1 leftovers:** nav → module manifests; field permissions; Zod; TS strict; PWA mark; missing logos  
-**Open §19 decisions** — do not guess
+1. More M1 Zod  
+2. Further M3 façade / inventory metrics  
+3. Demo env hooks after Alfred provisions  
 
-## Next after M2 close
+## Still externally blocked
 
-**M3** CRM unify (dual models → one).
+- CASA · logos · §19 · paid QTSP · M3a Supabase (Alfred)

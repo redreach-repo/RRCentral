@@ -8,6 +8,10 @@ import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import Modal from '../components/Modal'
 import { DIVISIONS } from '../lib/config'
+import {
+  applyUniqueCrmAccountLinks,
+  type CrmLinkPlan,
+} from '../lib/crmAccountLink'
 import { LOST_REASONS } from '../lib/dealRules'
 import { errorMessage } from '../lib/errors'
 import { formatAED } from '../lib/money'
@@ -26,7 +30,8 @@ import {
   type DealPipeline,
   type DealRow,
 } from '../lib/myDeals'
-import { loadMyDeals, moveMyDeal } from '../lib/myDealsStore'
+import { loadMyDeals, moveMyDeal, patchMyDeal } from '../lib/myDealsStore'
+import { can } from '../lib/permissions'
 import type { AppUser } from '../lib/types'
 import {
   buttonPrimaryStyle,
@@ -88,6 +93,16 @@ type PendingMove = {
   kind: 'won' | 'lost'
 }
 
+type PendingPatch = {
+  deal: DealRow
+  next_action: string
+  next_action_date: string
+  owner_user_id: string
+  notes: string
+  quote_ref: string
+  source: string
+}
+
 /**
  * One pipeline board for CRM, AI CRM sales, and CTRM Next.
  * Drag a card (or pick a stage) to move it; Won/Lost asks for a reason.
@@ -98,15 +113,20 @@ export default function MyDealsPage() {
   const { showToast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const access = dealAccess(userRole)
+  const canLinkAccounts = can(userRole, 'accounts.write')
+  const emptyLinkPlan: CrmLinkPlan = { unique: [], ambiguous: [], none: [] }
   const [deals, setDeals] = useState<DealRow[]>([])
   const [team, setTeam] = useState<AppUser[]>([])
+  const [linkPlan, setLinkPlan] = useState<CrmLinkPlan>(emptyLinkPlan)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [dragKey, setDragKey] = useState<string | null>(null)
   const [pending, setPending] = useState<PendingMove | null>(null)
+  const [pendingPatch, setPendingPatch] = useState<PendingPatch | null>(null)
   const [outcomeReason, setOutcomeReason] = useState('')
   const [lostNote, setLostNote] = useState('')
+  const [linkBusy, setLinkBusy] = useState(false)
   const [view, setView] = useState<'table' | 'board'>(() => {
     const q = searchParams.get('view')
     if (q === 'board' || q === 'table') return q
@@ -131,6 +151,7 @@ export default function MyDealsPage() {
       const result = await loadMyDeals(userRole, settings)
       setDeals(result.deals)
       setTeam(result.team)
+      setLinkPlan(result.linkPlan)
       setError('')
     } catch (e) {
       setError(errorMessage(e, 'Could not load the deals'))
@@ -138,6 +159,23 @@ export default function MyDealsPage() {
       setLoading(false)
     }
   }, [userRole, settings])
+
+  async function linkUniqueMatches() {
+    if (!linkPlan.unique.length || linkBusy) return
+    setLinkBusy(true)
+    try {
+      const n = await applyUniqueCrmAccountLinks(linkPlan.unique)
+      showToast(
+        n === 1 ? 'Linked 1 CRM deal to its Account' : `Linked ${n} CRM deals to Accounts`,
+        'success',
+      )
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not link CRM deals'), 'error')
+    } finally {
+      setLinkBusy(false)
+    }
+  }
 
   useEffect(() => {
     void load()
@@ -219,6 +257,44 @@ export default function MyDealsPage() {
     requestMove(deal, targetStageForColumn(deal.pipeline, column))
   }
 
+  function openPatch(deal: DealRow) {
+    setPendingPatch({
+      deal,
+      next_action: deal.next_action || '',
+      next_action_date: deal.next_action_date || '',
+      owner_user_id: deal.owner_user_id || '',
+      notes: deal.notes || '',
+      quote_ref: deal.quote_ref || '',
+      source: deal.source || '',
+    })
+  }
+
+  async function savePatch() {
+    if (!pendingPatch) return
+    setBusyKey(pendingPatch.deal.key)
+    try {
+      const patch: Parameters<typeof patchMyDeal>[1] = {
+        next_action: pendingPatch.next_action,
+        next_action_date: pendingPatch.next_action_date || null,
+        owner_user_id: pendingPatch.owner_user_id || null,
+        notes: pendingPatch.notes,
+      }
+      if (pendingPatch.deal.pipeline === 'crm') {
+        patch.quote_ref = pendingPatch.quote_ref
+      } else {
+        patch.source = pendingPatch.source
+      }
+      await patchMyDeal(pendingPatch.deal, patch, author)
+      showToast(`Updated ${pendingPatch.deal.account}`, 'success')
+      setPendingPatch(null)
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not update the deal'), 'error')
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
   const manageStagesHref =
     filters.pipeline === 'sales' ? '/sales' : filters.pipeline === 'ctrm' ? '/ctrm' : null
 
@@ -296,12 +372,31 @@ export default function MyDealsPage() {
   )
 
   const nextCell = (d: DealRow) => (
-    <>
+    <button
+      type="button"
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation()
+        openPatch(d)
+      }}
+      style={{
+        display: 'inline',
+        padding: 0,
+        margin: 0,
+        border: 'none',
+        background: 'transparent',
+        color: 'inherit',
+        font: 'inherit',
+        textAlign: 'left',
+        cursor: 'pointer',
+      }}
+      title="Edit next step"
+    >
       {d.next_action || <span style={{ color: colors.muted2 }}>No next step</span>}
       {d.next_action_date ? (
         <span style={{ color: d.overdue ? colors.danger : colors.muted, marginLeft: 6 }}>{nice(d.next_action_date)}</span>
       ) : null}
-    </>
+    </button>
   )
 
   const table = (
@@ -326,6 +421,19 @@ export default function MyDealsPage() {
                 <Link to={d.link} style={{ color: colors.text, fontWeight: 600 }}>
                   {d.account}
                 </Link>
+                {d.pipeline === 'crm' ? (
+                  <div style={{ marginTop: 4, fontSize: 11, color: colors.muted2 }}>
+                    {d.account_id ? 'Linked account' : 'CRM only'}
+                    {d.account_id ? (
+                      <>
+                        {' · '}
+                        <Link to={`/crm?edit=${d.id}`} style={{ color: colors.accent }}>
+                          Open sheet
+                        </Link>
+                      </>
+                    ) : null}
+                  </div>
+                ) : null}
               </td>
               <td style={tdStyle}>
                 <span style={PIPELINE_CHIPS[d.pipeline]}>{PIPELINE_LABELS[d.pipeline]}</span>{' '}
@@ -410,6 +518,11 @@ export default function MyDealsPage() {
                   </Link>
                   <span style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                     <span style={PIPELINE_CHIPS[d.pipeline]}>{PIPELINE_LABELS[d.pipeline]}</span>
+                    {d.pipeline === 'crm' ? (
+                      <span style={{ ...PIPELINE_CHIPS.crm, opacity: 0.85 }}>
+                        {d.account_id ? 'Linked' : 'Unlinked'}
+                      </span>
+                    ) : null}
                   </span>
                   <select
                     aria-label={`Stage for ${d.account}`}
@@ -458,7 +571,7 @@ export default function MyDealsPage() {
               <>
                 {' '}
                 <Link to={manageStagesHref} style={{ color: colors.accent }}>
-                  Open detailed stage board
+                  Open {filters.pipeline === 'sales' ? 'AI CRM' : 'CTRM'} detail
                 </Link>
               </>
             ) : null}
@@ -467,6 +580,73 @@ export default function MyDealsPage() {
       </header>
 
       {filterBar}
+
+      {!loading && (linkPlan.unique.length || linkPlan.ambiguous.length || linkPlan.none.length) ? (
+        <div
+          role="status"
+          style={{
+            ...cardStyle,
+            marginBottom: 12,
+            padding: '12px 14px',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 10,
+            alignItems: 'center',
+          }}
+        >
+          <div style={{ flex: '1 1 220px', fontSize: 13, color: colors.muted, lineHeight: 1.45 }}>
+            {linkPlan.unique.length ? (
+              <>
+                <strong style={{ color: colors.text }}>
+                  {linkPlan.unique.length === 1
+                    ? '1 CRM deal'
+                    : `${linkPlan.unique.length} CRM deals`}
+                </strong>{' '}
+                match a single Account by company name and can be linked safely.
+              </>
+            ) : (
+              <>
+                <strong style={{ color: colors.text }}>
+                  {linkPlan.ambiguous.length + linkPlan.none.length}
+                </strong>{' '}
+                CRM deal
+                {linkPlan.ambiguous.length + linkPlan.none.length === 1 ? '' : 's'} still need an Account
+                link
+                {linkPlan.ambiguous.length
+                  ? ` (${linkPlan.ambiguous.length} match more than one name)`
+                  : ''}
+                .
+              </>
+            )}
+            {linkPlan.none.length && linkPlan.unique.length ? (
+              <>
+                {' '}
+                {linkPlan.none.length} have no match
+                {linkPlan.ambiguous.length ? `; ${linkPlan.ambiguous.length} are ambiguous` : ''}.
+              </>
+            ) : null}
+          </div>
+          {canLinkAccounts && linkPlan.unique.length ? (
+            <button
+              type="button"
+              style={buttonPrimaryStyle}
+              disabled={linkBusy}
+              onClick={() => void linkUniqueMatches()}
+            >
+              {linkBusy
+                ? 'Linking…'
+                : linkPlan.unique.length === 1
+                  ? 'Link unique match'
+                  : `Link ${linkPlan.unique.length} unique matches`}
+            </button>
+          ) : null}
+          {linkPlan.ambiguous.length || linkPlan.none.length ? (
+            <Link to="/crm" style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}>
+              Open CRM
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
 
       {error ? <div style={{ ...cardStyle, color: colors.danger, marginBottom: 12 }}>{error}</div> : null}
 
@@ -554,6 +734,107 @@ export default function MyDealsPage() {
                     lostNote: pending.kind === 'lost' ? lostNote : undefined,
                   })
                 }
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={Boolean(pendingPatch)}
+        title="Next step"
+        onClose={() => setPendingPatch(null)}
+        width={420}
+      >
+        {pendingPatch ? (
+          <div style={{ display: 'grid', gap: 12 }}>
+            <p style={{ margin: 0, color: colors.muted, fontSize: 14, lineHeight: 1.45 }}>
+              {pendingPatch.deal.account} · {PIPELINE_LABELS[pendingPatch.deal.pipeline]}
+            </p>
+            <div>
+              <label style={labelStyle}>Next action</label>
+              <input
+                style={inputStyle}
+                value={pendingPatch.next_action}
+                onChange={(e) =>
+                  setPendingPatch((p) => (p ? { ...p, next_action: e.target.value } : p))
+                }
+                placeholder="What happens next"
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Date</label>
+              <input
+                type="date"
+                style={inputStyle}
+                value={pendingPatch.next_action_date}
+                onChange={(e) =>
+                  setPendingPatch((p) => (p ? { ...p, next_action_date: e.target.value } : p))
+                }
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Owner</label>
+              <select
+                style={selectStyle}
+                value={pendingPatch.owner_user_id}
+                onChange={(e) =>
+                  setPendingPatch((p) => (p ? { ...p, owner_user_id: e.target.value } : p))
+                }
+              >
+                <option value="">Nobody</option>
+                {team.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name || u.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Notes</label>
+              <textarea
+                style={{ ...inputStyle, minHeight: 72, resize: 'vertical' }}
+                value={pendingPatch.notes}
+                onChange={(e) => setPendingPatch((p) => (p ? { ...p, notes: e.target.value } : p))}
+                placeholder="Sheet notes"
+              />
+            </div>
+            {pendingPatch.deal.pipeline === 'crm' ? (
+              <div>
+                <label style={labelStyle}>Quote ref</label>
+                <input
+                  style={inputStyle}
+                  value={pendingPatch.quote_ref}
+                  onChange={(e) =>
+                    setPendingPatch((p) => (p ? { ...p, quote_ref: e.target.value } : p))
+                  }
+                  placeholder="RR-…"
+                />
+              </div>
+            ) : (
+              <div>
+                <label style={labelStyle}>Source</label>
+                <input
+                  style={inputStyle}
+                  value={pendingPatch.source}
+                  onChange={(e) =>
+                    setPendingPatch((p) => (p ? { ...p, source: e.target.value } : p))
+                  }
+                  placeholder="LinkedIn, referral…"
+                />
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button type="button" style={buttonSecondaryStyle} onClick={() => setPendingPatch(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                style={buttonPrimaryStyle}
+                disabled={busyKey === pendingPatch.deal.key}
+                onClick={() => void savePatch()}
               >
                 Save
               </button>

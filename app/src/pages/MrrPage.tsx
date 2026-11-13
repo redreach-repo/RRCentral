@@ -8,7 +8,7 @@ import { listContracts } from '../lib/deliveryStore'
 import { errorMessage } from '../lib/errors'
 import { formatAED } from '../lib/money'
 import { PIPELINE_WEIGHTS, mrrByAccount, mrrForecast, mrrHistory } from '../lib/mrr'
-import { can } from '../lib/permissions'
+import { canViewField } from '../lib/fieldPermissions'
 import { salesStageLabel } from '../lib/salesPipeline'
 import { listSalesDeals } from '../lib/salesPipelineStore'
 import { monthKey } from '../lib/delivery'
@@ -34,7 +34,7 @@ type Data = { accounts: Account[]; contracts: Contract[]; deals: SalesDeal[]; at
 export default function MrrPage() {
   const { userRole } = useAuth()
   const { showToast } = useToast()
-  const allowed = can(userRole, 'delivery.profitability')
+  const allowed = canViewField(userRole, 'delivery.profitability')
   const [data, setData] = useState<Data | null>(null)
 
   useEffect(() => {

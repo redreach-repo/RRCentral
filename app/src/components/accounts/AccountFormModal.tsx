@@ -4,8 +4,10 @@ import EditorSectionTabs, {
   editorPanelStyle,
   type EditorSection,
 } from '../EditorSectionTabs'
+import { useToast } from '../../contexts/ToastContext'
 import { ACCOUNT_TYPES, accountStatusLabel, accountTypeInfo } from '../../lib/accounts'
 import type { AccountInput, ContactInput } from '../../lib/accountsStore'
+import { parseAccountForm } from '../../lib/schemas/account'
 import type { Account, AccountType, AppUser } from '../../lib/types'
 import {
   buttonPrimaryStyle,
@@ -66,6 +68,7 @@ export default function AccountFormModal({
   saving,
   onSave,
 }: Props) {
+  const { showToast } = useToast()
   const [form, setForm] = useState<Form>(() => emptyForm(defaultType, defaultOwnerId))
   const [editorSection, setEditorSection] = useState<EditorSection>('basics')
 
@@ -100,30 +103,27 @@ export default function AccountFormModal({
   const ownerLocked = Boolean(lockedOwnerId) || (Boolean(account) && !canReassign)
 
   function submit() {
-    const input: AccountInput = {
+    const parsed = parseAccountForm({
       type: form.type,
-      name: form.name.trim(),
-      industry: form.industry.trim(),
-      country: form.country.trim(),
-      city: form.city.trim(),
-      website: form.website.trim(),
+      name: form.name,
+      industry: form.industry,
+      country: form.country,
+      city: form.city,
+      website: form.website,
       status: form.status,
       owner_user_id: lockedOwnerId ?? form.owner_user_id ?? null,
-      source: form.source.trim(),
-      notes: form.notes.trim(),
+      source: form.source,
+      notes: form.notes,
+      contactName: form.contactName,
+      contactEmail: form.contactEmail,
+      contactPhone: form.contactPhone,
+      editing: Boolean(account),
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
     }
-    const contact: ContactInput | null =
-      !account && form.contactName.trim()
-        ? {
-            name: form.contactName.trim(),
-            role: '',
-            email: form.contactEmail.trim(),
-            phone: form.contactPhone.trim(),
-            whatsapp: form.contactPhone.trim(),
-            is_primary: true,
-          }
-        : null
-    onSave(input, contact)
+    onSave(parsed.data.input, parsed.data.contact)
   }
 
   const sections: EditorSection[] = account ? ['basics', 'notes'] : ['basics', 'lines', 'notes']

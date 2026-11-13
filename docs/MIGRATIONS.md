@@ -50,3 +50,45 @@ No database migrations. Documentation and `brand-assets/` only.
 
 **Rollback**
 - Delete those definition rows by `field_key` if needed; values cascade.
+
+## M2 — `20261213160000_saved_views_seeds.sql`
+
+**What**
+- Seeds shared Accounts saved views (All / RR Threads / Unassigned)
+
+**Rollback**
+- Delete by `module_id = 'accounts'` and those names.
+
+## M2 — `20261213170000_pipelines_workflows.sql`
+
+**What**
+- `pipelines` / `pipeline_stages` seeded for CRM, AI CRM sales, CTRM Next
+- `workflow_definitions` / `workflow_runs` foundation + sample `crm_won_approval`
+- RLS + restrictive tenant isolation
+
+**Dry-run / tests**
+- `bash supabase/tests/run.sh` includes `pipelines_test.sql`
+
+**Rollback**
+- Forward-only preferred. Drop new tables after confirming Settings/CRM no longer read them; CRM falls back to hardcoded `PIPELINE_STAGES`.
+
+## M2 — `20261213180000_crm_quote_custom_field_seeds.sql`
+
+**What**
+- Seeds CRM custom fields (lead source detail, decision maker, competitor)
+- Seeds quotation custom fields (site visit required, installation notes)
+
+**Rollback**
+- Delete those definition rows by `object_type` + `field_key`; values cascade.
+
+## M2 — `20261213190000_crm_quote_saved_views_seeds.sql`
+
+**What**
+- Seeds shared CRM views (My Day, All deals, Board, Unassigned)
+- Seeds shared Quotations views (All / Drafts / Sent / Awarded)
+
+**Rollback**
+- Delete by `module_id` in (`crm`,`quotations`) and those names.
+
+
+

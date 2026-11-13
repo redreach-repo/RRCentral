@@ -15,22 +15,22 @@ Status key: **exists** · **partial** · **missing**
 |-------------|--------|------------------------|
 | Vite+React SPA on Supabase | exists | Keep; do not rewrite framework |
 | Trusted logic in Edge/DB not only browser | partial | Ledger/payroll/permissions must move server-side in M1+ |
-| Zod validation everywhere | partial | Spot use; standardize in M1 forms/API |
-| Module registry manifests | partial | M1 skeleton `app/src/modules/registry.ts`; nav still in Layout — finish move next slice |
+| Zod validation everywhere | partial | Login, password, app-user, account, ticket form schemas; keep expanding forms/API |
+| Module registry manifests | partial | M1 `APP_MODULES` in `modules/nav.ts`; Layout consumes manifests — flags/permissions next |
 | Domain events / `event_outbox` | partial | M1 table + RLS; workers not yet consuming |
 | Public REST API + webhooks | missing | M11 (or earlier for partners) |
 | Exact money `numeric` / no float | partial | SQL numeric exists; TS `number`+round — fix path in M7 |
 | Tenant / company / BU model | partial | M1 tables + seed + `tenant_id` retrofit; company switcher live |
 | RLS on every table | exists | M1 RESTRICTIVE tenant isolation on stamped tables |
 | Cross-tenant CI tests | partial | `tenant_isolation_test.sql` in `run.sh`; expand coverage next |
-| Roles + record rules + field permissions | partial | Fixed 5 roles; no record rules / field mask — M1 |
+| Roles + record rules + field permissions | partial | Fixed 5 roles; field-mask API started (`fieldPermissions`); record rules later |
 | Maker-checker | missing | M7/M8 for money/payroll |
-| Customization layer (fields, pipelines, objects, workflows, templates, views, dashboards, labels, numbering) | partial | M2 numbering + custom field defs/values UI on accounts; saved views/pipelines/workflows still open |
+| Customization layer (fields, pipelines, objects, workflows, templates, views, dashboards, labels, numbering) | partial | M2 layer largely in: numbering, fields, views, pipelines, workflow defs + runner (approval/notify); more step types / dashboards later |
 | Industry packs | missing | M12 |
 | Shell: Inbox/Sales/… areas, Cmd+K, AI button | partial | Accordion nav exists; restructure shell in M1 |
 | Company switcher | partial | M1 top-bar switcher; multi-company ops still thin |
 | EN+AR RTL | partial | M1 `I18nContext` + dir; catalogs incomplete |
-| PWA installable | partial | Manifest/icons exist historically; regenerate from brand mark in M1 branding |
+| PWA installable | partial | Icons + maskable safe-zone from brand mark; theme `#C8321A`; still missing division logos |
 | Brand kits per tenant/company/BU | partial | M1 `brand_kits` + `app/public/brand`; missing Boost/Care/Trading assets |
 | In-app guide `/guide` | partial | M1 route shell; content packs later |
 
@@ -41,9 +41,9 @@ Status key: **exists** · **partial** · **missing**
 | Module | Status | Notes / step |
 |--------|--------|--------------|
 | 6.1 Core platform | partial | Users/settings/audit/2-step exist; MFA passkeys/SSO missing → M1 |
-| 6.2 CRM and sales | partial | Strong ops CRM; dual models; partners/commissions on CTRM only → M3 unify |
-| 6.3 Email and calendar | partial | Zoho Mail/Calendar proxy; no Gmail/M365/IMAP full sync → M4 |
-| 6.4 Contracts and e-sign | partial | Agreement/NDA + `/sign` sealed PDF path; no clause library/obligations board → M5 |
+| 6.2 CRM and sales | partial | Strong ops CRM; three pipelines; Pipeline-first soft-retire (M3 slice 4); schema merge later (ask) |
+| 6.3 Email and calendar | partial | Zoho + Gmail Phase A + M365 Phase A/B (incl. inbox); Gmail inbox still CASA-gated; IMAP deferred |
+| 6.4 Contracts and e-sign | partial | NDA `/sign` + clauses + obligations board + spawn-on-sign; QTSP → M5 later |
 | 6.5 HR | missing | M6 |
 | 6.6 Payroll | missing | M8 UAE pack |
 | 6.7 Accounting (ledger) | partial | Invoices/payments/expenses/reports; **no** journals/CoA/immutability → M7 |
@@ -61,7 +61,7 @@ Status key: **exists** · **partial** · **missing**
 
 | Requirement | Status | Step |
 |-------------|--------|------|
-| Mail providers (Zoho→Gmail→M365→IMAP) | partial | M4; start Google verification early |
+| Mail providers (Zoho→Gmail→M365→IMAP) | partial | Zoho + Gmail Phase A + M365 Phase A/B; Gmail Phase B later; IMAP deferred |
 | AI gateway + tools-as-user + pgvector | partial | `ai-assist` Edge; no gateway/retrieval/action queue → M10 (light from M4) |
 | AI human approval queue | missing | M10 |
 | Field-level encryption (salary, IBAN, tokens) | missing | M1 for tokens; M6/M8 for HR fields |
@@ -111,10 +111,10 @@ WorshipHub admin, Tee Tribe shop, RR Wanders tour ops, CTRM commission tables �
 
 | Milestone | Blockers from audit |
 |-----------|---------------------|
-| **M0** | This audit + gap plan + brand-assets + STATUS; CI already largely green; enable app `strict` carefully in M1 not M0 |
+| **M0** | This audit + gap plan + brand-assets + STATUS; CI already largely green; app `strict` enabled in a later M1 leftover |
 | **M1** | Largest: `tenant_id` retrofit, RLS rewrite, shell, branding, i18n skeleton |
 | **M2** | Depends on M1 |
-| **M3** | Dual CRM merge; keep briefing |
+| **M3** | Dual/triple CRM merge; keep briefing — see `docs/M3_CRM_UNIFY.md` |
 | **M3a** | Separate Supabase project for demo (ask Alfred before provisioning) |
 | **M4+** | As spec |
 

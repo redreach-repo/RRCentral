@@ -992,6 +992,51 @@ export interface NdaTemplate {
   updated_at: string
 }
 
+/** Follow-through item on the M5 obligations board. */
+export type ContractObligationOwner = 'red_reach' | 'counterparty' | 'both'
+export type ContractObligationStatus = 'open' | 'done' | 'cancelled'
+
+export interface ContractObligation {
+  id: string
+  company_name: string
+  crm_id: string
+  legal_document_id: string | null
+  title: string
+  description: string
+  owner_party: ContractObligationOwner
+  due_date: string | null
+  status: ContractObligationStatus
+  completed_at: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+/** Reusable clause in the M5 contract clause library. */
+export type ContractClauseCategory =
+  | 'confidentiality'
+  | 'obligations'
+  | 'term'
+  | 'liability'
+  | 'general'
+  | 'other'
+
+export type ContractClauseStatus = 'draft' | 'active' | 'retired'
+
+export interface ContractClause {
+  id: string
+  clause_key: string
+  title: string
+  body: string
+  category: ContractClauseCategory
+  status: ContractClauseStatus
+  sort_order: number
+  notes: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
 export type LegalDocumentStatus = 'draft' | 'sent' | 'signed' | 'expired' | 'void'
 export type LegalDocumentType = 'nda' | 'service_agreement' | 'other'
 

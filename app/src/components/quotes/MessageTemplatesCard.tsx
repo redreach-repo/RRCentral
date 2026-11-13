@@ -11,10 +11,10 @@ import {
   renderTemplate,
   TEMPLATE_CHANNELS,
   TEMPLATE_PURPOSES,
-  templateProblem,
   type MessageTemplate,
 } from '../../lib/quoteNudges'
 import { deleteTemplate, listTemplates, saveTemplate, type TemplateInput } from '../../lib/quoteNudgesStore'
+import { parseMessageTemplateForm } from '../../lib/schemas/messageTemplate'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -71,14 +71,14 @@ export default function MessageTemplatesCard() {
   if (!allowed) return null
 
   async function save() {
-    const problem = templateProblem(form)
-    if (problem) {
-      showToast(problem, 'error')
+    const parsed = parseMessageTemplateForm(form)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setSaving(true)
     try {
-      await saveTemplate(form, user?.email || '', editId ?? undefined)
+      await saveTemplate(parsed.data, user?.email || '', editId ?? undefined)
       setForm(EMPTY)
       setEditId(null)
       await load()

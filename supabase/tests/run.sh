@@ -60,3 +60,16 @@ if [[ $numbering_rc -ne 0 ]] || grep -q "NUMBERING TEST FAILED\|ERROR:" /tmp/num
   exit 1
 fi
 echo "Numbering tests passed"
+
+echo "Running pipelines tests…"
+set +e
+"${PSQL[@]}" -d "$DB" -f tests/pipelines_test.sql > /tmp/pipelines_test_out.txt 2>&1
+pipelines_rc=$?
+set -e
+sed -n "s/.*NOTICE:  //p" /tmp/pipelines_test_out.txt || true
+if [[ $pipelines_rc -ne 0 ]] || grep -q "PIPELINES TEST FAILED\|ERROR:" /tmp/pipelines_test_out.txt; then
+  echo "Pipelines tests failed — full output:" >&2
+  cat /tmp/pipelines_test_out.txt >&2
+  exit 1
+fi
+echo "Pipelines tests passed"

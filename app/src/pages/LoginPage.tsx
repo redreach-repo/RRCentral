@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth, LOGIN_DOMAIN_REJECT_KEY } from '../contexts/AuthContext'
 import { authApi, MIN_PASSWORD_LENGTH } from '../lib/authApi'
+import { parseLoginCredentials } from '../lib/schemas/login'
 import BrandLogo from '../components/BrandLogo'
 import styles from './LoginPage.module.css'
 import { errorMessage } from '../lib/errors'
@@ -60,9 +61,14 @@ export default function LoginPage() {
   async function handleContinue(e: FormEvent) {
     e.preventDefault()
     setError('')
+    const parsed = parseLoginCredentials({ email, password, localMode: isLocalMode })
+    if (!parsed.ok) {
+      setError(parsed.error)
+      return
+    }
     setSubmitting(true)
     try {
-      await signInWithPassword(email, password)
+      await signInWithPassword(parsed.data.email, parsed.data.password)
     } catch (err) {
       const raw = errorMessage(err, 'Sign-in failed')
       setError(friendlyAuthError(raw))

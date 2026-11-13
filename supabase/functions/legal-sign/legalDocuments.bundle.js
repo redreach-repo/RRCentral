@@ -1783,10 +1783,129 @@ async function hashPortalToken(token) {
 }
 var PORTAL_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 
+// src/lib/clauseCompose.ts
+function clauseMarker(clauseKey) {
+  const key = clauseKey.trim().toLowerCase();
+  return `<!-- rr-clause:${key} -->`;
+}
+function clauseKeysFromText(text) {
+  const found = /* @__PURE__ */ new Set();
+  const re = /<!--\s*rr-clause:([a-z][a-z0-9_]{1,62})\s*-->/gi;
+  let m;
+  while ((m = re.exec(text || "")) !== null) {
+    found.add(m[1].toLowerCase());
+  }
+  return [...found];
+}
+
+// src/lib/obligationSpawn.ts
+var CLAUSE_SPAWN_RULES = {
+  confidentiality_def: {
+    title: "Confirm Confidential Information scope",
+    description: (company) => `Confirm what counts as Confidential Information under the signed document for ${company}.`,
+    owner_party: "both",
+    due_days: 7
+  },
+  recipient_obligations: {
+    title: "Brief team on recipient duties",
+    description: (company) => `Ensure staff handling ${company} materials follow recipient confidentiality duties.`,
+    owner_party: "red_reach",
+    due_days: 7
+  },
+  term_survive: {
+    title: "Diary confidentiality survival end",
+    description: (company) => `Record the survival period end date for confidentiality duties with ${company}.`,
+    owner_party: "red_reach",
+    due_days: 30
+  }
+};
+function addDaysIso(iso, days) {
+  const d = new Date(iso);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+function baseFields(input) {
+  const company = (input.company_name || "").trim() || "Client";
+  const created_by = (input.created_by || "legal-sign").trim() || "legal-sign";
+  return {
+    company_name: company,
+    crm_id: input.crm_id || "",
+    legal_document_id: input.legal_document_id,
+    status: "open",
+    completed_at: null,
+    created_by,
+    company
+  };
+}
+function defaultRows(input, base) {
+  const { company, ...rowBase } = base;
+  if (input.doc_type === "service_agreement") {
+    return [
+      {
+        ...rowBase,
+        title: "Confirm commercial start / kickoff",
+        description: `Follow up after signed service agreement for ${company}.`,
+        owner_party: "both",
+        due_date: addDaysIso(input.signed_at, 14)
+      }
+    ];
+  }
+  return [
+    {
+      ...rowBase,
+      title: "Protect Confidential Information",
+      description: `Ongoing duty under the signed ${input.doc_type === "nda" ? "NDA" : "document"} for ${company}.`,
+      owner_party: "counterparty",
+      due_date: null
+    },
+    {
+      ...rowBase,
+      title: "Return or destroy materials on request",
+      description: `Track return/destruction requests for ${company} confidential materials.`,
+      owner_party: "counterparty",
+      due_date: null
+    }
+  ];
+}
+function obligationsFromClauseKeys(keys, input) {
+  const base = baseFields(input);
+  const { company, ...rowBase } = base;
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const raw of keys) {
+    const key = raw.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    const rule = CLAUSE_SPAWN_RULES[key];
+    if (!rule) continue;
+    out.push({
+      ...rowBase,
+      title: rule.title,
+      description: rule.description(company),
+      owner_party: rule.owner_party,
+      due_date: rule.due_days == null ? null : addDaysIso(input.signed_at, rule.due_days)
+    });
+  }
+  return out;
+}
+function defaultObligationsOnSign(input) {
+  const base = baseFields(input);
+  const keys = [
+    ...input.clause_keys || [],
+    ...clauseKeysFromText(input.template_body || "")
+  ];
+  const fromClauses = obligationsFromClauseKeys(keys, input);
+  const defaults = defaultRows(input, base);
+  const titles = new Set(fromClauses.map((r) => r.title));
+  return [...fromClauses, ...defaults.filter((r) => !titles.has(r.title))];
+}
+
 // src/lib/legalDocuments.ts
 var LEGAL_SIGN_LINK_DAYS = 30;
 var LEGAL_SIGN_PDF_MAX_CHARS = 8e6;
 var LEGAL_SIGNATURE_MAX_CHARS = 6e5;
+var LEGAL_SIGN_ASSENT_BLURB = "Read the PDF, draw your signature, type your full name and date. We keep your name, signature, date, time and internet address as an electronic signing record of your assent. This is not a UAE Qualified Electronic Signature (QES).";
+var LEGAL_SIGN_DONE_BLURB = "A copy of this signing record is kept in Red Reach\u2019s files. It is an assent capture, not a UAE Qualified Electronic Signature.";
 function legalSignLinkState(row, now = /* @__PURE__ */ new Date()) {
   if (row.signed_at) return "signed";
   if (row.revoked_at) return "revoked";
@@ -1841,10 +1960,16 @@ function legalDocLabel(docType) {
   return "Document";
 }
 export {
+  CLAUSE_SPAWN_RULES,
   LEGAL_SIGNATURE_MAX_CHARS,
+  LEGAL_SIGN_ASSENT_BLURB,
+  LEGAL_SIGN_DONE_BLURB,
   LEGAL_SIGN_LINK_DAYS,
   LEGAL_SIGN_PDF_MAX_CHARS,
   LEGAL_SIGN_STATE_LABELS,
+  clauseKeysFromText,
+  clauseMarker,
+  defaultObligationsOnSign,
   hashPortalToken as hashLegalSignToken,
   isPortalToken as isLegalSignToken,
   legalDocLabel,
@@ -1853,5 +1978,6 @@ export {
   legalSignLinkState,
   legalSignView,
   newPortalToken as newLegalSignToken,
+  obligationsFromClauseKeys,
   signProblem
 };

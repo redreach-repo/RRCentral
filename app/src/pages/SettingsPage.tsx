@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import CtrmListsCard from '../components/ctrm/CtrmListsCard'
+import GmailCalendarCard from '../components/GmailCalendarCard'
 import GoogleDriveCard from '../components/GoogleDriveCard'
+import M365MailCalendarCard from '../components/M365MailCalendarCard'
 import HubSpotCard from '../components/HubSpotCard'
+import PipelineDetailNavCard from '../components/settings/PipelineDetailNavCard'
+import PipelinesSettingsCard from '../components/settings/PipelinesSettingsCard'
+import WorkflowRunsCard from '../components/settings/WorkflowRunsCard'
+import WorkflowsSettingsCard from '../components/settings/WorkflowsSettingsCard'
 import { Download, HardDrive, Plus, Trash2, Upload, Plug } from 'lucide-react'
 import SimpleRowActions from '../components/SimpleRowActions'
 import { db, currentAuthMode } from '../lib/db'
@@ -18,9 +24,16 @@ import {
 import { clearLocalData, DB_NAME } from '../lib/localDb'
 import { downloadCentralBackup } from '../lib/centralBackup'
 import { importCloudDumpFromFile } from '../lib/importCloudDump'
+import {
+  DEFAULT_MAIL_CALENDAR_PROVIDER,
+  MAIL_CALENDAR_PROVIDER_SETTING_KEY,
+  listMailCalendarProviderOptions,
+  resolveMailCalendarProviderId,
+} from '../lib/mailCalendar'
 import { testZohoConnection } from '../lib/zoho'
-import { isAllowedLoginEmail, loginEmailDomainError } from '../lib/allowedLoginEmail'
 import { authApi, MIN_PASSWORD_LENGTH } from '../lib/authApi'
+import { parseAppUserForm } from '../lib/schemas/appUser'
+import { parseChangePassword } from '../lib/schemas/changePassword'
 import {
   COMPANY_DOC_CATEGORIES,
   companyDocCategoryLabel,
@@ -45,6 +58,7 @@ import {
   type CustomFieldDefinition,
   type CustomFieldType,
 } from '../lib/customFields'
+import { parseCustomFieldDefinitionForm } from '../lib/schemas/customFieldDefinition'
 import {
   clearSupabaseRuntimeConfig,
   getSupabaseRuntimeConfig,
@@ -177,6 +191,10 @@ const ZOHO_KEYS = [
   { key: 'zohoMailAccountId', label: 'Mail account ID (optional)' },
   { key: 'zohoCalendarEnabled', label: 'Calendar sync (yes/no)' },
   { key: 'zohoMailEnabled', label: 'Mail send + inbox (yes/no)' },
+] as const
+
+const MAIL_CALENDAR_PROVIDER_KEYS = [
+  { key: MAIL_CALENDAR_PROVIDER_SETTING_KEY, label: 'Mail & calendar provider' },
 ] as const
 
 type UserForm = {
@@ -435,22 +453,23 @@ export default function SettingsPage() {
   }
 
   async function saveCustomField() {
-    if (!customFieldForm.label.trim()) {
-      showToast('Label is required', 'error')
+    const parsed = parseCustomFieldDefinitionForm(customFieldForm)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setBusy(true)
     try {
       await saveCustomFieldDefinition(
         {
-          object_type: customFieldForm.object_type,
-          field_key: editingCustomField?.field_key || slugifyFieldKey(customFieldForm.label),
-          label: customFieldForm.label,
-          field_type: customFieldForm.field_type,
-          options: parseSelectOptions(customFieldForm.optionsText),
-          required: customFieldForm.required,
-          sort_order: customFieldForm.sort_order,
-          active: customFieldForm.active,
+          object_type: parsed.data.object_type,
+          field_key: editingCustomField?.field_key || slugifyFieldKey(parsed.data.label),
+          label: parsed.data.label,
+          field_type: parsed.data.field_type,
+          options: parsed.data.options,
+          required: parsed.data.required,
+          sort_order: parsed.data.sort_order,
+          active: parsed.data.active,
         },
         editingCustomField?.id,
       )
@@ -590,17 +609,14 @@ export default function SettingsPage() {
   }
 
   async function handleChangeMyPassword() {
-    if (newPassword.length < MIN_PASSWORD_LENGTH) {
-      showToast(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`, 'error')
-      return
-    }
-    if (newPassword !== confirmPassword) {
-      showToast('Passwords do not match', 'error')
+    const parsed = parseChangePassword({ newPassword, confirmPassword })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setChangingPassword(true)
     try {
-      await changePassword(newPassword)
+      await changePassword(parsed.data.newPassword)
       setNewPassword('')
       setConfirmPassword('')
       showToast('Password updated', 'success')
@@ -734,31 +750,19 @@ export default function SettingsPage() {
   }
 
   async function saveUser() {
-    if (!userForm.email.trim()) {
-      showToast('Email is required', 'error')
+    const parsed = parseAppUserForm({
+      ...userForm,
+      editing: Boolean(editingUser),
+      localMode: isLocalMode,
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
-    if (!isAllowedLoginEmail(userForm.email)) {
-      showToast(loginEmailDomainError(userForm.email), 'error')
-      return
-    }
-    const password = userForm.password.trim()
-    if (!editingUser && !isLocalMode && !password) {
-      showToast(`Set an initial password (min ${MIN_PASSWORD_LENGTH} characters)`, 'error')
-      return
-    }
-    if (password && password.length < MIN_PASSWORD_LENGTH) {
-      showToast(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`, 'error')
-      return
-    }
+    const { email, name, role, active, password } = parsed.data
     setBusy(true)
     try {
-      const payload = {
-        email: userForm.email.trim().toLowerCase(),
-        name: userForm.name.trim(),
-        role: userForm.role,
-        active: userForm.active,
-      }
+      const payload = { email, name, role, active }
       if (editingUser) {
         const { error } = await db.from('app_users').update(payload).eq('id', editingUser.id)
         if (error) throw error
@@ -767,11 +771,7 @@ export default function SettingsPage() {
         if (error) throw error
       }
       if (password && authApi.adminSetPassword) {
-        const { error: pwdError } = await authApi.adminSetPassword(
-          payload.email,
-          password,
-          payload.name,
-        )
+        const { error: pwdError } = await authApi.adminSetPassword(email, password, name)
         if (pwdError) throw new Error(pwdError.message)
       }
       showToast(password ? 'User saved and password set' : 'User saved', 'success')
@@ -803,8 +803,8 @@ export default function SettingsPage() {
   async function handleTestZoho() {
     setTestingZoho(true)
     try {
-      // Persist draft Zoho keys first so test uses latest values
-      for (const { key } of ZOHO_KEYS) {
+      // Persist draft provider + Zoho keys first so test uses latest values
+      for (const { key } of [...MAIL_CALENDAR_PROVIDER_KEYS, ...ZOHO_KEYS]) {
         const value = draft[key] ?? settings[key] ?? ''
         if ((settings[key] ?? '') !== value) {
           await updateSetting(key, value)
@@ -827,6 +827,9 @@ export default function SettingsPage() {
     { id: 'quote-settings', label: 'Quotes' },
     { id: 'numbering', label: 'Numbering' },
     { id: 'custom-fields', label: 'Custom fields' },
+    { id: 'pipelines', label: 'Pipelines' },
+    { id: 'workflows', label: 'Workflows' },
+    { id: 'workflow-runs', label: 'Workflow runs' },
     { id: 'division-formats', label: 'Division formats' },
     { id: 'wanders', label: 'Wanders' },
     { id: 'system', label: 'System' },
@@ -1226,7 +1229,7 @@ export default function SettingsPage() {
           ) : null}
         </div>
         <p style={{ margin: '8px 0 14px', fontSize: 13, color: colors.muted, lineHeight: 1.45 }}>
-          Tenant-defined fields on accounts (and later CRM / quotations). Values are stored separately
+          Tenant-defined fields on accounts, CRM leads, and quotations. Values are stored separately
           from core columns.
         </p>
         {customFieldsLoading ? (
@@ -1284,6 +1287,11 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
+
+      <PipelinesSettingsCard />
+      <PipelineDetailNavCard />
+      <WorkflowsSettingsCard />
+      <WorkflowRunsCard />
 
       {renderSection(
         'Division quotation formats (editable titles, closings, Connect partner name)',
@@ -1347,8 +1355,41 @@ export default function SettingsPage() {
 
       <div id="zoho" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
         <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Plug size={18} /> Zoho Calendar &amp; Mail
+          <Plug size={18} /> Mail &amp; calendar
         </h2>
+        <div style={{ ...fieldStyle, maxWidth: 360, marginBottom: 14 }}>
+          <label style={labelStyle} htmlFor="mailCalendarProvider">
+            Provider
+          </label>
+          <select
+            id="mailCalendarProvider"
+            style={inputStyle}
+            value={resolveMailCalendarProviderId({
+              ...settings,
+              ...draft,
+              [MAIL_CALENDAR_PROVIDER_SETTING_KEY]:
+                draft[MAIL_CALENDAR_PROVIDER_SETTING_KEY] ??
+                settings[MAIL_CALENDAR_PROVIDER_SETTING_KEY] ??
+                DEFAULT_MAIL_CALENDAR_PROVIDER,
+            })}
+            onChange={(e) =>
+              setDraft((d) => ({ ...d, [MAIL_CALENDAR_PROVIDER_SETTING_KEY]: e.target.value }))
+            }
+          >
+            {listMailCalendarProviderOptions().map((opt) => (
+              <option key={opt.id} value={opt.id} disabled={!opt.available}>
+                {opt.available
+                  ? opt.label
+                  : `${opt.label} — ${opt.unavailableReason || 'Coming later'}`}
+              </option>
+            ))}
+          </select>
+          <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted2, lineHeight: 1.45 }}>
+            Zoho, Gmail, or Microsoft 365. Connect the provider below before selecting it. M365
+            includes inbox (Phase B). Gmail inbox still Phase B (CASA). IMAP deferred — see
+            COMPLIANCE_NOTES.
+          </p>
+        </div>
         {can(userRole, 'settings.manage') &&
         (draft.zohoPostHardeningRotationAck ?? settings.zohoPostHardeningRotationAck ?? 'no') !==
           'yes' &&
@@ -1390,6 +1431,7 @@ export default function SettingsPage() {
             </div>
           </div>
         ) : null}
+        <h3 style={{ ...sectionTitleStyle, fontSize: 15, margin: '4px 0 8px' }}>Zoho credentials</h3>
         <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.55 }}>
           Connect Zoho so CRM follow-ups sync to Calendar, you can send mail from CRM, and your{' '}
           <strong>Zoho mail</strong> (Inbox + Sent) appears on the Dashboard matched to CRM companies.
@@ -1468,10 +1510,12 @@ export default function SettingsPage() {
           <button
             type="button"
             style={buttonPrimaryStyle}
-            disabled={savingSection === 'Zoho' || settingsLoading}
-            onClick={() => void saveSection(ZOHO_KEYS, 'Zoho')}
+            disabled={savingSection === 'Mail & calendar' || settingsLoading}
+            onClick={() =>
+              void saveSection([...MAIL_CALENDAR_PROVIDER_KEYS, ...ZOHO_KEYS], 'Mail & calendar')
+            }
           >
-            {savingSection === 'Zoho' ? 'Saving…' : 'Save Zoho settings'}
+            {savingSection === 'Mail & calendar' ? 'Saving…' : 'Save mail & calendar'}
           </button>
           <button
             type="button"
@@ -1480,10 +1524,13 @@ export default function SettingsPage() {
             onClick={() => void handleTestZoho()}
           >
             <Plug size={14} />
-            {testingZoho ? 'Testing…' : 'Test connection'}
+            {testingZoho ? 'Testing…' : 'Test Zoho connection'}
           </button>
         </div>
       </div>
+
+      <GmailCalendarCard />
+      <M365MailCalendarCard />
 
       {currentAuthMode() === 'local' && (
         <div id="sheets-import" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>

@@ -11,9 +11,9 @@
 
 RR Central is a **single-tenant** operations suite for Red Reach Middle East FZE. It already covers CRM/pipelines, quotes→invoices→delivery notes, accounts/delivery/support, finance lists, Drive, WhatsApp/email intake, NDA e-sign, contract auto-billing, WorshipHub, Wanders, and Tee Tribe shop — with **89 public tables, all RLS-enabled**.
 
-It is **not** yet a multi-tenant subscription platform. There is no `tenant_id`, no customization layer, no double-entry ledger, no HR/payroll, no full mail sync beyond Zoho Mail/Calendar proxy, and TypeScript `strict` is off in the main app.
+It is **not** yet a multi-tenant subscription platform. There is no `tenant_id`, no customization layer, no double-entry ledger, no HR/payroll, and no full mail sync beyond Zoho Mail/Calendar proxy. TypeScript `strict` is on in the main app.
 
-**M0 RLS criterion:** pass — every `CREATE TABLE` in `supabase/migrations` has RLS enabled. Two tables intentionally have RLS with **no policies** (deny-all to anon/authenticated; service-role only): `drive_connection`, `worship_setup_log`.
+**M0 RLS criterion:** pass — every `CREATE TABLE` in `supabase/migrations` has RLS enabled. Tables with RLS and **no policies** (deny-all to anon/authenticated; service-role only): `drive_connection`, `gmail_connection`, `m365_connection`, `worship_setup_log`. `contract_clauses` has staff-read / manager-edit policies (M5).
 
 ---
 
@@ -21,7 +21,7 @@ It is **not** yet a multi-tenant subscription platform. There is no `tenant_id`,
 
 | Layer | Today |
 |-------|--------|
-| Web | Vite + React SPA, TypeScript (app `strict` **not** enabled; Tee Tribe package uses `strict: true`) |
+| Web | Vite + React SPA, TypeScript (`strict: true` in app and Tee Tribe) |
 | Auth | Supabase Auth email/password when configured; else IndexedDB **local mode** |
 | DB | Supabase Postgres + RLS; migrations applied by hand / CI |
 | Jobs | `pg_cron` + `pg_net` → Edge Functions with cron secrets; browser fallback for contract billing |
@@ -62,7 +62,7 @@ Local mode bypasses RLS (single-browser IndexedDB). Production expects Supabase.
 | `/quick-add` | Phone lead/call |
 | `/deals` | Unified pipeline |
 | `/sales` | AI CRM sales stages |
-| `/ctrm` | CTRM Next stages |
+| `/ctrm` | CTRM detail |
 | `/follow-ups` | Follow-ups |
 | `/quotations` · `/invoices` · `/delivery-notes` | Docs |
 | `/customer-files` | Google Drive index |
@@ -90,6 +90,8 @@ Nav: accordion sidebar (Overview / Sales / Clients / Delivery / Operations / Fin
 
 ### Intentional deny-all (RLS on, no policies)
 - `drive_connection` — OAuth refresh; service role only  
+- `gmail_connection` — Gmail/Calendar OAuth refresh; service role only  
+- `m365_connection` — Microsoft 365 OAuth refresh; service role only  
 - `worship_setup_log` — service role only  
 
 ### Dual / overlapping models (debt)
@@ -98,7 +100,7 @@ Nav: accordion sidebar (Overview / Sales / Clients / Delivery / Operations / Fin
 - Nullable `account_id` on crm/quotes/invoices/clients; soft name match until linked
 
 ### Full table list (alphabetical)
-`account_activities`, `account_contacts`, `account_link_log`, `accounts`, `activity_log`, `agreement_templates`, `ai_usage_log`, `app_errors`, `app_settings`, `app_users`, `attachments`, `audit_log`, `build_stages`, `build_tasks`, `build_template_items`, `build_templates`, `client_report_drafts`, `client_update_drafts`, `clients`, `company_documents`, `contract_invoices`, `contracts`, `crm`, `ctrm_client_terms`, `ctrm_deal_commissions`, `ctrm_deal_stage_changes`, `ctrm_deals`, `ctrm_fit_sheets`, `ctrm_sessions`, `customer_bookings`, `customer_documents`, `customer_payments`, `customer_refunds`, `delivery_notes`, `delivery_packages`, `digest_recipients`, `digest_runs`, `drive_connection`, `duplicate_dismissals`, `expenses`, `follow_up_updates`, `fx_rates`, `hubspot_links`, `hubspot_sync_runs`, `income`, `inventory_movements`, `invoice_reminders`, `invoices`, `legal_documents`, `legal_sign_links`, `legal_sign_pdfs`, `legal_signatures`, `line_items`, `message_templates`, `nda_templates`, `owned_domains`, `package_cost_components`, `package_selling_prices`, `payment_log`, `portal_access`, `portal_uploads`, `products`, `quotations`, `quote_accept_links`, `quote_accept_pdfs`, `quote_acceptances`, `quote_templates`, `report_calls`, `requirements`, `sales_deals`, `scheduled_departures`, `sla_policies`, `supplier_commitments`, `ticket_messages`, `tickets`, `time_entries`, `tour_packages`, `usage_import_runs`, `usage_records`, `usage_sources`, `vendors`, `wanders_deals`, `wanders_partners`, `wanders_passengers`, `wanders_terms_acceptances`, `watch_items`, `website_inquiries`, `worship_church_profiles`, `worship_setup_log`
+`account_activities`, `account_contacts`, `account_link_log`, `accounts`, `activity_log`, `agreement_templates`, `ai_usage_log`, `app_errors`, `app_settings`, `app_users`, `attachments`, `audit_log`, `build_stages`, `build_tasks`, `build_template_items`, `build_templates`, `client_report_drafts`, `client_update_drafts`, `clients`, `company_documents`, `contract_clauses`, `contract_obligations`, `contract_invoices`, `contracts`, `crm`, `ctrm_client_terms`, `ctrm_deal_commissions`, `ctrm_deal_stage_changes`, `ctrm_deals`, `ctrm_fit_sheets`, `ctrm_sessions`, `customer_bookings`, `customer_documents`, `customer_payments`, `customer_refunds`, `delivery_notes`, `delivery_packages`, `digest_recipients`, `digest_runs`, `drive_connection`, `duplicate_dismissals`, `expenses`, `follow_up_updates`, `fx_rates`, `hubspot_links`, `hubspot_sync_runs`, `income`, `inventory_movements`, `invoice_reminders`, `invoices`, `legal_documents`, `legal_sign_links`, `legal_sign_pdfs`, `legal_signatures`, `line_items`, `message_templates`, `nda_templates`, `owned_domains`, `package_cost_components`, `package_selling_prices`, `payment_log`, `portal_access`, `portal_uploads`, `products`, `quotations`, `quote_accept_links`, `quote_accept_pdfs`, `quote_acceptances`, `quote_templates`, `report_calls`, `requirements`, `sales_deals`, `scheduled_departures`, `sla_policies`, `supplier_commitments`, `ticket_messages`, `tickets`, `time_entries`, `tour_packages`, `usage_import_runs`, `usage_records`, `usage_sources`, `vendors`, `wanders_deals`, `wanders_partners`, `wanders_passengers`, `wanders_terms_acceptances`, `watch_items`, `website_inquiries`, `worship_church_profiles`, `worship_setup_log`
 
 ### Local IndexedDB
 `app/src/lib/localDb.ts` — subset of stores; cloud-only tables omitted. No RLS in local mode.
@@ -208,7 +210,7 @@ GitHub Actions: nightly DB backup (`backup.yml`).
 | Fireflies | Paste ID |
 | CTRM issues | Thin ticket grouper |
 | Wanders | Rich schema; less polish than Threads docs path |
-| TypeScript | App not `strict: true` |
+| TypeScript | App `strict: true` (M1 leftover closed) |
 | No Arabic/RTL | English only UI strings |
 | No module registry / workflows / custom fields | Hardcoded entities |
 | Red Reach–specific in core | WorshipHub, Tee Tribe, Wanders, CTRM commissions mixed into shared SPA |

@@ -29,7 +29,14 @@ import EditorSectionTabs, {
   type EditorSection,
 } from '../components/EditorSectionTabs'
 import LineItemImageField from '../components/LineItemImageField'
+import CustomFieldsCard from '../components/CustomFieldsCard'
+import SavedViewsBar from '../components/SavedViewsBar'
 import ClientBillToFields from '../components/ClientBillToFields'
+import {
+  normalizeQuotationsFilters,
+  quotationsFiltersEqual,
+  type QuotationsViewFilters,
+} from '../lib/savedViews'
 import { useClientBillTo } from '../hooks/useClientBillTo'
 import SupplierInvoiceModal from '../components/quotations/SupplierInvoiceModal'
 import QuoteRowActions from '../components/quotations/QuoteRowActions'
@@ -62,6 +69,7 @@ import { ensureCompanyFromDocument } from '../lib/ensureCompanyFromDocument'
 import { formatAED } from '../lib/money'
 import { formatRevisionReference, parseBaseReference } from '../lib/referenceNumber'
 import { allocateReference } from '../lib/numbering'
+import { parseQuotationForm } from '../lib/schemas/quotation'
 import { sortByDateDesc } from '../lib/finance'
 import { isQuotePastValidity, quoteValidUntil } from '../lib/documents'
 import { errorMessage, isUndefinedColumnError } from '../lib/errors'
@@ -170,7 +178,7 @@ const emptyForm = (defaults?: Partial<QuoteForm>): QuoteForm => ({
 })
 
 export default function QuotationsPage() {
-  const { user, userRole } = useAuth()
+  const { user, userRole, appUserId } = useAuth()
   const { settings, updateSetting } = useSettings()
   const { showToast } = useToast()
   const navigate = useNavigate()
@@ -185,6 +193,19 @@ export default function QuotationsPage() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<StatusTab>('All')
   const [search, setSearch] = useState('')
+
+  const currentQuoteViewFilters = useMemo(
+    () => normalizeQuotationsFilters({ q: search, status: tab }),
+    [search, tab],
+  )
+
+  const applyQuoteViewFilters = useCallback((raw: Record<string, unknown>) => {
+    const f = raw as QuotationsViewFilters
+    const nextStatus = String(f.status || 'All') as StatusTab
+    const allowed: StatusTab[] = ['All', 'Draft', 'Finalized', 'Sent', 'Awarded']
+    setTab(allowed.includes(nextStatus) ? nextStatus : 'All')
+    setSearch(String(f.q || ''))
+  }, [])
   /** Only one row’s action panel open at a time — keeps the table scannable. */
   const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
@@ -530,18 +551,38 @@ export default function QuotationsPage() {
   }
 
   async function saveDraft() {
-    if (!form.client.trim() && !form.items.some((i) => i.description.trim())) {
-      showToast('Add a client or line items before saving', 'error')
+    const parsed = parseQuotationForm({
+      client: form.client,
+      contact_name: form.contact_name,
+      contact_email: form.contact_email,
+      contact_phone: form.contact_phone,
+      division_code: form.division_code,
+      description: form.description,
+      payment_terms: form.payment_terms,
+      delivery_terms: form.delivery_terms,
+      moq: form.moq,
+      notes: form.notes,
+      date: form.date,
+      quotation_currency: form.quotation_currency,
+      payment_currency: form.payment_currency,
+      fx_rate: Number(form.fx_rate) || 0,
+      discount_percent: Number(form.discount_percent) || 0,
+      discount_amount: Number(form.discount_amount) || 0,
+      has_line_items: form.items.some((i) => i.description.trim()),
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
+    const f = parsed.data
     setSaving(true)
     // Which step failed is shown in the error, so problems can be diagnosed from a screenshot.
     let step = 'preparing the quote'
     try {
       const amount = totals.total
-      const vertical = divisionBrand(form.division_code)
+      const vertical = divisionBrand(f.division_code)
       const quoteId = editing?.quote_id || makeQuoteId()
-      const fxRate = Number(form.fx_rate) || 1
+      const fxRate = Number(f.fx_rate) || 1
       const baseAmount = toBaseAmount(amount, fxRate)
       const lineCostDoc = totals.cost
       const lineCostBase = toBaseAmount(lineCostDoc, fxRate)
@@ -549,9 +590,9 @@ export default function QuotationsPage() {
       const supplierCostBase =
         lineCostDoc > 0 ? lineCostBase : Number(form.supplier_cost_base) || 0
       const currencyFields = {
-        currency: form.quotation_currency,
-        quotation_currency: form.quotation_currency,
-        payment_currency: form.payment_currency,
+        currency: f.quotation_currency,
+        quotation_currency: f.quotation_currency,
+        payment_currency: f.payment_currency,
         supplier_currency: form.supplier_currency,
         booking_currency: form.booking_currency,
         fx_rate: fxRate,
@@ -570,21 +611,21 @@ export default function QuotationsPage() {
         estimated_gross_profit_base: revenueBase - supplierCostBase,
       }
       const payload = {
-        client: form.client.trim(),
-        contact_name: form.contact_name.trim(),
-        contact_email: form.contact_email.trim(),
-        contact_phone: form.contact_phone.trim(),
+        client: f.client,
+        contact_name: f.contact_name,
+        contact_email: f.contact_email,
+        contact_phone: f.contact_phone,
         vertical,
-        division_code: form.division_code,
-        description: form.description.trim(),
-        payment_terms: form.payment_terms,
-        delivery_terms: form.delivery_terms,
-        moq: form.moq,
-        notes: form.notes,
-        date: form.date || null,
+        division_code: f.division_code,
+        description: f.description,
+        payment_terms: f.payment_terms,
+        delivery_terms: f.delivery_terms,
+        moq: f.moq,
+        notes: f.notes,
+        date: f.date || null,
         amount,
-        discount_percent: form.offset_vat ? 0 : Number(form.discount_percent) || 0,
-        discount_amount: form.offset_vat ? 0 : Number(form.discount_amount) || 0,
+        discount_percent: form.offset_vat ? 0 : f.discount_percent,
+        discount_amount: form.offset_vat ? 0 : f.discount_amount,
         offset_vat: form.offset_vat,
         quote_id: quoteId,
         updated_by: who,
@@ -603,10 +644,10 @@ export default function QuotationsPage() {
         return rest
       }
 
-      if (form.quotation_currency !== BASE_CURRENCY || fxRate !== 1) {
+      if (f.quotation_currency !== BASE_CURRENCY || fxRate !== 1) {
         step = 'saving the FX rate'
         await approveFxRate({
-          from: form.quotation_currency,
+          from: f.quotation_currency,
           rate: fxRate,
           rateDate: form.fx_rate_date,
           approvedBy: who,
@@ -1303,6 +1344,21 @@ export default function QuotationsPage() {
           <Plus size={16} /> New quotation
         </button>
       </header>
+
+      <SavedViewsBar
+        moduleId="quotations"
+        filters={currentQuoteViewFilters}
+        ownerUserId={appUserId}
+        canWrite={userRole !== 'viewer'}
+        applyDefaultOnLoad={
+          !searchParams.get('client') && !searchParams.get('ref') && !searchParams.get('quote')
+        }
+        onApply={applyQuoteViewFilters}
+        onToast={showToast}
+        filtersEqual={(a, b) =>
+          quotationsFiltersEqual(a as QuotationsViewFilters, b as QuotationsViewFilters)
+        }
+      />
 
       <div className={qStyles.controls}>
         <div className={qStyles.tabs}>
@@ -2243,6 +2299,19 @@ export default function QuotationsPage() {
             onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
           />
         </div>
+        {editing?.id ? (
+          <CustomFieldsCard
+            objectType="quotation"
+            recordId={String(editing.id)}
+            editable={userRole !== 'viewer'}
+            onToast={showToast}
+            framed={false}
+          />
+        ) : (
+          <p style={{ margin: '12px 0 0', fontSize: 12, color: colors.muted }}>
+            Save the draft once to edit quotation custom fields.
+          </p>
+        )}
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>

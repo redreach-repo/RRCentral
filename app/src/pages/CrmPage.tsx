@@ -22,7 +22,9 @@ import {
 import CrmRowActions from '../components/crm/CrmRowActions'
 import { db } from '../lib/db'
 import { CRM_OUTCOME_REASONS, NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
-import { crmMoveProblem, isLostReason } from '../lib/dealRules'
+import { loadCrmStageKeys } from '../lib/pipelines'
+import { crmMoveProblem } from '../lib/dealRules'
+import { parseCrmForm } from '../lib/schemas/crm'
 import LostReasonFields from '../components/deals/LostReasonFields'
 import type { ActivityLogEntry, AppUser, CrmContact, CrmEntry, CustomerDocument, Invoice, Quotation } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -59,12 +61,7 @@ import {
   normalizeContacts,
   primaryContact,
 } from '../lib/contacts'
-import {
-  deleteZohoCalendarEvent,
-  isZohoCalendarEnabled,
-  isZohoMailEnabled,
-  syncFollowUpToZohoCalendar,
-} from '../lib/zoho'
+import { getCalendarProvider, getMailProvider } from '../lib/mailCalendar'
 import { resolveOwnerEmails } from '../lib/calendarAttendees'
 import EmailComposeModal from '../components/EmailComposeModal'
 import LinkDriveFileModal from '../components/LinkDriveFileModal'
@@ -72,6 +69,14 @@ import SaveToFolderPrompt from '../components/SaveToFolderPrompt'
 import WebsiteInquiriesPanel from '../site/components/WebsiteInquiriesPanel'
 import CrmLogTouchModal, { type LogTouchPayload } from '../components/CrmLogTouchModal'
 import CrmPipelineBoard from '../components/CrmPipelineBoard'
+import CustomFieldsCard from '../components/CustomFieldsCard'
+import SavedViewsBar from '../components/SavedViewsBar'
+import {
+  crmFiltersEqual,
+  normalizeCrmFilters,
+  type CrmViewFilters,
+} from '../lib/savedViews'
+import { triggerStageEnterWorkflows } from '../lib/workflowRunner'
 import CalendarSettingsModal from '../components/CalendarSettingsModal'
 import { useCompactCrm } from '../hooks/useMediaQuery'
 import resp from '../styles/crmResponsive.module.css'
@@ -221,11 +226,67 @@ export default function CrmPage() {
   const [calendarSettingsOpen, setCalendarSettingsOpen] = useState(false)
   const [accountLink, setAccountLink] = useState<CrmAccountLink | null>(null)
   const [accountLinkBusy, setAccountLinkBusy] = useState(false)
+  const [crmStages, setCrmStages] = useState<string[]>(() => [...PIPELINE_STAGES])
   const compact = useCompactCrm()
+
+  useEffect(() => {
+    void loadCrmStageKeys().then(setCrmStages)
+  }, [])
 
   const myOwnerName = useMemo(
     () => resolveSalesOwnerName(user?.email, owners),
     [user?.email, owners],
+  )
+
+  const currentCrmViewFilters = useMemo(
+    () =>
+      normalizeCrmFilters({
+        q: search,
+        stage: stageFilter,
+        owner: ownerFilter,
+        follow: followFilter,
+        view: viewMode,
+      }),
+    [search, stageFilter, ownerFilter, followFilter, viewMode],
+  )
+
+  const applyCrmViewFilters = useCallback(
+    (raw: Record<string, unknown>) => {
+      const f = raw as CrmViewFilters
+      const nextStage = String(f.stage || 'All')
+      const nextOwner = String(f.owner || 'All')
+      const nextFollow = String(f.follow || 'All')
+      const nextView = f.view === 'board' ? 'board' : 'list'
+      const nextQ = String(f.q || '')
+      setStageFilter(nextStage)
+      setOwnerFilter(
+        !canViewAll && myOwnerName && (nextOwner === 'All' || !nextOwner)
+          ? myOwnerName
+          : nextOwner,
+      )
+      setFollowFilter(
+        nextFollow === 'Due' ||
+          nextFollow === 'Overdue' ||
+          nextFollow === 'Today' ||
+          nextFollow === 'Upcoming' ||
+          nextFollow === 'None' ||
+          nextFollow === 'All'
+          ? nextFollow
+          : 'All',
+      )
+      setViewMode(nextView)
+      setSearch(nextQ)
+      setDefaultsReady(true)
+      const params = new URLSearchParams()
+      if (nextStage !== 'All') params.set('stage', nextStage)
+      if (nextOwner !== 'All') {
+        params.set('owner', nextOwner === myOwnerName ? 'me' : nextOwner)
+      }
+      if (nextFollow !== 'All') params.set('follow', nextFollow)
+      if (nextView !== 'list') params.set('view', nextView)
+      setSearchParams(params, { replace: true })
+    },
+    [canViewAll, myOwnerName, setSearchParams],
   )
 
   const teamForCalendar = useMemo(
@@ -451,6 +512,11 @@ export default function CrmPage() {
     })
   }, [editing, form, dealQuotes, dealInvoices])
 
+  const unlinkedCrmCount = useMemo(
+    () => entries.reduce((n, e) => (e.account_id ? n : n + 1), 0),
+    [entries],
+  )
+
   const ownerOptions = useMemo(() => {
     const names = new Set<string>()
     for (const o of owners) {
@@ -486,13 +552,41 @@ export default function CrmPage() {
 
   const stageCounts = useMemo(() => {
     const counts: Record<string, number> = { All: entries.length }
-    for (const s of PIPELINE_STAGES) counts[s] = 0
+    for (const s of crmStages) counts[s] = 0
     for (const e of entries) {
       const s = e.pipeline_stage || 'Lead'
       counts[s] = (counts[s] || 0) + 1
     }
     return counts
-  }, [entries])
+  }, [entries, crmStages])
+
+  async function maybeTriggerStageWorkflows(
+    entry: Pick<CrmEntry, 'id' | 'company_name' | 'pipeline_stage'>,
+    nextStage: string | undefined,
+  ) {
+    if (!nextStage || nextStage === (entry.pipeline_stage || 'Lead')) return
+    try {
+      const runs = await triggerStageEnterWorkflows({
+        pipelineKey: 'crm',
+        stageKey: nextStage,
+        objectType: 'crm',
+        recordId: String(entry.id),
+        recordLabel: entry.company_name,
+        actorEmail: user?.email || '',
+      })
+      const waiting = runs.filter((r) => r.status === 'awaiting_approval')
+      if (waiting.length) {
+        showToast(
+          `${waiting.length} workflow${waiting.length === 1 ? '' : 's'} waiting for approval (Settings → Workflow runs)`,
+          'success',
+        )
+      } else if (runs.length) {
+        showToast(`Started ${runs.length} workflow${runs.length === 1 ? '' : 's'}`, 'success')
+      }
+    } catch (e) {
+      showToast(errorMessage(e, 'Workflow trigger failed'), 'error')
+    }
+  }
 
   async function quickPatch(
     entry: CrmEntry,
@@ -525,12 +619,12 @@ export default function CrmPage() {
         updated_by: user?.email || '',
         updated_at: new Date().toISOString(),
       }
-      if (isZohoCalendarEnabled(settings) && patch.follow_up_date !== undefined) {
+      if (getCalendarProvider(settings).isEnabled(settings) && patch.follow_up_date !== undefined) {
         try {
           const contacts = hydrateContacts(entry)
           const p = primaryContact(contacts)
           if (nextFollow) {
-            const eventId = await syncFollowUpToZohoCalendar(settings, {
+            const eventId = await getCalendarProvider(settings).syncFollowUp(settings, {
               company: entry.company_name,
               nextAction: patch.next_action ?? entry.next_action,
               owner: entry.owner,
@@ -542,12 +636,12 @@ export default function CrmPage() {
             })
             if (eventId) payload.calendar_event_id = eventId
           } else if (entry.calendar_event_id) {
-            await deleteZohoCalendarEvent(settings, entry.calendar_event_id)
+            await getCalendarProvider(settings).deleteEvent(settings, entry.calendar_event_id)
             payload.calendar_event_id = ''
           }
         } catch (calErr) {
           showToast(
-            calErr instanceof Error ? `Updated locally; Zoho: ${calErr.message}` : 'Updated; calendar sync failed',
+            calErr instanceof Error ? `Updated locally; calendar: ${calErr.message}` : 'Updated; calendar sync failed',
             'error',
           )
         }
@@ -564,6 +658,7 @@ export default function CrmPage() {
         user?.email || '',
         entry.id,
       )
+      await maybeTriggerStageWorkflows(entry, patch.pipeline_stage)
       await load()
     } catch (e) {
       setError(errorMessage(e, 'Quick update failed'))
@@ -615,6 +710,7 @@ export default function CrmPage() {
       showToast(`Marked ${outcomeStage}`, 'success')
       setOutcomeTarget(null)
       setOutcomeReason('')
+      await maybeTriggerStageWorkflows(entry, outcomeStage)
       await load()
     } catch (e) {
       showToast(errorMessage(e, 'Could not close deal'), 'error')
@@ -658,17 +754,17 @@ export default function CrmPage() {
       if (payload.clearDate) patch.follow_up_date = null
       else if (payload.follow_up_date) patch.follow_up_date = payload.follow_up_date
 
-      if (isZohoCalendarEnabled(settings) && (payload.clearDate || payload.follow_up_date)) {
+      if (getCalendarProvider(settings).isEnabled(settings) && (payload.clearDate || payload.follow_up_date)) {
         try {
           const contacts = hydrateContacts(entry)
           const p = primaryContact(contacts)
           if (payload.clearDate) {
             if (entry.calendar_event_id) {
-              await deleteZohoCalendarEvent(settings, entry.calendar_event_id)
+              await getCalendarProvider(settings).deleteEvent(settings, entry.calendar_event_id)
               patch.calendar_event_id = ''
             }
           } else if (payload.follow_up_date) {
-            const eventId = await syncFollowUpToZohoCalendar(settings, {
+            const eventId = await getCalendarProvider(settings).syncFollowUp(settings, {
               company: entry.company_name,
               nextAction: payload.next_action || entry.next_action,
               owner: entry.owner,
@@ -683,7 +779,7 @@ export default function CrmPage() {
         } catch (calErr) {
           showToast(
             calErr instanceof Error
-              ? `Saved locally; Zoho Calendar: ${calErr.message}`
+              ? `Saved locally; calendar: ${calErr.message}`
               : 'Saved locally; calendar sync failed',
             'error',
           )
@@ -703,6 +799,9 @@ export default function CrmPage() {
       )
       showToast('Touch logged', 'success')
       setLogTouchTarget(null)
+      if (payload.pipeline_stage) {
+        await maybeTriggerStageWorkflows(entry, payload.pipeline_stage)
+      }
       await load()
     } catch (e) {
       showToast(errorMessage(e, 'Failed to save touch'), 'error')
@@ -881,61 +980,53 @@ export default function CrmPage() {
 
   async function handleSave(e: FormEvent) {
     e.preventDefault()
-    if (!form.company_name.trim()) {
-      setError('Company name is required')
+    const parsed = parseCrmForm({
+      company_name: form.company_name,
+      company_owner: form.company_owner,
+      address: form.address,
+      website: form.website,
+      trn: form.trn,
+      notes: form.notes,
+      follow_up_date: form.follow_up_date,
+      next_action: form.next_action,
+      owner: form.owner,
+      pipeline_stage: form.pipeline_stage || 'Lead',
+      quote_ref: form.quote_ref,
+      outcome_reason: form.outcome_reason,
+      lost_note: form.lost_note,
+      previous_stage: editing?.pipeline_stage || '',
+    })
+    if (!parsed.ok) {
+      setError(parsed.error)
       return
     }
-    const stage = form.pipeline_stage || 'Lead'
-    const closed = stage === 'Won' || stage === 'Lost'
-    if (!closed) {
-      if (!form.follow_up_date) {
-        setError('Follow-up date is required for open deals')
-        return
-      }
-      if (!form.next_action.trim()) {
-        setError('Next action is required for open deals')
-        return
-      }
-    }
-    if (closed && !form.outcome_reason.trim()) {
-      setError(`${stage} reason is required`)
-      return
-    }
-    if (stage === 'Lost' && (editing?.pipeline_stage || '') !== 'Lost') {
-      if (!isLostReason(form.outcome_reason)) {
-        setError('Pick why the deal was lost from the list')
-        return
-      }
-      if (!form.lost_note.trim()) {
-        setError('Add a note on why the deal was lost')
-        return
-      }
-    }
+    const f = parsed.data
+    const stage = f.pipeline_stage || 'Lead'
     setSaving(true)
     setError('')
     const who = user?.email || ''
     const contacts = normalizeContacts(form.contacts)
     const flat = flatFieldsFromContacts(contacts)
-    const followUpDate = form.follow_up_date || null
+    const followUpDate = f.follow_up_date || null
     const prevEventId = editing?.calendar_event_id || ''
 
     const payload: Record<string, unknown> = {
-      company_name: form.company_name.trim(),
+      company_name: f.company_name,
       ...flat,
       contacts,
-      company_owner: form.company_owner.trim(),
-      address: form.address.trim(),
-      website: form.website.trim(),
-      trn: form.trn.trim(),
-      notes: form.notes.trim(),
+      company_owner: f.company_owner,
+      address: f.address,
+      website: f.website,
+      trn: f.trn,
+      notes: f.notes.trim(),
       follow_up_date: followUpDate,
-      next_action: form.next_action,
-      owner: form.owner,
+      next_action: f.next_action,
+      owner: f.owner,
       pipeline_stage: stage,
-      quote_ref: form.quote_ref.trim(),
-      outcome_reason: form.outcome_reason.trim(),
+      quote_ref: f.quote_ref,
+      outcome_reason: f.outcome_reason,
       // Only sent with Lost, so saving works before the Wave 3 SQL is run.
-      ...(stage === 'Lost' ? { lost_note: form.lost_note.trim() } : {}),
+      ...(stage === 'Lost' ? { lost_note: f.lost_note } : {}),
       updated_by: who,
       updated_at: new Date().toISOString(),
     }
@@ -973,24 +1064,33 @@ export default function CrmPage() {
       await logActivity(
         editing ? 'update_crm' : 'create_crm',
         'crm',
-        form.company_name.trim(),
-        `${form.pipeline_stage || 'Lead'} · ${form.next_action || 'no action'}`,
+        f.company_name,
+        `${stage} · ${f.next_action || 'no action'}`,
         who,
         savedId,
       )
 
-      // Best-effort Zoho Calendar sync
-      if (isZohoCalendarEnabled(settings)) {
+      await maybeTriggerStageWorkflows(
+        {
+          id: savedId,
+          company_name: f.company_name,
+          pipeline_stage: editing?.pipeline_stage || 'Lead',
+        },
+        stage,
+      )
+
+      // Best-effort calendar sync via mailCalendar façade
+      if (getCalendarProvider(settings).isEnabled(settings)) {
         try {
           const p = primaryContact(contacts)
           if (followUpDate) {
-            const eventId = await syncFollowUpToZohoCalendar(settings, {
-              company: form.company_name.trim(),
-              nextAction: form.next_action,
-              owner: form.owner,
+            const eventId = await getCalendarProvider(settings).syncFollowUp(settings, {
+              company: f.company_name,
+              nextAction: f.next_action,
+              owner: f.owner,
               contactName: p?.name,
               contactEmail: p?.email,
-              teamAttendeeEmails: resolveOwnerEmails(form.owner, teamForCalendar),
+              teamAttendeeEmails: resolveOwnerEmails(f.owner, teamForCalendar),
               followUpDate,
               existingEventId: prevEventId || undefined,
             })
@@ -1001,14 +1101,14 @@ export default function CrmPage() {
                 .eq('id', savedId)
             }
           } else if (prevEventId) {
-            await deleteZohoCalendarEvent(settings, prevEventId)
+            await getCalendarProvider(settings).deleteEvent(settings, prevEventId)
             if (savedId) {
               await db.from('crm').update({ calendar_event_id: '' }).eq('id', savedId)
             }
           }
         } catch (calErr) {
           showToast(
-            calErr instanceof Error ? `Saved, but Zoho Calendar: ${calErr.message}` : 'Saved, but calendar sync failed',
+            calErr instanceof Error ? `Saved, but calendar: ${calErr.message}` : 'Saved, but calendar sync failed',
             'error',
           )
         }
@@ -1033,9 +1133,9 @@ export default function CrmPage() {
     setSaving(true)
     setError('')
     try {
-      if (isZohoCalendarEnabled(settings) && deleteTarget.calendar_event_id) {
+      if (getCalendarProvider(settings).isEnabled(settings) && deleteTarget.calendar_event_id) {
         try {
-          await deleteZohoCalendarEvent(settings, deleteTarget.calendar_event_id)
+          await getCalendarProvider(settings).deleteEvent(settings, deleteTarget.calendar_event_id)
         } catch {
           /* ignore calendar delete errors on CRM delete */
         }
@@ -1060,7 +1160,13 @@ export default function CrmPage() {
           <p className={docsStyles.subtitle}>
             {compact
               ? 'Overdue + today. Log the next touch, then move on.'
-              : 'Start with what is due. Switch to All deals when you need the full funnel.'}
+              : 'Start with what is due. Full funnel across CRM, AI CRM, and CTRM is on '}
+            {!compact ? (
+              <Link to="/deals" style={{ color: colors.accent }}>
+                Pipeline
+              </Link>
+            ) : null}
+            {!compact ? '.' : null}
           </p>
         </div>
         <button
@@ -1082,9 +1188,47 @@ export default function CrmPage() {
         }}
       />
 
+      {!loading && unlinkedCrmCount > 0 ? (
+        <div
+          role="status"
+          style={{
+            ...errorBanner,
+            color: colors.muted,
+            background: 'rgba(255,255,255,0.03)',
+            border: `1px solid ${colors.border}`,
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 10,
+            alignItems: 'center',
+            marginBottom: 12,
+          }}
+        >
+          <span style={{ flex: '1 1 200px', fontSize: 13, lineHeight: 1.45 }}>
+            {unlinkedCrmCount} CRM deal{unlinkedCrmCount === 1 ? '' : 's'} not linked to Accounts yet.
+            Unique name matches can be linked from Pipeline.
+          </span>
+          <Link
+            to="/deals?pipeline=crm"
+            style={{ ...btn, fontSize: 12, padding: '6px 10px', textDecoration: 'none' }}
+          >
+            Open Pipeline
+          </Link>
+        </div>
+      ) : null}
+
       {error && <div style={errorBanner}>{error}</div>}
 
       <div className={resp.stickyFilters}>
+        <SavedViewsBar
+          moduleId="crm"
+          filters={currentCrmViewFilters}
+          ownerUserId={appUserId}
+          canWrite={userRole !== 'viewer'}
+          applyDefaultOnLoad={false}
+          onApply={applyCrmViewFilters}
+          onToast={showToast}
+          filtersEqual={(a, b) => crmFiltersEqual(a as CrmViewFilters, b as CrmViewFilters)}
+        />
         <div className={resp.dueStripCompact}>
           <button
             type="button"
@@ -1175,7 +1319,7 @@ export default function CrmPage() {
             title="Pipeline stage"
           >
             <option value="All">All stages</option>
-            {PIPELINE_STAGES.map((s) => (
+            {crmStages.map((s) => (
               <option key={s} value={s}>
                 {s}
                 {stageCounts[s] ? ` (${stageCounts[s]})` : ''}
@@ -1277,6 +1421,7 @@ export default function CrmPage() {
           entries={filtered}
           busyId={quickBusyId}
           compact={compact}
+          stages={crmStages}
           onOpen={openEdit}
           onMoveStage={(row, stage) => void quickPatch(row, { pipeline_stage: stage })}
           renderActions={(row) => renderCrmRowActions(row, { flush: true })}
@@ -1327,7 +1472,7 @@ export default function CrmPage() {
                       value={row.pipeline_stage || 'Lead'}
                       onChange={(e) => void quickPatch(row, { pipeline_stage: e.target.value })}
                     >
-                      {PIPELINE_STAGES.map((s) => (
+                      {crmStages.map((s) => (
                         <option key={s} value={s}>
                           {s}
                         </option>
@@ -1453,7 +1598,7 @@ export default function CrmPage() {
                         value={row.pipeline_stage || 'Lead'}
                         onChange={(e) => void quickPatch(row, { pipeline_stage: e.target.value })}
                       >
-                        {PIPELINE_STAGES.map((s) => (
+                        {crmStages.map((s) => (
                           <option key={s} value={s}>
                             {s}
                           </option>
@@ -1720,7 +1865,7 @@ export default function CrmPage() {
                           value={form.pipeline_stage}
                           onChange={(e) => setForm((f) => ({ ...f, pipeline_stage: e.target.value }))}
                         >
-                          {PIPELINE_STAGES.map((s) => (
+                          {crmStages.map((s) => (
                             <option key={s} value={s}>
                               {s}
                             </option>
@@ -1783,8 +1928,8 @@ export default function CrmPage() {
                       )}
                     </div>
                     <p style={{ margin: '10px 0 0', fontSize: 12, color: colors.muted2 }}>
-                      {isZohoCalendarEnabled(settings)
-                        ? 'Follow-up date syncs to Zoho Calendar.'
+                      {getCalendarProvider(settings).isEnabled(settings)
+                        ? `Follow-up date syncs to ${getCalendarProvider(settings).label} Calendar.`
                         : 'Calendar sync is off.'}{' '}
                       <button
                         type="button"
@@ -1812,6 +1957,19 @@ export default function CrmPage() {
                       aria-label="Notes"
                     />
                   </div>
+
+                  {editing ? (
+                    <div className={resp.sheetSection}>
+                      <CustomFieldsCard
+                        objectType="crm"
+                        recordId={String(editing.id)}
+                        editable={userRole !== 'viewer'}
+                        onToast={showToast}
+                        framed={false}
+                        style={{ marginTop: 0 }}
+                      />
+                    </div>
+                  ) : null}
 
                   <div className={resp.sheetSection}>
                     <button
@@ -2167,6 +2325,7 @@ export default function CrmPage() {
         open={!!logTouchTarget}
         entry={logTouchTarget}
         busy={!!logTouchTarget && quickBusyId === logTouchTarget.id}
+        stages={crmStages}
         onClose={() => setLogTouchTarget(null)}
         onSave={saveLogTouch}
       />
@@ -2279,7 +2438,7 @@ export default function CrmPage() {
           company: settings.companyName || 'Red Reach Middle East FZE',
           contact: emailTarget ? primaryContact(hydrateContacts(emailTarget))?.name || 'team' : 'team',
         })}
-        zohoEnabled={isZohoMailEnabled(settings)}
+        zohoEnabled={getMailProvider(settings).isEnabled(settings)}
         onClose={() => setEmailTarget(null)}
         onSent={async () => {
           if (!emailTarget) return

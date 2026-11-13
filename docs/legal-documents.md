@@ -24,3 +24,4 @@ signed PDF to Google Drive + Customer files automatically.
 - Sign links use the same token pattern as quote accept (hash only stored; token after `#`).
 - Unsigned PDFs from an unapproved template are marked DRAFT — do not send those for real signature.
 - If Drive is not connected, the signature is still stored in RR Central; you can file the PDF later.
+- **Compliance:** The canvas signature is an **electronic signing record / assent capture**, not a UAE Qualified E-Signature (QES) or Advanced E-Signature under Decree-Law 46/2021. See `docs/COMPLIANCE_NOTES.md` § E-sign and `docs/M5_CONTRACTS_ESIGN.md`. Do not describe it as “same as handwritten” or “qualified”.

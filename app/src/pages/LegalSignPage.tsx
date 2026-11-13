@@ -2,7 +2,13 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Poin
 import { useLocation } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import BrandLogo from '../components/BrandLogo'
-import { legalDocLabel, signProblem, type LegalSignView } from '../lib/legalDocuments'
+import {
+  LEGAL_SIGN_ASSENT_BLURB,
+  LEGAL_SIGN_DONE_BLURB,
+  legalDocLabel,
+  signProblem,
+  type LegalSignView,
+} from '../lib/legalDocuments'
 import { callLegalSign } from '../lib/legalDocumentStore'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle } from '../lib/uiStyles'
 
@@ -214,18 +220,14 @@ export default function LegalSignPage() {
             <h2 style={{ fontSize: 18, margin: '0 0 6px' }}>Signed. Thank you.</h2>
             <p style={{ margin: 0, fontSize: 14 }}>
               Signed by {view.signed_name}
-              {view.signed_at ? ` on ${format(parseISO(view.signed_at), 'd MMM yyyy, HH:mm')}` : ''}.
-              A copy is kept in Red Reach&apos;s records
-              {view.company ? ` for ${view.company}` : ''}.
+              {view.signed_at ? ` on ${format(parseISO(view.signed_at), 'd MMM yyyy, HH:mm')}` : ''}
+              {view.company ? ` for ${view.company}` : ''}. {LEGAL_SIGN_DONE_BLURB}
             </p>
           </section>
         ) : (
           <section style={cardStyle}>
             <h2 style={{ fontSize: 18, margin: '0 0 6px' }}>Sign this {label}</h2>
-            <p style={{ ...muted, margin: '0 0 12px' }}>
-              Read the PDF, draw your signature, type your full name and date. We keep your name, signature,
-              date, time and internet address as the signing record.
-            </p>
+            <p style={{ ...muted, margin: '0 0 12px' }}>{LEGAL_SIGN_ASSENT_BLURB}</p>
             <div style={{ display: 'grid', gap: 10 }}>
               <label style={labelStyle}>Signature</label>
               <SignaturePad onChange={setSignaturePng} />

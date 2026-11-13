@@ -1,54 +1,31 @@
-import { useEffect, useMemo, useState, type ComponentType } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { WorshipHubIcon } from './worshiphub/WorshipHubIcon'
 import {
-  Bell,
-  ShieldCheck,
-  Building2,
-  Contact,
-  LayoutDashboard,
   Banknote,
-  Users,
+  BarChart3,
+  Bell,
+  Briefcase,
+  Building2,
   CalendarClock,
+  Contact,
   FileText,
   FolderOpen,
-  Receipt,
-  Truck,
-  Package,
-  Boxes,
-  Plane,
-  LayoutTemplate,
-  BarChart3,
-  Wallet,
-  Globe,
-  Settings,
-  KeyRound,
+  LayoutDashboard,
+  LifeBuoy,
   Menu,
   MoreHorizontal,
+  Package,
+  Receipt,
+  Timer,
+  Truck,
+  Users,
+  Wallet,
   X,
   LogOut,
-  LifeBuoy,
-  Briefcase,
-  Timer,
-  ClipboardList,
-  FileSignature,
-  ScrollText,
-  HeartPulse,
-  FileBarChart,
-  TrendingUp,
-  Bug,
-  Activity,
-  Gauge,
-  MessageSquareWarning,
-  Send,
-  CopyCheck,
-  PhoneCall,
-  Wrench,
   ChevronDown,
-  Handshake,
-  BookOpen,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useSettings } from '../contexts/SettingsContext'
 import { useTenant } from '../contexts/TenantContext'
 import { useI18n } from '../contexts/I18nContext'
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders'
@@ -59,179 +36,18 @@ import { elapsedLabel } from '../lib/timeTracking'
 import { useRecurringDeductionsSync } from '../hooks/useRecurringDeductionsSync'
 import { usePhoneShell } from '../hooks/useMediaQuery'
 import { can, roleAtLeast } from '../lib/permissions'
+import { shouldHidePipelineDetailNavItem } from '../lib/pipelineDetailNav'
 import type { UserRole } from '../lib/types'
+import { APP_MODULES, itemMatchesPath, moduleIdForPath, titleForPath } from '../modules/nav'
+import type { ModuleNavItem } from '../modules/registry'
 import BrandLogo from './BrandLogo'
 import ErrorBoundary from './ErrorBoundary'
 import styles from './Layout.module.css'
 
-type NavItem = {
-  to: string
-  label: string
-  icon: ComponentType<{ size?: number; strokeWidth?: number }>
-  end?: boolean
-  /** Optional sub-heading inside the active section panel. */
-  section?: string
-  minRole?: UserRole
-  roles?: UserRole[]
-  forStaff?: boolean
-}
-
-type NavGroup = {
-  id: string
-  label: string
-  icon: ComponentType<{ size?: number; strokeWidth?: number }>
-  items: NavItem[]
-}
+type NavItem = ModuleNavItem
 
 const NAV_SECTION_KEY = 'rrcentral_nav_section'
-
-/**
- * Accordion sidebar: labeled section groups expand to show their links.
- * Current route’s section stays open; multiple groups may be open at once.
- */
-const navGroups: NavGroup[] = [
-  {
-    id: 'overview',
-    label: 'Overview',
-    icon: LayoutDashboard,
-    items: [
-      { to: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true },
-      { to: '/guide', label: 'Guide', icon: BookOpen },
-    ],
-  },
-  {
-    id: 'sales',
-    label: 'Sales',
-    icon: Users,
-    items: [
-      { to: '/quick-add', label: 'Quick add', icon: PhoneCall, minRole: 'sales', section: 'Work' },
-      { to: '/crm', label: 'My Day', icon: Users, section: 'Work' },
-      { to: '/deals', label: 'Pipeline', icon: Briefcase, forStaff: true, section: 'Work' },
-      { to: '/sales', label: 'AI CRM stages', icon: TrendingUp, minRole: 'sales', section: 'Work' },
-      { to: '/ctrm', label: 'CTRM stages', icon: Handshake, minRole: 'sales', section: 'Work' },
-      { to: '/follow-ups', label: 'Follow-ups', icon: CalendarClock, section: 'Work' },
-      { to: '/quotations', label: 'Quotations', icon: FileText, section: 'Documents' },
-      { to: '/invoices', label: 'Invoices', icon: Receipt, section: 'Documents' },
-      { to: '/delivery-notes', label: 'Delivery notes', icon: Truck, section: 'Documents' },
-      { to: '/customer-files', label: 'Google Drive', icon: FolderOpen, section: 'Documents' },
-    ],
-  },
-  {
-    id: 'clients',
-    label: 'Clients',
-    icon: Contact,
-    items: [
-      { to: '/accounts', label: 'Accounts', icon: Contact, forStaff: true },
-      { to: '/support', label: 'Support', icon: LifeBuoy, forStaff: true },
-      {
-        to: '/ctrm-issues',
-        label: 'CTRM issues',
-        icon: MessageSquareWarning,
-        forStaff: true,
-      },
-      { to: '/client-health', label: 'Client health', icon: HeartPulse, forStaff: true },
-      { to: '/client-reports', label: 'Monthly reports', icon: FileBarChart, forStaff: true },
-      { to: '/client-updates', label: 'Weekly updates', icon: Send, forStaff: true },
-    ],
-  },
-  {
-    id: 'delivery',
-    label: 'Delivery',
-    icon: Package,
-    items: [
-      { to: '/products', label: 'WorshipHub', icon: WorshipHubIcon, forStaff: true },
-      { to: '/delivery-settings', label: 'Packages', icon: Package, minRole: 'manager' },
-      { to: '/build-templates', label: 'Build templates', icon: ClipboardList, forStaff: true },
-      { to: '/agreement-template', label: 'Agreement', icon: ScrollText, forStaff: true },
-      { to: '/nda-template', label: 'NDA template', icon: FileSignature, forStaff: true },
-    ],
-  },
-  {
-    id: 'ops',
-    label: 'Operations',
-    icon: Wrench,
-    items: [
-      { to: '/app/wanders', label: 'Wanders', icon: Plane },
-      { to: '/catalog', label: 'Catalog', icon: Package },
-      { to: '/inventory', label: 'Inventory', icon: Boxes },
-      { to: '/templates', label: 'Templates', icon: LayoutTemplate },
-      { to: '/domains', label: 'Domains', icon: Globe },
-    ],
-  },
-  {
-    id: 'finance',
-    label: 'Finance',
-    icon: Banknote,
-    items: [
-      { to: '/payments', label: 'Payments', icon: Banknote },
-      { to: '/expenses', label: 'Expenses', icon: Wallet },
-      { to: '/vendors', label: 'Vendors', icon: Building2 },
-      { to: '/reports', label: 'Reports', icon: BarChart3 },
-      { to: '/mrr', label: 'MRR', icon: TrendingUp, minRole: 'manager' },
-      { to: '/insights', label: 'Utilisation', icon: Gauge, minRole: 'manager' },
-      { to: '/duplicates', label: 'Duplicates', icon: CopyCheck, minRole: 'manager' },
-    ],
-  },
-  {
-    id: 'admin',
-    label: 'Admin',
-    icon: Settings,
-    items: [
-      { to: '/settings', label: 'Settings', icon: Settings, minRole: 'admin' },
-      {
-        to: '/settings#account',
-        label: 'Account',
-        icon: KeyRound,
-        roles: ['manager', 'sales', 'staff', 'viewer'],
-        forStaff: true,
-      },
-      { to: '/audit-log', label: 'Audit log', icon: ShieldCheck, minRole: 'admin' },
-      { to: '/app-errors', label: 'App errors', icon: Bug, minRole: 'admin' },
-      { to: '/system-check', label: 'System check', icon: Activity, minRole: 'admin' },
-    ],
-  },
-]
-
-const titleByPath: { match: (path: string) => boolean; title: string }[] = [
-  { match: (p) => p === '/app', title: 'Dashboard' },
-  { match: (p) => p.startsWith('/accounts'), title: 'Accounts' },
-  { match: (p) => p.startsWith('/delivery-settings'), title: 'Packages and rates' },
-  { match: (p) => p.startsWith('/build-templates'), title: 'Build templates' },
-  { match: (p) => p.startsWith('/agreement-template'), title: 'Agreement template' },
-  { match: (p) => p.startsWith('/nda-template'), title: 'NDA template' },
-  { match: (p) => p.startsWith('/client-health'), title: 'Client health' },
-  { match: (p) => p.startsWith('/client-reports'), title: 'Monthly reports' },
-  { match: (p) => p.startsWith('/mrr'), title: 'Monthly recurring revenue' },
-  { match: (p) => p.startsWith('/duplicates'), title: 'Duplicates' },
-  { match: (p) => p.startsWith('/ctrm-issues'), title: 'CTRM issues' },
-  { match: (p) => p.startsWith('/client-updates'), title: 'Weekly updates' },
-  { match: (p) => p.startsWith('/quick-add'), title: 'Quick add' },
-  { match: (p) => p.startsWith('/insights'), title: 'Utilisation and profit' },
-  { match: (p) => p.startsWith('/support'), title: 'Support' },
-  { match: (p) => p.startsWith('/ctrm'), title: 'CTRM Next stages' },
-  { match: (p) => p.startsWith('/sales'), title: 'AI CRM stages' },
-  { match: (p) => p.startsWith('/deals'), title: 'Pipeline' },
-  { match: (p) => p.startsWith('/products'), title: 'WorshipHub' },
-  { match: (p) => p.startsWith('/crm'), title: 'My Day' },
-  { match: (p) => p.startsWith('/follow-ups'), title: 'Follow-ups' },
-  { match: (p) => p.startsWith('/quotations'), title: 'Quotations' },
-  { match: (p) => p.startsWith('/invoices'), title: 'Invoices' },
-  { match: (p) => p.startsWith('/delivery-notes'), title: 'Delivery notes' },
-  { match: (p) => p.startsWith('/customer-files'), title: 'Google Drive' },
-  { match: (p) => p.startsWith('/app/wanders'), title: 'Wanders' },
-  { match: (p) => p.startsWith('/catalog'), title: 'Catalog' },
-  { match: (p) => p.startsWith('/inventory'), title: 'Inventory' },
-  { match: (p) => p.startsWith('/payments'), title: 'Payments' },
-  { match: (p) => p.startsWith('/templates'), title: 'Templates' },
-  { match: (p) => p.startsWith('/reports'), title: 'Reports' },
-  { match: (p) => p.startsWith('/expenses'), title: 'Expenses' },
-  { match: (p) => p.startsWith('/vendors'), title: 'Vendors' },
-  { match: (p) => p.startsWith('/domains'), title: 'Domains' },
-  { match: (p) => p.startsWith('/settings'), title: 'Settings' },
-  { match: (p) => p.startsWith('/audit-log'), title: 'Audit log' },
-  { match: (p) => p.startsWith('/app-errors'), title: 'App errors' },
-  { match: (p) => p.startsWith('/system-check'), title: 'System check' },
-]
+const navGroups = APP_MODULES
 
 const phonePrimaryNav: { to: string; label: string; icon: typeof LayoutDashboard; end?: boolean }[] = [
   { to: '/app', label: 'Home', icon: LayoutDashboard, end: true },
@@ -265,23 +81,6 @@ function isPhonePrimaryActive(pathname: string, to: string, end?: boolean): bool
   return pathname === to || pathname.startsWith(`${to}/`)
 }
 
-function navItemPath(to: string): string {
-  return to.split('#')[0] || to
-}
-
-function itemMatchesPath(pathname: string, item: NavItem): boolean {
-  const base = navItemPath(item.to)
-  if (item.end) return pathname === base
-  return pathname === base || pathname.startsWith(`${base}/`)
-}
-
-function sectionForPath(pathname: string): string {
-  for (const group of navGroups) {
-    if (group.items.some((item) => itemMatchesPath(pathname, item))) return group.id
-  }
-  return 'sales'
-}
-
 function readSavedSection(): string | null {
   try {
     return localStorage.getItem(NAV_SECTION_KEY)
@@ -298,17 +97,23 @@ function writeSavedSection(id: string) {
   }
 }
 
-function filterItems(items: NavItem[], userRole: UserRole): NavItem[] {
+function filterItems(
+  items: NavItem[],
+  userRole: UserRole,
+  settings: Record<string, string | undefined>,
+): NavItem[] {
   return items.filter((item) => {
     if (userRole === 'staff' && !item.forStaff) return false
     if (item.roles) return item.roles.includes(userRole)
     if (item.minRole) return roleAtLeast(userRole, item.minRole)
+    if (shouldHidePipelineDetailNavItem(item.to, settings, userRole)) return false
     return true
   })
 }
 
 export default function Layout() {
   const { user, userRole, signOut, isLocalMode } = useAuth()
+  const { settings } = useSettings()
   const { companies, activeCompanyId, setActiveCompanyId, activeCompany } = useTenant()
   const { t } = useI18n()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -324,13 +129,13 @@ export default function Layout() {
 
   const visibleGroups = useMemo(() => {
     return navGroups
-      .map((group) => ({ ...group, items: filterItems(group.items, userRole) }))
+      .map((group) => ({ ...group, items: filterItems(group.items, userRole, settings) }))
       .filter((group) => group.items.length > 0)
-  }, [userRole])
+  }, [userRole, settings])
 
-  const pathSection = sectionForPath(location.pathname)
+  const pathSection = moduleIdForPath(location.pathname)
   const [expandedIds, setExpandedIds] = useState<string[]>(() => {
-    const fromPath = sectionForPath(location.pathname)
+    const fromPath = moduleIdForPath(location.pathname)
     const saved = readSavedSection()
     const seed = saved && navGroups.some((g) => g.id === saved) ? saved : fromPath
     return Array.from(new Set([fromPath, seed].filter(Boolean)))
@@ -358,7 +163,7 @@ export default function Layout() {
     if (location.pathname.startsWith('/settings')) {
       return can(userRole, 'settings.manage') ? 'Settings' : 'Account'
     }
-    return titleByPath.find((t) => t.match(location.pathname))?.title || 'RED REACH Central'
+    return titleForPath(location.pathname) || 'RED REACH Central'
   })()
 
   const hideTopbarTitle =
@@ -403,8 +208,8 @@ export default function Layout() {
 
   const visiblePhoneShortcuts = useMemo(() => {
     const primaryPaths = new Set(phoneNav.map((item) => item.to))
-    return filterItems(phoneShortcuts, userRole).filter((item) => !primaryPaths.has(item.to))
-  }, [phoneNav, userRole])
+    return filterItems(phoneShortcuts, userRole, settings).filter((item) => !primaryPaths.has(item.to))
+  }, [phoneNav, userRole, settings])
 
   return (
     <div className={`${styles.shell} ${phoneShell ? styles.shellPhone : ''}`}>

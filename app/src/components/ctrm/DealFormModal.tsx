@@ -6,7 +6,8 @@ import EditorSectionTabs, {
   type EditorSection,
 } from '../EditorSectionTabs'
 import LostReasonFields from '../deals/LostReasonFields'
-import { CTRM_COMPANY_TYPES, CTRM_REGIONS, CTRM_STAGES, dealProblem } from '../../lib/ctrm'
+import { CTRM_COMPANY_TYPES, CTRM_REGIONS, CTRM_STAGES } from '../../lib/ctrm'
+import { parseCtrmDealForm } from '../../lib/schemas/ctrmDeal'
 import type {
   Account,
   AccountContact,
@@ -115,16 +116,12 @@ export default function DealFormModal({
 
   function submit() {
     if (!v) return
-    if (!v.accountId && !v.newCompany.trim()) {
-      setError('Pick the company, or type a new one')
+    const parsed = parseCtrmDealForm(v)
+    if (!parsed.ok) {
+      setError(parsed.error)
       return
     }
-    const problem = dealProblem(v)
-    if (problem) {
-      setError(problem)
-      return
-    }
-    onSave(v)
+    onSave({ ...v, ...parsed.data })
   }
 
   return (

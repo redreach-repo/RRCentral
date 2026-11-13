@@ -3,7 +3,7 @@ import { ACCOUNT_TYPES, normalizeCompanyName } from './accounts'
 import { DIVISIONS } from './config'
 import { invoiceDueDate, isCollectible } from './contractBilling'
 import { divisionFromReference } from './divisionPipeline'
-import { can } from './permissions'
+import { canViewField } from './fieldPermissions'
 import { expenseVatParts, incomeVatParts, quarterMonths, type VatQuarter } from './finance'
 import { RECURRING_DEDUCTIONS } from './recurringDeductions'
 import type {
@@ -22,7 +22,7 @@ import type {
 
 /** Profit (P&L, gross profit, net) is for managers and admins only. */
 export function canSeeProfit(role: UserRole | null | undefined): boolean {
-  return can(role, 'finance.profit')
+  return canViewField(role, 'finance.profit')
 }
 
 export const NOT_RECORDED = 'Not recorded'
