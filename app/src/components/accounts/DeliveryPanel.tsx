@@ -60,6 +60,7 @@ import { listAiUsage } from '../../lib/aiAssistStore'
 import { listContractInvoices, runContractBilling, skipSetupInvoice } from '../../lib/contractBillingStore'
 import { editedByHand } from '../../lib/usageImport'
 import { getUsageSource, saveUsageSource } from '../../lib/usageImportStore'
+import { canViewField } from '../../lib/fieldPermissions'
 import { can } from '../../lib/permissions'
 import { errorMessage } from '../../lib/errors'
 import { formatAED } from '../../lib/money'
@@ -204,7 +205,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
 
   const canContracts = can(userRole, 'delivery.contracts')
   const compact = useCompactCrm()
-  const seesProfit = can(userRole, 'delivery.profitability')
+  const seesProfit = canViewField(userRole, 'delivery.profitability')
   const { timer, now, start: startTimer, clear: clearTimer } = useRunningTimer(author.email)
   const timerHere = timer?.accountId === account.id
 
@@ -221,7 +222,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
         getUsageSource(account.id).catch(() => null),
       ])
       setUsageSource(src)
-      if (can(userRole, 'delivery.profitability')) {
+      if (canViewField(userRole, 'delivery.profitability')) {
         const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
         const ai = await listAiUsage(account.id, monthStart.toISOString()).catch(() => [])
         setAssistUsd(assistCostInMonth(ai, account.id, monthKey(new Date())))

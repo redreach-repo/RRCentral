@@ -13,6 +13,7 @@ import { HOURS_ALERT_MESSAGE, hoursAlert, monthLabel, ratesFromSettings, renewal
 import { listAiUsage } from '../../lib/aiAssistStore'
 import { currentContract, listContracts, listPackages, listTimeEntries, listUsage } from '../../lib/deliveryStore'
 import { formatAED } from '../../lib/money'
+import { canViewField } from '../../lib/fieldPermissions'
 import { can, roleAtLeast } from '../../lib/permissions'
 import { listDueReminders } from '../../lib/contractBillingStore'
 import { slaState } from '../../lib/sla'
@@ -54,7 +55,7 @@ export default function ModuleAlertsCard() {
   const { userRole } = useAuth()
   const { settings } = useSettings()
   const rates = useMemo(() => ratesFromSettings(settings), [settings])
-  const seesMoney = can(userRole, 'delivery.profitability')
+  const seesMoney = canViewField(userRole, 'delivery.profitability')
   const chasesPayments = roleAtLeast(userRole, 'sales')
   const reviewsChurches = userRole === 'admin' || userRole === 'manager'
   const [data, setData] = useState<Data | null>(null)
