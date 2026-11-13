@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import CtrmListsCard from '../components/ctrm/CtrmListsCard'
 import GoogleDriveCard from '../components/GoogleDriveCard'
 import HubSpotCard from '../components/HubSpotCard'
-import { Download, HardDrive, Pencil, Plus, Trash2, Upload, Plug } from 'lucide-react'
+import { Download, HardDrive, Plus, Trash2, Upload, Plug } from 'lucide-react'
+import SimpleRowActions from '../components/SimpleRowActions'
 import { db, currentAuthMode } from '../lib/db'
 import type { AppUser, CompanyDocument, CompanyDocumentCategory, UserRole } from '../lib/types'
 import TwoStepCard from '../components/security/TwoStepCard'
@@ -207,6 +208,8 @@ export default function SettingsPage() {
     expires_on: '',
   })
   const [deleteCompanyDoc, setDeleteCompanyDoc] = useState<CompanyDocument | null>(null)
+  const [userActionsId, setUserActionsId] = useState<string | null>(null)
+  const [docActionsId, setDocActionsId] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const backupRef = useRef<HTMLInputElement>(null)
   const cloudBackupRef = useRef<HTMLInputElement>(null)
@@ -981,20 +984,12 @@ export default function SettingsPage() {
                       )}
                     </td>
                     <td style={tdStyle}>
-                      <button
-                        type="button"
-                        style={buttonSecondaryStyle}
-                        onClick={() => openCompanyDocEdit(doc)}
-                      >
-                        <Pencil size={14} />
-                      </button>{' '}
-                      <button
-                        type="button"
-                        style={buttonDangerStyle}
-                        onClick={() => setDeleteCompanyDoc(doc)}
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      <SimpleRowActions
+                        expanded={docActionsId === doc.id}
+                        onToggle={() => setDocActionsId((id) => (id === doc.id ? null : doc.id))}
+                        onEdit={() => openCompanyDocEdit(doc)}
+                        onDelete={() => setDeleteCompanyDoc(doc)}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -1312,12 +1307,12 @@ export default function SettingsPage() {
                   <td style={tdStyle}>{u.role}</td>
                   <td style={tdStyle}>{u.active ? 'Yes' : 'No'}</td>
                   <td style={tdStyle}>
-                    <button type="button" style={buttonSecondaryStyle} onClick={() => openUserEdit(u)}>
-                      <Pencil size={14} />
-                    </button>{' '}
-                    <button type="button" style={buttonDangerStyle} onClick={() => setDeleteUser(u)}>
-                      <Trash2 size={14} />
-                    </button>
+                    <SimpleRowActions
+                      expanded={userActionsId === u.id}
+                      onToggle={() => setUserActionsId((id) => (id === u.id ? null : u.id))}
+                      onEdit={() => openUserEdit(u)}
+                      onDelete={() => setDeleteUser(u)}
+                    />
                   </td>
                 </tr>
               ))}

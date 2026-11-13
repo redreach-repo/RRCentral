@@ -24,19 +24,15 @@ import { createTicket, listTickets, slaPackageFor } from '../lib/supportStore'
 import { errorMessage } from '../lib/errors'
 import type { Account, AccountContact, AppUser, Ticket } from '../lib/types'
 import {
-  buttonPrimaryStyle,
   cardStyle,
   colors,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
-  toolbarStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 const PRIORITY_COLORS: Record<string, string> = {
   urgent: colors.danger,
@@ -181,25 +177,26 @@ export default function SupportPage() {
   }
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Support</h1>
-          <p style={pageSubtitleStyle}>
+          <p className={docsStyles.kicker}>Clients</p>
+          <h1 className={docsStyles.title}>Support</h1>
+          <p className={docsStyles.subtitle}>
             One queue for AI CRM clients and WorshipHub churches. The clock counts working hours only.
           </p>
         </div>
         {canWrite ? (
           <button
             type="button"
-            style={buttonPrimaryStyle}
+            className={docsStyles.newBtn}
             onClick={() => setModalOpen(true)}
             disabled={!writableAccounts.length}
           >
             <Plus size={16} /> New ticket
           </button>
         ) : null}
-      </div>
+      </header>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
         {[

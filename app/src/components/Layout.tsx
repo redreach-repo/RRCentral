@@ -368,6 +368,8 @@ export default function Layout() {
       '/domains',
       '/templates',
       '/inventory',
+      '/support',
+      '/reports',
     ].includes(location.pathname) || location.pathname.startsWith('/accounts')
 
   const primaryActive = phoneNav.some((item) =>
