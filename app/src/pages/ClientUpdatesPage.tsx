@@ -7,6 +7,7 @@ import { runAi } from '../lib/aiAssistStore'
 import { buildUpdateDrafts, loadUpdateQueue, saveUpdateBody, sendUpdate, setUpdateSkipped, type UpdateContact, type UpdateQueue } from '../lib/clientUpdatesStore'
 import { errorMessage } from '../lib/errors'
 import { roleAtLeast } from '../lib/permissions'
+import { parseClientUpdateBody } from '../lib/schemas/clientUpdate'
 import type { ClientUpdateDraft } from '../lib/types'
 import { CLIENT_UPDATE_BODY_MAX, CLIENT_UPDATE_STATUSES, updateRecipients, weekLabelOf, weekStartFor, whatsAppLink, type ClientUpdateChannel } from '../lib/weeklyUpdates'
 import {
@@ -154,9 +155,14 @@ function DraftCard({
   const changed = body.trim() !== draft.body.trim()
 
   async function save() {
+    const parsed = parseClientUpdateBody({ body })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
     setBusy('save')
     try {
-      await saveUpdateBody(draft.id, body)
+      await saveUpdateBody(draft.id, parsed.data.body)
       showToast('Update saved', 'success')
       await onChanged()
     } catch (e) {
@@ -180,16 +186,21 @@ function DraftCard({
   }
 
   async function send(channel: ClientUpdateChannel) {
+    const parsed = parseClientUpdateBody({ body })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
     // Open the WhatsApp tab on the tap itself, so the browser does not block it.
     const tab = channel === 'whatsapp' ? window.open('', '_blank') : null
     setBusy(channel)
-    const r = await sendUpdate(draft, channel, body, { appUserId, email: user?.email || '' })
+    const r = await sendUpdate(draft, channel, parsed.data.body, { appUserId, email: user?.email || '' })
     setBusy('')
     if (!r.ok) {
       tab?.close()
       showToast(r.message, 'error')
     } else if (channel === 'whatsapp') {
-      const link = whatsAppLink(r.data.to, body)
+      const link = whatsAppLink(r.data.to, parsed.data.body)
       if (tab) tab.location.href = link
       else window.location.href = link
       showToast('WhatsApp is open with the update typed in. Press send there.', 'success')
