@@ -6,6 +6,7 @@ import { db } from '../lib/db'
 import type { Attachment, Expense, Vendor } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
+import { canEditField, canViewField } from '../lib/fieldPermissions'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
 import SavedViewsBar from '../components/SavedViewsBar'
@@ -70,8 +71,10 @@ function isHttpUrl(url: string): boolean {
 }
 
 export default function VendorsPage() {
-  const { user, appUserId } = useAuth()
+  const { user, appUserId, userRole } = useAuth()
   const { showToast } = useToast()
+  const showTrn = canViewField(userRole, 'vendor.trn')
+  const editTrn = canEditField(userRole, 'vendor.trn')
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -204,7 +207,7 @@ export default function VendorsPage() {
         mobile: form.mobile.trim(),
         office: form.office.trim(),
         address: form.address.trim(),
-        trn: form.trn.trim(),
+        trn: editTrn ? form.trn.trim() : editing?.trn || '',
         website: form.website.trim(),
         payment_terms: form.payment_terms.trim(),
         notes: form.notes.trim(),
@@ -334,7 +337,7 @@ export default function VendorsPage() {
                 <tr>
                   <th>Company</th>
                   <th>Contact</th>
-                  <th>TRN</th>
+                  {showTrn ? <th>TRN</th> : null}
                   <th>Phone / email</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
@@ -347,7 +350,7 @@ export default function VendorsPage() {
                       {v.address ? <div className={docsStyles.meta}>{v.address}</div> : null}
                     </td>
                     <td>{v.primary_contact || '—'}</td>
-                    <td>{v.trn || '—'}</td>
+                    {showTrn ? <td>{v.trn || '—'}</td> : null}
                     <td>
                       {v.mobile || v.office || '—'}
                       {v.email ? <div className={docsStyles.meta}>{v.email}</div> : null}
@@ -404,15 +407,19 @@ export default function VendorsPage() {
               onChange={(e) => setForm((f) => ({ ...f, primary_contact: e.target.value }))}
             />
           </div>
-          <div style={fieldStyle}>
-            <label style={labelStyle}>TRN</label>
-            <input
-              style={inputStyle}
-              value={form.trn}
-              onChange={(e) => setForm((f) => ({ ...f, trn: e.target.value }))}
-              placeholder="UAE tax registration number"
-            />
-          </div>
+          {showTrn ? (
+            <div style={fieldStyle}>
+              <label style={labelStyle}>TRN</label>
+              <input
+                style={inputStyle}
+                value={form.trn}
+                onChange={(e) => setForm((f) => ({ ...f, trn: e.target.value }))}
+                placeholder="UAE tax registration number"
+                disabled={!editTrn}
+                readOnly={!editTrn}
+              />
+            </div>
+          ) : null}
           <div style={fieldStyle}>
             <label style={labelStyle}>Email</label>
             <input

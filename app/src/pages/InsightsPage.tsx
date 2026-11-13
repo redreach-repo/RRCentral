@@ -19,6 +19,7 @@ import {
   utilisation,
   type ClientTrend,
 } from '../lib/insights'
+import { canViewField } from '../lib/fieldPermissions'
 import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
 import { formatAED } from '../lib/money'
@@ -65,7 +66,7 @@ export default function InsightsPage() {
   const { showToast } = useToast()
   const [data, setData] = useState<Data | null>(null)
   const [capacityDraft, setCapacityDraft] = useState('')
-  const allowed = can(userRole, 'delivery.profitability')
+  const allowed = canViewField(userRole, 'delivery.profitability')
   const canChange = can(userRole, 'delivery.packages')
   const rates = useMemo(() => ratesFromSettings(settings), [settings])
   const capacity = capacityFromSettings(settings)

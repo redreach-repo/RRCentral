@@ -6,6 +6,7 @@ import { db } from '../lib/db'
 import { PAYMENT_METHODS, VAT_RATE } from '../lib/config'
 import type { Attachment, Expense, Quotation, Vendor } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
+import { canViewField } from '../lib/fieldPermissions'
 import { can } from '../lib/permissions'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
@@ -114,6 +115,7 @@ function applyExVat(exclusive: number, rate: number): Pick<ExpenseForm, 'amount'
 
 export default function ExpensesPage() {
   const { user, userRole } = useAuth()
+  const showVendorTrn = canViewField(userRole, 'vendor.trn')
   const { settings } = useSettings()
   const { showToast } = useToast()
   const vatRate = Number(settings.vatRate || VAT_RATE) || VAT_RATE
@@ -805,7 +807,7 @@ export default function ExpensesPage() {
                     }}
                   >
                     {v.company_name}
-                    {v.trn ? (
+                    {showVendorTrn && v.trn ? (
                       <span style={{ color: colors.muted2, marginLeft: 8 }}>TRN {v.trn}</span>
                     ) : null}
                   </button>

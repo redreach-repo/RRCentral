@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { FileUp } from 'lucide-react'
 import Modal from '../Modal'
+import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
+import { canViewField } from '../../lib/fieldPermissions'
 import { PAYMENT_METHODS } from '../../lib/config'
 import type { Attachment, Expense, Quotation, Vendor } from '../../lib/types'
 import { logActivity } from '../../lib/activity'
@@ -44,6 +46,8 @@ type Props = {
 /** Record the supplier's invoice (cost + VAT) against a quotation's deal. */
 export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onClose, onSaved }: Props) {
   const { showToast } = useToast()
+  const { userRole } = useAuth()
+  const showVendorTrn = canViewField(userRole, 'vendor.trn')
   const supplierInvoiceTarget = quote
   const [saving, setSaving] = useState(false)
   const [supplierInvoiceForm, setSupplierInvoiceForm] = useState({
@@ -376,7 +380,7 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
                   }}
                 >
                   {v.company_name}
-                  {v.trn ? (
+                  {showVendorTrn && v.trn ? (
                     <span style={{ color: colors.muted2, marginLeft: 8 }}>TRN {v.trn}</span>
                   ) : null}
                 </button>
