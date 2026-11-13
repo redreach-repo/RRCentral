@@ -10,13 +10,13 @@ import {
   QUICK_MIN_DIGITS,
   cleanPhoneInput,
   quickCallBody,
-  quickLeadProblem,
   quickMatches,
   type CallOutcome,
   type QuickLeadPipeline,
   type QuickMatch,
 } from '../lib/quickAdd'
 import { loadQuickData, logQuickCall, saveQuickLead, type QuickData } from '../lib/quickAddStore'
+import { parseQuickLeadForm } from '../lib/schemas/quickLead'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle, pageStyle, pageTitleStyle, selectStyle } from '../lib/uiStyles'
 
 const big: CSSProperties = { ...inputStyle, fontSize: 22, padding: '12px 14px', letterSpacing: 1 }
@@ -86,12 +86,33 @@ export default function QuickAddPage() {
   }
 
   async function addLead(open: boolean) {
-    const problem = quickLeadProblem({ phone, name: lead.name, email: lead.email }, data?.countryCode)
-    if (problem) return showToast(problem, 'error')
+    const parsed = parseQuickLeadForm({
+      phone,
+      name: lead.name,
+      company: lead.company,
+      email: lead.email,
+      source: lead.source,
+      pipeline: lead.pipeline,
+      note,
+      countryCode: data?.countryCode,
+    })
+    if (!parsed.ok) return showToast(parsed.error, 'error')
     setBusy(true)
     try {
       const refs = (data?.accounts || []).map((a) => a.reference)
-      const r = await saveQuickLead({ ...lead, phone, note }, refs, author)
+      const r = await saveQuickLead(
+        {
+          name: parsed.data.name,
+          company: parsed.data.company,
+          email: parsed.data.email,
+          source: parsed.data.source,
+          pipeline: parsed.data.pipeline,
+          phone: parsed.data.phone,
+          note: parsed.data.note,
+        },
+        refs,
+        author,
+      )
       showToast(`Lead added: ${lead.company.trim() || lead.name.trim()}`, 'success')
       if (open) navigate(r.path)
       else {

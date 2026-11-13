@@ -10,7 +10,7 @@
 
 ## Already on main
 
-- M0–M4 · M1 leftovers · M5 slices 1–5 · vault obligations (#245)
+- M0–M4 · M1 leftovers (incl. Quick Add Zod #248) · M5 slices 1–5 · vault obligations (#245)
 
 ## Still open
 
