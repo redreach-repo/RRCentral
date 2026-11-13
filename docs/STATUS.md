@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod support settings
+**Current milestone:** Continuous backlog — M1 Zod contract invoice settings
 
 ## Shipped this turn
 
-- Zod `parseSupportPoliciesForm` + `parseSupportWeekForm` for support SLA hours and working week
+- Zod `parseContractInvoiceSettings` for automatic contract invoice division + payment terms
 
 ## Already on main
 
-- Continuous backlog Zod through church details · M3a demo prep · QTSP scaffold · `pipeline_deals_v`
+- Continuous backlog Zod through support settings · M3a demo prep · QTSP scaffold · `pipeline_deals_v`
 
 ## Still open (agent queue)
 
