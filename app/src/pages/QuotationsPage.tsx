@@ -1,19 +1,7 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, Fragment } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState, Fragment } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import {
-  Copy,
-  ExternalLink,
-  FilePlus2,
-  FileUp,
-  GitBranch,
-  Pencil,
-  Plus,
-  Receipt,
-  RotateCcw,
-  Trash2,
-  Truck,
-} from 'lucide-react'
+import { FilePlus2, Plus, Trash2 } from 'lucide-react'
 import { db } from '../lib/db'
 import {
   DELIVERY_TERMS,
@@ -40,8 +28,10 @@ import LineItemImageField from '../components/LineItemImageField'
 import ClientBillToFields from '../components/ClientBillToFields'
 import { useClientBillTo } from '../hooks/useClientBillTo'
 import SupplierInvoiceModal from '../components/quotations/SupplierInvoiceModal'
+import QuoteRowActions from '../components/quotations/QuoteRowActions'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
+import qStyles from './QuotationsPage.module.css'
 import { logActivity } from '../lib/activity'
 import {
   calcTotals,
@@ -74,11 +64,7 @@ import {
 import { sortByDateDesc } from '../lib/finance'
 import { isQuotePastValidity, quoteValidUntil } from '../lib/documents'
 import { errorMessage, isUndefinedColumnError } from '../lib/errors'
-import {
-  canCreateDeliveryNoteFromQuote,
-  createDeliveryNoteFromQuote,
-  matchQuoteForDeliveryNote,
-} from '../lib/deliveryNotes'
+import { createDeliveryNoteFromQuote, matchQuoteForDeliveryNote } from '../lib/deliveryNotes'
 import { resolveDealRef } from '../lib/dealQuotes'
 import { registerLineItemSkus } from '../lib/skuRegistry'
 import { listVendors } from '../lib/vendors'
@@ -103,15 +89,11 @@ import {
   fieldStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
-  toolbarStyle,
   formGridStyle,
 } from '../lib/uiStyles'
 
@@ -184,13 +166,6 @@ const emptyForm = (defaults?: Partial<QuoteForm>): QuoteForm => ({
   discount_amount: 0,
   offset_vat: false,
   ...defaults,
-})
-
-const tabBtn = (active: boolean): CSSProperties => ({
-  ...buttonSecondaryStyle,
-  background: active ? colors.accent : 'rgba(255,255,255,0.06)',
-  borderColor: active ? colors.accent : colors.border,
-  padding: '8px 14px',
 })
 
 export default function QuotationsPage() {
@@ -1257,127 +1232,89 @@ export default function QuotationsPage() {
     .filter((c) => c.company_name.toLowerCase().includes(form.client.toLowerCase()))
     .slice(0, 8)
 
+  function quoteMeta(q: Quotation): string {
+    const bits: string[] = []
+    if (q.date) bits.push(format(new Date(q.date), 'dd MMM yyyy'))
+    if (q.valid_until && q.reference_number) {
+      bits.push(`Valid until ${format(new Date(q.valid_until), 'dd MMM yyyy')}`)
+    }
+    const deal = resolveDealRef(q)
+    if (deal && deal !== (q.reference_number || q.quote_id)) bits.push(`Deal ${deal}`)
+    else if (
+      q.deal_ref &&
+      quotes.some((o) => o.id !== q.id && resolveDealRef(o) === resolveDealRef(q))
+    ) {
+      bits.push(`Deal ${resolveDealRef(q)} · branched`)
+    }
+    return bits.join(' · ')
+  }
+
   function renderQuoteActions(q: Quotation) {
     return (
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-        <button type="button" style={buttonSecondaryStyle} onClick={() => void openEdit(q)} title="Edit">
-          <Pencil size={14} />
-        </button>
-        {(q.reference_number || q.id) && (
-          <Link
-            to={`/document/quote/${q.id}`}
-            style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}
-            title="View / email PDF"
-          >
-            <ExternalLink size={14} /> {compact ? '' : 'PDF / Email'}
-          </Link>
-        )}
-        {q.status === 'Draft' && (
-          <button type="button" style={buttonPrimaryStyle} disabled={saving} onClick={() => void finalize(q)}>
-            Finalize
-          </button>
-        )}
-        {q.status === 'Finalized' && (
-          <>
-            <button type="button" style={buttonSecondaryStyle} disabled={saving} onClick={() => void undoFinalize(q)} title="Undo finalize">
-              <RotateCcw size={14} />
-            </button>
-            <button type="button" style={buttonSecondaryStyle} disabled={saving} onClick={() => void revise(q)}>
-              Revise
-            </button>
-          </>
-        )}
-        {['Finalized', 'Sent', 'Accepted', 'Awarded'].includes(q.status) && (
-          <button
-            type="button"
-            style={buttonSecondaryStyle}
-            onClick={() => {
-              setOutcomeTarget(q)
-              setOutcomeStatus('Awarded')
-              setOutcomeReason(q.outcome_reason || '')
-            }}
-          >
-            Outcome
-          </button>
-        )}
-        {q.status === 'Awarded' && q.reference_number && (
-          <button
-            type="button"
-            style={buttonPrimaryStyle}
-            onClick={() => {
-              setConvertTarget(q)
-              setDepositPct('100')
-            }}
-          >
-            <Receipt size={14} /> Invoice
-          </button>
-        )}
-        {canCreateDeliveryNoteFromQuote(q) && (
-          <button
-            type="button"
-            style={buttonSecondaryStyle}
-            title="Create delivery note from this quotation"
-            onClick={() => setDnTarget(q)}
-          >
-            <Truck size={14} /> {compact ? '' : 'Delivery note'}
-          </button>
-        )}
-        <button
-          type="button"
-          style={buttonSecondaryStyle}
-          title="Store supplier invoice on this quotation"
-          onClick={() => void openSupplierInvoice(q)}
-        >
-          <FileUp size={14} /> {compact ? '' : 'Supplier invoice'}
-        </button>
-        {(q.reference_number || q.deal_ref) && q.status !== 'Superseded' ? (
-          <button
-            type="button"
-            style={buttonSecondaryStyle}
-            disabled={saving}
-            title="Branch for partial delivery — same supplier invoice / deal, new customer quote"
-            onClick={() => void branchQuote(q)}
-          >
-            <GitBranch size={14} /> {compact ? '' : 'Branch'}
-          </button>
-        ) : null}
-        <button type="button" style={buttonSecondaryStyle} disabled={saving} onClick={() => void duplicate(q)} title="Duplicate">
-          <Copy size={14} />
-        </button>
-        {canDeleteQuote ? (
-          <button type="button" style={buttonDangerStyle} onClick={() => setDeleteTarget(q)} title="Delete">
-            <Trash2 size={14} />
-          </button>
-        ) : null}
-      </div>
+      <QuoteRowActions
+        quote={q}
+        saving={saving}
+        canDelete={canDeleteQuote}
+        onEdit={(row) => void openEdit(row)}
+        onFinalize={(row) => void finalize(row)}
+        onUndoFinalize={(row) => void undoFinalize(row)}
+        onRevise={(row) => void revise(row)}
+        onOutcome={(row) => {
+          setOutcomeTarget(row)
+          setOutcomeStatus('Awarded')
+          setOutcomeReason(row.outcome_reason || '')
+        }}
+        onInvoice={(row) => {
+          setConvertTarget(row)
+          setDepositPct('100')
+        }}
+        onDeliveryNote={(row) => setDnTarget(row)}
+        onSupplierInvoice={(row) => void openSupplierInvoice(row)}
+        onBranch={(row) => void branchQuote(row)}
+        onDuplicate={(row) => void duplicate(row)}
+        onDelete={(row) => setDeleteTarget(row)}
+      />
     )
   }
 
-  return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
-        <div>
-          <h1 style={pageTitleStyle}>Quotations</h1>
-          <p style={pageSubtitleStyle}>Create, revise, and track quotations</p>
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          <button type="button" style={buttonPrimaryStyle} onClick={() => void openCreate()}>
-            <Plus size={16} /> New quotation
-          </button>
-        </div>
-      </div>
+  function openQuoteRow(q: Quotation) {
+    if (q.reference_number || q.id) {
+      navigate(`/document/quote/${q.id}`)
+      return
+    }
+    void openEdit(q)
+  }
 
-      <div className={resp.toolbar} style={{ marginBottom: 16 }}>
-        <div className={compact ? resp.chipScroll : resp.chipRow} style={{ marginBottom: 0, flex: 1 }}>
+  return (
+    <div className={qStyles.page}>
+      <header className={qStyles.hero}>
+        <div>
+          <p className={qStyles.kicker}>Sales documents</p>
+          <h1 className={qStyles.title}>Quotations</h1>
+          <p className={qStyles.subtitle}>
+            One list for drafts, awards, and follow-through — open a quote, take the next step.
+          </p>
+        </div>
+        <button type="button" className={qStyles.newBtn} onClick={() => void openCreate()}>
+          <Plus size={16} /> New quotation
+        </button>
+      </header>
+
+      <div className={qStyles.controls}>
+        <div className={qStyles.tabs}>
           {(['All', 'Draft', 'Finalized', 'Sent', 'Awarded'] as StatusTab[]).map((t) => (
-            <button key={t} type="button" style={tabBtn(tab === t)} onClick={() => setTab(t)}>
+            <button
+              key={t}
+              type="button"
+              className={tab === t ? qStyles.tabActive : qStyles.tab}
+              onClick={() => setTab(t)}
+            >
               {t}
             </button>
           ))}
         </div>
         <input
-          className={resp.toolbarSearch}
-          style={{ ...inputStyle, maxWidth: compact ? '100%' : 260 }}
+          className={qStyles.search}
           placeholder="Search client / ref…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -1385,99 +1322,50 @@ export default function QuotationsPage() {
       </div>
 
       {loading ? (
-        <div style={{ ...cardStyle, color: colors.muted }}>Loading quotations…</div>
+        <div className={qStyles.loading}>Loading quotations…</div>
       ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={<FilePlus2 size={22} />}
-          title="No quotations"
-          subtitle="Create a draft or filter a different status."
-          actionLabel="New quotation"
-          onAction={() => void openCreate()}
-        />
-      ) : compact ? (
-        <div className={resp.listStack}>
-          {filtered.map((q) => (
-            <article key={q.id} className={resp.card}>
-              <div className={resp.cardTop}>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div className={resp.cardTitle} style={{ cursor: 'default' }}>
-                    {q.reference_number || <span style={{ color: colors.muted2 }}>DRAFT</span>}
-                  </div>
-                  <div className={resp.cardMeta}>
-                    {q.client || '—'}
-                    {' · '}
-                    {q.vertical || divisionBrand(q.division_code)}
-                    {q.date ? ` · ${format(new Date(q.date), 'dd MMM yyyy')}` : ''}
-                  </div>
-                  {q.valid_until && q.reference_number ? (
-                    <div className={resp.cardMeta}>Valid until {format(new Date(q.valid_until), 'dd MMM yyyy')}</div>
-                  ) : null}
-                </div>
-                <StatusPill status={q.status} />
-              </div>
-              <div className={resp.cardMeta} style={{ fontSize: 15, fontWeight: 650, color: colors.text }}>
-                {formatAED(q.amount)}
-              </div>
-              <div className={resp.cardActions}>{renderQuoteActions(q)}</div>
-            </article>
-          ))}
+        <div className={qStyles.empty}>
+          <EmptyState
+            icon={<FilePlus2 size={22} />}
+            title="No quotations"
+            subtitle="Create a draft or filter a different status."
+            actionLabel="New quotation"
+            onAction={() => void openCreate()}
+          />
         </div>
       ) : (
-        <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
-          <div style={tableWrapStyle}>
-            <table style={tableStyle}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>Reference</th>
-                  <th style={thStyle}>Client</th>
-                  <th style={thStyle}>Division</th>
-                  <th style={thStyle}>Date</th>
-                  <th style={thStyle}>Amount</th>
-                  <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((q) => (
-                  <tr key={q.id}>
-                    <td style={tdStyle}>
-                      <div style={{ fontWeight: 600 }}>
-                        {q.reference_number || <span style={{ color: colors.muted2 }}>DRAFT</span>}
-                      </div>
-                      {q.valid_until && q.reference_number ? (
-                        <div style={{ fontSize: 11, color: colors.muted2 }}>
-                          Valid until {format(new Date(q.valid_until), 'dd MMM yyyy')}
-                        </div>
-                      ) : null}
-                      {resolveDealRef(q) &&
-                      resolveDealRef(q) !== (q.reference_number || q.quote_id) ? (
-                        <div style={{ fontSize: 11, color: colors.muted2 }}>
-                          Deal {resolveDealRef(q)}
-                        </div>
-                      ) : q.deal_ref &&
-                        quotes.some(
-                          (o) => o.id !== q.id && resolveDealRef(o) === resolveDealRef(q),
-                        ) ? (
-                        <div style={{ fontSize: 11, color: colors.muted2 }}>
-                          Deal {resolveDealRef(q)} · branched
-                        </div>
-                      ) : null}
-                    </td>
-                    <td style={tdStyle}>{q.client || '—'}</td>
-                    <td style={tdStyle}>{q.vertical || divisionBrand(q.division_code)}</td>
-                    <td style={tdStyle}>
-                      {q.date ? format(new Date(q.date), 'dd MMM yyyy') : '—'}
-                    </td>
-                    <td style={tdStyle}>{formatAED(q.amount)}</td>
-                    <td style={tdStyle}>
-                      <StatusPill status={q.status} />
-                    </td>
-                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{renderQuoteActions(q)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className={qStyles.list}>
+          {filtered.map((q) => (
+            <article
+              key={q.id}
+              className={qStyles.row}
+              onClick={() => openQuoteRow(q)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  openQuoteRow(q)
+                }
+              }}
+              role="button"
+              tabIndex={0}
+            >
+              <div className={qStyles.refBlock}>
+                <div className={qStyles.ref}>
+                  {q.reference_number || <span className={qStyles.refMuted}>DRAFT</span>}
+                </div>
+                {quoteMeta(q) ? <div className={qStyles.meta}>{quoteMeta(q)}</div> : null}
+              </div>
+              <div className={qStyles.client}>
+                <div className={qStyles.clientName}>{q.client || '—'}</div>
+                <div className={qStyles.division}>{q.vertical || divisionBrand(q.division_code)}</div>
+              </div>
+              <div className={qStyles.amount}>{formatAED(q.amount)}</div>
+              <div className={qStyles.statusCell}>
+                <StatusPill status={q.status} />
+              </div>
+              <div className={qStyles.actions}>{renderQuoteActions(q)}</div>
+            </article>
+          ))}
         </div>
       )}
 

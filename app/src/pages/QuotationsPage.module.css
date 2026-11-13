@@ -1,0 +1,256 @@
+/* Quotations list — document-first layout */
+
+.page {
+  --q-ink: #f4f1ea;
+  --q-muted: rgba(244, 241, 234, 0.62);
+  --q-faint: rgba(244, 241, 234, 0.38);
+  --q-line: rgba(244, 241, 234, 0.1);
+  --q-panel: rgba(18, 22, 28, 0.72);
+  --q-accent: #e85d04;
+  color: var(--q-ink);
+  min-height: 100%;
+  padding: 0 0 40px;
+  background:
+    radial-gradient(900px 420px at 8% -10%, rgba(232, 93, 4, 0.16), transparent 60%),
+    radial-gradient(700px 360px at 100% 0%, rgba(56, 95, 120, 0.18), transparent 55%),
+    linear-gradient(180deg, #0f1216 0%, #12161c 48%, #101318 100%);
+}
+
+.hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 8px 0 22px;
+  border-bottom: 1px solid var(--q-line);
+  margin-bottom: 18px;
+}
+
+.kicker {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--q-accent);
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(28px, 3vw, 36px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.subtitle {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--q-muted);
+  max-width: 42ch;
+}
+
+.newBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 12px;
+  background: var(--q-accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.newBtn:hover {
+  filter: brightness(1.05);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--q-line);
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.tab,
+.tabActive {
+  border: none;
+  background: transparent;
+  color: var(--q-muted);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.tabActive {
+  background: rgba(232, 93, 4, 0.18);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(232, 93, 4, 0.35);
+}
+
+.search {
+  flex: 1 1 220px;
+  max-width: 320px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid var(--q-line);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--q-ink);
+  padding: 0 14px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.search::placeholder {
+  color: var(--q-faint);
+}
+
+.search:focus {
+  outline: none;
+  border-color: rgba(232, 93, 4, 0.55);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.4fr) auto auto auto;
+  align-items: center;
+  gap: 12px 18px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--q-line);
+  background: var(--q-panel);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.row:hover {
+  border-color: rgba(232, 93, 4, 0.35);
+  background: rgba(24, 28, 34, 0.9);
+  transform: translateY(-1px);
+}
+
+.ref {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.refMuted {
+  color: var(--q-faint);
+  font-weight: 600;
+}
+
+.meta {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--q-faint);
+  line-height: 1.35;
+}
+
+.client {
+  min-width: 0;
+}
+
+.clientName {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.division {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--q-muted);
+}
+
+.amount {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.statusCell {
+  justify-self: end;
+}
+
+.actions {
+  justify-self: end;
+}
+
+.empty,
+.loading {
+  border: 1px solid var(--q-line);
+  border-radius: 16px;
+  background: var(--q-panel);
+  padding: 28px 20px;
+  color: var(--q-muted);
+}
+
+@media (max-width: 900px) {
+  .row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'ref status'
+      'client client'
+      'amount actions';
+  }
+
+  .refBlock {
+    grid-area: ref;
+  }
+
+  .client {
+    grid-area: client;
+  }
+
+  .amount {
+    grid-area: amount;
+    text-align: left;
+  }
+
+  .statusCell {
+    grid-area: status;
+  }
+
+  .actions {
+    grid-area: actions;
+  }
+
+  .search {
+    max-width: none;
+  }
+}
