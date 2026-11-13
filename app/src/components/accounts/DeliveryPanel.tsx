@@ -63,6 +63,7 @@ import { getUsageSource, saveUsageSource } from '../../lib/usageImportStore'
 import { canViewField } from '../../lib/fieldPermissions'
 import { can } from '../../lib/permissions'
 import { errorMessage } from '../../lib/errors'
+import { parseDeliveryContractForm } from '../../lib/schemas/deliveryContract'
 import { parseDeliveryRequirementForm } from '../../lib/schemas/deliveryRequirement'
 import { parseTimeEntryForm } from '../../lib/schemas/timeEntry'
 import { parseUsageMonthForm } from '../../lib/schemas/usageMonth'
@@ -354,27 +355,18 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
 
   async function submitContract() {
     if (!contractForm) return
-    const f = contractForm.form
+    const parsed = parseDeliveryContractForm(contractForm.form)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
+    const f = parsed.data
     const isNew = !contractForm.id
     const before = contracts.find((c) => c.id === contractForm.id)
     const switchedOn = Boolean(f.auto_invoice) && !isNew && !before?.auto_invoice
     let raised = 0
     await run(async () => {
-      const contractId = await saveContract(
-        account.id,
-        {
-          ...f,
-          monthly_fee: Number(f.monthly_fee) || 0,
-          setup_fee: Number(f.setup_fee) || 0,
-          setup_fee_paid: Number(f.setup_fee_paid) || 0,
-          discount_percent: Number(f.discount_percent) || 0,
-          discount_months_left: Math.max(0, Math.floor(Number(f.discount_months_left) || 0)),
-          term_start: f.term_start || null,
-          term_end: f.term_end || null,
-          billing_from: f.auto_invoice ? f.billing_from || null : null,
-        },
-        contractForm.id,
-      )
+      const contractId = await saveContract(account.id, f, contractForm.id)
       if (f.auto_invoice) {
         // A running contract switched on later starts with monthly invoices;
         // its setup fee was already handled by hand.
@@ -389,7 +381,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
       await logAccountEvent(
         account.id,
         isNew
-          ? `Contract added: ${name}, option ${f.option}, ${formatAED(Number(f.monthly_fee) || 0)} a month`
+          ? `Contract added: ${name}, option ${f.option}, ${formatAED(f.monthly_fee)} a month`
           : `Contract updated: ${name}, option ${f.option}, status ${f.status}`,
         author,
       )
