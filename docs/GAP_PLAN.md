@@ -111,7 +111,7 @@ WorshipHub admin, Tee Tribe shop, RR Wanders tour ops, CTRM commission tables â†
 
 | Milestone | Blockers from audit |
 |-----------|---------------------|
-| **M0** | This audit + gap plan + brand-assets + STATUS; CI already largely green; enable app `strict` carefully in M1 not M0 |
+| **M0** | This audit + gap plan + brand-assets + STATUS; CI already largely green; app `strict` enabled in a later M1 leftover |
 | **M1** | Largest: `tenant_id` retrofit, RLS rewrite, shell, branding, i18n skeleton |
 | **M2** | Depends on M1 |
 | **M3** | Dual/triple CRM merge; keep briefing â€” see `docs/M3_CRM_UNIFY.md` |
