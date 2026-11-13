@@ -25,7 +25,7 @@ Status key: **exists** · **partial** · **missing**
 | Cross-tenant CI tests | partial | `tenant_isolation_test.sql` in `run.sh`; expand coverage next |
 | Roles + record rules + field permissions | partial | Fixed 5 roles; no record rules / field mask — M1 |
 | Maker-checker | missing | M7/M8 for money/payroll |
-| Customization layer (fields, pipelines, objects, workflows, templates, views, dashboards, labels, numbering) | partial | M2 numbering + fields + saved views (Accounts/Vendors/CRM/Quotes) + pipelines/workflow defs; runner still open |
+| Customization layer (fields, pipelines, objects, workflows, templates, views, dashboards, labels, numbering) | partial | M2 layer largely in: numbering, fields, views, pipelines, workflow defs + runner (approval/notify); more step types / dashboards later |
 | Industry packs | missing | M12 |
 | Shell: Inbox/Sales/… areas, Cmd+K, AI button | partial | Accordion nav exists; restructure shell in M1 |
 | Company switcher | partial | M1 top-bar switcher; multi-company ops still thin |

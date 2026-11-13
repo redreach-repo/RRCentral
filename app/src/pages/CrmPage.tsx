@@ -80,6 +80,7 @@ import {
   normalizeCrmFilters,
   type CrmViewFilters,
 } from '../lib/savedViews'
+import { triggerStageEnterWorkflows } from '../lib/workflowRunner'
 import CalendarSettingsModal from '../components/CalendarSettingsModal'
 import { useCompactCrm } from '../hooks/useMediaQuery'
 import resp from '../styles/crmResponsive.module.css'
@@ -558,6 +559,34 @@ export default function CrmPage() {
     return counts
   }, [entries, crmStages])
 
+  async function maybeTriggerStageWorkflows(
+    entry: Pick<CrmEntry, 'id' | 'company_name' | 'pipeline_stage'>,
+    nextStage: string | undefined,
+  ) {
+    if (!nextStage || nextStage === (entry.pipeline_stage || 'Lead')) return
+    try {
+      const runs = await triggerStageEnterWorkflows({
+        pipelineKey: 'crm',
+        stageKey: nextStage,
+        objectType: 'crm',
+        recordId: String(entry.id),
+        recordLabel: entry.company_name,
+        actorEmail: user?.email || '',
+      })
+      const waiting = runs.filter((r) => r.status === 'awaiting_approval')
+      if (waiting.length) {
+        showToast(
+          `${waiting.length} workflow${waiting.length === 1 ? '' : 's'} waiting for approval (Settings → Workflow runs)`,
+          'success',
+        )
+      } else if (runs.length) {
+        showToast(`Started ${runs.length} workflow${runs.length === 1 ? '' : 's'}`, 'success')
+      }
+    } catch (e) {
+      showToast(errorMessage(e, 'Workflow trigger failed'), 'error')
+    }
+  }
+
   async function quickPatch(
     entry: CrmEntry,
     patch: Partial<Pick<CrmEntry, 'pipeline_stage' | 'follow_up_date' | 'next_action' | 'outcome_reason'>>,
@@ -628,6 +657,7 @@ export default function CrmPage() {
         user?.email || '',
         entry.id,
       )
+      await maybeTriggerStageWorkflows(entry, patch.pipeline_stage)
       await load()
     } catch (e) {
       setError(errorMessage(e, 'Quick update failed'))
@@ -679,6 +709,7 @@ export default function CrmPage() {
       showToast(`Marked ${outcomeStage}`, 'success')
       setOutcomeTarget(null)
       setOutcomeReason('')
+      await maybeTriggerStageWorkflows(entry, outcomeStage)
       await load()
     } catch (e) {
       showToast(errorMessage(e, 'Could not close deal'), 'error')
@@ -767,6 +798,9 @@ export default function CrmPage() {
       )
       showToast('Touch logged', 'success')
       setLogTouchTarget(null)
+      if (payload.pipeline_stage) {
+        await maybeTriggerStageWorkflows(entry, payload.pipeline_stage)
+      }
       await load()
     } catch (e) {
       showToast(errorMessage(e, 'Failed to save touch'), 'error')
@@ -1041,6 +1075,15 @@ export default function CrmPage() {
         `${form.pipeline_stage || 'Lead'} · ${form.next_action || 'no action'}`,
         who,
         savedId,
+      )
+
+      await maybeTriggerStageWorkflows(
+        {
+          id: savedId,
+          company_name: form.company_name.trim(),
+          pipeline_stage: editing?.pipeline_stage || 'Lead',
+        },
+        stage,
       )
 
       // Best-effort Zoho Calendar sync

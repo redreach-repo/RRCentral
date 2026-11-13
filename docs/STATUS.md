@@ -1,23 +1,22 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** M2 Customization layer (in progress)
+**Current milestone:** M2 Customization layer (closing)
 
-## Shipped this turn (M2 more saved views)
+## Shipped this turn (M2 workflow runner)
 
-- Saved views on **CRM** (stage / owner / follow / search / board) — My Day landing unchanged
-- Saved views on **Quotations** (status / search)
-- Seeds: CRM My Day / All / Board / Unassigned; Quotes All / Drafts / Sent / Awarded
+- `workflowRunner` — stage_enter match, run insert, approval pause, notify → activity
+- CRM stage moves (incl. Won/Lost) trigger matching workflows
+- Settings → **Workflow runs** — pending approvals + recent history
 
 ## Already on main
 
 - M1 tenancy / switcher / brand / i18n / guide
-- M2 numbering + custom fields (account/CRM/quote) + pipelines/workflows
-- M2 saved views on Accounts/Vendors
+- M2 numbering, custom fields, saved views, pipelines/workflow definitions
 
 ## Still open
 
-**M2 next:** workflow runner  
+**M2 leftovers:** more step types (webhook/update_field), dashboard widgets  
 **M1 leftovers:** nav → module manifests; field permissions; Zod; TS strict; PWA mark; missing logos  
 **Open §19 decisions** — do not guess
 
