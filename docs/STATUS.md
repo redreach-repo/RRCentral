@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** M1 leftover (expand field-mask wiring)
+**Current milestone:** M1 leftover (Zod vendor form)
 
 ## Shipped this turn
 
-- Field-mask: `delivery.profitability` call sites use `canViewField`; vendor TRN gated on Vendors / Expenses / supplier invoice modal
+- Zod `parseVendorForm` on vendor register/edit (company name, email, TRN, website)
 
 ## Already on main
 
-- M0–M4 · M1 leftovers · M5 slices 1–8 (vault + spawn + clause tags) · Quick Add Zod (#248)
+- M0–M4 · M1 leftovers (Quick Add Zod, field-mask expand) · M5 slices through clause-tag spawn
 
 ## Still open
 

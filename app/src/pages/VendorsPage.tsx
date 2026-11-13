@@ -7,6 +7,7 @@ import type { Attachment, Expense, Vendor } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { canEditField, canViewField } from '../lib/fieldPermissions'
+import { parseVendorForm } from '../lib/schemas/vendor'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
 import SavedViewsBar from '../components/SavedViewsBar'
@@ -194,23 +195,18 @@ export default function VendorsPage() {
   }
 
   async function save() {
-    if (!form.company_name.trim()) {
-      showToast('Company name is required', 'error')
+    const parsed = parseVendorForm({
+      ...form,
+      trn: editTrn ? form.trn : editing?.trn || '',
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setSaving(true)
     try {
       const payload = {
-        company_name: form.company_name.trim(),
-        primary_contact: form.primary_contact.trim(),
-        email: form.email.trim(),
-        mobile: form.mobile.trim(),
-        office: form.office.trim(),
-        address: form.address.trim(),
-        trn: editTrn ? form.trn.trim() : editing?.trn || '',
-        website: form.website.trim(),
-        payment_terms: form.payment_terms.trim(),
-        notes: form.notes.trim(),
+        ...parsed.data,
         active: true,
         updated_at: new Date().toISOString(),
       }
