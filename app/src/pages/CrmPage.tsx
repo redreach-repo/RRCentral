@@ -60,12 +60,7 @@ import {
   normalizeContacts,
   primaryContact,
 } from '../lib/contacts'
-import {
-  deleteZohoCalendarEvent,
-  isZohoCalendarEnabled,
-  isZohoMailEnabled,
-  syncFollowUpToZohoCalendar,
-} from '../lib/zoho'
+import { getCalendarProvider, getMailProvider } from '../lib/mailCalendar'
 import { resolveOwnerEmails } from '../lib/calendarAttendees'
 import EmailComposeModal from '../components/EmailComposeModal'
 import LinkDriveFileModal from '../components/LinkDriveFileModal'
@@ -623,12 +618,12 @@ export default function CrmPage() {
         updated_by: user?.email || '',
         updated_at: new Date().toISOString(),
       }
-      if (isZohoCalendarEnabled(settings) && patch.follow_up_date !== undefined) {
+      if (getCalendarProvider(settings).isEnabled(settings) && patch.follow_up_date !== undefined) {
         try {
           const contacts = hydrateContacts(entry)
           const p = primaryContact(contacts)
           if (nextFollow) {
-            const eventId = await syncFollowUpToZohoCalendar(settings, {
+            const eventId = await getCalendarProvider(settings).syncFollowUp(settings, {
               company: entry.company_name,
               nextAction: patch.next_action ?? entry.next_action,
               owner: entry.owner,
@@ -640,12 +635,12 @@ export default function CrmPage() {
             })
             if (eventId) payload.calendar_event_id = eventId
           } else if (entry.calendar_event_id) {
-            await deleteZohoCalendarEvent(settings, entry.calendar_event_id)
+            await getCalendarProvider(settings).deleteEvent(settings, entry.calendar_event_id)
             payload.calendar_event_id = ''
           }
         } catch (calErr) {
           showToast(
-            calErr instanceof Error ? `Updated locally; Zoho: ${calErr.message}` : 'Updated; calendar sync failed',
+            calErr instanceof Error ? `Updated locally; calendar: ${calErr.message}` : 'Updated; calendar sync failed',
             'error',
           )
         }
@@ -758,17 +753,17 @@ export default function CrmPage() {
       if (payload.clearDate) patch.follow_up_date = null
       else if (payload.follow_up_date) patch.follow_up_date = payload.follow_up_date
 
-      if (isZohoCalendarEnabled(settings) && (payload.clearDate || payload.follow_up_date)) {
+      if (getCalendarProvider(settings).isEnabled(settings) && (payload.clearDate || payload.follow_up_date)) {
         try {
           const contacts = hydrateContacts(entry)
           const p = primaryContact(contacts)
           if (payload.clearDate) {
             if (entry.calendar_event_id) {
-              await deleteZohoCalendarEvent(settings, entry.calendar_event_id)
+              await getCalendarProvider(settings).deleteEvent(settings, entry.calendar_event_id)
               patch.calendar_event_id = ''
             }
           } else if (payload.follow_up_date) {
-            const eventId = await syncFollowUpToZohoCalendar(settings, {
+            const eventId = await getCalendarProvider(settings).syncFollowUp(settings, {
               company: entry.company_name,
               nextAction: payload.next_action || entry.next_action,
               owner: entry.owner,
@@ -783,7 +778,7 @@ export default function CrmPage() {
         } catch (calErr) {
           showToast(
             calErr instanceof Error
-              ? `Saved locally; Zoho Calendar: ${calErr.message}`
+              ? `Saved locally; calendar: ${calErr.message}`
               : 'Saved locally; calendar sync failed',
             'error',
           )
@@ -1091,12 +1086,12 @@ export default function CrmPage() {
         stage,
       )
 
-      // Best-effort Zoho Calendar sync
-      if (isZohoCalendarEnabled(settings)) {
+      // Best-effort calendar sync via mailCalendar façade
+      if (getCalendarProvider(settings).isEnabled(settings)) {
         try {
           const p = primaryContact(contacts)
           if (followUpDate) {
-            const eventId = await syncFollowUpToZohoCalendar(settings, {
+            const eventId = await getCalendarProvider(settings).syncFollowUp(settings, {
               company: form.company_name.trim(),
               nextAction: form.next_action,
               owner: form.owner,
@@ -1113,14 +1108,14 @@ export default function CrmPage() {
                 .eq('id', savedId)
             }
           } else if (prevEventId) {
-            await deleteZohoCalendarEvent(settings, prevEventId)
+            await getCalendarProvider(settings).deleteEvent(settings, prevEventId)
             if (savedId) {
               await db.from('crm').update({ calendar_event_id: '' }).eq('id', savedId)
             }
           }
         } catch (calErr) {
           showToast(
-            calErr instanceof Error ? `Saved, but Zoho Calendar: ${calErr.message}` : 'Saved, but calendar sync failed',
+            calErr instanceof Error ? `Saved, but calendar: ${calErr.message}` : 'Saved, but calendar sync failed',
             'error',
           )
         }
@@ -1145,9 +1140,9 @@ export default function CrmPage() {
     setSaving(true)
     setError('')
     try {
-      if (isZohoCalendarEnabled(settings) && deleteTarget.calendar_event_id) {
+      if (getCalendarProvider(settings).isEnabled(settings) && deleteTarget.calendar_event_id) {
         try {
-          await deleteZohoCalendarEvent(settings, deleteTarget.calendar_event_id)
+          await getCalendarProvider(settings).deleteEvent(settings, deleteTarget.calendar_event_id)
         } catch {
           /* ignore calendar delete errors on CRM delete */
         }
@@ -1940,8 +1935,8 @@ export default function CrmPage() {
                       )}
                     </div>
                     <p style={{ margin: '10px 0 0', fontSize: 12, color: colors.muted2 }}>
-                      {isZohoCalendarEnabled(settings)
-                        ? 'Follow-up date syncs to Zoho Calendar.'
+                      {getCalendarProvider(settings).isEnabled(settings)
+                        ? `Follow-up date syncs to ${getCalendarProvider(settings).label} Calendar.`
                         : 'Calendar sync is off.'}{' '}
                       <button
                         type="button"
@@ -2450,7 +2445,7 @@ export default function CrmPage() {
           company: settings.companyName || 'Red Reach Middle East FZE',
           contact: emailTarget ? primaryContact(hydrateContacts(emailTarget))?.name || 'team' : 'team',
         })}
-        zohoEnabled={isZohoMailEnabled(settings)}
+        zohoEnabled={getMailProvider(settings).isEnabled(settings)}
         onClose={() => setEmailTarget(null)}
         onSent={async () => {
           if (!emailTarget) return
