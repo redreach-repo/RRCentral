@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod delivery settings
+**Current milestone:** Continuous backlog — M1 Zod message templates
 
 ## Shipped this turn
 
-- Zod parsers for delivery package + rates on Packages and rates settings
+- Zod `parseMessageTemplateForm` for quote follow-up WhatsApp/email templates
 
 ## Already on main
 
-- Continuous backlog Zod batch · QTSP scaffold · go-live/build · M3 plan · `pipeline_deals_v` · follow-ups Zod
+- Continuous backlog Zod batch · QTSP scaffold · go-live/build · M3 plan · `pipeline_deals_v` · follow-ups · delivery settings
 
 ## Still open (agent queue)
 
