@@ -22,8 +22,9 @@ import { clearLocalData, DB_NAME } from '../lib/localDb'
 import { downloadCentralBackup } from '../lib/centralBackup'
 import { importCloudDumpFromFile } from '../lib/importCloudDump'
 import { testZohoConnection } from '../lib/zoho'
-import { isAllowedLoginEmail, loginEmailDomainError } from '../lib/allowedLoginEmail'
 import { authApi, MIN_PASSWORD_LENGTH } from '../lib/authApi'
+import { parseAppUserForm } from '../lib/schemas/appUser'
+import { parseChangePassword } from '../lib/schemas/changePassword'
 import {
   COMPANY_DOC_CATEGORIES,
   companyDocCategoryLabel,
@@ -593,17 +594,14 @@ export default function SettingsPage() {
   }
 
   async function handleChangeMyPassword() {
-    if (newPassword.length < MIN_PASSWORD_LENGTH) {
-      showToast(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`, 'error')
-      return
-    }
-    if (newPassword !== confirmPassword) {
-      showToast('Passwords do not match', 'error')
+    const parsed = parseChangePassword({ newPassword, confirmPassword })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setChangingPassword(true)
     try {
-      await changePassword(newPassword)
+      await changePassword(parsed.data.newPassword)
       setNewPassword('')
       setConfirmPassword('')
       showToast('Password updated', 'success')
@@ -737,31 +735,19 @@ export default function SettingsPage() {
   }
 
   async function saveUser() {
-    if (!userForm.email.trim()) {
-      showToast('Email is required', 'error')
+    const parsed = parseAppUserForm({
+      ...userForm,
+      editing: Boolean(editingUser),
+      localMode: isLocalMode,
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
-    if (!isAllowedLoginEmail(userForm.email)) {
-      showToast(loginEmailDomainError(userForm.email), 'error')
-      return
-    }
-    const password = userForm.password.trim()
-    if (!editingUser && !isLocalMode && !password) {
-      showToast(`Set an initial password (min ${MIN_PASSWORD_LENGTH} characters)`, 'error')
-      return
-    }
-    if (password && password.length < MIN_PASSWORD_LENGTH) {
-      showToast(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`, 'error')
-      return
-    }
+    const { email, name, role, active, password } = parsed.data
     setBusy(true)
     try {
-      const payload = {
-        email: userForm.email.trim().toLowerCase(),
-        name: userForm.name.trim(),
-        role: userForm.role,
-        active: userForm.active,
-      }
+      const payload = { email, name, role, active }
       if (editingUser) {
         const { error } = await db.from('app_users').update(payload).eq('id', editingUser.id)
         if (error) throw error
@@ -770,11 +756,7 @@ export default function SettingsPage() {
         if (error) throw error
       }
       if (password && authApi.adminSetPassword) {
-        const { error: pwdError } = await authApi.adminSetPassword(
-          payload.email,
-          password,
-          payload.name,
-        )
+        const { error: pwdError } = await authApi.adminSetPassword(email, password, name)
         if (pwdError) throw new Error(pwdError.message)
       }
       showToast(password ? 'User saved and password set' : 'User saved', 'success')
