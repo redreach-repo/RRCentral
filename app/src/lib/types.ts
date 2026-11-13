@@ -992,6 +992,31 @@ export interface NdaTemplate {
   updated_at: string
 }
 
+/** Reusable clause in the M5 contract clause library. */
+export type ContractClauseCategory =
+  | 'confidentiality'
+  | 'obligations'
+  | 'term'
+  | 'liability'
+  | 'general'
+  | 'other'
+
+export type ContractClauseStatus = 'draft' | 'active' | 'retired'
+
+export interface ContractClause {
+  id: string
+  clause_key: string
+  title: string
+  body: string
+  category: ContractClauseCategory
+  status: ContractClauseStatus
+  sort_order: number
+  notes: string
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
 export type LegalDocumentStatus = 'draft' | 'sent' | 'signed' | 'expired' | 'void'
 export type LegalDocumentType = 'nda' | 'service_agreement' | 'other'
 
