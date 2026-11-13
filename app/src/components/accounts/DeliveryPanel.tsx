@@ -65,6 +65,7 @@ import { can } from '../../lib/permissions'
 import { errorMessage } from '../../lib/errors'
 import { parseDeliveryRequirementForm } from '../../lib/schemas/deliveryRequirement'
 import { parseTimeEntryForm } from '../../lib/schemas/timeEntry'
+import { parseUsageSourceForm } from '../../lib/schemas/usageSource'
 import { formatAED } from '../../lib/money'
 import { FORGOTTEN_TIMER_HOURS, elapsedHours, elapsedLabel, hoursLabel, timerHours } from '../../lib/timeTracking'
 import type {
@@ -466,8 +467,13 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
 
   async function submitSource() {
     if (!sourceForm) return
+    const parsed = parseUsageSourceForm(sourceForm)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
     await run(async () => {
-      await saveUsageSource(account.id, sourceForm, usageSource, author.email)
+      await saveUsageSource(account.id, parsed.data, usageSource, author.email)
       setSourceForm(null)
       showToast('Usage import links saved', 'success')
     }, 'Could not save the usage links')
