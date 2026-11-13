@@ -41,7 +41,7 @@ Status key: **exists** · **partial** · **missing**
 | Module | Status | Notes / step |
 |--------|--------|--------------|
 | 6.1 Core platform | partial | Users/settings/audit/2-step exist; MFA passkeys/SSO missing → M1 |
-| 6.2 CRM and sales | partial | Strong ops CRM; three pipelines; `/deals` write façade + linker (M3 slice 3); schema merge later |
+| 6.2 CRM and sales | partial | Strong ops CRM; three pipelines; Pipeline-first soft-retire (M3 slice 4); schema merge later (ask) |
 | 6.3 Email and calendar | partial | Zoho Mail/Calendar proxy; no Gmail/M365/IMAP full sync → M4 |
 | 6.4 Contracts and e-sign | partial | Agreement/NDA + `/sign` sealed PDF path; no clause library/obligations board → M5 |
 | 6.5 HR | missing | M6 |

@@ -62,7 +62,7 @@ Local mode bypasses RLS (single-browser IndexedDB). Production expects Supabase.
 | `/quick-add` | Phone lead/call |
 | `/deals` | Unified pipeline |
 | `/sales` | AI CRM sales stages |
-| `/ctrm` | CTRM Next stages |
+| `/ctrm` | CTRM detail |
 | `/follow-ups` | Follow-ups |
 | `/quotations` · `/invoices` · `/delivery-notes` | Docs |
 | `/customer-files` | Google Drive index |
