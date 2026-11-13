@@ -8,6 +8,10 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
+import EditorSectionTabs, {
+  editorPanelStyle,
+  type EditorSection,
+} from '../components/EditorSectionTabs'
 import { logActivity } from '../lib/activity'
 import { errorMessage, isMissingRelationError } from '../lib/errors'
 import { expenseVatParts } from '../lib/finance'
@@ -76,6 +80,7 @@ export default function VendorsPage() {
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Vendor | null>(null)
   const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
+  const [editorSection, setEditorSection] = useState<EditorSection>('basics')
   const [missingTable, setMissingTable] = useState(false)
   const [vendorInvoices, setVendorInvoices] = useState<Expense[]>([])
   const [invoiceAttachments, setInvoiceAttachments] = useState<Attachment[]>([])
@@ -157,6 +162,7 @@ export default function VendorsPage() {
     setForm(emptyForm())
     setVendorInvoices([])
     setInvoiceAttachments([])
+    setEditorSection('basics')
     setOpen(true)
   }
 
@@ -174,6 +180,7 @@ export default function VendorsPage() {
       payment_terms: v.payment_terms || '',
       notes: v.notes || '',
     })
+    setEditorSection('basics')
     setOpen(true)
     void loadVendorInvoices(v.company_name)
   }
@@ -353,6 +360,12 @@ export default function VendorsPage() {
         onClose={() => setOpen(false)}
         width={editing ? 760 : 640}
       >
+        <EditorSectionTabs
+          value={editorSection}
+          onChange={setEditorSection}
+          sections={editing ? ['basics', 'terms', 'notes', 'lines'] : ['basics', 'terms', 'notes']}
+        />
+        <div style={editorPanelStyle(editorSection === 'basics')}>
         <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.45 }}>
           Enter the supplier’s <strong style={{ color: colors.text }}>company name</strong> as it
           appears on their tax invoice. There is no separate vendor number — the invoice number
@@ -425,6 +438,10 @@ export default function VendorsPage() {
               onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
             />
           </div>
+        </div>
+        </div>
+
+        <div style={editorPanelStyle(editorSection === 'terms')}>
           <div style={fieldStyle}>
             <label style={labelStyle}>Payment terms</label>
             <input
@@ -435,6 +452,8 @@ export default function VendorsPage() {
             />
           </div>
         </div>
+
+        <div style={editorPanelStyle(editorSection === 'notes')}>
         <div style={fieldStyle}>
           <label style={labelStyle}>Notes</label>
           <textarea
@@ -443,8 +462,10 @@ export default function VendorsPage() {
             onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
           />
         </div>
+        </div>
 
         {editing ? (
+          <div style={editorPanelStyle(editorSection === 'lines')}>
           <div style={{ marginTop: 8, marginBottom: 16 }}>
             <div
               style={{
@@ -545,9 +566,10 @@ export default function VendorsPage() {
               </div>
             )}
           </div>
+          </div>
         ) : null}
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setOpen(false)}>
             Cancel
           </button>

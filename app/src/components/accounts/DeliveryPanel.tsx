@@ -873,7 +873,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
                       aria-label="Delete entry"
                       onClick={() => void run(() => deleteTimeEntry(t.id), 'Could not delete the entry')}
                     >
-                      <Trash2 size={12} />
+                      <Trash2 size={12} /> Remove
                     </button>
                   ) : null}
                 </li>
@@ -1149,7 +1149,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
                         void run(() => deleteRequirement(r.id), 'Could not delete the requirement')
                       }
                     >
-                      <Trash2 size={12} />
+                      <Trash2 size={12} /> Remove
                     </button>
                   </div>
                 ) : (

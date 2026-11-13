@@ -10,18 +10,14 @@ import { isAuditAvailable } from '../lib/auditLog'
 import { summarise, type CheckState, type FunctionCheck } from '../lib/systemCheck'
 import { runSystemCheck } from '../lib/systemCheckStore'
 import {
-  buttonSecondaryStyle,
   cardStyle,
   colors,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
-  toolbarStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 const STATE_COLOR: Record<CheckState, string> = { green: colors.success, amber: colors.warn, red: colors.danger }
 const STATE_LABEL: Record<CheckState, string> = { green: 'OK', amber: 'Check', red: 'Down' }
@@ -56,36 +52,47 @@ export default function SystemCheckPage() {
 
   if (!allowed) {
     return (
-      <div style={pageStyle}>
+      <div className={docsStyles.page}>
         <EmptyState title="Admins only" subtitle="Ask an admin if you need to see the system check." />
       </div>
     )
   }
   if (!isAuditAvailable()) {
     return (
-      <div style={pageStyle}>
+      <div className={docsStyles.page}>
         <EmptyState icon={<Activity size={28} />} title="System check runs in cloud mode" subtitle="Connect Supabase in Settings." />
       </div>
     )
   }
 
   return (
-    <div style={pageStyle}>
-      <h1 style={pageTitleStyle}>System check</h1>
-      <p style={pageSubtitleStyle}>
-        Every server function gets a harmless ping (it does not send, import or change anything), next to its last failure.
-        Each row names its test in docs/LIVE_TEST.md. Full error details are on <Link to="/app-errors" style={{ color: colors.accent }}>App errors</Link>.
-      </p>
-      <div style={toolbarStyle}>
-        <button type="button" style={buttonSecondaryStyle} disabled={loading} onClick={() => void load()}>
-          {loading ? 'Checking' : 'Check again'}
-        </button>
-        {checkedAt && !loading ? (
-          <span style={{ fontSize: 13, color: colors.muted }}>
-            {counts.green} OK, {counts.amber} to check, {counts.red} down, at {format(checkedAt, 'HH:mm')}
-          </span>
-        ) : null}
-      </div>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
+        <div>
+          <p className={docsStyles.kicker}>Admin</p>
+          <h1 className={docsStyles.title}>System check</h1>
+          <p className={docsStyles.subtitle}>
+            Every server function gets a harmless ping (it does not send, import or change anything), next to its last failure.
+            Each row names its test in docs/LIVE_TEST.md. Full error details are on <Link to="/app-errors" style={{ color: colors.accent }}>App errors</Link>.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'rgba(255,255,255,0.08)' }}
+            disabled={loading}
+            onClick={() => void load()}
+          >
+            {loading ? 'Checking' : 'Check again'}
+          </button>
+          {checkedAt && !loading ? (
+            <span style={{ fontSize: 13, color: colors.muted }}>
+              {counts.green} OK, {counts.amber} to check, {counts.red} down, at {format(checkedAt, 'HH:mm')}
+            </span>
+          ) : null}
+        </div>
+      </header>
       {problem ? (
         <div style={{ ...cardStyle, color: colors.danger }}>{problem}</div>
       ) : (

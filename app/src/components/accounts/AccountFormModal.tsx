@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react'
 import Modal from '../Modal'
+import EditorSectionTabs, {
+  editorPanelStyle,
+  type EditorSection,
+} from '../EditorSectionTabs'
 import { ACCOUNT_TYPES, accountStatusLabel, accountTypeInfo } from '../../lib/accounts'
 import type { AccountInput, ContactInput } from '../../lib/accountsStore'
 import type { Account, AccountType, AppUser } from '../../lib/types'
@@ -63,9 +67,11 @@ export default function AccountFormModal({
   onSave,
 }: Props) {
   const [form, setForm] = useState<Form>(() => emptyForm(defaultType, defaultOwnerId))
+  const [editorSection, setEditorSection] = useState<EditorSection>('basics')
 
   useEffect(() => {
     if (!open) return
+    setEditorSection('basics')
     if (account) {
       setForm({
         type: account.type,
@@ -120,8 +126,12 @@ export default function AccountFormModal({
     onSave(input, contact)
   }
 
+  const sections: EditorSection[] = account ? ['basics', 'notes'] : ['basics', 'lines', 'notes']
+
   return (
     <Modal open={open} onClose={onClose} title={account ? 'Edit account' : 'New account'} width={640}>
+      <EditorSectionTabs value={editorSection} onChange={setEditorSection} sections={sections} />
+      <div style={editorPanelStyle(editorSection === 'basics')}>
       <div style={formGridStyle}>
         <div style={fieldStyle}>
           <label style={labelStyle}>Type</label>
@@ -217,6 +227,42 @@ export default function AccountFormModal({
           onChange={(e) => set('website', e.target.value)}
         />
       </div>
+      </div>
+
+      <div style={editorPanelStyle(editorSection === 'lines')}>
+        <div style={{ fontSize: 13, fontWeight: 600, margin: '6px 0 10px' }}>
+          Main contact <span style={{ color: colors.muted2, fontWeight: 400 }}>(optional)</span>
+        </div>
+        <div style={formGridStyle}>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Name</label>
+            <input
+              style={inputStyle}
+              value={form.contactName}
+              onChange={(e) => set('contactName', e.target.value)}
+            />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Email</label>
+            <input
+              style={inputStyle}
+              type="email"
+              value={form.contactEmail}
+              onChange={(e) => set('contactEmail', e.target.value)}
+            />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Phone or WhatsApp</label>
+            <input
+              style={inputStyle}
+              value={form.contactPhone}
+              onChange={(e) => set('contactPhone', e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div style={editorPanelStyle(editorSection === 'notes')}>
       <div style={fieldStyle}>
         <label style={labelStyle}>Notes</label>
         <textarea
@@ -225,41 +271,7 @@ export default function AccountFormModal({
           onChange={(e) => set('notes', e.target.value)}
         />
       </div>
-
-      {!account ? (
-        <>
-          <div style={{ fontSize: 13, fontWeight: 600, margin: '6px 0 10px' }}>
-            Main contact <span style={{ color: colors.muted2, fontWeight: 400 }}>(optional)</span>
-          </div>
-          <div style={formGridStyle}>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Name</label>
-              <input
-                style={inputStyle}
-                value={form.contactName}
-                onChange={(e) => set('contactName', e.target.value)}
-              />
-            </div>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Email</label>
-              <input
-                style={inputStyle}
-                type="email"
-                value={form.contactEmail}
-                onChange={(e) => set('contactEmail', e.target.value)}
-              />
-            </div>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Phone or WhatsApp</label>
-              <input
-                style={inputStyle}
-                value={form.contactPhone}
-                onChange={(e) => set('contactPhone', e.target.value)}
-              />
-            </div>
-          </div>
-        </>
-      ) : null}
+      </div>
 
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
         <button type="button" style={buttonSecondaryStyle} onClick={onClose} disabled={saving}>

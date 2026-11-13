@@ -24,11 +24,9 @@ import {
   formGridStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   sectionTitleStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 type NumericField = Exclude<
   keyof DeliveryPackage,
@@ -142,19 +140,24 @@ export default function DeliverySettingsPage() {
 
   if (!canPackages) {
     return (
-      <div style={pageStyle}>
+      <div className={docsStyles.page}>
         <EmptyState icon={<Package size={22} />} title="Managers and admins only" subtitle="Ask Alfred if a package needs changing." />
       </div>
     )
   }
 
   return (
-    <div style={pageStyle}>
-      <h1 style={pageTitleStyle}>Packages and rates</h1>
-      <p style={pageSubtitleStyle}>
-        The AI CRM package catalogue, the rates used for overage and profitability, and support response times. Prices exclude 5% VAT.
-        Changes apply to new contracts; existing contracts keep the fees saved on them.
-      </p>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
+        <div>
+          <p className={docsStyles.kicker}>Delivery</p>
+          <h1 className={docsStyles.title}>Packages and rates</h1>
+          <p className={docsStyles.subtitle}>
+            The AI CRM package catalogue, the rates used for overage and profitability, and support response times. Prices exclude 5% VAT.
+            Changes apply to new contracts; existing contracts keep the fees saved on them.
+          </p>
+        </div>
+      </header>
 
       <section style={{ ...cardStyle, marginBottom: 16 }}>
         <h2 style={sectionTitleStyle}>Overage and costing rates</h2>

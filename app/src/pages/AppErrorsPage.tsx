@@ -12,12 +12,9 @@ import {
   buttonSecondaryStyle,
   cardStyle,
   colors,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
-  toolbarStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 const KIND_LABEL: Record<AppError['kind'], string> = {
   browser: 'Error',
@@ -69,37 +66,48 @@ export default function AppErrorsPage() {
 
   if (!can(userRole, 'audit.read')) {
     return (
-      <div style={pageStyle}>
+      <div className={docsStyles.page}>
         <EmptyState title="Admins only" subtitle="Ask an admin if you need to see app errors." />
       </div>
     )
   }
   if (!isAuditAvailable()) {
     return (
-      <div style={pageStyle}>
+      <div className={docsStyles.page}>
         <EmptyState icon={<Bug size={28} />} title="Error monitoring runs in cloud mode" subtitle="Connect Supabase in Settings." />
       </div>
     )
   }
 
   return (
-    <div style={pageStyle}>
-      <h1 style={pageTitleStyle}>App errors</h1>
-      <p style={pageSubtitleStyle}>
-        Errors people hit in RR Central, grouped by message, newest first. The daily digest email lists the last day's.
-        Mark one as fixed once it is dealt with.
-      </p>
-      <div style={toolbarStyle}>
-        <select style={selectStyle} value={days} onChange={(e) => setDays(Number(e.target.value))} aria-label="Period">
-          <option value={1}>Last 24 hours</option>
-          <option value={7}>Last 7 days</option>
-          <option value={30}>Last 30 days</option>
-          <option value={90}>Last 90 days</option>
-        </select>
-        <button type="button" style={buttonSecondaryStyle} disabled={loading} onClick={() => void load()}>
-          {loading ? 'Loading' : 'Refresh'}
-        </button>
-      </div>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
+        <div>
+          <p className={docsStyles.kicker}>Admin</p>
+          <h1 className={docsStyles.title}>App errors</h1>
+          <p className={docsStyles.subtitle}>
+            Errors people hit in RR Central, grouped by message, newest first. The daily digest email lists the last day's.
+            Mark one as fixed once it is dealt with.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <select style={selectStyle} value={days} onChange={(e) => setDays(Number(e.target.value))} aria-label="Period">
+            <option value={1}>Last 24 hours</option>
+            <option value={7}>Last 7 days</option>
+            <option value={30}>Last 30 days</option>
+            <option value={90}>Last 90 days</option>
+          </select>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'rgba(255,255,255,0.08)' }}
+            disabled={loading}
+            onClick={() => void load()}
+          >
+            {loading ? 'Loading' : 'Refresh'}
+          </button>
+        </div>
+      </header>
       {problem ? (
         <div style={{ ...cardStyle, color: colors.danger }}>{problem}</div>
       ) : !loading && groups.length === 0 ? (

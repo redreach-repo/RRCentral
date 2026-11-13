@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import Modal from '../Modal'
+import EditorSectionTabs, {
+  editorPanelStyle,
+  type EditorSection,
+} from '../EditorSectionTabs'
 import LostReasonFields from '../deals/LostReasonFields'
 import { formatAED } from '../../lib/money'
 import { SALES_STAGES, quoteFirstYear, quoteFromPackage, salesDealProblem } from '../../lib/salesPipeline'
@@ -57,10 +61,12 @@ export default function SalesDealFormModal({
 }: Props) {
   const [v, setV] = useState<SalesDealFormValues | null>(null)
   const [error, setError] = useState('')
+  const [editorSection, setEditorSection] = useState<EditorSection>('basics')
 
   useEffect(() => {
     if (!open) return
     setError('')
+    setEditorSection('basics')
     setV({
       accountId: deal?.account_id ?? lockedAccountId ?? '',
       newCompany: '',
@@ -122,6 +128,12 @@ export default function SalesDealFormModal({
           submit()
         }}
       >
+        <EditorSectionTabs
+          value={editorSection}
+          onChange={setEditorSection}
+          sections={['basics', 'lines', 'terms', 'notes']}
+        />
+        <div style={editorPanelStyle(editorSection === 'basics')}>
         <div style={formGridStyle}>
           <div style={fieldStyle}>
             <label style={labelStyle} htmlFor="sd-account">
@@ -216,34 +228,9 @@ export default function SalesDealFormModal({
             onChange={({ code, note }) => set({ lost_reason_code: code, lost_reason: note })}
           />
         ) : null}
-
-        <div style={formGridStyle}>
-          <div style={fieldStyle}>
-            <label style={labelStyle} htmlFor="sd-next">
-              Next action{isOpen ? '' : ' (optional)'}
-            </label>
-            <input
-              id="sd-next"
-              style={inputStyle}
-              value={v.next_action}
-              placeholder="Send the quote after the discovery call"
-              onChange={(e) => set({ next_action: e.target.value })}
-            />
-          </div>
-          <div style={fieldStyle}>
-            <label style={labelStyle} htmlFor="sd-next-date">
-              By when
-            </label>
-            <input
-              id="sd-next-date"
-              type="date"
-              style={inputStyle}
-              value={v.next_action_date ?? ''}
-              onChange={(e) => set({ next_action_date: e.target.value || null })}
-            />
-          </div>
         </div>
 
+        <div style={editorPanelStyle(editorSection === 'lines')}>
         <div style={{ border: `1px solid ${colors.border}`, borderRadius: 10, padding: 12, marginBottom: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Quote (AED, excluding VAT)</div>
           <div style={formGridStyle}>
@@ -368,7 +355,38 @@ export default function SalesDealFormModal({
             Leave the start empty to start on the first of next month.
           </div>
         </div>
+        </div>
 
+        <div style={editorPanelStyle(editorSection === 'terms')}>
+        <div style={formGridStyle}>
+          <div style={fieldStyle}>
+            <label style={labelStyle} htmlFor="sd-next">
+              Next action{isOpen ? '' : ' (optional)'}
+            </label>
+            <input
+              id="sd-next"
+              style={inputStyle}
+              value={v.next_action}
+              placeholder="Send the quote after the discovery call"
+              onChange={(e) => set({ next_action: e.target.value })}
+            />
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle} htmlFor="sd-next-date">
+              By when
+            </label>
+            <input
+              id="sd-next-date"
+              type="date"
+              style={inputStyle}
+              value={v.next_action_date ?? ''}
+              onChange={(e) => set({ next_action_date: e.target.value || null })}
+            />
+          </div>
+        </div>
+        </div>
+
+        <div style={editorPanelStyle(editorSection === 'notes')}>
         <div style={{ ...fieldStyle, marginBottom: 12 }}>
           <label style={labelStyle} htmlFor="sd-notes">
             Notes
@@ -379,6 +397,7 @@ export default function SalesDealFormModal({
             value={v.notes}
             onChange={(e) => set({ notes: e.target.value })}
           />
+        </div>
         </div>
 
         {error ? <p style={{ color: colors.danger, margin: '0 0 10px', fontSize: 13 }}>{error}</p> : null}

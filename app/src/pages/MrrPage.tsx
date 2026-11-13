@@ -17,15 +17,13 @@ import {
   cardStyle,
   colors,
   kpiGridStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   sectionTitleStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 const num: CSSProperties = { ...tdStyle, textAlign: 'right', whiteSpace: 'nowrap' }
 const numTh: CSSProperties = { ...thStyle, textAlign: 'right' }
@@ -66,9 +64,14 @@ export default function MrrPage() {
 
   if (!allowed) {
     return (
-      <div style={pageStyle}>
-        <h1 style={pageTitleStyle}>MRR</h1>
-        <p style={{ color: colors.muted }}>Only managers and admins can see revenue figures.</p>
+      <div className={docsStyles.page}>
+        <header className={docsStyles.hero}>
+          <div>
+            <p className={docsStyles.kicker}>Finance</p>
+            <h1 className={docsStyles.title}>MRR</h1>
+            <p className={docsStyles.subtitle}>Only managers and admins can see revenue figures.</p>
+          </div>
+        </header>
       </div>
     )
   }
@@ -82,14 +85,17 @@ export default function MrrPage() {
   )
 
   return (
-    <div style={pageStyle}>
-      <div>
-        <h1 style={pageTitleStyle}>Monthly recurring revenue</h1>
-        <p style={pageSubtitleStyle}>
-          What clients pay each month for their AI CRM, from their contracts, in AED before VAT. Setup fees are one off, so
-          they are not included. A month counts a contract that runs to the end of it. Past months use today's fees.
-        </p>
-      </div>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
+        <div>
+          <p className={docsStyles.kicker}>Finance</p>
+          <h1 className={docsStyles.title}>Monthly recurring revenue</h1>
+          <p className={docsStyles.subtitle}>
+            What clients pay each month for their AI CRM, from their contracts, in AED before VAT. Setup fees are one off, so
+            they are not included. A month counts a contract that runs to the end of it. Past months use today's fees.
+          </p>
+        </div>
+      </header>
 
       {!view ? (
         <p style={{ color: colors.muted }}>Loading…</p>

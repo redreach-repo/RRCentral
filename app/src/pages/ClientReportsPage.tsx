@@ -14,11 +14,9 @@ import {
   cardStyle,
   colors,
   inputStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 const smallBtn = { ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 13 }
 const muted = { color: colors.muted, fontSize: 13 }
@@ -67,12 +65,17 @@ export default function ClientReportsPage() {
   const sent = queue?.drafts.filter((d) => d.status === 'sent').length ?? 0
 
   return (
-    <div style={pageStyle}>
-      <h1 style={pageTitleStyle}>Monthly reports</h1>
-      <p style={pageSubtitleStyle}>
-        On the 1st each AI CRM client gets a report for the month before, with a summary drafted by AI. Check the summary, fix
-        anything, then send it. Nothing goes to a client without someone pressing Send.
-      </p>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
+        <div>
+          <p className={docsStyles.kicker}>Clients</p>
+          <h1 className={docsStyles.title}>Monthly reports</h1>
+          <p className={docsStyles.subtitle}>
+            On the 1st each AI CRM client gets a report for the month before, with a summary drafted by AI. Check the summary, fix
+            anything, then send it. Nothing goes to a client without someone pressing Send.
+          </p>
+        </div>
+      </header>
 
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', margin: '12px 0 16px' }}>
         <select aria-label="Report month" style={{ ...selectStyle, width: 'auto' }} value={month} onChange={(e) => setMonth(e.target.value)}>
