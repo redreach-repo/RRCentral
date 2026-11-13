@@ -1787,6 +1787,8 @@ var PORTAL_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 var LEGAL_SIGN_LINK_DAYS = 30;
 var LEGAL_SIGN_PDF_MAX_CHARS = 8e6;
 var LEGAL_SIGNATURE_MAX_CHARS = 6e5;
+var LEGAL_SIGN_ASSENT_BLURB = "Read the PDF, draw your signature, type your full name and date. We keep your name, signature, date, time and internet address as an electronic signing record of your assent. This is not a UAE Qualified Electronic Signature (QES).";
+var LEGAL_SIGN_DONE_BLURB = "A copy of this signing record is kept in Red Reach\u2019s files. It is an assent capture, not a UAE Qualified Electronic Signature.";
 function legalSignLinkState(row, now = /* @__PURE__ */ new Date()) {
   if (row.signed_at) return "signed";
   if (row.revoked_at) return "revoked";
@@ -1842,6 +1844,8 @@ function legalDocLabel(docType) {
 }
 export {
   LEGAL_SIGNATURE_MAX_CHARS,
+  LEGAL_SIGN_ASSENT_BLURB,
+  LEGAL_SIGN_DONE_BLURB,
   LEGAL_SIGN_LINK_DAYS,
   LEGAL_SIGN_PDF_MAX_CHARS,
   LEGAL_SIGN_STATE_LABELS,

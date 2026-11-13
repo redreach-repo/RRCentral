@@ -17,6 +17,13 @@ export const LEGAL_SIGN_PDF_MAX_CHARS = 8_000_000
 /** Max length of a PNG data-URL signature (about 400 KB raw). */
 export const LEGAL_SIGNATURE_MAX_CHARS = 600_000
 
+/** Client-facing copy for `/sign` — assent evidence, not UAE QES (see COMPLIANCE_NOTES § E-sign). */
+export const LEGAL_SIGN_ASSENT_BLURB =
+  'Read the PDF, draw your signature, type your full name and date. We keep your name, signature, date, time and internet address as an electronic signing record of your assent. This is not a UAE Qualified Electronic Signature (QES).'
+
+export const LEGAL_SIGN_DONE_BLURB =
+  'A copy of this signing record is kept in Red Reach’s files. It is an assent capture, not a UAE Qualified Electronic Signature.'
+
 export type LegalDocType = 'nda' | 'service_agreement' | 'other'
 export type LegalDocStatus = 'draft' | 'sent' | 'signed' | 'expired' | 'void'
 
