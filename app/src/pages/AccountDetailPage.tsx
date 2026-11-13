@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import FirefliesCallModal from '../components/accounts/FirefliesCallModal'
 import { canAttachCalls, meetingNotesForAi } from '../lib/fireflies'
@@ -114,9 +114,49 @@ function day(value: string | null): string {
 
 const smallBtn = { ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }
 
+type AccountTab = 'overview' | 'sales' | 'delivery' | 'modules' | 'files' | 'money'
+
+const ACCOUNT_TABS: { id: AccountTab; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'sales', label: 'Sales' },
+  { id: 'delivery', label: 'Delivery' },
+  { id: 'modules', label: 'Modules' },
+  { id: 'files', label: 'Files' },
+  { id: 'money', label: 'Money' },
+]
+
+const tabBarStyle: CSSProperties = {
+  display: 'flex',
+  gap: 4,
+  padding: 4,
+  marginBottom: 16,
+  borderRadius: 14,
+  background: 'rgba(255,255,255,0.04)',
+  border: '1px solid rgba(255,255,255,0.1)',
+  overflowX: 'auto',
+  maxWidth: '100%',
+}
+
+function tabBtnStyle(active: boolean): CSSProperties {
+  return {
+    appearance: 'none',
+    border: 'none',
+    background: active ? 'rgba(232,93,4,0.2)' : 'transparent',
+    color: active ? '#ffb56a' : 'rgba(242,244,247,0.62)',
+    fontSize: 13,
+    fontWeight: 600,
+    padding: '8px 14px',
+    borderRadius: 10,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    fontFamily: 'inherit',
+  }
+}
+
 export default function AccountDetailPage() {
   const { id = '' } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user, userRole, appUserId } = useAuth()
   const { showToast } = useToast()
   const [account, setAccount] = useState<Account | null>(null)
@@ -314,6 +354,31 @@ export default function AccountDetailPage() {
   const sortedContacts = sortContacts(contacts)
   const items = sortTimeline(timeline)
 
+  const isAi = account.type === 'ai_crm_client'
+  const isCtrm = account.type === 'ctrm_prospect'
+  const isWorship = account.type === 'worship_church'
+
+  const visibleTabs = ACCOUNT_TABS.filter((t) => {
+    if (t.id === 'overview' || t.id === 'modules') return true
+    if (t.id === 'sales') return isAi || isCtrm
+    if (t.id === 'delivery') return isAi
+    if (t.id === 'files') return isAi
+    if (t.id === 'money') return seesMoney
+    return false
+  })
+
+  const tabParam = searchParams.get('tab') as AccountTab | null
+  const tab: AccountTab = visibleTabs.some((t) => t.id === tabParam)
+    ? (tabParam as AccountTab)
+    : 'overview'
+
+  function setTab(next: AccountTab) {
+    const params = new URLSearchParams(searchParams)
+    if (next === 'overview') params.delete('tab')
+    else params.set('tab', next)
+    setSearchParams(params, { replace: true })
+  }
+
   return (
     <div style={pageStyle}>
       <Link
@@ -393,6 +458,23 @@ export default function AccountDetailPage() {
         ) : null}
       </div>
 
+      <div style={tabBarStyle} role="tablist" aria-label="Account sections">
+        {visibleTabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            style={tabBtnStyle(tab === t.id)}
+            onClick={() => setTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'overview' ? (
+      <>
       <div style={dualPanelGridStyle}>
         <section style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
@@ -571,22 +653,42 @@ export default function AccountDetailPage() {
       </div>
 
       <AccountCrmCard account={account} />
-
-      {account.type === 'ai_crm_client' ? (
-        <AccountSalesDealCard
-          account={account}
-          team={team}
-          editable={editable}
-          canContract={can(userRole, 'delivery.contracts')}
-          author={author}
-          onChanged={() => {
-            void load()
-            setDeliveryKey((k) => k + 1)
-          }}
-        />
+      </>
       ) : null}
 
-      {account.type === 'ai_crm_client' ? (
+      {tab === 'sales' ? (
+        <>
+          {isAi ? (
+            <AccountSalesDealCard
+              account={account}
+              team={team}
+              editable={editable}
+              canContract={can(userRole, 'delivery.contracts')}
+              author={author}
+              onChanged={() => {
+                void load()
+                setDeliveryKey((k) => k + 1)
+              }}
+            />
+          ) : null}
+          {isCtrm ? (
+            <>
+              <FitSheetCard account={account} contacts={sortedContacts} editable={editable} author={author} />
+              <AccountDealsCard
+                account={account}
+                contacts={contacts}
+                team={team}
+                editable={editable}
+                showCommission={can(userRole, 'ctrm.commission')}
+                author={author}
+                onChanged={() => void load()}
+              />
+            </>
+          ) : null}
+        </>
+      ) : null}
+
+      {tab === 'delivery' && isAi ? (
         <DeliveryPanel
           key={deliveryKey}
           account={account}
@@ -598,42 +700,30 @@ export default function AccountDetailPage() {
         />
       ) : null}
 
-      {account.type === 'ai_crm_client' ? (
+      {tab === 'files' && isAi ? (
         <>
           <PortalLinksCard account={account} contacts={sortedContacts} editable={editable} author={author} />
           <PortalUploadsCard account={account} editable={editable} />
         </>
       ) : null}
 
-      {account.type === 'worship_church' ? (
-        <ChurchProductCard account={account} editable={editable} author={author} onChanged={() => void load()} />
+      {tab === 'modules' ? (
+        <>
+          {isWorship ? (
+            <ChurchProductCard account={account} editable={editable} author={author} onChanged={() => void load()} />
+          ) : null}
+          {isCtrm ? (
+            <>
+              <CtrmTermsCard account={account} editable={editable} author={author} />
+              <SessionsCard account={account} editable={editable} author={author} />
+            </>
+          ) : null}
+          <AccountTicketsCard account={account} contacts={contacts} team={team} editable={editable} author={author} />
+        </>
       ) : null}
 
-      {account.type === 'ctrm_prospect' ? <FitSheetCard account={account} contacts={sortedContacts} editable={editable} author={author} /> : null}
-
-      {account.type !== 'ctrm_prospect' ? (
-        <AccountTicketsCard account={account} contacts={contacts} team={team} editable={editable} author={author} />
-      ) : (
-        <AccountDealsCard
-          account={account}
-          contacts={contacts}
-          team={team}
-          editable={editable}
-          showCommission={can(userRole, 'ctrm.commission')}
-          author={author}
-          onChanged={() => void load()}
-        />
-      )}
-
-      {account.type === 'ctrm_prospect' ? <CtrmTermsCard account={account} editable={editable} author={author} /> : null}
-      {account.type === 'ctrm_prospect' ? <SessionsCard account={account} editable={editable} author={author} /> : null}
-
-      {account.type === 'ctrm_prospect' ? (
-        <AccountTicketsCard account={account} contacts={contacts} team={team} editable={editable} author={author} />
-      ) : null}
-
-      {seesMoney ? (
-        <section style={{ ...cardStyle, marginTop: 16 }}>
+      {tab === 'money' && seesMoney ? (
+        <section style={{ ...cardStyle, marginTop: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
             <h2 style={sectionTitleStyle}>Quotations and invoices</h2>
             <Link to={`/invoices?account=${account.id}`} style={{ color: colors.muted, fontSize: 12 }}>
