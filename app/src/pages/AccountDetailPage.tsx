@@ -4,6 +4,7 @@ import { format, parseISO } from 'date-fns'
 import FirefliesCallModal from '../components/accounts/FirefliesCallModal'
 import { canAttachCalls, meetingNotesForAi } from '../lib/fireflies'
 import { ArrowLeft, ExternalLink, Link2, Pencil, Plus, Star, Trash2, Unlink } from 'lucide-react'
+import SimpleRowActions from '../components/SimpleRowActions'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
@@ -174,6 +175,7 @@ export default function AccountDetailPage() {
   const [noteKind, setNoteKind] = useState<AccountActivityKind>('note')
   const [noteBody, setNoteBody] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [contactActionsId, setContactActionsId] = useState<string | null>(null)
   const [firefliesOpen, setFirefliesOpen] = useState(false)
   const [callNotesSeed, setCallNotesSeed] = useState<{ notes: string } | null>(null)
 
@@ -444,7 +446,7 @@ export default function AccountDetailPage() {
             ) : null}
             {can(userRole, 'accounts.delete') ? (
               <button type="button" style={buttonDangerStyle} onClick={() => setConfirmDelete(true)}>
-                <Trash2 size={14} />
+                <Trash2 size={14} /> Delete
               </button>
             ) : null}
           </div>
@@ -534,36 +536,25 @@ export default function AccountDetailPage() {
                     ) : null}
                   </div>
                   {editable ? (
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-                      <button
-                        type="button"
-                        style={smallBtn}
-                        aria-label={`Edit ${c.name}`}
-                        onClick={() =>
-                          setContactModal({
-                            id: c.id,
-                            form: {
-                              name: c.name,
-                              role: c.role,
-                              email: c.email,
-                              phone: c.phone,
-                              whatsapp: c.whatsapp,
-                              is_primary: c.is_primary,
-                            },
-                          })
-                        }
-                      >
-                        <Pencil size={12} />
-                      </button>
-                      <button
-                        type="button"
-                        style={{ ...smallBtn, color: colors.danger }}
-                        aria-label={`Remove ${c.name}`}
-                        onClick={() => void handleDeleteContact(c)}
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
+                    <SimpleRowActions
+                      expanded={contactActionsId === c.id}
+                      onToggle={() => setContactActionsId((id) => (id === c.id ? null : c.id))}
+                      onEdit={() =>
+                        setContactModal({
+                          id: c.id,
+                          form: {
+                            name: c.name,
+                            role: c.role,
+                            email: c.email,
+                            phone: c.phone,
+                            whatsapp: c.whatsapp,
+                            is_primary: c.is_primary,
+                          },
+                        })
+                      }
+                      onDelete={() => void handleDeleteContact(c)}
+                      deleteLabel="Remove"
+                    />
                   ) : null}
                 </li>
               ))}
