@@ -1330,32 +1330,38 @@ export default function QuotationsPage() {
             <table className={qStyles.table}>
               <thead>
                 <tr>
-                  <th>Reference</th>
-                  <th>Client</th>
-                  <th>Division</th>
-                  <th>Date</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
+                  <th className={qStyles.colRef}>Reference</th>
+                  <th className={qStyles.colClient}>Client</th>
+                  <th className={qStyles.colDivision}>Division</th>
+                  <th className={qStyles.colDate}>Date</th>
+                  <th className={qStyles.colAmount}>Amount</th>
+                  <th className={qStyles.colStatus}>Status</th>
+                  <th className={qStyles.colActions} style={{ textAlign: 'right' }}>
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((q) => (
                   <tr key={q.id}>
-                    <td>
+                    <td className={qStyles.colRef}>
                       <div className={qStyles.ref}>
                         {q.reference_number || <span className={qStyles.refMuted}>DRAFT</span>}
                       </div>
                       {quoteMeta(q) ? <div className={qStyles.meta}>{quoteMeta(q)}</div> : null}
                     </td>
-                    <td>{q.client || '—'}</td>
-                    <td>{q.vertical || divisionBrand(q.division_code)}</td>
-                    <td>{q.date ? format(new Date(q.date), 'dd MMM yyyy') : '—'}</td>
-                    <td className={qStyles.amount}>{formatAED(q.amount)}</td>
-                    <td>
+                    <td className={`${qStyles.colClient} ${qStyles.clientCell}`}>{q.client || '—'}</td>
+                    <td className={qStyles.colDivision}>{q.vertical || divisionBrand(q.division_code)}</td>
+                    <td className={qStyles.colDate}>
+                      {q.date ? format(new Date(q.date), 'dd MMM yyyy') : '—'}
+                    </td>
+                    <td className={`${qStyles.colAmount} ${qStyles.amount}`}>{formatAED(q.amount)}</td>
+                    <td className={qStyles.colStatus}>
                       <StatusPill status={q.status} />
                     </td>
-                    <td className={qStyles.actionsCell}>{renderQuoteActions(q)}</td>
+                    <td className={`${qStyles.colActions} ${qStyles.actionsCell}`}>
+                      {renderQuoteActions(q)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
