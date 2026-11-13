@@ -14,6 +14,7 @@ import {
   labelStyle,
 } from '../lib/uiStyles'
 import { errorMessage } from '../lib/errors'
+import { parseScheduleMeetingForm } from '../lib/schemas/scheduleMeeting'
 
 type Props = {
   open: boolean
@@ -62,24 +63,18 @@ export default function ScheduleMeetingModal({
   }
 
   async function save() {
-    if (!title.trim()) {
-      setError('Title is required')
-      return
-    }
-    if (!date) {
-      setError('Date is required')
-      return
-    }
     const attendeeEmails = mergeAttendeeEmails(selectedTeam)
-    if (!attendeeEmails.length) {
-      setError('Select at least one team member to invite')
-      return
-    }
-    const [hourStr, minuteStr] = time.split(':')
-    const startHour = Number(hourStr)
-    const startMinute = Number(minuteStr) || 0
-    if (!Number.isFinite(startHour)) {
-      setError('Invalid start time')
+    const parsed = parseScheduleMeetingForm({
+      title,
+      date,
+      time,
+      duration,
+      location,
+      notes,
+      attendeeEmails,
+    })
+    if (!parsed.ok) {
+      setError(parsed.error)
       return
     }
 
@@ -87,14 +82,14 @@ export default function ScheduleMeetingModal({
     setError('')
     try {
       await getCalendarProvider(settings).createTeamMeeting(settings, {
-        title: title.trim(),
-        date,
-        startHour,
-        startMinute,
-        durationMinutes: Number(duration) || 30,
-        location,
-        description: notes.trim(),
-        attendeeEmails,
+        title: parsed.data.title,
+        date: parsed.data.date,
+        startHour: parsed.data.startHour,
+        startMinute: parsed.data.startMinute,
+        durationMinutes: parsed.data.durationMinutes,
+        location: parsed.data.location,
+        description: parsed.data.description,
+        attendeeEmails: parsed.data.attendeeEmails,
         crmCompany: selectedCrm?.company_name,
       })
       onCreated()

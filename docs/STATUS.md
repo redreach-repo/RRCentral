@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod quote templates
+**Current milestone:** Continuous backlog — M1 Zod schedule meeting
 
 ## Shipped this turn
 
-- Zod `parseQuoteTemplateForm` for quote template name / division / line items
+- Zod `parseScheduleMeetingForm` for team meeting title / date / time / attendees
 
 ## Already on main
 
-- Continuous backlog Zod through custom field definitions · M3a demo prep · QTSP scaffold · `pipeline_deals_v`
+- Continuous backlog Zod through quote templates · M3a demo prep · QTSP scaffold · `pipeline_deals_v`
 
 ## Still open (agent queue)
 
