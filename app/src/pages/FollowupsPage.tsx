@@ -31,12 +31,7 @@ import {
   DEFAULT_WHATSAPP_FOLLOWUP_QUOTE,
   loadFollowUpDocument,
 } from '../lib/followUpMessage'
-import {
-  deleteZohoCalendarEvent,
-  isZohoCalendarEnabled,
-  isZohoMailEnabled,
-  syncFollowUpToZohoCalendar,
-} from '../lib/zoho'
+import { getCalendarProvider, getMailProvider } from '../lib/mailCalendar'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -169,11 +164,11 @@ export default function FollowupsPage() {
         updated_at: new Date().toISOString(),
       }
 
-      if (isZohoCalendarEnabled(settings)) {
+      if (getCalendarProvider(settings).isEnabled(settings)) {
         try {
           const contacts = hydrateContacts(entry)
           const p = primaryContact(contacts)
-          const eventId = await syncFollowUpToZohoCalendar(settings, {
+          const eventId = await getCalendarProvider(settings).syncFollowUp(settings, {
             company: entry.company_name,
             nextAction: entry.next_action,
             owner: entry.owner,
@@ -190,7 +185,7 @@ export default function FollowupsPage() {
         } catch (calErr) {
           showToast(
             calErr instanceof Error
-              ? `Snoozed locally; Zoho Calendar: ${calErr.message}`
+              ? `Snoozed locally; calendar: ${calErr.message}`
               : 'Snoozed locally; calendar sync failed',
             'error',
           )
@@ -212,13 +207,13 @@ export default function FollowupsPage() {
   async function clearFollowUp(entry: CrmEntry) {
     setBusyId(entry.id)
     try {
-      if (isZohoCalendarEnabled(settings) && entry.calendar_event_id) {
+      if (getCalendarProvider(settings).isEnabled(settings) && entry.calendar_event_id) {
         try {
-          await deleteZohoCalendarEvent(settings, entry.calendar_event_id)
+          await getCalendarProvider(settings).deleteEvent(settings, entry.calendar_event_id)
         } catch (calErr) {
           showToast(
             calErr instanceof Error
-              ? `Cleared locally; Zoho Calendar: ${calErr.message}`
+              ? `Cleared locally; calendar: ${calErr.message}`
               : 'Cleared locally; calendar delete failed',
             'error',
           )
@@ -286,12 +281,12 @@ export default function FollowupsPage() {
         patch.follow_up_date = updateFollowDate
       }
 
-      if (isZohoCalendarEnabled(settings) && nextDate !== undefined) {
+      if (getCalendarProvider(settings).isEnabled(settings) && nextDate !== undefined) {
         try {
           const contacts = hydrateContacts(updateTarget)
           const p = primaryContact(contacts)
           if (nextDate) {
-            const eventId = await syncFollowUpToZohoCalendar(settings, {
+            const eventId = await getCalendarProvider(settings).syncFollowUp(settings, {
               company: updateTarget.company_name,
               nextAction: (patch.next_action as string) || updateTarget.next_action,
               owner: updateTarget.owner,
@@ -306,13 +301,13 @@ export default function FollowupsPage() {
             })
             if (eventId) patch.calendar_event_id = eventId
           } else if (updateTarget.calendar_event_id) {
-            await deleteZohoCalendarEvent(settings, updateTarget.calendar_event_id)
+            await getCalendarProvider(settings).deleteEvent(settings, updateTarget.calendar_event_id)
             patch.calendar_event_id = ''
           }
         } catch (calErr) {
           showToast(
             calErr instanceof Error
-              ? `Saved locally; Zoho Calendar: ${calErr.message}`
+              ? `Saved locally; calendar: ${calErr.message}`
               : 'Saved locally; calendar sync failed',
             'error',
           )
@@ -469,7 +464,7 @@ export default function FollowupsPage() {
           <h1 className={docsStyles.title}>Follow-ups</h1>
           <p className={docsStyles.subtitle}>
             Overdue and upcoming CRM actions
-            {isZohoCalendarEnabled(settings) ? ' · Zoho Calendar sync on' : ''}
+            {getCalendarProvider(settings).isEnabled(settings) ? ` · ${getCalendarProvider(settings).label} Calendar sync on` : ''}
             . Click Actions on a card for snooze, clear, or outreach.
           </p>
         </div>
@@ -631,7 +626,7 @@ export default function FollowupsPage() {
           company: settings.companyName || 'Red Reach Middle East FZE',
           contact: emailTarget ? primaryContact(hydrateContacts(emailTarget))?.name || 'team' : 'team',
         })}
-        zohoEnabled={isZohoMailEnabled(settings)}
+        zohoEnabled={getMailProvider(settings).isEnabled(settings)}
         onClose={() => setEmailTarget(null)}
       />
 

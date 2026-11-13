@@ -21,6 +21,7 @@ import {
 import { clearLocalData, DB_NAME } from '../lib/localDb'
 import { downloadCentralBackup } from '../lib/centralBackup'
 import { importCloudDumpFromFile } from '../lib/importCloudDump'
+import { activeMailCalendarProviderLabel } from '../lib/mailCalendar'
 import { testZohoConnection } from '../lib/zoho'
 import { authApi, MIN_PASSWORD_LENGTH } from '../lib/authApi'
 import { parseAppUserForm } from '../lib/schemas/appUser'
@@ -1341,6 +1342,23 @@ export default function SettingsPage() {
         <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
           <Plug size={18} /> Zoho Calendar &amp; Mail
         </h2>
+        <p
+          style={{
+            margin: '0 0 12px',
+            fontSize: 13,
+            color: colors.muted,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            flexWrap: 'wrap',
+          }}
+        >
+          <span>
+            Active provider:{' '}
+            <strong style={{ color: colors.text }}>{activeMailCalendarProviderLabel(draft)}</strong>
+          </span>
+          <span style={{ color: colors.muted2 }}>(switcher in a later M4 slice)</span>
+        </p>
         {can(userRole, 'settings.manage') &&
         (draft.zohoPostHardeningRotationAck ?? settings.zohoPostHardeningRotationAck ?? 'no') !==
           'yes' &&

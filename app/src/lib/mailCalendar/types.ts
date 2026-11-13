@@ -65,8 +65,21 @@ export type ListEventsOpts = {
   end: Date
 }
 
+/** CRM follow-up → calendar event payload (provider-neutral). */
+export type FollowUpEventInput = {
+  company: string
+  nextAction?: string
+  owner?: string
+  contactName?: string
+  contactEmail?: string
+  teamAttendeeEmails?: string[]
+  followUpDate: string
+  existingEventId?: string
+}
+
 export interface MailProvider {
   id: ProviderId
+  label: string
   isConfigured(settings: ProviderSettings): boolean
   isEnabled(settings: ProviderSettings): boolean
   sendMail(settings: ProviderSettings, opts: SendMailOpts): Promise<void>
@@ -77,10 +90,14 @@ export interface MailProvider {
 
 export interface CalendarProvider {
   id: ProviderId
+  label: string
   isConfigured(settings: ProviderSettings): boolean
   isEnabled(settings: ProviderSettings): boolean
   listCalendars(settings: ProviderSettings): Promise<CalendarInfo[]>
   listEvents(settings: ProviderSettings, opts: ListEventsOpts): Promise<CalendarEvent[]>
   createTeamMeeting(settings: ProviderSettings, input: TeamMeetingInput): Promise<string>
+  /** Create or update a CRM follow-up event. Returns event id (or '' when calendar disabled). */
+  syncFollowUp(settings: ProviderSettings, input: FollowUpEventInput): Promise<string>
+  deleteEvent(settings: ProviderSettings, eventId: string): Promise<void>
   webUrl(settings: ProviderSettings): string
 }
