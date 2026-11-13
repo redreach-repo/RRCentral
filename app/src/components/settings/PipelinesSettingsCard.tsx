@@ -58,10 +58,16 @@ export default function PipelinesSettingsCard() {
   const [editing, setEditing] = useState<PipelineStage | null>(null)
   const [busy, setBusy] = useState(false)
   const [actionsId, setActionsId] = useState<string | null>(null)
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    label: string
+    color: string
+    outcome: PipelineOutcome
+    sort_order: number
+    active: boolean
+  }>({
     label: '',
     color: DEFAULT_STAGE_COLORS[0],
-    outcome: 'open' as PipelineOutcome,
+    outcome: 'open',
     sort_order: 0,
     active: true,
   })
@@ -196,7 +202,7 @@ export default function PipelinesSettingsCard() {
                 style={{
                   ...buttonSecondaryStyle,
                   ...(selected?.id === p.id
-                    ? { borderColor: colors.brand, color: colors.brand, fontWeight: 600 }
+                    ? { borderColor: colors.accent, color: colors.accent, fontWeight: 600 }
                     : {}),
                 }}
               >
