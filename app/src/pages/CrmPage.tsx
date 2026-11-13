@@ -23,7 +23,8 @@ import CrmRowActions from '../components/crm/CrmRowActions'
 import { db } from '../lib/db'
 import { CRM_OUTCOME_REASONS, NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
 import { loadCrmStageKeys } from '../lib/pipelines'
-import { crmMoveProblem, isLostReason } from '../lib/dealRules'
+import { crmMoveProblem } from '../lib/dealRules'
+import { parseCrmForm } from '../lib/schemas/crm'
 import LostReasonFields from '../components/deals/LostReasonFields'
 import type { ActivityLogEntry, AppUser, CrmContact, CrmEntry, CustomerDocument, Invoice, Quotation } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -979,61 +980,53 @@ export default function CrmPage() {
 
   async function handleSave(e: FormEvent) {
     e.preventDefault()
-    if (!form.company_name.trim()) {
-      setError('Company name is required')
+    const parsed = parseCrmForm({
+      company_name: form.company_name,
+      company_owner: form.company_owner,
+      address: form.address,
+      website: form.website,
+      trn: form.trn,
+      notes: form.notes,
+      follow_up_date: form.follow_up_date,
+      next_action: form.next_action,
+      owner: form.owner,
+      pipeline_stage: form.pipeline_stage || 'Lead',
+      quote_ref: form.quote_ref,
+      outcome_reason: form.outcome_reason,
+      lost_note: form.lost_note,
+      previous_stage: editing?.pipeline_stage || '',
+    })
+    if (!parsed.ok) {
+      setError(parsed.error)
       return
     }
-    const stage = form.pipeline_stage || 'Lead'
-    const closed = stage === 'Won' || stage === 'Lost'
-    if (!closed) {
-      if (!form.follow_up_date) {
-        setError('Follow-up date is required for open deals')
-        return
-      }
-      if (!form.next_action.trim()) {
-        setError('Next action is required for open deals')
-        return
-      }
-    }
-    if (closed && !form.outcome_reason.trim()) {
-      setError(`${stage} reason is required`)
-      return
-    }
-    if (stage === 'Lost' && (editing?.pipeline_stage || '') !== 'Lost') {
-      if (!isLostReason(form.outcome_reason)) {
-        setError('Pick why the deal was lost from the list')
-        return
-      }
-      if (!form.lost_note.trim()) {
-        setError('Add a note on why the deal was lost')
-        return
-      }
-    }
+    const f = parsed.data
+    const stage = f.pipeline_stage || 'Lead'
     setSaving(true)
     setError('')
     const who = user?.email || ''
     const contacts = normalizeContacts(form.contacts)
     const flat = flatFieldsFromContacts(contacts)
-    const followUpDate = form.follow_up_date || null
+    const followUpDate = f.follow_up_date || null
     const prevEventId = editing?.calendar_event_id || ''
 
     const payload: Record<string, unknown> = {
-      company_name: form.company_name.trim(),
+      company_name: f.company_name,
       ...flat,
       contacts,
-      company_owner: form.company_owner.trim(),
-      address: form.address.trim(),
-      website: form.website.trim(),
-      trn: form.trn.trim(),
-      notes: form.notes.trim(),
+      company_owner: f.company_owner,
+      address: f.address,
+      website: f.website,
+      trn: f.trn,
+      notes: f.notes.trim(),
       follow_up_date: followUpDate,
-      next_action: form.next_action,
-      owner: form.owner,
+      next_action: f.next_action,
+      owner: f.owner,
       pipeline_stage: stage,
-      quote_ref: form.quote_ref.trim(),
-      outcome_reason: form.outcome_reason.trim(),
+      quote_ref: f.quote_ref,
+      outcome_reason: f.outcome_reason,
       // Only sent with Lost, so saving works before the Wave 3 SQL is run.
-      ...(stage === 'Lost' ? { lost_note: form.lost_note.trim() } : {}),
+      ...(stage === 'Lost' ? { lost_note: f.lost_note } : {}),
       updated_by: who,
       updated_at: new Date().toISOString(),
     }
@@ -1071,8 +1064,8 @@ export default function CrmPage() {
       await logActivity(
         editing ? 'update_crm' : 'create_crm',
         'crm',
-        form.company_name.trim(),
-        `${form.pipeline_stage || 'Lead'} · ${form.next_action || 'no action'}`,
+        f.company_name,
+        `${stage} · ${f.next_action || 'no action'}`,
         who,
         savedId,
       )
@@ -1080,7 +1073,7 @@ export default function CrmPage() {
       await maybeTriggerStageWorkflows(
         {
           id: savedId,
-          company_name: form.company_name.trim(),
+          company_name: f.company_name,
           pipeline_stage: editing?.pipeline_stage || 'Lead',
         },
         stage,
@@ -1092,12 +1085,12 @@ export default function CrmPage() {
           const p = primaryContact(contacts)
           if (followUpDate) {
             const eventId = await getCalendarProvider(settings).syncFollowUp(settings, {
-              company: form.company_name.trim(),
-              nextAction: form.next_action,
-              owner: form.owner,
+              company: f.company_name,
+              nextAction: f.next_action,
+              owner: f.owner,
               contactName: p?.name,
               contactEmail: p?.email,
-              teamAttendeeEmails: resolveOwnerEmails(form.owner, teamForCalendar),
+              teamAttendeeEmails: resolveOwnerEmails(f.owner, teamForCalendar),
               followUpDate,
               existingEventId: prevEventId || undefined,
             })
