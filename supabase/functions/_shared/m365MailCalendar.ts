@@ -1,4 +1,4 @@
-// Microsoft 365 Phase A: delegated Mail.Send + Calendars.ReadWrite.
+// Microsoft 365 Phase A+B: Mail.Send + Mail.Read + Calendars.ReadWrite.
 // Secrets: MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET (+ optional MICROSOFT_TENANT_ID).
 // See docs/COMPLIANCE_NOTES.md § M365.
 import type { SupabaseClient } from "jsr:@supabase/supabase-js@2"
@@ -10,8 +10,22 @@ export const M365_SCOPES = [
   "offline_access",
   "User.Read",
   "Mail.Send",
+  "Mail.Read",
   "Calendars.ReadWrite",
 ].join(" ")
+
+export type M365MailMessage = {
+  messageId: string
+  subject: string
+  fromAddress: string
+  sender: string
+  summary: string
+  receivedTime: number
+  status: "read" | "unread"
+  hasAttachment: boolean
+  folderId: string
+  toAddress?: string
+}
 
 export type M365Connection = {
   refresh_token: string
@@ -120,6 +134,48 @@ export async function loadM365Connection(sb: SupabaseClient): Promise<M365Connec
   const row = data as M365Connection | null
   if (!row?.refresh_token) return null
   return row
+}
+
+/** List recent messages from a well-known folder (inbox / sentitems). Phase B Mail.Read. */
+export async function listM365FolderMessages(
+  accessToken: string,
+  opts: {
+    folder: "inbox" | "sentitems"
+    limit?: number
+    status?: "all" | "read" | "unread"
+  },
+): Promise<M365MailMessage[]> {
+  const limit = Math.min(Math.max(opts.limit || 25, 1), 50)
+  const q = new URLSearchParams({
+    $top: String(limit),
+    $orderby: "receivedDateTime desc",
+    $select: "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId",
+  })
+  if (opts.status === "unread") q.set("$filter", "isRead eq false")
+  if (opts.status === "read") q.set("$filter", "isRead eq true")
+  const res = await fetch(`${GRAPH}/me/mailFolders/${opts.folder}/messages?${q}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(30_000),
+  })
+  const body = await graphJson(res)
+  const items = (body.value as Array<Record<string, unknown>> | undefined) || []
+  return items.map((raw) => {
+    const from = (raw.from || {}) as { emailAddress?: { address?: string; name?: string } }
+    const toList = (raw.toRecipients as Array<{ emailAddress?: { address?: string } }> | undefined) || []
+    const received = Date.parse(String(raw.receivedDateTime || ""))
+    return {
+      messageId: String(raw.id || ""),
+      subject: String(raw.subject || "(no subject)"),
+      fromAddress: String(from.emailAddress?.address || ""),
+      sender: String(from.emailAddress?.name || from.emailAddress?.address || ""),
+      summary: String(raw.bodyPreview || "").replace(/\s+/g, " ").trim(),
+      receivedTime: Number.isFinite(received) ? received : 0,
+      status: raw.isRead ? "read" : "unread",
+      hasAttachment: Boolean(raw.hasAttachments),
+      folderId: String(raw.parentFolderId || opts.folder),
+      toAddress: toList.map((t) => t.emailAddress?.address).filter(Boolean).join(", ") || undefined,
+    }
+  }).filter((m) => m.messageId)
 }
 
 export async function sendM365Mail(

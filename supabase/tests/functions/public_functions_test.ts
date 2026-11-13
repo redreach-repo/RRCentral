@@ -377,7 +377,7 @@ Deno.test({ name: "gmail-calendar needs a sign in, and Google's answer needs a s
 
 Deno.test({ name: "m365-mail-calendar needs a sign in, and Microsoft's answer needs a signed state", ...opts, fn: async () => {
   const fn = "m365-mail-calendar"
-  for (const action of ["status", "connect", "disconnect", "sendMail", "syncFollowUp", "listEvents"]) {
+  for (const action of ["status", "connect", "disconnect", "sendMail", "listInbox", "listSent", "syncFollowUp", "listEvents"]) {
     assertEquals(await call(fn, post(fn, { action })), 401)
     assertEquals(await call(fn, post(fn, { action }, { Authorization: "Bearer someone" })), 401)
   }
