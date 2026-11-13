@@ -65,6 +65,7 @@ import { can } from '../../lib/permissions'
 import { errorMessage } from '../../lib/errors'
 import { parseDeliveryRequirementForm } from '../../lib/schemas/deliveryRequirement'
 import { parseTimeEntryForm } from '../../lib/schemas/timeEntry'
+import { parseUsageMonthForm } from '../../lib/schemas/usageMonth'
 import { parseUsageSourceForm } from '../../lib/schemas/usageSource'
 import { formatAED } from '../../lib/money'
 import { FORGOTTEN_TIMER_HOURS, elapsedHours, elapsedLabel, hoursLabel, timerHours } from '../../lib/timeTracking'
@@ -480,8 +481,13 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
   }
 
   async function submitUsage() {
+    const parsed = parseUsageMonthForm(usageForm)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
     await run(async () => {
-      await saveUsage(account.id, usageMonth, usageForCalc, usageRow)
+      await saveUsage(account.id, usageMonth, parsed.data, usageRow)
       showToast(`Usage saved for ${monthLabel(usageMonth)}`, 'success')
     }, 'Could not save usage')
   }
