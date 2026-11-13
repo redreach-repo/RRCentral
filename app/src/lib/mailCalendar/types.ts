@@ -4,7 +4,42 @@
  */
 export type ProviderSettings = Record<string, string>
 
-export type ProviderId = 'zoho'
+/** Implemented + reserved ids for the Settings switcher. */
+export type ProviderId = 'zoho' | 'gmail' | 'm365' | 'imap'
+
+export const MAIL_CALENDAR_PROVIDER_SETTING_KEY = 'mailCalendarProvider'
+export const DEFAULT_MAIL_CALENDAR_PROVIDER: ProviderId = 'zoho'
+
+export type ProviderOption = {
+  id: ProviderId
+  label: string
+  /** When false, listed in Settings but not selectable. */
+  available: boolean
+  unavailableReason?: string
+}
+
+/** Catalog for Settings. Only `available: true` providers may be active. */
+export const MAIL_CALENDAR_PROVIDER_OPTIONS: readonly ProviderOption[] = [
+  { id: 'zoho', label: 'Zoho', available: true },
+  {
+    id: 'gmail',
+    label: 'Gmail',
+    available: false,
+    unavailableReason: 'Pending Google restricted-scopes compliance',
+  },
+  {
+    id: 'm365',
+    label: 'Microsoft 365',
+    available: false,
+    unavailableReason: 'Not implemented yet',
+  },
+  {
+    id: 'imap',
+    label: 'IMAP / other',
+    available: false,
+    unavailableReason: 'Not implemented yet',
+  },
+] as const
 
 export type SendMailOpts = {
   to: string

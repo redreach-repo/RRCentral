@@ -21,7 +21,12 @@ import {
 import { clearLocalData, DB_NAME } from '../lib/localDb'
 import { downloadCentralBackup } from '../lib/centralBackup'
 import { importCloudDumpFromFile } from '../lib/importCloudDump'
-import { activeMailCalendarProviderLabel } from '../lib/mailCalendar'
+import {
+  DEFAULT_MAIL_CALENDAR_PROVIDER,
+  MAIL_CALENDAR_PROVIDER_SETTING_KEY,
+  listMailCalendarProviderOptions,
+  resolveMailCalendarProviderId,
+} from '../lib/mailCalendar'
 import { testZohoConnection } from '../lib/zoho'
 import { authApi, MIN_PASSWORD_LENGTH } from '../lib/authApi'
 import { parseAppUserForm } from '../lib/schemas/appUser'
@@ -182,6 +187,10 @@ const ZOHO_KEYS = [
   { key: 'zohoMailAccountId', label: 'Mail account ID (optional)' },
   { key: 'zohoCalendarEnabled', label: 'Calendar sync (yes/no)' },
   { key: 'zohoMailEnabled', label: 'Mail send + inbox (yes/no)' },
+] as const
+
+const MAIL_CALENDAR_PROVIDER_KEYS = [
+  { key: MAIL_CALENDAR_PROVIDER_SETTING_KEY, label: 'Mail & calendar provider' },
 ] as const
 
 type UserForm = {
@@ -789,8 +798,8 @@ export default function SettingsPage() {
   async function handleTestZoho() {
     setTestingZoho(true)
     try {
-      // Persist draft Zoho keys first so test uses latest values
-      for (const { key } of ZOHO_KEYS) {
+      // Persist draft provider + Zoho keys first so test uses latest values
+      for (const { key } of [...MAIL_CALENDAR_PROVIDER_KEYS, ...ZOHO_KEYS]) {
         const value = draft[key] ?? settings[key] ?? ''
         if ((settings[key] ?? '') !== value) {
           await updateSetting(key, value)
@@ -1340,25 +1349,40 @@ export default function SettingsPage() {
 
       <div id="zoho" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
         <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Plug size={18} /> Zoho Calendar &amp; Mail
+          <Plug size={18} /> Mail &amp; calendar
         </h2>
-        <p
-          style={{
-            margin: '0 0 12px',
-            fontSize: 13,
-            color: colors.muted,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            flexWrap: 'wrap',
-          }}
-        >
-          <span>
-            Active provider:{' '}
-            <strong style={{ color: colors.text }}>{activeMailCalendarProviderLabel(draft)}</strong>
-          </span>
-          <span style={{ color: colors.muted2 }}>(switcher in a later M4 slice)</span>
-        </p>
+        <div style={{ ...fieldStyle, maxWidth: 360, marginBottom: 14 }}>
+          <label style={labelStyle} htmlFor="mailCalendarProvider">
+            Provider
+          </label>
+          <select
+            id="mailCalendarProvider"
+            style={inputStyle}
+            value={resolveMailCalendarProviderId({
+              ...settings,
+              ...draft,
+              [MAIL_CALENDAR_PROVIDER_SETTING_KEY]:
+                draft[MAIL_CALENDAR_PROVIDER_SETTING_KEY] ??
+                settings[MAIL_CALENDAR_PROVIDER_SETTING_KEY] ??
+                DEFAULT_MAIL_CALENDAR_PROVIDER,
+            })}
+            onChange={(e) =>
+              setDraft((d) => ({ ...d, [MAIL_CALENDAR_PROVIDER_SETTING_KEY]: e.target.value }))
+            }
+          >
+            {listMailCalendarProviderOptions().map((opt) => (
+              <option key={opt.id} value={opt.id} disabled={!opt.available}>
+                {opt.available
+                  ? opt.label
+                  : `${opt.label} — ${opt.unavailableReason || 'Coming later'}`}
+              </option>
+            ))}
+          </select>
+          <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted2, lineHeight: 1.45 }}>
+            Zoho is active today. Gmail / M365 / IMAP appear when their adapters ship (Gmail after
+            compliance).
+          </p>
+        </div>
         {can(userRole, 'settings.manage') &&
         (draft.zohoPostHardeningRotationAck ?? settings.zohoPostHardeningRotationAck ?? 'no') !==
           'yes' &&
@@ -1400,6 +1424,7 @@ export default function SettingsPage() {
             </div>
           </div>
         ) : null}
+        <h3 style={{ ...sectionTitleStyle, fontSize: 15, margin: '4px 0 8px' }}>Zoho credentials</h3>
         <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.55 }}>
           Connect Zoho so CRM follow-ups sync to Calendar, you can send mail from CRM, and your{' '}
           <strong>Zoho mail</strong> (Inbox + Sent) appears on the Dashboard matched to CRM companies.
@@ -1478,10 +1503,12 @@ export default function SettingsPage() {
           <button
             type="button"
             style={buttonPrimaryStyle}
-            disabled={savingSection === 'Zoho' || settingsLoading}
-            onClick={() => void saveSection(ZOHO_KEYS, 'Zoho')}
+            disabled={savingSection === 'Mail & calendar' || settingsLoading}
+            onClick={() =>
+              void saveSection([...MAIL_CALENDAR_PROVIDER_KEYS, ...ZOHO_KEYS], 'Mail & calendar')
+            }
           >
-            {savingSection === 'Zoho' ? 'Saving…' : 'Save Zoho settings'}
+            {savingSection === 'Mail & calendar' ? 'Saving…' : 'Save mail & calendar'}
           </button>
           <button
             type="button"
@@ -1490,7 +1517,7 @@ export default function SettingsPage() {
             onClick={() => void handleTestZoho()}
           >
             <Plug size={14} />
-            {testingZoho ? 'Testing…' : 'Test connection'}
+            {testingZoho ? 'Testing…' : 'Test Zoho connection'}
           </button>
         </div>
       </div>
