@@ -25,6 +25,8 @@ Merge green PRs bottom-up. Prefer this order so STATUS conflicts stay small:
 16. **#315** — this STATUS (merge near the end, or skip if another PR already refreshed STATUS)  
 17. **#316** — Zod quotation finalize  
 18. **#317** — Zod delivery note from quote
+19. **#318** — Zod ticket AI summary note  
+20. **#319** — Zod Wanders tour-ops booking link
 
 If a PR shows a STATUS-only conflict after an earlier merge, keep **this PR’s** milestone block.
 
