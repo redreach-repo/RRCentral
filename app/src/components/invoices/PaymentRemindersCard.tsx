@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { BellRing, Mail, MessageCircle, Pencil } from 'lucide-react'
+import { BellRing, ChevronDown, ChevronUp, Mail, MessageCircle, Pencil } from 'lucide-react'
 import EmailComposeModal from '../EmailComposeModal'
 import { useAuth } from '../../contexts/AuthContext'
 import { useSettings } from '../../contexts/SettingsContext'
@@ -41,6 +41,7 @@ export default function PaymentRemindersCard() {
   const [contacts, setContacts] = useState<AccountContact[]>([])
   const [emailFor, setEmailFor] = useState<ReminderRow | null>(null)
   const [busy, setBusy] = useState('')
+  const [open, setOpen] = useState(false)
   const company = settings.companyName || 'Red Reach Middle East FZE'
 
   const load = useCallback(async () => {
@@ -139,74 +140,108 @@ export default function PaymentRemindersCard() {
   if (!rows || rows.length === 0) return null
 
   return (
-    <section style={{ ...cardStyle, marginBottom: 16, borderColor: 'rgba(245,158,11,0.45)' }} aria-label="Payment reminders">
-      <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <BellRing size={18} /> Payment reminders due ({rows.length})
-      </h2>
-      <p style={{ color: colors.muted, fontSize: 13, margin: '0 0 8px' }}>
-        Due at 3, 7 and 14 days after the due date. Email or WhatsApp sends the prepared message to the account's
-        contact in one tap and records it, so each stage goes out once. Edit opens the email first.
-      </p>
-      <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-        {rows.map((row) => (
-          <li
-            key={row.invoice.id}
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 8,
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '8px 0',
-              borderTop: '1px solid rgba(255,255,255,0.06)',
-              fontSize: 13,
-            }}
-          >
-            <span style={{ minWidth: 0, flex: '1 1 220px' }}>
-              {row.invoice.account_id ? (
-                <Link to={`/accounts/${row.invoice.account_id}`} style={{ color: colors.text, fontWeight: 600 }}>
-                  {row.invoice.client}
-                </Link>
-              ) : (
-                <strong>{row.invoice.client}</strong>
-              )}{' '}
-              <span style={{ color: colors.muted }}>
-                {row.invoice.reference_number}, {formatAED(row.balance)} owing, due{' '}
-                {format(parseISO(row.due.dueDate), 'd MMM')},{' '}
-              </span>
-              <span style={{ color: row.due.stage === 14 ? colors.danger : colors.warn }}>
-                {row.due.daysLate} days late ({row.due.stage} day reminder)
-              </span>
-            </span>
-            <span style={{ display: 'flex', gap: 6 }}>
-              <button
-                type="button"
-                style={smallBtn}
-                disabled={busy === row.invoice.id || !recipientFor(row, 'email')}
-                title={recipientFor(row, 'email') ? `Send now to ${recipientFor(row, 'email')!.to}` : 'No contact email on this account'}
-                onClick={() => void send(row, 'email')}
+    <section
+      style={{
+        ...cardStyle,
+        marginBottom: 14,
+        padding: open ? 14 : '10px 14px',
+        borderColor: 'rgba(245,158,11,0.4)',
+        background: 'rgba(245,158,11,0.06)',
+      }}
+      aria-label="Payment reminders"
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        style={{
+          all: 'unset',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          width: '100%',
+          cursor: 'pointer',
+          boxSizing: 'border-box',
+        }}
+      >
+        <BellRing size={16} color={colors.warn} />
+        <span style={{ ...sectionTitleStyle, margin: 0, fontSize: 14, flex: 1 }}>
+          {rows.length} payment reminder{rows.length === 1 ? '' : 's'} due
+        </span>
+        <span style={{ fontSize: 12, color: colors.muted }}>
+          {open ? 'Hide' : 'Review'}
+        </span>
+        {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+      </button>
+
+      {open ? (
+        <>
+          <p style={{ color: colors.muted, fontSize: 12, margin: '10px 0 6px', lineHeight: 1.45 }}>
+            Due at 3, 7 and 14 days after the due date. Email or WhatsApp sends once per stage and records it.
+          </p>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {rows.map((row) => (
+              <li
+                key={row.invoice.id}
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '8px 0',
+                  borderTop: '1px solid rgba(255,255,255,0.06)',
+                  fontSize: 13,
+                }}
               >
-                <Mail size={12} /> {busy === row.invoice.id ? 'Sending…' : 'Email'}
-              </button>
-              <button
-                type="button"
-                style={smallBtn}
-                disabled={busy === row.invoice.id || !recipientFor(row, 'whatsapp')}
-                title={recipientFor(row, 'whatsapp') ? `Send now to +${recipientFor(row, 'whatsapp')!.to}` : 'No WhatsApp number on this account'}
-                onClick={() => void send(row, 'whatsapp')}
-              >
-                <MessageCircle size={12} /> WhatsApp
-              </button>
-              <button type="button" style={smallBtn} disabled={busy === row.invoice.id} title="Edit the email before sending" onClick={() => setEmailFor(row)}>
-                <Pencil size={12} /> Edit
-              </button>
-              <button type="button" style={smallBtn} disabled={busy === row.invoice.id} onClick={() => void markSent(row, 'other')}>
-                Mark sent
-              </button>
-            </span>
-          </li>
-        ))}
-      </ul>
+                <span style={{ minWidth: 0, flex: '1 1 220px' }}>
+                  {row.invoice.account_id ? (
+                    <Link to={`/accounts/${row.invoice.account_id}`} style={{ color: colors.text, fontWeight: 600 }}>
+                      {row.invoice.client}
+                    </Link>
+                  ) : (
+                    <strong>{row.invoice.client}</strong>
+                  )}{' '}
+                  <span style={{ color: colors.muted }}>
+                    {row.invoice.reference_number}, {formatAED(row.balance)} owing, due{' '}
+                    {format(parseISO(row.due.dueDate), 'd MMM')},{' '}
+                  </span>
+                  <span style={{ color: row.due.stage === 14 ? colors.danger : colors.warn }}>
+                    {row.due.daysLate} days late ({row.due.stage} day reminder)
+                  </span>
+                </span>
+                <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    style={smallBtn}
+                    disabled={busy === row.invoice.id || !recipientFor(row, 'email')}
+                    title={recipientFor(row, 'email') ? `Send now to ${recipientFor(row, 'email')!.to}` : 'No contact email on this account'}
+                    onClick={() => void send(row, 'email')}
+                  >
+                    <Mail size={12} /> {busy === row.invoice.id ? 'Sending…' : 'Email'}
+                  </button>
+                  <button
+                    type="button"
+                    style={smallBtn}
+                    disabled={busy === row.invoice.id || !recipientFor(row, 'whatsapp')}
+                    title={recipientFor(row, 'whatsapp') ? `Send now to +${recipientFor(row, 'whatsapp')!.to}` : 'No WhatsApp number on this account'}
+                    onClick={() => void send(row, 'whatsapp')}
+                  >
+                    <MessageCircle size={12} /> WhatsApp
+                  </button>
+                  <button type="button" style={smallBtn} disabled={busy === row.invoice.id} title="Edit the email before sending" onClick={() => setEmailFor(row)}>
+                    <Pencil size={12} /> Edit
+                  </button>
+                  <button type="button" style={smallBtn} disabled={busy === row.invoice.id} onClick={() => void markSent(row, 'other')}>
+                    Mark sent
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+
       <EmailComposeModal
         open={Boolean(emailFor)}
         companyName={emailFor?.invoice.client || ''}

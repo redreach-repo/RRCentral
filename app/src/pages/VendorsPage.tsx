@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { Building2, ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Building2, ExternalLink, Plus } from 'lucide-react'
+import VendorRowActions from '../components/vendors/VendorRowActions'
 import { db } from '../lib/db'
 import type { Attachment, Expense, Vendor } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -77,6 +78,7 @@ export default function VendorsPage() {
   const [form, setForm] = useState<VendorForm>(emptyForm())
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Vendor | null>(null)
+  const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
   const [missingTable, setMissingTable] = useState(false)
   const [vendorInvoices, setVendorInvoices] = useState<Expense[]>([])
   const [invoiceAttachments, setInvoiceAttachments] = useState<Attachment[]>([])
@@ -307,7 +309,7 @@ export default function VendorsPage() {
                   <th style={thStyle}>Contact</th>
                   <th style={thStyle}>TRN</th>
                   <th style={thStyle}>Phone / email</th>
-                  <th style={thStyle}></th>
+                  <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -327,17 +329,14 @@ export default function VendorsPage() {
                         <div style={{ fontSize: 11, color: colors.muted2 }}>{v.email}</div>
                       ) : null}
                     </td>
-                    <td style={tdStyle}>
-                      <button type="button" style={buttonSecondaryStyle} onClick={() => openEdit(v)}>
-                        <Pencil size={14} />
-                      </button>{' '}
-                      <button
-                        type="button"
-                        style={buttonDangerStyle}
-                        onClick={() => setDeleteTarget(v)}
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>
+                      <VendorRowActions
+                        vendor={v}
+                        expanded={actionsOpenId === v.id}
+                        onToggle={() => setActionsOpenId((id) => (id === v.id ? null : v.id))}
+                        onEdit={openEdit}
+                        onDelete={setDeleteTarget}
+                      />
                     </td>
                   </tr>
                 ))}

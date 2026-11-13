@@ -3,13 +3,11 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { format, isBefore, isToday, parseISO, startOfDay } from 'date-fns'
 import {
   Plus,
-  Pencil,
   Trash2,
   Search,
   X,
   ExternalLink,
   Loader2,
-  Mail,
   UserPlus,
   MessageCircle,
   FileText,
@@ -18,11 +16,10 @@ import {
   MessageSquarePlus,
   LayoutGrid,
   List,
-  Phone,
   Settings,
   ChevronDown,
-  MoreHorizontal,
 } from 'lucide-react'
+import CrmRowActions from '../components/crm/CrmRowActions'
 import { db } from '../lib/db'
 import { CRM_OUTCOME_REASONS, NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
 import { crmMoveProblem, isLostReason } from '../lib/dealRules'
@@ -220,7 +217,7 @@ export default function CrmPage() {
   const [outcomeReason, setOutcomeReason] = useState('')
   const [sheetTab, setSheetTab] = useState<SheetTab>('overview')
   const [companyDetailsOpen, setCompanyDetailsOpen] = useState(false)
-  const [rowMenuId, setRowMenuId] = useState<string | null>(null)
+  const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
   const [defaultsReady, setDefaultsReady] = useState(false)
   const [calendarSettingsOpen, setCalendarSettingsOpen] = useState(false)
   const [accountLink, setAccountLink] = useState<CrmAccountLink | null>(null)
@@ -388,20 +385,6 @@ export default function CrmPage() {
       }
     })()
   }, [canLinkAccounts])
-
-  useEffect(() => {
-    if (!rowMenuId) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setRowMenuId(null)
-    }
-    const onPointer = () => setRowMenuId(null)
-    window.addEventListener('keydown', onKey)
-    window.addEventListener('pointerdown', onPointer)
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      window.removeEventListener('pointerdown', onPointer)
-    }
-  }, [rowMenuId])
 
   useEffect(() => {
     const editId = searchParams.get('edit')
@@ -834,151 +817,29 @@ export default function CrmPage() {
     }
   }
 
-  function renderCrmRowActions(row: CrmEntry, opts?: { compactPrimary?: boolean }) {
-    const phone = primaryContact(hydrateContacts(row))?.phone || row.mobile_number || row.office_number || ''
-    const compactPrimary = Boolean(opts?.compactPrimary)
-    const menuOpen = rowMenuId === row.id
-    const primaryBtn: CSSProperties = {
-      ...btnGhost,
-      minHeight: 40,
-      padding: '8px 10px',
-      fontSize: 12,
-      fontWeight: 650,
-      gap: 6,
-      display: 'inline-flex',
-      alignItems: 'center',
-      flex: '1 1 auto',
-      justifyContent: 'center',
-    }
-    const iconBtn = compactPrimary ? primaryBtn : btnGhost
-
-    const overflow = (
-      <div style={{ position: 'relative' }}>
-        <button
-          type="button"
-          style={iconBtn}
-          title="More actions"
-          aria-expanded={menuOpen}
-          aria-haspopup="menu"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation()
-            setRowMenuId((id) => (id === row.id ? null : row.id))
-          }}
-        >
-          <MoreHorizontal size={14} />
-          {compactPrimary ? ' More' : null}
-        </button>
-        {menuOpen ? (
-          <div
-            role="menu"
-            style={{
-              position: 'absolute',
-              right: 0,
-              bottom: 'calc(100% + 4px)',
-              zIndex: 30,
-              minWidth: 180,
-              padding: 6,
-              borderRadius: 10,
-              border: `1px solid ${colors.border}`,
-              background: colors.card,
-              boxShadow: '0 12px 28px rgba(0,0,0,0.45)',
-              display: 'grid',
-              gap: 2,
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Link
-              role="menuitem"
-              to={`/quotations?client=${encodeURIComponent(row.company_name)}&new=1`}
-              style={{ ...btnGhost, textDecoration: 'none', justifyContent: 'flex-start' }}
-              onClick={() => setRowMenuId(null)}
-            >
-              <FileText size={14} /> New quote
-            </Link>
-            <button
-              type="button"
-              role="menuitem"
-              style={{ ...btnGhost, justifyContent: 'flex-start' }}
-              onClick={() => {
-                setRowMenuId(null)
-                setEmailTarget(row)
-              }}
-            >
-              <Mail size={14} /> Email
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              style={{ ...btnGhost, justifyContent: 'flex-start' }}
-              disabled={quickBusyId === row.id}
-              onClick={() => {
-                setRowMenuId(null)
-                void openWhatsAppFollowUp(row)
-              }}
-            >
-              <MessageCircle size={14} /> WhatsApp
-            </button>
-            {canDeleteCrm ? (
-              <button
-                type="button"
-                role="menuitem"
-                style={{ ...btnGhost, justifyContent: 'flex-start', color: colors.danger }}
-                onClick={() => {
-                  setRowMenuId(null)
-                  setDeleteTarget(row)
-                }}
-              >
-                <Trash2 size={14} /> Delete
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-    )
-
+  function renderCrmRowActions(row: CrmEntry, opts?: { flush?: boolean }) {
+    const phone =
+      primaryContact(hydrateContacts(row))?.phone || row.mobile_number || row.office_number || ''
     return (
-      <>
-        <button
-          type="button"
-          style={iconBtn}
-          title="Log touch"
-          onClick={() => {
-            setRowMenuId(null)
-            setLogTouchTarget(row)
-          }}
-        >
-          <MessageSquarePlus size={14} />
-          {compactPrimary ? ' Log' : null}
-        </button>
-        {phone ? (
-          <a
-            href={`tel:${phone.replace(/\s+/g, '')}`}
-            style={{ ...iconBtn, textDecoration: 'none' }}
-            title="Call"
-            onClick={() => {
-              void logActivity('call_crm', 'crm', row.company_name, phone, user?.email || '', row.id)
-            }}
-          >
-            <Phone size={14} />
-            {compactPrimary ? ' Call' : null}
-          </a>
-        ) : null}
-        <button
-          type="button"
-          style={iconBtn}
-          title="Open"
-          onClick={() => {
-            setRowMenuId(null)
-            openEdit(row)
-          }}
-        >
-          <Pencil size={14} />
-          {compactPrimary ? ' Open' : null}
-        </button>
-        {overflow}
-      </>
+      <CrmRowActions
+        entry={row}
+        expanded={actionsOpenId === row.id}
+        onToggle={() => setActionsOpenId((id) => (id === row.id ? null : row.id))}
+        busy={quickBusyId === row.id}
+        canDelete={canDeleteCrm}
+        phone={phone}
+        flush={opts?.flush}
+        onLog={(r) => setLogTouchTarget(r)}
+        onCall={(r) => {
+          const p =
+            primaryContact(hydrateContacts(r))?.phone || r.mobile_number || r.office_number || ''
+          void logActivity('call_crm', 'crm', r.company_name, p, user?.email || '', r.id)
+        }}
+        onOpen={(r) => openEdit(r)}
+        onEmail={(r) => setEmailTarget(r)}
+        onWhatsApp={(r) => void openWhatsAppFollowUp(r)}
+        onDelete={(r) => setDeleteTarget(r)}
+      />
     )
   }
 
@@ -1420,7 +1281,7 @@ export default function CrmPage() {
           compact={compact}
           onOpen={openEdit}
           onMoveStage={(row, stage) => void quickPatch(row, { pipeline_stage: stage })}
-          renderActions={(row) => renderCrmRowActions(row, { compactPrimary: compact })}
+          renderActions={(row) => renderCrmRowActions(row, { flush: true })}
         />
       ) : compact ? (
         <div className={resp.listStack}>
@@ -1524,7 +1385,7 @@ export default function CrmPage() {
                   </div>
                 </div>
                 <div className={resp.cardMeta}>Sales owner: {row.owner || 'Unassigned'}</div>
-                <div className={resp.cardActions}>{renderCrmRowActions(row, { compactPrimary: true })}</div>
+                <div className={resp.cardActions}>{renderCrmRowActions(row, { flush: true })}</div>
               </article>
             )
           })}

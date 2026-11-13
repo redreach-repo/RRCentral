@@ -98,7 +98,7 @@ const navGroups: NavGroup[] = [
     icon: Users,
     items: [
       { to: '/quick-add', label: 'Quick add', icon: PhoneCall, minRole: 'sales', section: 'Work' },
-      { to: '/crm', label: 'CRM', icon: Users, section: 'Work' },
+      { to: '/crm', label: 'My Day', icon: Users, section: 'Work' },
       { to: '/deals', label: 'Pipeline', icon: Briefcase, forStaff: true, section: 'Work' },
       { to: '/follow-ups', label: 'Follow-ups', icon: CalendarClock, section: 'Work' },
       { to: '/quotations', label: 'Quotations', icon: FileText, section: 'Documents' },
@@ -226,9 +226,9 @@ const titleByPath: { match: (path: string) => boolean; title: string }[] = [
 
 const phonePrimaryNav: { to: string; label: string; icon: typeof LayoutDashboard; end?: boolean }[] = [
   { to: '/app', label: 'Home', icon: LayoutDashboard, end: true },
-  { to: '/crm', label: 'CRM', icon: Users },
-  { to: '/follow-ups', label: 'Follow-ups', icon: CalendarClock },
+  { to: '/crm', label: 'My Day', icon: Users },
   { to: '/quotations', label: 'Quotes', icon: FileText },
+  { to: '/invoices', label: 'Invoices', icon: Receipt },
 ]
 
 const staffPhoneNav: typeof phonePrimaryNav = [
@@ -514,7 +514,7 @@ export default function Layout() {
                 >
                   <span className={styles.bottomNavIconWrap}>
                     <Icon size={22} strokeWidth={active ? 2.25 : 1.75} />
-                    {to === '/follow-ups' && reminders.due > 0 ? (
+                    {(to === '/crm' || to === '/follow-ups') && reminders.due > 0 ? (
                       <span className={styles.bottomNavBadge} aria-hidden>
                         {reminders.due > 99 ? '99+' : reminders.due}
                       </span>

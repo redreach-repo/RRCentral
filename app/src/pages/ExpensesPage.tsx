@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { FileUp, Paperclip, Pencil, Plus, Trash2, Wallet } from 'lucide-react'
+import { FileUp, Paperclip, Plus, Wallet } from 'lucide-react'
+import ExpenseRowActions from '../components/expenses/ExpenseRowActions'
 import { db } from '../lib/db'
 import { PAYMENT_METHODS, VAT_RATE } from '../lib/config'
 import type { Attachment, Expense, Quotation, Vendor } from '../lib/types'
@@ -134,6 +135,7 @@ export default function ExpensesPage() {
   const [parsing, setParsing] = useState(false)
   const [parseHint, setParseHint] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Expense | null>(null)
+  const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [driveLinkUrl, setDriveLinkUrl] = useState('')
   const [driveLinkTitle, setDriveLinkTitle] = useState('')
@@ -616,7 +618,7 @@ export default function ExpensesPage() {
                   <th style={thStyle}>VAT paid</th>
                   <th style={thStyle}>Total</th>
                   <th style={thStyle}>Quote</th>
-                  <th style={thStyle}></th>
+                  <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -643,23 +645,15 @@ export default function ExpensesPage() {
                       <td style={tdStyle}>{formatAED(parts.vat)}</td>
                       <td style={tdStyle}>{formatAED(parts.inclusive)}</td>
                       <td style={tdStyle}>{e.quote_ref || e.references_text || '—'}</td>
-                      <td style={tdStyle}>
-                        <button type="button" style={buttonSecondaryStyle} onClick={() => openEdit(e)}>
-                          <Pencil size={14} />
-                        </button>
-                        {can(userRole, 'expense.delete') && (
-                          <>
-                            {' '}
-                            <button
-                              type="button"
-                              style={buttonDangerStyle}
-                              onClick={() => setDeleteTarget(e)}
-                              aria-label="Delete expense"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </>
-                        )}
+                      <td style={{ ...tdStyle, textAlign: 'right' }}>
+                        <ExpenseRowActions
+                          expense={e}
+                          expanded={actionsOpenId === e.id}
+                          onToggle={() => setActionsOpenId((id) => (id === e.id ? null : e.id))}
+                          canDelete={can(userRole, 'expense.delete')}
+                          onEdit={openEdit}
+                          onDelete={setDeleteTarget}
+                        />
                       </td>
                     </tr>
                   )
