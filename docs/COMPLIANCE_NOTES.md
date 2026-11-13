@@ -4,7 +4,7 @@ Findings from official sources go here **before** shipping tax, payroll, e-sign,
 
 | Topic | Status | Source checked | Date | Notes |
 |-------|--------|----------------|------|-------|
-| UAE electronic signatures / trust services | not started | — | — | Required before M5 claims |
+| UAE electronic signatures / trust services | **concluded** | See § E-sign below | 13 Nov 2026 | Decree-Law 46/2021 + Cabinet Res. 28/2023. Today’s `/sign` canvas is **not** AdES/QES. Keep as operational evidence; QES only via TDRA-licensed QTSP (ask before paid vendor). |
 | UAE WPS SIF format | not started | — | — | Required before M8 bank file |
 | UAE end-of-service gratuity | not started | — | — | Required before M8 formula |
 | UAE VAT rates / return layout | not started | — | — | Partial product VAT today; verify before M7 return |
@@ -127,3 +127,43 @@ Avoid **application** `Mail.Send` / `Mail.Read` / `Calendars.ReadWrite` for the 
 
 - This note does **not** assert that RR Central will never support IMAP; it only defers it.
 - No IMAP client, connection table, or Edge Function ships in this assessment-only slice.
+
+---
+
+## UAE electronic signatures / trust services (M5) — assessment
+
+**Purpose:** Decide what RR Central may claim for NDA / contract e-sign, and when a TDRA-licensed trust service provider is required before M5 “legal effect” language.
+
+### Official sources (checked 13 Nov 2026, Asia/Dubai)
+
+1. [Federal Decree-Law No. (46) of 2021 on Electronic Transactions and Trust Services](https://uaelegislation.gov.ae/en/legislations/1539) (TDRA English reference PDF) — defines Electronic Signature, Advanced E-Signature (AdES), Qualified E-Signature (QES); TDRA licenses Trust Service Providers (TSP) and Qualified Trust Service Providers (QTSP). **A Qualified E-Signature is deemed equally authentic to a handwritten signature** when Decree-Law conditions are met.
+2. [Cabinet Resolution No. (28) of 2023](https://tdra.gov.ae/-/media/About/Trust-Services/Laws-and-Regulations/Cabinet-Resolution-No-28-of-2023-Regarding-the-Executive-Regulation-of-the-Federal-Decree-Law-EN.ashx) — executive regulation: licensing of TSP/QTSP, high-level requirements for (qualified) trust services.
+3. [UAE Government overview — Electronic Transactions and Trust Services law](https://u.ae/en/about-the-uae/digital-uae/regulatory-framework/electronic-transactions-and-trust-services-law) — TDRA regulates; ICP issues controls for government-sector trust services.
+4. [TDRA Trust Services FAQs](https://tdra.gov.ae/en/About/tdra-sectors/information-and-digital-government/policy-and-programs-department/trust-services/faqs) — licensing process; UAE Trusted List; mutual recognition does **not** by itself allow foreign (Q)TSPs to provide services in the UAE without local authorization / commercial registration.
+5. [UAE Trusted List (machine-readable)](https://uri.trustservices.gov.ae/uae-trusted-list/UAE-TL.xml) — official list of licensed (qualified) trust services for validation.
+
+### Levels (simplified for product decisions)
+
+| Level | Rough meaning | Handwritten-equivalent claim? | Who provides it |
+|-------|---------------|-------------------------------|-----------------|
+| Simple / basic e-signature | Data in electronic form used as a signature (e.g. drawn PNG + identity fields) | **No** automatic QES equivalence | App can capture evidence |
+| Advanced E-Signature (AdES) | Linked to signatory, capable of detecting changes, under signatory’s sole control (Decree-Law tests) | Legal effect when conditions met; not the QES “handwritten” presumption | Licensed TSP path |
+| Qualified E-Signature (QES) | AdES + qualified certificate + qualified signature device + QTSP validation rules | **Yes** — Decree-Law treats as equal to handwritten when valid | **QTSP** on UAE Trusted List |
+
+### What RR Central does today
+
+- `/sign#…` NDA flow (`legal-sign` Edge Function): client reads PDF, draws a PNG signature, types name/date, records IP/time — sealed PDF + vault (`docs/legal-documents.md`).
+- This is **operational evidence of assent**, useful for internal NDA tracking. It is **not** AdES or QES under Decree-Law 46/2021 and must **not** be marketed as a qualified / handwritten-equivalent signature.
+
+### Decision (binding for M5)
+
+1. **Phase A (product, no new paid vendor):** Keep the canvas `/sign` path for NDAs and similar internal docs. UI and docs must describe it as an **electronic signing record / assent capture**, not “qualified”, “AdES”, or “same as handwritten”. Clause library, obligations board, and vault UX may proceed without a QTSP.
+2. **Phase B (when a contract type needs QES/AdES legal effect):** Integrate a **TDRA-licensed QTSP** (verify on the UAE Trusted List). Prefer embedding / API of a licensed provider over building TSP/QTSP capabilities in-house. **Ask Alfred before any paid QTSP subscription** (Master Spec §0 paid-services rule).
+3. **Do not** register RR Central as a TSP/QTSP in M5 unless explicitly decided later.
+4. **Government / high-stakes filings:** Assume QES (or entity-required level) until legal counsel says otherwise; route those through Phase B.
+5. **Counsel:** Have Red Reach’s lawyer review NDA template approval process and which document types may stay on Phase A evidence vs require Phase B QTSP — product does not substitute legal advice.
+
+### Explicit non-claims
+
+- This note is **not** legal advice and does **not** certify any RR Central signature as AdES or QES.
+- No QTSP integration, new Edge Function, or paid vendor ships in this assessment-only slice.
