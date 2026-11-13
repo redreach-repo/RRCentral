@@ -173,6 +173,7 @@ export default function InvoicesPage() {
       : Math.abs(rate - standard) < 1e-9
         ? { vat_mode: 'standard', vat_percent: vatRateToPercent(standard) }
         : { vat_mode: 'custom', vat_percent: vatRateToPercent(rate) }
+  const [statusTab, setStatusTab] = useState<'All' | 'Draft' | 'Sent' | 'Cancelled'>('All')
   const [payTab, setPayTab] = useState<'All' | 'Pending' | 'Partial' | 'Paid'>('All')
   const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
   const compact = useCompactCrm()
@@ -232,6 +233,14 @@ export default function InvoicesPage() {
     const q = search.trim().toLowerCase()
     return invoices.filter((i) => {
       if (accountFilter && i.account_id !== accountFilter) return false
+      if (statusTab !== 'All') {
+        const raw = String(i.status || 'Draft')
+        const cancelled = isCancelledInvoice(i)
+        const draft = !cancelled && /draft/i.test(raw)
+        if (statusTab === 'Cancelled' && !cancelled) return false
+        if (statusTab === 'Draft' && !draft) return false
+        if (statusTab === 'Sent' && (cancelled || draft)) return false
+      }
       if (payTab !== 'All') {
         const pay = effectiveInvoicePaymentStatus(i)
         if (pay !== payTab) return false
@@ -243,7 +252,7 @@ export default function InvoicesPage() {
         i.description.toLowerCase().includes(q)
       )
     })
-  }, [invoices, search, payTab, accountFilter])
+  }, [invoices, search, statusTab, payTab, accountFilter])
 
   const formVatRate =
     form.vat_mode === 'zero' ? 0 : form.vat_mode === 'custom' ? vatPercentToRate(form.vat_percent, vatRate) : vatRate
@@ -727,15 +736,31 @@ export default function InvoicesPage() {
       ) : null}
 
       <div className={docsStyles.controls}>
-        <div className={docsStyles.tabs}>
+        <div className={docsStyles.tabs} role="tablist" aria-label="Invoice status">
+          {(['All', 'Draft', 'Sent', 'Cancelled'] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={statusTab === t}
+              className={statusTab === t ? docsStyles.tabActive : docsStyles.tab}
+              onClick={() => setStatusTab(t)}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+        <div className={docsStyles.tabs} role="tablist" aria-label="Payment status">
           {(['All', 'Pending', 'Partial', 'Paid'] as const).map((t) => (
             <button
               key={t}
               type="button"
+              role="tab"
+              aria-selected={payTab === t}
               className={payTab === t ? docsStyles.tabActive : docsStyles.tab}
               onClick={() => setPayTab(t)}
             >
-              {t}
+              {t === 'All' ? 'Any payment' : t}
             </button>
           ))}
         </div>

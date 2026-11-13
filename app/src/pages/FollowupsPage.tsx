@@ -44,11 +44,9 @@ import {
   colors,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   sectionTitleStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 import { logActivity } from '../lib/activity'
 import { errorMessage } from '../lib/errors'
 
@@ -464,26 +462,28 @@ export default function FollowupsPage() {
   }
 
   return (
-    <div style={pageStyle}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Follow-ups</h1>
-          <p style={{ ...pageSubtitleStyle, marginBottom: 0 }}>
+          <p className={docsStyles.kicker}>Sales · Work</p>
+          <h1 className={docsStyles.title}>Follow-ups</h1>
+          <p className={docsStyles.subtitle}>
             Overdue and upcoming CRM actions
             {isZohoCalendarEnabled(settings) ? ' · Zoho Calendar sync on' : ''}
+            . Click Actions on a card for snooze, clear, or outreach.
           </p>
         </div>
-        <button type="button" style={buttonSecondaryStyle} onClick={() => setCalendarSettingsOpen(true)}>
-          <Settings size={14} /> Calendar settings
+        <button type="button" className={docsStyles.newBtn} style={{ background: 'rgba(255,255,255,0.08)' }} onClick={() => setCalendarSettingsOpen(true)}>
+          <Settings size={16} /> Calendar
         </button>
-      </div>
+      </header>
 
       {error ? (
         <div style={{ ...cardStyle, color: colors.danger, marginBottom: 16 }}>{error}</div>
       ) : null}
 
       {loading ? (
-        <div style={{ ...cardStyle, color: colors.muted }}>Loading follow-ups…</div>
+        <div className={docsStyles.loading}>Loading follow-ups…</div>
       ) : (
         <>
           <section style={{ marginBottom: 28 }}>
@@ -491,7 +491,9 @@ export default function FollowupsPage() {
               <Bell size={16} color={colors.danger} /> Overdue ({overdue.length})
             </h2>
             {overdue.length === 0 ? (
-              <EmptyState title="No overdue follow-ups" subtitle="You're caught up on past due items." />
+              <div className={docsStyles.empty}>
+                <EmptyState title="No overdue follow-ups" subtitle="You're caught up on past due items." />
+              </div>
             ) : (
               <div className={compact ? resp.listStack : undefined} style={compact ? undefined : { display: 'grid', gap: 12 }}>
                 {overdue.map((e) => renderCard(e, 'overdue'))}
@@ -504,7 +506,9 @@ export default function FollowupsPage() {
               <CalendarClock size={16} color={colors.success} /> Upcoming (14 days) ({upcoming.length})
             </h2>
             {upcoming.length === 0 ? (
-              <EmptyState title="No upcoming follow-ups" subtitle="Nothing scheduled in the next two weeks." />
+              <div className={docsStyles.empty}>
+                <EmptyState title="No upcoming follow-ups" subtitle="Nothing scheduled in the next two weeks." />
+              </div>
             ) : (
               <div className={compact ? resp.listStack : undefined} style={compact ? undefined : { display: 'grid', gap: 12 }}>
                 {upcoming.map((e) => renderCard(e, 'upcoming'))}
