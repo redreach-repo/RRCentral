@@ -1,0 +1,70 @@
+{
+  "brand": "Red Reach",
+  "colors": {
+    "primary": "#C8321A",
+    "accent": "#E8872A",
+    "neutralDark": "#1A1A1A",
+    "neutralLight": "#FFFFFF"
+  },
+  "notes": "Colors are the stated Red Reach brand colors. Confirm exact values from the original brand files.",
+  "entities": {
+    "redreach-middle-east-fze": {
+      "kind": "company",
+      "files": [
+        "redreach/redreach-middle-east-fze.png",
+        "redreach/redreach-middle-east-fze.jpg"
+      ]
+    },
+    "rr-connect": {
+      "kind": "business_unit",
+      "files": [
+        "redreach/divisions/redreach-connect.png",
+        "redreach/divisions/redreach-connect.jpg"
+      ]
+    },
+    "rr-marketing": {
+      "kind": "business_unit",
+      "files": [
+        "redreach/divisions/redreach-marketing.png",
+        "redreach/divisions/redreach-marketing.jpg"
+      ]
+    },
+    "rr-threads": {
+      "kind": "business_unit",
+      "files": [
+        "redreach/divisions/redreach-threads.png",
+        "redreach/divisions/redreach-threads.jpg"
+      ]
+    },
+    "rr-wanders": {
+      "kind": "business_unit",
+      "files": [
+        "redreach/divisions/redreach-wanders.png",
+        "redreach/divisions/redreach-wanders.jpg"
+      ]
+    }
+  },
+  "mark": {
+    "source": "redreach/mark/redreach-mark-square.jpg",
+    "derived": [
+      "redreach/mark/derived/redreach-mark-512.png",
+      "redreach/mark/derived/redreach-mark-192.png",
+      "redreach/mark/derived/redreach-mark-180.png",
+      "redreach/mark/derived/redreach-mark-64.png",
+      "redreach/mark/derived/redreach-mark-32.png"
+    ]
+  },
+  "missing": [
+    "RR Boost logo",
+    "RR Care logo",
+    "RR Trading logo",
+    "SVG vector sources for all logos",
+    "white or light versions for dark backgrounds"
+  ],
+  "clientBrands": {
+    "tee-tribe": {
+      "file": "clients/tee-tribe.jpg",
+      "note": "Client brand. Account logo only, never tenant branding. Excluded from the demo."
+    }
+  }
+}
