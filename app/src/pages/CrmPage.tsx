@@ -25,6 +25,7 @@ import { CRM_OUTCOME_REASONS, NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/confi
 import { loadCrmStageKeys } from '../lib/pipelines'
 import { crmMoveProblem } from '../lib/dealRules'
 import { parseCrmForm } from '../lib/schemas/crm'
+import { parseCrmOutcomeForm } from '../lib/schemas/crmOutcome'
 import LostReasonFields from '../components/deals/LostReasonFields'
 import type { ActivityLogEntry, AppUser, CrmContact, CrmEntry, CustomerDocument, Invoice, Quotation } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -668,17 +669,23 @@ export default function CrmPage() {
   }
 
   async function confirmOutcome() {
-    if (!outcomeTarget || !outcomeReason.trim()) {
-      showToast('Outcome reason is required', 'error')
+    if (!outcomeTarget) return
+    const parsed = parseCrmOutcomeForm({
+      stage: outcomeStage,
+      outcome_reason: outcomeReason,
+      lost_note: outcomeNote,
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
-    if (outcomeStage === 'Lost') {
+    if (parsed.data.stage === 'Lost') {
       const problem = crmMoveProblem(outcomeTarget, {
         pipeline_stage: 'Lost',
         next_action: outcomeTarget.next_action,
         follow_up_date: outcomeTarget.follow_up_date,
-        outcome_reason: outcomeReason.trim(),
-        lost_note: outcomeNote,
+        outcome_reason: parsed.data.outcome_reason,
+        lost_note: parsed.data.lost_note,
       })
       if (problem) {
         showToast(problem, 'error')
@@ -691,9 +698,9 @@ export default function CrmPage() {
       const { error: err } = await db
         .from('crm')
         .update({
-          pipeline_stage: outcomeStage,
-          outcome_reason: outcomeReason.trim(),
-          ...(outcomeStage === 'Lost' ? { lost_note: outcomeNote.trim() } : {}),
+          pipeline_stage: parsed.data.stage,
+          outcome_reason: parsed.data.outcome_reason,
+          ...(parsed.data.stage === 'Lost' ? { lost_note: parsed.data.lost_note } : {}),
           updated_by: user?.email || '',
           updated_at: new Date().toISOString(),
         })
