@@ -51,6 +51,7 @@ import {
   setDocumentAccount,
   updateAccount,
 } from '../lib/accountsStore'
+import { canViewField } from '../lib/fieldPermissions'
 import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
 import { formatAED } from '../lib/money'
@@ -677,7 +678,7 @@ export default function AccountDetailPage() {
                 contacts={contacts}
                 team={team}
                 editable={editable}
-                showCommission={can(userRole, 'ctrm.commission')}
+                showCommission={canViewField(userRole, 'ctrm.commission')}
                 author={author}
                 onChanged={() => void load()}
               />

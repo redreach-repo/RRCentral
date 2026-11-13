@@ -2,6 +2,7 @@ import { differenceInCalendarDays, format, parseISO } from 'date-fns'
 import { normalizeCompanyName } from './accounts'
 import { stageLabel as ctrmStageLabel, isOpenDeal as isOpenCtrmDeal } from './ctrm'
 import { PIPELINE_WEIGHTS } from './mrr'
+import { canViewField } from './fieldPermissions'
 import { can } from './permissions'
 import { isOpenSalesDeal, quoteFirstYear, salesStageLabel } from './salesPipeline'
 import type {
@@ -38,7 +39,7 @@ export type DealPipeline = 'crm' | 'sales' | 'ctrm'
 export function dealAccess(role: UserRole | null | undefined): { pipelines: DealPipeline[]; commission: boolean } {
   return {
     pipelines: can(role, 'legacy.access') ? ['crm', 'sales', 'ctrm'] : ['sales', 'ctrm'],
-    commission: can(role, 'ctrm.commission'),
+    commission: canViewField(role, 'ctrm.commission'),
   }
 }
 
