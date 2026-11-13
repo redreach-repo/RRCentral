@@ -6,6 +6,7 @@ import {
   type SavedView,
 } from '../lib/savedViews'
 import { errorMessage } from '../lib/errors'
+import { parseSavedViewForm } from '../lib/schemas/savedView'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -82,19 +83,24 @@ export default function SavedViewsBar({
   }, [selected, filters, filtersEqual])
 
   async function saveCurrent() {
-    const name = nameDraft.trim()
-    if (!name) {
-      onToast('Name the view', 'error')
+    const parsed = parseSavedViewForm({
+      name: nameDraft,
+      module_id: moduleId,
+      filters,
+      owner_user_id: ownerUserId,
+    })
+    if (!parsed.ok) {
+      onToast(parsed.error, 'error')
       return
     }
     setSaving(true)
     try {
       const row = await createSavedView({
-        module_id: moduleId,
-        name,
-        filters,
-        is_shared: false,
-        owner_user_id: ownerUserId,
+        module_id: parsed.data.module_id,
+        name: parsed.data.name,
+        filters: parsed.data.filters,
+        is_shared: parsed.data.is_shared,
+        owner_user_id: parsed.data.owner_user_id,
       })
       setViews((prev) => [...prev, row].sort((a, b) => a.name.localeCompare(b.name)))
       setSelectedId(row.id)
