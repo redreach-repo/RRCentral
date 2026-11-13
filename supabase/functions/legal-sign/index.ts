@@ -132,6 +132,7 @@ type DocRow = {
   party_name: string
   party_email: string
   party_company: string
+  template_id: string | null
 }
 
 Deno.serve(withErrorLog("legal-sign", async (req) => {
