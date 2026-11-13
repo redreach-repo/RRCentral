@@ -8,6 +8,10 @@ import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import Modal from '../components/Modal'
 import { DIVISIONS } from '../lib/config'
+import {
+  applyUniqueCrmAccountLinks,
+  type CrmLinkPlan,
+} from '../lib/crmAccountLink'
 import { LOST_REASONS } from '../lib/dealRules'
 import { errorMessage } from '../lib/errors'
 import { formatAED } from '../lib/money'
@@ -27,6 +31,7 @@ import {
   type DealRow,
 } from '../lib/myDeals'
 import { loadMyDeals, moveMyDeal } from '../lib/myDealsStore'
+import { can } from '../lib/permissions'
 import type { AppUser } from '../lib/types'
 import {
   buttonPrimaryStyle,
@@ -98,8 +103,11 @@ export default function MyDealsPage() {
   const { showToast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const access = dealAccess(userRole)
+  const canLinkAccounts = can(userRole, 'accounts.write')
+  const emptyLinkPlan: CrmLinkPlan = { unique: [], ambiguous: [], none: [] }
   const [deals, setDeals] = useState<DealRow[]>([])
   const [team, setTeam] = useState<AppUser[]>([])
+  const [linkPlan, setLinkPlan] = useState<CrmLinkPlan>(emptyLinkPlan)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [busyKey, setBusyKey] = useState<string | null>(null)
@@ -107,6 +115,7 @@ export default function MyDealsPage() {
   const [pending, setPending] = useState<PendingMove | null>(null)
   const [outcomeReason, setOutcomeReason] = useState('')
   const [lostNote, setLostNote] = useState('')
+  const [linkBusy, setLinkBusy] = useState(false)
   const [view, setView] = useState<'table' | 'board'>(() => {
     const q = searchParams.get('view')
     if (q === 'board' || q === 'table') return q
@@ -131,6 +140,7 @@ export default function MyDealsPage() {
       const result = await loadMyDeals(userRole, settings)
       setDeals(result.deals)
       setTeam(result.team)
+      setLinkPlan(result.linkPlan)
       setError('')
     } catch (e) {
       setError(errorMessage(e, 'Could not load the deals'))
@@ -138,6 +148,23 @@ export default function MyDealsPage() {
       setLoading(false)
     }
   }, [userRole, settings])
+
+  async function linkUniqueMatches() {
+    if (!linkPlan.unique.length || linkBusy) return
+    setLinkBusy(true)
+    try {
+      const n = await applyUniqueCrmAccountLinks(linkPlan.unique)
+      showToast(
+        n === 1 ? 'Linked 1 CRM deal to its Account' : `Linked ${n} CRM deals to Accounts`,
+        'success',
+      )
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not link CRM deals'), 'error')
+    } finally {
+      setLinkBusy(false)
+    }
+  }
 
   useEffect(() => {
     void load()
@@ -485,6 +512,73 @@ export default function MyDealsPage() {
       </header>
 
       {filterBar}
+
+      {!loading && (linkPlan.unique.length || linkPlan.ambiguous.length || linkPlan.none.length) ? (
+        <div
+          role="status"
+          style={{
+            ...cardStyle,
+            marginBottom: 12,
+            padding: '12px 14px',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 10,
+            alignItems: 'center',
+          }}
+        >
+          <div style={{ flex: '1 1 220px', fontSize: 13, color: colors.muted, lineHeight: 1.45 }}>
+            {linkPlan.unique.length ? (
+              <>
+                <strong style={{ color: colors.text }}>
+                  {linkPlan.unique.length === 1
+                    ? '1 CRM deal'
+                    : `${linkPlan.unique.length} CRM deals`}
+                </strong>{' '}
+                match a single Account by company name and can be linked safely.
+              </>
+            ) : (
+              <>
+                <strong style={{ color: colors.text }}>
+                  {linkPlan.ambiguous.length + linkPlan.none.length}
+                </strong>{' '}
+                CRM deal
+                {linkPlan.ambiguous.length + linkPlan.none.length === 1 ? '' : 's'} still need an Account
+                link
+                {linkPlan.ambiguous.length
+                  ? ` (${linkPlan.ambiguous.length} match more than one name)`
+                  : ''}
+                .
+              </>
+            )}
+            {linkPlan.none.length && linkPlan.unique.length ? (
+              <>
+                {' '}
+                {linkPlan.none.length} have no match
+                {linkPlan.ambiguous.length ? `; ${linkPlan.ambiguous.length} are ambiguous` : ''}.
+              </>
+            ) : null}
+          </div>
+          {canLinkAccounts && linkPlan.unique.length ? (
+            <button
+              type="button"
+              style={buttonPrimaryStyle}
+              disabled={linkBusy}
+              onClick={() => void linkUniqueMatches()}
+            >
+              {linkBusy
+                ? 'Linking…'
+                : linkPlan.unique.length === 1
+                  ? 'Link unique match'
+                  : `Link ${linkPlan.unique.length} unique matches`}
+            </button>
+          ) : null}
+          {linkPlan.ambiguous.length || linkPlan.none.length ? (
+            <Link to="/crm" style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}>
+              Open CRM
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
 
       {error ? <div style={{ ...cardStyle, color: colors.danger, marginBottom: 12 }}>{error}</div> : null}
 

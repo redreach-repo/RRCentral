@@ -44,6 +44,72 @@ export function resolveCrmAccountLink(companyName: string, accounts: Account[]):
   return { status: 'none' }
 }
 
+export type CrmLinkProposal = {
+  crmId: string
+  companyName: string
+  accountId: string
+  accountName: string
+  accountReference: string
+}
+
+export type CrmLinkPlan = {
+  /** Unlinked CRM rows with exactly one soft-matched Account — safe to auto-link. */
+  unique: CrmLinkProposal[]
+  /** Unlinked CRM rows matching more than one Account — need a human. */
+  ambiguous: { crmId: string; companyName: string; accountIds: string[] }[]
+  /** Unlinked CRM rows with no Account match. */
+  none: { crmId: string; companyName: string }[]
+}
+
+/**
+ * M3 slice 2: plan FK backfill for CRM rows missing account_id.
+ * Only unique soft-matches are proposed for bulk apply.
+ */
+export function planCrmAccountBackfill(
+  crm: Pick<CrmEntry, 'id' | 'company_name' | 'account_id'>[],
+  accounts: Account[],
+): CrmLinkPlan {
+  const unique: CrmLinkProposal[] = []
+  const ambiguous: CrmLinkPlan['ambiguous'] = []
+  const none: CrmLinkPlan['none'] = []
+
+  for (const row of crm) {
+    if (row.account_id) continue
+    const companyName = String(row.company_name || '').trim()
+    if (!companyName) continue
+    const match = resolveCrmAccountLink(companyName, accounts)
+    if (match.status === 'linked') {
+      unique.push({
+        crmId: row.id,
+        companyName,
+        accountId: match.account.id,
+        accountName: match.account.name,
+        accountReference: match.account.reference,
+      })
+    } else if (match.status === 'ambiguous') {
+      ambiguous.push({
+        crmId: row.id,
+        companyName,
+        accountIds: match.accounts.map((a) => a.id),
+      })
+    } else {
+      none.push({ crmId: row.id, companyName })
+    }
+  }
+
+  return { unique, ambiguous, none }
+}
+
+/** Persist unique soft-match proposals onto crm.account_id. Returns how many wrote. */
+export async function applyUniqueCrmAccountLinks(proposals: CrmLinkProposal[]): Promise<number> {
+  let linked = 0
+  for (const p of proposals) {
+    await linkCrmToAccount(p.crmId, p.accountId)
+    linked += 1
+  }
+  return linked
+}
+
 /** Prefer the FK when set; fall back to soft name match. */
 export async function findAccountForCrm(
   entryOrName: Pick<CrmEntry, 'company_name' | 'account_id'> | string,
