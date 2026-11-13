@@ -3,6 +3,7 @@ import CtrmListsCard from '../components/ctrm/CtrmListsCard'
 import GoogleDriveCard from '../components/GoogleDriveCard'
 import HubSpotCard from '../components/HubSpotCard'
 import PipelinesSettingsCard from '../components/settings/PipelinesSettingsCard'
+import WorkflowRunsCard from '../components/settings/WorkflowRunsCard'
 import WorkflowsSettingsCard from '../components/settings/WorkflowsSettingsCard'
 import { Download, HardDrive, Plus, Trash2, Upload, Plug } from 'lucide-react'
 import SimpleRowActions from '../components/SimpleRowActions'
@@ -831,6 +832,7 @@ export default function SettingsPage() {
     { id: 'custom-fields', label: 'Custom fields' },
     { id: 'pipelines', label: 'Pipelines' },
     { id: 'workflows', label: 'Workflows' },
+    { id: 'workflow-runs', label: 'Workflow runs' },
     { id: 'division-formats', label: 'Division formats' },
     { id: 'wanders', label: 'Wanders' },
     { id: 'system', label: 'System' },
@@ -1291,6 +1293,7 @@ export default function SettingsPage() {
 
       <PipelinesSettingsCard />
       <WorkflowsSettingsCard />
+      <WorkflowRunsCard />
 
       {renderSection(
         'Division quotation formats (editable titles, closings, Connect partner name)',
