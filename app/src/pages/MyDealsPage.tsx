@@ -35,16 +35,13 @@ import {
   colors,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
-  toolbarStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 const VIEW_KEY = 'rr.myDeals.view'
 
@@ -450,11 +447,12 @@ export default function MyDealsPage() {
   )
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Pipeline</h1>
-          <p style={pageSubtitleStyle}>
+          <p className={docsStyles.kicker}>Sales · Work</p>
+          <h1 className={docsStyles.title}>Pipeline</h1>
+          <p className={docsStyles.subtitle}>
             CRM, AI CRM sales, and CTRM Next in one board. Drag a card or change its stage here.
             {manageStagesHref ? (
               <>
@@ -466,7 +464,7 @@ export default function MyDealsPage() {
             ) : null}
           </p>
         </div>
-      </div>
+      </header>
 
       {filterBar}
 
@@ -480,7 +478,7 @@ export default function MyDealsPage() {
       ) : null}
 
       {loading ? (
-        <div style={{ ...cardStyle, color: colors.muted }}>Loading the deals…</div>
+        <div className={docsStyles.loading}>Loading the deals…</div>
       ) : shown.length === 0 ? (
         <EmptyState
           icon={<Briefcase size={22} />}

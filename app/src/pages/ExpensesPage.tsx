@@ -10,6 +10,10 @@ import { can } from '../lib/permissions'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
+import EditorSectionTabs, {
+  editorPanelStyle,
+  type EditorSection,
+} from '../components/EditorSectionTabs'
 import EmptyState from '../components/EmptyState'
 import { formatAED } from '../lib/money'
 import { logActivity } from '../lib/activity'
@@ -122,6 +126,7 @@ export default function ExpensesPage() {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [open, setOpen] = useState(false)
+  const [editorSection, setEditorSection] = useState<EditorSection>('basics')
   const [editing, setEditing] = useState<Expense | null>(null)
   const [form, setForm] = useState<ExpenseForm>(emptyForm())
   const [saving, setSaving] = useState(false)
@@ -671,6 +676,12 @@ export default function ExpensesPage() {
         onClose={() => setOpen(false)}
         width={640}
       >
+        <EditorSectionTabs
+          value={editorSection}
+          onChange={setEditorSection}
+          sections={['basics', 'terms', 'notes']}
+        />
+        <div style={editorPanelStyle(editorSection === 'basics')}>
         <div style={fieldStyle}>
           <label style={labelStyle}>
             <FileUp size={12} style={{ marginRight: 4 }} />
@@ -809,6 +820,11 @@ export default function ExpensesPage() {
               . Saving also registers a new company name automatically.
             </p>
           </div>
+        </div>
+        </div>
+
+        <div style={editorPanelStyle(editorSection === 'terms')}>
+        <div style={formGridStyle}>
           <div style={fieldStyle}>
             <label style={labelStyle}>Category</label>
             <select
@@ -986,7 +1002,9 @@ export default function ExpensesPage() {
             </div>
           </div>
         ) : null}
+        </div>
 
+        <div style={editorPanelStyle(editorSection === 'notes')}>
         <div style={fieldStyle}>
           <label style={labelStyle}>Notes</label>
           <textarea
@@ -1016,8 +1034,9 @@ export default function ExpensesPage() {
             </ul>
           </div>
         ) : null}
+        </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setOpen(false)}>
             Cancel
           </button>

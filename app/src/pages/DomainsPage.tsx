@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { ExternalLink, Globe, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ExternalLink, Globe, Plus } from 'lucide-react'
 import { db } from '../lib/db'
 import type { OwnedDomain, OwnedDomainBillingCycle, OwnedDomainStatus } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
+import SimpleRowActions from '../components/SimpleRowActions'
 import { logActivity } from '../lib/activity'
 import { errorMessage, isMissingRelationError } from '../lib/errors'
 import { formatAED } from '../lib/money'
@@ -99,6 +100,7 @@ export default function DomainsPage() {
   const [form, setForm] = useState<DomainForm>(emptyForm())
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<OwnedDomain | null>(null)
+  const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
   const [missingTable, setMissingTable] = useState(false)
 
   const load = useCallback(async () => {
@@ -406,16 +408,12 @@ export default function DomainsPage() {
                         ) : null}
                       </td>
                       <td style={tdStyle}>
-                        <button type="button" style={buttonSecondaryStyle} onClick={() => openEdit(d)}>
-                          <Pencil size={14} />
-                        </button>{' '}
-                        <button
-                          type="button"
-                          style={buttonDangerStyle}
-                          onClick={() => setDeleteTarget(d)}
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <SimpleRowActions
+                          expanded={actionsOpenId === d.id}
+                          onToggle={() => setActionsOpenId((id) => (id === d.id ? null : d.id))}
+                          onEdit={() => openEdit(d)}
+                          onDelete={() => setDeleteTarget(d)}
+                        />
                       </td>
                     </tr>
                   )

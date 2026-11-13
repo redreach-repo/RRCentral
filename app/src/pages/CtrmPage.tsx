@@ -34,17 +34,14 @@ import {
   buttonSecondaryStyle,
   cardStyle,
   colors,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   sectionTitleStyle,
   selectStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
-  toolbarStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 const chip = (bg: string, color: string): CSSProperties => ({
   display: 'inline-flex',
@@ -313,11 +310,12 @@ export default function CtrmPage() {
   }
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>CTRM Next stages</h1>
-          <p style={pageSubtitleStyle}>
+          <p className={docsStyles.kicker}>Sales · Work</p>
+          <h1 className={docsStyles.title}>CTRM Next stages</h1>
+          <p className={docsStyles.subtitle}>
             Move CTRM Next introductions stage by stage. Day-to-day view lives on{' '}
             <Link to="/deals?pipeline=ctrm&view=board" style={{ color: colors.accent }}>
               Pipeline
@@ -326,16 +324,20 @@ export default function CtrmPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <Link to="/ctrm/summary" style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}>
+          <Link
+            to="/ctrm/summary"
+            className={docsStyles.newBtn}
+            style={{ textDecoration: 'none', background: 'rgba(255,255,255,0.08)' }}
+          >
             Weekly summary
           </Link>
           {canWrite ? (
-            <button type="button" style={buttonPrimaryStyle} onClick={() => setEditing({ deal: null })}>
+            <button type="button" className={docsStyles.newBtn} onClick={() => setEditing({ deal: null })}>
               <Plus size={16} /> New deal
             </button>
           ) : null}
         </div>
-      </div>
+      </header>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
         <select aria-label="View" style={{ ...selectStyle, maxWidth: 150 }} value={view} onChange={(e) => setFilter('view', e.target.value, 'board')}>

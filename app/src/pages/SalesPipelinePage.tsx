@@ -34,13 +34,10 @@ import {
   buttonSecondaryStyle,
   cardStyle,
   colors,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   sectionTitleStyle,
   selectStyle,
-  toolbarStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 const chip = (bg: string, color: string): CSSProperties => ({
   display: 'inline-flex',
@@ -308,11 +305,12 @@ export default function SalesPipelinePage() {
   const quotedMonthly = totals.find((t) => t.stage === 'quote_sent')
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>AI CRM stages</h1>
-          <p style={pageSubtitleStyle}>
+          <p className={docsStyles.kicker}>Sales · Work</p>
+          <h1 className={docsStyles.title}>AI CRM stages</h1>
+          <p className={docsStyles.subtitle}>
             Move AI CRM deals stage by stage. Day-to-day view lives on{' '}
             <Link to="/deals?pipeline=sales&view=board" style={{ color: colors.accent }}>
               Pipeline
@@ -321,11 +319,11 @@ export default function SalesPipelinePage() {
           </p>
         </div>
         {canWrite && !missingTable ? (
-          <button type="button" style={buttonPrimaryStyle} onClick={() => setEditing({ deal: null })}>
+          <button type="button" className={docsStyles.newBtn} onClick={() => setEditing({ deal: null })}>
             <Plus size={16} /> New deal
           </button>
         ) : null}
-      </div>
+      </header>
 
       {missingTable ? (
         <div style={{ ...cardStyle, color: colors.warn }}>Run the sales pipeline SQL in Supabase first, then reload this page.</div>
