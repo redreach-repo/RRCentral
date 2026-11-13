@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { firstZodError } from './common'
 
+const AMOUNT_MSG = 'Enter a valid payment amount'
+
 export type InvoicePaymentFormInput = {
   amount: string | number
   method: string
@@ -14,10 +16,21 @@ export type InvoicePaymentFormParsed = {
 }
 
 export const invoicePaymentFormSchema = z.object({
-  amount: z.coerce
-    .number({ invalid_type_error: 'Enter a valid payment amount' })
-    .finite()
-    .gt(0, 'Enter a valid payment amount'),
+  amount: z
+    .union([z.string(), z.number()])
+    .transform((raw) => (typeof raw === 'number' ? String(raw) : raw))
+    .pipe(
+      z
+        .string()
+        .trim()
+        .superRefine((raw, ctx) => {
+          const n = Number(raw)
+          if (!Number.isFinite(n) || !(n > 0)) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: AMOUNT_MSG })
+          }
+        })
+        .transform((raw) => Number(raw)),
+    ),
   method: z.string().trim().min(1, 'Pick a payment method'),
   notes: z.string(),
 })
