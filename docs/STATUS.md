@@ -9,7 +9,7 @@
 
 ## Already on main
 
-- Continuous backlog Zod through go-live/build · M3 consolidate plan · `pipeline_deals_v`
+- Continuous backlog Zod batch · QTSP scaffold · go-live/build · M3 plan · `pipeline_deals_v`
 
 ## Still open (agent queue)
 
