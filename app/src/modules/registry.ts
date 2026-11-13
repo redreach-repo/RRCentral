@@ -1,7 +1,7 @@
 /**
  * RRCRM module registry (M1).
  * Nav, permissions hints, and feature flags derive from these manifests.
- * Layout still renders accordion groups; add modules here instead of hardcoding.
+ * Sidebar groups live in `modules/nav.ts` (`APP_MODULES`); Layout only renders them.
  */
 import type { ComponentType } from 'react'
 import type { UserRole } from '../lib/types'

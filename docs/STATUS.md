@@ -1,26 +1,22 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** M3 CRM unify (slice 4 — soft-retire)
+**Current milestone:** M1 leftovers (nav → module manifests)
 
-## Shipped this turn (M3 soft-retire lists)
+## Shipped this turn (M1 nav manifests)
 
-- Sales · Work: Pipeline first; AI CRM / CTRM detail demoted in nav
-- Prefer-Pipeline banners on `/sales` and `/ctrm`; My Day → Pipeline link
-- Routes and tables unchanged — **no** destructive SQL
-- Plan: `docs/M3_CRM_UNIFY.md`
+- Moved Sales/Clients/… accordion groups into `app/src/modules/nav.ts` (`APP_MODULES`)
+- Layout renders manifests; path titles via `titleForPath`
+- Pipeline-first Sales · Work order preserved from M3 soft-retire
 
 ## Already on main
 
-- M0–M2 (tenancy, numbering, fields, views, pipelines, workflow runner)
-- M3 slices 1–3 (bridge, linker, write façade)
+- M0–M2 platform / CRM customization / workflow runner
+- M3 CRM unify slices 1–4 (bridge, linker, write façade, soft-retire)
 
 ## Still open
 
-**M3 next:** schema consolidate / route removal (**ask before destructive SQL**)  
-**M1 leftovers:** nav → module manifests; field permissions; Zod; TS strict; PWA mark; missing logos  
+**M1 leftovers:** field permissions; Zod; TS strict; PWA mark; missing logos  
+**M3 hold:** schema consolidate (**ask before destructive SQL**) · **M3a** demo (ask Alfred)  
+**Next after M1 leftovers:** **M4** mail/calendar expansion  
 **Open §19 decisions** — do not guess
-
-## Next after M3 close
-
-**M3a** demo project (ask first) · **M4** mail/calendar expansion
