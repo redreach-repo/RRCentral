@@ -9,7 +9,7 @@
 
 ## Already on main
 
-- Continuous backlog Zod through support settings · M3a demo prep · QTSP scaffold · `pipeline_deals_v`
+- Continuous backlog Zod through contract invoice settings · M3a demo prep · QTSP scaffold · `pipeline_deals_v`
 
 ## Still open (agent queue)
 
