@@ -40,7 +40,7 @@ export const scheduleMeetingFormSchema = z
         path: ['attendeeEmails'],
       })
     }
-    const [hourStr, minuteStr] = val.time.split(':')
+    const [hourStr] = val.time.split(':')
     const startHour = Number(hourStr)
     if (!Number.isFinite(startHour)) {
       ctx.addIssue({
