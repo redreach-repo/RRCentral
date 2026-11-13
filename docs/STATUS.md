@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod custom field definitions
+**Current milestone:** Continuous backlog — M1 Zod build templates
 
 ## Shipped this turn
 
-- Zod `parseCustomFieldDefinitionForm` for Settings → Custom fields (label, type, select options)
+- Zod `parseBuildTemplateForm` + `parseBuildTemplateItemForm` for build templates and lines
 
 ## Already on main
 
-- Continuous backlog Zod through watchdog · M3a demo prep · QTSP scaffold · `pipeline_deals_v`
+- Continuous backlog Zod through custom field definitions · M3a demo prep · QTSP scaffold · `pipeline_deals_v`
 
 ## Still open (agent queue)
 
