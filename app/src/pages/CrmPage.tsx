@@ -516,6 +516,11 @@ export default function CrmPage() {
     })
   }, [editing, form, dealQuotes, dealInvoices])
 
+  const unlinkedCrmCount = useMemo(
+    () => entries.reduce((n, e) => (e.account_id ? n : n + 1), 0),
+    [entries],
+  )
+
   const ownerOptions = useMemo(() => {
     const names = new Set<string>()
     for (const o of owners) {
@@ -1188,6 +1193,34 @@ export default function CrmPage() {
           })()
         }}
       />
+
+      {!loading && unlinkedCrmCount > 0 ? (
+        <div
+          role="status"
+          style={{
+            ...errorBanner,
+            color: colors.muted,
+            background: 'rgba(255,255,255,0.03)',
+            border: `1px solid ${colors.border}`,
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 10,
+            alignItems: 'center',
+            marginBottom: 12,
+          }}
+        >
+          <span style={{ flex: '1 1 200px', fontSize: 13, lineHeight: 1.45 }}>
+            {unlinkedCrmCount} CRM deal{unlinkedCrmCount === 1 ? '' : 's'} not linked to Accounts yet.
+            Unique name matches can be linked from Pipeline.
+          </span>
+          <Link
+            to="/deals?pipeline=crm"
+            style={{ ...btn, fontSize: 12, padding: '6px 10px', textDecoration: 'none' }}
+          >
+            Open Pipeline
+          </Link>
+        </div>
+      ) : null}
 
       {error && <div style={errorBanner}>{error}</div>}
 

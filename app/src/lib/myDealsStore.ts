@@ -8,6 +8,7 @@ import { CONTRACT_INVOICE_DIVISION_KEY, DEFAULT_CONTRACT_INVOICE_DIVISION } from
 import { crmMoveProblem, isLostReason } from './dealRules'
 import { dealProblem } from './ctrm'
 import { salesDealProblem } from './salesPipeline'
+import { planCrmAccountBackfill, type CrmLinkPlan } from './crmAccountLink'
 import {
   buildDealRows,
   dealAccess,
@@ -34,9 +35,10 @@ async function rows<T>(query: PromiseLike<{ data: unknown; error: unknown }>): P
 export async function loadMyDeals(
   role: UserRole | null | undefined,
   settings: Record<string, string | undefined>,
-): Promise<{ deals: DealRow[]; team: AppUser[] }> {
+): Promise<{ deals: DealRow[]; team: AppUser[]; linkPlan: CrmLinkPlan }> {
   const access = dealAccess(role)
   const withCrm = access.pipelines.includes('crm')
+  const emptyPlan: CrmLinkPlan = { unique: [], ambiguous: [], none: [] }
   const [team, accounts, sales, ctrm, changes, commissions, crm, quotations] = await Promise.all([
     listTeam(),
     listAccounts().then((r) => r.rows),
@@ -67,7 +69,8 @@ export async function loadMyDeals(
     salesDivision: settings[CONTRACT_INVOICE_DIVISION_KEY] || DEFAULT_CONTRACT_INVOICE_DIVISION,
     canSeeCommission: access.commission,
   })
-  return { deals, team }
+  const linkPlan = withCrm ? planCrmAccountBackfill(crm, accounts) : emptyPlan
+  return { deals, team, linkPlan }
 }
 
 type MoveAuthor = { appUserId: string | null; email: string }

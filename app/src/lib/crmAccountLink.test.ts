@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { contactMatchKey, resolveCrmAccountLink } from './crmAccountLink'
+import {
+  contactMatchKey,
+  planCrmAccountBackfill,
+  resolveCrmAccountLink,
+} from './crmAccountLink'
 import type { Account } from './types'
 
 function account(partial: Partial<Account> & Pick<Account, 'id' | 'name'>): Account {
@@ -57,5 +61,35 @@ describe('contactMatchKey', () => {
     expect(contactMatchKey({ email: '', phone: '+971 50 123 4567', name: 'Ali' })).toBe('p:971501234567')
     expect(contactMatchKey({ email: '', phone: '12', name: ' Ali ' })).toBe('n:ali')
     expect(contactMatchKey({ email: '', phone: '', name: '' })).toBe('')
+  })
+})
+
+describe('planCrmAccountBackfill', () => {
+  it('skips already-linked rows and buckets the rest', () => {
+    const accounts = [
+      account({ id: 'a1', name: 'Unique Co LLC', reference: 'AC-01' }),
+      account({ id: 'a2', name: 'Dup Co', reference: 'AC-02' }),
+      account({ id: 'a3', name: 'The Dup Co', reference: 'AC-03' }),
+    ]
+    const plan = planCrmAccountBackfill(
+      [
+        { id: 'c0', company_name: 'Already', account_id: 'a1' },
+        { id: 'c1', company_name: 'Unique Co', account_id: null },
+        { id: 'c2', company_name: 'Dup Co', account_id: null },
+        { id: 'c3', company_name: 'Brand New', account_id: null },
+      ],
+      accounts,
+    )
+    expect(plan.unique).toEqual([
+      {
+        crmId: 'c1',
+        companyName: 'Unique Co',
+        accountId: 'a1',
+        accountName: 'Unique Co LLC',
+        accountReference: 'AC-01',
+      },
+    ])
+    expect(plan.ambiguous.map((r) => r.crmId)).toEqual(['c2'])
+    expect(plan.none.map((r) => r.crmId)).toEqual(['c3'])
   })
 })
