@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import Modal from './Modal'
 import type { AppUser, CrmEntry } from '../lib/types'
-import { createTeamMeetingOnZoho, type ZohoSettings } from '../lib/zoho'
+import { getCalendarProvider, type ProviderSettings } from '../lib/mailCalendar'
 import { mergeAttendeeEmails } from '../lib/calendarAttendees'
 import {
   buttonPrimaryStyle,
@@ -18,7 +18,7 @@ import { errorMessage } from '../lib/errors'
 type Props = {
   open: boolean
   onClose: () => void
-  settings: ZohoSettings
+  settings: ProviderSettings
   team: AppUser[]
   crmEntries: CrmEntry[]
   defaultCrmId?: string
@@ -86,7 +86,7 @@ export default function ScheduleMeetingModal({
     setSaving(true)
     setError('')
     try {
-      await createTeamMeetingOnZoho(settings, {
+      await getCalendarProvider(settings).createTeamMeeting(settings, {
         title: title.trim(),
         date,
         startHour,

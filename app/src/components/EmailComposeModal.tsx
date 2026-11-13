@@ -4,7 +4,8 @@ import type { CrmContact } from '../lib/types'
 import { contactEmails, primaryContact } from '../lib/contacts'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
-import { openMailto, sendZohoMail } from '../lib/zoho'
+import { getMailProvider } from '../lib/mailCalendar'
+import { openMailto } from '../lib/zoho'
 import Modal from './Modal'
 import {
   buttonPrimaryStyle,
@@ -65,7 +66,7 @@ export default function EmailComposeModal({
     setSending(true)
     try {
       if (zohoEnabled) {
-        await sendZohoMail(settings, {
+        await getMailProvider(settings).sendMail(settings, {
           to: to.trim(),
           subject: subject.trim(),
           body: body.trim(),
