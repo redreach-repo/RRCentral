@@ -33,7 +33,7 @@ Soft-retire lists, account link backfill, write façade — see git history. Rou
 
 1. **Inventory + invariants (docs/tests)** — assert every open deal has next action/date rules; CRM `account_id` coverage metrics
 2. **Read model (done)** — SQL view `pipeline_deals_v` unions crm / sales_deals / ctrm_deals for reporting only (`security_invoker`, no commission, no writes)
-3. **Dual-write experiment** — new deals created from Pipeline write native table only (already true); expand façade coverage for remaining CRM sheet fields
+3. **Dual-write experiment** — new deals created from Pipeline write native table only (already true); façade covers next step / owner / notes plus CRM `quote_ref` and sales/CTRM `source` from Pipeline “Next step”
 4. **Route soft-hide (done)** — Settings → Pipeline detail nav (`hidePipelineDetailNav=yes`) hides `/sales` `/ctrm` from non-admin sidebar; URLs kept
 5. **Destructive merge** — **separate PR + explicit approve** before any `DROP` or forced redirects
 

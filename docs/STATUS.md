@@ -9,12 +9,12 @@
 
 ## Already on main
 
-- Continuous backlog Zod through delivery contracts · M3 route soft-hide · M3a demo prep · QTSP · `pipeline_deals_v`
+- Continuous backlog through M3 Pipeline façade notes · Zod contracts · route soft-hide · QTSP · `pipeline_deals_v`
 
 ## Still open (agent queue)
 
 1. More M1 Zod  
-2. Further M3 façade / inventory metrics  
+2. M3 inventory UI + metrics PRs  
 3. Demo env hooks after Alfred provisions  
 
 ## Still externally blocked
