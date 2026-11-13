@@ -1,21 +1,21 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** M5 contracts / e-sign (slice 5 — obligations board)
+**Current milestone:** M5 contracts / e-sign (slice 6 — spawn obligations on sign)
 
-## Shipped this turn (M5 slice 5)
+## Shipped this turn (M5 slice 6)
 
-- `contract_obligations` migration + `/obligations` board (filters, overdue, mark done)
-- Zod validation + unit tests
+- Signing an NDA/agreement opens default obligations on the board (idempotent)
+- Helper + tests bundled into `legal-sign`
 - Plan: `docs/M5_CONTRACTS_ESIGN.md`
 
 ## Already on main
 
-- M0–M4 · M1 leftovers · M5 slices 1–4
+- M0–M4 · M1 leftovers · M5 slices 1–5
 
 ## Still open
 
-**M5 next:** auto-spawn obligations from signed docs; QTSP only after ask  
+**M5 next:** richer spawn rules; QTSP only after ask  
 **M4 hold:** Gmail Phase B (CASA); IMAP only if a real need  
 **M1 leftovers:** more Zod; expand field mask; missing logos (need assets)  
 **M3 hold:** schema consolidate (**ask**) · **M3a** demo (ask Alfred)  

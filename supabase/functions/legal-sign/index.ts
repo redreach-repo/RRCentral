@@ -14,6 +14,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
 import { PDFDocument, rgb, StandardFonts } from "npm:pdf-lib@1.17.1"
 import {
+  defaultObligationsOnSign,
   hashLegalSignToken,
   isLegalSignToken,
   legalDocLabel,
@@ -287,6 +288,36 @@ Deno.serve(withErrorLog("legal-sign", async (req) => {
         customer_document_id: customerDocumentId,
       })
       .eq("id", doc.id)
+
+    try {
+      const seeds = defaultObligationsOnSign({
+        company_name: doc.company_name || "",
+        crm_id: doc.crm_id || "",
+        legal_document_id: doc.id,
+        doc_type: doc.doc_type || "nda",
+        signed_at: signedAt,
+        created_by: "legal-sign",
+      })
+      if (seeds.length) {
+        const { count } = await sb
+          .from("contract_obligations")
+          .select("id", { count: "exact", head: true })
+          .eq("legal_document_id", doc.id)
+        if (!count) {
+          await sb.from("contract_obligations").insert(
+            seeds.map((row) => ({
+              id: crypto.randomUUID(),
+              ...row,
+              created_at: signedAt,
+              updated_at: signedAt,
+            })),
+          )
+        }
+      }
+    } catch (e) {
+      // Board migration may not be applied yet — signing must still succeed.
+      console.error("legal-sign obligation spawn failed", e instanceof Error ? e.message : e)
+    }
 
     return json(
       legalSignView(doc, {

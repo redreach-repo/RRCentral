@@ -10,23 +10,25 @@
 | Canvas assent capture | Exists — **not** AdES/QES; client copy states this |
 | Clause library | `/clause-library` CRUD |
 | Compose into templates | Insert active clauses into NDA + agreement draft editors |
-| Obligations board | `/obligations` — open/done/cancelled follow-through |
+| Obligations board | `/obligations` |
+| Spawn on sign | `legal-sign` opens default obligations when a doc is signed |
 | TDRA QTSP integration | Not started → Phase B after ask |
 
-## Slice 5 (this milestone step)
+## Slice 6 (this milestone step)
 
-- Migration `contract_obligations` (staff RLS) + Zod + store
-- `/obligations` board with filters, overdue highlight, mark done
-- **No** QTSP
+- `defaultObligationsOnSign` helper + unit tests (bundled into `legal-sign`)
+- After successful sign: insert default open obligations (idempotent per document)
+- Signing still succeeds if the obligations table is missing
 
 ## Later
 
-1. Auto-create obligations from signed docs / clause tags
+1. Richer spawn rules / clause tags
 2. Phase B QTSP after Alfred approves a licensed vendor
 
 ## Ops
 
-1. Apply `20261214100000_contract_obligations.sql`
+1. Apply `contract_obligations` migration if not already
+2. Redeploy `legal-sign` after merge
 
 ## Rules
 

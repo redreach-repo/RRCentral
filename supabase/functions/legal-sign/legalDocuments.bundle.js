@@ -1783,6 +1783,52 @@ async function hashPortalToken(token) {
 }
 var PORTAL_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 
+// src/lib/obligationSpawn.ts
+function addDaysIso(iso, days) {
+  const d = new Date(iso);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+function defaultObligationsOnSign(input) {
+  const company = (input.company_name || "").trim() || "Client";
+  const created_by = (input.created_by || "legal-sign").trim() || "legal-sign";
+  const base = {
+    company_name: company,
+    crm_id: input.crm_id || "",
+    legal_document_id: input.legal_document_id,
+    status: "open",
+    completed_at: null,
+    created_by
+  };
+  if (input.doc_type === "service_agreement") {
+    return [
+      {
+        ...base,
+        title: "Confirm commercial start / kickoff",
+        description: `Follow up after signed service agreement for ${company}.`,
+        owner_party: "both",
+        due_date: addDaysIso(input.signed_at, 14)
+      }
+    ];
+  }
+  return [
+    {
+      ...base,
+      title: "Protect Confidential Information",
+      description: `Ongoing duty under the signed ${input.doc_type === "nda" ? "NDA" : "document"} for ${company}.`,
+      owner_party: "counterparty",
+      due_date: null
+    },
+    {
+      ...base,
+      title: "Return or destroy materials on request",
+      description: `Track return/destruction requests for ${company} confidential materials.`,
+      owner_party: "counterparty",
+      due_date: null
+    }
+  ];
+}
+
 // src/lib/legalDocuments.ts
 var LEGAL_SIGN_LINK_DAYS = 30;
 var LEGAL_SIGN_PDF_MAX_CHARS = 8e6;
@@ -1849,6 +1895,7 @@ export {
   LEGAL_SIGN_LINK_DAYS,
   LEGAL_SIGN_PDF_MAX_CHARS,
   LEGAL_SIGN_STATE_LABELS,
+  defaultObligationsOnSign,
   hashPortalToken as hashLegalSignToken,
   isPortalToken as isLegalSignToken,
   legalDocLabel,
