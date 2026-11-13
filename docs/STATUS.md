@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M3 route soft-hide
+**Current milestone:** Continuous backlog — M1 Zod Drive link modal
 
 ## Shipped this turn
 
-- M3 route soft-hide: Settings flag `hidePipelineDetailNav` hides `/sales` + `/ctrm` from non-admin nav (URLs kept)
+- Zod `parseLinkDriveFileForm` for Google Drive share links (company, URL, title)
 
 ## Already on main
 
-- Continuous backlog Zod through agreement template · M3a demo prep · QTSP scaffold · `pipeline_deals_v`
+- Continuous backlog Zod through agreement · M3 route soft-hide · M3a demo prep · QTSP · `pipeline_deals_v`
 
 ## Still open (agent queue)
 

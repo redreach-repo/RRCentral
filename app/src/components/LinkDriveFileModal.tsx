@@ -6,11 +6,11 @@ import { logActivity } from '../lib/activity'
 import { errorMessage, isMissingRelationError } from '../lib/errors'
 import {
   COMMUNICATION_KINDS,
-  isDriveShareUrl,
   saveCustomerDriveLink,
   suggestedDocumentTitle,
   type RelatedRefOption,
 } from '../lib/customerFiles'
+import { parseLinkDriveFileForm } from '../lib/schemas/linkDriveFile'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -129,35 +129,28 @@ export default function LinkDriveFileModal({
   }, [autoTitle, open, titleTouched])
 
   async function handleSave() {
-    if (!company.trim()) {
-      showToast('Company is required', 'error')
-      return
-    }
-    if (!isDriveShareUrl(driveUrl)) {
-      showToast('Use a Google Drive share link', 'error')
-      return
-    }
-    if (!docTitle.trim()) {
-      showToast('Give the file a short title', 'error')
+    const parsed = parseLinkDriveFileForm({ company, driveUrl, docTitle, notes, relatedRef })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setSaving(true)
     try {
       await saveCustomerDriveLink({
-        company,
+        company: parsed.data.company,
         crmId: crmId || null,
         category: resolvedCategory,
-        title: docTitle,
-        driveUrl,
-        relatedRef,
-        notes,
+        title: parsed.data.docTitle,
+        driveUrl: parsed.data.driveUrl,
+        relatedRef: parsed.data.relatedRef,
+        notes: parsed.data.notes,
         uploadedBy,
       })
       await logActivity(
         'add_customer_drive_file',
         'customer_document',
-        company,
-        `${resolvedCategory}: ${docTitle.trim()}`,
+        parsed.data.company,
+        `${resolvedCategory}: ${parsed.data.docTitle}`,
         uploadedBy,
         crmId || null,
       )
