@@ -562,7 +562,7 @@ export default function MyDealsPage() {
               <>
                 {' '}
                 <Link to={manageStagesHref} style={{ color: colors.accent }}>
-                  Open detailed stage board
+                  Open {filters.pipeline === 'sales' ? 'AI CRM' : 'CTRM'} detail
                 </Link>
               </>
             ) : null}

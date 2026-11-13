@@ -7,10 +7,10 @@
 | Pipeline | Table | List UI | Account link |
 |----------|-------|---------|--------------|
 | CRM (My Day) | `crm` | `/crm` | Optional `account_id` |
-| AI CRM sales | `sales_deals` | `/sales` | Required `account_id` |
-| CTRM Next | `ctrm_deals` | `/ctrm` | Required `account_id` |
+| AI CRM sales | `sales_deals` | `/sales` (detail) | Required `account_id` |
+| CTRM Next | `ctrm_deals` | `/ctrm` (detail) | Required `account_id` |
 
-`/deals` boards all three via `myDeals.ts` (read adapter) and writes through `myDealsStore` (`moveMyDeal` / `patchMyDeal`).
+`/deals` (**Pipeline**) boards all three via `myDeals.ts` and writes through `myDealsStore` (`moveMyDeal` / `patchMyDeal`).
 
 ## Slice 1 (done)
 
@@ -26,7 +26,7 @@
 - Per-deal CRM sheet linker unchanged (create account / open / view matches)
 - **No** create-all, **no** table merge / drops
 
-## Slice 3 (this milestone step)
+## Slice 3 (done)
 
 - Write façade: `moveMyDeal` (stage) + `patchMyDeal` (next step / owner)
 - `/deals` next-step click → shared modal; routes to native tables
@@ -34,9 +34,16 @@
 - Native `/crm` `/sales` `/ctrm` pages keep their own forms
 - **No** table merge / drops
 
-## Later slices (not yet)
+## Slice 4 (this milestone step) — soft-retire lists
 
-1. Retire duplicate list pages / schema consolidate (**ask before destructive SQL**)
+- Nav: **Pipeline** first under Sales · Work; `/sales` / `/ctrm` relabeled **AI CRM detail** / **CTRM detail**
+- Prefer-Pipeline banners on detail boards; My Day hero links to Pipeline
+- Routes and tables kept — **no** redirects that break bookmarks, **no** schema drops
+
+## Later (ask first)
+
+1. Schema consolidate / drop duplicate list routes (**ask before destructive SQL**)
+2. M3a demo project (Alfred)
 
 ## Rules
 

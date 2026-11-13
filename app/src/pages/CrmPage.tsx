@@ -1172,7 +1172,13 @@ export default function CrmPage() {
           <p className={docsStyles.subtitle}>
             {compact
               ? 'Overdue + today. Log the next touch, then move on.'
-              : 'Start with what is due. Switch to All deals when you need the full funnel.'}
+              : 'Start with what is due. Full funnel across CRM, AI CRM, and CTRM is on '}
+            {!compact ? (
+              <Link to="/deals" style={{ color: colors.accent }}>
+                Pipeline
+              </Link>
+            ) : null}
+            {!compact ? '.' : null}
           </p>
         </div>
         <button

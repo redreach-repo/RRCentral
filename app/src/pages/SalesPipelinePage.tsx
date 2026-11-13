@@ -309,13 +309,9 @@ export default function SalesPipelinePage() {
       <header className={docsStyles.hero}>
         <div>
           <p className={docsStyles.kicker}>Sales · Work</p>
-          <h1 className={docsStyles.title}>AI CRM stages</h1>
+          <h1 className={docsStyles.title}>AI CRM detail</h1>
           <p className={docsStyles.subtitle}>
-            Move AI CRM deals stage by stage. Day-to-day view lives on{' '}
-            <Link to="/deals?pipeline=sales&view=board" style={{ color: colors.accent }}>
-              Pipeline
-            </Link>
-            . A quote becomes the contract with Make contract.
+            Fine-grained AI CRM stages and Make contract. Day-to-day chasing lives on Pipeline.
           </p>
         </div>
         {canWrite && !missingTable ? (
@@ -324,6 +320,30 @@ export default function SalesPipelinePage() {
           </button>
         ) : null}
       </header>
+
+      <div
+        role="status"
+        style={{
+          ...cardStyle,
+          marginBottom: 12,
+          padding: '12px 14px',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 10,
+          alignItems: 'center',
+        }}
+      >
+        <span style={{ flex: '1 1 220px', fontSize: 13, color: colors.muted, lineHeight: 1.45 }}>
+          Prefer <strong style={{ color: colors.text }}>Pipeline</strong> for the shared board across CRM, AI CRM,
+          and CTRM. Use this page when you need the detailed AI CRM stage board or Make contract.
+        </span>
+        <Link
+          to="/deals?pipeline=sales&view=board"
+          style={{ ...buttonPrimaryStyle, textDecoration: 'none' }}
+        >
+          Open Pipeline
+        </Link>
+      </div>
 
       {missingTable ? (
         <div style={{ ...cardStyle, color: colors.warn }}>Run the sales pipeline SQL in Supabase first, then reload this page.</div>
