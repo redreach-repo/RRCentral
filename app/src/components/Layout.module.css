@@ -359,6 +359,45 @@
   display: inline;
 }
 
+.companySwitcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.companySwitcherLabel {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  white-space: nowrap;
+}
+
+.companySelect {
+  max-width: 200px;
+  min-width: 120px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.companySelect:hover,
+.companySelect:focus {
+  border-color: rgba(232, 135, 42, 0.45);
+  outline: none;
+}
+
+.companySelect option {
+  color: #1a1a1a;
+  background: #fff;
+}
+
 .topbarRight {
   display: flex;
   align-items: center;
@@ -573,6 +612,15 @@
 
 .shellPhone .userEmail {
   display: none;
+}
+
+.shellPhone .companySwitcherLabel {
+  display: none;
+}
+
+.shellPhone .companySelect {
+  max-width: 140px;
+  min-width: 96px;
 }
 
 .shellPhone .topbar {

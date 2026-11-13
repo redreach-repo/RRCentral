@@ -2,6 +2,9 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { SettingsProvider } from './contexts/SettingsContext'
 import { ToastProvider } from './contexts/ToastContext'
+import { TenantProvider } from './contexts/TenantContext'
+import { I18nProvider } from './contexts/I18nContext'
+import GuidePage from './pages/GuidePage'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
@@ -75,7 +78,9 @@ function HomeRoute() {
 export default function App() {
   return (
     <AuthProvider>
+      <I18nProvider>
       <SettingsProvider>
+        <TenantProvider>
         <ToastProvider>
           <Routes>
             <Route path="/" element={<Navigate to="/login" replace />} />
@@ -136,6 +141,7 @@ export default function App() {
               }
             >
               <Route path="app" element={<HomeRoute />} />
+              <Route path="guide" element={<GuidePage />} />
               <Route path="accounts" element={<AccountsPage />} />
               <Route path="accounts/:id" element={<AccountDetailPage />} />
               <Route path="delivery-settings" element={<DeliverySettingsPage />} />
@@ -179,7 +185,9 @@ export default function App() {
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </ToastProvider>
+        </TenantProvider>
       </SettingsProvider>
+      </I18nProvider>
     </AuthProvider>
   )
 }

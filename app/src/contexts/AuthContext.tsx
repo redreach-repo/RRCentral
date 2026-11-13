@@ -23,6 +23,8 @@ interface AuthContextValue {
   userRole: UserRole
   /** app_users.id of the signed-in person (owner of accounts). Null in local mode or before lookup. */
   appUserId: string | null
+  /** Tenant the signed-in member belongs to (RRCRM M1). */
+  tenantId: string | null
   /** False when signed in but not an active member of app_users (cloud mode). */
   hasAccess: boolean
   signInWithPassword: (email: string, password: string) => Promise<void>
@@ -35,9 +37,14 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
-type Membership = { role: UserRole; active: boolean; id: string | null }
+type Membership = {
+  role: UserRole
+  active: boolean
+  id: string | null
+  tenantId: string | null
+}
 
-const NO_MEMBERSHIP: Membership = { role: 'sales', active: false, id: null }
+const NO_MEMBERSHIP: Membership = { role: 'sales', active: false, id: null, tenantId: null }
 
 /**
  * Look up the signed-in user in app_users. In cloud mode RLS only returns the
@@ -46,17 +53,30 @@ const NO_MEMBERSHIP: Membership = { role: 'sales', active: false, id: null }
 async function lookupMembership(email: string | undefined): Promise<Membership> {
   if (!email) return NO_MEMBERSHIP
 
-  const { data, error } = await db
+  const emailFilter = email.replace(/[\\%_]/g, '\\$&')
+  let { data, error } = await db
     .from('app_users')
-    .select('id, role, active')
-    .ilike('email', email.replace(/[\\%_]/g, '\\$&'))
+    .select('id, role, active, tenant_id')
+    .ilike('email', emailFilter)
     .maybeSingle()
+
+  // Pre-M1 databases may not have tenant_id yet — fall back so login still works.
+  if (error) {
+    const retry = await db
+      .from('app_users')
+      .select('id, role, active')
+      .ilike('email', emailFilter)
+      .maybeSingle()
+    data = retry.data ? { ...retry.data, tenant_id: null } : null
+    error = retry.error
+  }
 
   if (error || !data) return NO_MEMBERSHIP
   return {
     role: normalizeUserRole(data.role),
     active: data.active !== false,
     id: data.id ? String(data.id) : null,
+    tenantId: data.tenant_id ? String(data.tenant_id) : null,
   }
 }
 
@@ -163,6 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       userRole: membership.role,
       appUserId: membership.id,
+      tenantId: membership.tenantId,
       hasAccess: membership.active || !isSupabaseConfigured(),
       signInWithPassword,
       changePassword,
