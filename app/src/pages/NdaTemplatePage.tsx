@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { Link } from 'react-router-dom'
 import { CheckCircle2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
+import { formatClauseForTemplate, insertTextAtCursor } from '../lib/clauseCompose'
+import { listContractClauses } from '../lib/clauseLibraryStore'
 import { errorMessage } from '../lib/errors'
 import { can } from '../lib/permissions'
 import {
@@ -23,7 +26,7 @@ import {
 } from '../lib/ndaTemplateStore'
 import { btn, btnGhost, btnPrimary, colors, input } from '../lib/pageStyles'
 import { pageStyle, pageSubtitleStyle, pageTitleStyle } from '../lib/uiStyles'
-import type { NdaTemplate } from '../lib/types'
+import type { ContractClause, NdaTemplate } from '../lib/types'
 
 function downloadBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob)
@@ -55,6 +58,7 @@ export default function NdaTemplatePage() {
   const [body, setBody] = useState(DEFAULT_NDA_BODY)
   const [busy, setBusy] = useState(false)
   const [approving, setApproving] = useState<{ by: string; on: string; note: string } | null>(null)
+  const [clauses, setClauses] = useState<ContractClause[]>([])
   const textRef = useRef<HTMLTextAreaElement>(null)
 
   const load = useCallback(
@@ -73,6 +77,12 @@ export default function NdaTemplatePage() {
   useEffect(() => {
     void load().catch((e) => showToast(errorMessage(e, 'Could not load NDA templates'), 'error'))
   }, [load, showToast])
+
+  useEffect(() => {
+    void listContractClauses()
+      .then((r) => setClauses(r.rows.filter((c) => c.status === 'active')))
+      .catch(() => setClauses([]))
+  }, [])
 
   const selected = templates.find((t) => t.id === selectedId) ?? null
   const inUse = templateInUse(templates)
@@ -105,16 +115,25 @@ export default function NdaTemplatePage() {
     }
   }
 
-  function insert(key: string) {
+  function insertAtCursor(piece: string) {
     const el = textRef.current
-    const token = `{{${key}}}`
-    if (!el) {
-      setBody((b) => b + token)
-      return
-    }
-    const start = el.selectionStart ?? body.length
-    const end = el.selectionEnd ?? start
-    setBody(body.slice(0, start) + token + body.slice(end))
+    const start = el?.selectionStart ?? body.length
+    const end = el?.selectionEnd ?? start
+    const next = insertTextAtCursor(body, piece, start, end)
+    setBody(next.text)
+    requestAnimationFrame(() => {
+      if (!textRef.current) return
+      textRef.current.focus()
+      textRef.current.setSelectionRange(next.cursor, next.cursor)
+    })
+  }
+
+  function insert(key: string) {
+    insertAtCursor(`{{${key}}}`)
+  }
+
+  function insertClause(clause: ContractClause) {
+    insertAtCursor(formatClauseForTemplate(clause))
   }
 
   return (
@@ -209,6 +228,31 @@ export default function NdaTemplatePage() {
                 {`{{${p.key}}}`}
               </button>
             ))}
+          </div>
+          <div style={{ display: 'grid', gap: 6 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+              <span style={{ fontSize: 12, color: colors.muted }}>Insert clause</span>
+              <Link to="/clause-library" style={{ fontSize: 12, color: colors.accent }}>
+                Manage library
+              </Link>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {clauses.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  style={btnGhost}
+                  disabled={!editing}
+                  title={c.clause_key}
+                  onClick={() => insertClause(c)}
+                >
+                  {c.title}
+                </button>
+              ))}
+              {!clauses.length ? (
+                <span style={{ fontSize: 12, color: colors.muted }}>No active clauses — add some in the clause library.</span>
+              ) : null}
+            </div>
           </div>
           {unknown.length ? (
             <p style={{ margin: 0, fontSize: 12, color: colors.warn }}>Unknown placeholders: {unknown.join(', ')}</p>

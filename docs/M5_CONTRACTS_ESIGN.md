@@ -8,25 +8,21 @@
 |------------|----------------|
 | NDA vault + send link | Exists (`legal-documents.md`, `/sign`, `legal-sign`) |
 | Canvas assent capture | Exists — **not** AdES/QES; client copy states this |
-| Clause library | Foundation table + `/clause-library` CRUD |
+| Clause library | `/clause-library` CRUD |
+| Compose into templates | Insert active clauses into NDA + agreement draft editors |
 | Obligations board | Missing → next |
 | TDRA QTSP integration | Not started → Phase B after ask |
 
-## Slice 3 (this milestone step)
+## Slice 4 (this milestone step)
 
-- Migration `contract_clauses` (RLS: staff read, managers edit) + seed clauses
-- Zod form + store + `/clause-library` page + Delivery nav link
-- **No** template composition yet; **no** QTSP
+- `formatClauseForTemplate` / `insertTextAtCursor` helpers + tests
+- NDA template + Agreement template: insert active clauses at cursor; link to library
+- **No** QTSP; **no** obligations board yet
 
 ## Later
 
-1. Compose clauses into NDA / agreement drafts
-2. Obligations board
-3. Phase B QTSP after Alfred approves a licensed vendor
-
-## Ops
-
-1. Apply `supabase/migrations/20261214090000_contract_clauses.sql`
+1. Obligations board
+2. Phase B QTSP after Alfred approves a licensed vendor
 
 ## Rules
 
