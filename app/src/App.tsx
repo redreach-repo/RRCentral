@@ -23,6 +23,7 @@ import BuildTemplatesPage from './pages/BuildTemplatesPage'
 import AgreementTemplatePage from './pages/AgreementTemplatePage'
 import NdaTemplatePage from './pages/NdaTemplatePage'
 import ClauseLibraryPage from './pages/ClauseLibraryPage'
+import ObligationsBoardPage from './pages/ObligationsBoardPage'
 import LegalSignPage from './pages/LegalSignPage'
 import ClientHealthPage from './pages/ClientHealthPage'
 import MrrPage from './pages/MrrPage'
@@ -150,6 +151,7 @@ export default function App() {
               <Route path="agreement-template" element={<AgreementTemplatePage />} />
               <Route path="nda-template" element={<NdaTemplatePage />} />
               <Route path="clause-library" element={<ClauseLibraryPage />} />
+              <Route path="obligations" element={<ObligationsBoardPage />} />
               <Route path="client-health" element={<ClientHealthPage />} />
               <Route path="client-reports" element={<ClientReportsPage />} />
               <Route path="mrr" element={<MrrPage />} />
