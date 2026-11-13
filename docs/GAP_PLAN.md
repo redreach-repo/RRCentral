@@ -43,7 +43,7 @@ Status key: **exists** · **partial** · **missing**
 | 6.1 Core platform | partial | Users/settings/audit/2-step exist; MFA passkeys/SSO missing → M1 |
 | 6.2 CRM and sales | partial | Strong ops CRM; three pipelines; Pipeline-first soft-retire (M3 slice 4); schema merge later (ask) |
 | 6.3 Email and calendar | partial | Zoho + Gmail Phase A + M365 Phase A/B (incl. inbox); Gmail inbox still CASA-gated; IMAP deferred |
-| 6.4 Contracts and e-sign | partial | Agreement/NDA + `/sign` sealed PDF path; no clause library/obligations board → M5 |
+| 6.4 Contracts and e-sign | partial | NDA `/sign` exists (assent evidence, not QES); UAE e-sign assessment concluded; clause library / QTSP Phase B → M5 |
 | 6.5 HR | missing | M6 |
 | 6.6 Payroll | missing | M8 UAE pack |
 | 6.7 Accounting (ledger) | partial | Invoices/payments/expenses/reports; **no** journals/CoA/immutability → M7 |
