@@ -23,6 +23,10 @@ import PaymentRemindersCard from '../components/invoices/PaymentRemindersCard'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
+import EditorSectionTabs, {
+  editorPanelStyle,
+  type EditorSection,
+} from '../components/EditorSectionTabs'
 import ClientBillToFields from '../components/ClientBillToFields'
 import { useClientBillTo } from '../hooks/useClientBillTo'
 import { ensureCompanyFromDocument } from '../lib/ensureCompanyFromDocument'
@@ -155,6 +159,7 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [editorOpen, setEditorOpen] = useState(false)
+  const [editorSection, setEditorSection] = useState<EditorSection>('basics')
   const [editing, setEditing] = useState<Invoice | null>(null)
   const [form, setForm] = useState<InvoiceForm>(emptyForm())
   const billTo = useClientBillTo(clients)
@@ -270,7 +275,7 @@ export default function InvoicesPage() {
         vertical: DIVISIONS[0].brand,
       }),
     )
-    setEditorOpen(true)
+    setEditorSection('basics'); setEditorOpen(true)
   }
 
   async function openEdit(inv: Invoice) {
@@ -295,7 +300,7 @@ export default function InvoicesPage() {
         ...vatFormFields(savedVatRate(items, vatRate), vatRate),
         items: toDraftItems(items),
       })
-      setEditorOpen(true)
+      setEditorSection('basics'); setEditorOpen(true)
     } catch (e) {
       showToast(errorMessage(e, 'Failed to load line items'), 'error')
     }
@@ -838,6 +843,9 @@ export default function InvoicesPage() {
       )}
 
       <Modal open={editorOpen} title={editing ? 'Edit invoice' : 'New invoice'} onClose={() => setEditorOpen(false)} width={920}>
+        <EditorSectionTabs value={editorSection} onChange={setEditorSection} />
+
+        <div style={editorPanelStyle(editorSection === 'basics')}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: 12 }}>
           <div style={fieldStyle}>
             <label style={labelStyle}>Client *</label>
@@ -918,19 +926,6 @@ export default function InvoicesPage() {
             client={form.client}
             savedClient={billTo.isSavedClient(form.client)}
           />
-          <div style={fieldStyle}>
-            <label style={labelStyle}>Payment terms</label>
-            <select
-              style={selectStyle}
-              value={form.payment_terms}
-              onChange={(e) => setForm((f) => ({ ...f, payment_terms: e.target.value }))}
-            >
-              <option value="">—</option>
-              {PAYMENT_TERMS.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-          </div>
         </div>
 
         <div style={fieldStyle}>
@@ -941,7 +936,9 @@ export default function InvoicesPage() {
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
           />
         </div>
+        </div>
 
+        <div style={editorPanelStyle(editorSection === 'lines')}>
         <div style={{ display: 'flex', justifyContent: 'space-between', margin: '12px 0 8px' }}>
           <strong>Line items</strong>
           <button
@@ -1102,12 +1099,36 @@ export default function InvoicesPage() {
           ) : null}
         </div>
 
+        </div>
+
+        <div style={editorPanelStyle(editorSection === 'terms')}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 12 }}>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Payment terms</label>
+              <select
+                style={selectStyle}
+                value={form.payment_terms}
+                onChange={(e) => setForm((f) => ({ ...f, payment_terms: e.target.value }))}
+              >
+                <option value="">—</option>
+                {PAYMENT_TERMS.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <p style={{ color: colors.muted, fontSize: 13, margin: '8px 0 0', lineHeight: 1.45 }}>
+            Delivery terms and MOQ follow the division format when you save.
+          </p>
+        </div>
+
         <div className={resp.totalsRow}>
           <span>Subtotal: <strong>{formatAED(totals.subtotal)}</strong></span>
           <span>VAT ({vatRateToPercent(formVatRate)}%): <strong>{formatAED(totals.vat)}</strong></span>
           <span>Total: <strong style={{ color: colors.accent }}>{formatAED(totals.total)}</strong></span>
         </div>
 
+        <div style={editorPanelStyle(editorSection === 'notes')}>
         <div style={fieldStyle}>
           <label style={labelStyle}>Notes</label>
           <textarea
@@ -1115,6 +1136,7 @@ export default function InvoicesPage() {
             value={form.notes}
             onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
           />
+        </div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>

@@ -24,6 +24,10 @@ import { can } from '../lib/permissions'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
+import EditorSectionTabs, {
+  editorPanelStyle,
+  type EditorSection,
+} from '../components/EditorSectionTabs'
 import LineItemImageField from '../components/LineItemImageField'
 import ClientBillToFields from '../components/ClientBillToFields'
 import { useClientBillTo } from '../hooks/useClientBillTo'
@@ -187,6 +191,7 @@ export default function QuotationsPage() {
   /** Only one row’s action panel open at a time — keeps the table scannable. */
   const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
+  const [editorSection, setEditorSection] = useState<EditorSection>('basics')
   const [editing, setEditing] = useState<Quotation | null>(null)
   const [form, setForm] = useState<QuoteForm>(emptyForm())
   const billTo = useClientBillTo(clients)
@@ -372,7 +377,7 @@ export default function QuotationsPage() {
           : {}),
       }),
     )
-    setEditorOpen(true)
+    setEditorSection('basics'); setEditorOpen(true)
     setSearchParams({}, { replace: true })
   }, [searchParams, loading, setSearchParams, settings, clients, crmRows, contactFieldsForClient, billTo])
 
@@ -419,7 +424,7 @@ export default function QuotationsPage() {
           items,
         }),
       )
-      setEditorOpen(true)
+      setEditorSection('basics'); setEditorOpen(true)
       setSearchParams({}, { replace: true })
     })()
   }, [searchParams, loading, setSearchParams, settings])
@@ -475,7 +480,7 @@ export default function QuotationsPage() {
         moq: settings.moqDefault || '50',
       }),
     )
-    setEditorOpen(true)
+    setEditorSection('basics'); setEditorOpen(true)
   }
 
   async function openEdit(q: Quotation) {
@@ -514,7 +519,7 @@ export default function QuotationsPage() {
         discount_amount: Number(q.discount_amount) || 0,
         offset_vat: quoteOffsetsVat(q, settings),
       })
-      setEditorOpen(true)
+      setEditorSection('basics'); setEditorOpen(true)
     } catch (e) {
       showToast(errorMessage(e, 'Failed to load line items'), 'error')
     }
@@ -1383,6 +1388,9 @@ export default function QuotationsPage() {
         onClose={() => setEditorOpen(false)}
         width={920}
       >
+        <EditorSectionTabs value={editorSection} onChange={setEditorSection} />
+
+        <div style={editorPanelStyle(editorSection === 'basics')}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: 12 }}>
           <div style={{ ...fieldStyle, position: 'relative' }}>
             <label style={labelStyle}>Client *</label>
@@ -1567,6 +1575,9 @@ export default function QuotationsPage() {
           />
         </div>
 
+        </div>
+
+        <div style={editorPanelStyle(editorSection === 'lines')}>
         <div
           style={{
             marginTop: 8,
@@ -1961,6 +1972,8 @@ export default function QuotationsPage() {
           </div>
         </div>
 
+        </div>
+
         <div
           style={{
             marginTop: 16,
@@ -2022,6 +2035,7 @@ export default function QuotationsPage() {
           </div>
         </div>
 
+        <div style={editorPanelStyle(editorSection === 'terms')}>
         <div
           style={{
             marginTop: 18,
@@ -2214,6 +2228,9 @@ export default function QuotationsPage() {
           </div>
         </div>
 
+        </div>
+
+        <div style={editorPanelStyle(editorSection === 'notes')}>
         <div style={fieldStyle}>
           <label style={labelStyle}>Notes</label>
           <textarea
@@ -2221,6 +2238,7 @@ export default function QuotationsPage() {
             value={form.notes}
             onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
           />
+        </div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
