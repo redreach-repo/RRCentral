@@ -56,6 +56,7 @@ import {
   sortByDateDesc,
 } from '../lib/finance'
 import { deleteFinanceForInvoiceRef, reconcileInvoiceFinance } from '../lib/invoiceFinance'
+import { parseInvoiceForm } from '../lib/schemas/invoice'
 import { useCompactCrm } from '../hooks/useMediaQuery'
 import resp from '../styles/crmResponsive.module.css'
 import {
@@ -314,18 +315,33 @@ export default function InvoicesPage() {
   }
 
   async function saveInvoice(finalize = false) {
-    if (!form.client.trim()) {
-      showToast('Client is required', 'error')
+    const parsed = parseInvoiceForm({
+      client: form.client,
+      vertical: form.vertical,
+      reference_number: form.reference_number,
+      description: form.description,
+      payment_terms: form.payment_terms,
+      delivery_terms: form.delivery_terms,
+      moq: form.moq,
+      notes: form.notes,
+      date: form.date,
+      status: form.status,
+      vat_mode: form.vat_mode,
+      vat_percent: form.vat_percent,
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
+    const f = parsed.data
     setSaving(true)
     try {
-      let reference = form.reference_number.trim()
+      let reference = f.reference_number
       const isTempRef = !reference || /^INV-DRAFT-/i.test(reference)
       const amount = totals.total
       const vertical =
-        DIVISIONS.find((d) => d.code === divisionCode)?.brand || form.vertical
-      const status = finalize ? (form.status === 'Draft' ? 'Sent' : form.status) : form.status
+        DIVISIONS.find((d) => d.code === divisionCode)?.brand || f.vertical
+      const status = finalize ? (f.status === 'Draft' ? 'Sent' : f.status) : f.status
       // Assign a real RR-XX-YYNNN ref when finalizing (or leaving Draft) — do not keep INV-DRAFT-*.
       const leavingDraft = String(status).toLowerCase() !== 'draft'
       if ((finalize || leavingDraft) && isTempRef) {
@@ -350,15 +366,15 @@ export default function InvoicesPage() {
       const fmt = getDivisionQuoteFormat(divisionCode, settings)
 
       const payload = {
-        client: form.client.trim(),
+        client: f.client,
         vertical,
         reference_number: reference,
-        description: form.description.trim(),
-        payment_terms: form.payment_terms,
-        delivery_terms: fmt.showDelivery ? form.delivery_terms : '',
-        moq: fmt.showMoq ? form.moq : '',
-        notes: form.notes,
-        date: form.date || null,
+        description: f.description,
+        payment_terms: f.payment_terms,
+        delivery_terms: fmt.showDelivery ? f.delivery_terms : '',
+        moq: fmt.showMoq ? f.moq : '',
+        notes: f.notes,
+        date: f.date || null,
         amount,
         status,
         payment_status,
