@@ -29,16 +29,13 @@ import {
   formGridStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
-  toolbarStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 type DomainForm = {
   domain_name: string
@@ -267,19 +264,25 @@ export default function DomainsPage() {
   }
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Domains</h1>
-          <p style={pageSubtitleStyle}>
+          <p className={docsStyles.kicker}>Operations</p>
+          <h1 className={docsStyles.title}>Domains</h1>
+          <p className={docsStyles.subtitle}>
             Track every domain you own — registrar, renewals, DNS, and hosting. Renewal alerts show
             on the dashboard when expiry is within 90 days.
           </p>
         </div>
-        <button type="button" style={buttonPrimaryStyle} onClick={openCreate} disabled={missingTable}>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          onClick={openCreate}
+          disabled={missingTable}
+        >
           <Plus size={16} /> Add domain
         </button>
-      </div>
+      </header>
 
       {missingTable ? (
         <div style={{ ...cardStyle, color: colors.muted, lineHeight: 1.55, marginBottom: 16 }}>
