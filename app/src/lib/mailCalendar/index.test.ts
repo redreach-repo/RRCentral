@@ -42,6 +42,7 @@ describe('mailCalendar façade', () => {
     const opts = listMailCalendarProviderOptions()
     expect(opts.find((o) => o.id === 'zoho')?.available).toBe(true)
     expect(opts.find((o) => o.id === 'gmail')?.available).toBe(false)
+    expect(opts.find((o) => o.id === 'gmail')?.unavailableReason).toMatch(/Phase A/)
     expect(opts.find((o) => o.id === 'm365')?.available).toBe(false)
     expect(opts.find((o) => o.id === 'imap')?.available).toBe(false)
   })

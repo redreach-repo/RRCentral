@@ -1379,8 +1379,8 @@ export default function SettingsPage() {
             ))}
           </select>
           <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted2, lineHeight: 1.45 }}>
-            Zoho is active today. Gmail / M365 / IMAP appear when their adapters ship (Gmail after
-            compliance).
+            Zoho is active today. Gmail Phase A (send + calendar) is approved in Compliance notes —
+            wire OAuth next; inbox (Phase B) needs restricted-scope verification. M365 / IMAP later.
           </p>
         </div>
         {can(userRole, 'settings.manage') &&

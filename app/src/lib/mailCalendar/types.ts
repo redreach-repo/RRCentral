@@ -25,7 +25,7 @@ export const MAIL_CALENDAR_PROVIDER_OPTIONS: readonly ProviderOption[] = [
     id: 'gmail',
     label: 'Gmail',
     available: false,
-    unavailableReason: 'Pending Google restricted-scopes compliance',
+    unavailableReason: 'OAuth not wired yet (Phase A send+calendar approved in COMPLIANCE_NOTES)',
   },
   {
     id: 'm365',
