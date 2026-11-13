@@ -63,6 +63,7 @@ import { getUsageSource, saveUsageSource } from '../../lib/usageImportStore'
 import { canViewField } from '../../lib/fieldPermissions'
 import { can } from '../../lib/permissions'
 import { errorMessage } from '../../lib/errors'
+import { parseDeliveryRequirementForm } from '../../lib/schemas/deliveryRequirement'
 import { parseTimeEntryForm } from '../../lib/schemas/timeEntry'
 import { formatAED } from '../../lib/money'
 import { FORGOTTEN_TIMER_HOURS, elapsedHours, elapsedLabel, hoursLabel, timerHours } from '../../lib/timeTracking'
@@ -501,13 +502,18 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
 
   async function addRequirement(e: FormEvent) {
     e.preventDefault()
-    if (!reqForm.title.trim()) return
+    const parsed = parseDeliveryRequirementForm(reqForm)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
+    const { title, detail } = parsed.data
     await run(async () => {
       await saveRequirement(
         account.id,
         {
-          title: reqForm.title.trim(),
-          detail: reqForm.detail.trim(),
+          title,
+          detail,
           status: 'open',
           source: '',
           is_change_request: signedOff,
@@ -515,7 +521,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
         author.email,
       )
       if (signedOff) {
-        await logAccountEvent(account.id, `Change request raised: ${reqForm.title.trim()}`, author)
+        await logAccountEvent(account.id, `Change request raised: ${title}`, author)
       }
       setReqForm({ title: '', detail: '' })
     }, 'Could not add the requirement')
