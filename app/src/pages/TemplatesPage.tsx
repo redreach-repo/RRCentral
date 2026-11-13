@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FilePlus2, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { FilePlus2, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS } from '../lib/config'
 import type { QuoteTemplate } from '../lib/types'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
+import SimpleRowActions from '../components/SimpleRowActions'
 import { newDraftLine, type DraftLineItem } from '../lib/lineItems'
 import { syncSeedTemplates } from '../lib/syncTemplates'
 import { formatAED } from '../lib/money'
@@ -77,6 +78,7 @@ export default function TemplatesPage() {
   const [saving, setSaving] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<QuoteTemplate | null>(null)
+  const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -233,7 +235,7 @@ export default function TemplatesPage() {
                       <div style={{ fontSize: 13, color: colors.muted2, marginTop: 6 }}>{t.description}</div>
                     ) : null}
                   </div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                     <button
                       type="button"
                       style={buttonPrimaryStyle}
@@ -241,12 +243,12 @@ export default function TemplatesPage() {
                     >
                       Create quote
                     </button>
-                    <button type="button" style={buttonSecondaryStyle} onClick={() => openEdit(t)}>
-                      <Pencil size={14} />
-                    </button>
-                    <button type="button" style={buttonDangerStyle} onClick={() => setDeleteTarget(t)}>
-                      <Trash2 size={14} />
-                    </button>
+                    <SimpleRowActions
+                      expanded={actionsOpenId === t.id}
+                      onToggle={() => setActionsOpenId((id) => (id === t.id ? null : t.id))}
+                      onEdit={() => openEdit(t)}
+                      onDelete={() => setDeleteTarget(t)}
+                    />
                   </div>
                 </div>
               </div>

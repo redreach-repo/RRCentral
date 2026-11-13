@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, ExternalLink, FileText, Package, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { Download, ExternalLink, FileText, Package, Plus, RefreshCw } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS, FABRIC_OPTIONS } from '../lib/config'
 import { BRAND_CATALOGUES, catalogueUrl } from '../lib/catalogues'
@@ -9,6 +9,7 @@ import type { Product } from '../lib/types'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
+import SimpleRowActions from '../components/SimpleRowActions'
 import { formatAED } from '../lib/money'
 import {
   buttonDangerStyle,
@@ -77,6 +78,7 @@ export default function CatalogPage() {
   const [saving, setSaving] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
+  const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -413,12 +415,12 @@ export default function CatalogPage() {
                       </button>
                     </td>
                     <td style={tdStyle}>
-                      <button type="button" style={buttonSecondaryStyle} onClick={() => openEdit(p)}>
-                        <Pencil size={14} />
-                      </button>{' '}
-                      <button type="button" style={buttonDangerStyle} onClick={() => setDeleteTarget(p)}>
-                        <Trash2 size={14} />
-                      </button>
+                      <SimpleRowActions
+                        expanded={actionsOpenId === p.id}
+                        onToggle={() => setActionsOpenId((id) => (id === p.id ? null : p.id))}
+                        onEdit={() => openEdit(p)}
+                        onDelete={() => setDeleteTarget(p)}
+                      />
                     </td>
                   </tr>
                 ))}
