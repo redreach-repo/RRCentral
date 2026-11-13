@@ -9,7 +9,7 @@
 
 ## Already on main
 
-- Continuous backlog Zod through saved views · M3 route soft-hide · M3a demo prep · QTSP · `pipeline_deals_v`
+- Continuous backlog Zod through Fireflies · M3 route soft-hide · M3a demo prep · QTSP · `pipeline_deals_v`
 
 ## Still open (agent queue)
 

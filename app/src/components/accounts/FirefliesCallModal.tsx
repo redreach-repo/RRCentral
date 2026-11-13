@@ -3,6 +3,7 @@ import Modal from '../Modal'
 import { errorMessage } from '../../lib/errors'
 import type { FirefliesMeeting } from '../../lib/fireflies'
 import { fetchFirefliesMeeting, meetingWhen, saveMeetingActivity } from '../../lib/firefliesStore'
+import { parseFirefliesMeetingInput } from '../../lib/schemas/firefliesMeeting'
 import { buttonPrimaryStyle, buttonSecondaryStyle, colors, inputStyle, labelStyle } from '../../lib/uiStyles'
 
 /**
@@ -37,10 +38,15 @@ export default function FirefliesCallModal({
   }
 
   async function fetchIt() {
+    const parsed = parseFirefliesMeetingInput({ input })
+    if (!parsed.ok) {
+      setError(parsed.error)
+      return
+    }
     setBusy(true)
     setError('')
     try {
-      setMeeting(await fetchFirefliesMeeting(accountId, input))
+      setMeeting(await fetchFirefliesMeeting(accountId, parsed.data.input))
     } catch (e) {
       setError(errorMessage(e, 'Could not read the meeting'))
     } finally {
