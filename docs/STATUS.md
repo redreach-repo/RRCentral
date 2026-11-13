@@ -9,22 +9,14 @@
 
 ## Already on main
 
-- M0–M4 · M1 leftovers · M5 through clause-tag spawn
-
-## In flight (other PRs)
-
-- Zod batch + QTSP scaffold stack
+- Continuous backlog Zod batch · QTSP scaffold · go-live/build · M3 plan · `pipeline_deals_v`
 
 ## Still open (agent queue)
 
-1. More M1 Zod
-2. M3 schema consolidate (non-destructive first slices)
-3. Demo env hooks after Alfred provisions
+1. More M1 Zod  
+2. M3 dual-write / route soft-hide later  
+3. Demo env hooks after Alfred provisions  
 
 ## Still externally blocked
 
-- **Gmail Phase B** — CASA  
-- **Division logos** — need assets  
-- **§19 decisions** — do not invent  
-- **Paid QTSP vendor** — Alfred  
-- **2nd Supabase for M3a** — Alfred  
+- CASA · logos · §19 · paid QTSP · M3a Supabase (Alfred)
