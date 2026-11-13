@@ -1,55 +1,56 @@
 .root {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
-  gap: 4px;
-  flex-wrap: nowrap;
+  gap: 5px;
+  max-width: 320px;
+  margin-left: auto;
 }
 
-.icon,
-.iconLink {
+.btn,
+.btnLink,
+.primary,
+.danger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.88);
+  gap: 5px;
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1;
   cursor: pointer;
-  padding: 0;
+  white-space: nowrap;
+  font-family: inherit;
   text-decoration: none;
   flex: 0 0 auto;
 }
 
-.icon:hover,
-.iconLink:hover {
+.btn,
+.btnLink {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.btn:hover,
+.btnLink:hover {
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
 }
 
-.icon:disabled {
+.btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
 .primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  height: 30px;
-  padding: 0 10px;
-  border-radius: 8px;
   border: none;
   background: #e85d04;
   color: #fff;
-  font-size: 12px;
-  font-weight: 650;
-  cursor: pointer;
-  white-space: nowrap;
-  font-family: inherit;
-  flex: 0 0 auto;
 }
 
 .primary:disabled {
@@ -61,57 +62,12 @@
   filter: brightness(1.06);
 }
 
-.moreWrap {
-  position: relative;
-}
-
-.menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  z-index: 40;
-  min-width: 180px;
-  padding: 6px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: #171a1f;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.menuItem,
-.menuDanger {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  border: none;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.9);
-  text-align: left;
-  padding: 9px 10px;
-  border-radius: 8px;
-  font-size: 13px;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.menuItem:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.menuDanger {
+.danger {
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.1);
   color: #fb7185;
 }
 
-.menuDanger:hover {
-  background: rgba(239, 68, 68, 0.12);
-}
-
-.menuItem:disabled,
-.menuDanger:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+.danger:hover {
+  background: rgba(239, 68, 68, 0.18);
 }

@@ -148,27 +148,28 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 920px;
+  table-layout: fixed;
+  min-width: 860px;
 }
 
 .table th {
   text-align: left;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--q-faint);
-  padding: 12px 14px;
+  padding: 9px 8px;
   border-bottom: 1px solid var(--q-line);
   background: rgba(0, 0, 0, 0.18);
   white-space: nowrap;
 }
 
 .table td {
-  padding: 12px 14px;
+  padding: 9px 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  vertical-align: middle;
-  font-size: 13px;
+  vertical-align: top;
+  font-size: 12.5px;
 }
 
 .table tbody tr:last-child td {
@@ -179,9 +180,34 @@
   background: rgba(255, 255, 255, 0.03);
 }
 
+/* Slightly tighter data columns; Actions gets the leftover width for wrapping chips. */
+.colRef {
+  width: 15%;
+}
+.colClient {
+  width: 16%;
+}
+.colDivision {
+  width: 11%;
+}
+.colDate {
+  width: 9%;
+}
+.colAmount {
+  width: 10%;
+}
+.colStatus {
+  width: 9%;
+}
+.colActions {
+  width: 30%;
+}
+
 .ref {
   font-weight: 700;
   letter-spacing: -0.01em;
+  font-size: 12.5px;
+  word-break: break-word;
 }
 
 .refMuted {
@@ -190,21 +216,26 @@
 }
 
 .meta {
-  margin-top: 3px;
-  font-size: 11px;
+  margin-top: 2px;
+  font-size: 10.5px;
   color: var(--q-faint);
-  line-height: 1.35;
+  line-height: 1.3;
+}
+
+.clientCell {
+  word-break: break-word;
 }
 
 .amount {
   font-variant-numeric: tabular-nums;
   font-weight: 650;
   white-space: nowrap;
+  font-size: 12.5px;
 }
 
 .actionsCell {
-  white-space: nowrap;
   text-align: right;
+  white-space: normal;
 }
 
 .empty,
