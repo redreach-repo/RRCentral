@@ -1234,7 +1234,6 @@ export default function QuotationsPage() {
 
   function quoteMeta(q: Quotation): string {
     const bits: string[] = []
-    if (q.date) bits.push(format(new Date(q.date), 'dd MMM yyyy'))
     if (q.valid_until && q.reference_number) {
       bits.push(`Valid until ${format(new Date(q.valid_until), 'dd MMM yyyy')}`)
     }
@@ -1277,14 +1276,6 @@ export default function QuotationsPage() {
     )
   }
 
-  function openQuoteRow(q: Quotation) {
-    if (q.reference_number || q.id) {
-      navigate(`/document/quote/${q.id}`)
-      return
-    }
-    void openEdit(q)
-  }
-
   return (
     <div className={qStyles.page}>
       <header className={qStyles.hero}>
@@ -1292,7 +1283,7 @@ export default function QuotationsPage() {
           <p className={qStyles.kicker}>Sales documents</p>
           <h1 className={qStyles.title}>Quotations</h1>
           <p className={qStyles.subtitle}>
-            One list for drafts, awards, and follow-through — open a quote, take the next step.
+            Create, revise, and track quotations in a clear table — icons for common actions, labels for the next step.
           </p>
         </div>
         <button type="button" className={qStyles.newBtn} onClick={() => void openCreate()}>
@@ -1334,38 +1325,42 @@ export default function QuotationsPage() {
           />
         </div>
       ) : (
-        <div className={qStyles.list}>
-          {filtered.map((q) => (
-            <article
-              key={q.id}
-              className={qStyles.row}
-              onClick={() => openQuoteRow(q)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  openQuoteRow(q)
-                }
-              }}
-              role="button"
-              tabIndex={0}
-            >
-              <div className={qStyles.refBlock}>
-                <div className={qStyles.ref}>
-                  {q.reference_number || <span className={qStyles.refMuted}>DRAFT</span>}
-                </div>
-                {quoteMeta(q) ? <div className={qStyles.meta}>{quoteMeta(q)}</div> : null}
-              </div>
-              <div className={qStyles.client}>
-                <div className={qStyles.clientName}>{q.client || '—'}</div>
-                <div className={qStyles.division}>{q.vertical || divisionBrand(q.division_code)}</div>
-              </div>
-              <div className={qStyles.amount}>{formatAED(q.amount)}</div>
-              <div className={qStyles.statusCell}>
-                <StatusPill status={q.status} />
-              </div>
-              <div className={qStyles.actions}>{renderQuoteActions(q)}</div>
-            </article>
-          ))}
+        <div className={qStyles.tableShell}>
+          <div className={qStyles.tableWrap}>
+            <table className={qStyles.table}>
+              <thead>
+                <tr>
+                  <th>Reference</th>
+                  <th>Client</th>
+                  <th>Division</th>
+                  <th>Date</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((q) => (
+                  <tr key={q.id}>
+                    <td>
+                      <div className={qStyles.ref}>
+                        {q.reference_number || <span className={qStyles.refMuted}>DRAFT</span>}
+                      </div>
+                      {quoteMeta(q) ? <div className={qStyles.meta}>{quoteMeta(q)}</div> : null}
+                    </td>
+                    <td>{q.client || '—'}</td>
+                    <td>{q.vertical || divisionBrand(q.division_code)}</td>
+                    <td>{q.date ? format(new Date(q.date), 'dd MMM yyyy') : '—'}</td>
+                    <td className={qStyles.amount}>{formatAED(q.amount)}</td>
+                    <td>
+                      <StatusPill status={q.status} />
+                    </td>
+                    <td className={qStyles.actionsCell}>{renderQuoteActions(q)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

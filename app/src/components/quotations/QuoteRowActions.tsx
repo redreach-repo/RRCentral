@@ -39,11 +39,13 @@ type MenuItem = {
   icon: ReactNode
   danger?: boolean
   disabled?: boolean
-  to?: string
-  onClick?: () => void
+  onClick: () => void
 }
 
-/** One primary CTA for the quote’s status; everything else lives in More. */
+/**
+ * Table-friendly actions: icon buttons for common ops, one labeled primary CTA,
+ * and More for rarer / destructive items — more options than before without text clutter.
+ */
 export default function QuoteRowActions({
   quote: q,
   saving = false,
@@ -107,29 +109,11 @@ export default function QuoteRowActions({
       >
         Revise
       </button>
-    ) : canView ? (
-      <Link to={`/document/quote/${q.id}`} className={styles.primaryLink}>
-        <ExternalLink size={14} /> Open
-      </Link>
-    ) : (
-      <button type="button" className={styles.primary} onClick={() => onEdit(q)}>
-        <Pencil size={14} /> Edit
-      </button>
-    )
+    ) : null
 
-  const menu: MenuItem[] = [
-    { key: 'edit', label: 'Edit', icon: <Pencil size={14} />, onClick: () => onEdit(q) },
-  ]
-  if (canView) {
-    menu.push({
-      key: 'pdf',
-      label: 'PDF / Email',
-      icon: <ExternalLink size={14} />,
-      to: `/document/quote/${q.id}`,
-    })
-  }
+  const more: MenuItem[] = []
   if (q.status === 'Finalized') {
-    menu.push({
+    more.push({
       key: 'undo',
       label: 'Undo finalize',
       icon: <RotateCcw size={14} />,
@@ -137,46 +121,8 @@ export default function QuoteRowActions({
       onClick: () => onUndoFinalize(q),
     })
   }
-  if (canOutcome) {
-    menu.push({
-      key: 'outcome',
-      label: 'Set outcome',
-      icon: <Receipt size={14} />,
-      onClick: () => onOutcome(q),
-    })
-  }
-  if (canDn) {
-    menu.push({
-      key: 'dn',
-      label: 'Delivery note',
-      icon: <Truck size={14} />,
-      onClick: () => onDeliveryNote(q),
-    })
-  }
-  menu.push({
-    key: 'supplier',
-    label: 'Supplier invoice',
-    icon: <FileUp size={14} />,
-    onClick: () => onSupplierInvoice(q),
-  })
-  if (canBranch) {
-    menu.push({
-      key: 'branch',
-      label: 'Branch deal',
-      icon: <GitBranch size={14} />,
-      disabled: saving,
-      onClick: () => onBranch(q),
-    })
-  }
-  menu.push({
-    key: 'dup',
-    label: 'Duplicate',
-    icon: <Copy size={14} />,
-    disabled: saving,
-    onClick: () => onDuplicate(q),
-  })
   if (canDelete) {
-    menu.push({
+    more.push({
       key: 'del',
       label: 'Delete',
       icon: <Trash2 size={14} />,
@@ -187,36 +133,73 @@ export default function QuoteRowActions({
 
   return (
     <div className={styles.root} ref={rootRef} onClick={(e) => e.stopPropagation()}>
-      <button type="button" className={styles.ghost} title="Edit" onClick={() => onEdit(q)}>
-        <Pencil size={15} />
+      <button type="button" className={styles.icon} title="Edit" onClick={() => onEdit(q)}>
+        <Pencil size={14} />
       </button>
+      {canView ? (
+        <Link to={`/document/quote/${q.id}`} className={styles.iconLink} title="PDF / Email">
+          <ExternalLink size={14} />
+        </Link>
+      ) : null}
       {primary}
-      <div className={styles.moreWrap}>
+      {canOutcome ? (
+        <button type="button" className={styles.icon} title="Set outcome" onClick={() => onOutcome(q)}>
+          <Receipt size={14} />
+        </button>
+      ) : null}
+      {canDn ? (
         <button
           type="button"
-          className={styles.ghost}
-          aria-expanded={open}
-          aria-haspopup="menu"
-          title="More actions"
-          onClick={() => setOpen((v) => !v)}
+          className={styles.icon}
+          title="Delivery note"
+          onClick={() => onDeliveryNote(q)}
         >
-          <Ellipsis size={16} />
+          <Truck size={14} />
         </button>
-        {open ? (
-          <div className={styles.menu} role="menu">
-            {menu.map((item) =>
-              item.to ? (
-                <Link
-                  key={item.key}
-                  role="menuitem"
-                  className={styles.menuItem}
-                  to={item.to}
-                  onClick={() => setOpen(false)}
-                >
-                  {item.icon}
-                  {item.label}
-                </Link>
-              ) : (
+      ) : null}
+      <button
+        type="button"
+        className={styles.icon}
+        title="Supplier invoice"
+        onClick={() => onSupplierInvoice(q)}
+      >
+        <FileUp size={14} />
+      </button>
+      {canBranch ? (
+        <button
+          type="button"
+          className={styles.icon}
+          title="Branch deal"
+          disabled={saving}
+          onClick={() => onBranch(q)}
+        >
+          <GitBranch size={14} />
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className={styles.icon}
+        title="Duplicate"
+        disabled={saving}
+        onClick={() => onDuplicate(q)}
+      >
+        <Copy size={14} />
+      </button>
+      {more.length > 0 ? (
+        <div className={styles.moreWrap}>
+          <button
+            type="button"
+            className={styles.icon}
+            aria-expanded={open}
+            aria-haspopup="menu"
+            title="More actions"
+            onClick={() => setOpen((v) => !v)}
+          >
+            <Ellipsis size={15} />
+          </button>
+          {open ? (
+            <div className={styles.menu} role="menu">
+              {more.map((item) => (
                 <button
                   key={item.key}
                   type="button"
@@ -225,17 +208,17 @@ export default function QuoteRowActions({
                   disabled={item.disabled}
                   onClick={() => {
                     setOpen(false)
-                    item.onClick?.()
+                    item.onClick()
                   }}
                 >
                   {item.icon}
                   {item.label}
                 </button>
-              ),
-            )}
-          </div>
-        ) : null}
-      </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }
