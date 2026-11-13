@@ -44,6 +44,7 @@ import {
   CopyCheck,
   PhoneCall,
   Wrench,
+  ChevronDown,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders'
@@ -296,36 +297,25 @@ export default function Layout() {
       .filter((group) => group.items.length > 0)
   }, [userRole])
 
-  const [activeSection, setActiveSection] = useState(() => {
+  const pathSection = sectionForPath(location.pathname)
+  const [expandedIds, setExpandedIds] = useState<string[]>(() => {
     const fromPath = sectionForPath(location.pathname)
     const saved = readSavedSection()
-    if (saved && navGroups.some((g) => g.id === saved)) return saved
-    return fromPath
+    const seed = saved && navGroups.some((g) => g.id === saved) ? saved : fromPath
+    return Array.from(new Set([fromPath, seed].filter(Boolean)))
   })
 
   useEffect(() => {
-    const fromPath = sectionForPath(location.pathname)
-    setActiveSection((prev) => {
-      if (prev === fromPath) return prev
-      writeSavedSection(fromPath)
-      return fromPath
+    writeSavedSection(pathSection)
+    setExpandedIds((prev) => (prev.includes(pathSection) ? prev : [...prev, pathSection]))
+  }, [pathSection])
+
+  function toggleSection(id: string) {
+    setExpandedIds((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      writeSavedSection(id)
+      return next.length ? next : [id]
     })
-  }, [location.pathname])
-
-  const activeGroup =
-    visibleGroups.find((g) => g.id === activeSection) || visibleGroups[0] || null
-
-  function selectSection(id: string) {
-    setActiveSection(id)
-    writeSavedSection(id)
-    const group = visibleGroups.find((g) => g.id === id)
-    if (!group?.items.length) return
-    const alreadyHere = group.items.some((item) => itemMatchesPath(location.pathname, item))
-    // Jump to the section’s first page when leaving another section (or Overview).
-    if (!alreadyHere) {
-      navigate(group.items[0].to)
-      setSidebarOpen(false)
-    }
   }
 
   function openReminders() {
@@ -366,85 +356,84 @@ export default function Layout() {
       )}
 
       <aside className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
-        <div className={styles.rail} aria-label="Sections">
-          <div className={styles.railBrand} title="RED REACH Central">
-            <BrandLogo height={22} className={styles.railLogo} />
-          </div>
-          <div className={styles.railButtons} role="tablist" aria-orientation="vertical">
-            {visibleGroups.map((group) => {
-              const Icon = group.icon
-              const selected = activeGroup?.id === group.id
-              const hasDue =
-                group.id === 'sales' &&
-                group.items.some((i) => i.to === '/follow-ups') &&
-                reminders.due > 0
-              return (
+        <div className={styles.sideBrand}>
+          <BrandLogo height={28} className={styles.sideLogo} />
+          <button
+            type="button"
+            className={styles.closeBtn}
+            aria-label="Close sidebar"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <nav className={styles.sideNav} aria-label="Main">
+          {visibleGroups.map((group) => {
+            const Icon = group.icon
+            const open = expandedIds.includes(group.id)
+            const groupActive = group.items.some((item) => itemMatchesPath(location.pathname, item))
+            const hasDue =
+              group.id === 'sales' &&
+              group.items.some((i) => i.to === '/follow-ups') &&
+              reminders.due > 0
+            return (
+              <div key={group.id} className={styles.sideGroup}>
                 <button
-                  key={group.id}
                   type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  aria-controls="nav-section-panel"
-                  aria-label={group.label}
-                  title={group.label}
-                  className={`${styles.railBtn} ${selected ? styles.railBtnActive : ''}`}
-                  onClick={() => selectSection(group.id)}
+                  className={`${styles.sideGroupBtn} ${groupActive ? styles.sideGroupBtnActive : ''} ${open ? styles.sideGroupBtnOpen : ''}`}
+                  aria-expanded={open}
+                  onClick={() => toggleSection(group.id)}
                 >
-                  <Icon size={19} strokeWidth={selected ? 2.15 : 1.75} />
-                  {hasDue ? <span className={styles.railDot} aria-hidden /> : null}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <div className={styles.panel} id="nav-section-panel" role="tabpanel">
-          <div className={styles.panelHeader}>
-            <div>
-              <p className={styles.panelEyebrow}>RED REACH</p>
-              <h2 className={styles.panelTitle}>{activeGroup?.label || 'Menu'}</h2>
-            </div>
-            <button
-              type="button"
-              className={styles.closeBtn}
-              aria-label="Close sidebar"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <X size={18} />
-            </button>
-          </div>
-
-          <nav className={styles.panelNav} aria-label={activeGroup?.label || 'Section'}>
-            {(activeGroup?.items || []).map((item, idx, items) => {
-              const Icon = item.icon
-              const prevSection = idx > 0 ? items[idx - 1]?.section : undefined
-              const showSection = Boolean(item.section && item.section !== prevSection)
-              return (
-                <div key={`${item.to}-${item.label}`}>
-                  {showSection ? (
-                    <div className={styles.panelSectionLabel}>{item.section}</div>
+                  <Icon size={17} strokeWidth={groupActive ? 2.1 : 1.75} />
+                  <span className={styles.sideGroupLabel}>{group.label}</span>
+                  {hasDue ? (
+                    <span className={styles.navBadge} aria-label={`${reminders.due} due`}>
+                      {reminders.due > 99 ? '99+' : reminders.due}
+                    </span>
                   ) : null}
-                  <NavLink
-                    to={item.to}
-                    end={item.end}
-                    className={({ isActive }) =>
-                      `${styles.navItem} ${isActive ? styles.navItemActive : ''}`
-                    }
-                    onClick={() => setSidebarOpen(false)}
-                  >
-                    <Icon size={16} strokeWidth={1.75} />
-                    <span>{item.label}</span>
-                    {item.to === '/follow-ups' && reminders.due > 0 && (
-                      <span className={styles.navBadge} aria-label={`${reminders.due} due`}>
-                        {reminders.due > 99 ? '99+' : reminders.due}
-                      </span>
-                    )}
-                  </NavLink>
-                </div>
-              )
-            })}
-          </nav>
-        </div>
+                  <ChevronDown
+                    size={15}
+                    className={`${styles.sideChevron} ${open ? styles.sideChevronOpen : ''}`}
+                    aria-hidden
+                  />
+                </button>
+                {open ? (
+                  <div className={styles.sideItems}>
+                    {group.items.map((item, idx, items) => {
+                      const ItemIcon = item.icon
+                      const prevSection = idx > 0 ? items[idx - 1]?.section : undefined
+                      const showSection = Boolean(item.section && item.section !== prevSection)
+                      return (
+                        <div key={`${item.to}-${item.label}`}>
+                          {showSection ? (
+                            <div className={styles.panelSectionLabel}>{item.section}</div>
+                          ) : null}
+                          <NavLink
+                            to={item.to}
+                            end={item.end}
+                            className={({ isActive }) =>
+                              `${styles.navItem} ${isActive ? styles.navItemActive : ''}`
+                            }
+                            onClick={() => setSidebarOpen(false)}
+                          >
+                            <ItemIcon size={15} strokeWidth={1.75} />
+                            <span>{item.label}</span>
+                            {item.to === '/follow-ups' && reminders.due > 0 && (
+                              <span className={styles.navBadge} aria-label={`${reminders.due} due`}>
+                                {reminders.due > 99 ? '99+' : reminders.due}
+                              </span>
+                            )}
+                          </NavLink>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            )
+          })}
+        </nav>
       </aside>
 
       <div className={styles.main}>
