@@ -296,10 +296,47 @@
   letter-spacing: -0.01em;
 }
 
+.attentionToggle {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.035);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.attentionToggle:hover {
+  background: rgba(255, 255, 255, 0.055);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.attentionToggleCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.attentionHint {
+  font-size: 12px;
+  color: rgba(242, 244, 247, 0.5);
+}
+
 .attentionStack {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  margin-top: 12px;
 }
 
 .attentionStack > :global(*) {

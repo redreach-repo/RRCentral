@@ -48,11 +48,8 @@ import {
   fieldStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
-  toolbarStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 function formatWhen(value?: string | null): string {
   if (!value) return ''
@@ -253,11 +250,12 @@ export default function CustomerFilesPage() {
   }
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Google Drive</h1>
-          <p style={pageSubtitleStyle}>
+          <p className={docsStyles.kicker}>Sales documents</p>
+          <h1 className={docsStyles.title}>Google Drive</h1>
+          <p className={docsStyles.subtitle}>
             Every customer document lives in Google Drive. RR Central keeps the folder links — quotes,
             invoices, delivery notes, communications, purchasing, and signed copies.
           </p>
@@ -267,12 +265,13 @@ export default function CustomerFilesPage() {
             href={drive.customers_url}
             target="_blank"
             rel="noreferrer"
-            style={{ ...buttonSecondaryStyle, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            className={docsStyles.newBtn}
+            style={{ textDecoration: 'none', background: 'rgba(255,255,255,0.08)' }}
           >
-            <ExternalLink size={14} /> Open Customers in Drive
+            <ExternalLink size={16} /> Open in Drive
           </a>
         ) : null}
-      </div>
+      </header>
 
       {isLocalMode ? (
         <div style={{ ...cardStyle, marginBottom: 16, borderColor: colors.warn }}>
