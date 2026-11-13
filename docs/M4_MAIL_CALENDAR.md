@@ -9,7 +9,7 @@
 | Send / inbox / sent | Façade → Zoho Mail (`lib/mailCalendar` + `zoho.ts`) |
 | Calendar list / events / team meeting | Façade → Zoho Calendar |
 | CRM follow-up sync | Façade → `CalendarProvider.syncFollowUp` / `deleteEvent` (Zoho adapter) |
-| Settings provider label | Shows active provider from façade (Zoho; no switch yet) |
+| Settings provider switch | `mailCalendarProvider` setting + select (Zoho selectable; others listed disabled) |
 
 ## Slice 1
 
@@ -18,18 +18,23 @@
 - Rewired: EmailComposeModal, ZohoInboxPanel, ZohoCalendarPanel, ScheduleMeetingModal
 - Docs + Google restricted Gmail scopes assessment **started** (no Gmail code)
 
-## Slice 2 (this milestone step)
+## Slice 2
 
 - Extended `CalendarProvider` with `syncFollowUp` / `deleteEvent` + `label`
 - CRM follow-up sync on CrmPage + FollowupsPage goes through the façade
-- Settings Zoho card shows **Active provider: Zoho** via `activeMailCalendarProviderLabel`
-- Still Zoho-only under the hood (no Settings switch)
+- Settings showed active provider label
+
+## Slice 3 (this milestone step)
+
+- Setting key `mailCalendarProvider` (default `zoho`)
+- `resolveMailCalendarProviderId` / `listMailCalendarProviderOptions`
+- Settings **Mail & calendar** card: provider `<select>` (Gmail / M365 / IMAP disabled with reasons)
+- Getters read the setting; only Zoho adapter exists — unavailable ids fall back to Zoho
 
 ## Later slices (not yet)
 
-1. Provider switch from Settings (still Zoho-only until then)
-2. Gmail adapter (after compliance assessment)
-3. M365 / IMAP
+1. Gmail adapter (after compliance assessment)
+2. M365 / IMAP
 
 ## Rules
 
