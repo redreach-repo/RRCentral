@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** M1 leftover (Zod vendor form)
+**Current milestone:** M1 leftover (Zod expense form)
 
 ## Shipped this turn
 
-- Zod `parseVendorForm` on vendor register/edit (company name, email, TRN, website)
+- Zod `parseExpenseForm` on expense create/edit (vendor, amount, category, payment method)
 
 ## Already on main
 
-- M0–M4 · M1 leftovers (Quick Add Zod, field-mask expand) · M5 slices through clause-tag spawn
+- M0–M4 · M1 leftovers (Quick Add / vendor Zod, field-mask) · M5 through clause-tag spawn
 
 ## Still open
 
