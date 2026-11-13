@@ -1230,7 +1230,7 @@ export default function SettingsPage() {
           ) : null}
         </div>
         <p style={{ margin: '8px 0 14px', fontSize: 13, color: colors.muted, lineHeight: 1.45 }}>
-          Tenant-defined fields on accounts (and later CRM / quotations). Values are stored separately
+          Tenant-defined fields on accounts, CRM leads, and quotations. Values are stored separately
           from core columns.
         </p>
         {customFieldsLoading ? (

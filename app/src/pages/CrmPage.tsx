@@ -73,6 +73,7 @@ import SaveToFolderPrompt from '../components/SaveToFolderPrompt'
 import WebsiteInquiriesPanel from '../site/components/WebsiteInquiriesPanel'
 import CrmLogTouchModal, { type LogTouchPayload } from '../components/CrmLogTouchModal'
 import CrmPipelineBoard from '../components/CrmPipelineBoard'
+import CustomFieldsCard from '../components/CustomFieldsCard'
 import CalendarSettingsModal from '../components/CalendarSettingsModal'
 import { useCompactCrm } from '../hooks/useMediaQuery'
 import resp from '../styles/crmResponsive.module.css'
@@ -1819,6 +1820,19 @@ export default function CrmPage() {
                       aria-label="Notes"
                     />
                   </div>
+
+                  {editing ? (
+                    <div className={resp.sheetSection}>
+                      <CustomFieldsCard
+                        objectType="crm"
+                        recordId={String(editing.id)}
+                        editable={userRole !== 'viewer'}
+                        onToast={showToast}
+                        framed={false}
+                        style={{ marginTop: 0 }}
+                      />
+                    </div>
+                  ) : null}
 
                   <div className={resp.sheetSection}>
                     <button

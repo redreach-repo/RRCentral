@@ -29,6 +29,7 @@ import EditorSectionTabs, {
   type EditorSection,
 } from '../components/EditorSectionTabs'
 import LineItemImageField from '../components/LineItemImageField'
+import CustomFieldsCard from '../components/CustomFieldsCard'
 import ClientBillToFields from '../components/ClientBillToFields'
 import { useClientBillTo } from '../hooks/useClientBillTo'
 import SupplierInvoiceModal from '../components/quotations/SupplierInvoiceModal'
@@ -2243,6 +2244,19 @@ export default function QuotationsPage() {
             onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
           />
         </div>
+        {editing?.id ? (
+          <CustomFieldsCard
+            objectType="quotation"
+            recordId={String(editing.id)}
+            editable={userRole !== 'viewer'}
+            onToast={showToast}
+            framed={false}
+          />
+        ) : (
+          <p style={{ margin: '12px 0 0', fontSize: 12, color: colors.muted }}>
+            Save the draft once to edit quotation custom fields.
+          </p>
+        )}
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
