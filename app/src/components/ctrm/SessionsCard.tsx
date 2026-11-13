@@ -10,12 +10,12 @@ import {
   leftToCover,
   notStarted,
   sessionKindLabel,
-  sessionProblem,
   type SessionDraft,
 } from '../../lib/ctrmSessions'
 import { listSessions, markFollowUpDone, saveSession } from '../../lib/ctrmSessionsStore'
 import { errorMessage } from '../../lib/errors'
 import { parseSettingsList } from '../../lib/fitSheet'
+import { parseCtrmSessionForm } from '../../lib/schemas/ctrmSession'
 import type { Account, CtrmSession, CtrmSessionKind } from '../../lib/types'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, fieldStyle, inputStyle, labelStyle, sectionTitleStyle, selectStyle } from '../../lib/uiStyles'
 
@@ -61,11 +61,11 @@ export default function SessionsCard({ account, editable, author }: { account: A
 
   async function save() {
     if (!editing) return
-    const problem = sessionProblem(editing.draft)
-    if (problem) return showToast(problem, 'error')
+    const parsed = parseCtrmSessionForm(editing.draft)
+    if (!parsed.ok) return showToast(parsed.error, 'error')
     setSaving(true)
     try {
-      await saveSession(account.id, editing.draft, editing.session, author)
+      await saveSession(account.id, parsed.data, editing.session, author)
       showToast('Session saved', 'success')
       setEditing(null)
       await load()

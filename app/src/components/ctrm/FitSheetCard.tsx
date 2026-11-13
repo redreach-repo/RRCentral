@@ -13,10 +13,10 @@ import {
   fitSheetMissing,
   fitSheetRows,
   parseSettingsList,
-  parseUserCount,
   type FitSheetDraft,
 } from '../../lib/fitSheet'
 import { loadFitSheet, saveFitSheet } from '../../lib/fitSheetStore'
+import { parseFitSheetForm } from '../../lib/schemas/fitSheet'
 import type { Account, AccountContact, CtrmFitFocus, CtrmFitSheet } from '../../lib/types'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, fieldStyle, inputStyle, labelStyle, sectionTitleStyle, selectStyle } from '../../lib/uiStyles'
 
@@ -70,9 +70,22 @@ export default function FitSheetCard({
 
   async function save() {
     if (!draft) return
+    const parsed = parseFitSheetForm({
+      commodities: draft.commodities,
+      focus: draft.focus,
+      users,
+      current_system: draft.current_system,
+      decision_maker_id: draft.decision_maker_id,
+      modules: draft.modules,
+      notes: draft.notes,
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
     setSaving(true)
     try {
-      await saveFitSheet(account.id, sheet, { ...draft, user_count: parseUserCount(users) }, author)
+      await saveFitSheet(account.id, sheet, parsed.data, author)
       showToast('Fit sheet saved', 'success')
       setDraft(null)
       await load()

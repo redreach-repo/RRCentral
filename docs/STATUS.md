@@ -1,20 +1,28 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** M1 leftover (Zod supplier invoice)
+**Current milestone:** Continuous backlog (unlocked) — M1 Zod batch
 
 ## Shipped this turn
 
-- Zod `parseSupplierInvoiceForm` on quote supplier invoice (vendor, total, Drive link)
+- Zod: CTRM fit sheet, catalog product, CRM log-touch, CTRM terms, CTRM sessions
+- Continuous mode on — agent keeps shipping without waiting for “next”
 
 ## Already on main
 
-- M0–M4 · M1 leftovers (forms Zod through payments, field-mask) · M5 through clause-tag spawn
+- M0–M4 · M1 leftovers (forms Zod through supplier invoice, field-mask) · M5 through clause-tag spawn
 
-## Still open
+## Still open (agent queue)
 
-**M5 next:** QTSP only after ask  
-**M4 hold:** Gmail Phase B (CASA); IMAP only if a real need  
-**M1 leftovers:** more Zod; missing logos (need assets)  
-**M3 hold:** schema consolidate (**ask**) · **M3a** demo (ask Alfred)  
-**Open §19 decisions** — do not guess
+1. More M1 Zod (follow-ups, delivery settings, templates, …)
+2. M5 QTSP Phase B scaffold (no QES claim until licensed vendor)
+3. M3 schema consolidate (non-destructive first slices)
+4. M3a demo isolation prep (Alfred still provisions 2nd Supabase)
+
+## Still externally blocked
+
+- **Gmail Phase B** — CASA / restricted scope verification  
+- **Division logos** — need Boost / Care / Trading assets  
+- **§19 product decisions** — do not invent  
+- **Paid QTSP vendor** — Alfred picks licensed provider before live QES  
+- **IMAP** — only if a real non-API mailbox need appears  
