@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** M1 leftover (Zod domains form)
+**Current milestone:** M1 leftover (Zod delivery note form)
 
 ## Shipped this turn
 
-- Zod `parseDomainForm` on owned-domains tracker (name, cost, dates, status)
+- Zod `parseDeliveryNoteForm` on delivery note edit (status, date)
 
 ## Already on main
 
-- M0–M4 · M1 leftovers (Quick Add / vendor / expense / CRM / invoice / quote Zod, field-mask) · M5 through clause-tag spawn
+- M0–M4 · M1 leftovers (forms Zod through domains, field-mask) · M5 through clause-tag spawn
 
 ## Still open
 
