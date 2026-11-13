@@ -1,21 +1,21 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** M5 contracts / e-sign (slice 2 — `/sign` copy audit)
+**Current milestone:** M5 contracts / e-sign (slice 3 — clause library foundation)
 
-## Shipped this turn (M5 slice 2)
+## Shipped this turn (M5 slice 3)
 
-- Client `/sign` + NDA template + vault copy: assent capture, not UAE QES
-- Shared blurb constants + unit test
+- `contract_clauses` migration + seeds
+- `/clause-library` CRUD (managers) + Zod validation
 - Plan: `docs/M5_CONTRACTS_ESIGN.md`
 
 ## Already on main
 
-- M0–M4 · M1 leftovers · M5 slice 1 (e-sign compliance)
+- M0–M4 · M1 leftovers · M5 slices 1–2 (e-sign compliance + `/sign` copy)
 
 ## Still open
 
-**M5 next:** clause library / obligations; QTSP only after ask  
+**M5 next:** compose clauses into templates; obligations board; QTSP only after ask  
 **M4 hold:** Gmail Phase B (CASA); IMAP only if a real need  
 **M1 leftovers:** more Zod; expand field mask; missing logos (need assets)  
 **M3 hold:** schema consolidate (**ask**) · **M3a** demo (ask Alfred)  

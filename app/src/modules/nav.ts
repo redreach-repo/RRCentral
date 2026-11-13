@@ -94,6 +94,7 @@ export const APP_MODULES: ModuleManifest[] = [
       { to: '/build-templates', label: 'Build templates', icon: ClipboardList, forStaff: true },
       { to: '/agreement-template', label: 'Agreement', icon: ScrollText, forStaff: true },
       { to: '/nda-template', label: 'NDA template', icon: FileSignature, forStaff: true },
+      { to: '/clause-library', label: 'Clause library', icon: ScrollText, forStaff: true },
     ],
   },
   {
@@ -146,6 +147,7 @@ export const APP_MODULES: ModuleManifest[] = [
 const PATH_TITLE_OVERRIDES: { match: (path: string) => boolean; title: string }[] = [
   { match: (p) => p.startsWith('/delivery-settings'), title: 'Packages and rates' },
   { match: (p) => p.startsWith('/agreement-template'), title: 'Agreement template' },
+  { match: (p) => p.startsWith('/clause-library'), title: 'Clause library' },
   { match: (p) => p.startsWith('/mrr'), title: 'Monthly recurring revenue' },
   { match: (p) => p.startsWith('/insights'), title: 'Utilisation and profit' },
 ]
