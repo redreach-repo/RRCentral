@@ -9,7 +9,7 @@
 
 ## Already on main
 
-- Continuous backlog Zod through calendar settings · M3a demo prep · QTSP scaffold · `pipeline_deals_v`
+- Continuous backlog Zod through pipeline stages · M3a demo prep · QTSP scaffold · `pipeline_deals_v`
 
 ## Still open (agent queue)
 

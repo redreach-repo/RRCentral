@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
 import { errorMessage } from '../../lib/errors'
 import { can } from '../../lib/permissions'
+import { parsePipelineStageForm } from '../../lib/schemas/pipelineStage'
 import {
   DEFAULT_STAGE_COLORS,
   listPipelineStages,
@@ -127,8 +128,9 @@ export default function PipelinesSettingsCard() {
 
   async function save() {
     if (!selected) return
-    if (!form.label.trim()) {
-      showToast('Label is required', 'error')
+    const parsed = parsePipelineStageForm(form)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setBusy(true)
@@ -137,12 +139,12 @@ export default function PipelinesSettingsCard() {
       await savePipelineStage(
         {
           pipeline_id: selected.id,
-          stage_key: editing?.stage_key || slugifyStageKey(form.label, style),
-          label: form.label,
-          color: form.color,
-          outcome: form.outcome,
-          sort_order: form.sort_order,
-          active: form.active,
+          stage_key: editing?.stage_key || slugifyStageKey(parsed.data.label, style),
+          label: parsed.data.label,
+          color: parsed.data.color,
+          outcome: parsed.data.outcome,
+          sort_order: parsed.data.sort_order,
+          active: parsed.data.active,
         },
         editing?.id,
       )
