@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod client weekly updates
+**Current milestone:** Continuous backlog — M1 Zod delivery time entry
 
 ## Shipped this turn
 
-- Zod `parseClientUpdateBody` for weekly client update save/send
+- Zod `parseTimeEntryForm` for Delivery panel hours logging
 
 ## Already on main
 
-- Continuous backlog Zod through Fireflies · M3 route soft-hide · M3a demo prep · QTSP · `pipeline_deals_v`
+- Continuous backlog Zod through client updates · M3 route soft-hide · M3a demo prep · QTSP · `pipeline_deals_v`
 
 ## Still open (agent queue)
 
