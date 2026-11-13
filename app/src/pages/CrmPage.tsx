@@ -70,7 +70,6 @@ import EmailComposeModal from '../components/EmailComposeModal'
 import LinkDriveFileModal from '../components/LinkDriveFileModal'
 import SaveToFolderPrompt from '../components/SaveToFolderPrompt'
 import WebsiteInquiriesPanel from '../site/components/WebsiteInquiriesPanel'
-import PageHeader from '../components/PageHeader'
 import CrmLogTouchModal, { type LogTouchPayload } from '../components/CrmLogTouchModal'
 import CrmPipelineBoard from '../components/CrmPipelineBoard'
 import CalendarSettingsModal from '../components/CalendarSettingsModal'
@@ -86,7 +85,6 @@ import {
   type FollowBucket,
 } from '../lib/crmWorkQueue'
 import {
-  page,
   btn,
   btnPrimary,
   btnDanger,
@@ -107,6 +105,7 @@ import {
   errorBanner,
   colors,
 } from '../lib/pageStyles'
+import docsStyles from '../styles/docsList.module.css'
 import { errorMessage } from '../lib/errors'
 import QuoteNudgesCard from '../components/quotes/QuoteNudgesCard'
 import SessionFollowUpsCard from '../components/ctrm/SessionFollowUpsCard'
@@ -1053,27 +1052,26 @@ export default function CrmPage() {
   }
 
   return (
-    <div style={page}>
-      <PageHeader
-        title="My Day"
-        subtitle={
-          compact
-            ? 'Overdue + today. Log the next touch, then move on.'
-            : 'Start with what is due. Switch to All deals when you need the full funnel.'
-        }
-        actions={
-          <button
-            type="button"
-            style={{
-              ...btnPrimary,
-              minHeight: compact ? 44 : undefined,
-            }}
-            onClick={openCreate}
-          >
-            <Plus size={16} /> Add company
-          </button>
-        }
-      />
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
+        <div>
+          <p className={docsStyles.kicker}>Sales · Work</p>
+          <h1 className={docsStyles.title}>My Day</h1>
+          <p className={docsStyles.subtitle}>
+            {compact
+              ? 'Overdue + today. Log the next touch, then move on.'
+              : 'Start with what is due. Switch to All deals when you need the full funnel.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          style={{ minHeight: compact ? 44 : undefined }}
+          onClick={openCreate}
+        >
+          <Plus size={16} /> Add company
+        </button>
+      </header>
 
       <WebsiteInquiriesPanel
         onConverted={(crmId) => {

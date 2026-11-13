@@ -231,12 +231,23 @@ const phonePrimaryNav: { to: string; label: string; icon: typeof LayoutDashboard
   { to: '/app', label: 'Home', icon: LayoutDashboard, end: true },
   { to: '/crm', label: 'My Day', icon: Users },
   { to: '/quotations', label: 'Quotes', icon: FileText },
-  { to: '/invoices', label: 'Invoices', icon: Receipt },
+  { to: '/follow-ups', label: 'Follow-ups', icon: CalendarClock },
 ]
 
 const staffPhoneNav: typeof phonePrimaryNav = [
+  { to: '/app', label: 'Home', icon: LayoutDashboard, end: true },
   { to: '/accounts', label: 'Accounts', icon: Contact },
   { to: '/support', label: 'Support', icon: LifeBuoy },
+]
+
+/** Phone drawer shortcuts — destinations not already on the primary bottom tabs. */
+const phoneShortcuts: NavItem[] = [
+  { to: '/deals', label: 'Pipeline', icon: Briefcase, forStaff: true },
+  { to: '/customer-files', label: 'Drive', icon: FolderOpen },
+  { to: '/accounts', label: 'Accounts', icon: Contact, forStaff: true },
+  { to: '/invoices', label: 'Invoices', icon: Receipt },
+  { to: '/expenses', label: 'Expenses', icon: Wallet },
+  { to: '/payments', label: 'Payments', icon: Banknote },
 ]
 
 function isPhonePrimaryActive(pathname: string, to: string, end?: boolean): boolean {
@@ -353,11 +364,20 @@ export default function Layout() {
       '/expenses',
       '/vendors',
       '/payments',
+      '/catalog',
+      '/domains',
+      '/templates',
+      '/inventory',
     ].includes(location.pathname) || location.pathname.startsWith('/accounts')
 
   const primaryActive = phoneNav.some((item) =>
     isPhonePrimaryActive(location.pathname, item.to, item.end),
   )
+
+  const visiblePhoneShortcuts = useMemo(() => {
+    const primaryPaths = new Set(phoneNav.map((item) => item.to))
+    return filterItems(phoneShortcuts, userRole).filter((item) => !primaryPaths.has(item.to))
+  }, [phoneNav, userRole])
 
   return (
     <div className={`${styles.shell} ${phoneShell ? styles.shellPhone : ''}`}>
@@ -398,6 +418,30 @@ export default function Layout() {
         </div>
 
         <nav className={styles.sideNav} aria-label="Main">
+          {phoneShell && visiblePhoneShortcuts.length > 0 ? (
+            <div className={styles.phoneShortcuts}>
+              <div className={styles.phoneShortcutsLabel}>Shortcuts</div>
+              <div className={styles.phoneShortcutsGrid}>
+                {visiblePhoneShortcuts.map((item) => {
+                  const ItemIcon = item.icon
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.end}
+                      className={({ isActive }) =>
+                        `${styles.phoneShortcut} ${isActive ? styles.phoneShortcutActive : ''}`
+                      }
+                      onClick={() => setSidebarOpen(false)}
+                    >
+                      <ItemIcon size={16} strokeWidth={1.75} />
+                      <span>{item.label}</span>
+                    </NavLink>
+                  )
+                })}
+              </div>
+            </div>
+          ) : null}
           {visibleGroups.map((group) => {
             const Icon = group.icon
             const open = expandedIds.includes(group.id)
@@ -555,12 +599,13 @@ export default function Layout() {
             })}
             <button
               type="button"
-              className={`${styles.bottomNavItem} ${!primaryActive && sidebarOpen ? styles.bottomNavItemActive : ''}`}
+              className={`${styles.bottomNavItem} ${!primaryActive ? styles.bottomNavItemActive : ''}`}
               onClick={() => setSidebarOpen(true)}
               aria-label="More pages"
+              aria-expanded={sidebarOpen}
             >
               <span className={styles.bottomNavIconWrap}>
-                <MoreHorizontal size={22} strokeWidth={1.75} />
+                <MoreHorizontal size={22} strokeWidth={!primaryActive ? 2.25 : 1.75} />
               </span>
               <span className={styles.bottomNavLabel}>More</span>
             </button>

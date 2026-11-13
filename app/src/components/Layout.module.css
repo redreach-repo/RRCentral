@@ -117,6 +117,57 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.phoneShortcuts {
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 2px 12px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.phoneShortcutsLabel {
+  margin: 0 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.phoneShortcutsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.phoneShortcut {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.phoneShortcut:hover,
+.phoneShortcut:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.phoneShortcutActive {
+  border-color: rgba(232, 93, 4, 0.45);
+  background: rgba(232, 93, 4, 0.12);
+  color: #ffb56a;
+}
+
 .sideGroup {
   display: flex;
   flex-direction: column;
@@ -510,6 +561,10 @@
 
 .shellPhone .closeBtn {
   display: grid;
+}
+
+.shellPhone .phoneShortcuts {
+  display: flex;
 }
 
 .shellPhone .menuBtn {

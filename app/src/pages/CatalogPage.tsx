@@ -20,18 +20,15 @@ import {
   fieldStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
-  toolbarStyle,
   formGridStyle,
   sectionTitleStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 import { errorMessage } from '../lib/errors'
 
 type ProductForm = {
@@ -239,16 +236,18 @@ export default function CatalogPage() {
   }, [divisionFilter])
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Catalog</h1>
-          <p style={pageSubtitleStyle}>Brand catalogues and products across divisions</p>
+          <p className={docsStyles.kicker}>Operations</p>
+          <h1 className={docsStyles.title}>Catalog</h1>
+          <p className={docsStyles.subtitle}>Brand catalogues and products across divisions</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
             type="button"
-            style={buttonSecondaryStyle}
+            className={docsStyles.newBtn}
+            style={{ background: 'rgba(255,255,255,0.08)' }}
             disabled={syncing}
             onClick={() => void syncCatalogueSkus()}
             title="Load / refresh RR Threads catalogue SKUs"
@@ -257,18 +256,19 @@ export default function CatalogPage() {
           </button>
           <button
             type="button"
-            style={buttonSecondaryStyle}
+            className={docsStyles.newBtn}
+            style={{ background: 'rgba(255,255,255,0.08)' }}
             disabled={syncing}
             onClick={() => void syncDivisionServices()}
             title="Load Marketing, Connect (Konekt+) and Trading service rows"
           >
             <RefreshCw size={16} /> Load Marketing / Connect / Trading
           </button>
-          <button type="button" style={buttonPrimaryStyle} onClick={openCreate}>
+          <button type="button" className={docsStyles.newBtn} onClick={openCreate}>
             <Plus size={16} /> Add product
           </button>
         </div>
-      </div>
+      </header>
 
       {visibleCatalogues.length > 0 ? (
         <div style={{ marginBottom: 24 }}>

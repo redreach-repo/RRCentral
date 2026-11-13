@@ -20,17 +20,14 @@ import {
   fieldStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
-  toolbarStyle,
   formGridStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 import { errorMessage } from '../lib/errors'
 
 type TemplateForm = {
@@ -188,26 +185,28 @@ export default function TemplatesPage() {
   const brand = (code: string) => DIVISIONS.find((d) => d.code === code)?.brand || code
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Templates</h1>
-          <p style={pageSubtitleStyle}>Reusable quotation line-item sets</p>
+          <p className={docsStyles.kicker}>Operations</p>
+          <h1 className={docsStyles.title}>Templates</h1>
+          <p className={docsStyles.subtitle}>Reusable quotation line-item sets</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
             type="button"
-            style={buttonSecondaryStyle}
+            className={docsStyles.newBtn}
+            style={{ background: 'rgba(255,255,255,0.08)' }}
             disabled={syncing}
             onClick={() => void syncSkuTemplates()}
           >
             <RefreshCw size={16} /> {syncing ? 'Syncing…' : 'Load SKU templates'}
           </button>
-          <button type="button" style={buttonPrimaryStyle} onClick={openCreate}>
+          <button type="button" className={docsStyles.newBtn} onClick={openCreate}>
             <Plus size={16} /> New template
           </button>
         </div>
-      </div>
+      </header>
 
       {loading ? (
         <div style={{ ...cardStyle, color: colors.muted }}>Loading templates…</div>
