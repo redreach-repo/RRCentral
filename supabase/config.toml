@@ -13,6 +13,9 @@ verify_jwt = false
 [functions.gmail-calendar]
 verify_jwt = false
 
+[functions.m365-mail-calendar]
+verify_jwt = false
+
 [functions.hubspot-sync]
 verify_jwt = false
 

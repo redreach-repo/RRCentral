@@ -29,9 +29,7 @@ export const MAIL_CALENDAR_PROVIDER_OPTIONS: readonly ProviderOption[] = [
   {
     id: 'm365',
     label: 'Microsoft 365',
-    available: false,
-    unavailableReason:
-      'OAuth not wired yet (Phase A Mail.Send+Calendars.ReadWrite approved in COMPLIANCE_NOTES)',
+    available: true,
   },
   {
     id: 'imap',
