@@ -11,7 +11,7 @@ Findings from official sources go here **before** shipping tax, payroll, e-sign,
 | UAE corporate tax | not started | — | — | M7+ |
 | UAE e-invoicing timeline / format | not started | — | — | Design invoice model for accredited provider |
 | Google restricted Gmail scopes assessment | **concluded** | See § Gmail below | 13 Nov 2026 | Phase A **implemented** (`gmail.send` + `calendar.events` via `gmail-calendar` Edge Function). Phase B inbox (`gmail.readonly`) still blocked until restricted verification + CASA plan. |
-| Microsoft 365 Graph mail/calendar assessment | **concluded** | See § M365 below | 13 Nov 2026 | Phase A: delegated `Mail.Send` + `Calendars.ReadWrite`. Phase B: delegated `Mail.Read`. No M365 OAuth code until implementation slice. Prefer delegated over application permissions. |
+| Microsoft 365 Graph mail/calendar assessment | **concluded** | See § M365 below | 13 Nov 2026 | Phase A **implemented** (`Mail.Send` + `Calendars.ReadWrite` via `m365-mail-calendar`). Phase B `Mail.Read` later. Prefer delegated over application permissions. |
 | Data residency (UAE hosting options) | not started | — | — | Decide before first external customer / M13 |
 
 Do not rely on model memory for legal or tax rules.
@@ -82,13 +82,12 @@ Avoid **application** `Mail.Send` / `Mail.Read` / `Calendars.ReadWrite` for the 
 
 ### Decision (binding for M4)
 
-1. **Phase A (next M365 implementation slice):** Entra app registration + delegated OAuth for **`Mail.Send` + `Calendars.ReadWrite`** (+ `offline_access` / `openid` / `User.Read` as needed for sign-in). Mirror the Gmail Edge Function pattern (`m365-mail-calendar` + service-role connection table). **Do not** request `Mail.Read` in Phase A.
+1. **Phase A (shipped in M4 slice 7):** Entra app + delegated OAuth via `m365-mail-calendar` Edge Function and `m365_connection`. Scopes: `Mail.Send` + `Calendars.ReadWrite` (+ `openid` / `offline_access` / `User.Read`). **Do not** request `Mail.Read` in Phase A.
 2. **Phase B (later):** Add delegated **`Mail.Read`** for inbox/sent matching after Phase A is stable; document tenant admin-consent expectations and publisher verification for multi-tenant use.
 3. **Publisher verification:** Plan Entra publisher verification before asking external tenants to consent; internal/single-tenant Red Reach use can proceed under Testing / admin consent.
-4. **Settings switcher:** Keep M365 **unavailable** until Phase A OAuth is wired; reason text points here.
-5. **IMAP:** Out of scope for this assessment — modern providers deprecate basic auth; treat IMAP as a later provider with its own OAuth/app-password rules.
+4. **Settings switcher:** M365 is selectable; Connect card must succeed before APIs work.
+5. **IMAP:** Still deferred.
 
 ### Explicit non-claims
 
-- This note does **not** assert that an Entra app is registered, publisher-verified, or consented in any customer tenant.
-- No Microsoft Graph tokens or M365 adapters ship in the assessment-only slice.
+- This note does **not** assert that an Entra app is publisher-verified or consented in any external customer tenant.

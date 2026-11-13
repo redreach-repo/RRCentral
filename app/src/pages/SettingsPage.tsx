@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import CtrmListsCard from '../components/ctrm/CtrmListsCard'
 import GmailCalendarCard from '../components/GmailCalendarCard'
 import GoogleDriveCard from '../components/GoogleDriveCard'
+import M365MailCalendarCard from '../components/M365MailCalendarCard'
 import HubSpotCard from '../components/HubSpotCard'
 import PipelinesSettingsCard from '../components/settings/PipelinesSettingsCard'
 import WorkflowRunsCard from '../components/settings/WorkflowRunsCard'
@@ -1380,9 +1381,8 @@ export default function SettingsPage() {
             ))}
           </select>
           <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted2, lineHeight: 1.45 }}>
-            Zoho or Gmail (Phase A: send + calendar). Connect Gmail below before selecting it. M365
-            Phase A (Mail.Send + Calendars.ReadWrite) is approved in Compliance notes — OAuth next.
-            IMAP later.
+            Zoho, Gmail, or Microsoft 365 (Phase A: send + calendar). Connect the provider below
+            before selecting it. Inbox on Gmail/M365 is Phase B. IMAP later.
           </p>
         </div>
         {can(userRole, 'settings.manage') &&
@@ -1525,6 +1525,7 @@ export default function SettingsPage() {
       </div>
 
       <GmailCalendarCard />
+      <M365MailCalendarCard />
 
       {currentAuthMode() === 'local' && (
         <div id="sheets-import" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>

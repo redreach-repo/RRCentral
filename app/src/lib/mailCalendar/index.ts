@@ -1,6 +1,6 @@
 /**
  * M4 mail/calendar provider façade.
- * Slice 5: Zoho + Gmail Phase A (send + calendar); inbox stays Zoho/Phase B.
+ * Slice 7: Zoho + Gmail Phase A + M365 Phase A (send + calendar).
  */
 import type {
   CalendarProvider,
@@ -16,6 +16,8 @@ import {
 } from './types'
 import { gmailCalendarProvider } from './gmailCalendarAdapter'
 import { gmailMailProvider } from './gmailMailAdapter'
+import { m365CalendarProvider } from './m365CalendarAdapter'
+import { m365MailProvider } from './m365MailAdapter'
 import { zohoCalendarProvider } from './zohoCalendarAdapter'
 import { zohoMailProvider } from './zohoMailAdapter'
 
@@ -63,6 +65,8 @@ export function getMailProvider(settings?: ProviderSettings): MailProvider {
   switch (resolveMailCalendarProviderId(settings)) {
     case 'gmail':
       return gmailMailProvider
+    case 'm365':
+      return m365MailProvider
     case 'zoho':
     default:
       return zohoMailProvider
@@ -74,6 +78,8 @@ export function getCalendarProvider(settings?: ProviderSettings): CalendarProvid
   switch (resolveMailCalendarProviderId(settings)) {
     case 'gmail':
       return gmailCalendarProvider
+    case 'm365':
+      return m365CalendarProvider
     case 'zoho':
     default:
       return zohoCalendarProvider
