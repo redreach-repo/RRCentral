@@ -72,3 +72,13 @@ No database migrations. Documentation and `brand-assets/` only.
 **Rollback**
 - Forward-only preferred. Drop new tables after confirming Settings/CRM no longer read them; CRM falls back to hardcoded `PIPELINE_STAGES`.
 
+## M2 — `20261213180000_crm_quote_custom_field_seeds.sql`
+
+**What**
+- Seeds CRM custom fields (lead source detail, decision maker, competitor)
+- Seeds quotation custom fields (site visit required, installation notes)
+
+**Rollback**
+- Delete those definition rows by `object_type` + `field_key`; values cascade.
+
+
