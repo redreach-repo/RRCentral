@@ -3,21 +3,22 @@
 **Last updated:** 13 November 2026 (Asia/Dubai)  
 **Current milestone:** M2 Customization layer (in progress)
 
-## Shipped this turn (M2 numbering + customization foundation)
+## Shipped this turn (M2 custom fields UI)
 
-- `supabase/migrations/20261213140000_customization_layer.sql` — `numbering_sequences`, `custom_field_definitions` / `custom_field_values`, `saved_views`, `rr_allocate_reference()`
-- Quotes / invoices / delivery notes / accounts allocate via RPC (client falls back to max+1)
-- Settings → **Numbering** table (live counters + next preview)
-- `supabase/tests/numbering_test.sql` wired into `run.sh`
+- Settings → **Custom fields** — create / edit / activate definitions (account, CRM, quotation objects)
+- Account detail — **Custom fields** card (view / edit values)
+- Seed definitions for Red Reach accounts: Preferred carrier, Billing notes, NDA on file
+- `customFields` store: slugify, coerce, load/save values
 
-## Already on main (M1)
+## Already on main
 
-- Tenancy + restrictive RLS + company switcher + brand kits + i18n skeleton + `/guide`
+- M1 tenancy / switcher / brand / i18n / guide
+- M2 numbering sequences + `rr_allocate_reference` + Settings Numbering
 
 ## Still open
 
-**M2 next slices:** custom field UI on records, saved views in list pages, pipelines/workflows as data, labels/dashboards  
-**M1 leftovers:** move Layout nav fully into module manifests; field permissions; Zod; TS strict; PWA mark regen; missing Boost/Care/Trading logos  
+**M2 next:** saved views on list pages, pipelines/workflows as data, CRM/quote custom field surfaces  
+**M1 leftovers:** nav → module manifests; field permissions; Zod; TS strict; PWA mark; missing logos  
 **Open §19 decisions** — do not guess
 
 ## Next after M2 close

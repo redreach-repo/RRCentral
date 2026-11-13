@@ -35,6 +35,17 @@ import {
   type NumberingSequence,
 } from '../lib/numbering'
 import {
+  CUSTOM_FIELD_OBJECTS,
+  CUSTOM_FIELD_TYPES,
+  listAllCustomFieldDefinitions,
+  parseSelectOptions,
+  saveCustomFieldDefinition,
+  setCustomFieldDefinitionActive,
+  slugifyFieldKey,
+  type CustomFieldDefinition,
+  type CustomFieldType,
+} from '../lib/customFields'
+import {
   clearSupabaseRuntimeConfig,
   getSupabaseRuntimeConfig,
   saveSupabaseRuntimeConfig,
@@ -217,6 +228,20 @@ export default function SettingsPage() {
   const [docActionsId, setDocActionsId] = useState<string | null>(null)
   const [numberingRows, setNumberingRows] = useState<NumberingSequence[]>([])
   const [numberingLoading, setNumberingLoading] = useState(false)
+  const [customFields, setCustomFields] = useState<CustomFieldDefinition[]>([])
+  const [customFieldsLoading, setCustomFieldsLoading] = useState(false)
+  const [customFieldOpen, setCustomFieldOpen] = useState(false)
+  const [editingCustomField, setEditingCustomField] = useState<CustomFieldDefinition | null>(null)
+  const [customFieldForm, setCustomFieldForm] = useState({
+    object_type: 'account',
+    label: '',
+    field_type: 'text' as CustomFieldType,
+    optionsText: '',
+    required: false,
+    sort_order: 0,
+    active: true,
+  })
+  const [customFieldActionsId, setCustomFieldActionsId] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const backupRef = useRef<HTMLInputElement>(null)
   const cloudBackupRef = useRef<HTMLInputElement>(null)
@@ -303,6 +328,17 @@ export default function SettingsPage() {
     }
   }, [])
 
+  const loadCustomFields = useCallback(async () => {
+    setCustomFieldsLoading(true)
+    try {
+      setCustomFields(await listAllCustomFieldDefinitions())
+    } catch {
+      setCustomFields([])
+    } finally {
+      setCustomFieldsLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (can(userRole, 'users.manage')) void loadUsers()
   }, [userRole, loadUsers])
@@ -310,6 +346,10 @@ export default function SettingsPage() {
   useEffect(() => {
     void loadNumbering()
   }, [loadNumbering])
+
+  useEffect(() => {
+    if (can(userRole, 'settings.manage') || can(userRole, 'users.manage')) void loadCustomFields()
+  }, [userRole, loadCustomFields])
 
   useEffect(() => {
     if (can(userRole, 'settings.manage')) void loadCompanyDocs()
@@ -361,6 +401,77 @@ export default function SettingsPage() {
       await loadCompanyDocs()
     } catch (e) {
       showToast(errorMessage(e, 'Save failed'), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function openCustomFieldCreate() {
+    setEditingCustomField(null)
+    setCustomFieldForm({
+      object_type: 'account',
+      label: '',
+      field_type: 'text',
+      optionsText: '',
+      required: false,
+      sort_order: customFields.length,
+      active: true,
+    })
+    setCustomFieldOpen(true)
+  }
+
+  function openCustomFieldEdit(row: CustomFieldDefinition) {
+    setEditingCustomField(row)
+    setCustomFieldForm({
+      object_type: row.object_type,
+      label: row.label,
+      field_type: row.field_type,
+      optionsText: parseSelectOptions(row.options).join('\n'),
+      required: row.required,
+      sort_order: row.sort_order,
+      active: row.active,
+    })
+    setCustomFieldOpen(true)
+  }
+
+  async function saveCustomField() {
+    if (!customFieldForm.label.trim()) {
+      showToast('Label is required', 'error')
+      return
+    }
+    setBusy(true)
+    try {
+      await saveCustomFieldDefinition(
+        {
+          object_type: customFieldForm.object_type,
+          field_key: editingCustomField?.field_key || slugifyFieldKey(customFieldForm.label),
+          label: customFieldForm.label,
+          field_type: customFieldForm.field_type,
+          options: parseSelectOptions(customFieldForm.optionsText),
+          required: customFieldForm.required,
+          sort_order: customFieldForm.sort_order,
+          active: customFieldForm.active,
+        },
+        editingCustomField?.id,
+      )
+      showToast(editingCustomField ? 'Field updated' : 'Field added', 'success')
+      setCustomFieldOpen(false)
+      await loadCustomFields()
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not save custom field'), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function toggleCustomFieldActive(row: CustomFieldDefinition) {
+    setBusy(true)
+    try {
+      await setCustomFieldDefinitionActive(row.id, !row.active)
+      showToast(row.active ? 'Field deactivated' : 'Field activated', 'success')
+      await loadCustomFields()
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not update field'), 'error')
     } finally {
       setBusy(false)
     }
@@ -715,6 +826,7 @@ export default function SettingsPage() {
     { id: 'bank', label: 'Bank' },
     { id: 'quote-settings', label: 'Quotes' },
     { id: 'numbering', label: 'Numbering' },
+    { id: 'custom-fields', label: 'Custom fields' },
     { id: 'division-formats', label: 'Division formats' },
     { id: 'wanders', label: 'Wanders' },
     { id: 'system', label: 'System' },
@@ -1094,6 +1206,76 @@ export default function SettingsPage() {
                       }}
                     >
                       {previewNextReference(row)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div id="custom-fields" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Custom fields</h2>
+          {can(userRole, 'settings.manage') ? (
+            <button type="button" style={buttonPrimaryStyle} onClick={openCustomFieldCreate}>
+              <Plus size={16} style={{ marginRight: 6 }} />
+              Add field
+            </button>
+          ) : null}
+        </div>
+        <p style={{ margin: '8px 0 14px', fontSize: 13, color: colors.muted, lineHeight: 1.45 }}>
+          Tenant-defined fields on accounts (and later CRM / quotations). Values are stored separately
+          from core columns.
+        </p>
+        {customFieldsLoading ? (
+          <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>Loading…</p>
+        ) : customFields.length === 0 ? (
+          <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>
+            No custom fields yet. Add one for Accounts to see it on account pages.
+          </p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>Object</th>
+                  <th style={thStyle}>Label</th>
+                  <th style={thStyle}>Key</th>
+                  <th style={thStyle}>Type</th>
+                  <th style={thStyle}>Status</th>
+                  <th style={thStyle}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {customFields.map((row) => (
+                  <tr key={row.id}>
+                    <td style={tdStyle}>
+                      {CUSTOM_FIELD_OBJECTS.find((o) => o.value === row.object_type)?.label ||
+                        row.object_type}
+                    </td>
+                    <td style={tdStyle}>
+                      {row.label}
+                      {row.required ? ' *' : ''}
+                    </td>
+                    <td style={{ ...tdStyle, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+                      {row.field_key}
+                    </td>
+                    <td style={tdStyle}>{row.field_type}</td>
+                    <td style={tdStyle}>{row.active ? 'Active' : 'Off'}</td>
+                    <td style={tdStyle}>
+                      {can(userRole, 'settings.manage') ? (
+                        <SimpleRowActions
+                          expanded={customFieldActionsId === row.id}
+                          onToggle={() =>
+                            setCustomFieldActionsId((id) => (id === row.id ? null : row.id))
+                          }
+                          onEdit={() => openCustomFieldEdit(row)}
+                          onDelete={() => void toggleCustomFieldActive(row)}
+                          deleteLabel={row.active ? 'Deactivate' : 'Activate'}
+                        />
+                      ) : null}
                     </td>
                   </tr>
                 ))}
@@ -1604,6 +1786,116 @@ export default function SettingsPage() {
             onClick={() => void confirmDeleteCompanyDoc()}
           >
             Remove
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={customFieldOpen}
+        title={editingCustomField ? 'Edit custom field' : 'Add custom field'}
+        onClose={() => setCustomFieldOpen(false)}
+        width={480}
+      >
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Object</label>
+            <select
+              style={selectStyle}
+              value={customFieldForm.object_type}
+              disabled={Boolean(editingCustomField)}
+              onChange={(e) =>
+                setCustomFieldForm((f) => ({ ...f, object_type: e.target.value }))
+              }
+            >
+              {CUSTOM_FIELD_OBJECTS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Label</label>
+            <input
+              style={inputStyle}
+              value={customFieldForm.label}
+              onChange={(e) => setCustomFieldForm((f) => ({ ...f, label: e.target.value }))}
+              placeholder="Preferred carrier"
+            />
+            {!editingCustomField ? (
+              <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted }}>
+                Key will be <code>{slugifyFieldKey(customFieldForm.label) || 'field'}</code>
+              </p>
+            ) : (
+              <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted }}>
+                Key <code>{editingCustomField.field_key}</code> stays fixed
+              </p>
+            )}
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Type</label>
+            <select
+              style={selectStyle}
+              value={customFieldForm.field_type}
+              onChange={(e) =>
+                setCustomFieldForm((f) => ({
+                  ...f,
+                  field_type: e.target.value as CustomFieldType,
+                }))
+              }
+            >
+              {CUSTOM_FIELD_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {customFieldForm.field_type === 'select' ||
+          customFieldForm.field_type === 'multiselect' ? (
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Options (one per line)</label>
+              <textarea
+                style={{ ...inputStyle, minHeight: 96, resize: 'vertical' }}
+                value={customFieldForm.optionsText}
+                onChange={(e) =>
+                  setCustomFieldForm((f) => ({ ...f, optionsText: e.target.value }))
+                }
+              />
+            </div>
+          ) : null}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+            <input
+              type="checkbox"
+              checked={customFieldForm.required}
+              onChange={(e) =>
+                setCustomFieldForm((f) => ({ ...f, required: e.target.checked }))
+              }
+            />
+            Required
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+            <input
+              type="checkbox"
+              checked={customFieldForm.active}
+              onChange={(e) =>
+                setCustomFieldForm((f) => ({ ...f, active: e.target.checked }))
+              }
+            />
+            Active
+          </label>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+          <button type="button" style={buttonSecondaryStyle} onClick={() => setCustomFieldOpen(false)}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            style={buttonPrimaryStyle}
+            disabled={busy}
+            onClick={() => void saveCustomField()}
+          >
+            {busy ? 'Saving…' : 'Save field'}
           </button>
         </div>
       </Modal>
