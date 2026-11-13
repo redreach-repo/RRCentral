@@ -226,8 +226,9 @@ async function moveCtrmDeal(
 }
 
 /**
- * M3 write façade: patch next step / owner on any Pipeline deal.
- * Routes to the native table; does not merge schemas or touch deal value.
+ * M3 write façade: patch next step / owner / notes (and a few sheet fields)
+ * on any Pipeline deal. Routes to the native table; does not merge schemas
+ * or invent deal value (CRM value still comes from quotations).
  */
 export async function patchMyDeal(
   deal: DealRow,
@@ -240,6 +241,9 @@ export async function patchMyDeal(
   const merged = applyMyDealPatchLocal(deal, {
     ...patch,
     next_action: patch.next_action !== undefined ? patch.next_action.trim() : undefined,
+    notes: patch.notes !== undefined ? patch.notes.trim() : undefined,
+    quote_ref: patch.quote_ref !== undefined ? patch.quote_ref.trim() : undefined,
+    source: patch.source !== undefined ? patch.source.trim() : undefined,
   })
   if (deal.open) {
     const problem = stageMoveProblem({
@@ -276,6 +280,8 @@ async function patchCrmDeal(deal: DealRow, patch: MyDealPatch, author: MoveAutho
   if (patch.next_action !== undefined) payload.next_action = patch.next_action.trim()
   if (patch.next_action_date !== undefined) payload.follow_up_date = patch.next_action_date
   if (patch.owner_user_id !== undefined) payload.owner = crmOwnerText(patch.owner_user_id, team)
+  if (patch.notes !== undefined) payload.notes = patch.notes.trim()
+  if (patch.quote_ref !== undefined) payload.quote_ref = patch.quote_ref.trim()
 
   const { error: upd } = await db.from('crm').update(payload).eq('id', deal.id)
   if (upd) throw upd
@@ -303,6 +309,8 @@ async function patchSalesDeal(deal: DealRow, patch: MyDealPatch, author: MoveAut
     next_action_date:
       patch.next_action_date !== undefined ? patch.next_action_date : row.next_action_date,
     owner_user_id: patch.owner_user_id !== undefined ? patch.owner_user_id : row.owner_user_id,
+    notes: patch.notes !== undefined ? patch.notes.trim() : row.notes,
+    source: patch.source !== undefined ? patch.source.trim() : row.source,
   }
   const problem = salesDealProblem(next)
   if (problem) throw new Error(problem)
@@ -311,6 +319,8 @@ async function patchSalesDeal(deal: DealRow, patch: MyDealPatch, author: MoveAut
   if (patch.next_action !== undefined) storePatch.next_action = patch.next_action.trim()
   if (patch.next_action_date !== undefined) storePatch.next_action_date = patch.next_action_date
   if (patch.owner_user_id !== undefined) storePatch.owner_user_id = patch.owner_user_id
+  if (patch.notes !== undefined) storePatch.notes = patch.notes.trim()
+  if (patch.source !== undefined) storePatch.source = patch.source.trim()
   await updateSalesDeal(row, storePatch, author)
 }
 
@@ -325,6 +335,8 @@ async function patchCtrmDeal(deal: DealRow, patch: MyDealPatch, author: MoveAuth
     next_action_date:
       patch.next_action_date !== undefined ? patch.next_action_date : row.next_action_date,
     owner_user_id: patch.owner_user_id !== undefined ? patch.owner_user_id : row.owner_user_id,
+    notes: patch.notes !== undefined ? patch.notes.trim() : row.notes,
+    source: patch.source !== undefined ? patch.source.trim() : row.source,
   }
   const problem = dealProblem(next)
   if (problem) throw new Error(problem)
@@ -333,5 +345,7 @@ async function patchCtrmDeal(deal: DealRow, patch: MyDealPatch, author: MoveAuth
   if (patch.next_action !== undefined) storePatch.next_action = patch.next_action.trim()
   if (patch.next_action_date !== undefined) storePatch.next_action_date = patch.next_action_date
   if (patch.owner_user_id !== undefined) storePatch.owner_user_id = patch.owner_user_id
+  if (patch.notes !== undefined) storePatch.notes = patch.notes.trim()
+  if (patch.source !== undefined) storePatch.source = patch.source.trim()
   await updateDeal(row, storePatch, author)
 }

@@ -39,6 +39,7 @@ function input(over: Partial<MyDealsInput> = {}): MyDealsInput {
         next_action: 'Follow up on quote',
         follow_up_date: '2026-11-18',
         quote_ref: '',
+        notes: 'Quoted last week',
         updated_at: '2026-11-10T08:00:00Z',
         created_at: '2026-10-01T08:00:00Z',
         stage_changed_at: '2026-11-05T08:00:00Z',
@@ -54,6 +55,7 @@ function input(over: Partial<MyDealsInput> = {}): MyDealsInput {
         owner_user_id: 'u-alfred',
         next_action: 'Call back',
         next_action_date: '2026-11-25',
+        notes: '',
         monthly_fee: 1000,
         setup_fee: 2000,
         discount_percent: 0,
@@ -73,6 +75,7 @@ function input(over: Partial<MyDealsInput> = {}): MyDealsInput {
         owner_user_id: null,
         next_action: 'Chase decision',
         next_action_date: null,
+        notes: 'Waiting on legal',
         company_type: 'trading_house',
         created_at: '2026-09-01T08:00:00Z',
         stage_changed_at: null,
@@ -256,13 +259,24 @@ describe('write façade helpers', () => {
       owner_user_id: 'u-sara',
       owner_label: 'Sara',
       source: '',
+      notes: 'Was warm',
+      quote_ref: 'RR-01',
       division: '',
       link: '/crm?edit=c1',
     }
-    expect(applyMyDealPatchLocal(deal, { next_action: 'Call again', owner_user_id: 'u-alfred' })).toMatchObject({
+    expect(
+      applyMyDealPatchLocal(deal, {
+        next_action: 'Call again',
+        owner_user_id: 'u-alfred',
+        notes: 'Left voicemail',
+        quote_ref: 'RR-02',
+      }),
+    ).toMatchObject({
       next_action: 'Call again',
       next_action_date: '2026-11-01',
       owner_user_id: 'u-alfred',
+      notes: 'Left voicemail',
+      quote_ref: 'RR-02',
     })
   })
 })
