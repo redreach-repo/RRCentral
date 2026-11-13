@@ -30,6 +30,7 @@ Merge green PRs bottom-up. Prefer this order so STATUS conflicts stay small:
 21. **#320** — Zod expense supplier PDF pick
 22. **#321** — CRM Guide day-to-day content pack
 23. **#322** — Cmd/Ctrl+K command palette
+24. **#323** — event_outbox enqueue from activity log
 
 If a PR shows a STATUS-only conflict after an earlier merge, keep **this PR’s** milestone block.
 
