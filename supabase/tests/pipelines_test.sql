@@ -26,5 +26,17 @@ begin
     raise exception 'PIPELINES TEST FAILED: crm_won_approval missing';
   end if;
 
+  -- M3 pipeline_deals_v read model exists with expected columns
+  if to_regclass('public.pipeline_deals_v') is null then
+    raise exception 'PIPELINES TEST FAILED: pipeline_deals_v missing';
+  end if;
+  select count(*) into n
+  from information_schema.columns
+  where table_schema = 'public' and table_name = 'pipeline_deals_v'
+    and column_name in ('pipeline', 'deal_id', 'account_id', 'stage', 'tenant_id');
+  if n < 5 then
+    raise exception 'PIPELINES TEST FAILED: pipeline_deals_v columns incomplete, got %', n;
+  end if;
+
   raise notice 'PIPELINES TEST OK';
 end $$;
