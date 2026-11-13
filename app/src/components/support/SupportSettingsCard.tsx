@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useSettings } from '../../contexts/SettingsContext'
 import { useToast } from '../../contexts/ToastContext'
 import { SUPPORT_SETTING_KEYS, calendarFromSettings, workingDayHours } from '../../lib/sla'
+import { parseSupportPoliciesForm, parseSupportWeekForm } from '../../lib/schemas/supportSettings'
 import { listPolicies, savePolicy } from '../../lib/supportStore'
 import { errorMessage } from '../../lib/errors'
 import type { SlaPolicy } from '../../lib/types'
@@ -62,18 +63,23 @@ export default function SupportSettingsCard({ canPolicies, canWeek }: { canPolic
   }, [settings])
 
   async function savePolicies() {
+    const parsed = parseSupportPoliciesForm(policies.map((p) => ({ id: p.id, label: p.label, hours: hours[p.id] ?? '' })))
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
     setSaving('policies')
     try {
-      for (const p of policies) {
-        const n = Number(hours[p.id])
-        if (!Number.isFinite(n) || n < 0) throw new Error(`${p.label}: hours must be a number`)
-        if (n !== Number(p.first_response_hours)) {
+      for (const row of parsed.data) {
+        const p = policies.find((x) => x.id === row.id)
+        if (!p) continue
+        if (row.first_response_hours !== Number(p.first_response_hours)) {
           await savePolicy(p.id, {
             applies_to: p.applies_to,
             package_id: p.package_id,
             account_type: p.account_type,
             label: p.label,
-            first_response_hours: n,
+            first_response_hours: row.first_response_hours,
           })
         }
       }
@@ -87,19 +93,16 @@ export default function SupportSettingsCard({ canPolicies, canWeek }: { canPolic
   }
 
   async function saveWeek() {
-    if (!days.length) {
-      showToast('Pick at least one working day', 'error')
-      return
-    }
-    if (!/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end) || end <= start) {
-      showToast('Opening time must be before closing time', 'error')
+    const parsed = parseSupportWeekForm({ days, start, end })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setSaving('week')
     try {
-      await updateSetting(SUPPORT_SETTING_KEYS.days, [...days].sort().join(','))
-      await updateSetting(SUPPORT_SETTING_KEYS.start, start)
-      await updateSetting(SUPPORT_SETTING_KEYS.end, end)
+      await updateSetting(SUPPORT_SETTING_KEYS.days, parsed.data.days.join(','))
+      await updateSetting(SUPPORT_SETTING_KEYS.start, parsed.data.start)
+      await updateSetting(SUPPORT_SETTING_KEYS.end, parsed.data.end)
       showToast('Working week saved', 'success')
     } catch (e) {
       showToast(errorMessage(e, 'Could not save the working week'), 'error')
