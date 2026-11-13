@@ -6,6 +6,7 @@ import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import StatusPill from '../components/StatusPill'
 import AccountFormModal from '../components/accounts/AccountFormModal'
+import SavedViewsBar from '../components/SavedViewsBar'
 import {
   ACCOUNT_TYPES,
   accountStatusLabel,
@@ -13,6 +14,11 @@ import {
   accountTypeLabel,
   visibleAccounts,
 } from '../lib/accounts'
+import {
+  accountsFiltersEqual,
+  normalizeAccountsFilters,
+  type AccountsViewFilters,
+} from '../lib/savedViews'
 import {
   type AccountInput,
   type ContactInput,
@@ -46,7 +52,7 @@ export default function AccountsPage() {
   const [loading, setLoading] = useState(true)
   const [missingTable, setMissingTable] = useState(false)
   const [search, setSearch] = useState(() => searchParams.get('q') || '')
-  const [ownerFilter, setOwnerFilter] = useState('all')
+  const [ownerFilter, setOwnerFilter] = useState(() => searchParams.get('owner') || 'all')
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -54,6 +60,37 @@ export default function AccountsPage() {
   const typeFilter: TypeFilter = ACCOUNT_TYPES.some((t) => t.value === typeParam)
     ? (typeParam as AccountType)
     : 'all'
+
+  const hasUrlFilters = Boolean(
+    searchParams.get('q') || searchParams.get('type') || searchParams.get('owner'),
+  )
+
+  const currentViewFilters = useMemo(
+    () =>
+      normalizeAccountsFilters({
+        q: search,
+        type: typeFilter,
+        owner: ownerFilter,
+      }),
+    [search, typeFilter, ownerFilter],
+  )
+
+  const applyViewFilters = useCallback(
+    (raw: Record<string, unknown>) => {
+      const f = raw as AccountsViewFilters
+      const params = new URLSearchParams()
+      const nextType = String(f.type || 'all')
+      const nextOwner = String(f.owner || 'all')
+      const nextQ = String(f.q || '')
+      if (nextType !== 'all') params.set('type', nextType)
+      if (nextOwner !== 'all') params.set('owner', nextOwner)
+      if (nextQ) params.set('q', nextQ)
+      setSearch(nextQ)
+      setOwnerFilter(nextOwner)
+      setSearchParams(params, { replace: true })
+    },
+    [setSearchParams],
+  )
 
   useEffect(() => {
     const q = searchParams.get('q')
@@ -124,6 +161,18 @@ export default function AccountsPage() {
     const params = new URLSearchParams(searchParams)
     if (next === 'all') params.delete('type')
     else params.set('type', next)
+    if (ownerFilter !== 'all') params.set('owner', ownerFilter)
+    else params.delete('owner')
+    if (search.trim()) params.set('q', search.trim())
+    else params.delete('q')
+    setSearchParams(params, { replace: true })
+  }
+
+  function setOwner(next: string) {
+    setOwnerFilter(next)
+    const params = new URLSearchParams(searchParams)
+    if (next === 'all') params.delete('owner')
+    else params.set('owner', next)
     setSearchParams(params, { replace: true })
   }
 
@@ -193,6 +242,19 @@ export default function AccountsPage() {
         </div>
       ) : null}
 
+      <SavedViewsBar
+        moduleId="accounts"
+        filters={currentViewFilters}
+        ownerUserId={appUserId}
+        canWrite={canWrite}
+        applyDefaultOnLoad={!hasUrlFilters}
+        onApply={applyViewFilters}
+        onToast={showToast}
+        filtersEqual={(a, b) =>
+          accountsFiltersEqual(a as AccountsViewFilters, b as AccountsViewFilters)
+        }
+      />
+
       <div className={docsStyles.controls}>
         <div className={docsStyles.tabs} role="tablist" aria-label="Account type">
           {(['all', ...ACCOUNT_TYPES.map((t) => t.value)] as TypeFilter[]).map((t) => {
@@ -221,7 +283,7 @@ export default function AccountsPage() {
           <select
             style={{ ...selectStyle, maxWidth: 200, height: 40 }}
             value={ownerFilter}
-            onChange={(e) => setOwnerFilter(e.target.value)}
+            onChange={(e) => setOwner(e.target.value)}
             aria-label="Owner"
           >
             <option value="all">Any owner</option>
