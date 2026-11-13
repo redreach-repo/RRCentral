@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSettings } from '../../contexts/SettingsContext'
 import { useToast } from '../../contexts/ToastContext'
 import { errorMessage } from '../../lib/errors'
+import { parseWatchdogSettingsForm } from '../../lib/schemas/watchdogSettings'
 import { DEFAULT_STALE_DAYS, STALE_DAY_KEYS, staleDays, type Pipeline } from '../../lib/watchdog'
 import { buttonPrimaryStyle, cardStyle, colors, fieldStyle, formGridStyle, inputStyle, labelStyle, sectionTitleStyle } from '../../lib/uiStyles'
 
@@ -20,16 +21,16 @@ export default function WatchdogSettingsCard() {
   }, [settings])
 
   async function save() {
-    for (const p of Object.keys(days) as Pipeline[]) {
-      const n = Number(days[p])
-      if (!Number.isInteger(n) || n < 1 || n > 365) {
-        showToast(`${LABELS[p]}: enter whole days from 1 to 365`, 'error')
-        return
-      }
+    const parsed = parseWatchdogSettingsForm(days)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
     }
     setSaving(true)
     try {
-      for (const p of Object.keys(days) as Pipeline[]) await updateSetting(STALE_DAY_KEYS[p], String(Number(days[p])))
+      for (const p of Object.keys(parsed.data) as Pipeline[]) {
+        await updateSetting(STALE_DAY_KEYS[p], String(parsed.data[p]))
+      }
       showToast('Watchdog settings saved', 'success')
     } catch (e) {
       showToast(errorMessage(e, 'Could not save the settings'), 'error')
