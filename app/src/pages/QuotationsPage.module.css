@@ -200,7 +200,11 @@
   width: 9%;
 }
 .colActions {
-  width: 30%;
+  width: 22%;
+}
+
+.rowExpanded td {
+  vertical-align: top;
 }
 
 .ref {
