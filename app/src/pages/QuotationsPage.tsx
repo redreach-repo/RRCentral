@@ -184,6 +184,8 @@ export default function QuotationsPage() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<StatusTab>('All')
   const [search, setSearch] = useState('')
+  /** Only one row’s action panel open at a time — keeps the table scannable. */
+  const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState<Quotation | null>(null)
   const [form, setForm] = useState<QuoteForm>(emptyForm())
@@ -1252,6 +1254,8 @@ export default function QuotationsPage() {
     return (
       <QuoteRowActions
         quote={q}
+        expanded={actionsOpenId === q.id}
+        onToggle={() => setActionsOpenId((id) => (id === q.id ? null : q.id))}
         saving={saving}
         canDelete={canDeleteQuote}
         onEdit={(row) => void openEdit(row)}
@@ -1283,7 +1287,7 @@ export default function QuotationsPage() {
           <p className={qStyles.kicker}>Sales documents</p>
           <h1 className={qStyles.title}>Quotations</h1>
           <p className={qStyles.subtitle}>
-            Create, revise, and track quotations in a clear table — icons for common actions, labels for the next step.
+            Create, revise, and track quotations. Click Actions on a row to reveal every option.
           </p>
         </div>
         <button type="button" className={qStyles.newBtn} onClick={() => void openCreate()}>
@@ -1343,7 +1347,10 @@ export default function QuotationsPage() {
               </thead>
               <tbody>
                 {filtered.map((q) => (
-                  <tr key={q.id}>
+                  <tr
+                    key={q.id}
+                    className={actionsOpenId === q.id ? qStyles.rowExpanded : undefined}
+                  >
                     <td className={qStyles.colRef}>
                       <div className={qStyles.ref}>
                         {q.reference_number || <span className={qStyles.refMuted}>DRAFT</span>}

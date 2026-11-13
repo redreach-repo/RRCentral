@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
 import {
+  ChevronDown,
+  ChevronUp,
   Copy,
   ExternalLink,
   FileUp,
@@ -16,6 +18,8 @@ import styles from './QuoteRowActions.module.css'
 
 export type QuoteRowActionsProps = {
   quote: Quotation
+  expanded: boolean
+  onToggle: () => void
   saving?: boolean
   canDelete?: boolean
   onEdit: (q: Quotation) => void
@@ -31,9 +35,14 @@ export type QuoteRowActionsProps = {
   onDelete: (q: Quotation) => void
 }
 
-/** Labeled action chips that wrap onto 2–3 rows inside the Actions column. */
+/**
+ * Collapsed: one Actions button (row stays a single line).
+ * Expanded: labeled action chips wrap onto 2–3 lines.
+ */
 export default function QuoteRowActions({
   quote: q,
+  expanded,
+  onToggle,
   saving = false,
   canDelete = false,
   onEdit,
@@ -53,8 +62,21 @@ export default function QuoteRowActions({
   const canOutcome = ['Finalized', 'Sent', 'Accepted', 'Awarded'].includes(q.status)
   const canDn = canCreateDeliveryNoteFromQuote(q)
 
+  if (!expanded) {
+    return (
+      <div className={styles.rootCollapsed} onClick={(e) => e.stopPropagation()}>
+        <button type="button" className={styles.toggle} onClick={onToggle} aria-expanded={false}>
+          Actions <ChevronDown size={14} />
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className={styles.root} onClick={(e) => e.stopPropagation()}>
+      <button type="button" className={styles.toggleActive} onClick={onToggle} aria-expanded>
+        Hide <ChevronUp size={14} />
+      </button>
       <button type="button" className={styles.btn} onClick={() => onEdit(q)}>
         <Pencil size={13} /> Edit
       </button>
