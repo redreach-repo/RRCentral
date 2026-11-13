@@ -11,13 +11,12 @@ type Props = {
   busyId: string | null
   /** Phone / compact: stage picker + vertical list instead of horizontal board */
   compact?: boolean
+  /** Tenant pipeline stages (falls back to hardcoded CRM list). */
+  stages?: readonly string[]
   onOpen: (entry: CrmEntry) => void
   onMoveStage: (entry: CrmEntry, stage: string) => void
   renderActions: (entry: CrmEntry) => ReactNode
 }
-
-const openStages = PIPELINE_STAGES.filter((s) => s !== 'Won' && s !== 'Lost')
-const closedStages = PIPELINE_STAGES.filter((s) => s === 'Won' || s === 'Lost')
 
 function toneFor(entry: CrmEntry): string {
   const bucket = followUpBucket(entry.follow_up_date)
@@ -30,12 +29,14 @@ function toneFor(entry: CrmEntry): string {
 function DealCard({
   row,
   busy,
+  stages,
   onOpen,
   onMoveStage,
   renderActions,
 }: {
   row: CrmEntry
   busy: boolean
+  stages: readonly string[]
   onOpen: (entry: CrmEntry) => void
   onMoveStage: (entry: CrmEntry, stage: string) => void
   renderActions: (entry: CrmEntry) => ReactNode
@@ -65,7 +66,7 @@ function DealCard({
         onChange={(e) => onMoveStage(row, e.target.value)}
         aria-label={`Move ${row.company_name}`}
       >
-        {PIPELINE_STAGES.map((s) => (
+        {stages.map((s) => (
           <option key={s} value={s}>
             Move to {s}
           </option>
@@ -80,22 +81,25 @@ export default function CrmPipelineBoard({
   entries,
   busyId,
   compact,
+  stages = PIPELINE_STAGES,
   onOpen,
   onMoveStage,
   renderActions,
 }: Props) {
+  const openStages = stages.filter((s) => s !== 'Won' && s !== 'Lost')
+  const closedStages = stages.filter((s) => s === 'Won' || s === 'Lost')
   const counts = useMemo(() => {
     const map: Record<string, number> = {}
-    for (const s of PIPELINE_STAGES) map[s] = 0
+    for (const s of stages) map[s] = 0
     for (const e of entries) {
       const s = e.pipeline_stage || 'Lead'
       map[s] = (map[s] || 0) + 1
     }
     return map
-  }, [entries])
+  }, [entries, stages])
 
   const firstWithDeals =
-    PIPELINE_STAGES.find((s) => (counts[s] || 0) > 0) || openStages[0] || 'Lead'
+    stages.find((s) => (counts[s] || 0) > 0) || openStages[0] || 'Lead'
   const [stageFocus, setStageFocus] = useState(firstWithDeals)
 
   const byStage = (stage: string) => entries.filter((e) => (e.pipeline_stage || 'Lead') === stage)
@@ -105,7 +109,7 @@ export default function CrmPipelineBoard({
     return (
       <div className={resp.boardCompact}>
         <div className={resp.chipScroll} role="tablist" aria-label="Pipeline stage">
-          {PIPELINE_STAGES.map((s) => (
+          {stages.map((s) => (
             <button
               key={s}
               type="button"
@@ -127,6 +131,7 @@ export default function CrmPipelineBoard({
                 key={row.id}
                 row={row}
                 busy={busyId === row.id}
+                stages={stages}
                 onOpen={onOpen}
                 onMoveStage={onMoveStage}
                 renderActions={renderActions}
@@ -155,6 +160,7 @@ export default function CrmPipelineBoard({
                 key={row.id}
                 row={row}
                 busy={busyId === row.id}
+                stages={stages}
                 onOpen={onOpen}
                 onMoveStage={onMoveStage}
                 renderActions={renderActions}

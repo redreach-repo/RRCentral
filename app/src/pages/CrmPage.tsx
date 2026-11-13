@@ -22,6 +22,7 @@ import {
 import CrmRowActions from '../components/crm/CrmRowActions'
 import { db } from '../lib/db'
 import { CRM_OUTCOME_REASONS, NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
+import { loadCrmStageKeys } from '../lib/pipelines'
 import { crmMoveProblem, isLostReason } from '../lib/dealRules'
 import LostReasonFields from '../components/deals/LostReasonFields'
 import type { ActivityLogEntry, AppUser, CrmContact, CrmEntry, CustomerDocument, Invoice, Quotation } from '../lib/types'
@@ -221,7 +222,12 @@ export default function CrmPage() {
   const [calendarSettingsOpen, setCalendarSettingsOpen] = useState(false)
   const [accountLink, setAccountLink] = useState<CrmAccountLink | null>(null)
   const [accountLinkBusy, setAccountLinkBusy] = useState(false)
+  const [crmStages, setCrmStages] = useState<string[]>(() => [...PIPELINE_STAGES])
   const compact = useCompactCrm()
+
+  useEffect(() => {
+    void loadCrmStageKeys().then(setCrmStages)
+  }, [])
 
   const myOwnerName = useMemo(
     () => resolveSalesOwnerName(user?.email, owners),
@@ -486,13 +492,13 @@ export default function CrmPage() {
 
   const stageCounts = useMemo(() => {
     const counts: Record<string, number> = { All: entries.length }
-    for (const s of PIPELINE_STAGES) counts[s] = 0
+    for (const s of crmStages) counts[s] = 0
     for (const e of entries) {
       const s = e.pipeline_stage || 'Lead'
       counts[s] = (counts[s] || 0) + 1
     }
     return counts
-  }, [entries])
+  }, [entries, crmStages])
 
   async function quickPatch(
     entry: CrmEntry,
@@ -1175,7 +1181,7 @@ export default function CrmPage() {
             title="Pipeline stage"
           >
             <option value="All">All stages</option>
-            {PIPELINE_STAGES.map((s) => (
+            {crmStages.map((s) => (
               <option key={s} value={s}>
                 {s}
                 {stageCounts[s] ? ` (${stageCounts[s]})` : ''}
@@ -1277,6 +1283,7 @@ export default function CrmPage() {
           entries={filtered}
           busyId={quickBusyId}
           compact={compact}
+          stages={crmStages}
           onOpen={openEdit}
           onMoveStage={(row, stage) => void quickPatch(row, { pipeline_stage: stage })}
           renderActions={(row) => renderCrmRowActions(row, { flush: true })}
@@ -1327,7 +1334,7 @@ export default function CrmPage() {
                       value={row.pipeline_stage || 'Lead'}
                       onChange={(e) => void quickPatch(row, { pipeline_stage: e.target.value })}
                     >
-                      {PIPELINE_STAGES.map((s) => (
+                      {crmStages.map((s) => (
                         <option key={s} value={s}>
                           {s}
                         </option>
@@ -1453,7 +1460,7 @@ export default function CrmPage() {
                         value={row.pipeline_stage || 'Lead'}
                         onChange={(e) => void quickPatch(row, { pipeline_stage: e.target.value })}
                       >
-                        {PIPELINE_STAGES.map((s) => (
+                        {crmStages.map((s) => (
                           <option key={s} value={s}>
                             {s}
                           </option>
@@ -1720,7 +1727,7 @@ export default function CrmPage() {
                           value={form.pipeline_stage}
                           onChange={(e) => setForm((f) => ({ ...f, pipeline_stage: e.target.value }))}
                         >
-                          {PIPELINE_STAGES.map((s) => (
+                          {crmStages.map((s) => (
                             <option key={s} value={s}>
                               {s}
                             </option>
@@ -2167,6 +2174,7 @@ export default function CrmPage() {
         open={!!logTouchTarget}
         entry={logTouchTarget}
         busy={!!logTouchTarget && quickBusyId === logTouchTarget.id}
+        stages={crmStages}
         onClose={() => setLogTouchTarget(null)}
         onSave={saveLogTouch}
       />

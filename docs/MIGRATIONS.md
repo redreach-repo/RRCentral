@@ -50,3 +50,16 @@ No database migrations. Documentation and `brand-assets/` only.
 
 **Rollback**
 - Delete those definition rows by `field_key` if needed; values cascade.
+
+## M2 — `20261213170000_pipelines_workflows.sql`
+
+**What**
+- `pipelines` / `pipeline_stages` seeded for CRM, AI CRM sales, CTRM Next
+- `workflow_definitions` / `workflow_runs` foundation + sample `crm_won_approval`
+- RLS + restrictive tenant isolation
+
+**Dry-run / tests**
+- `bash supabase/tests/run.sh` includes `pipelines_test.sql`
+
+**Rollback**
+- Forward-only preferred. Drop new tables after confirming Settings/CRM no longer read them; CRM falls back to hardcoded `PIPELINE_STAGES`.

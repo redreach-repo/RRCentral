@@ -24,11 +24,20 @@ type Props = {
   open: boolean
   entry: CrmEntry | null
   busy?: boolean
+  /** Tenant CRM stages; defaults to hardcoded PIPELINE_STAGES. */
+  stages?: readonly string[]
   onClose: () => void
   onSave: (payload: LogTouchPayload) => Promise<void>
 }
 
-export default function CrmLogTouchModal({ open, entry, busy, onClose, onSave }: Props) {
+export default function CrmLogTouchModal({
+  open,
+  entry,
+  busy,
+  stages = PIPELINE_STAGES,
+  onClose,
+  onSave,
+}: Props) {
   const [text, setText] = useState('')
   const [followDate, setFollowDate] = useState('')
   const [stage, setStage] = useState('')
@@ -86,7 +95,7 @@ export default function CrmLogTouchModal({ open, entry, busy, onClose, onSave }:
           <div style={fieldStyle}>
             <label style={labelStyle}>Stage</label>
             <select style={inputStyle} value={stage} onChange={(e) => setStage(e.target.value)}>
-              {PIPELINE_STAGES.map((s) => (
+              {stages.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>
