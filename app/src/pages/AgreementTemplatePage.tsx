@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { CheckCircle2, Copy, Download, FileSignature, Save, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -6,6 +7,8 @@ import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import AgreementPreview from '../components/AgreementPreview'
+import { formatClauseForTemplate, insertTextAtCursor } from '../lib/clauseCompose'
+import { listContractClauses } from '../lib/clauseLibraryStore'
 import { ratesFromSettings } from '../lib/delivery'
 import { downloadBlob } from '../lib/documents'
 import {
@@ -26,7 +29,7 @@ import {
 } from '../lib/agreementStore'
 import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
-import type { AgreementTemplate } from '../lib/types'
+import type { AgreementTemplate, ContractClause } from '../lib/types'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -58,6 +61,7 @@ export default function AgreementTemplatePage() {
   const [body, setBody] = useState(DEFAULT_AGREEMENT_BODY)
   const [busy, setBusy] = useState(false)
   const [approving, setApproving] = useState<{ by: string; on: string; note: string } | null>(null)
+  const [clauses, setClauses] = useState<ContractClause[]>([])
   const textRef = useRef<HTMLTextAreaElement>(null)
 
   const load = useCallback(async (select?: string) => {
@@ -77,6 +81,12 @@ export default function AgreementTemplatePage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    void listContractClauses()
+      .then((r) => setClauses(r.rows.filter((c) => c.status === 'active')))
+      .catch(() => setClauses([]))
+  }, [])
 
   const selected = templates.find((t) => t.id === selectedId) ?? null
   const inUse = templateInUse(templates)
@@ -109,20 +119,25 @@ export default function AgreementTemplatePage() {
     }
   }
 
-  function insert(key: string) {
+  function insertAtCursor(piece: string) {
     const el = textRef.current
-    const token = `{{${key}}}`
-    if (!el) {
-      setBody((b) => b + token)
-      return
-    }
-    const start = el.selectionStart ?? body.length
-    const end = el.selectionEnd ?? start
-    setBody(body.slice(0, start) + token + body.slice(end))
+    const start = el?.selectionStart ?? body.length
+    const end = el?.selectionEnd ?? start
+    const next = insertTextAtCursor(body, piece, start, end)
+    setBody(next.text)
     requestAnimationFrame(() => {
-      el.focus()
-      el.setSelectionRange(start + token.length, start + token.length)
+      if (!textRef.current) return
+      textRef.current.focus()
+      textRef.current.setSelectionRange(next.cursor, next.cursor)
     })
+  }
+
+  function insert(key: string) {
+    insertAtCursor(`{{${key}}}`)
+  }
+
+  function insertClause(clause: ContractClause) {
+    insertAtCursor(formatClauseForTemplate(clause))
   }
 
   function samplePdf() {
@@ -315,6 +330,33 @@ export default function AgreementTemplatePage() {
                   </li>
                 ))}
               </ul>
+            </details>
+          ) : null}
+
+          {editing ? (
+            <details style={{ marginTop: 12 }}>
+              <summary style={{ cursor: 'pointer', fontSize: 13 }}>
+                Insert clause{' '}
+                <Link to="/clause-library" style={{ color: colors.accent, marginLeft: 6 }} onClick={(e) => e.stopPropagation()}>
+                  Manage library
+                </Link>
+              </summary>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                {clauses.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    style={{ ...smallBtn, padding: '3px 8px' }}
+                    title={c.clause_key}
+                    onClick={() => insertClause(c)}
+                  >
+                    {c.title}
+                  </button>
+                ))}
+                {!clauses.length ? (
+                  <span style={{ fontSize: 12, color: colors.muted }}>No active clauses yet.</span>
+                ) : null}
+              </div>
             </details>
           ) : null}
         </section>
