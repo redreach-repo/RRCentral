@@ -357,11 +357,7 @@ export default function Layout() {
 
       <aside className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
         <div className={styles.sideBrand}>
-          <BrandLogo height={26} className={styles.sideLogo} />
-          <div className={styles.sideBrandCopy}>
-            <p className={styles.sideEyebrow}>RED REACH</p>
-            <p className={styles.sideProduct}>Central</p>
-          </div>
+          <BrandLogo height={28} className={styles.sideLogo} />
           <button
             type="button"
             className={styles.closeBtn}

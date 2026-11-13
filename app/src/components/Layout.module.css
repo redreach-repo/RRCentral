@@ -79,6 +79,7 @@
 .sideBrand {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
   padding: 16px 14px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -86,33 +87,11 @@
 }
 
 .sideLogo {
-  flex-shrink: 0;
-  height: 26px;
-  width: auto;
-}
-
-.sideBrandCopy {
-  min-width: 0;
   flex: 1;
-}
-
-.sideEyebrow {
-  margin: 0;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.38);
-  line-height: 1.2;
-}
-
-.sideProduct {
-  margin: 1px 0 0;
-  font-size: 15px;
-  font-weight: 650;
-  letter-spacing: -0.02em;
-  color: #fff;
-  line-height: 1.2;
+  min-width: 0;
+  height: 28px;
+  width: auto;
+  max-width: 168px;
 }
 
 .closeBtn {
@@ -145,13 +124,14 @@
 }
 
 .sideGroupBtn {
+  appearance: none;
   display: flex;
   align-items: center;
   gap: 9px;
   width: 100%;
   margin: 0;
   padding: 9px 10px;
-  border: none;
+  border: 1px solid transparent;
   border-radius: 9px;
   background: transparent;
   color: rgba(255, 255, 255, 0.72);
@@ -163,7 +143,8 @@
   cursor: pointer;
   transition:
     background 0.15s ease,
-    color 0.15s ease;
+    color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .sideGroupBtn:hover {
@@ -180,7 +161,7 @@
 }
 
 .sideGroupBtnActive.sideGroupBtnOpen {
-  background: rgba(232, 93, 4, 0.12);
+  background: rgba(232, 93, 4, 0.14);
   color: #ffb56a;
 }
 
