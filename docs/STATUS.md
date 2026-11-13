@@ -1,20 +1,16 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** M1 leftover (Zod supplier invoice)
+**Current milestone:** Continuous backlog (unlocked) — M1 Zod delivery settings
 
 ## Shipped this turn
 
-- Zod `parseSupplierInvoiceForm` on quote supplier invoice (vendor, total, Drive link)
+- Zod parsers for delivery package + rates on Packages and rates settings
 
-## Already on main
+## In flight
 
-- M0–M4 · M1 leftovers (forms Zod through payments, field-mask) · M5 through clause-tag spawn
+- Zod batch · QTSP · M3a · M3 plan · follow-ups
 
-## Still open
+## Still externally blocked
 
-**M5 next:** QTSP only after ask  
-**M4 hold:** Gmail Phase B (CASA); IMAP only if a real need  
-**M1 leftovers:** more Zod; missing logos (need assets)  
-**M3 hold:** schema consolidate (**ask**) · **M3a** demo (ask Alfred)  
-**Open §19 decisions** — do not guess
+- CASA · logos · §19 · paid QTSP · M3a Supabase (Alfred)
