@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod usage import links
+**Current milestone:** Continuous backlog — M1 Zod monthly usage figures
 
 ## Shipped this turn
 
-- Zod `parseUsageSourceForm` for Delivery panel WhatsApp / AI workspace links
+- Zod `parseUsageMonthForm` for Delivery panel monthly usage save
 
 ## Already on main
 
