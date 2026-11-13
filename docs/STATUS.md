@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod watchdog settings
+**Current milestone:** Continuous backlog — M1 Zod quote templates
 
 ## Shipped this turn
 
-- Zod `parseWatchdogSettingsForm` for stale-deal day thresholds (CRM / sales / CTRM)
+- Zod `parseQuoteTemplateForm` for quote template name / division / line items
 
 ## Already on main
 
-- Continuous backlog Zod through workflows · M3a demo prep · QTSP scaffold · `pipeline_deals_v`
+- Continuous backlog Zod through watchdog · M3a demo prep · QTSP scaffold · `pipeline_deals_v`
 
 ## Still open (agent queue)
 
