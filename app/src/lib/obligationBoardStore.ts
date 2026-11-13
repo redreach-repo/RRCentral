@@ -23,6 +23,27 @@ export async function listContractObligations(): Promise<{
   return { rows: (data || []) as ContractObligation[], missingTable: false }
 }
 
+/** Obligations for one CRM company (by crm id and/or company name). */
+export async function listObligationsForCompany(opts: {
+  companyName: string
+  crmId?: string
+}): Promise<{ rows: ContractObligation[]; missingTable: boolean }> {
+  const all = await listContractObligations()
+  if (all.missingTable) return all
+  const company = opts.companyName.trim().toLowerCase()
+  const crmId = (opts.crmId || '').trim()
+  return {
+    rows: all.rows.filter(
+      (r) => (crmId && r.crm_id === crmId) || r.company_name.trim().toLowerCase() === company,
+    ),
+    missingTable: false,
+  }
+}
+
+export function filterOpenObligations(rows: ContractObligation[]): ContractObligation[] {
+  return rows.filter((r) => r.status === 'open')
+}
+
 export async function saveContractObligation(
   input: ObligationFormInput,
   author: string,
