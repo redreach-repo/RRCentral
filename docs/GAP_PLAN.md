@@ -41,7 +41,7 @@ Status key: **exists** · **partial** · **missing**
 | Module | Status | Notes / step |
 |--------|--------|--------------|
 | 6.1 Core platform | partial | Users/settings/audit/2-step exist; MFA passkeys/SSO missing → M1 |
-| 6.2 CRM and sales | partial | Strong ops CRM; dual models; partners/commissions on CTRM only → M3 unify |
+| 6.2 CRM and sales | partial | Strong ops CRM; three pipelines; `/deals` + account bridge started (M3 slice 1); schema merge later |
 | 6.3 Email and calendar | partial | Zoho Mail/Calendar proxy; no Gmail/M365/IMAP full sync → M4 |
 | 6.4 Contracts and e-sign | partial | Agreement/NDA + `/sign` sealed PDF path; no clause library/obligations board → M5 |
 | 6.5 HR | missing | M6 |
@@ -114,7 +114,7 @@ WorshipHub admin, Tee Tribe shop, RR Wanders tour ops, CTRM commission tables �
 | **M0** | This audit + gap plan + brand-assets + STATUS; CI already largely green; enable app `strict` carefully in M1 not M0 |
 | **M1** | Largest: `tenant_id` retrofit, RLS rewrite, shell, branding, i18n skeleton |
 | **M2** | Depends on M1 |
-| **M3** | Dual CRM merge; keep briefing |
+| **M3** | Dual/triple CRM merge; keep briefing — see `docs/M3_CRM_UNIFY.md` |
 | **M3a** | Separate Supabase project for demo (ask Alfred before provisioning) |
 | **M4+** | As spec |
 

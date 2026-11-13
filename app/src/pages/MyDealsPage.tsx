@@ -326,6 +326,19 @@ export default function MyDealsPage() {
                 <Link to={d.link} style={{ color: colors.text, fontWeight: 600 }}>
                   {d.account}
                 </Link>
+                {d.pipeline === 'crm' ? (
+                  <div style={{ marginTop: 4, fontSize: 11, color: colors.muted2 }}>
+                    {d.account_id ? 'Linked account' : 'CRM only'}
+                    {d.account_id ? (
+                      <>
+                        {' · '}
+                        <Link to={`/crm?edit=${d.id}`} style={{ color: colors.accent }}>
+                          Open sheet
+                        </Link>
+                      </>
+                    ) : null}
+                  </div>
+                ) : null}
               </td>
               <td style={tdStyle}>
                 <span style={PIPELINE_CHIPS[d.pipeline]}>{PIPELINE_LABELS[d.pipeline]}</span>{' '}
@@ -410,6 +423,11 @@ export default function MyDealsPage() {
                   </Link>
                   <span style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                     <span style={PIPELINE_CHIPS[d.pipeline]}>{PIPELINE_LABELS[d.pipeline]}</span>
+                    {d.pipeline === 'crm' ? (
+                      <span style={{ ...PIPELINE_CHIPS.crm, opacity: 0.85 }}>
+                        {d.account_id ? 'Linked' : 'Unlinked'}
+                      </span>
+                    ) : null}
                   </span>
                   <select
                     aria-label={`Stage for ${d.account}`}

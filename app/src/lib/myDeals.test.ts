@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildDealRows,
+  crmDealLink,
   dealAccess,
   dealSources,
   dealTotals,
@@ -38,6 +39,7 @@ function input(over: Partial<MyDealsInput> = {}): MyDealsInput {
         updated_at: '2026-11-10T08:00:00Z',
         created_at: '2026-10-01T08:00:00Z',
         stage_changed_at: '2026-11-05T08:00:00Z',
+        account_id: null,
       },
     ],
     salesDeals: [
@@ -92,12 +94,21 @@ function input(over: Partial<MyDealsInput> = {}): MyDealsInput {
 const all: DealFilters = { owner: 'all', pipeline: 'all', source: 'all', division: 'all', showClosed: false }
 const byKey = (rows: ReturnType<typeof buildDealRows>) => new Map(rows.map((r) => [r.key, r]))
 
+describe('crmDealLink', () => {
+  it('opens Accounts when linked and the CRM sheet when not', () => {
+    expect(crmDealLink('c1', null)).toBe('/crm?edit=c1')
+    expect(crmDealLink('c1', '')).toBe('/crm?edit=c1')
+    expect(crmDealLink('c1', 'a9')).toBe('/accounts/a9')
+  })
+})
+
 describe('buildDealRows', () => {
   it('puts the three pipelines in one list with value, weighted value and days in stage', () => {
     const rows = byKey(buildDealRows(input()))
     const crm = rows.get('crm:c1')!
     expect(crm).toMatchObject({
       account: 'Mass Allied Freighters L.L.C',
+      account_id: null,
       deal: 'RR-01-26003',
       stageLabel: 'Quoted',
       column: 'proposal',
@@ -136,6 +147,22 @@ describe('buildDealRows', () => {
     )
     expect(rows.find((r) => r.id === 'c1')).toMatchObject({ open: false, value: 4535, weighted: 4535, column: 'won' })
     expect(rows.find((r) => r.id === 'c2')).toMatchObject({ value: null, weighted: null, owner_user_id: null, owner_label: 'Nobody' })
+  })
+
+  it('bridges linked CRM rows to Accounts (name, source, link)', () => {
+    const rows = byKey(
+      buildDealRows(
+        input({
+          crm: [{ ...input().crm[0], account_id: 'a1' }],
+        }),
+      ),
+    )
+    expect(rows.get('crm:c1')).toMatchObject({
+      account_id: 'a1',
+      account: 'Clinic LLC',
+      source: 'Referral',
+      link: '/accounts/a1',
+    })
   })
 
   it('falls back to older dates for days in stage on rows saved before the stage clock', () => {
