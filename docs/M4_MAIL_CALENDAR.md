@@ -8,39 +8,35 @@
 |------------|----------------|
 | Send / inbox / sent | Façade → Zoho **or** Gmail send (Phase A); Gmail inbox = Phase B |
 | Calendar list / events / team meeting / follow-up | Façade → Zoho **or** Google Calendar (`calendar.events`) |
-| Settings provider switch | `mailCalendarProvider` — Zoho + Gmail selectable |
+| Settings provider switch | `mailCalendarProvider` — Zoho + Gmail selectable; M365 listed disabled |
 | Gmail OAuth | `gmail-calendar` Edge Function + `gmail_connection` (service-role only) |
+| M365 compliance | **Concluded** in `COMPLIANCE_NOTES.md` — Phase A `Mail.Send` + `Calendars.ReadWrite` |
 
-## Slice 1–3
+## Slice 1–5
 
-- Façade, Zoho adapters, follow-up via façade, Settings provider switch
+- Façade, Zoho adapters, follow-up, provider switch, Gmail compliance, Gmail Phase A OAuth
 
-## Slice 4
+## Slice 6 (this milestone step)
 
-- Concluded Gmail scopes assessment (`COMPLIANCE_NOTES.md`) — Phase A vs B
-
-## Slice 5 (this milestone step)
-
-- `gmail_connection` migration + `gmail-calendar` Edge Function (Connect OAuth)
-- Client `lib/gmailCalendarApi.ts` + `gmailMailAdapter` / `gmailCalendarAdapter`
-- Settings **Gmail & Google Calendar** connect card; Gmail selectable in provider switch
-- Phase A scopes only: `gmail.send` + `calendar.events` (primary calendar)
-- Inbox/Sent on Gmail throw Phase B errors
+- Concluded Microsoft Graph mail/calendar assessment with official Learn sources
+- Binding plan: **Phase A** = delegated `Mail.Send` + `Calendars.ReadWrite`; **Phase B** = `Mail.Read`
+- Settings / provider catalog reason updated; **no** M365 OAuth or adapter code
 
 ## Later
 
-1. Gmail Phase B inbox (`gmail.readonly` + verification/CASA)
-2. M365 / IMAP
+1. M365 Phase A adapter (Entra app + Edge Function, mirror Gmail)
+2. Gmail Phase B inbox (`gmail.readonly` + verification/CASA)
+3. M365 Phase B inbox; IMAP
 
-## Ops
+## Ops (Gmail — already on main)
 
 1. Prefer `GOOGLE_MAIL_CLIENT_ID` / `GOOGLE_MAIL_CLIENT_SECRET` (falls back to Drive’s `GOOGLE_CLIENT_*`)
 2. Add redirect URI `…/functions/v1/gmail-calendar` in Google Cloud Console
 3. `npx supabase functions deploy gmail-calendar`
 4. Apply migration `20261113160000_gmail_connection.sql`
-5. Settings → Connect Gmail → select Provider **Gmail**
 
 ## Rules
 
-- Do not break the Zoho proxy path
+- Do not break the Zoho proxy path or Gmail Phase A
 - No `gmail.readonly` until Phase B prerequisites in `COMPLIANCE_NOTES.md`
+- No Microsoft Graph calls until M365 Phase A implementation slice

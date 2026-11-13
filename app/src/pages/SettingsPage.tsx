@@ -1380,8 +1380,9 @@ export default function SettingsPage() {
             ))}
           </select>
           <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted2, lineHeight: 1.45 }}>
-            Zoho or Gmail (Phase A: send + calendar). Connect Gmail in the card below before selecting
-            it. Inbox on Gmail is Phase B. M365 / IMAP later.
+            Zoho or Gmail (Phase A: send + calendar). Connect Gmail below before selecting it. M365
+            Phase A (Mail.Send + Calendars.ReadWrite) is approved in Compliance notes — OAuth next.
+            IMAP later.
           </p>
         </div>
         {can(userRole, 'settings.manage') &&

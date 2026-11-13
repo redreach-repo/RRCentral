@@ -11,6 +11,7 @@ Findings from official sources go here **before** shipping tax, payroll, e-sign,
 | UAE corporate tax | not started | — | — | M7+ |
 | UAE e-invoicing timeline / format | not started | — | — | Design invoice model for accredited provider |
 | Google restricted Gmail scopes assessment | **concluded** | See § Gmail below | 13 Nov 2026 | Phase A **implemented** (`gmail.send` + `calendar.events` via `gmail-calendar` Edge Function). Phase B inbox (`gmail.readonly`) still blocked until restricted verification + CASA plan. |
+| Microsoft 365 Graph mail/calendar assessment | **concluded** | See § M365 below | 13 Nov 2026 | Phase A: delegated `Mail.Send` + `Calendars.ReadWrite`. Phase B: delegated `Mail.Read`. No M365 OAuth code until implementation slice. Prefer delegated over application permissions. |
 | Data residency (UAE hosting options) | not started | — | — | Decide before first external customer / M13 |
 
 Do not rely on model memory for legal or tax rules.
@@ -53,3 +54,41 @@ Workspace policy lists CRM / productivity enhancers as an **approved** Gmail sco
 ### Explicit non-claims
 
 - This note does **not** assert that RR Central is already verified, CASA-assessed, or cleared for public consumer Gmail access beyond Testing/Internal exceptions.
+
+---
+
+## Microsoft 365 / Graph mail & calendar (M4) — assessment
+
+**Purpose:** Decide which Microsoft Graph permissions RR Central may request for an M365 mail/calendar adapter, and what consent / verification gates apply before shipping.
+
+### Official sources (checked 13 Nov 2026, Asia/Dubai)
+
+1. [Microsoft Graph permissions reference](https://learn.microsoft.com/en-us/graph/permissions-reference) — `Mail.Send` (delegated: send as signed-in user; AdminConsentRequired **No** by default), `Mail.Read` (delegated: read signed-in mailbox; AdminConsentRequired **No** by default), `Calendars.ReadWrite` (delegated: full access to user calendars; AdminConsentRequired **No** by default). Application (daemon) variants of these permissions require **admin consent**.
+2. [Scopes and permissions in the Microsoft identity platform](https://learn.microsoft.com/en-us/entra/identity-platform/scopes-oidc) — some Graph permissions are admin-restricted; org users may be unable to consent even when the permission table says “No,” depending on tenant policy.
+3. [Manage app consent policies](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/manage-app-consent-policies) — Microsoft-managed / tenant consent policies can require admin approval for classified delegated permissions (calendar write is commonly treated as restricted by tenant defaults).
+4. [Publisher verification overview](https://learn.microsoft.com/en-us/entra/identity-platform/publisher-verification-overview) — unverified publishers are marked risky; verification does **not** bypass admin-consent requirements for sensitive scopes.
+5. [Developer’s guide to requesting permissions and consent](https://learn.microsoft.com/en-us/entra/identity-platform/consent-types-developer) — request least privilege via `scope`; use admin-consent endpoint when tenants block user consent.
+
+### Scope matrix for RR Central (parity with Zoho / Gmail Phase A)
+
+| Feature | Candidate Graph permission | Type | Notes |
+|---------|----------------------------|------|-------|
+| Send mail from CRM | `Mail.Send` | Delegated | Least privilege for send; saves to Sent Items without `Mail.ReadWrite` |
+| Inbox / Sent dashboard match | `Mail.Read` | Delegated | Broader mailbox read — Phase B |
+| Follow-up / team meetings | `Calendars.ReadWrite` | Delegated | Create/update/delete events on user calendars |
+| Calendar read-only board | `Calendars.Read` | Delegated | Prefer if write is unnecessary for a read-only view |
+
+Avoid **application** `Mail.Send` / `Mail.Read` / `Calendars.ReadWrite` for the interactive CRM app (admin consent + org-wide blast radius). Use application permissions only if a future daemon job is explicitly designed with mailbox access policies.
+
+### Decision (binding for M4)
+
+1. **Phase A (next M365 implementation slice):** Entra app registration + delegated OAuth for **`Mail.Send` + `Calendars.ReadWrite`** (+ `offline_access` / `openid` / `User.Read` as needed for sign-in). Mirror the Gmail Edge Function pattern (`m365-mail-calendar` + service-role connection table). **Do not** request `Mail.Read` in Phase A.
+2. **Phase B (later):** Add delegated **`Mail.Read`** for inbox/sent matching after Phase A is stable; document tenant admin-consent expectations and publisher verification for multi-tenant use.
+3. **Publisher verification:** Plan Entra publisher verification before asking external tenants to consent; internal/single-tenant Red Reach use can proceed under Testing / admin consent.
+4. **Settings switcher:** Keep M365 **unavailable** until Phase A OAuth is wired; reason text points here.
+5. **IMAP:** Out of scope for this assessment — modern providers deprecate basic auth; treat IMAP as a later provider with its own OAuth/app-password rules.
+
+### Explicit non-claims
+
+- This note does **not** assert that an Entra app is registered, publisher-verified, or consented in any customer tenant.
+- No Microsoft Graph tokens or M365 adapters ship in the assessment-only slice.

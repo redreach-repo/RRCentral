@@ -36,11 +36,12 @@ describe('mailCalendar façade', () => {
     ).toBe('zoho')
   })
 
-  it('lists Zoho and Gmail as available; M365/IMAP unavailable', () => {
+  it('lists Zoho and Gmail as available; M365/IMAP unavailable with Phase A reasons', () => {
     const opts = listMailCalendarProviderOptions()
     expect(opts.find((o) => o.id === 'zoho')?.available).toBe(true)
     expect(opts.find((o) => o.id === 'gmail')?.available).toBe(true)
     expect(opts.find((o) => o.id === 'm365')?.available).toBe(false)
+    expect(opts.find((o) => o.id === 'm365')?.unavailableReason).toMatch(/Phase A/)
     expect(opts.find((o) => o.id === 'imap')?.available).toBe(false)
   })
 })
