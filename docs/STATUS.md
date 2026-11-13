@@ -1,21 +1,20 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** M5 contracts / e-sign (slice 5 — obligations board)
+**Current milestone:** M5 contracts / e-sign (vault obligations UI)
 
-## Shipped this turn (M5 slice 5)
+## Shipped this turn
 
-- `contract_obligations` migration + `/obligations` board (filters, overdue, mark done)
-- Zod validation + unit tests
-- Plan: `docs/M5_CONTRACTS_ESIGN.md`
+- CRM Contracts vault: open obligations list, quick-add, mark done, link to board
+- Awaits merge of spawn-on-sign ([#244](https://github.com/redreach-repo/RRCentral/pull/244)) for auto rows after `/sign`
 
 ## Already on main
 
-- M0–M4 · M1 leftovers · M5 slices 1–4
+- M0–M4 · M1 leftovers · M5 slices 1–5
 
 ## Still open
 
-**M5 next:** auto-spawn obligations from signed docs; QTSP only after ask  
+**M5 next:** QTSP only after ask; richer spawn after #244  
 **M4 hold:** Gmail Phase B (CASA); IMAP only if a real need  
 **M1 leftovers:** more Zod; expand field mask; missing logos (need assets)  
 **M3 hold:** schema consolidate (**ask**) · **M3a** demo (ask Alfred)  

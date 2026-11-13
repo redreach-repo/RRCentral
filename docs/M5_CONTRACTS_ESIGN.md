@@ -11,17 +11,18 @@
 | Clause library | `/clause-library` CRUD |
 | Compose into templates | Insert active clauses into NDA + agreement draft editors |
 | Obligations board | `/obligations` — open/done/cancelled follow-through |
+| Vault obligations | CRM Contracts tab: list / quick-add / mark done |
+| Spawn on sign | [#244](https://github.com/redreach-repo/RRCentral/pull/244) (open) — default rows after `/sign` |
 | TDRA QTSP integration | Not started → Phase B after ask |
 
-## Slice 5 (this milestone step)
+## Slice 7 (this milestone step)
 
-- Migration `contract_obligations` (staff RLS) + Zod + store
-- `/obligations` board with filters, overdue highlight, mark done
-- **No** QTSP
+- Contracts vault panel: open obligations for the company + quick-add + mark done
+- Link to full `/obligations` board
 
 ## Later
 
-1. Auto-create obligations from signed docs / clause tags
+1. Merge spawn-on-sign (#244) + richer spawn rules
 2. Phase B QTSP after Alfred approves a licensed vendor
 
 ## Ops
