@@ -45,6 +45,11 @@ import {
 import docsStyles from '../styles/docsList.module.css'
 import { PAYMENT_METHODS } from '../lib/config'
 import { errorMessage } from '../lib/errors'
+import {
+  parseCustomerPaymentForm,
+  parseCustomerRefundForm,
+  parseSupplierCommitmentForm,
+} from '../lib/schemas/payment'
 
 type PayForm = {
   booking_id: string
@@ -184,24 +189,31 @@ export default function PaymentsPage() {
 
   async function savePayment() {
     if (!selected) return
-    if (!form.amount_received) {
-      showToast('Enter amount received', 'error')
+    const parsed = parseCustomerPaymentForm({
+      ...form,
+      booking_id: selected.id,
+      quote_ref: selected.reference_number || selected.quote_id,
+      client: selected.client,
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setSaving(true)
     try {
+      const pay = parsed.data
       await approveFxRate({
-        from: form.currency,
-        rate: form.fx_rate,
-        rateDate: form.fx_rate_date,
+        from: pay.currency,
+        rate: pay.fx_rate,
+        rateDate: pay.fx_rate_date,
         approvedBy: user?.email || '',
-        notes: `Payment ${form.payment_type} · ${form.quote_ref}`,
+        notes: `Payment ${pay.payment_type} · ${pay.quote_ref}`,
       })
       await saveCustomerPayment({
-        ...form,
+        ...pay,
         booking_id: selected.id,
         quote_ref: selected.reference_number || selected.quote_id,
-        invoice_ref: form.invoice_ref || '',
+        invoice_ref: pay.invoice_ref || '',
         client: selected.client,
         created_by: user?.email || '',
         fx_rate_approved_by: user?.email || '',
@@ -218,10 +230,18 @@ export default function PaymentsPage() {
 
   async function saveRefund() {
     if (!refundPayment || !selected) return
+    const parsed = parseCustomerRefundForm({
+      amount_refunded: refundAmount,
+      reason: refundReason,
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
     setSaving(true)
     try {
       const rate = Number(refundPayment.fx_rate) || 1
-      const base = toBaseAmount(refundAmount, rate)
+      const base = toBaseAmount(parsed.data.amount_refunded, rate)
       await saveCustomerRefund({
         payment_id: refundPayment.id,
         booking_id: selected.id,
@@ -231,14 +251,14 @@ export default function PaymentsPage() {
         original_currency: refundPayment.currency,
         original_amount_received: refundPayment.amount_received,
         refund_currency: refundPayment.currency,
-        amount_refunded: refundAmount,
+        amount_refunded: parsed.data.amount_refunded,
         fx_rate: rate,
         fx_rate_date: format(new Date(), 'yyyy-MM-dd'),
         conversion_fee: 0,
         bank_fee: 0,
         base_amount: base,
         fx_gain_loss: 0,
-        reason: refundReason,
+        reason: parsed.data.reason,
         approved_by: user?.email || '',
         approved_at: new Date().toISOString(),
         status: 'Refunded',
@@ -258,31 +278,33 @@ export default function PaymentsPage() {
 
   async function saveSupplier() {
     if (!selected) return
-    if (!supplierForm.amount || !supplierForm.supplier_name) {
-      showToast('Supplier name and amount required', 'error')
+    const parsed = parseSupplierCommitmentForm(supplierForm)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setSaving(true)
     try {
+      const s = parsed.data
       await approveFxRate({
-        from: supplierForm.currency,
-        rate: supplierForm.fx_rate,
-        rateDate: supplierForm.fx_rate_date,
+        from: s.currency,
+        rate: s.fx_rate,
+        rateDate: s.fx_rate_date,
         approvedBy: user?.email || '',
-        notes: `Supplier ${supplierForm.supplier_name} · ${selected.reference_number || selected.quote_id}`,
+        notes: `Supplier ${s.supplier_name} · ${selected.reference_number || selected.quote_id}`,
       })
       await saveSupplierCommitment({
         booking_id: selected.id,
         quote_ref: selected.reference_number || selected.quote_id,
-        supplier_name: supplierForm.supplier_name,
-        description: supplierForm.description,
-        amount: supplierForm.amount,
-        currency: supplierForm.currency,
-        fx_rate: supplierForm.fx_rate,
-        fx_rate_date: supplierForm.fx_rate_date,
+        supplier_name: s.supplier_name,
+        description: s.description,
+        amount: s.amount,
+        currency: s.currency,
+        fx_rate: s.fx_rate,
+        fx_rate_date: s.fx_rate_date,
         status: 'Open',
-        due_date: supplierForm.due_date || null,
-        notes: supplierForm.notes,
+        due_date: s.due_date || null,
+        notes: s.notes,
       })
       showToast('Supplier commitment saved (original currency preserved)', 'success')
       setSupplierOpen(false)
