@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import CtrmListsCard from '../components/ctrm/CtrmListsCard'
 import GoogleDriveCard from '../components/GoogleDriveCard'
 import HubSpotCard from '../components/HubSpotCard'
+import PipelinesSettingsCard from '../components/settings/PipelinesSettingsCard'
+import WorkflowsSettingsCard from '../components/settings/WorkflowsSettingsCard'
 import { Download, HardDrive, Plus, Trash2, Upload, Plug } from 'lucide-react'
 import SimpleRowActions from '../components/SimpleRowActions'
 import { db, currentAuthMode } from '../lib/db'
@@ -827,6 +829,8 @@ export default function SettingsPage() {
     { id: 'quote-settings', label: 'Quotes' },
     { id: 'numbering', label: 'Numbering' },
     { id: 'custom-fields', label: 'Custom fields' },
+    { id: 'pipelines', label: 'Pipelines' },
+    { id: 'workflows', label: 'Workflows' },
     { id: 'division-formats', label: 'Division formats' },
     { id: 'wanders', label: 'Wanders' },
     { id: 'system', label: 'System' },
@@ -1284,6 +1288,9 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
+
+      <PipelinesSettingsCard />
+      <WorkflowsSettingsCard />
 
       {renderSection(
         'Division quotation formats (editable titles, closings, Connect partner name)',
