@@ -9,7 +9,7 @@
 
 ## Already on main
 
-- Continuous backlog Zod through message templates · QTSP scaffold · go-live/build · M3 plan · `pipeline_deals_v`
+- Continuous backlog Zod through message templates · M3a demo prep · QTSP scaffold · `pipeline_deals_v`
 
 ## Still open (agent queue)
 
