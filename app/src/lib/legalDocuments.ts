@@ -6,6 +6,9 @@
 import { addDays, format, parseISO } from 'date-fns'
 import { hashPortalToken, isPortalToken, newPortalToken } from './clientPortal'
 
+export { defaultObligationsOnSign } from './obligationSpawn'
+export type { SpawnObligationInput, SpawnObligationRow } from './obligationSpawn'
+
 export {
   hashPortalToken as hashLegalSignToken,
   isPortalToken as isLegalSignToken,
