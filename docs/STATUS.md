@@ -13,12 +13,12 @@
 ## Already on main
 
 - M1 tenancy / switcher / brand / i18n / guide
-- M2 numbering sequences + `rr_allocate_reference` + Settings Numbering
-- M2 custom fields UI + account values + seeds
+- M2 numbering + custom fields UI + seeds
+- M2 saved views on Accounts/Vendors (#213)
 
 ## Still open
 
-**M2 next:** saved views on list pages (if not yet merged); CRM/quote custom field surfaces; workflow runner  
+**M2 next:** CRM/quote custom field surfaces; more list pages; workflow runner  
 **M1 leftovers:** nav → module manifests; field permissions; Zod; TS strict; PWA mark; missing logos  
 **Open §19 decisions** — do not guess
 

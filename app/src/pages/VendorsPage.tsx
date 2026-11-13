@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import EditorSectionTabs, {
   editorPanelStyle,
   type EditorSection,
@@ -69,11 +70,15 @@ function isHttpUrl(url: string): boolean {
 }
 
 export default function VendorsPage() {
-  const { user } = useAuth()
+  const { user, appUserId } = useAuth()
   const { showToast } = useToast()
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const vendorViewFilters = useMemo(() => {
+    const q = search.trim()
+    return q ? { q } : {}
+  }, [search])
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Vendor | null>(null)
   const [form, setForm] = useState<VendorForm>(emptyForm())
@@ -289,6 +294,16 @@ export default function VendorsPage() {
           <code>supabase/migrations/20260924203122_vendors.sql</code> in the Supabase SQL editor, then refresh.
         </div>
       ) : null}
+
+      <SavedViewsBar
+        moduleId="vendors"
+        filters={vendorViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => setSearch(String(f.q || ''))}
+        onToast={showToast}
+      />
 
       <div className={docsStyles.controls}>
         <input

@@ -51,6 +51,14 @@ No database migrations. Documentation and `brand-assets/` only.
 **Rollback**
 - Delete those definition rows by `field_key` if needed; values cascade.
 
+## M2 — `20261213160000_saved_views_seeds.sql`
+
+**What**
+- Seeds shared Accounts saved views (All / RR Threads / Unassigned)
+
+**Rollback**
+- Delete by `module_id = 'accounts'` and those names.
+
 ## M2 — `20261213170000_pipelines_workflows.sql`
 
 **What**
@@ -63,3 +71,4 @@ No database migrations. Documentation and `brand-assets/` only.
 
 **Rollback**
 - Forward-only preferred. Drop new tables after confirming Settings/CRM no longer read them; CRM falls back to hardcoded `PIPELINE_STAGES`.
+
