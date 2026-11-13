@@ -46,8 +46,11 @@ import {
   Wrench,
   ChevronDown,
   Handshake,
+  BookOpen,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useTenant } from '../contexts/TenantContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders'
 import { useContractBillingSync } from '../hooks/useContractBillingSync'
 import { useFridayHoursReminder } from '../hooks/useFridayHoursReminder'
@@ -91,7 +94,10 @@ const navGroups: NavGroup[] = [
     id: 'overview',
     label: 'Overview',
     icon: LayoutDashboard,
-    items: [{ to: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true }],
+    items: [
+      { to: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true },
+      { to: '/guide', label: 'Guide', icon: BookOpen },
+    ],
   },
   {
     id: 'sales',
@@ -303,6 +309,8 @@ function filterItems(items: NavItem[], userRole: UserRole): NavItem[] {
 
 export default function Layout() {
   const { user, userRole, signOut, isLocalMode } = useAuth()
+  const { companies, activeCompanyId, setActiveCompanyId, activeCompany } = useTenant()
+  const { t } = useI18n()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
@@ -574,15 +582,33 @@ export default function Layout() {
               <Bell size={16} />
               {reminders.due > 0 && <span className={styles.reminderCount}>{reminders.due}</span>}
             </button>
+            {companies.length > 0 ? (
+              <label className={styles.companySwitcher}>
+                <span className={styles.companySwitcherLabel}>{t('shell.company')}</span>
+                <select
+                  className={styles.companySelect}
+                  value={activeCompanyId || ''}
+                  onChange={(e) => setActiveCompanyId(e.target.value)}
+                  aria-label={t('shell.company')}
+                  title={activeCompany?.legal_name || activeCompany?.name || t('shell.company')}
+                >
+                  {companies.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             <span className={styles.userEmail}>{user?.email}</span>
             <button
               type="button"
               className={styles.signOutBtn}
               onClick={() => void signOut()}
-              aria-label="Sign out"
+              aria-label={t('shell.signOut')}
             >
               <LogOut size={16} />
-              <span className={styles.signOutLabel}>Sign out</span>
+              <span className={styles.signOutLabel}>{t('shell.signOut')}</span>
             </button>
           </div>
         </header>

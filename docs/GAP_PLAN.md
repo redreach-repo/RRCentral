@@ -16,23 +16,23 @@ Status key: **exists** · **partial** · **missing**
 | Vite+React SPA on Supabase | exists | Keep; do not rewrite framework |
 | Trusted logic in Edge/DB not only browser | partial | Ledger/payroll/permissions must move server-side in M1+ |
 | Zod validation everywhere | partial | Spot use; standardize in M1 forms/API |
-| Module registry manifests | missing | M1 — generate nav/permissions/flags from manifests |
-| Domain events / `event_outbox` | missing | M1 — introduce with first cross-module posts |
+| Module registry manifests | partial | M1 skeleton `app/src/modules/registry.ts`; nav still in Layout — finish move next slice |
+| Domain events / `event_outbox` | partial | M1 table + RLS; workers not yet consuming |
 | Public REST API + webhooks | missing | M11 (or earlier for partners) |
 | Exact money `numeric` / no float | partial | SQL numeric exists; TS `number`+round — fix path in M7 |
-| Tenant / company / BU model | missing | M1 — retrofit `tenant_id`, Red Reach = tenant one |
-| RLS on every table | exists | Already on; add `tenant_id` policies in M1 |
-| Cross-tenant CI tests | missing | M1 |
+| Tenant / company / BU model | partial | M1 tables + seed + `tenant_id` retrofit; company switcher live |
+| RLS on every table | exists | M1 RESTRICTIVE tenant isolation on stamped tables |
+| Cross-tenant CI tests | partial | `tenant_isolation_test.sql` in `run.sh`; expand coverage next |
 | Roles + record rules + field permissions | partial | Fixed 5 roles; no record rules / field mask — M1 |
 | Maker-checker | missing | M7/M8 for money/payroll |
 | Customization layer (fields, pipelines, objects, workflows, templates, views, dashboards, labels, numbering) | missing | M2 (numbering pattern RR-… exists as code constants — move to data) |
 | Industry packs | missing | M12 |
 | Shell: Inbox/Sales/… areas, Cmd+K, AI button | partial | Accordion nav exists; restructure shell in M1 |
-| Company switcher | missing | M1 |
-| EN+AR RTL | missing | M1 i18n foundation |
+| Company switcher | partial | M1 top-bar switcher; multi-company ops still thin |
+| EN+AR RTL | partial | M1 `I18nContext` + dir; catalogs incomplete |
 | PWA installable | partial | Manifest/icons exist historically; regenerate from brand mark in M1 branding |
-| Brand kits per tenant/company/BU | missing | M1 §5.1; seed from `brand-assets/` |
-| In-app guide `/guide` | missing | M1 |
+| Brand kits per tenant/company/BU | partial | M1 `brand_kits` + `app/public/brand`; missing Boost/Care/Trading assets |
+| In-app guide `/guide` | partial | M1 route shell; content packs later |
 
 ---
 
