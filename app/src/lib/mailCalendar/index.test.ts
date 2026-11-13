@@ -33,11 +33,13 @@ describe('mailCalendar façade', () => {
     )
   })
 
-  it('lists Zoho, Gmail, and M365 as available; IMAP unavailable', () => {
+  it('lists Zoho, Gmail, and M365 as available; IMAP unavailable with compliance reason', () => {
     const opts = listMailCalendarProviderOptions()
     expect(opts.find((o) => o.id === 'zoho')?.available).toBe(true)
     expect(opts.find((o) => o.id === 'gmail')?.available).toBe(true)
     expect(opts.find((o) => o.id === 'm365')?.available).toBe(true)
-    expect(opts.find((o) => o.id === 'imap')?.available).toBe(false)
+    const imap = opts.find((o) => o.id === 'imap')
+    expect(imap?.available).toBe(false)
+    expect(imap?.unavailableReason || '').toMatch(/COMPLIANCE_NOTES|Gmail\/M365/i)
   })
 })
