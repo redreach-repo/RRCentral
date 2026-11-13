@@ -31,12 +31,10 @@ import {
   formGridStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   sectionTitleStyle,
   selectStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 const smallBtn: CSSProperties = { ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }
 const rowStyle: CSSProperties = {
@@ -202,7 +200,7 @@ export default function BuildTemplatesPage() {
         {canEdit ? (
           <span style={{ display: 'flex', gap: 6 }}>
             <button type="button" style={smallBtn} aria-label={`Edit ${i.title}`} onClick={() => openItem(i.kind, i)}>
-              <Pencil size={12} />
+              <Pencil size={12} /> Edit
             </button>
             <button
               type="button"
@@ -214,7 +212,7 @@ export default function BuildTemplatesPage() {
                 void run(() => deleteTemplateItem(i.id), 'Could not delete the line')
               }
             >
-              <Trash2 size={12} />
+              <Trash2 size={12} /> Remove
             </button>
           </span>
         ) : null}
@@ -223,11 +221,12 @@ export default function BuildTemplatesPage() {
   }
 
   return (
-    <div style={pageStyle}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Build templates</h1>
-          <p style={pageSubtitleStyle}>
+          <p className={docsStyles.kicker}>Delivery</p>
+          <h1 className={docsStyles.title}>Build templates</h1>
+          <p className={docsStyles.subtitle}>
             A ready build checklist and starter configuration for each package. On a client, Start from template copies
             the checklist into their build and the starter configuration into their requirements. Changes here apply to
             the next client, not to builds already started.
@@ -236,13 +235,13 @@ export default function BuildTemplatesPage() {
         {canEdit ? (
           <button
             type="button"
-            style={buttonPrimaryStyle}
+            className={docsStyles.newBtn}
             onClick={() => setTemplateForm({ name: '', description: '', package_id: '', active: true })}
           >
             <Plus size={14} /> New template
           </button>
         ) : null}
-      </div>
+      </header>
 
       {templates.length === 0 ? (
         <EmptyState

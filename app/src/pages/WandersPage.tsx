@@ -47,17 +47,14 @@ import {
   formGridStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
-  toolbarStyle,
   sectionTitleStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 import { buildWhatsAppUrl } from '../lib/whatsapp'
 import { errorMessage } from '../lib/errors'
 
@@ -267,11 +264,12 @@ export default function WandersPage() {
   const commercial = form ? recomputeCommercial(form) : null
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>RR Wanders CRM</h1>
-          <p style={pageSubtitleStyle}>
+          <p className={docsStyles.kicker}>Operations</p>
+          <h1 className={docsStyles.title}>RR Wanders CRM</h1>
+          <p className={docsStyles.subtitle}>
             Travel deals, packages, partners, departures and bookings — separate from RR Threads. Base
             currency: <strong>{baseCurrency}</strong>
             {baseCurrency === 'TBC' ? ' (confirm in Settings before production)' : ''}.
@@ -280,10 +278,9 @@ export default function WandersPage() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
             type="button"
+            className={docsStyles.newBtn}
             style={{
-              ...buttonSecondaryStyle,
-              background: mode === 'leads' ? colors.accent : 'rgba(255,255,255,0.06)',
-              borderColor: mode === 'leads' ? colors.accent : colors.border,
+              background: mode === 'leads' ? undefined : 'rgba(255,255,255,0.08)',
             }}
             onClick={() => setMode('leads')}
           >
@@ -291,22 +288,21 @@ export default function WandersPage() {
           </button>
           <button
             type="button"
+            className={docsStyles.newBtn}
             style={{
-              ...buttonSecondaryStyle,
-              background: mode === 'tourops' ? colors.accent : 'rgba(255,255,255,0.06)',
-              borderColor: mode === 'tourops' ? colors.accent : colors.border,
+              background: mode === 'tourops' ? undefined : 'rgba(255,255,255,0.08)',
             }}
             onClick={() => setMode('tourops')}
           >
             Tour products & ops
           </button>
           {mode === 'leads' ? (
-            <button type="button" style={buttonPrimaryStyle} onClick={newDeal}>
+            <button type="button" className={docsStyles.newBtn} onClick={newDeal}>
               <Plus size={16} /> New enquiry
             </button>
           ) : null}
         </div>
-      </div>
+      </header>
 
       {mode === 'tourops' ? (
         <WandersTourOpsPanel deals={deals} />

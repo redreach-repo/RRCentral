@@ -246,8 +246,12 @@ const phoneShortcuts: NavItem[] = [
   { to: '/customer-files', label: 'Drive', icon: FolderOpen },
   { to: '/accounts', label: 'Accounts', icon: Contact, forStaff: true },
   { to: '/invoices', label: 'Invoices', icon: Receipt },
+  { to: '/delivery-notes', label: 'Delivery notes', icon: Truck },
   { to: '/expenses', label: 'Expenses', icon: Wallet },
+  { to: '/vendors', label: 'Vendors', icon: Building2 },
   { to: '/payments', label: 'Payments', icon: Banknote },
+  { to: '/catalog', label: 'Catalog', icon: Package },
+  { to: '/reports', label: 'Reports', icon: BarChart3 },
 ]
 
 function isPhonePrimaryActive(pathname: string, to: string, end?: boolean): boolean {
@@ -370,6 +374,19 @@ export default function Layout() {
       '/inventory',
       '/support',
       '/reports',
+      '/app/wanders',
+      '/products',
+      '/delivery-settings',
+      '/build-templates',
+      '/mrr',
+      '/insights',
+      '/client-health',
+      '/client-reports',
+      '/client-updates',
+      '/duplicates',
+      '/audit-log',
+      '/app-errors',
+      '/system-check',
     ].includes(location.pathname) || location.pathname.startsWith('/accounts')
 
   const primaryActive = phoneNav.some((item) =>

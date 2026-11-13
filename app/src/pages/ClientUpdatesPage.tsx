@@ -15,11 +15,9 @@ import {
   cardStyle,
   colors,
   inputStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 const smallBtn = { ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 13 }
 const muted = { color: colors.muted, fontSize: 13 }
@@ -76,13 +74,18 @@ export default function ClientUpdatesPage() {
   const sent = queue?.drafts.filter((d) => d.status === 'sent').length ?? 0
 
   return (
-    <div style={pageStyle}>
-      <h1 style={pageTitleStyle}>Weekly updates</h1>
-      <p style={pageSubtitleStyle}>
-        Every Thursday each CTRM Next client gets a short update drafted from their issues and sessions: what was fixed this
-        week, what is still open and what comes next. Check the wording, then send it by email or WhatsApp. Nothing goes to a
-        client until someone taps Send.
-      </p>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
+        <div>
+          <p className={docsStyles.kicker}>Clients</p>
+          <h1 className={docsStyles.title}>Weekly updates</h1>
+          <p className={docsStyles.subtitle}>
+            Every Thursday each CTRM Next client gets a short update drafted from their issues and sessions: what was fixed this
+            week, what is still open and what comes next. Check the wording, then send it by email or WhatsApp. Nothing goes to a
+            client until someone taps Send.
+          </p>
+        </div>
+      </header>
 
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', margin: '12px 0 16px' }}>
         <select aria-label="Week" style={{ ...selectStyle, width: 'auto' }} value={week} onChange={(e) => setWeek(e.target.value)}>

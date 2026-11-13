@@ -9,14 +9,12 @@ import {
   cardStyle,
   colors,
   kpiGridStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
 } from '../lib/uiStyles'
+import docsStyles from '../styles/docsList.module.css'
 
 const BANDS: HealthBand[] = ['at_risk', 'watch', 'healthy']
 
@@ -37,15 +35,18 @@ export default function ClientHealthPage() {
   const warnings = rows?.filter((r) => r.health.churnWarning).length ?? 0
 
   return (
-    <div style={pageStyle}>
-      <div>
-        <h1 style={pageTitleStyle}>Client health</h1>
-        <p style={pageSubtitleStyle}>
-          A score out of 100 for each client with a running contract, from four parts worth 25 each: usage against their
-          plan, support tickets, monthly report calls attended, and overdue invoices. Below 50, or any warning sign, shows a
-          churn warning. Lowest scores first.
-        </p>
-      </div>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
+        <div>
+          <p className={docsStyles.kicker}>Clients</p>
+          <h1 className={docsStyles.title}>Client health</h1>
+          <p className={docsStyles.subtitle}>
+            A score out of 100 for each client with a running contract, from four parts worth 25 each: usage against their
+            plan, support tickets, monthly report calls attended, and overdue invoices. Below 50, or any warning sign, shows a
+            churn warning. Lowest scores first.
+          </p>
+        </div>
+      </header>
 
       <div style={kpiGridStyle}>
         {BANDS.map((b) => (
