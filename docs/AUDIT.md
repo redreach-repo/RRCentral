@@ -13,7 +13,7 @@ RR Central is a **single-tenant** operations suite for Red Reach Middle East FZE
 
 It is **not** yet a multi-tenant subscription platform. There is no `tenant_id`, no customization layer, no double-entry ledger, no HR/payroll, and no full mail sync beyond Zoho Mail/Calendar proxy. TypeScript `strict` is on in the main app.
 
-**M0 RLS criterion:** pass — every `CREATE TABLE` in `supabase/migrations` has RLS enabled. Two tables intentionally have RLS with **no policies** (deny-all to anon/authenticated; service-role only): `drive_connection`, `worship_setup_log`.
+**M0 RLS criterion:** pass — every `CREATE TABLE` in `supabase/migrations` has RLS enabled. Tables with RLS and **no policies** (deny-all to anon/authenticated; service-role only): `drive_connection`, `gmail_connection`, `worship_setup_log`.
 
 ---
 
@@ -90,6 +90,7 @@ Nav: accordion sidebar (Overview / Sales / Clients / Delivery / Operations / Fin
 
 ### Intentional deny-all (RLS on, no policies)
 - `drive_connection` — OAuth refresh; service role only  
+- `gmail_connection` — Gmail/Calendar OAuth refresh; service role only  
 - `worship_setup_log` — service role only  
 
 ### Dual / overlapping models (debt)

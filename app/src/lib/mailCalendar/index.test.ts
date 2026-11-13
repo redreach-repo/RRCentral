@@ -19,30 +19,27 @@ describe('mailCalendar façade', () => {
     expect(resolveMailCalendarProviderId()).toBe(DEFAULT_MAIL_CALENDAR_PROVIDER)
   })
 
-  it('reads mailCalendarProvider from settings when available', () => {
-    expect(
-      resolveMailCalendarProviderId({ [MAIL_CALENDAR_PROVIDER_SETTING_KEY]: 'zoho' }),
-    ).toBe('zoho')
-    expect(getMailProvider({ [MAIL_CALENDAR_PROVIDER_SETTING_KEY]: 'zoho' }).id).toBe('zoho')
+  it('returns Gmail providers when mailCalendarProvider=gmail', () => {
+    const settings = { [MAIL_CALENDAR_PROVIDER_SETTING_KEY]: 'gmail' }
+    expect(resolveMailCalendarProviderId(settings)).toBe('gmail')
+    expect(getMailProvider(settings).id).toBe('gmail')
+    expect(getCalendarProvider(settings).id).toBe('gmail')
+    expect(activeMailCalendarProviderLabel(settings)).toBe('Gmail')
   })
 
   it('falls back to Zoho for unknown or unavailable provider ids', () => {
     expect(
-      resolveMailCalendarProviderId({ [MAIL_CALENDAR_PROVIDER_SETTING_KEY]: 'gmail' }),
+      resolveMailCalendarProviderId({ [MAIL_CALENDAR_PROVIDER_SETTING_KEY]: 'm365' }),
     ).toBe('zoho')
     expect(
       resolveMailCalendarProviderId({ [MAIL_CALENDAR_PROVIDER_SETTING_KEY]: 'not-a-provider' }),
     ).toBe('zoho')
-    expect(
-      resolveMailCalendarProviderId({ [MAIL_CALENDAR_PROVIDER_SETTING_KEY]: '' }),
-    ).toBe('zoho')
   })
 
-  it('lists Zoho as available and future providers as unavailable', () => {
+  it('lists Zoho and Gmail as available; M365/IMAP unavailable', () => {
     const opts = listMailCalendarProviderOptions()
     expect(opts.find((o) => o.id === 'zoho')?.available).toBe(true)
-    expect(opts.find((o) => o.id === 'gmail')?.available).toBe(false)
-    expect(opts.find((o) => o.id === 'gmail')?.unavailableReason).toMatch(/Phase A/)
+    expect(opts.find((o) => o.id === 'gmail')?.available).toBe(true)
     expect(opts.find((o) => o.id === 'm365')?.available).toBe(false)
     expect(opts.find((o) => o.id === 'imap')?.available).toBe(false)
   })

@@ -1,6 +1,6 @@
 /**
  * M4 mail/calendar provider façade.
- * Slice 3: Settings-backed provider id; only Zoho is available/implemented.
+ * Slice 5: Zoho + Gmail Phase A (send + calendar); inbox stays Zoho/Phase B.
  */
 import type {
   CalendarProvider,
@@ -14,6 +14,8 @@ import {
   MAIL_CALENDAR_PROVIDER_OPTIONS,
   MAIL_CALENDAR_PROVIDER_SETTING_KEY,
 } from './types'
+import { gmailCalendarProvider } from './gmailCalendarAdapter'
+import { gmailMailProvider } from './gmailMailAdapter'
 import { zohoCalendarProvider } from './zohoCalendarAdapter'
 import { zohoMailProvider } from './zohoMailAdapter'
 
@@ -56,23 +58,23 @@ export function listMailCalendarProviderOptions(): readonly ProviderOption[] {
   return MAIL_CALENDAR_PROVIDER_OPTIONS
 }
 
-/** Active mail provider — Zoho until other adapters ship. */
+/** Active mail provider. */
 export function getMailProvider(settings?: ProviderSettings): MailProvider {
-  const id = resolveMailCalendarProviderId(settings)
-  switch (id) {
+  switch (resolveMailCalendarProviderId(settings)) {
+    case 'gmail':
+      return gmailMailProvider
     case 'zoho':
-      return zohoMailProvider
     default:
       return zohoMailProvider
   }
 }
 
-/** Active calendar provider — Zoho until other adapters ship. */
+/** Active calendar provider. */
 export function getCalendarProvider(settings?: ProviderSettings): CalendarProvider {
-  const id = resolveMailCalendarProviderId(settings)
-  switch (id) {
+  switch (resolveMailCalendarProviderId(settings)) {
+    case 'gmail':
+      return gmailCalendarProvider
     case 'zoho':
-      return zohoCalendarProvider
     default:
       return zohoCalendarProvider
   }

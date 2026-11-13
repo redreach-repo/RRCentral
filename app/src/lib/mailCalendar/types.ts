@@ -24,8 +24,7 @@ export const MAIL_CALENDAR_PROVIDER_OPTIONS: readonly ProviderOption[] = [
   {
     id: 'gmail',
     label: 'Gmail',
-    available: false,
-    unavailableReason: 'OAuth not wired yet (Phase A send+calendar approved in COMPLIANCE_NOTES)',
+    available: true,
   },
   {
     id: 'm365',

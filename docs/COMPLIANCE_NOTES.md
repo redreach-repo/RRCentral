@@ -10,7 +10,7 @@ Findings from official sources go here **before** shipping tax, payroll, e-sign,
 | UAE VAT rates / return layout | not started | — | — | Partial product VAT today; verify before M7 return |
 | UAE corporate tax | not started | — | — | M7+ |
 | UAE e-invoicing timeline / format | not started | — | — | Design invoice model for accredited provider |
-| Google restricted Gmail scopes assessment | **concluded** | See § Gmail below | 13 Nov 2026 | Phased plan: Phase A send-only (`gmail.send` + Calendar, sensitive); Phase B inbox (`gmail.readonly`, restricted + CASA if server-stored). **No Gmail OAuth code until Phase A implementation slice.** |
+| Google restricted Gmail scopes assessment | **concluded** | See § Gmail below | 13 Nov 2026 | Phase A **implemented** (`gmail.send` + `calendar.events` via `gmail-calendar` Edge Function). Phase B inbox (`gmail.readonly`) still blocked until restricted verification + CASA plan. |
 | Data residency (UAE hosting options) | not started | — | — | Decide before first external customer / M13 |
 
 Do not rely on model memory for legal or tax rules.
@@ -45,12 +45,11 @@ Workspace policy lists CRM / productivity enhancers as an **approved** Gmail sco
 
 ### Decision (binding for M4)
 
-1. **Phase A (next implementation slice after this note):** Gmail **send** + Google Calendar follow-up/meeting sync using **sensitive** scopes only (`gmail.send` + `calendar.events` / narrow calendar scopes). Requires Google Cloud OAuth client, consent screen, and sensitive-scope verification (or Testing / Internal exception while prototyping). **Do not** request `gmail.readonly` in Phase A.
+1. **Phase A (shipped in M4 slice 5):** Gmail **send** + Google Calendar via `gmail-calendar` Edge Function and `gmail_connection`. Scopes: `gmail.send` + `calendar.events` only. Production still needs Google sensitive-scope verification (or Testing / Internal while prototyping). **Do not** request `gmail.readonly` in Phase A.
 2. **Phase B (later):** Inbox / Sent matching via `gmail.readonly` only after restricted-scope verification **and** a plan for CASA if any restricted Gmail data is stored or proxied through our backend. Until then keep inbox on Zoho (or omit).
 3. **Least privilege:** Never request `https://mail.google.com/` or `gmail.modify` unless a documented need appears; prefer `gmail.send` over `gmail.compose` for send-only.
-4. **Settings switcher:** Gmail stays **unavailable** in the UI until Phase A OAuth is wired; reason text points here, not “compliance unfinished.”
+4. **Settings switcher:** Gmail is selectable; Connect card must succeed before APIs work.
 
 ### Explicit non-claims
 
-- This note does **not** assert that RR Central is already verified, CASA-assessed, or allowed to call Gmail in production.
-- No Gmail adapter or OAuth tokens ship in the assessment-only slice.
+- This note does **not** assert that RR Central is already verified, CASA-assessed, or cleared for public consumer Gmail access beyond Testing/Internal exceptions.

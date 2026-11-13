@@ -6,46 +6,41 @@
 
 | Capability | Implementation |
 |------------|----------------|
-| Send / inbox / sent | Façade → Zoho Mail (`lib/mailCalendar` + `zoho.ts`) |
-| Calendar list / events / team meeting | Façade → Zoho Calendar |
-| CRM follow-up sync | Façade → `CalendarProvider.syncFollowUp` / `deleteEvent` (Zoho adapter) |
-| Settings provider switch | `mailCalendarProvider` setting + select (Zoho selectable; others listed disabled) |
-| Gmail compliance | **Concluded** in `COMPLIANCE_NOTES.md` — Phase A send+calendar (sensitive); Phase B inbox (restricted) |
+| Send / inbox / sent | Façade → Zoho **or** Gmail send (Phase A); Gmail inbox = Phase B |
+| Calendar list / events / team meeting / follow-up | Façade → Zoho **or** Google Calendar (`calendar.events`) |
+| Settings provider switch | `mailCalendarProvider` — Zoho + Gmail selectable |
+| Gmail OAuth | `gmail-calendar` Edge Function + `gmail_connection` (service-role only) |
 
-## Slice 1
+## Slice 1–3
 
-- Façade: `lib/mailCalendar` — `getMailProvider` / `getCalendarProvider`
-- Zoho adapters wrap existing `zoho.ts` APIs 1:1
-- Rewired: EmailComposeModal, ZohoInboxPanel, ZohoCalendarPanel, ScheduleMeetingModal
-- Docs + Google restricted Gmail scopes assessment **started** (no Gmail code)
+- Façade, Zoho adapters, follow-up via façade, Settings provider switch
 
-## Slice 2
+## Slice 4
 
-- Extended `CalendarProvider` with `syncFollowUp` / `deleteEvent` + `label`
-- CRM follow-up sync on CrmPage + FollowupsPage goes through the façade
-- Settings showed active provider label
+- Concluded Gmail scopes assessment (`COMPLIANCE_NOTES.md`) — Phase A vs B
 
-## Slice 3
+## Slice 5 (this milestone step)
 
-- Setting key `mailCalendarProvider` (default `zoho`)
-- `resolveMailCalendarProviderId` / `listMailCalendarProviderOptions`
-- Settings **Mail & calendar** card: provider `<select>` (Gmail / M365 / IMAP disabled with reasons)
-- Getters read the setting; only Zoho adapter exists — unavailable ids fall back to Zoho
+- `gmail_connection` migration + `gmail-calendar` Edge Function (Connect OAuth)
+- Client `lib/gmailCalendarApi.ts` + `gmailMailAdapter` / `gmailCalendarAdapter`
+- Settings **Gmail & Google Calendar** connect card; Gmail selectable in provider switch
+- Phase A scopes only: `gmail.send` + `calendar.events` (primary calendar)
+- Inbox/Sent on Gmail throw Phase B errors
 
-## Slice 4 (this milestone step)
+## Later
 
-- Concluded Google Gmail/Calendar scopes assessment with official sources in `COMPLIANCE_NOTES.md`
-- Binding plan: **Phase A** = `gmail.send` + Calendar (sensitive only); **Phase B** = `gmail.readonly` after restricted verification + CASA plan
-- Settings Gmail disabled reason updated (no longer “compliance unfinished”)
-- Still **no** Gmail OAuth / adapter code
+1. Gmail Phase B inbox (`gmail.readonly` + verification/CASA)
+2. M365 / IMAP
 
-## Later slices (not yet)
+## Ops
 
-1. Gmail Phase A adapter (OAuth + send + calendar) — after Cloud project / consent screen work
-2. Gmail Phase B inbox (restricted scopes)
-3. M365 / IMAP
+1. Prefer `GOOGLE_MAIL_CLIENT_ID` / `GOOGLE_MAIL_CLIENT_SECRET` (falls back to Drive’s `GOOGLE_CLIENT_*`)
+2. Add redirect URI `…/functions/v1/gmail-calendar` in Google Cloud Console
+3. `npx supabase functions deploy gmail-calendar`
+4. Apply migration `20261113160000_gmail_connection.sql`
+5. Settings → Connect Gmail → select Provider **Gmail**
 
 ## Rules
 
-- Do not break the Zoho proxy path or CRM follow-up sync
-- No Gmail restricted-scope calls until Phase B prerequisites in `COMPLIANCE_NOTES.md` are met
+- Do not break the Zoho proxy path
+- No `gmail.readonly` until Phase B prerequisites in `COMPLIANCE_NOTES.md`
