@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import Modal from '../Modal'
+import EditorSectionTabs, {
+  editorPanelStyle,
+  type EditorSection,
+} from '../EditorSectionTabs'
 import LostReasonFields from '../deals/LostReasonFields'
 import { CTRM_COMPANY_TYPES, CTRM_REGIONS, CTRM_STAGES, dealProblem } from '../../lib/ctrm'
 import type {
@@ -77,10 +81,12 @@ export default function DealFormModal({
 }: Props) {
   const [v, setV] = useState<DealFormValues | null>(null)
   const [error, setError] = useState('')
+  const [editorSection, setEditorSection] = useState<EditorSection>('basics')
 
   useEffect(() => {
     if (!open) return
     setError('')
+    setEditorSection('basics')
     setV({
       accountId: deal?.account_id ?? lockedAccountId ?? '',
       newCompany: '',
@@ -129,6 +135,12 @@ export default function DealFormModal({
           submit()
         }}
       >
+        <EditorSectionTabs
+          value={editorSection}
+          onChange={setEditorSection}
+          sections={['basics', 'terms', 'notes']}
+        />
+        <div style={editorPanelStyle(editorSection === 'basics')}>
         <div style={formGridStyle}>
           <div style={fieldStyle}>
             <label style={labelStyle} htmlFor="deal-account">
@@ -265,7 +277,9 @@ export default function DealFormModal({
             onChange={({ code, note }) => set({ lost_reason_code: code, lost_reason: note })}
           />
         ) : null}
+        </div>
 
+        <div style={editorPanelStyle(editorSection === 'terms')}>
         <div style={formGridStyle}>
           <div style={fieldStyle}>
             <label style={labelStyle} htmlFor="deal-next">
@@ -291,18 +305,6 @@ export default function DealFormModal({
               onChange={(e) => set({ next_action_date: e.target.value || null })}
             />
           </div>
-        </div>
-
-        <div style={{ ...fieldStyle, marginBottom: 12 }}>
-          <label style={labelStyle} htmlFor="deal-notes">
-            Notes
-          </label>
-          <textarea
-            id="deal-notes"
-            style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }}
-            value={v.notes}
-            onChange={(e) => set({ notes: e.target.value })}
-          />
         </div>
 
         {v.commission ? (
@@ -339,6 +341,21 @@ export default function DealFormModal({
             </div>
           </div>
         ) : null}
+        </div>
+
+        <div style={editorPanelStyle(editorSection === 'notes')}>
+        <div style={{ ...fieldStyle, marginBottom: 12 }}>
+          <label style={labelStyle} htmlFor="deal-notes">
+            Notes
+          </label>
+          <textarea
+            id="deal-notes"
+            style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }}
+            value={v.notes}
+            onChange={(e) => set({ notes: e.target.value })}
+          />
+        </div>
+        </div>
 
         {error ? <p style={{ color: colors.danger, margin: '0 0 10px', fontSize: 13 }}>{error}</p> : null}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>

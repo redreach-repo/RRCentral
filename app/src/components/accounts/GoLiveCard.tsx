@@ -200,7 +200,7 @@ export default function GoLiveCard({
                       disabled={busy}
                       onClick={() => window.confirm(`Delete "${t.title}"?`) && void run(() => deleteBuildTask(t.id), 'Could not delete the step')}
                     >
-                      <Trash2 size={12} />
+                      <Trash2 size={12} /> Remove
                     </button>
                   </span>
                 ) : null}

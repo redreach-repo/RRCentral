@@ -664,7 +664,7 @@ export default function CustomerFilesPage() {
                                   title="Remove link only"
                                   onClick={() => void removeDriveFile(item)}
                                 >
-                                  <Trash2 size={14} />
+                                  <Trash2 size={14} /> Unlink
                                 </button>
                               ) : null}
                             </div>

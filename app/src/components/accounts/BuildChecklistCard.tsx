@@ -229,7 +229,7 @@ export default function BuildChecklistCard({
                         void run(() => deleteBuildTask(t.id), 'Could not delete the task')
                       }
                     >
-                      <Trash2 size={12} />
+                      <Trash2 size={12} /> Remove
                     </button>
                   ) : null}
                 </li>
