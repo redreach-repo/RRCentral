@@ -45,6 +45,7 @@ import {
   PhoneCall,
   Wrench,
   ChevronDown,
+  Handshake,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders'
@@ -82,8 +83,8 @@ type NavGroup = {
 const NAV_SECTION_KEY = 'rrcentral_nav_section'
 
 /**
- * Section rail: pick a category on the icon strip, then only that
- * category’s links appear in the panel. Never stacks every group at once.
+ * Accordion sidebar: labeled section groups expand to show their links.
+ * Current route’s section stays open; multiple groups may be open at once.
  */
 const navGroups: NavGroup[] = [
   {
@@ -100,6 +101,8 @@ const navGroups: NavGroup[] = [
       { to: '/quick-add', label: 'Quick add', icon: PhoneCall, minRole: 'sales', section: 'Work' },
       { to: '/crm', label: 'My Day', icon: Users, section: 'Work' },
       { to: '/deals', label: 'Pipeline', icon: Briefcase, forStaff: true, section: 'Work' },
+      { to: '/sales', label: 'AI CRM stages', icon: TrendingUp, minRole: 'sales', section: 'Work' },
+      { to: '/ctrm', label: 'CTRM stages', icon: Handshake, minRole: 'sales', section: 'Work' },
       { to: '/follow-ups', label: 'Follow-ups', icon: CalendarClock, section: 'Work' },
       { to: '/quotations', label: 'Quotations', icon: FileText, section: 'Documents' },
       { to: '/invoices', label: 'Invoices', icon: Receipt, section: 'Documents' },
@@ -170,7 +173,7 @@ const navGroups: NavGroup[] = [
     items: [
       { to: '/settings', label: 'Settings', icon: Settings, minRole: 'admin' },
       {
-        to: '/settings',
+        to: '/settings#account',
         label: 'Account',
         icon: KeyRound,
         roles: ['manager', 'sales', 'staff', 'viewer'],
@@ -241,9 +244,14 @@ function isPhonePrimaryActive(pathname: string, to: string, end?: boolean): bool
   return pathname === to || pathname.startsWith(`${to}/`)
 }
 
+function navItemPath(to: string): string {
+  return to.split('#')[0] || to
+}
+
 function itemMatchesPath(pathname: string, item: NavItem): boolean {
-  if (item.end) return pathname === item.to
-  return pathname === item.to || pathname.startsWith(`${item.to}/`)
+  const base = navItemPath(item.to)
+  if (item.end) return pathname === base
+  return pathname === base || pathname.startsWith(`${base}/`)
 }
 
 function sectionForPath(pathname: string): string {
@@ -323,8 +331,17 @@ export default function Layout() {
     navigate('/follow-ups')
   }
 
-  const pageTitle =
-    titleByPath.find((t) => t.match(location.pathname))?.title || 'RED REACH Central'
+  const pageTitle = (() => {
+    if (location.pathname.startsWith('/settings')) {
+      return can(userRole, 'settings.manage') ? 'Settings' : 'Account'
+    }
+    return titleByPath.find((t) => t.match(location.pathname))?.title || 'RED REACH Central'
+  })()
+
+  const hideTopbarTitle =
+    ['/app', '/quotations', '/invoices', '/delivery-notes', '/follow-ups', '/customer-files'].includes(
+      location.pathname,
+    ) || location.pathname.startsWith('/accounts')
 
   const primaryActive = phoneNav.some((item) =>
     isPhonePrimaryActive(location.pathname, item.to, item.end),
@@ -447,9 +464,9 @@ export default function Layout() {
             <Menu size={20} />
           </button>
 
-          <div className={styles.topbarCopy}>
+          <div className={styles.topbarCopy} aria-label={pageTitle}>
             <p className={styles.topbarEyebrow}>RED REACH Central</p>
-            <h1 className={styles.title}>{pageTitle}</h1>
+            {hideTopbarTitle ? null : <h1 className={styles.title}>{pageTitle}</h1>}
           </div>
 
           <div className={styles.topbarRight}>

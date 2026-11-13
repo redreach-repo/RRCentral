@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom'
 import {
   ArrowRight,
   CalendarClock,
+  ChevronDown,
+  ChevronUp,
   FolderOpen,
   Globe,
   Shield,
@@ -74,6 +76,7 @@ export default function DashboardPage() {
   const [companyDocs, setCompanyDocs] = useState<CompanyDocument[]>([])
   const [ownedDomains, setOwnedDomains] = useState<OwnedDomain[]>([])
   const [followUpSyncNote, setFollowUpSyncNote] = useState('')
+  const [attentionOpen, setAttentionOpen] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -379,55 +382,11 @@ export default function DashboardPage() {
         <ZohoCalendarPanel crmEntries={crm} />
       </section>
 
-      <section className={dash.section} aria-label="Needs attention">
-        <div className={dash.sectionHead}>
-          <h2 className={dash.sectionTitle}>Needs attention</h2>
-        </div>
-        <div className={dash.attentionStack}>
-          <NewLeadsCard />
-          <WatchdogCard />
-          <NoNextStepCard />
-          <ModuleAlertsCard />
-          <CtrmRenewalsCard />
-          {domainAlerts.length > 0 || ownedDomains.length > 0 ? (
-            <div className={dash.surface}>
-              <h3 className={dash.surfaceTitle} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Globe size={16} /> Domain renewals
-              </h3>
-              {domainAlerts.length === 0 ? (
-                <p style={{ color: colors.muted2, fontSize: 13, margin: 0, lineHeight: 1.45 }}>
-                  {ownedDomains.length} domain{ownedDomains.length === 1 ? '' : 's'} tracked — none
-                  expiring in the next 90 days.
-                </p>
-              ) : (
-                <ul style={{ margin: 0, paddingLeft: 18, color: colors.muted, fontSize: 13, lineHeight: 1.55 }}>
-                  {domainAlerts.slice(0, 8).map((a) => (
-                    <li key={a.id} style={{ marginBottom: 6 }}>
-                      <strong style={{ color: a.severity === 'overdue' ? colors.danger : colors.text }}>
-                        {a.domainName}
-                      </strong>{' '}
-                      · {domainAlertLabel(a)}
-                      {a.registrar ? ` · ${a.registrar}` : ''}
-                      {a.autoRenew ? ' · auto-renew' : ''}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p style={{ margin: '12px 0 0', fontSize: 12 }}>
-                <Link to="/domains" style={{ color: colors.accent }}>
-                  Manage domains
-                </Link>
-              </p>
-            </div>
-          ) : null}
-        </div>
-      </section>
-
       <section className={dash.section} aria-label="Pipeline">
         <div className={dash.sectionHead}>
           <h2 className={dash.sectionTitle}>Pipeline</h2>
           <Link to="/crm" className={dash.sectionLink}>
-            Open CRM
+            Open My Day
           </Link>
         </div>
         <div className={dash.pulseRow}>
@@ -456,6 +415,63 @@ export default function DashboardPage() {
             </Link>
           ))}
         </div>
+      </section>
+
+      <section className={dash.section} aria-label="Needs attention">
+        <button
+          type="button"
+          className={dash.attentionToggle}
+          aria-expanded={attentionOpen}
+          onClick={() => setAttentionOpen((v) => !v)}
+        >
+          <span className={dash.attentionToggleCopy}>
+            <span className={dash.sectionTitle}>Needs attention</span>
+            <span className={dash.attentionHint}>
+              Leads, watchdog, next steps, modules, renewals
+            </span>
+          </span>
+          {attentionOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        </button>
+        {attentionOpen ? (
+          <div className={dash.attentionStack}>
+            <NewLeadsCard />
+            <WatchdogCard />
+            <NoNextStepCard />
+            <ModuleAlertsCard />
+            <CtrmRenewalsCard />
+            {domainAlerts.length > 0 || ownedDomains.length > 0 ? (
+              <div className={dash.surface}>
+                <h3 className={dash.surfaceTitle} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Globe size={16} /> Domain renewals
+                </h3>
+                {domainAlerts.length === 0 ? (
+                  <p style={{ color: colors.muted2, fontSize: 13, margin: 0, lineHeight: 1.45 }}>
+                    {ownedDomains.length} domain{ownedDomains.length === 1 ? '' : 's'} tracked — none
+                    expiring in the next 90 days.
+                  </p>
+                ) : (
+                  <ul style={{ margin: 0, paddingLeft: 18, color: colors.muted, fontSize: 13, lineHeight: 1.55 }}>
+                    {domainAlerts.slice(0, 8).map((a) => (
+                      <li key={a.id} style={{ marginBottom: 6 }}>
+                        <strong style={{ color: a.severity === 'overdue' ? colors.danger : colors.text }}>
+                          {a.domainName}
+                        </strong>{' '}
+                        · {domainAlertLabel(a)}
+                        {a.registrar ? ` · ${a.registrar}` : ''}
+                        {a.autoRenew ? ' · auto-renew' : ''}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p style={{ margin: '12px 0 0', fontSize: 12 }}>
+                  <Link to="/domains" style={{ color: colors.accent }}>
+                    Manage domains
+                  </Link>
+                </p>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
       <section className={dash.section} aria-label="Recent documents">

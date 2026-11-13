@@ -477,7 +477,7 @@ export default function SettingsPage() {
 
   if (!can(userRole, 'settings.manage')) {
     return (
-      <div style={pageStyle}>
+      <div style={pageStyle} id="account">
         <h1 style={pageTitleStyle}>Account</h1>
         <p style={pageSubtitleStyle}>Change the password you use to sign in.</p>
         <TwoStepCard />
@@ -1158,7 +1158,7 @@ export default function SettingsPage() {
 
       <TwoStepCard />
 
-      <div style={{ ...cardStyle, marginBottom: 20 }}>
+      <div style={{ ...cardStyle, marginBottom: 20 }} id="account">
         <h2 style={sectionTitleStyle}>My password</h2>
         <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
           Change the password you use to sign in to Central. Minimum {MIN_PASSWORD_LENGTH} characters.
