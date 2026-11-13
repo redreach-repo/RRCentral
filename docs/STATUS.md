@@ -1,20 +1,20 @@
 # RRCRM status
 
 **Last updated:** 13 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod agreement template
+**Current milestone:** Continuous backlog — M1 Zod NDA template
 
 ## Shipped this turn
 
-- Zod `parseAgreementDraftForm` + `parseAgreementApproveForm` for service agreement wording / lawyer approval
+- Zod `parseNdaDraftForm` + `parseNdaApproveForm` for NDA wording / lawyer approval
 
 ## Already on main
 
-- Continuous backlog Zod through schedule meeting · M3a demo prep · QTSP scaffold · `pipeline_deals_v`
+- Continuous backlog Zod through agreement template · M3a demo prep · QTSP scaffold · `pipeline_deals_v`
 
 ## Still open (agent queue)
 
 1. More M1 Zod  
-2. M3 dual-write / route soft-hide later  
+2. M3 dual-write / façade coverage  
 3. Demo env hooks after Alfred provisions  
 
 ## Still externally blocked
