@@ -16,6 +16,7 @@ import {
   MoreHorizontal,
   Package,
   Receipt,
+  Search,
   Timer,
   Truck,
   Users,
@@ -383,6 +384,15 @@ export default function Layout() {
                 <span>{elapsedLabel(timer.startedAt, now)}</span>
               </NavLink>
             ) : null}
+            <button
+              type="button"
+              className={styles.reminderBtn}
+              onClick={() => setCommandOpen(true)}
+              title="Jump to a page (⌘K / Ctrl+K)"
+              aria-label="Jump to a page"
+            >
+              <Search size={16} />
+            </button>
             <button
               type="button"
               className={styles.reminderBtn}
