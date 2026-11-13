@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import { ExternalLink, Link2, Paperclip, Pencil, Plus, Trash2, Truck } from 'lucide-react'
+import { Link2, Paperclip, Plus, Truck } from 'lucide-react'
+import DeliveryNoteRowActions from '../components/deliveryNotes/DeliveryNoteRowActions'
+import docsStyles from '../styles/docsList.module.css'
 import { db } from '../lib/db'
 import { DELIVERY_NOTE_STATUSES, DELIVERY_TERMS } from '../lib/config'
 import type { Attachment, DeliveryNote, Quotation } from '../lib/types'
@@ -35,26 +37,19 @@ import {
 import { errorMessage } from '../lib/errors'
 import { type DraftLineItem } from '../lib/lineItems'
 import { sortByDateDesc } from '../lib/finance'
-import { useCompactCrm } from '../hooks/useMediaQuery'
-import resp from '../styles/crmResponsive.module.css'
 import {
   buttonDangerStyle,
   buttonPrimaryStyle,
   buttonSecondaryStyle,
-  cardStyle,
   colors,
   fieldStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
-  pageSubtitleStyle,
-  pageTitleStyle,
   selectStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
   thStyle,
-  toolbarStyle,
 } from '../lib/uiStyles'
 
 interface NoteForm {
@@ -87,7 +82,6 @@ export default function DeliveryNotesPage() {
   const { showToast } = useToast()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const compact = useCompactCrm()
   const who = user?.email || ''
   const prefix = settings.deliveryNotePrefix || 'DN'
 
@@ -96,6 +90,7 @@ export default function DeliveryNotesPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState<StatusTab>('All')
+  const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [quotePick, setQuotePick] = useState('')
@@ -287,46 +282,38 @@ export default function DeliveryNotesPage() {
 
   function renderActions(note: DeliveryNote) {
     return (
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-        <button type="button" style={buttonSecondaryStyle} onClick={() => void openEdit(note)} title="Edit">
-          <Pencil size={14} />
-        </button>
-        <Link
-          to={`/document/delivery-note/${note.id}`}
-          style={{ ...buttonSecondaryStyle, textDecoration: 'none' }}
-          title="View / print PDF"
-        >
-          <ExternalLink size={14} />
-        </Link>
-        <button type="button" style={buttonDangerStyle} onClick={() => setDeleteTarget(note)} title="Delete">
-          <Trash2 size={14} />
-        </button>
-      </div>
+      <DeliveryNoteRowActions
+        note={note}
+        expanded={actionsOpenId === note.id}
+        onToggle={() => setActionsOpenId((id) => (id === note.id ? null : note.id))}
+        onEdit={(row) => void openEdit(row)}
+        onDelete={(row) => setDeleteTarget(row)}
+      />
     )
   }
 
   return (
-    <div style={pageStyle}>
-      <div style={toolbarStyle}>
+    <div className={docsStyles.page}>
+      <header className={docsStyles.hero}>
         <div>
-          <h1 style={pageTitleStyle}>Delivery notes</h1>
-          <p style={pageSubtitleStyle}>Goods receipts based on finalized quotations — quantities only</p>
+          <p className={docsStyles.kicker}>Sales documents</p>
+          <h1 className={docsStyles.title}>Delivery notes</h1>
+          <p className={docsStyles.subtitle}>
+            Goods receipts from finalized quotations. Click Actions on a row for Edit, PDF, or Delete.
+          </p>
         </div>
-        <button type="button" style={buttonPrimaryStyle} onClick={() => setCreateOpen(true)}>
+        <button type="button" className={docsStyles.newBtn} onClick={() => setCreateOpen(true)}>
           <Plus size={16} /> From quotation
         </button>
-      </div>
+      </header>
 
-      <div className={resp.toolbar} style={{ marginBottom: 16 }}>
-        <div className={resp.chipRow} style={{ marginBottom: 0, flex: 1 }}>
+      <div className={docsStyles.controls}>
+        <div className={docsStyles.tabs}>
           {(['All', 'Draft', 'Issued', 'Delivered'] as StatusTab[]).map((t) => (
             <button
               key={t}
               type="button"
-              style={{
-                ...buttonSecondaryStyle,
-                ...(tab === t ? { borderColor: colors.accent, color: colors.accent } : null),
-              }}
+              className={tab === t ? docsStyles.tabActive : docsStyles.tab}
               onClick={() => setTab(t)}
             >
               {t}
@@ -334,8 +321,7 @@ export default function DeliveryNotesPage() {
           ))}
         </div>
         <input
-          className={resp.toolbarSearch}
-          style={{ ...inputStyle, maxWidth: compact ? '100%' : 320 }}
+          className={docsStyles.search}
           placeholder="Search client / quote / DN…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -343,65 +329,55 @@ export default function DeliveryNotesPage() {
       </div>
 
       {loading ? (
-        <div style={{ ...cardStyle, color: colors.muted }}>Loading delivery notes…</div>
+        <div className={docsStyles.loading}>Loading delivery notes…</div>
       ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={<Truck size={22} />}
-          title="No delivery notes"
-          subtitle="Create a delivery note from a finalized or awarded quotation."
-          actionLabel="From quotation"
-          onAction={() => setCreateOpen(true)}
-        />
-      ) : compact ? (
-        <div className={resp.listStack}>
-          {filtered.map((note) => (
-            <article key={note.id} className={resp.card}>
-              <div className={resp.cardTop}>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div className={resp.cardTitle} style={{ cursor: 'default' }}>
-                    {note.reference_number || '—'}
-                  </div>
-                  <div className={resp.cardMeta}>
-                    {note.client || '—'}
-                    {note.quote_ref ? ` · Quote ${note.quote_ref}` : ''}
-                    {note.date ? ` · ${format(new Date(note.date), 'dd MMM yyyy')}` : ''}
-                  </div>
-                </div>
-                <StatusPill status={note.status} />
-              </div>
-              <div className={resp.cardActions}>{renderActions(note)}</div>
-            </article>
-          ))}
+        <div className={docsStyles.empty}>
+          <EmptyState
+            icon={<Truck size={22} />}
+            title="No delivery notes"
+            subtitle="Create a delivery note from a finalized or awarded quotation."
+            actionLabel="From quotation"
+            onAction={() => setCreateOpen(true)}
+          />
         </div>
       ) : (
-        <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
-          <div style={tableWrapStyle}>
-            <table style={tableStyle}>
+        <div className={docsStyles.tableShell}>
+          <div className={docsStyles.tableWrap}>
+            <table className={docsStyles.table}>
               <thead>
                 <tr>
-                  <th style={thStyle}>Reference</th>
-                  <th style={thStyle}>Client</th>
-                  <th style={thStyle}>Quotation</th>
-                  <th style={thStyle}>Date</th>
-                  <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Actions</th>
+                  <th className={docsStyles.colRef}>Reference</th>
+                  <th className={docsStyles.colClient}>Client</th>
+                  <th className={docsStyles.colDivision}>Quotation</th>
+                  <th className={docsStyles.colDate}>Date</th>
+                  <th className={docsStyles.colStatus}>Status</th>
+                  <th className={docsStyles.colActions} style={{ textAlign: 'right' }}>
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((note) => (
-                  <tr key={note.id}>
-                    <td style={tdStyle}>
-                      <strong>{note.reference_number || '—'}</strong>
+                  <tr
+                    key={note.id}
+                    className={actionsOpenId === note.id ? docsStyles.rowExpanded : undefined}
+                  >
+                    <td className={docsStyles.colRef}>
+                      <div className={docsStyles.ref}>{note.reference_number || '—'}</div>
                     </td>
-                    <td style={tdStyle}>{note.client || '—'}</td>
-                    <td style={tdStyle}>{note.quote_ref || '—'}</td>
-                    <td style={tdStyle}>
+                    <td className={`${docsStyles.colClient} ${docsStyles.clientCell}`}>
+                      {note.client || '—'}
+                    </td>
+                    <td className={docsStyles.colDivision}>{note.quote_ref || '—'}</td>
+                    <td className={docsStyles.colDate}>
                       {note.date ? format(new Date(note.date), 'dd MMM yyyy') : '—'}
                     </td>
-                    <td style={tdStyle}>
+                    <td className={docsStyles.colStatus}>
                       <StatusPill status={note.status} />
                     </td>
-                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{renderActions(note)}</td>
+                    <td className={`${docsStyles.colActions} ${docsStyles.actionsCell}`}>
+                      {renderActions(note)}
+                    </td>
                   </tr>
                 ))}
               </tbody>

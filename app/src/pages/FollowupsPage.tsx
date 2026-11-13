@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { addDays, differenceInCalendarDays, format, parseISO, startOfDay } from 'date-fns'
-import { Bell, CalendarClock, Mail, MessageSquarePlus, MessageCircle, Phone, Settings } from 'lucide-react'
+import { Bell, CalendarClock, Settings } from 'lucide-react'
+import FollowUpCardActions from '../components/followups/FollowUpCardActions'
 import { useCompactCrm } from '../hooks/useMediaQuery'
 import resp from '../styles/crmResponsive.module.css'
 import { db } from '../lib/db'
@@ -76,6 +77,7 @@ export default function FollowupsPage() {
   const [updateNextAction, setUpdateNextAction] = useState('')
   const [updateClearDate, setUpdateClearDate] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
   const [emailTarget, setEmailTarget] = useState<CrmEntry | null>(null)
   const [calendarSettingsOpen, setCalendarSettingsOpen] = useState(false)
 
@@ -358,18 +360,6 @@ export default function FollowupsPage() {
         ? `${p?.name || '—'} +${contacts.length - 1}`
         : p?.name || entry.primary_contact || '—'
 
-    const actionStyle = compact
-      ? {
-          ...buttonSecondaryStyle,
-          minHeight: 40,
-          padding: '8px 10px',
-          fontSize: 12,
-          fontWeight: 650,
-          flex: '1 1 auto',
-          justifyContent: 'center' as const,
-        }
-      : buttonSecondaryStyle
-
     const openUpdate = () => {
       setUpdateTarget(entry)
       setUpdateText('')
@@ -378,6 +368,20 @@ export default function FollowupsPage() {
       setUpdateNextAction(entry.next_action || '')
       setUpdateClearDate(false)
     }
+
+    const actions = (
+      <FollowUpCardActions
+        entry={entry}
+        expanded={actionsOpenId === entry.id}
+        onToggle={() => setActionsOpenId((id) => (id === entry.id ? null : entry.id))}
+        busy={busy}
+        onSnooze={(row) => void snooze(row)}
+        onClear={(row) => void clearFollowUp(row)}
+        onEmail={(row) => setEmailTarget(row)}
+        onWhatsApp={(row) => void openFollowUpWhatsApp(row)}
+        onUpdate={() => openUpdate()}
+      />
+    )
 
     if (compact) {
       return (
@@ -398,6 +402,7 @@ export default function FollowupsPage() {
               <div className={resp.cardMeta}>
                 {contactLabel} · {entry.next_action || 'No action'}
                 {entry.owner ? ` · ${entry.owner}` : ''}
+                {phone ? ` · ${phone}` : ''}
               </div>
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -411,30 +416,7 @@ export default function FollowupsPage() {
               </div>
             </div>
           </div>
-          <div className={resp.cardActions}>
-            <button type="button" style={actionStyle} disabled={busy} onClick={openUpdate}>
-              <MessageSquarePlus size={14} /> Log
-            </button>
-            {phone ? (
-              <a
-                href={`tel:${phone.replace(/\s+/g, '')}`}
-                style={{ ...actionStyle, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
-              >
-                <Phone size={14} /> Call
-              </a>
-            ) : null}
-            <button
-              type="button"
-              style={actionStyle}
-              disabled={busy}
-              onClick={() => void openFollowUpWhatsApp(entry)}
-            >
-              <MessageCircle size={14} /> WhatsApp
-            </button>
-            <button type="button" style={actionStyle} disabled={busy} onClick={() => void snooze(entry)}>
-              +7d
-            </button>
-          </div>
+          <div className={resp.cardActions}>{actions}</div>
         </article>
       )
     }
@@ -476,33 +458,7 @@ export default function FollowupsPage() {
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button type="button" style={buttonSecondaryStyle} disabled={busy} onClick={() => void snooze(entry)}>
-            Snooze +7d
-          </button>
-          <button type="button" style={buttonSecondaryStyle} disabled={busy} onClick={() => void clearFollowUp(entry)}>
-            Clear
-          </button>
-          <button
-            type="button"
-            style={buttonSecondaryStyle}
-            disabled={busy}
-            onClick={() => setEmailTarget(entry)}
-          >
-            <Mail size={14} /> Email
-          </button>
-          <button
-            type="button"
-            style={buttonSecondaryStyle}
-            disabled={busy}
-            onClick={() => void openFollowUpWhatsApp(entry)}
-          >
-            <MessageCircle size={14} /> WhatsApp
-          </button>
-          <button type="button" style={buttonSecondaryStyle} disabled={busy} onClick={openUpdate}>
-            <MessageSquarePlus size={14} /> Add Update
-          </button>
-        </div>
+        {actions}
       </div>
     )
   }
