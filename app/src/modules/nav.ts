@@ -119,6 +119,8 @@ export const APP_MODULES: ModuleManifest[] = [
     id: 'finance',
     label: 'Finance',
     icon: Banknote,
+    /** Soft-hide via app_settings.moduleFlags JSON, e.g. {"finance":false}. */
+    flag: 'finance',
     items: [
       { to: '/payments', label: 'Payments', icon: Banknote },
       { to: '/expenses', label: 'Expenses', icon: Wallet },
