@@ -4,6 +4,7 @@ import { Search } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { commandPaletteItems, filterCommandPaletteItems } from '../lib/commandPalette'
+import { trapTabKey } from '../lib/focusTrap'
 import styles from './CommandPalette.module.css'
 
 type Props = {
@@ -18,17 +19,33 @@ export default function CommandPalette({ open, onClose }: Props) {
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const previouslyFocused = useRef<HTMLElement | null>(null)
 
   const all = useMemo(() => commandPaletteItems(userRole, settings), [userRole, settings])
   const items = useMemo(() => filterCommandPaletteItems(all, query), [all, query])
 
   useEffect(() => {
     if (!open) return
+    previouslyFocused.current = document.activeElement as HTMLElement | null
     setQuery('')
     setActive(0)
     const t = window.setTimeout(() => inputRef.current?.focus(), 20)
-    return () => window.clearTimeout(t)
-  }, [open])
+    const onDocKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+        return
+      }
+      if (panelRef.current) trapTabKey(e, panelRef.current)
+    }
+    document.addEventListener('keydown', onDocKey)
+    return () => {
+      window.clearTimeout(t)
+      document.removeEventListener('keydown', onDocKey)
+      previouslyFocused.current?.focus?.()
+    }
+  }, [open, onClose])
 
   useEffect(() => {
     setActive(0)
@@ -42,11 +59,6 @@ export default function CommandPalette({ open, onClose }: Props) {
   }
 
   function onKeyDown(e: KeyboardEvent) {
-    if (e.key === 'Escape') {
-      e.preventDefault()
-      onClose()
-      return
-    }
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       setActive((i) => Math.min(i + 1, Math.max(items.length - 1, 0)))
@@ -67,6 +79,7 @@ export default function CommandPalette({ open, onClose }: Props) {
   return (
     <div className={styles.overlay} role="presentation" onMouseDown={onClose}>
       <div
+        ref={panelRef}
         className={styles.panel}
         role="dialog"
         aria-modal="true"
@@ -84,6 +97,7 @@ export default function CommandPalette({ open, onClose }: Props) {
             placeholder="Jump to a page…"
             aria-autocomplete="list"
             aria-controls="rr-command-list"
+            aria-activedescendant={items[active] ? `rr-command-opt-${active}` : undefined}
           />
           <kbd className={styles.kbd}>esc</kbd>
         </div>
@@ -94,6 +108,7 @@ export default function CommandPalette({ open, onClose }: Props) {
             items.map((item, i) => (
               <li key={`${item.group}-${item.to}`}>
                 <button
+                  id={`rr-command-opt-${i}`}
                   type="button"
                   role="option"
                   aria-selected={i === active}

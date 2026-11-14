@@ -78,3 +78,6 @@ verify_jwt = false
 
 [functions.stripe-invoice-webhook]
 verify_jwt = false
+
+[functions.event-outbox]
+verify_jwt = false

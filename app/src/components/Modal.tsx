@@ -1,8 +1,9 @@
-import { useEffect, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { colors } from '../lib/uiStyles'
 import { useCompactCrm } from '../hooks/useMediaQuery'
+import { focusFirst, trapTabKey } from '../lib/focusTrap'
 
 interface ModalProps {
   open: boolean
@@ -75,18 +76,33 @@ const closeBtnStyle: CSSProperties = {
 
 export default function Modal({ open, title, onClose, children, width = 520 }: ModalProps) {
   const compact = useCompactCrm()
+  const titleId = useId()
+  const panelRef = useRef<HTMLDivElement>(null)
+  const previouslyFocused = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     if (!open) return
+    previouslyFocused.current = document.activeElement as HTMLElement | null
+    const panel = panelRef.current
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+        return
+      }
+      if (panel) trapTabKey(e, panel)
     }
     document.addEventListener('keydown', onKey)
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+    const t = window.setTimeout(() => {
+      if (panel) focusFirst(panel)
+    }, 20)
     return () => {
+      window.clearTimeout(t)
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = prev
+      previouslyFocused.current?.focus?.()
     }
   }, [open, onClose])
 
@@ -122,8 +138,12 @@ export default function Modal({ open, title, onClose, children, width = 520 }: M
           from { opacity: 0; transform: translateY(12px) scale(0.98); }
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
+        @media (prefers-reduced-motion: reduce) {
+          * { animation: none !important; }
+        }
       `}</style>
       <div
+        ref={panelRef}
         style={{
           ...cardStyle,
           maxWidth,
@@ -133,10 +153,13 @@ export default function Modal({ open, title, onClose, children, width = 520 }: M
         }}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-labelledby={titleId}
+        tabIndex={-1}
       >
         <div style={headerStyle}>
-          <h2 style={titleStyle}>{title}</h2>
+          <h2 id={titleId} style={titleStyle}>
+            {title}
+          </h2>
           <button type="button" style={closeBtnStyle} onClick={onClose} aria-label="Close">
             <X size={18} />
           </button>

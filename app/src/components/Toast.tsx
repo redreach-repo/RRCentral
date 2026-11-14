@@ -50,11 +50,14 @@ export default function Toast({ message, type, onClose }: ToastProps) {
   }
 
   return (
-    <div style={style} role="status">
+    <div style={style} role={type === 'error' ? 'alert' : 'status'}>
       <style>{`
         @keyframes rrToastIn {
           from { opacity: 0; transform: translateX(12px); }
           to { opacity: 1; transform: translateX(0); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          * { animation: none !important; }
         }
       `}</style>
       <Icon size={18} style={{ color: t.color, flexShrink: 0, marginTop: 1 }} />
