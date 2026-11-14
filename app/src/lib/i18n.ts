@@ -279,6 +279,17 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.buildTemplates.subtitle':
       'A ready build checklist and starter configuration for each package. On a client, Start from template copies the checklist into their build and the starter configuration into their requirements. Changes here apply to the next client, not to builds already started.',
     'page.buildTemplates.new': 'New template',
+    'page.ndaTemplate.title': 'NDA template',
+    'page.ndaTemplate.subtitle':
+      'Lawyer-approved wording for NDAs sent from the CRM contracts vault. Clients capture assent via a private link (electronic signing record — not a UAE Qualified E-Signature). The signed PDF is filed to Google Drive when Drive is connected.',
+    'page.clauseLibrary.title': 'Clause library',
+    'page.clauseLibrary.subtitle':
+      'Reusable contract / NDA wording blocks for M5. Compose into templates later. This is a wording library — not a UAE Qualified E-Signature.',
+    'page.obligations.title': 'Obligations board',
+    'page.obligations.subtitleLead':
+      'Track follow-through from NDAs and agreements (return materials, renewals, survivor duties). Not a UAE Qualified E-Signature. Clause wording lives in the',
+    'page.obligations.clauseLibrary': 'clause library',
+    'page.obligations.subtitleTrail': '.',
     'page.ops.kicker': 'Operations',
     'page.catalog.title': 'Catalog',
     'page.catalog.subtitle': 'Brand catalogues and products across divisions',
@@ -572,6 +583,17 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.buildTemplates.subtitle':
       'قائمة تحقق جاهزة وإعداد أولي لكل باقة. على العميل، ابدأ من قالب ينسخ القائمة إلى بنائه والإعداد إلى متطلباته. التغييرات هنا تنطبق على العميل التالي لا على البناءات التي بدأت.',
     'page.buildTemplates.new': 'قالب جديد',
+    'page.ndaTemplate.title': 'قالب اتفاقية عدم الإفصاح',
+    'page.ndaTemplate.subtitle':
+      'صياغة معتمدة من المحامي لاتفاقيات عدم الإفصاح من خزنة عقود CRM. يوافق العملاء عبر رابط خاص (سجل توقيع إلكتروني — ليس توقيعاً مؤهلاً إماراتياً). يُحفظ PDF الموقّع في Google Drive عند الاتصال.',
+    'page.clauseLibrary.title': 'مكتبة البنود',
+    'page.clauseLibrary.subtitle':
+      'كتل صياغة قابلة لإعادة الاستخدام للعقود واتفاقيات عدم الإفصاح لـ M5. تُركَّب في القوالب لاحقاً. هذه مكتبة صياغة — ليست توقيعاً مؤهلاً إماراتياً.',
+    'page.obligations.title': 'لوحة الالتزامات',
+    'page.obligations.subtitleLead':
+      'تتبّع المتابعة من اتفاقيات عدم الإفصاح والعقود (إعادة المواد والتجديدات والواجبات الباقية). ليست توقيعاً مؤهلاً إماراتياً. صياغة البنود في',
+    'page.obligations.clauseLibrary': 'مكتبة البنود',
+    'page.obligations.subtitleTrail': '.',
     'page.ops.kicker': 'العمليات',
     'page.catalog.title': 'الكتالوج',
     'page.catalog.subtitle': 'كتالوجات العلامات والمنتجات عبر الأقسام',

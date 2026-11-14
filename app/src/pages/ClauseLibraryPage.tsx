@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { errorMessage } from '../lib/errors'
 import {
@@ -35,6 +36,7 @@ const emptyForm = {
 }
 
 export default function ClauseLibraryPage() {
+  const { t } = useI18n()
   const { userRole, user } = useAuth()
   const { showToast } = useToast()
   const canEdit = can(userRole, 'delivery.packages')
@@ -118,11 +120,8 @@ export default function ClauseLibraryPage() {
 
   return (
     <div style={pageStyle}>
-      <h1 style={pageTitleStyle}>Clause library</h1>
-      <p style={pageSubtitleStyle}>
-        Reusable contract / NDA wording blocks for M5. Compose into templates later. This is a wording library —
-        not a UAE Qualified E-Signature.
-      </p>
+      <h1 style={pageTitleStyle}>{t('page.clauseLibrary.title')}</h1>
+      <p style={pageSubtitleStyle}>{t('page.clauseLibrary.subtitle')}</p>
 
       {missingTable ? (
         <p style={{ color: colors.muted, fontSize: 13 }}>

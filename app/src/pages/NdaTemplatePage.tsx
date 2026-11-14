@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { Link } from 'react-router-dom'
 import { CheckCircle2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatClauseForTemplate, insertTextAtCursor } from '../lib/clauseCompose'
@@ -48,6 +49,7 @@ const card: CSSProperties = {
 }
 
 export default function NdaTemplatePage() {
+  const { t } = useI18n()
   const { userRole, user } = useAuth()
   const { settings } = useSettings()
   const { showToast } = useToast()
@@ -140,12 +142,8 @@ export default function NdaTemplatePage() {
   return (
     <div style={pageStyle}>
       <div>
-        <h1 style={pageTitleStyle}>NDA template</h1>
-        <p style={pageSubtitleStyle}>
-          Lawyer-approved wording for NDAs sent from the CRM contracts vault. Clients capture assent via a private
-          link (electronic signing record — not a UAE Qualified E-Signature). The signed PDF is filed to Google Drive
-          when Drive is connected.
-        </p>
+        <h1 style={pageTitleStyle}>{t('page.ndaTemplate.title')}</h1>
+        <p style={pageSubtitleStyle}>{t('page.ndaTemplate.subtitle')}</p>
       </div>
 
       {missingTable ? (
