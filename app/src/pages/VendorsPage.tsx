@@ -5,6 +5,7 @@ import VendorRowActions from '../components/vendors/VendorRowActions'
 import { db } from '../lib/db'
 import type { Attachment, Expense, Vendor } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { canEditField, canViewField } from '../lib/fieldPermissions'
 import { parseVendorForm } from '../lib/schemas/vendor'
@@ -72,6 +73,7 @@ function isHttpUrl(url: string): boolean {
 }
 
 export default function VendorsPage() {
+  const { t } = useI18n()
   const { user, appUserId, userRole } = useAuth()
   const { showToast } = useToast()
   const showTrn = canViewField(userRole, 'vendor.trn')
@@ -270,12 +272,9 @@ export default function VendorsPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Finance</p>
-          <h1 className={docsStyles.title}>Vendors</h1>
-          <p className={docsStyles.subtitle}>
-            Register suppliers you buy from. Pick them when saving a supplier invoice — no vendor
-            number needed.
-          </p>
+          <p className={docsStyles.kicker}>{t('page.finance.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.vendors.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.vendors.subtitle')}</p>
         </div>
         <button
           type="button"
@@ -283,7 +282,7 @@ export default function VendorsPage() {
           onClick={openCreate}
           disabled={missingTable}
         >
-          <Plus size={16} /> Register vendor
+          <Plus size={16} /> {t('page.vendors.new')}
         </button>
       </header>
 

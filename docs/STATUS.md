@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — delivery module flag
+**Current milestone:** Continuous backlog — clients page body EN+AR
 
 ## Shipped this turn
 
-- Settings → Module flags can soft-hide **Delivery** as well as Operations and Finance
+- Page-body EN+AR catalogs for **Accounts**, **Support**, **Follow-ups**, and **Vendors** list heroes
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs · Cmd+K · module flags ops/finance · EN+AR · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome · pipeline density
+- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR docs/finance · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome · pipeline density
 
 ## Still open (agent queue)
 
