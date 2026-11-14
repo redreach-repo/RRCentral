@@ -38,7 +38,7 @@ describe('findReplaceableBulkLinks', () => {
         related_ref: 'Q-01-26001',
         title: 'Quotation Q-01-26001',
         file_name: 'Quote-Q-01-26001.html',
-        notes: 'Bulk filed from RR Central · doc_id=abc',
+        notes: 'Bulk filed from HighMast · doc_id=abc',
       }),
     ]
     expect(findReplaceableBulkLinks(docs, { category: 'quotation', relatedRef: 'Q-01-26001', docId: 'abc' })).toHaveLength(1)

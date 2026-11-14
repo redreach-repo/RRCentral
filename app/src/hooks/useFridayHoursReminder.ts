@@ -8,6 +8,7 @@ import {
   shouldSendFridayReminder,
   weekStartKey,
 } from '../lib/timeTracking'
+import { PRODUCT } from '../lib/product'
 
 const CHECK_MS = 30 * 60 * 1000
 
@@ -33,7 +34,7 @@ export function useFridayHoursReminder(enabled: boolean, permission: string) {
         if (!alive) return
         const missing = clientsWithoutHoursThisWeek({ accounts, contracts, entries, today: now })
         const message = fridayReminderMessage(missing.map((a) => a.name))
-        if (message) new Notification('RED REACH Central: hours this week', { body: message, tag: 'rr-friday-hours' })
+        if (message) new Notification(`${PRODUCT.name}: hours this week`, { body: message, tag: 'rr-friday-hours' })
         markFridayReminderSent(now)
       } catch {
         // Best effort; the dashboard shows the list too.

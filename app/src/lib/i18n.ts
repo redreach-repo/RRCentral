@@ -247,7 +247,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.ctrmDetail.new': 'New deal',
     'page.customerFiles.title': 'Google Drive',
     'page.customerFiles.subtitle':
-      'Every customer document lives in Google Drive. RR Central keeps the folder links — quotes, invoices, delivery notes, communications, purchasing, and signed copies.',
+      'Every customer document lives in Google Drive. HighMast keeps the folder links — quotes, invoices, delivery notes, communications, purchasing, and signed copies.',
     'page.customerFiles.openDrive': 'Open in Drive',
     'page.login.title': 'HighMast',
     'page.login.endorsement': 'by Red Reach',
@@ -792,7 +792,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.agreementTemplate.wordingHint':
       'A line starting with # is the title, ## a heading and - a bullet point. A line that says [signatures] adds the signature boxes. Words in double curly brackets are filled in from the contract.',
     'page.agreementTemplate.unknownPlaceholders':
-      'RR Central does not know {list}. Pick from the list below so it can be filled in.',
+      'HighMast does not know {list}. Pick from the list below so it can be filled in.',
     'page.agreementTemplate.missingPlaceholders':
       'The wording leaves out {list}. Every agreement should show the usage caps and the early exit fee.',
     'page.agreementTemplate.fillable': 'Things that can be filled in',
@@ -936,7 +936,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.domains.archive': 'Archive',
     'page.appErrors.title': 'App errors',
     'page.appErrors.subtitle':
-      'Errors people hit in RR Central, grouped by message, newest first. The daily digest email lists the last day\'s. Mark one as fixed once it is dealt with.',
+      'Errors people hit in HighMast, grouped by message, newest first. The daily digest email lists the last day\'s. Mark one as fixed once it is dealt with.',
     'page.appErrors.refresh': 'Refresh',
     'page.appErrors.loading': 'Loading',
     'page.appErrors.adminsOnly': 'Admins only',
@@ -1201,7 +1201,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.ctrmDetail.new': 'صفقة جديدة',
     'page.customerFiles.title': 'Google Drive',
     'page.customerFiles.subtitle':
-      'كل مستند عميل يعيش في Google Drive. RR Central يحتفظ بروابط المجلدات — العروض والفواتير وإشعارات التسليم والمراسلات والمشتريات والنسخ الموقّعة.',
+      'كل مستند عميل يعيش في Google Drive. HighMast يحتفظ بروابط المجلدات — العروض والفواتير وإشعارات التسليم والمراسلات والمشتريات والنسخ الموقّعة.',
     'page.customerFiles.openDrive': 'فتح في Drive',
     'page.login.title': 'HighMast',
     'page.login.endorsement': 'من Red Reach',
@@ -1745,7 +1745,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.agreementTemplate.wordingHint':
       'سطر يبدأ بـ # عنوان، و## عنوان فرعي، و- نقطة تعداد. سطر يقول [signatures] يضيف مربعات التوقيع. الكلمات بين أقواس مزدوجة تُملأ من العقد.',
     'page.agreementTemplate.unknownPlaceholders':
-      'RR Central لا يعرف {list}. اختر من القائمة أدناه ليُملأ.',
+      'HighMast لا يعرف {list}. اختر من القائمة أدناه ليُملأ.',
     'page.agreementTemplate.missingPlaceholders':
       'الصياغة تُسقط {list}. يجب أن تُظهر كل اتفاقية حدود الاستخدام ورسوم الخروج المبكر.',
     'page.agreementTemplate.fillable': 'أشياء يمكن ملؤها',
@@ -1889,7 +1889,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.domains.archive': 'أرشفة',
     'page.appErrors.title': 'أخطاء التطبيق',
     'page.appErrors.subtitle':
-      'أخطاء يصطدم بها الناس في RR Central، مجمّعة حسب الرسالة، الأحدث أولاً. بريد الملخص اليومي يسرد يوم أمس. علّم واحداً كمحلولاً بعد معالجته.',
+      'أخطاء يصطدم بها الناس في HighMast، مجمّعة حسب الرسالة، الأحدث أولاً. بريد الملخص اليومي يسرد يوم أمس. علّم واحداً كمحلولاً بعد معالجته.',
     'page.appErrors.refresh': 'تحديث',
     'page.appErrors.loading': 'جارٍ التحميل',
     'page.appErrors.adminsOnly': 'للمسؤولين فقط',

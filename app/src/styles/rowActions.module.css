@@ -76,7 +76,7 @@
 
 .primary {
   border: none;
-  background: #e85d04;
+  background: var(--accent);
   color: #fff;
 }
 

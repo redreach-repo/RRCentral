@@ -25,7 +25,7 @@ export default function ContactPage() {
             <em>Let&apos;s talk.</em>
           </h1>
           <p className="site-lede">
-            Choose the desk. If you are not sure, send a general enquiry. It lands in Central so the right
+            Choose the desk. If you are not sure, send a general enquiry. It lands in HighMast so the right
             people can pick it up.
           </p>
         </div>

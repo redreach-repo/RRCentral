@@ -1304,8 +1304,8 @@ export default function DocumentPage() {
                 padding: '8px 12px',
                 fontWeight: 600,
                 cursor: 'pointer',
-                background: '#e85d04',
-                color: '#fff',
+                background: 'var(--primary)',
+                color: 'var(--on-primary)',
                 fontSize: 13,
               }}
             >

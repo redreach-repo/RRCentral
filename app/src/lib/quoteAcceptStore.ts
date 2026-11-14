@@ -13,6 +13,7 @@ import {
 } from './quoteAccept'
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseConfig'
 import type { Quotation } from './types'
+import { PRODUCT } from './product'
 
 const NOT_VALID = 'This link does not work any more. Ask Red Reach for a new one.'
 const LINK_COLUMNS = 'id, quotation_id, label, created_by, created_at, expires_at, revoked_at, last_opened_at, accepted_at, accepted_name'
@@ -99,7 +100,7 @@ export type AcceptResult<T> = { ok: true; data: T } | { ok: false; message: stri
 /** Calls the quote-accept function from the client's page. */
 export async function callQuoteAccept<T = AcceptView>(token: string, body: Record<string, unknown> = {}): Promise<AcceptResult<T>> {
   if (!isAcceptToken(token)) return { ok: false, message: NOT_VALID }
-  if (!isSupabaseConfigured()) return { ok: false, message: 'Accept links only work when RR Central is connected to the cloud.' }
+  if (!isSupabaseConfigured()) return { ok: false, message: `Accept links only work when ${PRODUCT.name} is connected to the cloud.` }
   const { data, error } = await getSupabaseClient().functions.invoke('quote-accept', { body: { token, ...body } })
   if (error) {
     let message = 'The page could not load. Please try again later.'

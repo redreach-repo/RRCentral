@@ -11,6 +11,7 @@ import {
   type LegalDocType,
 } from './legalDocuments'
 import type { LegalDocument, LegalSignLink, LegalSignature } from './types'
+import { PRODUCT } from './product'
 
 function check(result: { error: unknown }) {
   if (result.error) throw result.error
@@ -196,7 +197,7 @@ export async function callLegalSign(
   token: string,
   body: Record<string, unknown> = {},
 ): Promise<LegalSignViewResult> {
-  if (!isSupabaseConfigured()) return { ok: false, error: 'RR Central is not connected to Supabase.' }
+  if (!isSupabaseConfigured()) return { ok: false, error: `${PRODUCT.name} is not connected to Supabase.` }
   const { data, error } = await getSupabaseClient().functions.invoke('legal-sign', {
     body: { token, ...body },
   })

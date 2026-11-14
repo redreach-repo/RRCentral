@@ -164,7 +164,7 @@ export default function HomePage() {
               <em>Let&apos;s talk.</em>
             </h2>
             <p className="site-lede">
-              Choose the desk. If you are not sure, send a general enquiry. It lands in Central so the
+              Choose the desk. If you are not sure, send a general enquiry. It lands in HighMast so the
               right people can pick it up.
             </p>
           </div>

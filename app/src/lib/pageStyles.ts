@@ -1,17 +1,18 @@
 import type { CSSProperties } from 'react'
 
+/** Prefer design tokens; keep semantic status colours separate from brand. */
 export const colors = {
-  bg: '#0b0c0e',
-  card: 'rgba(255,255,255,0.03)',
-  border: 'rgba(255,255,255,0.08)',
-  accent: '#e85d04',
-  text: '#f4f5f7',
-  muted: 'rgba(244,245,247,0.58)',
-  muted2: 'rgba(244,245,247,0.38)',
-  danger: '#f07178',
-  success: '#3ecf8e',
-  warn: '#e6b450',
-  info: '#3b82f6',
+  bg: 'var(--bg)',
+  card: 'var(--card)',
+  border: 'var(--border)',
+  accent: 'var(--primary)',
+  text: 'var(--text)',
+  muted: 'var(--muted)',
+  muted2: 'var(--muted-2)',
+  danger: 'var(--danger)',
+  success: 'var(--success)',
+  warn: 'var(--warn)',
+  info: 'var(--info)',
 } as const
 
 export const page: CSSProperties = {
@@ -68,9 +69,9 @@ export const btn: CSSProperties = {
 
 export const btnPrimary: CSSProperties = {
   ...btn,
-  background: colors.accent,
-  borderColor: colors.accent,
-  color: '#fff',
+  background: 'var(--primary)',
+  borderColor: 'var(--primary)',
+  color: 'var(--on-primary)',
 }
 
 export const btnDanger: CSSProperties = {

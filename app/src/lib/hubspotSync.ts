@@ -7,6 +7,7 @@
 import { db } from './db'
 import { isMissingRelationError, isUndefinedColumnError } from './errors'
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseConfig'
+import { PRODUCT } from './product'
 
 export interface HubSpotSyncRun {
   id: string
@@ -70,7 +71,7 @@ export type HubSpotSyncResult = { ok: true; summary: string; message: string } |
 
 /** Run the hubspot-sync Edge Function now, as the signed in manager or admin. */
 export async function runHubSpotSync(): Promise<HubSpotSyncResult> {
-  if (!isSupabaseConfigured()) return { ok: false, message: 'HubSpot needs RR Central connected to Supabase.' }
+  if (!isSupabaseConfigured()) return { ok: false, message: `HubSpot needs ${PRODUCT.name} connected to Supabase.` }
   const { data, error } = await getSupabaseClient().functions.invoke('hubspot-sync', { body: {} })
   if (error) {
     const status = (error as { context?: { status?: number } }).context?.status

@@ -43,7 +43,9 @@ import { domainAlertLabel, domainRenewalAlerts } from '../lib/domainAlerts'
 import { syncUnansweredQuoteFollowUps } from '../lib/quoteFollowUpSync'
 import { useSettings } from '../contexts/SettingsContext'
 import { useAuth } from '../contexts/AuthContext'
+import { useTenant } from '../contexts/TenantContext'
 import { useI18n } from '../contexts/I18nContext'
+import { PRODUCT } from '../lib/product'
 import { can } from '../lib/permissions'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
@@ -66,7 +68,10 @@ import { errorMessage } from '../lib/errors'
 export default function DashboardPage() {
   const { userRole } = useAuth()
   const { settings } = useSettings()
+  const { activeCompany } = useTenant()
   const { t } = useI18n()
+  const companyLabel =
+    activeCompany?.name || settings.companyName || settings.brand || PRODUCT.name
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [quotations, setQuotations] = useState<Quotation[]>([])
@@ -292,7 +297,9 @@ export default function DashboardPage() {
   return (
     <div className={dash.page} style={pageStyle}>
       <section className={dash.hero} aria-label={t('page.dashboard.heroToday')}>
-        <p className={dash.heroEyebrow}>{weekday} · Red Reach Central</p>
+        <p className={dash.heroEyebrow}>
+          {weekday} · {companyLabel}
+        </p>
         <h1 className={dash.heroTitle}>
           {myDayCount > 0 ? t('page.dashboard.heroTitleDue') : t('page.dashboard.heroTitleClear')}
         </h1>

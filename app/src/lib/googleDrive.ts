@@ -6,6 +6,7 @@
  */
 
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseConfig'
+import { PRODUCT } from './product'
 
 export const DRIVE_STORAGE_PROVIDER = 'google_drive'
 
@@ -58,7 +59,7 @@ export function driveFolderId(url: string): string | null {
 }
 
 async function callDrive<T>(body: Record<string, unknown>): Promise<T> {
-  if (!isSupabaseConfigured()) throw new Error('Google Drive needs RR Central connected to Supabase')
+  if (!isSupabaseConfigured()) throw new Error(`Google Drive needs ${PRODUCT.name} connected to Supabase`)
   const { data, error } = await getSupabaseClient().functions.invoke('google-drive', { body })
   if (error) {
     // The function answers { error } with a 4xx/5xx; show that text, not "non-2xx".

@@ -23,6 +23,7 @@ import StatusPill from '../components/StatusPill'
 import LinkDriveFileModal, { type LinkDriveFileMode } from '../components/LinkDriveFileModal'
 import { logActivity } from '../lib/activity'
 import { errorMessage, isMissingRelationError } from '../lib/errors'
+import { PRODUCT } from '../lib/product'
 import {
   buildFolderChecklist,
   CUSTOMER_FOLDER_SECTIONS,
@@ -291,8 +292,8 @@ export default function CustomerFilesPage() {
             <Link to="/settings#google-drive" style={{ color: colors.accent }}>
               Settings → Google Drive
             </Link>
-            . Then RR Central makes a folder per client under <strong>RR Central / Customers</strong>, and
-            Save to Drive on quotes and invoices files the PDF there.
+            . Then {PRODUCT.name} makes a folder per client under <strong>RR Central / Customers</strong>, and Save to
+            Drive on quotes and invoices files the PDF there.
           </p>
         </div>
       ) : null}
@@ -344,7 +345,7 @@ export default function CustomerFilesPage() {
                       appearance: 'none',
                       border: 0,
                       borderBottom: `1px solid ${colors.border}`,
-                      background: active ? `${colors.accent}18` : 'transparent',
+                      background: active ? 'color-mix(in srgb, var(--primary) 12%, transparent)' : 'transparent',
                       color: colors.text,
                       padding: '12px 14px',
                       cursor: 'pointer',
@@ -379,7 +380,7 @@ export default function CustomerFilesPage() {
                 style={{
                   ...cardStyle,
                   background: 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(232,93,4,0.12) 100%)',
-                  borderColor: `${colors.accent}55`,
+                  borderColor: 'color-mix(in srgb, var(--primary) 40%, transparent)',
                 }}
               >
                 <div

@@ -2,7 +2,7 @@
   display: flex;
   min-height: 100vh;
   min-height: 100dvh;
-  background: var(--bg, #0b0c0e);
+  background: var(--bg);
   color: var(--text, #f4f5f7);
   position: relative;
   isolation: isolate;
@@ -31,7 +31,7 @@
   font-weight: 600;
   letter-spacing: 0.02em;
   color: #3b2108;
-  background: linear-gradient(90deg, #f6b26b, #e85d04 50%, #f6b26b);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 55%, white), var(--accent) 50%, color-mix(in srgb, var(--accent) 55%, white));
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
 }
 
@@ -186,7 +186,7 @@
   border-color: var(--border-strong, rgba(255, 255, 255, 0.12));
   background: rgba(255, 255, 255, 0.06);
   color: var(--text, #f4f5f7);
-  box-shadow: inset 2px 0 0 var(--accent, #e85d04);
+  box-shadow: inset 2px 0 0 var(--primary);
 }
 
 .sideGroup {
@@ -301,8 +301,8 @@
   min-width: 20px;
   padding: 1px 6px;
   border-radius: 999px;
-  background: #e85d04;
-  color: #fff;
+  background: var(--primary);
+  color: var(--on-primary);
   font-size: 11px;
   font-weight: 700;
   text-align: center;
@@ -314,7 +314,7 @@
   color: var(--text, #f4f5f7);
   border-color: transparent;
   font-weight: 600;
-  box-shadow: inset 2px 0 0 var(--accent, #e85d04);
+  box-shadow: inset 2px 0 0 var(--primary);
 }
 
 .main {
@@ -489,8 +489,8 @@
   min-width: 18px;
   padding: 0 5px;
   border-radius: 999px;
-  background: #e85d04;
-  color: #fff;
+  background: var(--primary);
+  color: var(--on-primary);
   font-size: 10.5px;
   font-weight: 700;
   line-height: 18px;
@@ -578,8 +578,8 @@
   min-width: 16px;
   padding: 0 4px;
   border-radius: 999px;
-  background: #e85d04;
-  color: #fff;
+  background: var(--primary);
+  color: var(--on-primary);
   font-size: 10px;
   font-weight: 700;
   line-height: 16px;

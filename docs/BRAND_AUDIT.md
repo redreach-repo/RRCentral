@@ -16,13 +16,14 @@
 
 ## Product name hardcodes (user-facing)
 
-Still say **RR Central** / **RED REACH Central** in chrome or copy (non-exhaustive; grep `RR Central`):
+**Sweep (14 Nov 2026):** Settings Drive/HubSpot cards, toast/error stores, browser notifications, Dashboard hero (company label), Products/WorshipHub chrome, Customer Files / Delivery Panel copy, marketing site CRM links, and key i18n EN+AR strings now use `PRODUCT.name` / HighMast.
 
-- Shell: `Layout.tsx` topbar eyebrow, `RouteAnnouncer.tsx` title fallback
-- Guide / i18n bodies: many `page.*` and `guide.*` strings in `i18n.ts`
-- Settings cards, Drive, HubSpot, digest docs, ProtectedRoute (partially fixed)
-- Ops copy: Dashboard, CustomerFiles, Products (WorshipHub), ModuleAlerts, DeliveryPanel
-- Edge-facing pure modules that surface the name in emails/toasts
+**Still may say RR Central (intentional or deferred):**
+
+- Drive folder path **`RR Central / Customers`** (live Drive tree; rename later)
+- Code comments / JSDoc / type docs
+- Edge Function error strings that still say RR Central (repo/function names stay)
+- Some guide pack prose and deep ops docs
 
 **Rule for this rebrand:** HighMast surfaces (sign-in, PWA fallback name, sidebar footer, About, system emails) → `PRODUCT`. Tenant Red Reach keeps “Red Reach” in company docs and tenant kit.
 
@@ -39,15 +40,15 @@ Still say **RR Central** / **RED REACH Central** in chrome or copy (non-exhausti
 
 ## Hardcoded colours
 
-| Location | Examples |
-|----------|----------|
-| `app/src/index.css` `:root` | `--bg #0b0c0e`, `--accent #e85d04` (old orange), not HighMast tokens |
-| `app/src/lib/uiStyles.ts` `colors` | Raw hex `#e85d04`, `#0b0c0e`, … |
-| `LoginPage.module.css` | `#c8321a` / `#e8872a` literals after PRODUCT PR |
-| Module CSS | Dashboard, Document, Layout, CommandPalette, docsList, … |
-| Inline styles | Settings, gates, many pages |
+| Location | Status |
+|----------|--------|
+| `app/src/styles/tokens.css` | Source of truth (hex OK here only) |
+| `uiStyles` / `pageStyles` | Token vars |
+| Layout / Dashboard / CRM responsive chrome | Old `#e85d04` → tokens; badges `--primary` |
+| Document letterhead / client report print CSS | May still hold print-specific oranges — review with PDF pass |
+| Login / gates | Prefer `--primary` / `--on-primary` |
 
-Target: CSS variables from §5 design tokens (light/dark). Components read `var(--primary)` etc. Semantic status colours stay separate.
+Target remains: components read tokens only. Semantic status colours stay separate.
 
 ## Fonts
 
@@ -57,14 +58,13 @@ Target: CSS variables from §5 design tokens (light/dark). Components read `var(
 
 ## Modes
 
-No light/dark/automatic preference yet. App is dark-only. Spec: light, dark, system; persist per user; apply before first paint.
+Light / dark / system via `themeMode` + `ThemeProvider`; applied before paint. Contrast unit tests exist (`tokenContrast.test.ts`).
 
 ## Accessibility gaps
 
-- No automated contrast test on token pairs
-- No axe (or similar) on sign-in / Home / list / form / PDF
+- Broader axe suite still open (sign-in / Home / list / form / PDF, both modes)
 - Pipeline stage colours may rely on hue alone
-- Focus rings not consistently tokenised (`--focus-ring`)
+- Focus rings: improve coverage beyond login/shell
 
 ## Out of scope this step (per prompt)
 

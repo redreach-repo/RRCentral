@@ -7,6 +7,7 @@ import { useDriveStatus } from '../hooks/useDriveStatus'
 import { errorMessage } from '../lib/errors'
 import { fileQuotesAndInvoicesToDrive, type FileDocsSummary } from '../lib/fileDocsToDrive'
 import { disconnectDrive, startDriveConnect } from '../lib/googleDrive'
+import { PRODUCT } from '../lib/product'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../lib/uiStyles'
 
 const linkBtn = { ...buttonSecondaryStyle, display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }
@@ -51,7 +52,7 @@ export default function GoogleDriveCard() {
   }
 
   async function disconnect() {
-    if (!window.confirm('Disconnect Google Drive? Files and folders stay in Google Drive; RR Central stops adding to them.')) return
+    if (!window.confirm(`Disconnect Google Drive? Files and folders stay in Google Drive; ${PRODUCT.name} stops adding to them.`)) return
     setBusy(true)
     try {
       await disconnectDrive()
@@ -98,13 +99,15 @@ export default function GoogleDriveCard() {
     <div style={{ ...cardStyle, marginBottom: 20 }}>
       <h2 style={sectionTitleStyle}>{t('page.settings.section.googleDrive')}</h2>
       <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
-        All documents live in Google Drive; RR Central only keeps the share links. Once connected, RR Central makes a
-        folder per client under <strong>RR Central / Customers</strong>, files matched emails and portal uploads there,
-        and <strong>Save to Drive</strong> on quotes, invoices and delivery notes uploads the PDF. Company papers sit
-        under <strong>Company documents</strong>. Share the RR Central folder with your team in Drive.
+        All documents live in Google Drive; {PRODUCT.name} only keeps the share links. Once connected, {PRODUCT.name}{' '}
+        makes a folder per client under <strong>RR Central / Customers</strong>, files matched emails and portal uploads
+        there, and <strong>Save to Drive</strong> on quotes, invoices and delivery notes uploads the PDF. Company papers
+        sit under <strong>Company documents</strong>. Share the root Drive folder with your team.
       </p>
       {isLocalMode ? (
-        <p style={{ fontSize: 13, color: colors.muted }}>Google Drive needs RR Central connected to Supabase.</p>
+        <p style={{ fontSize: 13, color: colors.muted }}>
+          Google Drive needs {PRODUCT.name} connected to Supabase.
+        </p>
       ) : loading ? (
         <p style={{ fontSize: 13, color: colors.muted }}>
           <Loader2 size={14} className="spin" style={{ verticalAlign: -2 }} /> Checking Google Drive…
@@ -127,7 +130,7 @@ export default function GoogleDriveCard() {
             </span>
             {status.root_url ? (
               <a href={status.root_url} target="_blank" rel="noreferrer" style={linkBtn}>
-                <ExternalLink size={14} /> RR Central folder
+                <ExternalLink size={14} /> {PRODUCT.name} folder
               </a>
             ) : null}
             {status.customers_url ? (

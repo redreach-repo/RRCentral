@@ -4,6 +4,7 @@ import { logAccountEvent } from './accountsStore'
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseConfig'
 import { sanitiseTenants, type ChurchAction } from './worshiphub'
 import type { WorshipChurchProfile, WorshipTenant } from './types'
+import { PRODUCT } from './product'
 
 type Author = { appUserId: string | null; email: string }
 
@@ -61,7 +62,7 @@ export type LiveResult =
   | { connected: false; reason: 'local' | 'not_configured' | 'not_deployed' | 'unreachable'; message: string }
 
 const NOT_CONNECTED: Record<string, string> = {
-  local: 'This copy of RR Central runs in local mode, so it cannot reach WorshipHub.',
+  local: `This copy of ${PRODUCT.name} runs in local mode, so it cannot reach WorshipHub.`,
   not_configured: 'The WorshipHub connection is not set up yet.',
   not_deployed: 'The worshiphub-read function is not deployed yet.',
   unreachable: 'WorshipHub did not answer.',

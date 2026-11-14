@@ -3,6 +3,7 @@ import { isMissingRelationError } from './errors'
 import { pairIds, pairKey, type DuplicateKind } from './duplicates'
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseConfig'
 import type { Account, AccountContact } from './types'
+import { PRODUCT } from './product'
 
 async function rows<T>(query: PromiseLike<{ data: unknown; error: unknown }>): Promise<T[]> {
   const { data, error } = await query
@@ -33,7 +34,7 @@ export async function loadDuplicateData(): Promise<DuplicateData> {
 
 /** "Not a duplicate": hides the pair from now on. */
 export async function dismissPair(kind: DuplicateKind, a: string, b: string, by: string): Promise<void> {
-  if (!isSupabaseConfigured()) throw new Error('This works once RR Central is connected to Supabase.')
+  if (!isSupabaseConfigured()) throw new Error(`This works once ${PRODUCT.name} is connected to Supabase.`)
   const [a_id, b_id] = pairIds(a, b)
   const { error } = await db.from('duplicate_dismissals').insert({ id: crypto.randomUUID(), kind, a_id, b_id, dismissed_by: by, created_at: new Date().toISOString() })
   if (error && (error as { code?: string }).code !== '23505') throw error
@@ -43,7 +44,7 @@ export type MergeResult = { moved: Record<string, number>; left: Record<string, 
 
 /** Merges `dup` into `keep` in the database (managers and admins only). */
 export async function mergePair(kind: DuplicateKind, keep: string, dup: string): Promise<MergeResult> {
-  if (!isSupabaseConfigured()) throw new Error('Merging works once RR Central is connected to Supabase.')
+  if (!isSupabaseConfigured()) throw new Error(`Merging works once ${PRODUCT.name} is connected to Supabase.`)
   const fn = kind === 'account' ? 'rr_merge_accounts' : 'rr_merge_contacts'
   const { data, error } = await getSupabaseClient().rpc(fn, { keep, dup })
   if (error) {

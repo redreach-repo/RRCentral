@@ -6,6 +6,7 @@ import { logAccountEvent } from './accountsStore'
 import { currentContract, listContracts, listPackages } from './deliveryStore'
 import { DEFAULT_ACCOUNT_TYPE_HOURS, addWorkingHours, slaHoursFor, type WorkingCalendar } from './sla'
 import type { AccountType, SlaPolicy, Ticket, TicketChannel, TicketMessage, TicketPriority } from './types'
+import { PRODUCT } from './product'
 
 type Author = { appUserId: string | null; email: string }
 
@@ -233,7 +234,7 @@ export async function slaPackageFor(accountId: string, accountType: AccountType)
   return contract && contract.status !== 'ended' && contract.status !== 'cancelled' ? contract.package_id : null
 }
 
-export const WHATSAPP_LOCAL_MODE = 'Sending on WhatsApp works once RR Central is connected to Supabase.'
+export const WHATSAPP_LOCAL_MODE = `Sending on WhatsApp works once ${PRODUCT.name} is connected to Supabase.`
 
 /** Sends a reply on a WhatsApp ticket through the whatsapp-send function, which also logs it on the ticket. */
 export async function sendWhatsAppReply(ticketId: string, body: string): Promise<void> {
