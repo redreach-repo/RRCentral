@@ -21,8 +21,8 @@ describe('GUIDE_BILLING_SECTIONS', () => {
 })
 
 describe('GUIDE_PACKS', () => {
-  it('lists CRM, billing, then delivery', () => {
-    expect(GUIDE_PACKS.map((p) => p.id)).toEqual(['crm', 'billing', 'delivery'])
+  it('lists CRM, billing, delivery, then admin', () => {
+    expect(GUIDE_PACKS.map((p) => p.id)).toEqual(['crm', 'billing', 'delivery', 'admin'])
     expect(GUIDE_PACKS.every((p) => p.sections.length > 0)).toBe(true)
   })
 })
