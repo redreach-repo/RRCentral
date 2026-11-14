@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { visibleAccounts } from '../lib/accounts'
 import { listAccounts } from '../lib/accountsStore'
 import { summaryText, weeklySummary } from '../lib/ctrm'
@@ -13,6 +14,7 @@ import styles from './ClientReportPage.module.css'
 
 /** Weekly pipeline update for CTRM Next, to copy or print. No commission or fees. */
 export default function CtrmSummaryPage() {
+  const { t } = useI18n()
   const { userRole, appUserId } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const day = searchParams.get('week') || format(new Date(), 'yyyy-MM-dd')
@@ -60,12 +62,13 @@ export default function CtrmSummaryPage() {
     }
   }
 
-  if (loading) return <div className={styles.page}>Loading summary…</div>
+  if (loading) return <div className={styles.page}>{t('page.ctrmSummary.loading')}</div>
   if (error) {
     return (
       <div className={styles.page}>
         <div className={styles.sheet}>
-          {error} <Link to="/deals?pipeline=ctrm&view=board">Back to Pipeline</Link>
+          {error}{' '}
+          <Link to="/deals?pipeline=ctrm&view=board">{t('page.ctrmSummary.back')}</Link>
         </div>
       </div>
     )
@@ -77,10 +80,10 @@ export default function CtrmSummaryPage() {
   return (
     <div className={styles.page}>
       <div className={styles.toolbar}>
-        <Link to="/deals?pipeline=ctrm&view=board">Back to Pipeline</Link>
+        <Link to="/deals?pipeline=ctrm&view=board">{t('page.ctrmSummary.back')}</Link>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <label style={{ fontSize: 14 }}>
-            Week of{' '}
+            {t('page.ctrmSummary.weekOf')}{' '}
             <input
               type="date"
               aria-label="Any day in the week"
@@ -89,10 +92,10 @@ export default function CtrmSummaryPage() {
             />
           </label>
           <button type="button" onClick={() => void copy()}>
-            Copy as text
+            {t('page.ctrmSummary.copy')}
           </button>
           <button type="button" onClick={() => window.print()}>
-            Print or save as PDF
+            {t('page.ctrmSummary.print')}
           </button>
         </div>
       </div>
@@ -104,17 +107,19 @@ export default function CtrmSummaryPage() {
 
       {summary.byStage.every((b) => b.count === 0) ? (
         <p className={styles.toolbar} style={{ fontSize: 13 }}>
-          There are no deals yet, so this summary is empty.{' '}
-          <Link to="/ctrm">Add the first deal on the CTRM stage board.</Link>
+          {t('page.ctrmSummary.emptyLead')}{' '}
+          <Link to="/ctrm">{t('page.ctrmSummary.emptyLink')}</Link>
         </p>
       ) : null}
 
       <article className={styles.sheet}>
         <div className={styles.muted} style={{ fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-          Red Reach for CTRM Next, weekly pipeline
+          {t('page.ctrmSummary.kicker')}
         </div>
         <h1>
-          Week of {nice(summary.weekStart)} to {nice(summary.weekEnd)}
+          {t('page.ctrmSummary.weekRange')
+            .replace('{start}', nice(summary.weekStart))
+            .replace('{end}', nice(summary.weekEnd))}
         </h1>
 
         <h2>Deals by stage</h2>

@@ -15,6 +15,7 @@ import { db, currentAuthMode } from '../lib/db'
 import type { AppUser, CompanyDocument, CompanyDocumentCategory, UserRole } from '../lib/types'
 import TwoStepCard from '../components/security/TwoStepCard'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
@@ -208,6 +209,7 @@ type UserForm = {
 }
 
 export default function SettingsPage() {
+  const { t } = useI18n()
   const { user, userRole, isLocalMode, changePassword } = useAuth()
   const { settings, updateSetting, loading: settingsLoading } = useSettings()
   const { showToast } = useToast()
@@ -618,8 +620,8 @@ export default function SettingsPage() {
   if (!can(userRole, 'settings.manage')) {
     return (
       <div style={pageStyle} id="account">
-        <h1 style={pageTitleStyle}>Account</h1>
-        <p style={pageSubtitleStyle}>Change the password you use to sign in.</p>
+        <h1 style={pageTitleStyle}>{t('page.account.title')}</h1>
+        <p style={pageSubtitleStyle}>{t('page.account.subtitle')}</p>
         <TwoStepCard />
         <div style={cardStyle}>
           <h2 style={sectionTitleStyle}>My password</h2>
@@ -841,8 +843,8 @@ export default function SettingsPage() {
 
   return (
     <div style={pageStyle}>
-      <h1 style={pageTitleStyle}>Settings</h1>
-      <p style={pageSubtitleStyle}>Company details, data storage, and user access</p>
+      <h1 style={pageTitleStyle}>{t('page.settings.title')}</h1>
+      <p style={pageSubtitleStyle}>{t('page.settings.subtitle')}</p>
 
       <nav
         aria-label="Settings sections"
