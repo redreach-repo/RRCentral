@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — tenant isolation for brand kits
+**Current milestone:** Continuous backlog — EN+AR client portal chrome
 
 ## Shipped this turn
 
-- Expanded `tenant_isolation_test.sql` for **brand_kits** (read isolation + forged insert blocked)
+- Wired **ClientPortalPage** loading / section headers / progress chrome through EN+AR catalogs
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR (incl. legal e-sign + quote-accept) · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome · pipeline density · ticket + account detail + fit sheet + document viewer i18n · pipeline_stages + workflow_runs + custom_field_values + numbering_sequences isolation
+- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome · pipeline density · public accept/sign i18n · brand_kits isolation
 
 ## Still open (agent queue)
 
