@@ -1,0 +1,39 @@
+{
+  "product": "HighMast",
+  "endorsement": "by Red Reach",
+  "route": "A — H with rising mast and light",
+  "colors": {
+    "highmastRed": "#C8321A",
+    "highmastOrange": "#E8872A",
+    "charcoal": "#1A1A1A",
+    "grey": "#6E6E6E",
+    "warmGrey": "#B8B2AC",
+    "paper": "#F7F4F1"
+  },
+  "files": {
+    "symbol": "highmast-symbol.png",
+    "stacked": "highmast-stacked.png",
+    "derived": [
+      "derived/highmast-mark-512.png",
+      "derived/highmast-mark-192.png",
+      "derived/highmast-mark-180.png",
+      "derived/highmast-mark-64.png",
+      "derived/highmast-mark-32.png",
+      "derived/highmast-mark-16.png"
+    ]
+  },
+  "notes": [
+    "PNG exports supplied 14 November 2026 (symbol 59×72, stacked lockup 329×210), both with transparent backgrounds.",
+    "Not SVG yet. Prefer SVG sources with text outlined to paths (Master Spec Appendix C.1).",
+    "Derived marks are cropped and placed on a transparent square canvas for favicon / PWA use. Source resolution is low — upscales look soft.",
+    "Wordmark in stacked lockup is charcoal grey. Endorsement line 'by Red Reach' is not in these files.",
+    "Known review points from the spec: the light can make the right stroke read as an i ('Hi'); orange light is soft on white at 16 px."
+  ],
+  "missing": [
+    "SVG sources (symbol, horizontal, stacked, with and without endorsement)",
+    "Full / black / white / reverse colourways",
+    "Horizontal lockup",
+    "Favicon and app icons as designed masters (red app icon, dark app icon)",
+    "Endorsement lockups ('by Red Reach')"
+  ]
+}

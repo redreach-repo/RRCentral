@@ -1,12 +1,16 @@
 {
   "brand": "Red Reach",
+  "productBrand": {
+    "name": "HighMast",
+    "manifest": "highmast/brand.json"
+  },
   "colors": {
     "primary": "#C8321A",
     "accent": "#E8872A",
     "neutralDark": "#1A1A1A",
     "neutralLight": "#FFFFFF"
   },
-  "notes": "Colors are the stated Red Reach brand colors. Confirm exact values from the original brand files.",
+  "notes": "Colors are the stated Red Reach brand colors. Confirm exact values from the original brand files. Product brand assets live under highmast/.",
   "entities": {
     "redreach-middle-east-fze": {
       "kind": "company",
