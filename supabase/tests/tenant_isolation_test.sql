@@ -247,6 +247,15 @@ values (
   'b0000000-0000-4000-8000-000000000001'
 );
 
+insert into public.pipelines (pipeline_key, name, object_type, description, tenant_id)
+values (
+  'tenant_b_secret',
+  'Tenant B Secret Pipeline',
+  'deal',
+  'Tenant B Secret Pipeline Notes',
+  'b0000000-0000-4000-8000-000000000001'
+);
+
 insert into public.event_outbox (event_type, aggregate_type, aggregate_id, tenant_id, status)
 values (
   'finalize_quote',
@@ -363,6 +372,10 @@ select pg_temp.expect(
   'redreach admin cannot read tenant B saved_views'
 );
 select pg_temp.expect(
+  (select count(*) from public.pipelines where pipeline_key = 'tenant_b_secret') = 0,
+  'redreach admin cannot read tenant B pipelines'
+);
+select pg_temp.expect(
   (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 0,
   'redreach admin cannot read tenant B event_outbox'
 );
@@ -473,6 +486,10 @@ select pg_temp.expect(
 select pg_temp.expect(
   (select count(*) from public.saved_views where name = 'Tenant B Secret View') = 1,
   'tenant B admin can read own saved_views'
+);
+select pg_temp.expect(
+  (select count(*) from public.pipelines where pipeline_key = 'tenant_b_secret') = 1,
+  'tenant B admin can read own pipelines'
 );
 select pg_temp.expect(
   (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 1,
@@ -782,6 +799,22 @@ begin
     raise exception 'TENANT TEST FAILED: tenant B admin forged saved_view into redreach';
   end if;
   raise notice 'ok - tenant B cannot insert saved_view into redreach tenant_id';
+end $$;
+
+do $$
+declare
+  failed boolean := false;
+begin
+  begin
+    insert into public.pipelines (pipeline_key, name, object_type, tenant_id)
+    values ('forged_pipeline', 'Forged Pipeline', 'deal', 'a0000000-0000-4000-8000-000000000001');
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: tenant B admin forged pipeline into redreach';
+  end if;
+  raise notice 'ok - tenant B cannot insert pipeline into redreach tenant_id';
 end $$;
 
 ------------------------------------------------------------ Append-only audit_log (authenticated cannot mutate)
