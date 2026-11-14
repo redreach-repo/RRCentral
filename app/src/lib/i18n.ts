@@ -302,6 +302,20 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.quoteTemplates.syncSkus': 'Load SKU templates',
     'page.quoteTemplates.syncing': 'Syncing…',
     'page.quoteTemplates.new': 'New template',
+    'page.quickAdd.title': 'Quick add',
+    'page.quickAdd.restricted':
+      'Quick add is for the sales team. Log calls on the account timeline instead.',
+    'page.ctrmIssues.title': 'CTRM issues',
+    'page.ctrmIssues.subtitle':
+      'Problems CTRM Next clients have raised, grouped by client. The vendor ticket number and status are typed in by hand. An issue turns red when the client has had no update for {days} working days. Log a new one from the client\'s account (Client issues → Log an issue).',
+    'page.wanders.title': 'RR Wanders CRM',
+    'page.wanders.subtitleLead':
+      'Travel deals, packages, partners, departures and bookings — separate from RR Threads. Base currency:',
+    'page.wanders.tbcHint': ' (confirm in Settings before production)',
+    'page.wanders.subtitleTrail': '.',
+    'page.wanders.leads': 'Customer leads',
+    'page.wanders.tourOps': 'Tour products & ops',
+    'page.wanders.newEnquiry': 'New enquiry',
     'page.ops.kicker': 'Operations',
     'page.catalog.title': 'Catalog',
     'page.catalog.subtitle': 'Brand catalogues and products across divisions',
@@ -618,6 +632,20 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.quoteTemplates.syncSkus': 'تحميل قوالب SKU',
     'page.quoteTemplates.syncing': 'جارٍ المزامنة…',
     'page.quoteTemplates.new': 'قالب جديد',
+    'page.quickAdd.title': 'إضافة سريعة',
+    'page.quickAdd.restricted':
+      'الإضافة السريعة لفريق المبيعات. سجّل المكالمات على الجدول الزمني للحساب بدلاً من ذلك.',
+    'page.ctrmIssues.title': 'مشاكل CTRM',
+    'page.ctrmIssues.subtitle':
+      'مشاكل رفعها عملاء CTRM Next، مجمّعة حسب العميل. رقم تذكرة المورد وحالتها يُدخلان يدوياً. تتحول المشكلة إلى أحمر عندما لا يحصل العميل على تحديث لمدة {days} أيام عمل. سجّل واحدةً من حساب العميل (مشاكل العميل → تسجيل مشكلة).',
+    'page.wanders.title': 'CRM لـ RR Wanders',
+    'page.wanders.subtitleLead':
+      'صفقات سفر وباقات وشركاء ومغادرات وحجوزات — منفصلة عن RR Threads. العملة الأساسية:',
+    'page.wanders.tbcHint': ' (أكّد في الإعدادات قبل الإنتاج)',
+    'page.wanders.subtitleTrail': '.',
+    'page.wanders.leads': 'عملاء محتملون',
+    'page.wanders.tourOps': 'منتجات وعمليات الجولات',
+    'page.wanders.newEnquiry': 'استفسار جديد',
     'page.ops.kicker': 'العمليات',
     'page.catalog.title': 'الكتالوج',
     'page.catalog.subtitle': 'كتالوجات العلامات والمنتجات عبر الأقسام',

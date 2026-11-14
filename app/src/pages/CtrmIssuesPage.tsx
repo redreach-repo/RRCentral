@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { listAccounts, listTeam } from '../lib/accountsStore'
 import { CLIENT_UPDATE_DAYS, groupIssuesByClient, isCtrmIssue, needsClientUpdate, vendorStatusLabel } from '../lib/ctrmIssues'
@@ -19,6 +20,7 @@ const muted = { color: colors.muted, fontSize: 13 }
  * 2 working days is flagged in red.
  */
 export default function CtrmIssuesPage() {
+  const { t } = useI18n()
   const { showToast } = useToast()
   const [tickets, setTickets] = useState<Ticket[] | null>(null)
   const [accounts, setAccounts] = useState<Account[]>([])
@@ -47,11 +49,9 @@ export default function CtrmIssuesPage() {
 
   return (
     <div style={pageStyle}>
-      <h1 style={pageTitleStyle}>CTRM issues</h1>
+      <h1 style={pageTitleStyle}>{t('page.ctrmIssues.title')}</h1>
       <p style={pageSubtitleStyle}>
-        Problems CTRM Next clients have raised, grouped by client. The vendor ticket number and status are typed in by hand. An
-        issue turns red when the client has had no update for {CLIENT_UPDATE_DAYS} working days. Log a new one from the
-        client's account (Client issues → Log an issue).
+        {t('page.ctrmIssues.subtitle').replace('{days}', String(CLIENT_UPDATE_DAYS))}
       </p>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '12px 0 16px' }}>
         <button type="button" style={tab(!showAll)} onClick={() => setShowAll(false)}>
