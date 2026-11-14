@@ -94,21 +94,26 @@ export default function ClientUpdatesPage() {
             </option>
           ))}
         </select>
-        <span style={muted}>{queue ? `${waiting} waiting for approval, ${sent} sent` : 'Loading…'}</span>
+        <span style={muted}>
+          {queue
+            ? t('page.clientUpdates.queueStatus')
+                .replace('{waiting}', String(waiting))
+                .replace('{sent}', String(sent))
+            : t('page.clientUpdates.loading')}
+        </span>
         {roleAtLeast(userRole, 'manager') && !queue?.missingTable ? (
           <button type="button" style={smallBtn} disabled={building} onClick={() => void build()}>
-            {building ? 'Building…' : 'Build missing drafts now'}
+            {building ? t('page.clientUpdates.building') : t('page.clientUpdates.buildDrafts')}
           </button>
         ) : null}
       </div>
 
       {queue?.missingTable ? (
-        <p style={{ color: colors.warn }}>The weekly updates table is not set up yet. Run the weekly updates SQL first.</p>
+        <p style={{ color: colors.warn }}>{t('page.clientUpdates.missingTable')}</p>
       ) : queue && queue.drafts.length === 0 ? (
         <section style={cardStyle}>
           <p style={{ ...muted, margin: 0 }}>
-            No updates for the {weekLabelOf(week)} yet. They are drafted on Thursday for every CTRM Next client with a signed
-            deal and something to report.
+            {t('page.clientUpdates.empty').replace('{week}', weekLabelOf(week))}
           </p>
         </section>
       ) : (
@@ -142,6 +147,7 @@ function DraftCard({
   canEdit: boolean
   onChanged: () => Promise<void>
 }) {
+  const { t } = useI18n()
   const { user, appUserId } = useAuth()
   const { showToast } = useToast()
   const [body, setBody] = useState(draft.body)
@@ -243,18 +249,20 @@ function DraftCard({
 
       {open && canEdit ? (
         <textarea
-          aria-label="Update"
+          aria-label={t('page.clientUpdates.body')}
           style={{ ...inputStyle, minHeight: 220, resize: 'vertical', lineHeight: 1.5, fontFamily: 'inherit' }}
           maxLength={CLIENT_UPDATE_BODY_MAX}
           value={body}
           onChange={(e) => setBody(e.target.value)}
         />
       ) : (
-        <p style={{ fontSize: 14, whiteSpace: 'pre-wrap', margin: 0 }}>{draft.body || 'No text.'}</p>
+        <p style={{ fontSize: 14, whiteSpace: 'pre-wrap', margin: 0 }}>
+          {draft.body || t('page.clientUpdates.noText')}
+        </p>
       )}
 
       <button type="button" onClick={() => setShowFacts((v) => !v)} style={{ ...smallBtn, marginTop: 8, border: 'none', paddingLeft: 0 }}>
-        {showFacts ? 'Hide what it was built from' : 'Show what it was built from'}
+        {showFacts ? t('page.clientUpdates.hideFacts') : t('page.clientUpdates.showFacts')}
       </button>
       {showFacts ? (
         <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
@@ -270,7 +278,7 @@ function DraftCard({
             <>
               {to.email ? (
                 <button type="button" style={buttonPrimaryStyle} disabled={!!busy || !body.trim()} onClick={() => void send('email')}>
-                  {busy === 'email' ? 'Sending…' : 'Send by email'}
+                  {busy === 'email' ? t('page.clientUpdates.sending') : t('page.clientUpdates.sendEmail')}
                 </button>
               ) : null}
               {to.whatsapp ? (
@@ -280,30 +288,32 @@ function DraftCard({
                   disabled={!!busy || !body.trim()}
                   onClick={() => void send('whatsapp')}
                 >
-                  {busy === 'whatsapp' ? 'Opening…' : 'Send by WhatsApp'}
+                  {busy === 'whatsapp' ? t('page.clientUpdates.opening') : t('page.clientUpdates.sendWhatsApp')}
                 </button>
               ) : null}
             </>
           ) : (
-            <span style={muted}>An admin, manager or sales person sends it.</span>
+            <span style={muted}>{t('page.clientUpdates.sendRestricted')}</span>
           )}
           <button type="button" style={smallBtn} disabled={!!busy || body.trim().length < 20} onClick={() => void tidy()}>
-            {busy === 'tidy' ? 'Tidying…' : 'Tidy wording'}
+            {busy === 'tidy' ? t('page.clientUpdates.tidying') : t('page.clientUpdates.tidy')}
           </button>
           {changed ? (
             <button type="button" style={smallBtn} disabled={!!busy} onClick={() => void save()}>
-              Save
+              {t('page.clientUpdates.save')}
             </button>
           ) : null}
           <button type="button" style={smallBtn} disabled={!!busy} onClick={() => void skip(true)}>
-            Skip this week
+            {t('page.clientUpdates.skipWeek')}
           </button>
         </div>
       ) : null}
-      {open && canEdit ? <p style={{ ...muted, margin: '8px 0 0' }}>Tidy wording only changes how it reads. It cannot add facts.</p> : null}
+      {open && canEdit ? (
+        <p style={{ ...muted, margin: '8px 0 0' }}>{t('page.clientUpdates.tidyHint')}</p>
+      ) : null}
       {draft.status === 'skipped' && canEdit ? (
         <button type="button" style={{ ...smallBtn, marginTop: 10 }} disabled={!!busy} onClick={() => void skip(false)}>
-          Put back in the queue
+          {t('page.clientUpdates.putBack')}
         </button>
       ) : null}
     </section>

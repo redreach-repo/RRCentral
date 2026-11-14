@@ -421,6 +421,32 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.clientUpdates.title': 'Weekly updates',
     'page.clientUpdates.subtitle':
       'Every Thursday each CTRM Next client gets a short update drafted from their issues and sessions: what was fixed this week, what is still open and what comes next. Check the wording, then send it by email or WhatsApp. Nothing goes to a client until someone taps Send.',
+    'page.clientUpdates.loading': 'Loading…',
+    'page.clientUpdates.queueStatus':
+      '{waiting} waiting for approval, {sent} sent',
+    'page.clientUpdates.building': 'Building…',
+    'page.clientUpdates.buildDrafts': 'Build missing drafts now',
+    'page.clientUpdates.missingTable':
+      'The weekly updates table is not set up yet. Run the weekly updates SQL first.',
+    'page.clientUpdates.empty':
+      'No updates for the {week} yet. They are drafted on Thursday for every CTRM Next client with a signed deal and something to report.',
+    'page.clientUpdates.body': 'Update',
+    'page.clientUpdates.noText': 'No text.',
+    'page.clientUpdates.showFacts': 'Show what it was built from',
+    'page.clientUpdates.hideFacts': 'Hide what it was built from',
+    'page.clientUpdates.sending': 'Sending…',
+    'page.clientUpdates.opening': 'Opening…',
+    'page.clientUpdates.sendEmail': 'Send by email',
+    'page.clientUpdates.sendWhatsApp': 'Send by WhatsApp',
+    'page.clientUpdates.sendRestricted':
+      'An admin, manager or sales person sends it.',
+    'page.clientUpdates.tidying': 'Tidying…',
+    'page.clientUpdates.tidy': 'Tidy wording',
+    'page.clientUpdates.tidyHint':
+      'Tidy wording only changes how it reads. It cannot add facts.',
+    'page.clientUpdates.save': 'Save',
+    'page.clientUpdates.skipWeek': 'Skip this week',
+    'page.clientUpdates.putBack': 'Put back in the queue',
     'page.followups.title': 'Follow-ups',
     'page.followups.subtitleLead': 'Overdue and upcoming CRM actions',
     'page.followups.calendarSyncOn': ' · {provider} Calendar sync on',
@@ -966,6 +992,32 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.clientUpdates.title': 'التحديثات الأسبوعية',
     'page.clientUpdates.subtitle':
       'كل خميس يحصل كل عميل CTRM Next على تحديث قصير من مشكلاته وجلساته: ما أُصلح هذا الأسبوع، وما زال مفتوحاً، وما يلي. راجع الصياغة ثم أرسل بالبريد أو واتساب. لا يصل شيء حتى يضغط أحد إرسال.',
+    'page.clientUpdates.loading': 'جارٍ التحميل…',
+    'page.clientUpdates.queueStatus':
+      '{waiting} بانتظار الموافقة، {sent} مُرسل',
+    'page.clientUpdates.building': 'جارٍ البناء…',
+    'page.clientUpdates.buildDrafts': 'بناء المسودات الناقصة الآن',
+    'page.clientUpdates.missingTable':
+      'جدول التحديثات الأسبوعية غير مُعد بعد. نفّذ SQL التحديثات الأسبوعية أولاً.',
+    'page.clientUpdates.empty':
+      'لا تحديثات لأسبوع {week} بعد. تُصاغ يوم الخميس لكل عميل CTRM Next بصفقة موقعة ولديه ما يُبلَّغ.',
+    'page.clientUpdates.body': 'التحديث',
+    'page.clientUpdates.noText': 'لا نص.',
+    'page.clientUpdates.showFacts': 'إظهار ما بُني منه',
+    'page.clientUpdates.hideFacts': 'إخفاء ما بُني منه',
+    'page.clientUpdates.sending': 'جارٍ الإرسال…',
+    'page.clientUpdates.opening': 'جارٍ الفتح…',
+    'page.clientUpdates.sendEmail': 'إرسال بالبريد',
+    'page.clientUpdates.sendWhatsApp': 'إرسال عبر واتساب',
+    'page.clientUpdates.sendRestricted':
+      'يرسله مسؤول أو مدير أو شخص مبيعات.',
+    'page.clientUpdates.tidying': 'جارٍ التنقيح…',
+    'page.clientUpdates.tidy': 'تنقيح الصياغة',
+    'page.clientUpdates.tidyHint':
+      'تنقيح الصياغة يغيّر طريقة القراءة فقط. لا يمكنه إضافة حقائق.',
+    'page.clientUpdates.save': 'حفظ',
+    'page.clientUpdates.skipWeek': 'تخطِّ هذا الأسبوع',
+    'page.clientUpdates.putBack': 'أعده إلى قائمة الانتظار',
     'page.followups.title': 'المتابعات',
     'page.followups.subtitleLead': 'إجراءات CRM المتأخرة والقادمة',
     'page.followups.calendarSyncOn': ' · مزامنة تقويم {provider} مفعّلة',
