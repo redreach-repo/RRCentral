@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — Settings and CTRM summary EN+AR
+**Current milestone:** Continuous backlog — tenant isolation for saved views
 
 ## Shipped this turn
 
-- Page-body EN+AR catalogs for **Settings**, **Account**, and **CTRM weekly summary** chrome
+- Expanded `tenant_isolation_test.sql` for **saved_views** (read isolation + forged insert blocked)
 
 ## Already on main
 
