@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod Supabase connect
+**Current milestone:** Continuous backlog — M1 Zod quotation finalize
 
 ## Shipped this turn
 
-- Zod `parseSupabaseConnectForm` for Settings cloud credentials (API host + anon key)
+- Zod `parseQuotationFinalizeForm` requires a client before allocating a quotation reference
 
 ## Already on main
 
