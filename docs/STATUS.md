@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod legal sign + quote accept
+**Current milestone:** Continuous backlog — M1 Zod vault NDA signer
 
 ## Shipped this turn
 
-- Zod `parseLegalSignForm` + `parseQuoteAcceptForm` (shared rules via existing problem helpers)
+- Zod `parseVaultNdaForm` before creating an NDA draft in the contracts vault
 
 ## Already on main
 
@@ -13,8 +13,9 @@
 
 ## Still open (agent queue)
 
-1. Merge overnight PR queue  
-2. Demo env hooks after Alfred provisions  
+1. More M1 Zod  
+2. M3 inventory UI + metrics PRs  
+3. Demo env hooks after Alfred provisions  
 
 ## Still externally blocked
 
