@@ -85,21 +85,25 @@ export default function ClientReportsPage() {
           ))}
         </select>
         <span style={muted}>
-          {queue ? `${waiting} waiting for approval, ${sent} sent` : 'Loading…'}
+          {queue
+            ? t('page.clientReports.queueStatus')
+                .replace('{waiting}', String(waiting))
+                .replace('{sent}', String(sent))
+            : t('page.clientReports.loading')}
         </span>
         {roleAtLeast(userRole, 'manager') && !queue?.missingTable ? (
           <button type="button" style={smallBtn} disabled={building} onClick={() => void build()}>
-            {building ? 'Building…' : 'Build missing drafts now'}
+            {building ? t('page.clientReports.building') : t('page.clientReports.buildDrafts')}
           </button>
         ) : null}
       </div>
 
       {queue?.missingTable ? (
-        <p style={{ color: colors.warn }}>The monthly reports table is not set up yet. Run the monthly reports SQL first.</p>
+        <p style={{ color: colors.warn }}>{t('page.clientReports.missingTable')}</p>
       ) : queue && queue.drafts.length === 0 ? (
         <section style={cardStyle}>
           <p style={{ ...muted, margin: 0 }}>
-            No reports for {monthLabelOf(month)} yet. They are drafted on the 1st for every AI CRM client with an active contract.
+            {t('page.clientReports.empty').replace('{month}', monthLabelOf(month))}
           </p>
         </section>
       ) : (
@@ -133,6 +137,7 @@ function DraftCard({
   canEdit: boolean
   onChanged: () => Promise<void>
 }) {
+  const { t } = useI18n()
   const { showToast } = useToast()
   const [summary, setSummary] = useState(draft.summary)
   const [busy, setBusy] = useState('')
@@ -203,7 +208,7 @@ function DraftCard({
           : `To ${to.email ? to.email.contact.name || to.email.to : 'nobody by email'}${to.whatsapp ? `, WhatsApp ${to.whatsapp.to}` : ', no WhatsApp number'}`}
         {' · '}
         <Link to={`/accounts/${draft.account_id}/report?month=${draft.month.slice(0, 7)}`} style={{ color: colors.accent }}>
-          Full report
+          {t('page.clientReports.fullReport')}
         </Link>
         {draft.ai_cost_usd ? ` · AI draft $${Number(draft.ai_cost_usd).toFixed(4)}` : ''}
       </p>
@@ -212,19 +217,21 @@ function DraftCard({
 
       {open && canEdit ? (
         <textarea
-          aria-label="Summary"
+          aria-label={t('page.clientReports.summary')}
           style={{ ...inputStyle, minHeight: 130, resize: 'vertical', lineHeight: 1.5 }}
           maxLength={CLIENT_REPORT_SUMMARY_MAX}
           value={summary}
-          placeholder="Write the summary the client will read."
+          placeholder={t('page.clientReports.summaryPlaceholder')}
           onChange={(e) => setSummary(e.target.value)}
         />
       ) : (
-        <p style={{ fontSize: 14, whiteSpace: 'pre-wrap', margin: 0 }}>{draft.summary || 'No summary.'}</p>
+        <p style={{ fontSize: 14, whiteSpace: 'pre-wrap', margin: 0 }}>
+          {draft.summary || t('page.clientReports.noSummary')}
+        </p>
       )}
 
       <button type="button" onClick={() => setShowFacts((v) => !v)} style={{ ...smallBtn, marginTop: 8, border: 'none', paddingLeft: 0 }}>
-        {showFacts ? 'Hide the numbers' : 'Show the numbers that go with it'}
+        {showFacts ? t('page.clientReports.hideFacts') : t('page.clientReports.showFacts')}
       </button>
       {showFacts ? (
         <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
@@ -244,35 +251,41 @@ function DraftCard({
                 disabled={!!busy || !both.length || !summary.trim()}
                 onClick={() => void send(both)}
               >
-                {busy === 'send' ? 'Sending…' : both.length === 2 ? 'Approve and send by email and WhatsApp' : both[0] === 'whatsapp' ? 'Approve and send by WhatsApp' : 'Approve and send by email'}
+                {busy === 'send'
+                  ? t('page.clientReports.sending')
+                  : both.length === 2
+                    ? t('page.clientReports.approveBoth')
+                    : both[0] === 'whatsapp'
+                      ? t('page.clientReports.approveWhatsApp')
+                      : t('page.clientReports.approveEmail')}
               </button>
               {both.length === 2 ? (
                 <>
                   <button type="button" style={smallBtn} disabled={!!busy} onClick={() => void send(['email'])}>
-                    Email only
+                    {t('page.clientReports.emailOnly')}
                   </button>
                   <button type="button" style={smallBtn} disabled={!!busy} onClick={() => void send(['whatsapp'])}>
-                    WhatsApp only
+                    {t('page.clientReports.whatsappOnly')}
                   </button>
                 </>
               ) : null}
             </>
           ) : (
-            <span style={muted}>An admin, manager or sales person sends it.</span>
+            <span style={muted}>{t('page.clientReports.sendRestricted')}</span>
           )}
           {changed ? (
             <button type="button" style={smallBtn} disabled={!!busy} onClick={() => void save()}>
-              Save summary
+              {t('page.clientReports.saveSummary')}
             </button>
           ) : null}
           <button type="button" style={smallBtn} disabled={!!busy} onClick={() => void skip(true)}>
-            Skip this month
+            {t('page.clientReports.skipMonth')}
           </button>
         </div>
       ) : null}
       {draft.status === 'skipped' && canEdit ? (
         <button type="button" style={{ ...smallBtn, marginTop: 10 }} disabled={!!busy} onClick={() => void skip(false)}>
-          Put back in the queue
+          {t('page.clientReports.putBack')}
         </button>
       ) : null}
     </section>

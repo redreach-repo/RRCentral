@@ -391,6 +391,33 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.clientReports.title': 'Monthly reports',
     'page.clientReports.subtitle':
       'On the 1st each AI CRM client gets a report for the month before, with a summary drafted by AI. Check the summary, fix anything, then send it. Nothing goes to a client without someone pressing Send.',
+    'page.clientReports.loading': 'Loading…',
+    'page.clientReports.queueStatus':
+      '{waiting} waiting for approval, {sent} sent',
+    'page.clientReports.building': 'Building…',
+    'page.clientReports.buildDrafts': 'Build missing drafts now',
+    'page.clientReports.missingTable':
+      'The monthly reports table is not set up yet. Run the monthly reports SQL first.',
+    'page.clientReports.empty':
+      'No reports for {month} yet. They are drafted on the 1st for every AI CRM client with an active contract.',
+    'page.clientReports.summary': 'Summary',
+    'page.clientReports.summaryPlaceholder':
+      'Write the summary the client will read.',
+    'page.clientReports.noSummary': 'No summary.',
+    'page.clientReports.showFacts': 'Show the numbers that go with it',
+    'page.clientReports.hideFacts': 'Hide the numbers',
+    'page.clientReports.sending': 'Sending…',
+    'page.clientReports.approveBoth': 'Approve and send by email and WhatsApp',
+    'page.clientReports.approveWhatsApp': 'Approve and send by WhatsApp',
+    'page.clientReports.approveEmail': 'Approve and send by email',
+    'page.clientReports.emailOnly': 'Email only',
+    'page.clientReports.whatsappOnly': 'WhatsApp only',
+    'page.clientReports.sendRestricted':
+      'An admin, manager or sales person sends it.',
+    'page.clientReports.saveSummary': 'Save summary',
+    'page.clientReports.skipMonth': 'Skip this month',
+    'page.clientReports.putBack': 'Put back in the queue',
+    'page.clientReports.fullReport': 'Full report',
     'page.clientUpdates.title': 'Weekly updates',
     'page.clientUpdates.subtitle':
       'Every Thursday each CTRM Next client gets a short update drafted from their issues and sessions: what was fixed this week, what is still open and what comes next. Check the wording, then send it by email or WhatsApp. Nothing goes to a client until someone taps Send.',
@@ -910,6 +937,32 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.clientReports.title': 'التقارير الشهرية',
     'page.clientReports.subtitle':
       'في الأول من كل شهر يحصل كل عميل AI CRM على تقرير للشهر السابق بملخص مسودة بالذكاء الاصطناعي. راجع الملخص وصحّح ثم أرسل. لا يصل شيء للعميل دون ضغط إرسال.',
+    'page.clientReports.loading': 'جارٍ التحميل…',
+    'page.clientReports.queueStatus':
+      '{waiting} بانتظار الموافقة، {sent} مُرسل',
+    'page.clientReports.building': 'جارٍ البناء…',
+    'page.clientReports.buildDrafts': 'بناء المسودات الناقصة الآن',
+    'page.clientReports.missingTable':
+      'جدول التقارير الشهرية غير مُعد بعد. نفّذ SQL التقارير الشهرية أولاً.',
+    'page.clientReports.empty':
+      'لا تقارير لـ {month} بعد. تُصاغ في الأول من الشهر لكل عميل AI CRM بعقد ساري.',
+    'page.clientReports.summary': 'الملخص',
+    'page.clientReports.summaryPlaceholder': 'اكتب الملخص الذي سيقرأه العميل.',
+    'page.clientReports.noSummary': 'لا ملخص.',
+    'page.clientReports.showFacts': 'إظهار الأرقام المرافقة',
+    'page.clientReports.hideFacts': 'إخفاء الأرقام',
+    'page.clientReports.sending': 'جارٍ الإرسال…',
+    'page.clientReports.approveBoth': 'اعتماد وإرسال بالبريد وواتساب',
+    'page.clientReports.approveWhatsApp': 'اعتماد وإرسال عبر واتساب',
+    'page.clientReports.approveEmail': 'اعتماد وإرسال بالبريد',
+    'page.clientReports.emailOnly': 'البريد فقط',
+    'page.clientReports.whatsappOnly': 'واتساب فقط',
+    'page.clientReports.sendRestricted':
+      'يرسله مسؤول أو مدير أو شخص مبيعات.',
+    'page.clientReports.saveSummary': 'حفظ الملخص',
+    'page.clientReports.skipMonth': 'تخطِّ هذا الشهر',
+    'page.clientReports.putBack': 'أعده إلى قائمة الانتظار',
+    'page.clientReports.fullReport': 'التقرير الكامل',
     'page.clientUpdates.title': 'التحديثات الأسبوعية',
     'page.clientUpdates.subtitle':
       'كل خميس يحصل كل عميل CTRM Next على تحديث قصير من مشكلاته وجلساته: ما أُصلح هذا الأسبوع، وما زال مفتوحاً، وما يلي. راجع الصياغة ثم أرسل بالبريد أو واتساب. لا يصل شيء حتى يضغط أحد إرسال.',
