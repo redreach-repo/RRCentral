@@ -286,6 +286,16 @@ values (
   'b0000000-0000-4000-8000-000000000001'
 );
 
+insert into public.workflow_runs (definition_id, tenant_id, status, error_message)
+select
+  id,
+  'b0000000-0000-4000-8000-000000000001',
+  'pending',
+  'Tenant B Secret Run'
+from public.workflow_definitions
+where workflow_key = 'tenant_b_secret'
+  and tenant_id = 'b0000000-0000-4000-8000-000000000001';
+
 insert into public.event_outbox (event_type, aggregate_type, aggregate_id, tenant_id, status)
 values (
   'finalize_quote',
@@ -418,6 +428,10 @@ select pg_temp.expect(
   'redreach admin cannot read tenant B workflow_definitions'
 );
 select pg_temp.expect(
+  (select count(*) from public.workflow_runs where error_message = 'Tenant B Secret Run') = 0,
+  'redreach admin cannot read tenant B workflow_runs'
+);
+select pg_temp.expect(
   (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 0,
   'redreach admin cannot read tenant B event_outbox'
 );
@@ -544,6 +558,10 @@ select pg_temp.expect(
 select pg_temp.expect(
   (select count(*) from public.workflow_definitions where workflow_key = 'tenant_b_secret') = 1,
   'tenant B admin can read own workflow_definitions'
+);
+select pg_temp.expect(
+  (select count(*) from public.workflow_runs where error_message = 'Tenant B Secret Run') = 1,
+  'tenant B admin can read own workflow_runs'
 );
 select pg_temp.expect(
   (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 1,
@@ -930,6 +948,27 @@ begin
     raise exception 'TENANT TEST FAILED: tenant B admin forged workflow_definition into redreach';
   end if;
   raise notice 'ok - tenant B cannot insert workflow_definition into redreach tenant_id';
+end $$;
+
+do $$
+declare
+  failed boolean := false;
+begin
+  begin
+    insert into public.workflow_runs (definition_id, tenant_id, error_message)
+    select
+      id,
+      'a0000000-0000-4000-8000-000000000001',
+      'Forged Run'
+    from public.workflow_definitions
+    where workflow_key = 'tenant_b_secret';
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: tenant B admin forged workflow_run into redreach';
+  end if;
+  raise notice 'ok - tenant B cannot insert workflow_run into redreach tenant_id';
 end $$;
 
 ------------------------------------------------------------ Append-only audit_log (authenticated cannot mutate)
