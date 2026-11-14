@@ -6,6 +6,8 @@
 
 Alfred's list has 13 names (he wrote "14"): HR, Payroll, Marketing, SaaS tenant billing, Public REST API + webhooks, Maker-checker, Industry packs, AI approval queue, Field-level encryption, Sentry/structured logs, Demo isolation, WPS/gratuity, Arabic bilingual PDFs. Payroll and WPS/gratuity are kept as two modules, so the table below has 13 rows. If a 14th module was meant, it is not in this plan yet.
 
+**Update 14 Nov 20:40 UTC (read this first).** While this plan was being written, Cursor's #413 (merged 20:10 UTC) shipped first slices of eight modules and #415 is deepening them: HR, Payroll, WPS/gratuity, Marketing, SaaS tenant billing, Industry packs, Maker-checker and Public API + webhooks (`docs/FEATURE_SLICES_M6_M12.md`). So the split below is **revised**: those eight stay with Cursor, and Claude takes the five nobody has started, plus a security fix for the merged slices. Claude closed its own duplicate drafts for Maker-checker (#416) and Public API (#417).
+
 The gap plan only has one line per module and MASTER_SPEC v1.2 is not in the repo, so the acceptance criteria below are our own reading. Anything that needs a business, legal or pricing answer is listed under "Needs Alfred" and must not be invented in code.
 
 ---
@@ -46,31 +48,33 @@ This PR adds plug-in slots so a module PR only adds new files:
 
 ---
 
-## Split
+## Split (revised)
 
-Claude takes the foundations and the high-risk money and people modules (they depend on each other). Cursor takes the modules that sit next to code it already owns (EN+AR catalogs, documents) or that stand alone.
+| # | Module | Owner | Where |
+|---|--------|-------|-------|
+| 1 | Maker-checker | Cursor | #413 merged, #415 open |
+| 2 | Public REST API + webhooks | Cursor | #413 merged, #415 open |
+| 3 | Sentry / structured logs | Claude | draft #418 |
+| 4 | Demo isolation | Claude | |
+| 5 | Field-level encryption | Claude | |
+| 6 | HR | Cursor | #413 merged, #415 open |
+| 7 | Payroll | Cursor | #413 merged, #415 open |
+| 8 | WPS / gratuity | Cursor | #413 merged, #415 open (planning only, not legal advice) |
+| 9 | Arabic bilingual PDFs | Claude | |
+| 10 | Marketing | Cursor | #413 merged, #415 open |
+| 11 | SaaS tenant billing | Cursor | #413 merged, #415 open |
+| 12 | AI approval queue | Claude | |
+| 13 | Industry packs | Cursor | #413 merged, #415 open |
+| – | Permission fix for the #413 tables | Claude | new migration only, no Cursor files |
 
-| # | Module | Owner | Depends on |
-|---|--------|-------|------------|
-| 1 | Maker-checker | Claude | none |
-| 2 | Public REST API + webhooks | Claude | none (uses `event_outbox`) |
-| 3 | Sentry / structured logs | Claude | none |
-| 4 | Demo isolation | Claude | none |
-| 5 | Field-level encryption | Claude | none |
-| 6 | HR | Claude | 5 for salary / IBAN fields |
-| 7 | Payroll | Claude | 1, 5, 6 |
-| 8 | WPS / gratuity | Claude | 6, 7 |
-| 9 | Arabic bilingual PDFs | Cursor | none |
-| 10 | Marketing | Cursor | none |
-| 11 | SaaS tenant billing | Cursor | none (Stripe **test mode** only) |
-| 12 | AI approval queue | Cursor | may reuse 1 once merged; build standalone first |
-| 13 | Industry packs | Cursor | none |
+**Cursor: please do not edit** `supabase/functions/_shared/functionHealth.ts`, `lib/errorReporting.ts` (Claude #418) or anything under `modules/extensions/`. **Claude will not edit** `featureSliceStores.ts`, the M6–M12 pages, `supabase/functions/public-api/`, or Cursor's migrations; fixes to Cursor's tables go in new Claude migrations only.
 
-Where a module depends on one that is not merged yet, it ships with a clearly marked seam (e.g. "salary stored in plain numeric until Field-level encryption merges") and says so in the PR.
-
----
+### Security notes for Cursor's eight modules (from Claude's review of #413)
+The #413 migration gives every `rr_is_staff()` user (admin, manager **and sales**) full read/write on `hr_employees`, `payroll_runs`, `payroll_lines`, `approval_requests`, `api_keys` and `webhook_endpoints`. That means a sales user could read salaries and IBANs, approve any request including their own, mint an API key by inserting their own hash, and read webhook secrets. Claude's permission-fix PR tightens this in a new migration (HR/payroll: manager and admin; keys and webhooks: admin; approvals: four eyes enforced by a trigger). **Alfred: do not run `20261217120000_feature_slices_m6_m12.sql` on the live database without that fix.**
 
 ## Acceptance criteria
+
+The criteria below were written before the re-split; for modules now owned by Cursor they are a checklist Cursor can use, not a second implementation.
 
 ### 1. Maker-checker (Claude)
 - Table `approval_requests` (entity type, entity id, action, payload snapshot, amount, status pending/approved/rejected/cancelled, maker, checker, reason, timestamps) with RLS and tenant isolation.
@@ -150,22 +154,20 @@ Where a module depends on one that is not merged yet, it ships with a clearly ma
 
 ---
 
-## Status summary (Claude refreshes this; the source of truth is each `docs/modules/<module>.md`)
+## Status summary (Claude refreshes this; the source of truth is each `docs/modules/<module>.md` or Cursor's `docs/FEATURE_SLICES_M6_M12.md`)
 
-Status values: `not started` · `in progress` · `draft PR open` · `built and tested (draft)` · `blocked`.
-
-| # | Module | Owner | Status | PR | Notes (stubbed / unverified) |
-|---|--------|-------|--------|----|------------------------------|
-| 1 | Maker-checker | Claude | not started | | |
-| 2 | Public REST API + webhooks | Claude | not started | | |
-| 3 | Sentry / structured logs | Claude | not started | | |
-| 4 | Demo isolation | Claude | not started | | |
-| 5 | Field-level encryption | Claude | not started | | |
-| 6 | HR | Claude | not started | | |
-| 7 | Payroll | Claude | not started | | |
-| 8 | WPS / gratuity | Claude | not started | | |
-| 9 | Arabic bilingual PDFs | Cursor | not started | | |
-| 10 | Marketing | Cursor | not started | | |
-| 11 | SaaS tenant billing | Cursor | not started | | |
-| 12 | AI approval queue | Cursor | not started | | |
-| 13 | Industry packs | Cursor | not started | | |
+| # | Module | Owner | Status | PR |
+|---|--------|-------|--------|----|
+| 1 | Maker-checker | Cursor | first slice merged, deepening | #413, #415 |
+| 2 | Public REST API + webhooks | Cursor | first slice merged, deepening | #413, #415 |
+| 3 | Sentry / structured logs | Claude | draft PR open | #418 |
+| 4 | Demo isolation | Claude | in progress | |
+| 5 | Field-level encryption | Claude | not started | |
+| 6 | HR | Cursor | first slice merged, deepening | #413, #415 |
+| 7 | Payroll | Cursor | first slice merged, deepening | #413, #415 |
+| 8 | WPS / gratuity | Cursor | planning-only calc merged, deepening | #413, #415 |
+| 9 | Arabic bilingual PDFs | Claude | not started | |
+| 10 | Marketing | Cursor | first slice merged, deepening | #413, #415 |
+| 11 | SaaS tenant billing | Cursor | first slice merged, deepening | #413, #415 |
+| 12 | AI approval queue | Claude | not started | |
+| 13 | Industry packs | Cursor | first slice merged, deepening | #413, #415 |
