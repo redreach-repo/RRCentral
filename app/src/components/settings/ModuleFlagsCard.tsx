@@ -4,6 +4,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { errorMessage } from '../../lib/errors'
 import {
   MODULE_FLAGS_KEY,
+  SETTINGS_MODULE_FLAGS,
   isModuleFlagEnabled,
   parseModuleFlags,
   serializeModuleFlags,
@@ -19,27 +20,41 @@ import {
   selectStyle,
 } from '../../lib/uiStyles'
 
+type FlagState = Record<string, boolean>
+
 /** Soft-hide optional shell modules via app_settings.moduleFlags JSON. */
 export default function ModuleFlagsCard() {
   const { settings, updateSetting } = useSettings()
   const { showToast } = useToast()
-  const [opsEnabled, setOpsEnabled] = useState(true)
+  const [enabled, setEnabled] = useState<FlagState>(() =>
+    Object.fromEntries(SETTINGS_MODULE_FLAGS.map((row) => [row.flag, true])),
+  )
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     const flags = parseModuleFlags(settings)
-    setOpsEnabled(isModuleFlagEnabled(flags, 'ops'))
+    setEnabled(
+      Object.fromEntries(
+        SETTINGS_MODULE_FLAGS.map((row) => [row.flag, isModuleFlagEnabled(flags, row.flag)]),
+      ),
+    )
   }, [settings])
 
   async function save() {
     setSaving(true)
     try {
-      const next = withModuleFlag(parseModuleFlags(settings), 'ops', opsEnabled)
+      let next = parseModuleFlags(settings)
+      for (const row of SETTINGS_MODULE_FLAGS) {
+        next = withModuleFlag(next, row.flag, enabled[row.flag] !== false)
+      }
       await updateSetting(MODULE_FLAGS_KEY, serializeModuleFlags(next))
+      const hidden = SETTINGS_MODULE_FLAGS.filter((row) => enabled[row.flag] === false).map(
+        (row) => row.flag,
+      )
       showToast(
-        opsEnabled
-          ? 'Operations module shown in the sidebar again'
-          : 'Operations module hidden from the sidebar (URLs still work)',
+        hidden.length
+          ? `Hidden from sidebar: ${hidden.join(', ')} (URLs still work)`
+          : 'All optional modules shown in the sidebar again',
         'success',
       )
     } catch (e) {
@@ -55,22 +70,26 @@ export default function ModuleFlagsCard() {
       <p style={{ color: colors.muted, fontSize: 13, margin: '0 0 12px', lineHeight: 1.5 }}>
         Soft-hide optional sidebar modules for everyone. Direct URLs keep working. Stored as{' '}
         <code style={{ fontSize: 12 }}>moduleFlags</code> JSON in settings (for example{' '}
-        <code style={{ fontSize: 12 }}>{'{"ops":false}'}</code>).
+        <code style={{ fontSize: 12 }}>{'{"ops":false,"finance":false}'}</code>).
       </p>
-      <div style={fieldStyle}>
-        <label style={labelStyle} htmlFor="module-flag-ops">
-          Operations (Wanders, Catalog, Inventory, Templates, Domains)
-        </label>
-        <select
-          id="module-flag-ops"
-          style={selectStyle}
-          value={opsEnabled ? 'yes' : 'no'}
-          onChange={(e) => setOpsEnabled(e.target.value === 'yes')}
-        >
-          <option value="yes">Show in sidebar</option>
-          <option value="no">Hide from sidebar</option>
-        </select>
-      </div>
+      {SETTINGS_MODULE_FLAGS.map((row) => (
+        <div key={row.flag} style={fieldStyle}>
+          <label style={labelStyle} htmlFor={`module-flag-${row.flag}`}>
+            {row.label}
+          </label>
+          <select
+            id={`module-flag-${row.flag}`}
+            style={selectStyle}
+            value={enabled[row.flag] !== false ? 'yes' : 'no'}
+            onChange={(e) =>
+              setEnabled((prev) => ({ ...prev, [row.flag]: e.target.value === 'yes' }))
+            }
+          >
+            <option value="yes">Show in sidebar</option>
+            <option value="no">Hide from sidebar</option>
+          </select>
+        </div>
+      ))}
       <button type="button" style={buttonPrimaryStyle} disabled={saving} onClick={() => void save()}>
         Save
       </button>

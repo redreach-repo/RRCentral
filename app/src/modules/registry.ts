@@ -35,6 +35,18 @@ export const REDREACH_COMPANY_ID = 'a0000000-0000-4000-8000-000000000002'
 /** app_settings key: JSON map of module flag → boolean (false hides the module). */
 export const MODULE_FLAGS_KEY = 'moduleFlags'
 
+/** Soft-hide toggles exposed on Settings → Module flags (must match module `flag` keys). */
+export const SETTINGS_MODULE_FLAGS: { flag: string; label: string }[] = [
+  {
+    flag: 'ops',
+    label: 'Operations (Wanders, Catalog, Inventory, Templates, Domains)',
+  },
+  {
+    flag: 'finance',
+    label: 'Finance (Payments, Expenses, Vendors, Reports, MRR, Utilisation)',
+  },
+]
+
 /**
  * Parse `moduleFlags` from settings. Missing keys default to enabled.
  * Example: `{"ops":false}` hides the Operations module.

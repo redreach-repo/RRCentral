@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  SETTINGS_MODULE_FLAGS,
   isModuleFlagEnabled,
   modulesEnabled,
   parseModuleFlags,
@@ -7,6 +8,7 @@ import {
   withModuleFlag,
   type ModuleManifest,
 } from './registry'
+import { APP_MODULES } from './nav'
 
 const stubIcon = () => null
 
@@ -34,5 +36,12 @@ describe('module registry', () => {
     expect(withModuleFlag({ ops: false }, 'ops', true)).toEqual({})
     expect(serializeModuleFlags({ ops: false, hr: true })).toBe('{"ops":false}')
     expect(serializeModuleFlags({})).toBe('')
+  })
+
+  it('exposes Settings toggles that match APP_MODULES flag keys', () => {
+    expect(SETTINGS_MODULE_FLAGS.map((row) => row.flag)).toEqual(['ops', 'finance'])
+    for (const row of SETTINGS_MODULE_FLAGS) {
+      expect(APP_MODULES.some((m) => m.flag === row.flag)).toBe(true)
+    }
   })
 })
