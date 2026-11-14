@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — module flags for Clients
+**Current milestone:** Continuous backlog — EN+AR account detail chrome
 
 ## Shipped this turn
 
-- Settings Module flags card can soft-hide **Clients** (`{"clients":false}`)
+- Wired **AccountDetailPage** loading / not-found / header actions / tabs / contacts chrome through EN+AR catalogs
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs (incl. admin) · Cmd+K · module flags · EN+AR · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome · pipeline density · ticket detail i18n · workflow_definitions isolation
+- Continuous backlog · Zod · Guide packs (incl. admin) · Cmd+K · module flags (incl. Clients) · EN+AR · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome · pipeline density · ticket detail i18n · workflow_definitions isolation
 
 ## Still open (agent queue)
 

@@ -6,6 +6,7 @@ import { canAttachCalls, meetingNotesForAi } from '../lib/fireflies'
 import { ArrowLeft, ExternalLink, Link2, Pencil, Plus, Star, Trash2, Unlink } from 'lucide-react'
 import SimpleRowActions from '../components/SimpleRowActions'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import StatusPill from '../components/StatusPill'
@@ -120,13 +121,13 @@ const smallBtn = { ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }
 
 type AccountTab = 'overview' | 'sales' | 'delivery' | 'modules' | 'files' | 'money'
 
-const ACCOUNT_TABS: { id: AccountTab; label: string }[] = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'sales', label: 'Sales' },
-  { id: 'delivery', label: 'Delivery' },
-  { id: 'modules', label: 'Modules' },
-  { id: 'files', label: 'Files' },
-  { id: 'money', label: 'Money' },
+const ACCOUNT_TABS: { id: AccountTab; labelKey: string }[] = [
+  { id: 'overview', labelKey: 'page.accountDetail.tab.overview' },
+  { id: 'sales', labelKey: 'page.accountDetail.tab.sales' },
+  { id: 'delivery', labelKey: 'page.accountDetail.tab.delivery' },
+  { id: 'modules', labelKey: 'page.accountDetail.tab.modules' },
+  { id: 'files', labelKey: 'page.accountDetail.tab.files' },
+  { id: 'money', labelKey: 'page.accountDetail.tab.money' },
 ]
 
 const tabBarStyle: CSSProperties = {
@@ -161,6 +162,7 @@ export default function AccountDetailPage() {
   const { id = '' } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const { t } = useI18n()
   const { user, userRole, appUserId } = useAuth()
   const { showToast } = useToast()
   const [account, setAccount] = useState<Account | null>(null)
@@ -347,15 +349,15 @@ export default function AccountDetailPage() {
   }
 
   if (loading && !account) {
-    return <div style={{ ...cardStyle, color: colors.muted }}>Loading account…</div>
+    return <div style={{ ...cardStyle, color: colors.muted }}>{t('page.accountDetail.loading')}</div>
   }
 
   if (!account) {
     return (
       <div style={{ ...cardStyle, color: colors.muted, lineHeight: 1.6 }}>
-        This account does not exist, or it is not assigned to you.{' '}
+        {t('page.accountDetail.notFound')}{' '}
         <Link to="/accounts" style={{ color: colors.accent }}>
-          Back to accounts
+          {t('page.accountDetail.backToAccounts')}
         </Link>
       </div>
     )
@@ -395,7 +397,7 @@ export default function AccountDetailPage() {
         to="/accounts"
         style={{ color: colors.muted, fontSize: 13, display: 'inline-flex', gap: 6, marginBottom: 12 }}
       >
-        <ArrowLeft size={14} /> Accounts
+        <ArrowLeft size={14} /> {t('page.accounts.title')}
       </Link>
 
       <div style={{ ...cardStyle, marginBottom: 16 }}>
@@ -418,7 +420,9 @@ export default function AccountDetailPage() {
             </h1>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', fontSize: 13 }}>
               <StatusPill status={accountStatusLabel(account.status)} />
-              <span style={{ color: colors.muted }}>Owner: {teamName(account.owner_user_id)}</span>
+              <span style={{ color: colors.muted }}>
+                {t('page.accountDetail.owner').replace('{name}', teamName(account.owner_user_id))}
+              </span>
               {[account.city, account.country].filter(Boolean).length ? (
                 <span style={{ color: colors.muted }}>
                   {[account.city, account.country].filter(Boolean).join(', ')}
@@ -431,7 +435,8 @@ export default function AccountDetailPage() {
                   rel="noreferrer"
                   style={{ color: colors.accent }}
                 >
-                  Website <ExternalLink size={11} style={{ verticalAlign: -1 }} />
+                  {t('page.accountDetail.website')}{' '}
+                  <ExternalLink size={11} style={{ verticalAlign: -1 }} />
                 </a>
               ) : null}
             </div>
@@ -449,12 +454,12 @@ export default function AccountDetailPage() {
             ) : null}
             {editable ? (
               <button type="button" style={buttonSecondaryStyle} onClick={() => setEditOpen(true)}>
-                <Pencil size={14} /> Edit
+                <Pencil size={14} /> {t('page.accountDetail.edit')}
               </button>
             ) : null}
             {can(userRole, 'accounts.delete') ? (
               <button type="button" style={buttonDangerStyle} onClick={() => setConfirmDelete(true)}>
-                <Trash2 size={14} /> Delete
+                <Trash2 size={14} /> {t('page.accountDetail.delete')}
               </button>
             ) : null}
           </div>
@@ -475,16 +480,16 @@ export default function AccountDetailPage() {
       />
 
       <div style={tabBarStyle} role="tablist" aria-label="Account sections">
-        {visibleTabs.map((t) => (
+        {visibleTabs.map((tabDef) => (
           <button
-            key={t.id}
+            key={tabDef.id}
             type="button"
             role="tab"
-            aria-selected={tab === t.id}
-            style={tabBtnStyle(tab === t.id)}
-            onClick={() => setTab(t.id)}
+            aria-selected={tab === tabDef.id}
+            style={tabBtnStyle(tab === tabDef.id)}
+            onClick={() => setTab(tabDef.id)}
           >
-            {t.label}
+            {t(tabDef.labelKey)}
           </button>
         ))}
       </div>
@@ -494,7 +499,7 @@ export default function AccountDetailPage() {
       <div style={dualPanelGridStyle}>
         <section style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-            <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Contacts</h2>
+            <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.accountDetail.contacts')}</h2>
             {editable ? (
               <button
                 type="button"
@@ -503,7 +508,7 @@ export default function AccountDetailPage() {
                   setContactModal({ form: { ...emptyContact(), is_primary: contacts.length === 0 } })
                 }
               >
-                <Plus size={13} /> Add
+                <Plus size={13} /> {t('page.accountDetail.add')}
               </button>
             ) : null}
           </div>
