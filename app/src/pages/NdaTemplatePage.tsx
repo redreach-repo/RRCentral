@@ -69,7 +69,7 @@ export default function NdaTemplatePage() {
       const r = await listNdaTemplates()
       setTemplates(r.rows)
       setMissingTable(r.missingTable)
-      const pick = r.rows.find((t) => t.id === select) ?? templateInUse(r.rows) ?? r.rows[0]
+      const pick = r.rows.find((row) => row.id === select) ?? templateInUse(r.rows) ?? r.rows[0]
       setSelectedId(pick?.id ?? '')
       setTitle(pick?.title ?? DEFAULT_NDA_TITLE)
       setBody(pick?.body ?? DEFAULT_NDA_BODY)
@@ -87,7 +87,7 @@ export default function NdaTemplatePage() {
       .catch(() => setClauses([]))
   }, [])
 
-  const selected = templates.find((t) => t.id === selectedId) ?? null
+  const selected = templates.find((row) => row.id === selectedId) ?? null
   const inUse = templateInUse(templates)
   const editing = canEdit && !missingTable && (!selected || selected.status === 'draft')
   const dirty = selected ? selected.body !== body || selected.title !== title : true
@@ -147,45 +147,51 @@ export default function NdaTemplatePage() {
       </div>
 
       {missingTable ? (
-        <p style={{ color: colors.warn, fontSize: 13 }}>
-          Run <code>supabase/migrations/20261206120000_legal_documents.sql</code> in Supabase to save and approve
-          templates.
-        </p>
+        <p style={{ color: colors.warn, fontSize: 13 }}>{t('page.ndaTemplate.missingTable')}</p>
       ) : null}
 
       <section style={card}>
-        <h2 style={{ margin: 0, fontSize: 15 }}>In use now</h2>
+        <h2 style={{ margin: 0, fontSize: 15 }}>{t('page.ndaTemplate.inUseNow')}</h2>
         {inUse?.status === 'approved' ? (
           <p style={{ margin: 0, fontSize: 13 }}>
             <CheckCircle2 size={14} style={{ color: colors.success, verticalAlign: -2, marginRight: 6 }} />
-            Version {inUse.version}, approved by {inUse.approved_by}
-            {inUse.approved_at ? ` on ${String(inUse.approved_at).slice(0, 10)}` : ''}.
+            {t('page.ndaTemplate.approvedLine')
+              .replace('{version}', String(inUse.version))
+              .replace('{by}', inUse.approved_by || '')
+              .replace(
+                '{onPart}',
+                inUse.approved_at
+                  ? t('page.ndaTemplate.approvedOn').replace('{date}', String(inUse.approved_at).slice(0, 10))
+                  : '',
+              )}
           </p>
         ) : (
-          <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>No approved NDA yet — sent PDFs will say DRAFT.</p>
+          <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>{t('page.ndaTemplate.noApproved')}</p>
         )}
       </section>
 
       <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.2fr)' }}>
         <section style={card}>
-          <h2 style={{ margin: 0, fontSize: 15 }}>Versions</h2>
-          {templates.map((t) => (
+          <h2 style={{ margin: 0, fontSize: 15 }}>{t('page.ndaTemplate.versions')}</h2>
+          {templates.map((row) => (
             <button
-              key={t.id}
+              key={row.id}
               type="button"
               style={{
                 ...btnGhost,
                 justifyContent: 'flex-start',
-                fontWeight: t.id === selectedId ? 700 : 400,
+                fontWeight: row.id === selectedId ? 700 : 400,
               }}
               onClick={() => {
-                if (dirty && editing && !window.confirm('Leave without saving?')) return
-                setSelectedId(t.id)
-                setTitle(t.title)
-                setBody(t.body)
+                if (dirty && editing && !window.confirm(t('page.ndaTemplate.leaveUnsaved'))) return
+                setSelectedId(row.id)
+                setTitle(row.title)
+                setBody(row.body)
               }}
             >
-              v{t.version} · {t.status}
+              {t('page.ndaTemplate.versionStatus')
+                .replace('{version}', String(row.version))
+                .replace('{status}', row.status)}
             </button>
           ))}
           {canEdit ? (
@@ -201,18 +207,23 @@ export default function NdaTemplatePage() {
                 )
               }
             >
-              New draft from {selected ? `v${selected.version}` : 'starter'}
+              {t('page.ndaTemplate.newDraftFrom').replace(
+                '{from}',
+                selected
+                  ? t('page.ndaTemplate.versionShort').replace('{version}', String(selected.version))
+                  : t('page.ndaTemplate.starter'),
+              )}
             </button>
           ) : null}
         </section>
 
         <section style={card}>
           <label style={{ fontSize: 12, color: colors.muted }}>
-            Title
+            {t('page.ndaTemplate.titleField')}
             <input style={{ ...input, marginTop: 4 }} value={title} disabled={!editing} onChange={(e) => setTitle(e.target.value)} />
           </label>
           <label style={{ fontSize: 12, color: colors.muted }}>
-            Wording
+            {t('page.ndaTemplate.wording')}
             <textarea
               ref={textRef}
               style={{ ...input, marginTop: 4, minHeight: 280, fontFamily: 'ui-monospace, monospace', fontSize: 12 }}
@@ -230,9 +241,9 @@ export default function NdaTemplatePage() {
           </div>
           <div style={{ display: 'grid', gap: 6 }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-              <span style={{ fontSize: 12, color: colors.muted }}>Insert clause</span>
+              <span style={{ fontSize: 12, color: colors.muted }}>{t('page.ndaTemplate.insertClause')}</span>
               <Link to="/clause-library" style={{ fontSize: 12, color: colors.accent }}>
-                Manage library
+                {t('page.ndaTemplate.manageLibrary')}
               </Link>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -249,12 +260,14 @@ export default function NdaTemplatePage() {
                 </button>
               ))}
               {!clauses.length ? (
-                <span style={{ fontSize: 12, color: colors.muted }}>No active clauses — add some in the clause library.</span>
+                <span style={{ fontSize: 12, color: colors.muted }}>{t('page.ndaTemplate.noActiveClauses')}</span>
               ) : null}
             </div>
           </div>
           {unknown.length ? (
-            <p style={{ margin: 0, fontSize: 12, color: colors.warn }}>Unknown placeholders: {unknown.join(', ')}</p>
+            <p style={{ margin: 0, fontSize: 12, color: colors.warn }}>
+              {t('page.ndaTemplate.unknownPlaceholders').replace('{list}', unknown.join(', '))}
+            </p>
           ) : null}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {editing ? (
@@ -281,7 +294,7 @@ export default function NdaTemplatePage() {
                   )
                 }}
               >
-                Save draft
+                {t('page.ndaTemplate.saveDraft')}
               </button>
             ) : null}
             <button
@@ -298,12 +311,12 @@ export default function NdaTemplatePage() {
                 downloadBlob(blob, 'NDA-sample.pdf')
               }}
             >
-              Sample PDF
+              {t('page.ndaTemplate.samplePdf')}
             </button>
             {canEdit && selected?.status === 'draft' ? (
               <>
                 <button type="button" style={btnPrimary} disabled={busy} onClick={() => setApproving({ by: '', on: new Date().toISOString().slice(0, 10), note: '' })}>
-                  Mark approved by lawyer
+                  {t('page.ndaTemplate.markApproved')}
                 </button>
                 <button
                   type="button"
@@ -313,7 +326,7 @@ export default function NdaTemplatePage() {
                     void run(() => deleteNdaDraft(selected.id), 'Could not delete', 'Draft deleted').then(() => load())
                   }
                 >
-                  Delete draft
+                  {t('page.ndaTemplate.deleteDraft')}
                 </button>
               </>
             ) : null}
@@ -334,22 +347,24 @@ export default function NdaTemplatePage() {
           }}
         >
           <div style={{ ...card, maxWidth: 420, width: '100%' }}>
-            <h3 style={{ margin: 0 }}>Approve NDA v{selected.version}</h3>
+            <h3 style={{ margin: 0 }}>
+              {t('page.ndaTemplate.approveTitle').replace('{version}', String(selected.version))}
+            </h3>
             <label style={{ fontSize: 12 }}>
-              Lawyer name
+              {t('page.ndaTemplate.lawyerName')}
               <input style={{ ...input, marginTop: 4 }} value={approving.by} onChange={(e) => setApproving({ ...approving, by: e.target.value })} />
             </label>
             <label style={{ fontSize: 12 }}>
-              Date
+              {t('page.ndaTemplate.date')}
               <input style={{ ...input, marginTop: 4 }} type="date" value={approving.on} onChange={(e) => setApproving({ ...approving, on: e.target.value })} />
             </label>
             <label style={{ fontSize: 12 }}>
-              Note
+              {t('page.ndaTemplate.note')}
               <input style={{ ...input, marginTop: 4 }} value={approving.note} onChange={(e) => setApproving({ ...approving, note: e.target.value })} />
             </label>
             <div style={{ display: 'flex', gap: 8 }}>
               <button type="button" style={btnGhost} onClick={() => setApproving(null)}>
-                Cancel
+                {t('page.ndaTemplate.cancel')}
               </button>
               <button
                 type="button"
@@ -381,7 +396,7 @@ export default function NdaTemplatePage() {
                   ).then(() => setApproving(null))
                 }}
               >
-                Approve
+                {t('page.ndaTemplate.approve')}
               </button>
             </div>
           </div>
