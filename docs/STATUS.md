@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod vault NDA signer
+**Current milestone:** Continuous backlog — M1 Zod ticket reply
 
 ## Shipped this turn
 
-- Zod `parseVaultNdaForm` before creating an NDA draft in the contracts vault
+- Zod `parseTicketReplyForm` before ticket reply / WhatsApp send
 
 ## Already on main
 
