@@ -241,7 +241,7 @@ Deno.serve(withErrorLog("daily-digest", async (req) => {
   if (trigger === "schedule" && count === 0) {
     await finish({ message: "Nothing needed attention, so nothing was sent." })
     // Drop a stale/empty attention signal so it does not linger for tomorrow.
-    await sb.from("app_settings").delete().eq("key", "digest_attention_signal").catch(() => {})
+    await sb.from("app_settings").delete().eq("key", "digest_attention_signal")
     return json({ skipped: true, items: 0, message: "Nothing needed attention, so nothing was sent." })
   }
 
@@ -302,7 +302,7 @@ Deno.serve(withErrorLog("daily-digest", async (req) => {
   // channel failed (so a later "Send now" or tomorrow's run can retry).
   const bothFailed = emailStatus === "error" && whatsappStatus === "error"
   if (!bothFailed) {
-    await sb.from("app_settings").delete().eq("key", "digest_attention_signal").catch(() => {})
+    await sb.from("app_settings").delete().eq("key", "digest_attention_signal")
   }
 
   return json({
