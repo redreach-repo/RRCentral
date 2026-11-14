@@ -201,7 +201,16 @@ Deno.test({ name: "client-updates refuses an unknown sign in and lets the schedu
 Deno.test({ name: "hubspot-sync refuses a signed in user who is not a manager or admin", ...opts, fn: async () => {
   // The role check cannot confirm this token, so the caller counts as staff, sales or viewer.
   assertEquals(await call("hubspot-sync", post("hubspot-sync", {}, { Authorization: "Bearer someone" })), 403)
+} })
 
+Deno.test({ name: "hubspot-sync fails closed without its schedule secret", ...opts, fn: async () => {
+  Deno.env.delete("HUBSPOT_CRON_SECRET")
+  try {
+    assertEquals(await call("hubspot-sync", post("hubspot-sync", {}, { "x-cron-secret": ENV.HUBSPOT_CRON_SECRET })), 401)
+  } finally {
+    Deno.env.set("HUBSPOT_CRON_SECRET", ENV.HUBSPOT_CRON_SECRET)
+  }
+} })
 
 Deno.test({ name: "event-outbox refuses a signed in user who is not a manager or admin", ...opts, fn: async () => {
   assertEquals(await call("event-outbox", post("event-outbox", {}, { Authorization: "Bearer someone" })), 403)
@@ -213,17 +222,6 @@ Deno.test({ name: "event-outbox fails closed without its schedule secret", ...op
     assertEquals(await call("event-outbox", post("event-outbox", {}, { "x-cron-secret": ENV.OUTBOX_CRON_SECRET })), 401)
   } finally {
     Deno.env.set("OUTBOX_CRON_SECRET", ENV.OUTBOX_CRON_SECRET)
-  }
-} })
-
-} })
-
-Deno.test({ name: "hubspot-sync fails closed without its schedule secret", ...opts, fn: async () => {
-  Deno.env.delete("HUBSPOT_CRON_SECRET")
-  try {
-    assertEquals(await call("hubspot-sync", post("hubspot-sync", {}, { "x-cron-secret": ENV.HUBSPOT_CRON_SECRET })), 401)
-  } finally {
-    Deno.env.set("HUBSPOT_CRON_SECRET", ENV.HUBSPOT_CRON_SECRET)
   }
 } })
 
