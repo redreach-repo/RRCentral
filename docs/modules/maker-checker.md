@@ -50,5 +50,5 @@ Seeded rules for Red Reach (change any time): `payroll.run` (always), `payment.r
 No secrets, no functions to deploy.
 
 ## Tests
-- `supabase/tests/modules/maker_checker_test.sql`: 35 checks (every role, four eyes, reasons, cancel, cross tenant, anon, audit).
+- `supabase/tests/modules/maker_checker_test.sql`: 31 checks (every role, four eyes, reasons, cancel, cross tenant, anon, audit).
 - `app/src/lib/makerChecker/makerChecker.test.ts`: policy thresholds, who can decide or cancel, queue order.
