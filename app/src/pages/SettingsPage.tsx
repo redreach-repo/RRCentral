@@ -84,6 +84,7 @@ import {
   thStyle,
 } from '../lib/uiStyles'
 import { errorMessage } from '../lib/errors'
+import { parseSupabaseConnectForm } from '../lib/schemas/supabaseConnect'
 
 const COMPANY_KEYS = [
   { key: 'companyName', label: 'Company name' },
@@ -286,26 +287,12 @@ export default function SettingsPage() {
   }, [])
 
   function connectSupabase() {
-    const url = supabaseUrl.trim().replace(/\/+$/, '')
-    const key = supabaseKey.trim()
-    if (!url || !key) {
-      showToast('Enter Supabase URL and anon key', 'error')
+    const parsed = parseSupabaseConnectForm({ url: supabaseUrl, anonKey: supabaseKey })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
-    // Must be the API host (https://xxxx.supabase.co), never the dashboard URL.
-    const apiHostOk = /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url)
-    if (!apiHostOk || url.includes('supabase.com/dashboard')) {
-      showToast(
-        'Use Project URL like https://xxxx.supabase.co (not the dashboard link)',
-        'error',
-      )
-      return
-    }
-    if (!key.startsWith('eyJ') && !key.startsWith('sb_publishable_')) {
-      showToast('Anon key looks wrong — paste the anon/public key', 'error')
-      return
-    }
-    saveSupabaseRuntimeConfig(url, key)
+    saveSupabaseRuntimeConfig(parsed.data.url, parsed.data.anonKey)
     showToast('Cloud credentials saved — reloading…', 'success')
     window.setTimeout(() => window.location.reload(), 600)
   }
