@@ -50,8 +50,10 @@ import { shouldHidePipelineDetailNavItem } from '../lib/pipelineDetailNav'
 import { roleAtLeast } from '../lib/permissions'
 import type { UserRole } from '../lib/types'
 import { modulesEnabled, parseModuleFlags, type ModuleManifest, type ModuleNavItem } from './registry'
+import { EXTENSION_MODULES } from './extensions'
+import { mergeExtensionNav } from './extensions/collect'
 
-export const APP_MODULES: ModuleManifest[] = [
+const CORE_MODULES: ModuleManifest[] = [
   {
     id: 'overview',
     label: 'Overview',
@@ -200,6 +202,9 @@ export const APP_MODULES: ModuleManifest[] = [
     ],
   },
 ]
+
+/** Core groups, then gap plan modules from modules/extensions (docs/MODULE_BUILD_PLAN.md). */
+export const APP_MODULES: ModuleManifest[] = mergeExtensionNav(CORE_MODULES, EXTENSION_MODULES)
 
 /** Topbar titles that differ from the short nav label (longer / more specific). */
 const PATH_TITLE_OVERRIDES: { match: (path: string) => boolean; title: string }[] = [
