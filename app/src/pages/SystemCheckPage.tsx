@@ -3,6 +3,7 @@ import { format, parseISO } from 'date-fns'
 import { Activity } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import EmptyState from '../components/EmptyState'
 import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
@@ -24,6 +25,7 @@ const STATE_COLOR: Record<CheckState, string> = { green: colors.success, amber: 
 const STATE_LABEL: Record<CheckState, string> = { green: 'OK', amber: 'Check', red: 'Down' }
 
 export default function SystemCheckPage() {
+  const { t } = useI18n()
   const { userRole } = useAuth()
   const [checks, setChecks] = useState<FunctionCheck[]>([])
   const [outbox, setOutbox] = useState<OutboxHealth | null>(null)
@@ -73,11 +75,14 @@ export default function SystemCheckPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Admin</p>
-          <h1 className={docsStyles.title}>System check</h1>
+          <p className={docsStyles.kicker}>{t('page.admin.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.systemCheck.title')}</h1>
           <p className={docsStyles.subtitle}>
-            Every server function gets a harmless ping (it does not send, import or change anything), next to its last failure.
-            Each row names its test in docs/LIVE_TEST.md. Full error details are on <Link to="/app-errors" style={{ color: colors.accent }}>App errors</Link>.
+            {t('page.systemCheck.subtitleLead')}{' '}
+            <Link to="/app-errors" style={{ color: colors.accent }}>
+              {t('page.systemCheck.appErrors')}
+            </Link>
+            {t('page.systemCheck.subtitleTrail')}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>

@@ -80,10 +80,25 @@ const PAGE_KEYS = [
   'page.vendors.title',
   'page.vendors.subtitle',
   'page.vendors.new',
+  'page.reports.title',
+  'page.reports.subtitle',
+  'page.mrr.title',
+  'page.mrr.titleShort',
+  'page.mrr.subtitle',
+  'page.mrr.restricted',
+  'page.insights.title',
+  'page.insights.subtitle',
+  'page.admin.kicker',
+  'page.audit.title',
+  'page.audit.subtitle',
+  'page.systemCheck.title',
+  'page.systemCheck.subtitleLead',
+  'page.systemCheck.appErrors',
+  'page.systemCheck.subtitleTrail',
 ] as const
 
 describe('page body i18n catalogs', () => {
-  it('has EN and AR entries for sales, finance, and clients page chrome', () => {
+  it('has EN and AR entries for sales, finance, clients, and admin page chrome', () => {
     for (const key of PAGE_KEYS) {
       expect(t('en', key)).not.toBe(key)
       expect(t('ar', key)).not.toBe(key)

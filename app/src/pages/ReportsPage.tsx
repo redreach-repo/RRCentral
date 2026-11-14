@@ -19,6 +19,7 @@ import type {
   SupplierCommitment,
 } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
@@ -73,6 +74,7 @@ import {
 type Tab = 'answers' | 'cashflow' | 'winrate' | 'aging' | 'pnl' | 'vat' | 'statement' | 'funnel' | 'fx'
 
 export default function ReportsPage() {
+  const { t } = useI18n()
   const { showToast } = useToast()
   const { settings } = useSettings()
   const { userRole } = useAuth()
@@ -581,12 +583,9 @@ export default function ReportsPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Finance</p>
-          <h1 className={docsStyles.title}>Reports</h1>
-          <p className={docsStyles.subtitle}>
-            VAT, sales answers, cash flow, aging, multi-currency, and P&L — income excludes not-awarded
-            quotes
-          </p>
+          <p className={docsStyles.kicker}>{t('page.finance.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.reports.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.reports.subtitle')}</p>
         </div>
         <button type="button" className={docsStyles.newBtn} onClick={exportCsv} disabled={loading}>
           <Download size={16} /> Export CSV
