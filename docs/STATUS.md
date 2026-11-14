@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod ticket AI summary
+**Current milestone:** Continuous backlog — M1 Zod tour-ops booking link
 
 ## Shipped this turn
 
-- Zod `parseTicketSummaryForm` before saving an AI ticket summary as an internal note
+- Zod `parseTourOpsLinkForm` for Wanders tour-ops deal/departure/pax booking link
 
 ## Already on main
 
