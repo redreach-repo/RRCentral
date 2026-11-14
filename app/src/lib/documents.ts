@@ -65,6 +65,7 @@ export {
   invoiceKindLabel,
   isInternalDraftId,
   isTempDocumentRef,
+  printsDraftBanner,
   type InvoiceKind,
 } from './documentRefs'
 import { isTempDocumentRef } from './documentRefs'
