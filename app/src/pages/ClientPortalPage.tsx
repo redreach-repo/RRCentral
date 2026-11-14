@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import BrandLogo from '../components/BrandLogo'
+import { useI18n } from '../contexts/I18nContext'
 import {
   PORTAL_MESSAGE_MAX,
   PORTAL_UPLOAD_TYPES,
@@ -54,6 +55,7 @@ const rowStyle: CSSProperties = {
  * this client's view.
  */
 export default function ClientPortalPage() {
+  const { t } = useI18n()
   const { hash } = useLocation()
   const token = decodeURIComponent(hash.replace(/^#/, ''))
   const [view, setView] = useState<PortalView | null>(null)
@@ -78,8 +80,10 @@ export default function ClientPortalPage() {
   }, [load])
 
   useEffect(() => {
-    document.title = view ? `${view.account.name}, client portal` : 'Client portal'
-  }, [view])
+    document.title = view
+      ? t('page.clientPortal.titleSuffix').replace('{name}', view.account.name)
+      : t('page.clientPortal.docTitle')
+  }, [view, t])
 
   if (!view) {
     return (
@@ -87,7 +91,9 @@ export default function ClientPortalPage() {
         <div style={column}>
           <BrandLogo height={32} />
           <section style={cardStyle}>
-            <p style={{ margin: 0, color: error ? colors.text : colors.muted }}>{loading ? 'Loading your portal…' : error}</p>
+            <p style={{ margin: 0, color: error ? colors.text : colors.muted }}>
+              {loading ? t('page.clientPortal.loading') : error}
+            </p>
           </section>
         </div>
       </div>
@@ -106,15 +112,24 @@ export default function ClientPortalPage() {
         <div>
           <h1 style={{ fontSize: 26, margin: '8px 0 4px' }}>{view.account.name}</h1>
           <p style={{ ...muted, margin: 0 }}>
-            {view.plan ? `${view.plan.packageName} package` : 'Your AI CRM'}
-            {view.plan?.supportResponse ? `, replies within ${view.plan.supportResponse}` : ''}
+            {view.plan
+              ? t('page.clientPortal.package').replace('{name}', view.plan.packageName)
+              : t('page.clientPortal.defaultPlan')}
+            {view.plan?.supportResponse
+              ? t('page.clientPortal.repliesWithin').replace('{window}', view.plan.supportResponse)
+              : ''}
             {view.account.reference ? `, ${view.account.reference}` : ''}
           </p>
         </div>
 
-        <Section title="Build progress">
+        <Section title={t('page.clientPortal.buildProgress')}>
           <p style={{ margin: '0 0 10px', fontSize: 14 }}>
-            {build.live ? 'Your system is live.' : `${build.done} of ${build.total} stages done. Now: ${build.current}.`}
+            {build.live
+              ? t('page.clientPortal.systemLive')
+              : t('page.clientPortal.stagesDone')
+                  .replace('{done}', String(build.done))
+                  .replace('{total}', String(build.total))
+                  .replace('{current}', build.current)}
           </p>
           <Bar percent={build.percent} />
           <ol style={{ margin: '12px 0 0', padding: 0, listStyle: 'none' }}>
@@ -131,11 +146,17 @@ export default function ClientPortalPage() {
         </Section>
 
         {view.goLive ? (
-          <Section title="Go live checklist">
+          <Section title={t('page.clientPortal.goLive')}>
             <p style={{ margin: '0 0 10px', fontSize: 14 }}>
               {view.goLive.done === view.goLive.total
-                ? 'Everything is done.'
-                : `${view.goLive.done} of ${view.goLive.total} steps done${view.goLive.goLiveDate ? `. Go live planned for ${view.goLive.goLiveDate}` : ''}.`}
+                ? t('page.clientPortal.everythingDone')
+                : `${t('page.clientPortal.stepsDone')
+                    .replace('{done}', String(view.goLive.done))
+                    .replace('{total}', String(view.goLive.total))}${
+                    view.goLive.goLiveDate
+                      ? t('page.clientPortal.goLivePlanned').replace('{date}', view.goLive.goLiveDate)
+                      : ''
+                  }.`}
             </p>
             <Bar percent={view.goLive.percent} />
             <ol style={{ margin: '12px 0 0', padding: 0, listStyle: 'none' }}>
@@ -154,24 +175,26 @@ export default function ClientPortalPage() {
           </Section>
         ) : null}
 
-        <Section title={`Your requests (${view.openTickets.length} open)`}>
+        <Section
+          title={t('page.clientPortal.requests').replace('{n}', String(view.openTickets.length))}
+        >
           {view.openTickets.length === 0 ? (
-            <p style={{ ...muted, margin: 0 }}>Nothing open right now.</p>
+            <p style={{ ...muted, margin: 0 }}>{t('page.clientPortal.nothingOpen')}</p>
           ) : (
             <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-              {view.openTickets.map((t, i) => (
-                <TicketRow key={t.id || `${t.subject}-${i}`} token={token} ticket={t} onDone={load} />
+              {view.openTickets.map((ticket, i) => (
+                <TicketRow key={ticket.id || `${ticket.subject}-${i}`} token={token} ticket={ticket} onDone={load} />
               ))}
             </ul>
           )}
           {view.recentlyResolved.length ? (
             <>
-              <div style={{ ...muted, margin: '14px 0 4px' }}>Done recently</div>
+              <div style={{ ...muted, margin: '14px 0 4px' }}>{t('page.clientPortal.doneRecently')}</div>
               <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-                {view.recentlyResolved.map((t, i) => (
-                  <li key={`${t.subject}-${i}`} style={rowStyle}>
-                    <span>{t.subject}</span>
-                    <span style={muted}>{t.resolved}</span>
+                {view.recentlyResolved.map((ticket, i) => (
+                  <li key={`${ticket.subject}-${i}`} style={rowStyle}>
+                    <span>{ticket.subject}</span>
+                    <span style={muted}>{ticket.resolved}</span>
                   </li>
                 ))}
               </ul>
@@ -180,7 +203,7 @@ export default function ClientPortalPage() {
         </Section>
 
         {view.quotes.length ? (
-          <Section title="Quotes">
+          <Section title={t('page.clientPortal.quotes')}>
             <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
               {view.quotes.map((q) => (
                 <QuoteRow key={q.id} token={token} quote={q} onDone={load} />
@@ -190,7 +213,7 @@ export default function ClientPortalPage() {
         ) : null}
 
         {view.invoices.length ? (
-          <Section title="Invoices">
+          <Section title={t('page.clientPortal.invoices')}>
             <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
               {view.invoices.map((inv) => (
                 <InvoiceRow key={inv.id} invoice={inv} />
@@ -199,11 +222,11 @@ export default function ClientPortalPage() {
           </Section>
         ) : null}
 
-        <Section title="Send us a file">
+        <Section title={t('page.clientPortal.sendFile')}>
           <UploadForm token={token} onDone={load} />
           {view.uploads.length ? (
             <>
-              <div style={{ ...muted, margin: '14px 0 4px' }}>Files you sent</div>
+              <div style={{ ...muted, margin: '14px 0 4px' }}>{t('page.clientPortal.filesSent')}</div>
               <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
                 {view.uploads.map((u, i) => (
                   <li key={`${u.filename}-${i}`} style={rowStyle}>
@@ -218,9 +241,9 @@ export default function ClientPortalPage() {
           ) : null}
         </Section>
 
-        <Section title="Usage against your plan">
+        <Section title={t('page.clientPortal.usage')}>
           {view.usage.length === 0 ? (
-            <p style={{ ...muted, margin: 0 }}>No usage recorded yet.</p>
+            <p style={{ ...muted, margin: 0 }}>{t('page.clientPortal.noUsage')}</p>
           ) : (
             <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))' }}>
               {view.usage.map((u) => (
@@ -231,7 +254,7 @@ export default function ClientPortalPage() {
         </Section>
 
         <Section
-          title="Monthly report"
+          title={t('page.clientPortal.monthlyReport')}
           action={
             <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <select
@@ -251,12 +274,12 @@ export default function ClientPortalPage() {
                 onClick={() => window.print()}
                 style={{ background: 'transparent', color: colors.muted, border: `1px solid ${colors.border}`, borderRadius: 8, padding: '6px 10px', cursor: 'pointer' }}
               >
-                Print
+                {t('page.clientPortal.print')}
               </button>
             </span>
           }
         >
-          {loading ? <p style={{ ...muted, margin: '0 0 8px' }}>Loading…</p> : null}
+          {loading ? <p style={{ ...muted, margin: '0 0 8px' }}>{t('page.clientPortal.loadingShort')}</p> : null}
           <h3 style={{ fontSize: 14, margin: '0 0 6px' }}>Hours</h3>
           <p style={{ margin: '0 0 6px', fontSize: 14 }}>
             <strong>{report.hours}h</strong> worked in {report.label}
