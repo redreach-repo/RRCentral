@@ -1,22 +1,21 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — outbox worker + CRM a11y
+**Current milestone:** Continuous backlog — CRM minimal redesign
 
 ## Shipped this turn
 
-- `event-outbox` Edge Function + `rr_claim_event_outbox` (retry / DLQ); see `docs/event-outbox.md`
-- CRM accessibility: skip link, route announcer, modal/command-palette focus traps, reduced motion, toast alerts
+- Modern minimalist CRM chrome: quieter tokens, flatter shell/sidebar/topbar, solid page titles, dark Cmd+K, quieter dashboard/docs list surfaces (brand orange kept as accent)
 
 ## Already on main
 
-- Continuous backlog through M3 Pipeline façade · Zod · Guide · Cmd+K · QTSP · `pipeline_deals_v` · outbox enqueue
+- Continuous backlog through M3 · Zod · Guide · Cmd+K · QTSP · outbox worker · a11y basics
 
 ## Still open (agent queue)
 
 1. Domain-specific outbox handlers (digest / webhooks / HubSpot)  
-2. Demo env hooks after Alfred provisions  
-3. Broader a11y pass (forms, tables, phone nav)
+2. Broader page-by-page visual pass (pipeline board, deal sheets)  
+3. Demo env hooks after Alfred provisions  
 
 ## Still externally blocked
 

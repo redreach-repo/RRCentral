@@ -17,7 +17,7 @@ const screen: CSSProperties = {
   minHeight: '100vh',
   display: 'grid',
   placeItems: 'center',
-  background: '#121417',
+  background: '#0b0c0e',
   color: 'rgba(255,255,255,0.9)',
   fontFamily: "'DM Sans', sans-serif",
   padding: 16,

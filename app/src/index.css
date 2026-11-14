@@ -6,6 +6,31 @@
   box-sizing: border-box;
 }
 
+:root {
+  /* Minimal CRM surface — Red Reach ink + sparingly used orange */
+  --bg: #0b0c0e;
+  --bg-elevated: #111214;
+  --sidebar: #0f1012;
+  --surface: #141518;
+  --surface-2: #181a1e;
+  --accent: #e85d04;
+  --accent-soft: #ff9f4a;
+  --accent-muted: rgba(232, 93, 4, 0.14);
+  --card: rgba(255, 255, 255, 0.03);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --text: #f4f5f7;
+  --muted: rgba(244, 245, 247, 0.58);
+  --muted-2: rgba(244, 245, 247, 0.38);
+  --success: #3ecf8e;
+  --danger: #f07178;
+  --warn: #e6b450;
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 40px rgba(0, 0, 0, 0.35);
+  --radius: 10px;
+  --radius-sm: 8px;
+  --space-page: clamp(20px, 2.4vw, 32px);
+}
+
 html {
   -webkit-text-size-adjust: 100%;
 }
@@ -16,12 +41,13 @@ body {
   min-height: 100dvh;
   font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
   font-optical-sizing: auto;
-  background: #0e1013;
-  color: #f2f4f7;
+  background: var(--bg);
+  color: var(--text);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  letter-spacing: -0.005em;
 }
 
 #root {
@@ -56,42 +82,27 @@ img {
 }
 
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.03);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(232, 93, 4, 0.45);
+  background: rgba(232, 93, 4, 0.4);
 }
 
 ::selection {
-  background: rgba(232, 93, 4, 0.35);
+  background: rgba(232, 93, 4, 0.32);
   color: #fff;
 }
-
-:root {
-  --bg: #0e1013;
-  --sidebar: #1a1d22;
-  --accent: #e85d04;
-  --accent-soft: #ff9f4a;
-  --card: rgba(255, 255, 255, 0.05);
-  --border: rgba(255, 255, 255, 0.12);
-  --text: #f2f4f7;
-  --muted: rgba(255, 255, 255, 0.5);
-  --success: #22c55e;
-  --danger: #ef4444;
-  --shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
-}
-
 
 /* rr-a11y */
 .rr-sr-only {
@@ -112,9 +123,9 @@ img {
   top: 12px;
   z-index: 10050;
   padding: 10px 14px;
-  border-radius: 8px;
-  background: #f2f4f7;
-  color: #0e1013;
+  border-radius: var(--radius-sm);
+  background: var(--text);
+  color: var(--bg);
   font-size: 14px;
   font-weight: 650;
   text-decoration: none;
@@ -125,12 +136,12 @@ img {
 .rr-skip-link:focus,
 .rr-skip-link:focus-visible {
   transform: translateY(0);
-  outline: 2px solid #e85d04;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
 :focus-visible {
-  outline: 2px solid #e85d04;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
