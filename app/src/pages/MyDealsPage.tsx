@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { Briefcase, Columns3, List } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
@@ -114,6 +115,7 @@ type PendingPatch = {
  * Drag a card (or pick a stage) to move it; Won/Lost asks for a reason.
  */
 export default function MyDealsPage() {
+  const { t } = useI18n()
   const { user, userRole, appUserId } = useAuth()
   const { settings } = useSettings()
   const { showToast } = useToast()
@@ -583,10 +585,10 @@ export default function MyDealsPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Sales · Work</p>
-          <h1 className={docsStyles.title}>Pipeline</h1>
+          <p className={docsStyles.kicker}>{t('page.deals.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.deals.title')}</h1>
           <p className={docsStyles.subtitle}>
-            CRM, AI CRM sales, and CTRM Next in one board. Drag a card or change its stage here.
+            {t('page.deals.subtitle')}
             {manageStagesHref ? (
               <>
                 {' '}

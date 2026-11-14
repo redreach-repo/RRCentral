@@ -29,6 +29,7 @@ import { parseCrmOutcomeForm } from '../lib/schemas/crmOutcome'
 import LostReasonFields from '../components/deals/LostReasonFields'
 import type { ActivityLogEntry, AppUser, CrmContact, CrmEntry, CustomerDocument, Invoice, Quotation } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { logActivity } from '../lib/activity'
@@ -184,6 +185,7 @@ function followUpColor(dateStr: string | null): string {
 }
 
 export default function CrmPage() {
+  const { t } = useI18n()
   const { user, userRole, appUserId } = useAuth()
   const { settings } = useSettings()
   const { showToast } = useToast()
@@ -1162,18 +1164,20 @@ export default function CrmPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Sales · Work</p>
-          <h1 className={docsStyles.title}>My Day</h1>
+          <p className={docsStyles.kicker}>{t('page.crm.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.crm.title')}</h1>
           <p className={docsStyles.subtitle}>
-            {compact
-              ? 'Overdue + today. Log the next touch, then move on.'
-              : 'Start with what is due. Full funnel across CRM, AI CRM, and CTRM is on '}
-            {!compact ? (
-              <Link to="/deals" style={{ color: colors.accent }}>
-                Pipeline
-              </Link>
-            ) : null}
-            {!compact ? '.' : null}
+            {compact ? (
+              t('page.crm.subtitleCompact')
+            ) : (
+              <>
+                {t('page.crm.subtitleLead')}{' '}
+                <Link to="/deals" style={{ color: colors.accent }}>
+                  {t('page.dashboard.pipeline')}
+                </Link>
+                .
+              </>
+            )}
           </p>
         </div>
         <button
@@ -1182,7 +1186,7 @@ export default function CrmPage() {
           style={{ minHeight: compact ? 44 : undefined }}
           onClick={openCreate}
         >
-          <Plus size={16} /> Add company
+          <Plus size={16} /> {t('page.crm.addCompany')}
         </button>
       </header>
 
@@ -1250,7 +1254,7 @@ export default function CrmPage() {
             <span className={resp.dueTileValue} style={{ color: colors.warn }}>
               {dueCounts.overdue + dueCounts.today}
             </span>
-            <span className={resp.dueTileLabel}>My Day</span>
+            <span className={resp.dueTileLabel}>{t('page.crm.title')}</span>
           </button>
           <button
             type="button"

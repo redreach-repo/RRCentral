@@ -43,6 +43,7 @@ import { domainAlertLabel, domainRenewalAlerts } from '../lib/domainAlerts'
 import { syncUnansweredQuoteFollowUps } from '../lib/quoteFollowUpSync'
 import { useSettings } from '../contexts/SettingsContext'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { can } from '../lib/permissions'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
@@ -65,6 +66,7 @@ import { errorMessage } from '../lib/errors'
 export default function DashboardPage() {
   const { userRole } = useAuth()
   const { settings } = useSettings()
+  const { t } = useI18n()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [quotations, setQuotations] = useState<Quotation[]>([])
@@ -265,7 +267,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className={dash.page} style={pageStyle}>
-        <PageHeader title="Dashboard" subtitle="Loading metrics…" />
+        <PageHeader title={t('page.dashboard.title')} subtitle={t('page.dashboard.loading')} />
       </div>
     )
   }
@@ -273,7 +275,7 @@ export default function DashboardPage() {
   if (error) {
     return (
       <div className={dash.page} style={pageStyle}>
-        <PageHeader title="Dashboard" />
+        <PageHeader title={t('page.dashboard.title')} />
         <div style={{ ...cardStyle, color: colors.danger }}>{error}</div>
       </div>
     )
@@ -283,33 +285,29 @@ export default function DashboardPage() {
   const heroLine =
     myDayCount > 0
       ? myDayCount === 1
-        ? 'One follow-up needs you.'
-        : `${myDayCount} follow-ups need you.`
-      : 'Nothing overdue or due today. Nice work.'
+        ? t('page.dashboard.heroOneFollowUp')
+        : t('page.dashboard.heroNFollowUps').replace('{n}', String(myDayCount))
+      : t('page.dashboard.heroClearLine')
 
   return (
     <div className={dash.page} style={pageStyle}>
-      <section className={dash.hero} aria-label="Today">
+      <section className={dash.hero} aria-label={t('page.dashboard.heroToday')}>
         <p className={dash.heroEyebrow}>{weekday} · Red Reach Central</p>
         <h1 className={dash.heroTitle}>
-          {myDayCount > 0 ? (
-            <>
-              Start with <em>My Day</em>
-            </>
-          ) : (
-            <>Your board is clear</>
-          )}
+          {myDayCount > 0 ? t('page.dashboard.heroTitleDue') : t('page.dashboard.heroTitleClear')}
         </h1>
-        <p className={dash.heroLead}>{heroLine} Income below counts paid and awarded invoices only.</p>
+        <p className={dash.heroLead}>
+          {heroLine} {t('page.dashboard.heroIncomeNote')}
+        </p>
         <div className={dash.heroActions}>
           <Link to="/crm?follow=Due&owner=me" className={dash.heroPrimary}>
-            <CalendarClock size={16} /> Open My Day
+            <CalendarClock size={16} /> {t('page.dashboard.openMyDay')}
           </Link>
           <Link to="/deals?view=board" className={dash.heroSecondary}>
-            Pipeline <ArrowRight size={14} />
+            {t('page.dashboard.pipeline')} <ArrowRight size={14} />
           </Link>
           <Link to="/quotations" className={dash.heroSecondary}>
-            Quotations
+            {t('page.dashboard.quotations')}
           </Link>
         </div>
         <div className={dash.heroStats}>
@@ -317,15 +315,15 @@ export default function DashboardPage() {
             <div className={`${dash.heroStatValue} ${overdueFollowUps ? dash.heroStatValueWarn : ''}`}>
               {overdueFollowUps}
             </div>
-            <div className={dash.heroStatLabel}>Overdue</div>
+            <div className={dash.heroStatLabel}>{t('page.dashboard.overdue')}</div>
           </div>
           <div className={dash.heroStat}>
             <div className={dash.heroStatValue}>{dueTodayFollowUps}</div>
-            <div className={dash.heroStatLabel}>Due today</div>
+            <div className={dash.heroStatLabel}>{t('page.dashboard.dueToday')}</div>
           </div>
           <div className={dash.heroStat}>
             <div className={dash.heroStatValue}>{openPipeline}</div>
-            <div className={dash.heroStatLabel}>Open deals</div>
+            <div className={dash.heroStatLabel}>{t('page.dashboard.openDeals')}</div>
           </div>
         </div>
       </section>
@@ -337,74 +335,80 @@ export default function DashboardPage() {
         </p>
       ) : null}
 
-      <section className={dash.section} aria-label="This month">
+      <section className={dash.section} aria-label={t('page.dashboard.thisMonth')}>
         <div className={dash.sectionHead}>
-          <h2 className={dash.sectionTitle}>This month · {monthLabel}</h2>
+          <h2 className={dash.sectionTitle}>
+            {t('page.dashboard.thisMonth')} · {monthLabel}
+          </h2>
           <Link to="/reports" className={dash.sectionLink}>
-            Reports
+            {t('page.dashboard.reports')}
           </Link>
         </div>
         <div className={dash.moneyRow}>
           <div className={dash.moneyCard}>
-            <div className={dash.moneyLabel}>Income</div>
+            <div className={dash.moneyLabel}>{t('page.dashboard.income')}</div>
             <div className={dash.moneyValue} style={{ color: colors.success }}>
               {formatMoney(monthIncome)}
             </div>
-            <div className={dash.moneyHint}>YTD paid {formatMoney(ytdIncome)}</div>
+            <div className={dash.moneyHint}>
+              {t('page.dashboard.ytdPaid').replace('{amount}', formatMoney(ytdIncome))}
+            </div>
           </div>
           <div className={dash.moneyCard}>
-            <div className={dash.moneyLabel}>Expenses</div>
+            <div className={dash.moneyLabel}>{t('page.dashboard.expenses')}</div>
             <div className={dash.moneyValue} style={{ color: colors.danger }}>
               {formatMoney(monthExpenses)}
             </div>
-            <div className={dash.moneyHint}>YTD {formatMoney(ytdExpenses)}</div>
+            <div className={dash.moneyHint}>
+              {t('page.dashboard.ytd').replace('{amount}', formatMoney(ytdExpenses))}
+            </div>
           </div>
           <div className={dash.moneyCard}>
-            <div className={dash.moneyLabel}>Net</div>
+            <div className={dash.moneyLabel}>{t('page.dashboard.net')}</div>
             <div
               className={dash.moneyValue}
               style={{ color: monthNet >= 0 ? colors.success : colors.danger }}
             >
               {formatMoney(monthNet)}
             </div>
-            <div className={dash.moneyHint}>Income − expenses</div>
+            <div className={dash.moneyHint}>{t('page.dashboard.netHint')}</div>
           </div>
         </div>
       </section>
 
-      <section className={dash.section} aria-label="Schedule">
+      <section className={dash.section} aria-label={t('page.dashboard.schedule')}>
         <div className={dash.sectionHead}>
-          <h2 className={dash.sectionTitle}>Schedule</h2>
+          <h2 className={dash.sectionTitle}>{t('page.dashboard.schedule')}</h2>
           <Link to="/follow-ups" className={dash.sectionLink}>
-            All follow-ups
+            {t('page.dashboard.allFollowUps')}
           </Link>
         </div>
         <ZohoCalendarPanel crmEntries={crm} />
       </section>
 
-      <section className={dash.section} aria-label="Pipeline">
+      <section className={dash.section} aria-label={t('page.dashboard.pipeline')}>
         <div className={dash.sectionHead}>
-          <h2 className={dash.sectionTitle}>Pipeline</h2>
+          <h2 className={dash.sectionTitle}>{t('page.dashboard.pipeline')}</h2>
           <Link to="/crm" className={dash.sectionLink}>
-            Open My Day
+            {t('page.dashboard.openMyDay')}
           </Link>
         </div>
         <div className={dash.pulseRow}>
           <Link to="/quotations" className={dash.pulseLink}>
             <div className={dash.pulseValue}>{openQuotes}</div>
-            <div className={dash.pulseLabel}>Open quotes</div>
+            <div className={dash.pulseLabel}>{t('page.dashboard.openQuotes')}</div>
           </Link>
           <Link to="/crm" className={dash.pulseLink}>
             <div className={dash.pulseValue}>{openPipeline}</div>
-            <div className={dash.pulseLabel}>Open deals</div>
+            <div className={dash.pulseLabel}>{t('page.dashboard.openDeals')}</div>
           </Link>
           <Link to="/invoices" className={dash.pulseLink}>
             <div className={dash.pulseValue}>{pendingInvoices}</div>
-            <div className={dash.pulseLabel}>Pending invoices</div>
+            <div className={dash.pulseLabel}>{t('page.dashboard.pendingInvoices')}</div>
           </Link>
           <Link to="/crm?follow=Due&owner=me" className={dash.pulseLink}>
             <div className={dash.pulseValue}>{overdueFollowUps}</div>
-            <div className={dash.pulseLabel}>Overdue follow-ups</div>
+            <div className={dash.pulseLabel}>{t('page.dashboard.overdueFollowUps')}</div>
           </Link>
         </div>
         <div className={dash.stageRow}>

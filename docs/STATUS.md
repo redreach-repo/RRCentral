@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — tenant isolation for expenses/DNs
+**Current milestone:** Continuous backlog — page body EN+AR catalogs
 
 ## Shipped this turn
 
-- Expanded `tenant_isolation_test.sql` for **expenses** and **delivery_notes** (read isolation + forged insert blocked)
+- Page-body EN+AR catalogs for **Dashboard**, **My Day**, **Pipeline**, and **Login** chrome (`page.*` keys + `pageI18n.test.ts`)
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR nav · QTSP · outbox · digest · HubSpot · System check · tenant CI (invoices/deals) · a11y · chrome · pipeline density
+- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR nav · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome · pipeline density
 
 ## Still open (agent queue)
 

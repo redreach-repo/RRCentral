@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth, LOGIN_DOMAIN_REJECT_KEY } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { authApi, MIN_PASSWORD_LENGTH } from '../lib/authApi'
 import { parseLoginCredentials } from '../lib/schemas/login'
 import BrandLogo from '../components/BrandLogo'
@@ -19,6 +20,7 @@ function friendlyAuthError(raw: string): string {
 }
 
 export default function LoginPage() {
+  const { t } = useI18n()
   const { user, loading, signInWithPassword, isLocalMode } = useAuth()
   const location = useLocation()
   const [email, setEmail] = useState('')
@@ -47,7 +49,7 @@ export default function LoginPage() {
   if (loading) {
     return (
       <div className={styles.page}>
-        <div className={styles.card}>Loading…</div>
+        <div className={styles.card}>{t('page.login.loading')}</div>
       </div>
     )
   }
@@ -82,10 +84,8 @@ export default function LoginPage() {
       <div className={styles.glow} aria-hidden />
       <div className={styles.card}>
         <BrandLogo height={52} className={styles.logo} />
-        <h1 className={styles.title}>RED REACH Central</h1>
-        <p className={styles.subtitle}>
-          Multi-division CRM &amp; quoting for Red Reach Middle East FZE
-        </p>
+        <h1 className={styles.title}>{t('page.login.title')}</h1>
+        <p className={styles.subtitle}>{t('page.login.subtitle')}</p>
         <p className={styles.bookmark}>
           Bookmark: <code className={styles.bookmarkUrl}>…/RRCentral/login</code>
         </p>
@@ -98,7 +98,7 @@ export default function LoginPage() {
             </p>
           )}
           <label className={styles.fieldLabel} htmlFor="login-email">
-            Email (@redreach.ae)
+            {t('page.login.email')}
           </label>
           <input
             id="login-email"
@@ -131,7 +131,7 @@ export default function LoginPage() {
             </div>
           )}
           <label className={styles.fieldLabel} htmlFor="login-password">
-            Password
+            {t('page.login.password')}
           </label>
           <input
             id="login-password"
@@ -148,7 +148,7 @@ export default function LoginPage() {
           />
           {error && <p className={styles.error}>{error}</p>}
           <button type="submit" className={styles.submitBtn} disabled={submitting}>
-            {submitting ? 'Signing in…' : 'Sign in'}
+            {submitting ? t('page.login.signingIn') : t('page.login.signIn')}
           </button>
         </form>
 
