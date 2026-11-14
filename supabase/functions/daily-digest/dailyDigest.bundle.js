@@ -1793,6 +1793,23 @@ function subMonths(date, amount, options) {
   return addMonths(date, -amount, options);
 }
 
+// src/lib/product.ts
+var PRODUCT = {
+  name: "HighMast",
+  shortName: "HighMast",
+  endorsement: "by Red Reach",
+  tagline: "CRM, quoting, delivery and finance for growing teams",
+  description: "HighMast \u2014 CRM, quoting, delivery and finance by Red Reach",
+  colors: {
+    red: "#C8321A",
+    orange: "#E8872A",
+    charcoal: "#1A1A1A",
+    grey: "#6E6E6E",
+    warmGrey: "#B8B2AC",
+    paper: "#F7F4F1"
+  }
+};
+
 // src/lib/config.ts
 var DIVISIONS = [
   { code: "01", brand: "RR Threads", category: "Uniforms" },
@@ -2315,8 +2332,11 @@ function digestDateLabel(d) {
 function digestEmail(d, appUrl) {
   const base = appUrl.replace(/\/$/, "");
   const count = digestCount(d);
-  const subject = count === 0 ? `RR Central digest for ${digestDateLabel(d)}: all clear` : `RR Central digest for ${digestDateLabel(d)}: ${count} ${count === 1 ? "thing needs" : "things need"} attention`;
-  const lines = [`Good morning. Here is what needs attention in RR Central today, ${digestDateLabel(d)}.`, ""];
+  const subject = count === 0 ? `${PRODUCT.name} digest for ${digestDateLabel(d)}: all clear` : `${PRODUCT.name} digest for ${digestDateLabel(d)}: ${count} ${count === 1 ? "thing needs" : "things need"} attention`;
+  const lines = [
+    `Good morning. Here is what needs attention in ${PRODUCT.name} today, ${digestDateLabel(d)}.`,
+    ""
+  ];
   for (const s of digestSections(d)) {
     lines.push(`${s.title} (${s.items.length})`);
     if (s.items.length === 0) lines.push(`  ${s.empty}`);
@@ -2328,7 +2348,9 @@ function digestEmail(d, appUrl) {
   }
   lines.push(`Open the dashboard: ${base}/app`);
   lines.push("");
-  lines.push("You get this because you are on the daily digest list in RR Central (Packages and rates).");
+  lines.push(
+    `You get this because you are on the daily digest list in ${PRODUCT.name} (Packages and rates).`
+  );
   return { subject, body: lines.join("\n") };
 }
 function digestWhatsAppValues(d) {

@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { PRODUCT } from '../lib/product'
 import TwoStepGate from './security/TwoStepGate'
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -42,9 +43,9 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
         }}
       >
         <div style={{ maxWidth: 420, textAlign: 'center' }}>
-          <h1 style={{ fontSize: 22, marginBottom: 12 }}>No access to RR Central</h1>
+          <h1 style={{ fontSize: 22, marginBottom: 12 }}>No access to {PRODUCT.name}</h1>
           <p style={{ color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, marginBottom: 20 }}>
-            {user.email} is signed in but is not on the RR Central team list. Ask an admin to add
+            {user.email} is signed in but is not on the {PRODUCT.name} team list. Ask an admin to add
             you under Settings → Users, then sign in again.
           </p>
           <button

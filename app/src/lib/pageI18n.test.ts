@@ -49,6 +49,7 @@ const PAGE_KEYS = [
   'page.customerFiles.subtitle',
   'page.customerFiles.openDrive',
   'page.login.title',
+  'page.login.endorsement',
   'page.login.subtitle',
   'page.login.email',
   'page.login.password',

@@ -4,9 +4,11 @@ import { useAuth, LOGIN_DOMAIN_REJECT_KEY } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { authApi, MIN_PASSWORD_LENGTH } from '../lib/authApi'
 import { parseLoginCredentials } from '../lib/schemas/login'
-import BrandLogo from '../components/BrandLogo'
 import styles from './LoginPage.module.css'
 import { errorMessage } from '../lib/errors'
+import { PRODUCT, productAssetUrls } from '../lib/product'
+
+const highmastAssets = productAssetUrls(import.meta.env.BASE_URL)
 
 function friendlyAuthError(raw: string): string {
   const msg = raw.toLowerCase()
@@ -83,8 +85,14 @@ export default function LoginPage() {
     <div className={styles.page}>
       <div className={styles.glow} aria-hidden />
       <div className={styles.card}>
-        <BrandLogo height={52} className={styles.logo} />
-        <h1 className={styles.title}>{t('page.login.title')}</h1>
+        <img
+          src={highmastAssets.stacked}
+          alt={PRODUCT.name}
+          className={styles.logo}
+          height={72}
+        />
+        <p className={styles.endorsement}>{t('page.login.endorsement')}</p>
+        <h1 className={styles.srOnly}>{t('page.login.title')}</h1>
         <p className={styles.subtitle}>{t('page.login.subtitle')}</p>
         <p className={styles.bookmark}>
           Bookmark: <code className={styles.bookmarkUrl}>…/RRCentral/login</code>
@@ -153,6 +161,7 @@ export default function LoginPage() {
         </form>
 
         <p className={styles.subtitle} style={{ marginTop: 22, marginBottom: 0 }}>
+          {PRODUCT.endorsement} ·{' '}
           <a href="https://www.redreach.ae" style={{ color: 'rgba(255,255,255,0.55)' }}>
             www.redreach.ae
           </a>

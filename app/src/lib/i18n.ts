@@ -68,7 +68,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'nav.item.audit-log': 'Audit log',
     'nav.item.app-errors': 'App errors',
     'nav.item.system-check': 'System check',
-    'guide.title': 'How we work in RR Central',
+    'guide.title': 'How we work in HighMast',
     'guide.body':
       'Short paths for the sales day, money, client care, operations, finance, and admin: My Day through obligations, Wanders through Domains, Vendors through Duplicates, then Settings, module flags, System check, Audit log, and App errors.',
     'guide.back': 'Back to app',
@@ -249,8 +249,9 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.customerFiles.subtitle':
       'Every customer document lives in Google Drive. RR Central keeps the folder links — quotes, invoices, delivery notes, communications, purchasing, and signed copies.',
     'page.customerFiles.openDrive': 'Open in Drive',
-    'page.login.title': 'RED REACH Central',
-    'page.login.subtitle': 'Multi-division CRM & quoting for Red Reach Middle East FZE',
+    'page.login.title': 'HighMast',
+    'page.login.endorsement': 'by Red Reach',
+    'page.login.subtitle': 'CRM, quoting, delivery and finance for growing teams',
     'page.login.email': 'Email (@redreach.ae)',
     'page.login.password': 'Password',
     'page.login.signIn': 'Sign in',
@@ -965,7 +966,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'nav.item.audit-log': 'سجل التدقيق',
     'nav.item.app-errors': 'أخطاء التطبيق',
     'nav.item.system-check': 'فحص النظام',
-    'guide.title': 'كيف نعمل في RR Central',
+    'guide.title': 'كيف نعمل في HighMast',
     'guide.body':
       'مسارات قصيرة ليوم المبيعات والمال ورعاية العملاء والعمليات والمالية والإدارة: من يومي إلى الالتزامات، وWanders إلى النطاقات، والموردين إلى المكررات، ثم الإعدادات وأعلام الوحدات وفحص النظام وسجل التدقيق وأخطاء التطبيق.',
     'guide.back': 'العودة إلى التطبيق',
@@ -1146,8 +1147,9 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.customerFiles.subtitle':
       'كل مستند عميل يعيش في Google Drive. RR Central يحتفظ بروابط المجلدات — العروض والفواتير وإشعارات التسليم والمراسلات والمشتريات والنسخ الموقّعة.',
     'page.customerFiles.openDrive': 'فتح في Drive',
-    'page.login.title': 'RED REACH Central',
-    'page.login.subtitle': 'CRM وعروض أسعار متعددة الأقسام لـ Red Reach Middle East FZE',
+    'page.login.title': 'HighMast',
+    'page.login.endorsement': 'من Red Reach',
+    'page.login.subtitle': 'إدارة علاقات العملاء والعروض والتسليم والمالية للفرق النامية',
     'page.login.email': 'البريد (@redreach.ae)',
     'page.login.password': 'كلمة المرور',
     'page.login.signIn': 'تسجيل الدخول',
