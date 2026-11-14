@@ -6,6 +6,7 @@
 // (including "not set up yet" 503s). Rows have kind 'function' and the
 // function name in `page`, so admins see them on App errors and System check.
 
+import { installDemoGuard } from "./demoGuard.ts"
 import { scrubText } from "./scrub.ts"
 import { sendToSentry } from "./sentry.ts"
 import { logEdge, requestIdFor } from "./structuredLog.ts"
@@ -120,6 +121,8 @@ function short(text: string): string {
 }
 
 export function withErrorLog(fn: string, handler: Handler, opts: HealthOptions = {}): Handler {
+  // Demo isolation (gap plan module 4): in a demo project nothing leaves except calls to its own Supabase.
+  installDemoGuard()
   return async (req: Request) => {
     if (new URL(req.url).searchParams.get("ping") === "1") return ping(req, fn, opts)
     // One structured line per request (gap plan module 3): fn, method, path, status, duration, request id.
