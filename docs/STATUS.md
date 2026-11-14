@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — EN+AR weekly updates queue chrome
+**Current milestone:** Continuous backlog — ops guide pack
 
 ## Shipped this turn
 
-- Wired **ClientUpdatesPage** queue toolbar, empty states, and draft-card actions through EN+AR catalogs
+- Added **operations** content pack to `/guide` (Wanders, Catalog, Inventory, Templates, Domains)
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs · Cmd+K · module flags (incl. sales) · EN+AR (incl. monthly reports queue) · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome
+- Continuous backlog · Zod · Guide packs (CRM/billing/delivery/admin) · Cmd+K · module flags · EN+AR · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome
 
 ## Still open (agent queue)
 

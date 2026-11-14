@@ -70,11 +70,12 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'nav.item.system-check': 'System check',
     'guide.title': 'How we work in RR Central',
     'guide.body':
-      'Short paths for the sales day, money, client care, and admin: My Day through obligations, then Settings, module flags, System check, Audit log, and App errors.',
+      'Short paths for the sales day, money, client care, operations, and admin: My Day through obligations, then Wanders through Domains, then Settings, module flags, System check, Audit log, and App errors.',
     'guide.back': 'Back to app',
     'guide.pack.crm': 'Sales day',
     'guide.pack.billing': 'Billing and money',
     'guide.pack.delivery': 'Delivery and care',
+    'guide.pack.ops': 'Operations',
     'guide.pack.admin': 'Admin and platform',
     'guide.crm.myday.title': 'My Day',
     'guide.crm.myday.body':
@@ -156,6 +157,26 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.admin.appErrors.body':
       'Browser and function failures saved for triage. Clear resolved rows after you fix the cause.',
     'guide.admin.appErrors.link': 'Open App errors',
+    'guide.ops.wanders.title': 'Wanders',
+    'guide.ops.wanders.body':
+      'Travel leads, packages, partners, departures and bookings for RR Wanders — kept separate from RR Threads deals.',
+    'guide.ops.wanders.link': 'Open Wanders',
+    'guide.ops.catalog.title': 'Catalog',
+    'guide.ops.catalog.body':
+      'Brand catalogues and products across divisions. Sync SKUs when the list drifts from the source of truth.',
+    'guide.ops.catalog.link': 'Open Catalog',
+    'guide.ops.inventory.title': 'Inventory',
+    'guide.ops.inventory.body':
+      'Stock movements and on-hand quantities for catalogue SKUs so delivery and trading stay honest.',
+    'guide.ops.inventory.link': 'Open Inventory',
+    'guide.ops.templates.title': 'Templates',
+    'guide.ops.templates.body':
+      'Reusable quote templates so new quotations start from a known set of lines instead of a blank page.',
+    'guide.ops.templates.link': 'Open Templates',
+    'guide.ops.domains.title': 'Domains',
+    'guide.ops.domains.body':
+      'Owned domains, registrar notes, and renewals so client sites do not expire quietly.',
+    'guide.ops.domains.link': 'Open Domains',
     'page.dashboard.title': 'Dashboard',
     'page.dashboard.loading': 'Loading metrics…',
     'page.dashboard.heroToday': 'Today',
@@ -642,11 +663,12 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'nav.item.system-check': 'فحص النظام',
     'guide.title': 'كيف نعمل في RR Central',
     'guide.body':
-      'مسارات قصيرة ليوم المبيعات والمال ورعاية العملاء والإدارة: من يومي إلى الالتزامات، ثم الإعدادات وأعلام الوحدات وفحص النظام وسجل التدقيق وأخطاء التطبيق.',
+      'مسارات قصيرة ليوم المبيعات والمال ورعاية العملاء والعمليات والإدارة: من يومي إلى الالتزامات، ثم Wanders إلى النطاقات، ثم الإعدادات وأعلام الوحدات وفحص النظام وسجل التدقيق وأخطاء التطبيق.',
     'guide.back': 'العودة إلى التطبيق',
     'guide.pack.crm': 'يوم المبيعات',
     'guide.pack.billing': 'الفوترة والمال',
     'guide.pack.delivery': 'التسليم والرعاية',
+    'guide.pack.ops': 'العمليات',
     'guide.pack.admin': 'الإدارة والمنصة',
     'guide.crm.myday.title': 'يومي',
     'guide.crm.myday.body':
@@ -728,6 +750,26 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.admin.appErrors.body':
       'إخفاقات المتصفح والدوال محفوظة للفرز. امسح الصفوف المحلولة بعد إصلاح السبب.',
     'guide.admin.appErrors.link': 'فتح أخطاء التطبيق',
+    'guide.ops.wanders.title': 'Wanders',
+    'guide.ops.wanders.body':
+      'عملاء محتملون وباقات وشركاء ومغادرات وحجوزات لـ RR Wanders — منفصلة عن صفقات RR Threads.',
+    'guide.ops.wanders.link': 'فتح Wanders',
+    'guide.ops.catalog.title': 'الكتالوج',
+    'guide.ops.catalog.body':
+      'كتالوجات العلامات والمنتجات عبر الأقسام. زامن SKU عندما تبتعد القائمة عن مصدر الحقيقة.',
+    'guide.ops.catalog.link': 'فتح الكتالوج',
+    'guide.ops.inventory.title': 'المخزون',
+    'guide.ops.inventory.body':
+      'حركات المخزون والكميات المتاحة لـ SKU الكتالوج حتى يبقى التسليم والتجارة صادقين.',
+    'guide.ops.inventory.link': 'فتح المخزون',
+    'guide.ops.templates.title': 'القوالب',
+    'guide.ops.templates.body':
+      'قوالب عروض قابلة لإعادة الاستخدام حتى تبدأ العروض الجديدة من بنود معروفة لا من صفحة فارغة.',
+    'guide.ops.templates.link': 'فتح القوالب',
+    'guide.ops.domains.title': 'النطاقات',
+    'guide.ops.domains.body':
+      'النطاقات المملوكة وملاحظات المسجّل والتجديدات حتى لا تنتهي مواقع العملاء بهدوء.',
+    'guide.ops.domains.link': 'فتح النطاقات',
     'page.dashboard.title': 'لوحة التحكم',
     'page.dashboard.loading': 'جارٍ تحميل المقاييس…',
     'page.dashboard.heroToday': 'اليوم',
