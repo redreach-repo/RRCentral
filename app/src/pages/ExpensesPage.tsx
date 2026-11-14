@@ -5,6 +5,7 @@ import ExpenseRowActions from '../components/expenses/ExpenseRowActions'
 import { db } from '../lib/db'
 import { PAYMENT_METHODS, VAT_RATE } from '../lib/config'
 import { EXPENSE_CATEGORIES, parseExpenseForm } from '../lib/schemas/expense'
+import { parseExpensePdfPick } from '../lib/schemas/expensePdf'
 import type { Attachment, Expense, Quotation, Vendor } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { canViewField } from '../lib/fieldPermissions'
@@ -333,9 +334,10 @@ export default function ExpensesPage() {
     if (!files?.length) return
     try {
       const list = [...files]
-      const pdf = list.find((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name))
+      const pdf = list.find((f) => parseExpensePdfPick({ fileName: f.name, mimeType: f.type }).ok)
       if (!pdf) {
-        showToast('Choose a PDF to fill the form. Store the file on Google Drive and paste the link below.', 'error')
+        const bad = parseExpensePdfPick({ fileName: list[0]?.name || '', mimeType: list[0]?.type || '' })
+        showToast(bad.ok ? 'Choose a PDF to fill the form. Store the file on Google Drive and paste the link below.' : bad.error, 'error')
         return
       }
       setParsing(true)
