@@ -217,6 +217,14 @@ values (
   'b0000000-0000-4000-8000-000000000001'
 );
 
+insert into public.income (client_source, reference_number, description, tenant_id)
+values (
+  'Tenant B Secret Client',
+  'INC-TB-0001',
+  'Tenant B Secret Income',
+  'b0000000-0000-4000-8000-000000000001'
+);
+
 insert into public.event_outbox (event_type, aggregate_type, aggregate_id, tenant_id, status)
 values (
   'finalize_quote',
@@ -317,6 +325,10 @@ select pg_temp.expect(
   'redreach admin cannot read tenant B quote_templates'
 );
 select pg_temp.expect(
+  (select count(*) from public.income where reference_number = 'INC-TB-0001') = 0,
+  'redreach admin cannot read tenant B income'
+);
+select pg_temp.expect(
   (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 0,
   'redreach admin cannot read tenant B event_outbox'
 );
@@ -411,6 +423,10 @@ select pg_temp.expect(
 select pg_temp.expect(
   (select count(*) from public.quote_templates where description = 'Tenant B Secret Quote Template') = 1,
   'tenant B admin can read own quote_templates'
+);
+select pg_temp.expect(
+  (select count(*) from public.income where reference_number = 'INC-TB-0001') = 1,
+  'tenant B admin can read own income'
 );
 select pg_temp.expect(
   (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 1,
@@ -656,6 +672,22 @@ begin
     raise exception 'TENANT TEST FAILED: tenant B admin forged quote_template into redreach';
   end if;
   raise notice 'ok - tenant B cannot insert quote_template into redreach tenant_id';
+end $$;
+
+do $$
+declare
+  failed boolean := false;
+begin
+  begin
+    insert into public.income (client_source, reference_number, tenant_id)
+    values ('Forged Client', 'INC-FORGED', 'a0000000-0000-4000-8000-000000000001');
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: tenant B admin forged income into redreach';
+  end if;
+  raise notice 'ok - tenant B cannot insert income into redreach tenant_id';
 end $$;
 
 ------------------------------------------------------------ Append-only audit_log (authenticated cannot mutate)
