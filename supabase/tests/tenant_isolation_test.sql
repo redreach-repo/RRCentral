@@ -73,6 +73,42 @@ values ('Tenant B Secret Lead', 'b0000000-0000-4000-8000-000000000001');
 insert into public.vendors (company_name, tenant_id)
 values ('Tenant B Secret Vendor', 'b0000000-0000-4000-8000-000000000001');
 
+-- Broader stamped tables (GAP_PLAN: expand coverage beyond CRM/vendors).
+insert into public.accounts (type, name, reference, tenant_id)
+values (
+  'ai_crm_client',
+  'Tenant B Secret Account',
+  'AC-TB-0001',
+  'b0000000-0000-4000-8000-000000000001'
+);
+
+insert into public.quotations (client, reference_number, status, tenant_id)
+values (
+  'Tenant B Secret Quote',
+  'RR-TB-0001',
+  'Draft',
+  'b0000000-0000-4000-8000-000000000001'
+);
+
+insert into public.event_outbox (event_type, aggregate_type, aggregate_id, tenant_id, status)
+values (
+  'finalize_quote',
+  'quotation',
+  'RR-TB-0001',
+  'b0000000-0000-4000-8000-000000000001',
+  'pending'
+);
+
+-- Red Reach-owned outbox row for the reverse check.
+insert into public.event_outbox (event_type, aggregate_type, aggregate_id, tenant_id, status)
+values (
+  'mark_paid',
+  'invoice',
+  'RR-A-PAID',
+  'a0000000-0000-4000-8000-000000000001',
+  'pending'
+);
+
 ------------------------------------------------------------ Red Reach admin cannot see tenant B
 set role authenticated;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
@@ -88,6 +124,18 @@ select pg_temp.expect(
 select pg_temp.expect(
   (select count(*) from public.vendors where company_name = 'Tenant B Secret Vendor') = 0,
   'redreach admin cannot read tenant B vendors'
+);
+select pg_temp.expect(
+  (select count(*) from public.accounts where name = 'Tenant B Secret Account') = 0,
+  'redreach admin cannot read tenant B accounts'
+);
+select pg_temp.expect(
+  (select count(*) from public.quotations where reference_number = 'RR-TB-0001') = 0,
+  'redreach admin cannot read tenant B quotations'
+);
+select pg_temp.expect(
+  (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 0,
+  'redreach admin cannot read tenant B event_outbox'
 );
 select pg_temp.expect(
   (select count(*) from public.tenants where slug = 'demo-b') = 0,
@@ -118,6 +166,22 @@ select pg_temp.expect(
   'tenant B admin can read own CRM'
 );
 select pg_temp.expect(
+  (select count(*) from public.accounts where name = 'Tenant B Secret Account') = 1,
+  'tenant B admin can read own accounts'
+);
+select pg_temp.expect(
+  (select count(*) from public.quotations where reference_number = 'RR-TB-0001') = 1,
+  'tenant B admin can read own quotations'
+);
+select pg_temp.expect(
+  (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 1,
+  'tenant B admin can read own event_outbox'
+);
+select pg_temp.expect(
+  (select count(*) from public.event_outbox where aggregate_id = 'RR-A-PAID') = 0,
+  'tenant B admin cannot read redreach event_outbox'
+);
+select pg_temp.expect(
   (select count(*) from public.tenants) = 1,
   'tenant B admin sees only own tenant'
 );
@@ -143,7 +207,76 @@ begin
   raise notice 'ok - tenant B cannot insert into redreach tenant_id';
 end $$;
 
+do $$
+declare
+  failed boolean := false;
+begin
+  begin
+    insert into public.event_outbox (event_type, aggregate_type, aggregate_id, tenant_id)
+    values ('finalize_quote', 'quotation', 'FORGED', 'a0000000-0000-4000-8000-000000000001');
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: tenant B admin forged event_outbox into redreach';
+  end if;
+  raise notice 'ok - tenant B cannot insert event_outbox into redreach tenant_id';
+end $$;
+
+------------------------------------------------------------ Append-only audit_log (authenticated cannot mutate)
+do $$
+declare
+  failed boolean := false;
+  rid bigint;
+begin
+  -- Seed a row as the table owner (security definer / migration role), then
+  -- prove authenticated cannot insert, update or delete it.
+  reset role;
+  insert into public.audit_log (table_name, operation, row_id, actor_email)
+  values ('tenant_isolation_test', 'INSERT', 'ci-append-only', 'system')
+  returning id into rid;
+
+  set role authenticated;
+  set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+
+  begin
+    insert into public.audit_log (table_name, operation, row_id, actor_email)
+    values ('tenant_isolation_test', 'INSERT', 'forged', 'evil');
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: authenticated inserted into audit_log';
+  end if;
+  raise notice 'ok - authenticated cannot insert audit_log';
+
+  failed := false;
+  begin
+    update public.audit_log set actor_email = 'tampered' where id = rid;
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: authenticated updated audit_log';
+  end if;
+  raise notice 'ok - authenticated cannot update audit_log';
+
+  failed := false;
+  begin
+    delete from public.audit_log where id = rid;
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: authenticated deleted audit_log';
+  end if;
+  raise notice 'ok - authenticated cannot delete audit_log';
+end $$;
+
 reset role;
+
+-- Clean the append-only probe row (superuser / migration role).
+delete from public.audit_log where table_name = 'tenant_isolation_test' and row_id in ('ci-append-only', 'forged');
 
 -- Leave no active non-@redreach.ae logins behind (catch_up_check_test expects OK).
 update public.app_users

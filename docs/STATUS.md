@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — outbox System check
+**Current milestone:** Continuous backlog — tenant + audit CI
 
 ## Shipped this turn
 
-- System check Outbox card (pending/processing/failed + HubSpot/digest nudges) and LIVE_TEST 33 for `event-outbox` — see `docs/event-outbox.md` / `docs/LIVE_TEST.md`
+- Expanded `tenant_isolation_test.sql`: accounts, quotations, `event_outbox`, plus append-only `audit_log` (authenticated cannot insert/update/delete)
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide · Cmd+K · QTSP · outbox worker · domain handlers · digest signal · HubSpot nudge · a11y · minimal chrome · pipeline density
+- Continuous backlog · Zod · Guide · Cmd+K · QTSP · outbox worker · domain handlers · digest signal · HubSpot nudge · System check outbox · a11y · minimal chrome · pipeline density
 
 ## Still open (agent queue)
 
