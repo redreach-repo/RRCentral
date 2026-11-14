@@ -1,0 +1,95 @@
+/**
+ * HighMast design tokens (§5.2–5.4).
+ * Components must read these variables — not raw brand hex.
+ * Status colours are fixed and separate from brand.
+ */
+
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --surface: #f7f4f1;
+  --text: #1a1a1a;
+  --text-muted: #6e6e6e;
+  --primary: #c8321a;
+  --on-primary: #ffffff;
+  --primary-text: #c8321a;
+  --accent: #e8872a;
+  --accent-text: #a9540a;
+  --on-accent: #1a1a1a;
+  --focus-ring: #c8321a;
+
+  /* Legacy aliases used across the app */
+  --bg-elevated: #f7f4f1;
+  --sidebar: #f7f4f1;
+  --surface-2: #ffffff;
+  --accent-soft: #e8872a;
+  --accent-muted: rgba(200, 50, 26, 0.12);
+  --card: #f7f4f1;
+  --border: rgba(26, 26, 26, 0.12);
+  --border-strong: rgba(26, 26, 26, 0.2);
+  --muted: #6e6e6e;
+  --muted-2: rgba(110, 110, 110, 0.85);
+
+  --success: #1f7a4d;
+  --danger: #b42318;
+  --warn: #a15c00;
+  --info: #175cd3;
+
+  --shadow: 0 1px 0 rgba(26, 26, 26, 0.04), 0 12px 40px rgba(26, 26, 26, 0.08);
+  --radius: 10px;
+  --radius-sm: 8px;
+  --space-page: clamp(20px, 2.4vw, 32px);
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #141414;
+  --surface: #1a1a1a;
+  --text: #f7f4f1;
+  --text-muted: #b8b2ac;
+  --primary: #c8321a;
+  --on-primary: #ffffff;
+  /* Never use brand red for small text on dark — use lifted primary-text */
+  --primary-text: #f0654a;
+  --accent: #e8872a;
+  --accent-text: #e8872a;
+  --on-accent: #1a1a1a;
+  --focus-ring: #e8872a;
+
+  --bg-elevated: #1a1a1a;
+  --sidebar: #141414;
+  --surface-2: #1f1f1f;
+  --accent-soft: #e8872a;
+  --accent-muted: rgba(232, 135, 42, 0.14);
+  --card: rgba(247, 244, 241, 0.04);
+  --border: rgba(247, 244, 241, 0.12);
+  --border-strong: rgba(247, 244, 241, 0.2);
+  --muted: #b8b2ac;
+  --muted-2: rgba(184, 178, 172, 0.75);
+
+  --success: #3ecf8e;
+  --danger: #f07178;
+  --warn: #e6b450;
+  --info: #7ab7ff;
+
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+@media (prefers-contrast: more) {
+  :root,
+  [data-theme='light'] {
+    --border: rgba(26, 26, 26, 0.35);
+    --border-strong: rgba(26, 26, 26, 0.55);
+  }
+  [data-theme='dark'] {
+    --border: rgba(247, 244, 241, 0.35);
+    --border-strong: rgba(247, 244, 241, 0.55);
+  }
+}
+
+@media (forced-colors: active) {
+  :root {
+    --focus-ring: Highlight;
+  }
+}

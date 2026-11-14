@@ -18,29 +18,25 @@
     "rr-connect": {
       "kind": "business_unit",
       "files": [
-        "redreach/divisions/redreach-connect.png",
-        "redreach/divisions/redreach-connect.jpg"
+        "redreach/divisions/redreach-connect.png"
       ]
     },
     "rr-marketing": {
       "kind": "business_unit",
       "files": [
-        "redreach/divisions/redreach-marketing.png",
-        "redreach/divisions/redreach-marketing.jpg"
+        "redreach/divisions/redreach-marketing.png"
       ]
     },
     "rr-threads": {
       "kind": "business_unit",
       "files": [
-        "redreach/divisions/redreach-threads.png",
-        "redreach/divisions/redreach-threads.jpg"
+        "redreach/divisions/redreach-threads.png"
       ]
     },
     "rr-wanders": {
       "kind": "business_unit",
       "files": [
-        "redreach/divisions/redreach-wanders.png",
-        "redreach/divisions/redreach-wanders.jpg"
+        "redreach/divisions/redreach-wanders.png"
       ]
     }
   },
@@ -66,5 +62,20 @@
       "file": "clients/tee-tribe.jpg",
       "note": "Client brand. Account logo only, never tenant branding. Excluded from the demo."
     }
+  },
+  "highmast": {
+    "name": "HighMast",
+    "endorsement": "by Red Reach",
+    "route": "A (H with a mast)",
+    "colors": {
+      "red": "#C8321A",
+      "orange": "#E8872A",
+      "charcoal": "#1A1A1A",
+      "grey": "#6E6E6E",
+      "warmGrey": "#B8B2AC",
+      "paper": "#F7F4F1"
+    },
+    "files": "highmast/A-h-mast, highmast/wordmark",
+    "tenantBrandingNote": "Tenants supply their own logos and colours. HighMast assets are used on HighMast surfaces and the default theme only."
   }
 }

@@ -1,11 +1,11 @@
 .page {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
   padding: 24px;
-  background:
-    radial-gradient(ellipse 70% 50% at 50% -20%, rgba(232, 135, 42, 0.12), transparent 55%),
-    var(--bg, #0b0c0e);
+  background: var(--bg, #141414);
+  color: var(--text, #f7f4f1);
   position: relative;
   overflow: hidden;
 }
@@ -15,7 +15,7 @@
   width: 420px;
   height: 420px;
   border-radius: 50%;
-  background: rgba(200, 50, 26, 0.1);
+  background: color-mix(in srgb, var(--accent, #e8872a) 14%, transparent);
   filter: blur(80px);
   top: 40%;
   left: 50%;
@@ -28,10 +28,10 @@
   width: min(400px, 100%);
   padding: 36px 32px;
   text-align: center;
-  background: var(--surface, #141518);
-  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-  border-radius: 12px;
-  box-shadow: var(--shadow, 0 12px 40px rgba(0, 0, 0, 0.35));
+  background: var(--surface, #1a1a1a);
+  border: 1px solid var(--border, rgba(247, 244, 241, 0.12));
+  border-radius: var(--radius, 10px);
+  box-shadow: var(--shadow);
 }
 
 @media (max-width: 640px) {
@@ -44,10 +44,6 @@
   .card {
     padding: 28px 18px;
     border-radius: 14px;
-  }
-
-  .title {
-    font-size: 20px;
   }
 
   .subtitle {
@@ -66,7 +62,7 @@
 }
 
 .logo {
-  margin: 0 auto 10px;
+  margin: 0 auto 12px;
   max-width: 220px;
   width: auto;
   height: auto;
@@ -79,7 +75,7 @@
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-muted, #b8b2ac);
 }
 
 .srOnly {
@@ -94,49 +90,11 @@
   border: 0;
 }
 
-.title {
-  margin: 0 0 8px;
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: #f2f4f7;
-}
-
 .subtitle {
   margin: 0 0 28px;
   font-size: 14px;
   line-height: 1.5;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.bookmark {
-  margin: -12px 0 24px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.22);
-  font-size: 12px;
-  line-height: 1.45;
-  color: rgba(255, 255, 255, 0.72);
-  text-align: left;
-}
-
-.bookmarkUrl {
-  color: #ff9f4a;
-  font-size: 12px;
-}
-
-.bookmarkHint {
-  display: inline-block;
-  margin-top: 6px;
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 11px;
-}
-
-.bookmarkHint code,
-.bookmark code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.92em;
+  color: var(--text-muted, #b8b2ac);
 }
 
 .submitBtn {
@@ -145,23 +103,23 @@
   justify-content: center;
   gap: 10px;
   width: 100%;
+  min-height: 44px;
   padding: 13px 18px;
   border: none;
   border-radius: 10px;
-  background: #c8321a;
-  color: #fff;
+  background: var(--primary, #c8321a);
+  color: var(--on-primary, #fff);
   font-size: 15px;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
   transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-  box-shadow: 0 8px 20px rgba(200, 50, 26, 0.35);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--primary, #c8321a) 35%, transparent);
 }
 
 .submitBtn:hover {
-  background: #e8872a;
+  filter: brightness(1.06);
   transform: translateY(-1px);
-  box-shadow: 0 10px 24px rgba(232, 135, 42, 0.4);
 }
 
 .submitBtn:active {
@@ -172,6 +130,11 @@
   opacity: 0.65;
   cursor: not-allowed;
   transform: none;
+}
+
+.submitBtn:focus-visible {
+  outline: 2px solid var(--focus-ring, #e8872a);
+  outline-offset: 2px;
 }
 
 .localForm {
@@ -185,9 +148,9 @@
   margin: 0 0 6px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: rgba(200, 50, 26, 0.12);
-  border: 1px solid rgba(200, 50, 26, 0.28);
-  color: rgba(255, 220, 190, 0.95);
+  background: var(--accent-muted);
+  border: 1px solid color-mix(in srgb, var(--primary, #c8321a) 28%, transparent);
+  color: var(--text);
   font-size: 12px;
   line-height: 1.4;
   text-align: center;
@@ -198,25 +161,26 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-muted, #b8b2ac);
 }
 
 .emailInput {
   width: 100%;
   box-sizing: border-box;
+  min-height: 44px;
   padding: 12px 14px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(0, 0, 0, 0.28);
-  color: #f2f4f7;
+  border: 1px solid var(--border-strong);
+  background: color-mix(in srgb, var(--bg, #141414) 70%, transparent);
+  color: var(--text);
   font-size: 15px;
   font-family: inherit;
 }
 
 .emailInput:focus {
   outline: none;
-  border-color: rgba(232, 135, 42, 0.7);
-  box-shadow: 0 0 0 3px rgba(200, 50, 26, 0.18);
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 28%, transparent);
 }
 
 .seedList {
@@ -227,25 +191,26 @@
 }
 
 .seedChip {
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.75);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: var(--text-muted);
   border-radius: 999px;
-  padding: 5px 10px;
+  padding: 8px 10px;
+  min-height: 36px;
   font-size: 11px;
   font-family: inherit;
   cursor: pointer;
 }
 
 .seedChip:hover {
-  background: rgba(200, 50, 26, 0.18);
-  border-color: rgba(232, 135, 42, 0.35);
-  color: #fff;
+  background: var(--accent-muted);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--text);
 }
 
 .error {
   margin: 0;
   font-size: 13px;
-  color: #ff8a80;
+  color: var(--danger, #f07178);
   text-align: center;
 }

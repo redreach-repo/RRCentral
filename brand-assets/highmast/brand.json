@@ -1,0 +1,17 @@
+{
+  "product": "HighMast",
+  "endorsement": "by Red Reach",
+  "route": "A — H with rising mast and light",
+  "colors": {
+    "highmastRed": "#C8321A",
+    "highmastOrange": "#E8872A",
+    "charcoal": "#1A1A1A",
+    "grey": "#6E6E6E",
+    "warmGrey": "#B8B2AC",
+    "paper": "#F7F4F1"
+  },
+  "files": {
+    "dir": "A-h-mast",
+    "note": "PNG renders from design export; A_symbol_reverse.svg is a geometric vector of route A. Full SVG zip (wordmarks) still preferred when available."
+  }
+}

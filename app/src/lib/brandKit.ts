@@ -45,4 +45,7 @@ export function applyBrandCssVars(kit: BrandKit, root: HTMLElement = document.do
   root.style.setProperty('--rr-brand-accent', kit.accent_color)
   root.style.setProperty('--rr-brand-dark', kit.neutral_dark)
   root.style.setProperty('--rr-brand-light', kit.neutral_light)
+  // Map tenant kit onto HighMast design tokens used by chrome (after sign-in).
+  root.style.setProperty('--primary', kit.primary_color)
+  root.style.setProperty('--accent', kit.accent_color)
 }

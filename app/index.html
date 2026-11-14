@@ -3,23 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/RRCentral/favicon-32.png?v=9" />
-    <link rel="icon" type="image/png" sizes="48x48" href="/RRCentral/favicon-48.png?v=9" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/RRCentral/icons/icon-192.png?v=9" />
-    <link rel="icon" type="image/png" sizes="512x512" href="/RRCentral/icons/icon-512.png?v=9" />
-    <!--
-      iOS Add to Home Screen:
-      - Prefer explicit sized links (cache-busted) so devices pick the HighMast mark.
-      - Also ship copies under /app/ and /login/ (see vite spaFallback404) because
-        Safari often probes apple-touch-icon.png relative to the current path.
-    -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/RRCentral/apple-touch-icon-180x180.png?v=9" />
-    <link rel="apple-touch-icon" sizes="167x167" href="/RRCentral/apple-touch-icon-167x167.png?v=9" />
-    <link rel="apple-touch-icon" sizes="152x152" href="/RRCentral/apple-touch-icon-152x152.png?v=9" />
-    <link rel="apple-touch-icon" sizes="120x120" href="/RRCentral/apple-touch-icon-120x120.png?v=9" />
-    <link rel="apple-touch-icon" href="/RRCentral/apple-touch-icon.png?v=9" />
-    <link rel="apple-touch-icon-precomposed" href="/RRCentral/apple-touch-icon-precomposed.png?v=9" />
-    <link rel="manifest" href="/RRCentral/manifest.webmanifest?v=9" />
+    <script>
+      // Apply colour mode before first paint (no flash).
+      (function () {
+        try {
+          var key = 'highmast.themeMode'
+          var mode = localStorage.getItem(key) || 'system'
+          var dark =
+            mode === 'dark' ||
+            (mode !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          var theme = dark ? 'dark' : 'light'
+          document.documentElement.dataset.theme = theme
+          document.documentElement.style.colorScheme = theme
+        } catch (e) {
+          document.documentElement.dataset.theme = 'dark'
+        }
+      })()
+    </script>
+    <link rel="icon" type="image/png" sizes="32x32" href="/RRCentral/favicon-32.png?v=10" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/RRCentral/favicon-48.png?v=10" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/RRCentral/icons/icon-192.png?v=10" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/RRCentral/icons/icon-512.png?v=10" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/RRCentral/apple-touch-icon-180x180.png?v=10" />
+    <link rel="apple-touch-icon" sizes="167x167" href="/RRCentral/apple-touch-icon-167x167.png?v=10" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/RRCentral/apple-touch-icon-152x152.png?v=10" />
+    <link rel="apple-touch-icon" sizes="120x120" href="/RRCentral/apple-touch-icon-120x120.png?v=10" />
+    <link rel="apple-touch-icon" href="/RRCentral/apple-touch-icon.png?v=10" />
+    <link rel="apple-touch-icon-precomposed" href="/RRCentral/apple-touch-icon-precomposed.png?v=10" />
+    <link rel="manifest" href="/RRCentral/manifest.webmanifest?v=10" />
     <meta name="theme-color" content="#C8321A" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -33,9 +44,10 @@
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,600;0,700;0,800;1,700&family=Sarabun:ital,wght@0,400;0,500;0,600;0,700;1,600&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet" />
   </head>
   <body>
+    <a class="rr-skip-link" href="#main-content">Skip to content</a>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

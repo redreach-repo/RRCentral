@@ -1,17 +1,17 @@
 import type { CSSProperties } from 'react'
 
-/** Shared CRM chrome — keep in sync with :root tokens in index.css */
+/** Shared CRM chrome — reads HighMast design tokens (see styles/tokens.css). */
 export const colors = {
-  bg: '#0b0c0e',
-  card: 'rgba(255,255,255,0.03)',
-  border: 'rgba(255,255,255,0.08)',
-  accent: '#e85d04',
-  text: '#f4f5f7',
-  muted: 'rgba(244,245,247,0.58)',
-  muted2: 'rgba(244,245,247,0.38)',
-  danger: '#f07178',
-  success: '#3ecf8e',
-  warn: '#e6b450',
+  bg: 'var(--bg)',
+  card: 'var(--card)',
+  border: 'var(--border)',
+  accent: 'var(--primary)',
+  text: 'var(--text)',
+  muted: 'var(--muted)',
+  muted2: 'var(--muted-2)',
+  danger: 'var(--danger)',
+  success: 'var(--success)',
+  warn: 'var(--warn)',
 }
 
 export const pageStyle: CSSProperties = {
@@ -70,11 +70,12 @@ export const sectionTitleStyle: CSSProperties = {
 }
 
 export const buttonPrimaryStyle: CSSProperties = {
-  background: colors.accent,
-  color: '#fff',
+  background: 'var(--primary)',
+  color: 'var(--on-primary)',
   border: 'none',
   borderRadius: 8,
   padding: '9px 14px',
+  minHeight: 44,
   fontSize: 13,
   fontWeight: 600,
   cursor: 'pointer',

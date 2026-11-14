@@ -50,7 +50,7 @@ export default function LoginPage() {
 
   if (loading) {
     return (
-      <div className={styles.page}>
+      <div className={styles.page} data-theme="dark">
         <div className={styles.card}>{t('page.login.loading')}</div>
       </div>
     )
@@ -82,27 +82,24 @@ export default function LoginPage() {
   }
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} data-theme="dark">
       <div className={styles.glow} aria-hidden />
       <div className={styles.card}>
         <img
-          src={highmastAssets.stacked}
+          src={highmastAssets.stackedReverse}
           alt={PRODUCT.name}
           className={styles.logo}
-          height={72}
+          height={88}
         />
-        <p className={styles.endorsement}>{t('page.login.endorsement')}</p>
-        <h1 className={styles.srOnly}>{t('page.login.title')}</h1>
-        <p className={styles.subtitle}>{t('page.login.subtitle')}</p>
-        <p className={styles.bookmark}>
-          Bookmark: <code className={styles.bookmarkUrl}>…/RRCentral/login</code>
-        </p>
+        <p className={styles.endorsement}>{PRODUCT.endorsement}</p>
+        <h1 className={styles.srOnly}>{PRODUCT.name}</h1>
+        <p className={styles.subtitle}>{PRODUCT.tagline}</p>
 
         <form className={styles.localForm} onSubmit={(e) => void handleContinue(e)}>
           {isLocalMode && (
             <p className={styles.localBanner}>
-              Local mode (this browser only). Use an @redreach.ae email. To share with colleagues:
-              Settings → Data &amp; storage → Connect Supabase.
+              Local mode (this browser only). Use a company email. To share with colleagues: Settings
+              → Data &amp; storage → Connect Supabase.
             </p>
           )}
           <label className={styles.fieldLabel} htmlFor="login-email">
@@ -113,7 +110,7 @@ export default function LoginPage() {
             className={styles.emailInput}
             type="email"
             list="login-email-suggestions"
-            placeholder="you@redreach.ae"
+            placeholder="you@company.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="username"
@@ -154,18 +151,15 @@ export default function LoginPage() {
             required={!isLocalMode}
             minLength={isLocalMode ? undefined : MIN_PASSWORD_LENGTH}
           />
-          {error && <p className={styles.error}>{error}</p>}
+          {error && (
+            <p className={styles.error} role="alert" id="login-error">
+              {error}
+            </p>
+          )}
           <button type="submit" className={styles.submitBtn} disabled={submitting}>
             {submitting ? t('page.login.signingIn') : t('page.login.signIn')}
           </button>
         </form>
-
-        <p className={styles.subtitle} style={{ marginTop: 22, marginBottom: 0 }}>
-          {PRODUCT.endorsement} ·{' '}
-          <a href="https://www.redreach.ae" style={{ color: 'rgba(255,255,255,0.55)' }}>
-            www.redreach.ae
-          </a>
-        </p>
       </div>
     </div>
   )

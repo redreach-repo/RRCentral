@@ -24,11 +24,17 @@ import {
   X,
   LogOut,
   ChevronDown,
+  Moon,
+  Sun,
+  Monitor,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useTenant } from '../contexts/TenantContext'
+import { useTheme } from '../contexts/ThemeContext'
 import { useI18n } from '../contexts/I18nContext'
+import { PRODUCT, productAssetUrls } from '../lib/product'
+import type { ThemeMode } from '../lib/themeMode'
 import { useFollowUpReminders } from '../hooks/useFollowUpReminders'
 import { useContractBillingSync } from '../hooks/useContractBillingSync'
 import { useFridayHoursReminder } from '../hooks/useFridayHoursReminder'
@@ -52,6 +58,9 @@ import CommandPalette from './CommandPalette'
 import ErrorBoundary from './ErrorBoundary'
 import RouteAnnouncer from './RouteAnnouncer'
 import styles from './Layout.module.css'
+
+const highmastAssets = productAssetUrls(import.meta.env.BASE_URL)
+const THEME_CYCLE: ThemeMode[] = ['system', 'light', 'dark']
 
 type NavItem = ModuleNavItem
 
@@ -109,8 +118,11 @@ export default function Layout() {
   const { user, userRole, signOut, isLocalMode } = useAuth()
   const { settings } = useSettings()
   const { companies, activeCompanyId, setActiveCompanyId, activeCompany } = useTenant()
+  const { mode, setMode } = useTheme()
   const { t } = useI18n()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const companyLabel =
+    activeCompany?.name || settings.companyName || settings.brand || PRODUCT.name
   const [commandOpen, setCommandOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
@@ -168,7 +180,7 @@ export default function Layout() {
     if (location.pathname.startsWith('/settings')) {
       return can(userRole, 'settings.manage') ? 'Settings' : 'Account'
     }
-    return titleForPath(location.pathname) || 'RED REACH Central'
+    return titleForPath(location.pathname) || companyLabel
   })()
 
   const hideTopbarTitle =
@@ -356,6 +368,16 @@ export default function Layout() {
             )
           })}
         </nav>
+        <div className={styles.sideFooter}>
+          <img
+            src={highmastAssets.symbolReverse}
+            alt=""
+            width={16}
+            height={20}
+            className={styles.sideFooterMark}
+          />
+          <span className={styles.sideFooterLabel}>{PRODUCT.name}</span>
+        </div>
       </aside>
 
       <div className={styles.main}>
@@ -370,7 +392,7 @@ export default function Layout() {
           </button>
 
           <div className={styles.topbarCopy} aria-label={pageTitle}>
-            <p className={styles.topbarEyebrow}>RED REACH Central</p>
+            <p className={styles.topbarEyebrow}>{companyLabel}</p>
             {hideTopbarTitle ? null : <h1 className={styles.title}>{pageTitle}</h1>}
           </div>
 
@@ -387,6 +409,18 @@ export default function Layout() {
                 <span>{elapsedLabel(timer.startedAt, now)}</span>
               </NavLink>
             ) : null}
+            <button
+              type="button"
+              className={styles.reminderBtn}
+              onClick={() => {
+                const i = THEME_CYCLE.indexOf(mode)
+                setMode(THEME_CYCLE[(i + 1) % THEME_CYCLE.length])
+              }}
+              title={`Colour mode: ${mode}`}
+              aria-label={`Colour mode ${mode}. Click to change.`}
+            >
+              {mode === 'light' ? <Sun size={16} /> : mode === 'dark' ? <Moon size={16} /> : <Monitor size={16} />}
+            </button>
             <button
               type="button"
               className={styles.reminderBtn}
