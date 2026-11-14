@@ -62,9 +62,9 @@ Light / dark / system via `themeMode` + `ThemeProvider`; applied before paint. C
 
 ## Accessibility gaps
 
-- Broader axe suite still open (sign-in / Home / list / form / PDF, both modes)
+- Axe suite live: `app/src/a11y/surfaces.a11y.test.ts` (sign-in dark; Home / list / form / PDF in light+dark) plus existing `tokenContrast.test.ts`
 - Pipeline stage colours may rely on hue alone
-- Focus rings: improve coverage beyond login/shell
+- Live React mounts (full Layout/DocumentPage) still optional next step beyond chrome fixtures
 
 ## Out of scope this step (per prompt)
 

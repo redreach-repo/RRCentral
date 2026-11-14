@@ -115,6 +115,8 @@ export default function LoginPage() {
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="username"
             required
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? 'login-error' : undefined}
           />
           <datalist id="login-email-suggestions">
             {seedEmails.map((addr) => (
@@ -150,12 +152,14 @@ export default function LoginPage() {
             autoComplete="current-password"
             required={!isLocalMode}
             minLength={isLocalMode ? undefined : MIN_PASSWORD_LENGTH}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? 'login-error' : undefined}
           />
-          {error && (
+          {error ? (
             <p className={styles.error} role="alert" id="login-error">
               {error}
             </p>
-          )}
+          ) : null}
           <button type="submit" className={styles.submitBtn} disabled={submitting}>
             {submitting ? t('page.login.signingIn') : t('page.login.signIn')}
           </button>
