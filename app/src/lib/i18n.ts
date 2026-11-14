@@ -244,6 +244,27 @@ const STRINGS: Record<Locale, Record<string, string>> = {
       'Every server function gets a harmless ping (it does not send, import or change anything), next to its last failure. Each row names its test in docs/LIVE_TEST.md. Full error details are on',
     'page.systemCheck.appErrors': 'App errors',
     'page.systemCheck.subtitleTrail': '.',
+    'page.ops.kicker': 'Operations',
+    'page.catalog.title': 'Catalog',
+    'page.catalog.subtitle': 'Brand catalogues and products across divisions',
+    'page.catalog.add': 'Add product',
+    'page.catalog.syncSkus': 'Sync catalogue SKUs',
+    'page.catalog.syncing': 'Syncing…',
+    'page.catalog.loadServices': 'Load Marketing / Connect / Trading',
+    'page.inventory.title': 'Inventory',
+    'page.inventory.subtitle':
+      'Manual stock by SKU · available = on hand − reserved{low}. Sync pulls catalogue SKUs; quote/catalog stock hooks are not automatic yet.',
+    'page.inventory.lowStock': ' · {n} low stock',
+    'page.inventory.syncSkus': 'Sync catalogue SKUs',
+    'page.domains.title': 'Domains',
+    'page.domains.subtitle':
+      'Track every domain you own — registrar, renewals, DNS, and hosting. Renewal alerts show on the dashboard when expiry is within 90 days.',
+    'page.domains.add': 'Add domain',
+    'page.appErrors.title': 'App errors',
+    'page.appErrors.subtitle':
+      'Errors people hit in RR Central, grouped by message, newest first. The daily digest email lists the last day\'s. Mark one as fixed once it is dealt with.',
+    'page.appErrors.refresh': 'Refresh',
+    'page.appErrors.loading': 'Loading',
   },
   ar: {
     'shell.company': 'الشركة',
@@ -481,6 +502,27 @@ const STRINGS: Record<Locale, Record<string, string>> = {
       'كل دالة خادم تحصل على نبضة غير ضارة (لا ترسل ولا تستورد ولا تغيّر شيئاً)، بجانب آخر فشل. كل صف يسمي اختباره في docs/LIVE_TEST.md. تفاصيل الأخطاء الكاملة على',
     'page.systemCheck.appErrors': 'أخطاء التطبيق',
     'page.systemCheck.subtitleTrail': '.',
+    'page.ops.kicker': 'العمليات',
+    'page.catalog.title': 'الكتالوج',
+    'page.catalog.subtitle': 'كتالوجات العلامات والمنتجات عبر الأقسام',
+    'page.catalog.add': 'إضافة منتج',
+    'page.catalog.syncSkus': 'مزامنة SKU الكتالوج',
+    'page.catalog.syncing': 'جارٍ المزامنة…',
+    'page.catalog.loadServices': 'تحميل التسويق / Connect / التجارة',
+    'page.inventory.title': 'المخزون',
+    'page.inventory.subtitle':
+      'مخزون يدوي حسب SKU · المتاح = في اليد − المحجوز{low}. المزامنة تسحب SKU الكتالوج؛ ربط العرض/الكتالوج ليس تلقائياً بعد.',
+    'page.inventory.lowStock': ' · {n} مخزون منخفض',
+    'page.inventory.syncSkus': 'مزامنة SKU الكتالوج',
+    'page.domains.title': 'النطاقات',
+    'page.domains.subtitle':
+      'تتبّع كل نطاق تملكه — المسجّل والتجديدات وDNS والاستضافة. تنبيهات التجديد تظهر على لوحة التحكم قبل 90 يوماً من الانتهاء.',
+    'page.domains.add': 'إضافة نطاق',
+    'page.appErrors.title': 'أخطاء التطبيق',
+    'page.appErrors.subtitle':
+      'أخطاء يصطدم بها الناس في RR Central، مجمّعة حسب الرسالة، الأحدث أولاً. بريد الملخص اليومي يسرد يوم أمس. علّم واحداً كمحلولاً بعد معالجته.',
+    'page.appErrors.refresh': 'تحديث',
+    'page.appErrors.loading': 'جارٍ التحميل',
   },
 }
 

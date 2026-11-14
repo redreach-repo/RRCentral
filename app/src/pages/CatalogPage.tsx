@@ -6,6 +6,7 @@ import { BRAND_CATALOGUES, catalogueUrl } from '../lib/catalogues'
 import { syncSeedCatalog } from '../lib/syncCatalog'
 import { ensureDivisionCataloguesSeeded } from '../lib/syncDivisionCatalogues'
 import type { Product } from '../lib/types'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
@@ -65,6 +66,7 @@ const emptyForm = (): ProductForm => ({
 })
 
 export default function CatalogPage() {
+  const { t } = useI18n()
   const { showToast } = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -239,9 +241,9 @@ export default function CatalogPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Operations</p>
-          <h1 className={docsStyles.title}>Catalog</h1>
-          <p className={docsStyles.subtitle}>Brand catalogues and products across divisions</p>
+          <p className={docsStyles.kicker}>{t('page.ops.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.catalog.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.catalog.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
@@ -252,7 +254,7 @@ export default function CatalogPage() {
             onClick={() => void syncCatalogueSkus()}
             title="Load / refresh RR Threads catalogue SKUs"
           >
-            <RefreshCw size={16} /> {syncing ? 'Syncing…' : 'Sync catalogue SKUs'}
+            <RefreshCw size={16} /> {syncing ? t('page.catalog.syncing') : t('page.catalog.syncSkus')}
           </button>
           <button
             type="button"
@@ -262,10 +264,10 @@ export default function CatalogPage() {
             onClick={() => void syncDivisionServices()}
             title="Load Marketing, Connect (Konekt+) and Trading service rows"
           >
-            <RefreshCw size={16} /> Load Marketing / Connect / Trading
+            <RefreshCw size={16} /> {t('page.catalog.loadServices')}
           </button>
           <button type="button" className={docsStyles.newBtn} onClick={openCreate}>
-            <Plus size={16} /> Add product
+            <Plus size={16} /> {t('page.catalog.add')}
           </button>
         </div>
       </header>
