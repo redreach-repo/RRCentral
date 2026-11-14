@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { APP_MODULES, moduleIdForPath, titleForPath } from './nav'
+import { HIDE_PIPELINE_DETAIL_NAV_KEY } from '../lib/pipelineDetailNav'
+import { APP_MODULES, moduleIdForPath, titleForPath, visibleAppModules } from './nav'
 
 describe('APP_MODULES', () => {
   it('lists the seven shell sections in order', () => {
@@ -32,5 +33,29 @@ describe('moduleIdForPath / titleForPath', () => {
     expect(titleForPath('/crm')).toBe('My Day')
     expect(titleForPath('/delivery-settings')).toBe('Packages and rates')
     expect(titleForPath('/insights')).toBe('Utilisation and profit')
+  })
+})
+
+describe('visibleAppModules', () => {
+  it('hides ops when moduleFlags says so and filters admin items by role', () => {
+    const sales = visibleAppModules('sales', { moduleFlags: '{"ops":false}' })
+    expect(sales.map((m) => m.id)).not.toContain('ops')
+    const adminItems = sales.find((m) => m.id === 'admin')?.items.map((i) => i.to) || []
+    expect(adminItems).toContain('/settings#account')
+    expect(adminItems).not.toContain('/settings')
+    expect(adminItems).not.toContain('/system-check')
+    expect(sales.find((m) => m.id === 'finance')?.items.some((i) => i.to === '/mrr')).toBe(false)
+
+    const admin = visibleAppModules('admin', {})
+    expect(admin.map((m) => m.id)).toContain('ops')
+    expect(admin.find((m) => m.id === 'admin')?.items.some((i) => i.to === '/system-check')).toBe(true)
+  })
+
+  it('soft-hides pipeline detail nav for non-admins when the setting is on', () => {
+    const sales = visibleAppModules('sales', { [HIDE_PIPELINE_DETAIL_NAV_KEY]: 'yes' })
+    const work = sales.find((m) => m.id === 'sales')?.items.map((i) => i.to) || []
+    expect(work).not.toContain('/sales')
+    expect(work).not.toContain('/ctrm')
+    expect(work).toContain('/deals')
   })
 })

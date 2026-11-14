@@ -37,9 +37,14 @@ import { elapsedLabel } from '../lib/timeTracking'
 import { useRecurringDeductionsSync } from '../hooks/useRecurringDeductionsSync'
 import { usePhoneShell } from '../hooks/useMediaQuery'
 import { can, roleAtLeast } from '../lib/permissions'
-import { shouldHidePipelineDetailNavItem } from '../lib/pipelineDetailNav'
-import type { UserRole } from '../lib/types'
-import { APP_MODULES, itemMatchesPath, moduleIdForPath, titleForPath } from '../modules/nav'
+import {
+  APP_MODULES,
+  itemMatchesPath,
+  moduleIdForPath,
+  navItemVisible,
+  titleForPath,
+  visibleAppModules,
+} from '../modules/nav'
 import type { ModuleNavItem } from '../modules/registry'
 import BrandLogo from './BrandLogo'
 import CommandPalette from './CommandPalette'
@@ -50,7 +55,6 @@ import styles from './Layout.module.css'
 type NavItem = ModuleNavItem
 
 const NAV_SECTION_KEY = 'rrcentral_nav_section'
-const navGroups = APP_MODULES
 
 const phonePrimaryNav: { to: string; label: string; icon: typeof LayoutDashboard; end?: boolean }[] = [
   { to: '/app', label: 'Home', icon: LayoutDashboard, end: true },
@@ -100,20 +104,6 @@ function writeSavedSection(id: string) {
   }
 }
 
-function filterItems(
-  items: NavItem[],
-  userRole: UserRole,
-  settings: Record<string, string | undefined>,
-): NavItem[] {
-  return items.filter((item) => {
-    if (userRole === 'staff' && !item.forStaff) return false
-    if (item.roles) return item.roles.includes(userRole)
-    if (item.minRole) return roleAtLeast(userRole, item.minRole)
-    if (shouldHidePipelineDetailNavItem(item.to, settings, userRole)) return false
-    return true
-  })
-}
-
 export default function Layout() {
   const { user, userRole, signOut, isLocalMode } = useAuth()
   const { settings } = useSettings()
@@ -131,17 +121,16 @@ export default function Layout() {
   useRecurringDeductionsSync(Boolean(user) && roleAtLeast(userRole, 'sales'))
   const phoneNav = userRole === 'staff' ? staffPhoneNav : phonePrimaryNav
 
-  const visibleGroups = useMemo(() => {
-    return navGroups
-      .map((group) => ({ ...group, items: filterItems(group.items, userRole, settings) }))
-      .filter((group) => group.items.length > 0)
-  }, [userRole, settings])
+  const visibleGroups = useMemo(
+    () => visibleAppModules(userRole, settings),
+    [userRole, settings],
+  )
 
   const pathSection = moduleIdForPath(location.pathname)
   const [expandedIds, setExpandedIds] = useState<string[]>(() => {
     const fromPath = moduleIdForPath(location.pathname)
     const saved = readSavedSection()
-    const seed = saved && navGroups.some((g) => g.id === saved) ? saved : fromPath
+    const seed = saved && APP_MODULES.some((g) => g.id === saved) ? saved : fromPath
     return Array.from(new Set([fromPath, seed].filter(Boolean)))
   })
 
@@ -223,7 +212,9 @@ export default function Layout() {
 
   const visiblePhoneShortcuts = useMemo(() => {
     const primaryPaths = new Set(phoneNav.map((item) => item.to))
-    return filterItems(phoneShortcuts, userRole, settings).filter((item) => !primaryPaths.has(item.to))
+    return phoneShortcuts
+      .filter((item) => navItemVisible(item, userRole, settings))
+      .filter((item) => !primaryPaths.has(item.to))
   }, [phoneNav, userRole, settings])
 
   return (
