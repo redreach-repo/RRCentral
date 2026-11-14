@@ -109,6 +109,22 @@ from public.accounts
 where reference = 'AC-TB-0001'
 limit 1;
 
+insert into public.expenses (vendor, category, amount, tenant_id)
+values (
+  'Tenant B Secret Expense',
+  'COGS',
+  250,
+  'b0000000-0000-4000-8000-000000000001'
+);
+
+insert into public.delivery_notes (client, reference_number, status, tenant_id)
+values (
+  'Tenant B Secret DN',
+  'DN-TB-0001',
+  'Issued',
+  'b0000000-0000-4000-8000-000000000001'
+);
+
 insert into public.event_outbox (event_type, aggregate_type, aggregate_id, tenant_id, status)
 values (
   'finalize_quote',
@@ -161,6 +177,14 @@ select pg_temp.expect(
   'redreach admin cannot read tenant B sales_deals'
 );
 select pg_temp.expect(
+  (select count(*) from public.expenses where vendor = 'Tenant B Secret Expense') = 0,
+  'redreach admin cannot read tenant B expenses'
+);
+select pg_temp.expect(
+  (select count(*) from public.delivery_notes where reference_number = 'DN-TB-0001') = 0,
+  'redreach admin cannot read tenant B delivery_notes'
+);
+select pg_temp.expect(
   (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 0,
   'redreach admin cannot read tenant B event_outbox'
 );
@@ -207,6 +231,14 @@ select pg_temp.expect(
 select pg_temp.expect(
   (select count(*) from public.sales_deals where next_action = 'Call Tenant B') = 1,
   'tenant B admin can read own sales_deals'
+);
+select pg_temp.expect(
+  (select count(*) from public.expenses where vendor = 'Tenant B Secret Expense') = 1,
+  'tenant B admin can read own expenses'
+);
+select pg_temp.expect(
+  (select count(*) from public.delivery_notes where reference_number = 'DN-TB-0001') = 1,
+  'tenant B admin can read own delivery_notes'
 );
 select pg_temp.expect(
   (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 1,
@@ -272,6 +304,38 @@ begin
     raise exception 'TENANT TEST FAILED: tenant B admin forged invoice into redreach';
   end if;
   raise notice 'ok - tenant B cannot insert invoice into redreach tenant_id';
+end $$;
+
+do $$
+declare
+  failed boolean := false;
+begin
+  begin
+    insert into public.expenses (vendor, tenant_id)
+    values ('Forged expense', 'a0000000-0000-4000-8000-000000000001');
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: tenant B admin forged expense into redreach';
+  end if;
+  raise notice 'ok - tenant B cannot insert expense into redreach tenant_id';
+end $$;
+
+do $$
+declare
+  failed boolean := false;
+begin
+  begin
+    insert into public.delivery_notes (client, reference_number, tenant_id)
+    values ('Forged DN', 'DN-FORGED-1', 'a0000000-0000-4000-8000-000000000001');
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: tenant B admin forged delivery_note into redreach';
+  end if;
+  raise notice 'ok - tenant B cannot insert delivery_note into redreach tenant_id';
 end $$;
 
 ------------------------------------------------------------ Append-only audit_log (authenticated cannot mutate)

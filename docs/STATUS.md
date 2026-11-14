@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — tenant isolation for invoices/deals
+**Current milestone:** Continuous backlog — tenant isolation for expenses/DNs
 
 ## Shipped this turn
 
-- Expanded `tenant_isolation_test.sql` for **invoices** and **sales_deals** (read isolation + forged invoice insert blocked)
+- Expanded `tenant_isolation_test.sql` for **expenses** and **delivery_notes** (read isolation + forged insert blocked)
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR nav · QTSP · outbox · digest · HubSpot · System check · tenant/audit CI · a11y · chrome · pipeline density
+- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR nav · QTSP · outbox · digest · HubSpot · System check · tenant CI (invoices/deals) · a11y · chrome · pipeline density
 
 ## Still open (agent queue)
 
