@@ -26,8 +26,21 @@
   color: var(--muted, #5c5c5c);
 }
 
-.sections {
+.pack {
   margin: 0 0 28px;
+}
+
+.packTitle {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 620;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted, #5c5c5c);
+}
+
+.sections {
+  margin: 0;
   padding: 0;
   list-style: none;
   display: flex;

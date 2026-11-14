@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — module flags / nav permissions
+**Current milestone:** Continuous backlog — guide billing pack
 
 ## Shipped this turn
 
-- Module registry flags + role filtering centralized (`visibleAppModules` / `parseModuleFlags`); Layout and Cmd+K consume them; Operations soft-hide via `app_settings.moduleFlags` JSON `{"ops":false}`
+- In-app guide second content pack (billing/money) + multi-pack `/guide` shell; EN+AR strings for invoices, payments, DNs, expenses, digest
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide · Cmd+K · QTSP · outbox · digest · HubSpot nudge · System check outbox · tenant/audit CI · a11y · minimal chrome · pipeline density
+- Continuous backlog · Zod · Guide CRM pack · Cmd+K · module flags · QTSP · outbox · digest · HubSpot · System check · tenant/audit CI · a11y · chrome · pipeline density
 
 ## Still open (agent queue)
 
