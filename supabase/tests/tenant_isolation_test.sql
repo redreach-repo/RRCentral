@@ -307,6 +307,14 @@ values (
   'Tenant B Secret Brand'
 );
 
+insert into public.business_units (tenant_id, company_id, code, name)
+values (
+  'b0000000-0000-4000-8000-000000000001',
+  'b0000000-0000-4000-8000-000000000002',
+  'tenant_b_secret',
+  'Tenant B Secret BU'
+);
+
 insert into public.workflow_definitions (
   workflow_key, name, description, tenant_id
 )
@@ -467,6 +475,10 @@ select pg_temp.expect(
   'redreach admin cannot read tenant B brand_kits'
 );
 select pg_temp.expect(
+  (select count(*) from public.business_units where code = 'tenant_b_secret') = 0,
+  'redreach admin cannot read tenant B business_units'
+);
+select pg_temp.expect(
   (select count(*) from public.workflow_definitions where workflow_key = 'tenant_b_secret') = 0,
   'redreach admin cannot read tenant B workflow_definitions'
 );
@@ -609,6 +621,10 @@ select pg_temp.expect(
 select pg_temp.expect(
   (select count(*) from public.brand_kits where legal_footer = 'Tenant B Secret Brand') = 1,
   'tenant B admin can read own brand_kits'
+);
+select pg_temp.expect(
+  (select count(*) from public.business_units where code = 'tenant_b_secret') = 1,
+  'tenant B admin can read own business_units'
 );
 select pg_temp.expect(
   (select count(*) from public.workflow_definitions where workflow_key = 'tenant_b_secret') = 1,
@@ -1055,6 +1071,27 @@ begin
     raise exception 'TENANT TEST FAILED: tenant B admin forged brand_kit into redreach';
   end if;
   raise notice 'ok - tenant B cannot insert brand_kit into redreach tenant_id';
+end $$;
+
+do $$
+declare
+  failed boolean := false;
+begin
+  begin
+    insert into public.business_units (tenant_id, company_id, code, name)
+    values (
+      'a0000000-0000-4000-8000-000000000001',
+      'b0000000-0000-4000-8000-000000000002',
+      'forged_bu',
+      'Forged BU'
+    );
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: tenant B admin forged business_unit into redreach';
+  end if;
+  raise notice 'ok - tenant B cannot insert business_unit into redreach tenant_id';
 end $$;
 
 do $$
