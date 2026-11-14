@@ -34,6 +34,24 @@ export async function listHubSpotRuns(limit = 5): Promise<HubSpotSyncRun[]> {
   return ((data || []) as HubSpotSyncRun[]).slice(0, limit)
 }
 
+/** ISO timestamp from `app_settings.hubspot_sync_requested_at`, or null when none. */
+export function parseHubSpotNudge(raw: string | null | undefined): string | null {
+  const v = typeof raw === 'string' ? raw.trim() : ''
+  if (!v) return null
+  const t = Date.parse(v)
+  return Number.isFinite(t) ? new Date(t).toISOString() : null
+}
+
+/** Pending outbox HubSpot nudge, if the event-outbox worker asked for a sync. */
+export async function getHubSpotNudge(): Promise<string | null> {
+  const { data, error } = await db.from('app_settings').select('value').eq('key', 'hubspot_sync_requested_at').maybeSingle()
+  if (error) {
+    if (isMissingRelationError(error) || isUndefinedColumnError(error)) return null
+    throw error
+  }
+  return parseHubSpotNudge(typeof data?.value === 'string' ? data.value : null)
+}
+
 /** "2 companies, 5 contacts and 1 deal sent" style line for a run. */
 export function runSummary(r: Pick<HubSpotSyncRun, 'companies_created' | 'companies_updated' | 'contacts_created' | 'contacts_updated' | 'deals_created' | 'deals_updated' | 'failed' | 'finished_at'>): string {
   if (!r.finished_at) return 'Running…'

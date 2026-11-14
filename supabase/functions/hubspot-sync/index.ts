@@ -85,8 +85,30 @@ Deno.serve(withErrorLog("hubspot-sync", async (req) => {
   const token = Deno.env.get("HUBSPOT_ACCESS_TOKEN") || ""
   if (!token) return json({ error: "HubSpot is not set up yet. Add HUBSPOT_ACCESS_TOKEN in Supabase (see docs/hubspot-sync.md)." }, 503)
 
+  // Optional body: { only_if_requested: true } skips unless the outbox worker
+  // wrote app_settings.hubspot_sync_requested_at (for a frequent poller cron).
+  let onlyIfRequested = false
+  try {
+    const body = req.method === "POST" ? await req.json().catch(() => ({})) : {}
+    onlyIfRequested = Boolean(body && typeof body === "object" && (body as { only_if_requested?: unknown }).only_if_requested)
+  } catch {
+    onlyIfRequested = false
+  }
+
   const sb = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
   const started = Date.now()
+
+  const { data: nudgeRow } = await sb
+    .from("app_settings")
+    .select("value")
+    .eq("key", "hubspot_sync_requested_at")
+    .maybeSingle()
+  const nudgeRaw = typeof nudgeRow?.value === "string" ? nudgeRow.value.trim() : ""
+  const nudgeAt = nudgeRaw && Number.isFinite(Date.parse(nudgeRaw)) ? nudgeRaw : null
+
+  if (onlyIfRequested && !nudgeAt) {
+    return json({ skipped: true, reason: "no_nudge", message: "No outbox HubSpot nudge; nothing to sync." })
+  }
 
   const since = new Date(started - RUNNING_MINUTES * 60_000).toISOString()
   const { data: running } = await sb
@@ -143,5 +165,13 @@ Deno.serve(withErrorLog("hubspot-sync", async (req) => {
     .update({ ...counts, message, finished_at: new Date().toISOString() })
     .eq("id", run.id)
 
-  return json({ ok: true, ...counts, message })
+  // Clear the outbox nudge after any finished attempt so it does not linger.
+  // A later outbox batch will rewrite it if sync is needed again.
+  let nudgeCleared = false
+  if (nudgeAt) {
+    const { error: clearError } = await sb.from("app_settings").delete().eq("key", "hubspot_sync_requested_at")
+    nudgeCleared = !clearError
+  }
+
+  return json({ ok: true, ...counts, message, nudge_at: nudgeAt, nudge_cleared: nudgeCleared })
 }, { secrets: ["HUBSPOT_ACCESS_TOKEN", "HUBSPOT_CRON_SECRET"] }))

@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — digest outbox signal
+**Current milestone:** Continuous backlog — HubSpot outbox nudge
 
 ## Shipped this turn
 
-- Morning digest reads `app_settings.digest_attention_signal` (outbox worker buffer) into “Recent CRM activity”, then clears it after send — see `docs/daily-digest.md` / `docs/event-outbox.md`
+- `hubspot-sync` honors/clears `hubspot_sync_requested_at` (outbox nudge), optional `only_if_requested` poller, Settings card shows pending nudge — see `docs/hubspot-sync.md`
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide · Cmd+K · QTSP · outbox worker · domain handlers · a11y · minimal chrome · pipeline density
+- Continuous backlog · Zod · Guide · Cmd+K · QTSP · outbox worker · domain handlers · digest signal · a11y · minimal chrome · pipeline density
 
 ## Still open (agent queue)
 

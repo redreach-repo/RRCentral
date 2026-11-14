@@ -3,7 +3,7 @@ import { Loader2, RefreshCw } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { errorMessage } from '../lib/errors'
-import { type HubSpotSyncRun, listHubSpotRuns, runHubSpotSync, runSummary } from '../lib/hubspotSync'
+import { getHubSpotNudge, type HubSpotSyncRun, listHubSpotRuns, runHubSpotSync, runSummary } from '../lib/hubspotSync'
 import { buttonPrimaryStyle, cardStyle, colors, sectionTitleStyle } from '../lib/uiStyles'
 
 const when = (iso: string) => new Date(iso).toLocaleString()
@@ -16,6 +16,7 @@ export default function HubSpotCard() {
   const { userRole, isLocalMode } = useAuth()
   const { showToast } = useToast()
   const [runs, setRuns] = useState<HubSpotSyncRun[]>([])
+  const [nudgeAt, setNudgeAt] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const canSync = userRole === 'admin' || userRole === 'manager'
@@ -26,7 +27,9 @@ export default function HubSpotCard() {
       return
     }
     try {
-      setRuns(await listHubSpotRuns(3))
+      const [nextRuns, nextNudge] = await Promise.all([listHubSpotRuns(3), getHubSpotNudge()])
+      setRuns(nextRuns)
+      setNudgeAt(nextNudge)
     } catch (e) {
       showToast(errorMessage(e, 'Could not load the HubSpot runs'), 'error')
     } finally {
@@ -85,6 +88,11 @@ export default function HubSpotCard() {
                 : 'Not synced yet.'}
             </span>
           </div>
+          {nudgeAt ? (
+            <p style={{ fontSize: 13, color: colors.warn, margin: '10px 0 0' }}>
+              Outbox asked for a sync at {when(nudgeAt)}. Sync now (or the next schedule) will clear it.
+            </p>
+          ) : null}
           {last?.message ? (
             <pre style={{ fontSize: 12, color: colors.warn, whiteSpace: 'pre-wrap', margin: '10px 0 0' }}>{last.message}</pre>
           ) : null}

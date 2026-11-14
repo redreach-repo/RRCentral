@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { runSummary } from './hubspotSync'
+import { parseHubSpotNudge, runSummary } from './hubspotSync'
 
 const run = (over = {}) => ({
   companies_created: 0,
@@ -24,5 +24,15 @@ describe('runSummary', () => {
     expect(runSummary(run())).toBe('Nothing new to send')
     expect(runSummary(run({ deals_created: 3, failed: 1 }))).toBe('3 deals sent, 1 failed')
     expect(runSummary(run({ finished_at: null }))).toBe('Running…')
+  })
+})
+
+describe('parseHubSpotNudge', () => {
+  it('keeps a valid ISO timestamp and rejects junk', () => {
+    expect(parseHubSpotNudge('2026-11-14T07:00:00.000Z')).toBe('2026-11-14T07:00:00.000Z')
+    expect(parseHubSpotNudge(' 2026-11-14T07:00:00Z ')).toBe('2026-11-14T07:00:00.000Z')
+    expect(parseHubSpotNudge('')).toBeNull()
+    expect(parseHubSpotNudge(null)).toBeNull()
+    expect(parseHubSpotNudge('not-a-date')).toBeNull()
   })
 })
