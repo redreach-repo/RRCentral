@@ -76,12 +76,12 @@ export default function BuildTemplatesPage() {
   const load = useCallback(async () => {
     try {
       // Templates first: in local mode reading them seeds the lines too.
-      const [t, p] = await Promise.all([listBuildTemplates(), listPackages()])
-      const i = await listTemplateItems()
-      setTemplates(t)
-      setPackages(p)
-      setItems(i)
-      setSelectedId((current) => (t.some((x) => x.id === current) ? current : t[0]?.id ?? ''))
+      const [tpls, pkgs] = await Promise.all([listBuildTemplates(), listPackages()])
+      const itemRows = await listTemplateItems()
+      setTemplates(tpls)
+      setPackages(pkgs)
+      setItems(itemRows)
+      setSelectedId((current) => (tpls.some((x) => x.id === current) ? current : tpls[0]?.id ?? ''))
     } catch (e) {
       showToast(errorMessage(e, 'Could not load build templates'), 'error')
     }
@@ -91,15 +91,15 @@ export default function BuildTemplatesPage() {
     void load()
   }, [load])
 
-  const selected = templates.find((t) => t.id === selectedId) ?? null
+  const selected = templates.find((row) => row.id === selectedId) ?? null
   const selectedItems = useMemo(() => sortItems(items.filter((i) => i.template_id === selectedId)), [items, selectedId])
   const tasks = selectedItems.filter((i) => i.kind === 'task')
   const configLines = selectedItems.filter((i) => i.kind === 'config')
   const goLiveLines = [...selectedItems.filter((i) => i.kind === 'golive')].sort(
     (a, b) => (a.due_days ?? 0) - (b.due_days ?? 0) || a.sort - b.sort,
   )
-  const pkgOf = (t: BuildTemplate) => packages.find((p) => p.id === t.package_id) ?? null
-  const hoursFor = (t: BuildTemplate) => templateHours(items.filter((i) => i.template_id === t.id))
+  const pkgOf = (row: BuildTemplate) => packages.find((p) => p.id === row.package_id) ?? null
+  const hoursFor = (row: BuildTemplate) => templateHours(items.filter((i) => i.template_id === row.id))
 
   async function run(job: () => Promise<void>, failure: string) {
     setBusy(true)
@@ -120,7 +120,7 @@ export default function BuildTemplatesPage() {
       showToast(parsed.error, 'error')
       return
     }
-    const existing = templates.find((t) => t.id === templateForm.id)
+    const existing = templates.find((row) => row.id === templateForm.id)
     const input = {
       code: existing?.code ?? codeFromName(parsed.data.name, templates),
       name: parsed.data.name,
@@ -187,25 +187,32 @@ export default function BuildTemplatesPage() {
         ) : null}
         {i.kind === 'golive' ? (
           <span style={{ color: colors.muted2, fontSize: 12, whiteSpace: 'nowrap' }}>
-            {ownerLabel(i.owner)}, day {i.due_days ?? 0}
+            {t('page.buildTemplates.ownerDay')
+              .replace('{owner}', ownerLabel(i.owner))
+              .replace('{day}', String(i.due_days ?? 0))}
           </span>
         ) : null}
         {canEdit ? (
           <span style={{ display: 'flex', gap: 6 }}>
-            <button type="button" style={smallBtn} aria-label={`Edit ${i.title}`} onClick={() => openItem(i.kind, i)}>
-              <Pencil size={12} /> Edit
+            <button
+              type="button"
+              style={smallBtn}
+              aria-label={t('page.buildTemplates.editItem').replace('{title}', i.title)}
+              onClick={() => openItem(i.kind, i)}
+            >
+              <Pencil size={12} /> {t('page.buildTemplates.edit')}
             </button>
             <button
               type="button"
               style={{ ...smallBtn, color: colors.danger }}
-              aria-label={`Delete ${i.title}`}
+              aria-label={t('page.buildTemplates.deleteItem').replace('{title}', i.title)}
               disabled={busy}
               onClick={() =>
-                window.confirm(`Delete "${i.title}" from the template?`) &&
+                window.confirm(t('page.buildTemplates.deleteItemConfirm').replace('{title}', i.title)) &&
                 void run(() => deleteTemplateItem(i.id), 'Could not delete the line')
               }
             >
-              <Trash2 size={12} /> Remove
+              <Trash2 size={12} /> {t('page.buildTemplates.remove')}
             </button>
           </span>
         ) : null}
@@ -235,27 +242,27 @@ export default function BuildTemplatesPage() {
       {templates.length === 0 ? (
         <EmptyState
           icon={<ClipboardList size={22} />}
-          title="No build templates yet"
-          subtitle="Run supabase/migrations/20261106090000_build_templates.sql in Supabase to add the Starter, Growth and Done for you templates."
+          title={t('page.buildTemplates.emptyTitle')}
+          subtitle={t('page.buildTemplates.emptySubtitle')}
         />
       ) : (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start' }}>
           <section style={{ ...cardStyle, flex: '1 1 260px', minWidth: 0 }}>
-            <h2 style={sectionTitleStyle}>Templates</h2>
+            <h2 style={sectionTitleStyle}>{t('page.buildTemplates.list')}</h2>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-              {templates.map((t) => {
-                const pkg = pkgOf(t)
-                const hours = hoursFor(t)
+              {templates.map((row) => {
+                const pkg = pkgOf(row)
+                const hours = hoursFor(row)
                 return (
-                  <li key={t.id}>
+                  <li key={row.id}>
                     <button
                       type="button"
-                      onClick={() => setSelectedId(t.id)}
+                      onClick={() => setSelectedId(row.id)}
                       style={{
                         width: '100%',
                         textAlign: 'left',
-                        background: t.id === selectedId ? 'rgba(232,93,4,0.15)' : 'transparent',
-                        border: `1px solid ${t.id === selectedId ? colors.accent : 'transparent'}`,
+                        background: row.id === selectedId ? 'rgba(232,93,4,0.15)' : 'transparent',
+                        border: `1px solid ${row.id === selectedId ? colors.accent : 'transparent'}`,
                         borderRadius: 8,
                         padding: '8px 10px',
                         color: colors.text,
@@ -264,12 +271,16 @@ export default function BuildTemplatesPage() {
                       }}
                     >
                       <div style={{ fontWeight: 600 }}>
-                        {t.name}
-                        {!t.active ? <span style={{ color: colors.muted2, fontWeight: 400 }}> (not in use)</span> : null}
+                        {row.name}
+                        {!row.active ? (
+                          <span style={{ color: colors.muted2, fontWeight: 400 }}>{t('page.buildTemplates.notInUse')}</span>
+                        ) : null}
                       </div>
                       <div style={{ fontSize: 12, color: hoursOver(hours, pkg) ? colors.warn : colors.muted }}>
-                        {pkg ? pkg.name : 'Any package'}, {hoursLabel(hours)}
-                        {pkg?.build_hours_target ? ` of ${hoursLabel(pkg.build_hours_target)} target` : ''}
+                        {pkg ? pkg.name : t('page.buildTemplates.anyPackage')}, {hoursLabel(hours)}
+                        {pkg?.build_hours_target
+                          ? t('page.buildTemplates.ofTarget').replace('{hours}', hoursLabel(pkg.build_hours_target))
+                          : ''}
                       </div>
                     </button>
                   </li>
@@ -300,7 +311,7 @@ export default function BuildTemplatesPage() {
                         })
                       }
                     >
-                      <Pencil size={12} /> Edit
+                      <Pencil size={12} /> {t('page.buildTemplates.edit')}
                     </button>
                     <button
                       type="button"
@@ -315,18 +326,20 @@ export default function BuildTemplatesPage() {
                         })
                       }
                     >
-                      <Copy size={12} /> Copy
+                      <Copy size={12} /> {t('page.buildTemplates.copy')}
                     </button>
                     <button
                       type="button"
                       style={{ ...smallBtn, color: colors.danger }}
                       disabled={busy}
                       onClick={() =>
-                        window.confirm(`Delete ${selected.name}? Clients that used it keep their checklist.`) &&
+                        window.confirm(
+                          t('page.buildTemplates.deleteConfirm').replace('{name}', selected.name),
+                        ) &&
                         void run(() => deleteBuildTemplate(selected.id), 'Could not delete the template')
                       }
                     >
-                      <Trash2 size={12} /> Delete
+                      <Trash2 size={12} /> {t('page.buildTemplates.delete')}
                     </button>
                   </span>
                 ) : null}
@@ -334,19 +347,21 @@ export default function BuildTemplatesPage() {
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
                 <h3 style={{ fontSize: 14, margin: 0 }}>
-                  Build checklist, {tasks.length} steps, {hoursLabel(templateHours(tasks))}
+                  {t('page.buildTemplates.checklistHeading')
+                    .replace('{n}', String(tasks.length))
+                    .replace('{hours}', hoursLabel(templateHours(tasks)))}
                 </h3>
                 {canEdit ? (
                   <button type="button" style={smallBtn} onClick={() => openItem('task')}>
-                    <Plus size={12} /> Step
+                    <Plus size={12} /> {t('page.buildTemplates.addStep')}
                   </button>
                 ) : null}
               </div>
               {tasks.length === 0 ? (
-                <p style={{ color: colors.muted, fontSize: 13 }}>No steps yet.</p>
+                <p style={{ color: colors.muted, fontSize: 13 }}>{t('page.buildTemplates.noSteps')}</p>
               ) : (
                 BUILD_STAGES.map((s) => {
-                  const inStage = tasks.filter((t) => t.stage === s.value)
+                  const inStage = tasks.filter((task) => task.stage === s.value)
                   if (!inStage.length) return null
                   return (
                     <div key={s.value} style={{ marginTop: 10 }}>
@@ -358,35 +373,37 @@ export default function BuildTemplatesPage() {
               )}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20 }}>
-                <h3 style={{ fontSize: 14, margin: 0 }}>Starter configuration</h3>
+                <h3 style={{ fontSize: 14, margin: 0 }}>{t('page.buildTemplates.starterConfig')}</h3>
                 {canEdit ? (
                   <button type="button" style={smallBtn} onClick={() => openItem('config')}>
-                    <Plus size={12} /> Line
+                    <Plus size={12} /> {t('page.buildTemplates.addLine')}
                   </button>
                 ) : null}
               </div>
               <p style={{ color: colors.muted2, fontSize: 12, margin: '4px 0 0' }}>
-                Copied into the client's requirements, ready to agree at discovery.
+                {t('page.buildTemplates.starterConfigHint')}
               </p>
               {configLines.length === 0 ? (
-                <p style={{ color: colors.muted, fontSize: 13 }}>No starter configuration yet.</p>
+                <p style={{ color: colors.muted, fontSize: 13 }}>{t('page.buildTemplates.noStarterConfig')}</p>
               ) : (
                 <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 0' }}>{configLines.map(itemRow)}</ul>
               )}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20 }}>
-                <h3 style={{ fontSize: 14, margin: 0 }}>Go live checklist, {goLiveLines.length} steps</h3>
+                <h3 style={{ fontSize: 14, margin: 0 }}>
+                  {t('page.buildTemplates.goLiveHeading').replace('{n}', String(goLiveLines.length))}
+                </h3>
                 {canEdit ? (
                   <button type="button" style={smallBtn} onClick={() => openItem('golive')}>
-                    <Plus size={12} /> Go live step
+                    <Plus size={12} /> {t('page.buildTemplates.addGoLive')}
                   </button>
                 ) : null}
               </div>
               <p style={{ color: colors.muted2, fontSize: 12, margin: '4px 0 0' }}>
-                Who does what before go live, due a number of days after the client signs. The client sees it in their portal.
+                {t('page.buildTemplates.goLiveHint')}
               </p>
               {goLiveLines.length === 0 ? (
-                <p style={{ color: colors.muted, fontSize: 13 }}>No go live steps yet.</p>
+                <p style={{ color: colors.muted, fontSize: 13 }}>{t('page.buildTemplates.noGoLive')}</p>
               ) : (
                 <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 0' }}>{goLiveLines.map(itemRow)}</ul>
               )}
@@ -397,14 +414,20 @@ export default function BuildTemplatesPage() {
 
       <Modal
         open={Boolean(templateForm)}
-        title={templateForm?.copyOf ? 'Copy template' : templateForm?.id ? 'Edit template' : 'New template'}
+        title={
+          templateForm?.copyOf
+            ? t('page.buildTemplates.copyModal')
+            : templateForm?.id
+              ? t('page.buildTemplates.editModal')
+              : t('page.buildTemplates.newModal')
+        }
         onClose={() => setTemplateForm(null)}
       >
         {templateForm ? (
           <div style={{ display: 'grid', gap: 12 }}>
             <div style={formGridStyle}>
               <div style={fieldStyle}>
-                <label style={labelStyle}>Name</label>
+                <label style={labelStyle}>{t('page.buildTemplates.name')}</label>
                 <input
                   style={inputStyle}
                   value={templateForm.name}
@@ -412,13 +435,13 @@ export default function BuildTemplatesPage() {
                 />
               </div>
               <div style={fieldStyle}>
-                <label style={labelStyle}>Package</label>
+                <label style={labelStyle}>{t('page.buildTemplates.package')}</label>
                 <select
                   style={selectStyle}
                   value={templateForm.package_id}
                   onChange={(e) => setTemplateForm({ ...templateForm, package_id: e.target.value })}
                 >
-                  <option value="">Any package</option>
+                  <option value="">{t('page.buildTemplates.anyPackage')}</option>
                   {packages.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
@@ -428,7 +451,7 @@ export default function BuildTemplatesPage() {
               </div>
             </div>
             <div style={fieldStyle}>
-              <label style={labelStyle}>Description</label>
+              <label style={labelStyle}>{t('page.buildTemplates.description')}</label>
               <textarea
                 style={{ ...inputStyle, minHeight: 70 }}
                 value={templateForm.description}
@@ -441,15 +464,15 @@ export default function BuildTemplatesPage() {
                 checked={templateForm.active}
                 onChange={(e) => setTemplateForm({ ...templateForm, active: e.target.checked })}
               />
-              In use (offered on client pages)
+              {t('page.buildTemplates.inUse')}
             </label>
             {templateForm.copyOf ? (
               <p style={{ color: colors.muted, fontSize: 13, margin: 0 }}>
-                Copies every step and starter configuration line from {templateForm.copyOf.name}.
+                {t('page.buildTemplates.copiesFrom').replace('{name}', templateForm.copyOf.name)}
               </p>
             ) : null}
             <button type="button" style={buttonPrimaryStyle} disabled={busy} onClick={() => void saveTemplate()}>
-              Save
+              {t('page.buildTemplates.save')}
             </button>
           </div>
         ) : null}
@@ -457,7 +480,13 @@ export default function BuildTemplatesPage() {
 
       <Modal
         open={Boolean(itemForm)}
-        title={itemForm?.kind === 'config' ? 'Starter configuration line' : itemForm?.kind === 'golive' ? 'Go live step' : 'Build step'}
+        title={
+          itemForm?.kind === 'config'
+            ? t('page.buildTemplates.modalConfig')
+            : itemForm?.kind === 'golive'
+              ? t('page.buildTemplates.modalGoLive')
+              : t('page.buildTemplates.modalBuild')
+        }
         onClose={() => setItemForm(null)}
       >
         {itemForm ? (
@@ -465,7 +494,7 @@ export default function BuildTemplatesPage() {
             {itemForm.kind === 'task' ? (
               <div style={formGridStyle}>
                 <div style={fieldStyle}>
-                  <label style={labelStyle}>Stage</label>
+                  <label style={labelStyle}>{t('page.buildTemplates.stage')}</label>
                   <select
                     style={selectStyle}
                     value={itemForm.stage}
@@ -479,7 +508,7 @@ export default function BuildTemplatesPage() {
                   </select>
                 </div>
                 <div style={fieldStyle}>
-                  <label style={labelStyle}>Estimated hours</label>
+                  <label style={labelStyle}>{t('page.buildTemplates.estimatedHours')}</label>
                   <input
                     style={inputStyle}
                     inputMode="decimal"
@@ -492,7 +521,7 @@ export default function BuildTemplatesPage() {
             {itemForm.kind === 'golive' ? (
               <div style={formGridStyle}>
                 <div style={fieldStyle}>
-                  <label style={labelStyle}>Stage</label>
+                  <label style={labelStyle}>{t('page.buildTemplates.stage')}</label>
                   <select
                     style={selectStyle}
                     value={itemForm.stage}
@@ -506,7 +535,7 @@ export default function BuildTemplatesPage() {
                   </select>
                 </div>
                 <div style={fieldStyle}>
-                  <label style={labelStyle}>Owner</label>
+                  <label style={labelStyle}>{t('page.buildTemplates.owner')}</label>
                   <select
                     style={selectStyle}
                     value={itemForm.owner}
@@ -520,7 +549,7 @@ export default function BuildTemplatesPage() {
                   </select>
                 </div>
                 <div style={fieldStyle}>
-                  <label style={labelStyle}>Due, days after signing</label>
+                  <label style={labelStyle}>{t('page.buildTemplates.dueDays')}</label>
                   <input
                     style={inputStyle}
                     inputMode="numeric"
@@ -531,7 +560,11 @@ export default function BuildTemplatesPage() {
               </div>
             ) : null}
             <div style={fieldStyle}>
-              <label style={labelStyle}>{itemForm.kind === 'config' ? 'What is set up' : 'Step'}</label>
+              <label style={labelStyle}>
+                {itemForm.kind === 'config'
+                  ? t('page.buildTemplates.whatIsSetUp')
+                  : t('page.buildTemplates.stepField')}
+              </label>
               <input
                 style={inputStyle}
                 value={itemForm.title}
@@ -539,7 +572,7 @@ export default function BuildTemplatesPage() {
               />
             </div>
             <div style={fieldStyle}>
-              <label style={labelStyle}>Detail (optional)</label>
+              <label style={labelStyle}>{t('page.buildTemplates.detailOptional')}</label>
               <textarea
                 style={{ ...inputStyle, minHeight: 70 }}
                 value={itemForm.detail}
@@ -547,7 +580,7 @@ export default function BuildTemplatesPage() {
               />
             </div>
             <button type="button" style={buttonPrimaryStyle} disabled={busy} onClick={() => void saveItem()}>
-              Save
+              {t('page.buildTemplates.save')}
             </button>
           </div>
         ) : null}
