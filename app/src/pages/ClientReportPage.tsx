@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { addMonths, format, parseISO } from 'date-fns'
+import { useI18n } from '../contexts/I18nContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { getAccount } from '../lib/accountsStore'
 import {
@@ -46,6 +47,7 @@ import styles from './ClientReportPage.module.css'
 export default function ClientReportPage() {
   const { id = '' } = useParams<{ id: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
+  const { t } = useI18n()
   const { settings } = useSettings()
   const rates = useMemo(() => ratesFromSettings(settings), [settings])
   const month = monthKey(searchParams.get('month') ? `${searchParams.get('month')}-01` : new Date())
@@ -117,13 +119,13 @@ export default function ClientReportPage() {
     .join('\n')
   const plan = planEdits[month] ?? defaultPlan
 
-  if (loading) return <div className={styles.page}>Loading report…</div>
+  if (loading) return <div className={styles.page}>{t('page.clientReport.loading')}</div>
   if (error || !account) {
     return (
       <div className={styles.page}>
         <div className={styles.sheet}>
-          {error || 'This account does not exist, or it is not assigned to you.'}{' '}
-          <Link to="/accounts">Back to accounts</Link>
+          {error || t('page.clientReport.notFound')}{' '}
+          <Link to="/accounts">{t('page.clientReport.backToAccounts')}</Link>
         </div>
       </div>
     )
@@ -178,7 +180,9 @@ export default function ClientReportPage() {
   return (
     <div className={styles.page}>
       <div className={styles.toolbar}>
-        <Link to={`/accounts/${account.id}`}>Back to {account.name}</Link>
+        <Link to={`/accounts/${account.id}`}>
+          {t('page.clientReport.backTo').replace('{name}', account.name)}
+        </Link>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <input
             type="month"
@@ -187,41 +191,44 @@ export default function ClientReportPage() {
             onChange={(e) => e.target.value && setSearchParams({ month: e.target.value }, { replace: true })}
           />
           <button type="button" disabled={aiBusy} onClick={() => void writeSummary()}>
-            {aiBusy ? 'Writing…' : 'Write summary with AI'}
+            {aiBusy ? t('page.clientReport.writing') : t('page.clientReport.writeSummary')}
           </button>
           <button type="button" onClick={() => window.print()}>
-            Print or save as PDF
+            {t('page.clientReport.print')}
           </button>
         </div>
       </div>
 
       <article className={styles.sheet}>
         <div className={styles.muted} style={{ fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-          {settings.companyName || 'Red Reach Middle East FZE'}, monthly report
+          {t('page.clientReport.kicker').replace(
+            '{company}',
+            settings.companyName || 'Red Reach Middle East FZE',
+          )}
         </div>
         <h1>{account.name}</h1>
         <div className={styles.muted}>
           {monthLabel(month)}
-          {pkg ? `, ${pkg.name} package` : ''}
+          {pkg ? t('page.clientReport.package').replace('{name}', pkg.name) : ''}
           {account.reference ? `, ${account.reference}` : ''}
         </div>
 
         {aiError ? <p className={styles.screenOnly} style={{ color: '#b42318', fontSize: 13 }}>{aiError}</p> : null}
         {summary || aiBusy ? (
           <>
-            <h2>Summary</h2>
+            <h2>{t('page.clientReport.summary')}</h2>
             <textarea
               className={styles.plan}
-              aria-label="Summary"
+              aria-label={t('page.clientReport.summary')}
               value={summary}
-              placeholder={aiBusy ? 'Writing the summary…' : ''}
+              placeholder={aiBusy ? t('page.clientReport.writingPlaceholder') : ''}
               onChange={(e) => setSummaries((p) => ({ ...p, [month]: e.target.value }))}
             />
             <div className={styles.planPrint}>{summary}</div>
           </>
         ) : null}
 
-        <h2>Hours</h2>
+        <h2>{t('page.clientReport.hours')}</h2>
         <p style={{ margin: '0 0 8px' }}>
           <strong>{totalHours}h</strong> worked this month
           {pkg ? ` against a ${pkg.target_hours}h monthly target.` : '.'}
