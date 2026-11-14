@@ -6,6 +6,11 @@
 // (including "not set up yet" 503s). Rows have kind 'function' and the
 // function name in `page`, so admins see them on App errors and System check.
 
+import { installDemoGuard } from "./demoGuard.ts"
+import { scrubText } from "./scrub.ts"
+import { sendToSentry } from "./sentry.ts"
+import { logEdge, requestIdFor } from "./structuredLog.ts"
+
 type Handler = (req: Request) => Response | Promise<Response>
 
 export type HealthOptions = {
@@ -57,8 +62,8 @@ export async function logFunctionError(fn: string, message: string, detail = "")
       headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json", Prefer: "return=minimal" },
       body: JSON.stringify({
         kind: "function",
-        message: (message || `${fn} failed`).slice(0, 1000),
-        detail: detail.slice(0, 4000),
+        message: scrubText(message || `${fn} failed`).slice(0, 1000),
+        detail: scrubText(detail).slice(0, 4000),
         page: fn.slice(0, 500),
         release: "edge",
       }),
@@ -68,6 +73,14 @@ export async function logFunctionError(fn: string, message: string, detail = "")
   } catch {
     // Logging must never turn into a second failure.
   }
+  // Optional: also to Sentry when the SENTRY_DSN secret is set (off by default).
+  await sendToSentry(env("SENTRY_DSN"), {
+    message,
+    detail,
+    environment: env("APP_ENV") || "production",
+    release: "edge",
+    tags: { fn: fn.slice(0, 100), runtime: "edge" },
+  })
 }
 
 /** True when the caller's JWT belongs to an RR Central admin. */
@@ -108,19 +121,30 @@ function short(text: string): string {
 }
 
 export function withErrorLog(fn: string, handler: Handler, opts: HealthOptions = {}): Handler {
+  // Demo isolation (gap plan module 4): in a demo project nothing leaves except calls to its own Supabase.
+  installDemoGuard()
   return async (req: Request) => {
     if (new URL(req.url).searchParams.get("ping") === "1") return ping(req, fn, opts)
+    // One structured line per request (gap plan module 3): fn, method, path, status, duration, request id.
+    const started = Date.now()
+    const request_id = requestIdFor(req)
+    const path = new URL(req.url).pathname
     try {
       const res = await handler(req)
-      if (res.status >= 500) {
+      const status = res.status
+      logEdge(status >= 500 ? "error" : status >= 400 ? "warn" : "info", "request", {
+        fn, method: req.method, path, status, duration_ms: Date.now() - started, request_id,
+      })
+      if (status >= 500) {
         const text = await res.clone().text().catch(() => "")
-        await logFunctionError(fn, `${fn} answered ${res.status}: ${short(text) || "no detail"}`, `${req.method} ${new URL(req.url).pathname}`)
+        await logFunctionError(fn, `${fn} answered ${status}: ${short(text) || "no detail"}`, `${req.method} ${path} request_id=${request_id}`)
       }
       return res
     } catch (e) {
       const err = e instanceof Error ? e : new Error(String(e))
-      await logFunctionError(fn, `${fn} crashed: ${err.message || err.name}`, err.stack || "")
-      return json(req, { error: "Something went wrong on the server. It has been logged for the admins." }, 500)
+      logEdge("error", "crash", { fn, method: req.method, path, duration_ms: Date.now() - started, request_id, error: err.message || err.name })
+      await logFunctionError(fn, `${fn} crashed: ${err.message || err.name}`, `request_id=${request_id}\n${err.stack || ""}`)
+      return json(req, { error: "Something went wrong on the server. It has been logged for the admins.", request_id }, 500)
     }
   }
 }

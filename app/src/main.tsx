@@ -3,11 +3,17 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import StagingBanner from './components/StagingBanner'
+import DemoBanner from './components/DemoBanner'
+import { installBrowserDemoGuard, isDemoBuild } from './lib/demo/demoMode'
+import { getSupabaseRuntimeConfig } from './lib/supabaseConfig'
 import { handoffTarget, isStagingBuild, routerBasename, stagingHandoff } from './lib/appEnv'
 import './index.css'
 import { installErrorReporting } from './lib/errorReporting'
 
 installErrorReporting()
+// Demo isolation: in a demo build nothing leaves the browser except to this site and its own Supabase.
+const demo = isDemoBuild()
+if (demo) installBrowserDemoGuard(getSupabaseRuntimeConfig().url)
 
 const staging = isStagingBuild()
 const handoff = stagingHandoff(window.location, staging)
@@ -26,6 +32,7 @@ if (handoff) {
     <StrictMode>
       <BrowserRouter basename={routerBasename()}>
         {staging ? <StagingBanner /> : null}
+        {demo ? <DemoBanner /> : null}
         <App />
       </BrowserRouter>
     </StrictMode>,
