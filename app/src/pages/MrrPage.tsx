@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { listAccounts } from '../lib/accountsStore'
 import { loadClientHealth } from '../lib/clientHealthStore'
@@ -32,6 +33,7 @@ const aed = (n: number) => (n ? formatAED(n) : '-')
 type Data = { accounts: Account[]; contracts: Contract[]; deals: SalesDeal[]; atRisk: Set<string> }
 
 export default function MrrPage() {
+  const { t } = useI18n()
   const { userRole } = useAuth()
   const { showToast } = useToast()
   const allowed = canViewField(userRole, 'delivery.profitability')
@@ -67,9 +69,9 @@ export default function MrrPage() {
       <div className={docsStyles.page}>
         <header className={docsStyles.hero}>
           <div>
-            <p className={docsStyles.kicker}>Finance</p>
-            <h1 className={docsStyles.title}>MRR</h1>
-            <p className={docsStyles.subtitle}>Only managers and admins can see revenue figures.</p>
+            <p className={docsStyles.kicker}>{t('page.finance.kicker')}</p>
+            <h1 className={docsStyles.title}>{t('page.mrr.titleShort')}</h1>
+            <p className={docsStyles.subtitle}>{t('page.mrr.restricted')}</p>
           </div>
         </header>
       </div>
@@ -88,12 +90,9 @@ export default function MrrPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Finance</p>
-          <h1 className={docsStyles.title}>Monthly recurring revenue</h1>
-          <p className={docsStyles.subtitle}>
-            What clients pay each month for their AI CRM, from their contracts, in AED before VAT. Setup fees are one off, so
-            they are not included. A month counts a contract that runs to the end of it. Past months use today's fees.
-          </p>
+          <p className={docsStyles.kicker}>{t('page.finance.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.mrr.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.mrr.subtitle')}</p>
         </div>
       </header>
 

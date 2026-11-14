@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — tenant isolation for legal documents
+**Current milestone:** Continuous backlog — admin/finance page body EN+AR
 
 ## Shipped this turn
 
-- Expanded `tenant_isolation_test.sql` for **legal_documents** (read isolation + forged insert blocked)
+- Page-body EN+AR catalogs for **Reports**, **MRR**, **Insights**, **Audit log**, and **System check** heroes
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome · pipeline density
+- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR list chrome · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome · pipeline density
 
 ## Still open (agent queue)
 

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { subMonths } from 'date-fns'
 import { TrendingDown, TrendingUp, Minus, Gauge } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
@@ -62,6 +63,7 @@ function TrendIcon({ t }: { t: ClientTrend }) {
 }
 
 export default function InsightsPage() {
+  const { t } = useI18n()
   const { userRole } = useAuth()
   const { settings, updateSetting } = useSettings()
   const { showToast } = useToast()
@@ -138,12 +140,9 @@ export default function InsightsPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Finance</p>
-          <h1 className={docsStyles.title}>Utilisation and profit</h1>
-          <p className={docsStyles.subtitle}>
-            How much of your delivery time is used, so you know when to hire, and how each client's profit moves month to
-            month. Amounts exclude VAT.
-          </p>
+          <p className={docsStyles.kicker}>{t('page.finance.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.insights.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.insights.subtitle')}</p>
         </div>
       </header>
 

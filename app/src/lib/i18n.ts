@@ -224,6 +224,26 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.vendors.subtitle':
       'Register suppliers you buy from. Pick them when saving a supplier invoice — no vendor number needed.',
     'page.vendors.new': 'Register vendor',
+    'page.reports.title': 'Reports',
+    'page.reports.subtitle':
+      'VAT, sales answers, cash flow, aging, multi-currency, and P&L — income excludes not-awarded quotes',
+    'page.mrr.title': 'Monthly recurring revenue',
+    'page.mrr.titleShort': 'MRR',
+    'page.mrr.subtitle':
+      'What clients pay each month for their AI CRM, from their contracts, in AED before VAT. Setup fees are one off, so they are not included. A month counts a contract that runs to the end of it. Past months use today\'s fees.',
+    'page.mrr.restricted': 'Only managers and admins can see revenue figures.',
+    'page.insights.title': 'Utilisation and profit',
+    'page.insights.subtitle':
+      'How much of your delivery time is used, so you know when to hire, and how each client\'s profit moves month to month. Amounts exclude VAT.',
+    'page.admin.kicker': 'Admin',
+    'page.audit.title': 'Audit log',
+    'page.audit.subtitle':
+      'Every create, change and delete on key records, who did it and what changed. Recorded by the database, so it cannot be edited from the app. Secrets are hidden.',
+    'page.systemCheck.title': 'System check',
+    'page.systemCheck.subtitleLead':
+      'Every server function gets a harmless ping (it does not send, import or change anything), next to its last failure. Each row names its test in docs/LIVE_TEST.md. Full error details are on',
+    'page.systemCheck.appErrors': 'App errors',
+    'page.systemCheck.subtitleTrail': '.',
   },
   ar: {
     'shell.company': 'الشركة',
@@ -441,6 +461,26 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.vendors.subtitle':
       'سجّل الموردين الذين تشتري منهم. اخترهم عند حفظ فاتورة مورد — بلا رقم مورد.',
     'page.vendors.new': 'تسجيل مورد',
+    'page.reports.title': 'التقارير',
+    'page.reports.subtitle':
+      'ضريبة القيمة المضافة وإجابات المبيعات والتدفق النقدي والتقادم والعملات المتعددة وبيان الدخل — الدخل يستثني العروض غير الممنوحة',
+    'page.mrr.title': 'الإيراد الشهري المتكرر',
+    'page.mrr.titleShort': 'MRR',
+    'page.mrr.subtitle':
+      'ما يدفعه العملاء شهرياً لـ AI CRM من عقودهم، بالدرهم قبل الضريبة. رسوم التأسيس لمرة واحدة فلا تُحسب. الشهر يحسب عقداً يمتد حتى نهايته. الأشهر السابقة تستخدم الرسوم الحالية.',
+    'page.mrr.restricted': 'المدراء والمسؤولون فقط يمكنهم رؤية أرقام الإيراد.',
+    'page.insights.title': 'الاستخدام والربح',
+    'page.insights.subtitle':
+      'كم من وقت التسليم يُستخدم لتعرف متى توظّف، وكيف يتحرك ربح كل عميل شهراً بعد شهر. المبالغ بلا ضريبة.',
+    'page.admin.kicker': 'الإدارة',
+    'page.audit.title': 'سجل التدقيق',
+    'page.audit.subtitle':
+      'كل إنشاء وتغيير وحذف على السجلات الرئيسية، ومن فعله وما تغيّر. يسجّله قاعدة البيانات فلا يُعدَّل من التطبيق. الأسرار مخفية.',
+    'page.systemCheck.title': 'فحص النظام',
+    'page.systemCheck.subtitleLead':
+      'كل دالة خادم تحصل على نبضة غير ضارة (لا ترسل ولا تستورد ولا تغيّر شيئاً)، بجانب آخر فشل. كل صف يسمي اختباره في docs/LIVE_TEST.md. تفاصيل الأخطاء الكاملة على',
+    'page.systemCheck.appErrors': 'أخطاء التطبيق',
+    'page.systemCheck.subtitleTrail': '.',
   },
 }
 

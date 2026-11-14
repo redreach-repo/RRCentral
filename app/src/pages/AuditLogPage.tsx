@@ -4,6 +4,7 @@ import { format, parseISO, subDays } from 'date-fns'
 import { Download, ShieldCheck } from 'lucide-react'
 import { db } from '../lib/db'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { can } from '../lib/permissions'
 import EmptyState from '../components/EmptyState'
 import {
@@ -93,6 +94,7 @@ async function lookupClients(
 }
 
 export default function AuditLogPage() {
+  const { t } = useI18n()
   const { userRole } = useAuth()
   const [params, setParams] = useSearchParams()
   const focus = (params.get('focus') || '') as AuditFocus | ''
@@ -192,12 +194,9 @@ export default function AuditLogPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Admin</p>
-          <h1 className={docsStyles.title}>Audit log</h1>
-          <p className={docsStyles.subtitle}>
-            Every create, change and delete on key records, who did it and what changed. Recorded by the database,
-            so it cannot be edited from the app. Secrets are hidden.
-          </p>
+          <p className={docsStyles.kicker}>{t('page.admin.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.audit.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.audit.subtitle')}</p>
         </div>
       </header>
 
