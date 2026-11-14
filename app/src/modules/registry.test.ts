@@ -40,6 +40,7 @@ describe('module registry', () => {
 
   it('exposes Settings toggles that match APP_MODULES flag keys', () => {
     expect(SETTINGS_MODULE_FLAGS.map((row) => row.flag)).toEqual([
+      'overview',
       'sales',
       'ops',
       'finance',

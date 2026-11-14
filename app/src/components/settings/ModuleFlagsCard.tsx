@@ -71,7 +71,7 @@ export default function ModuleFlagsCard() {
         Soft-hide optional sidebar modules for everyone. Direct URLs keep working. Stored as{' '}
         <code style={{ fontSize: 12 }}>moduleFlags</code> JSON in settings (for example{' '}
         <code style={{ fontSize: 12 }}>
-          {'{"sales":false,"ops":false,"finance":false,"delivery":false,"clients":false}'}
+          {'{"overview":false,"sales":false,"ops":false,"finance":false,"delivery":false,"clients":false}'}
         </code>
         ).
       </p>

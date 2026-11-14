@@ -144,7 +144,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.admin.settings.link': 'Open Settings',
     'guide.admin.moduleFlags.title': 'Module flags',
     'guide.admin.moduleFlags.body':
-      'Soft-hide Sales, Operations, Finance, Delivery, or Clients from the sidebar for everyone. Direct URLs still work.',
+      'Soft-hide Overview, Sales, Operations, Finance, Delivery, or Clients from the sidebar for everyone. Direct URLs still work.',
     'guide.admin.moduleFlags.link': 'Open Module flags',
     'guide.admin.systemCheck.title': 'System check',
     'guide.admin.systemCheck.body':
@@ -758,7 +758,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.admin.settings.link': 'فتح الإعدادات',
     'guide.admin.moduleFlags.title': 'أعلام الوحدات',
     'guide.admin.moduleFlags.body':
-      'أخفِ المبيعات أو العمليات أو المالية أو التسليم أو العملاء من الشريط الجانبي للجميع. الروابط المباشرة تبقى تعمل.',
+      'أخفِ النظرة العامة أو المبيعات أو العمليات أو المالية أو التسليم أو العملاء من الشريط الجانبي للجميع. الروابط المباشرة تبقى تعمل.',
     'guide.admin.moduleFlags.link': 'فتح أعلام الوحدات',
     'guide.admin.systemCheck.title': 'فحص النظام',
     'guide.admin.systemCheck.body':

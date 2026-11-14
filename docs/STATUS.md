@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — finance guide pack
+**Current milestone:** Continuous backlog — module flags for Overview
 
 ## Shipped this turn
 
-- Added **finance** content pack to `/guide` (Vendors, Reports, MRR, Utilisation, Duplicates)
+- Settings Module flags card can soft-hide **Overview** (`overview` flag)
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs (CRM/billing/delivery/ops/admin) · Cmd+K · module flags · EN+AR · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome
+- Continuous backlog · Zod · Guide packs (incl. finance) · Cmd+K · module flags (sales/ops/finance/delivery/clients) · EN+AR · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome
 
 ## Still open (agent queue)
 

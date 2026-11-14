@@ -52,6 +52,8 @@ export const APP_MODULES: ModuleManifest[] = [
     id: 'overview',
     label: 'Overview',
     icon: LayoutDashboard,
+    /** Soft-hide via app_settings.moduleFlags JSON, e.g. {"overview":false}. */
+    flag: 'overview',
     items: [
       { to: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true },
       { to: '/guide', label: 'Guide', icon: BookOpen },
