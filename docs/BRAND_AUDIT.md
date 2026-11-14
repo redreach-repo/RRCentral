@@ -35,7 +35,7 @@ Still say **RR Central** / **RED REACH Central** in chrome or copy (non-exhausti
 | Favicon / PWA | Regenerated from seed PNG | `A_favicon_full.svg` / `A_app-icon_full.svg` (+ dark) as fallback |
 | Documents PDF | Tenant / settings logo | Unchanged (tenant) |
 
-**Asset intake note:** Chat upload provided **PNG/JPG renders** of route A (H-mast), not the `brand-assets.zip` SVG tree. Drive search found no zip. Audit treats PNGs as interim masters until SVGs land; prefer SVG when available.
+**Asset intake note:** Chat upload provided **PNG/JPG renders** of route A (H-mast), not the `brand-assets.zip` SVG tree. Drive search found no zip. Classified lockups now live under `brand-assets/highmast/A-h-mast/` (dark reverse/white + light black/duo). Prefer official SVG masters when available. Never put charcoal/duo wordmarks on dark surfaces.
 
 ## Hardcoded colours
 

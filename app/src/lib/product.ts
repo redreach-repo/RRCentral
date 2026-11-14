@@ -34,6 +34,13 @@ export function productAssetUrls(baseUrl: string) {
     stackedReverseWithEndorsement: `${dir}/A_stacked_reverse_by-red-reach.png`,
     horizontalReverse: `${dir}/A_horizontal_reverse.png`,
     horizontalReverseWithEndorsement: `${dir}/A_horizontal_reverse_by-red-reach.png`,
+    /** Light backgrounds — charcoal/black wordmarks (never use on dark). */
+    stackedBlack: `${dir}/A_stacked_black.png`,
+    stackedBlackWithEndorsement: `${dir}/A_stacked_black_by-red-reach.png`,
+    horizontalBlack: `${dir}/A_horizontal_black.png`,
+    horizontalBlackWithEndorsement: `${dir}/A_horizontal_black_by-red-reach.png`,
+    horizontalDuo: `${dir}/A_horizontal_duo.png`,
+    horizontalDuoWithEndorsement: `${dir}/A_horizontal_duo_by-red-reach.png`,
     symbolReverse: `${dir}/A_symbol_reverse.svg`,
     symbolReversePng: `${dir}/A_symbol_reverse.png`,
     symbolWhite: `${dir}/A_symbol_white.svg`,
