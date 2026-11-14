@@ -626,6 +626,16 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.ctrmIssues.title': 'CTRM issues',
     'page.ctrmIssues.subtitle':
       'Problems CTRM Next clients have raised, grouped by client. The vendor ticket number and status are typed in by hand. An issue turns red when the client has had no update for {days} working days. Log a new one from the client\'s account (Client issues → Log an issue).',
+    'page.ctrmIssues.open': 'Open ({n})',
+    'page.ctrmIssues.all': 'All',
+    'page.ctrmIssues.flagged': '{n} waiting for an update to the client',
+    'page.ctrmIssues.loading': 'Loading…',
+    'page.ctrmIssues.emptyAll': 'No CTRM Next issues logged yet.',
+    'page.ctrmIssues.emptyOpen': 'No open CTRM Next issues.',
+    'page.ctrmIssues.needUpdate': ', {n} need an update',
+    'page.ctrmIssues.noSubject': '(no subject)',
+    'page.ctrmIssues.accountFallback': 'Account',
+    'page.ctrmIssues.noClient': 'No client yet',
     'page.wanders.title': 'RR Wanders CRM',
     'page.wanders.subtitleLead':
       'Travel deals, packages, partners, departures and bookings — separate from RR Threads. Base currency:',
@@ -1291,6 +1301,16 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.ctrmIssues.title': 'مشاكل CTRM',
     'page.ctrmIssues.subtitle':
       'مشاكل رفعها عملاء CTRM Next، مجمّعة حسب العميل. رقم تذكرة المورد وحالتها يُدخلان يدوياً. تتحول المشكلة إلى أحمر عندما لا يحصل العميل على تحديث لمدة {days} أيام عمل. سجّل واحدةً من حساب العميل (مشاكل العميل → تسجيل مشكلة).',
+    'page.ctrmIssues.open': 'مفتوح ({n})',
+    'page.ctrmIssues.all': 'الكل',
+    'page.ctrmIssues.flagged': '{n} بانتظار تحديث للعميل',
+    'page.ctrmIssues.loading': 'جارٍ التحميل…',
+    'page.ctrmIssues.emptyAll': 'لا مشاكل CTRM Next مسجّلة بعد.',
+    'page.ctrmIssues.emptyOpen': 'لا مشاكل CTRM Next مفتوحة.',
+    'page.ctrmIssues.needUpdate': '، {n} تحتاج تحديثاً',
+    'page.ctrmIssues.noSubject': '(بلا موضوع)',
+    'page.ctrmIssues.accountFallback': 'حساب',
+    'page.ctrmIssues.noClient': 'لا عميل بعد',
     'page.wanders.title': 'CRM لـ RR Wanders',
     'page.wanders.subtitleLead':
       'صفقات سفر وباقات وشركاء ومغادرات وحجوزات — منفصلة عن RR Threads. العملة الأساسية:',
