@@ -6,6 +6,7 @@ describe('PRODUCT', () => {
     expect(PRODUCT.name).toBe('HighMast')
     expect(PRODUCT.shortName).toBe('HighMast')
     expect(PRODUCT.endorsement).toBe('by Red Reach')
+    expect(PRODUCT.poweredBy).toBe('Powered by HighMast')
   })
 
   it('keeps the Master Spec brand colours', () => {

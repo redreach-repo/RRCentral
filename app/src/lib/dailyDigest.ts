@@ -405,6 +405,7 @@ export function digestEmail(d: Digest, appUrl: string): { subject: string; body:
   lines.push(
     `You get this because you are on the daily digest list in ${PRODUCT.name} (Packages and rates).`,
   )
+  lines.push(PRODUCT.poweredBy)
   return { subject, body: lines.join('\n') }
 }
 

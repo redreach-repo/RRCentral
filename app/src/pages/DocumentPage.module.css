@@ -196,10 +196,18 @@
   text-align: center;
   font-size: 12.5px;
   font-weight: 600;
-  padding: 14px 20px;
+  padding: 12px 20px 10px;
   letter-spacing: 0.02em;
   /* Flush to bottom edge of the A4 sheet (no gap under the bar) */
   border: 0;
+}
+
+.footerPowered {
+  margin-top: 4px;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  opacity: 0.92;
 }
 
 @media (max-width: 900px) {

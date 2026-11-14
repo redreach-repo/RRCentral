@@ -22,6 +22,7 @@ import {
   Globe,
   Handshake,
   HeartPulse,
+  Info,
   KeyRound,
   LayoutDashboard,
   LayoutTemplate,
@@ -57,6 +58,7 @@ export const APP_MODULES: ModuleManifest[] = [
     items: [
       { to: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true },
       { to: '/guide', label: 'Guide', icon: BookOpen },
+      { to: '/about-product', label: 'About', icon: Info },
     ],
   },
   {
