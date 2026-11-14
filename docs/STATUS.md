@@ -1,19 +1,19 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — Cmd+K jump palette
+**Current milestone:** Continuous backlog — M1 event outbox enqueue
 
 ## Shipped this turn
 
-- Cmd/Ctrl+K command palette jumps to any nav page the signed-in role can open
+- `enqueueDomainEvent` + dual-write from `logActivity` into `event_outbox` (workers still later)
 
 ## Already on main
 
-- Continuous backlog through M3 Pipeline façade notes · Zod contracts · Guide CRM pack · QTSP · `pipeline_deals_v`
+- Continuous backlog through M3 Pipeline façade · Zod · Guide · Cmd+K · QTSP · `pipeline_deals_v`
 
 ## Still open (agent queue)
 
-1. More M1 Zod (open PRs)  
+1. Outbox workers / consumers  
 2. Demo env hooks after Alfred provisions  
 
 ## Still externally blocked
