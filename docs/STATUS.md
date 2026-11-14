@@ -1,21 +1,20 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — CRM minimal redesign
+**Current milestone:** Continuous backlog — pipeline density
 
 ## Shipped this turn
 
-- Modern minimalist CRM chrome: quieter tokens, flatter shell/sidebar/topbar, solid page titles, dark Cmd+K, quieter dashboard/docs list surfaces (brand orange kept as accent)
+- Pipeline / deal-sheet density: quieter board columns & cards, sheet tabs, My Day tiles; shared Pipeline + AI CRM detail boards tightened to match minimal chrome
 
 ## Already on main
 
-- Continuous backlog through M3 · Zod · Guide · Cmd+K · QTSP · outbox worker · a11y basics
+- Continuous backlog · Zod · Guide · Cmd+K · QTSP · outbox worker · a11y · minimal CRM chrome (#326)
 
 ## Still open (agent queue)
 
 1. Domain-specific outbox handlers (digest / webhooks / HubSpot)  
-2. Broader page-by-page visual pass (pipeline board, deal sheets)  
-3. Demo env hooks after Alfred provisions  
+2. Demo env hooks after Alfred provisions  
 
 ## Still externally blocked
 

@@ -1684,7 +1684,7 @@ export default function CrmPage() {
               maxWidth: compact ? '100%' : 720,
               maxHeight: compact ? '100dvh' : '90vh',
               minHeight: compact ? '100dvh' : undefined,
-              borderRadius: compact ? 0 : 14,
+              borderRadius: compact ? 0 : 10,
             }}
             onClick={(e) => e.stopPropagation()}
           >
