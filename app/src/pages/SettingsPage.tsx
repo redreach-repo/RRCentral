@@ -624,7 +624,7 @@ export default function SettingsPage() {
         <p style={pageSubtitleStyle}>{t('page.account.subtitle')}</p>
         <TwoStepCard />
         <div style={cardStyle}>
-          <h2 style={sectionTitleStyle}>My password</h2>
+          <h2 style={sectionTitleStyle}>{t('page.settings.section.myPassword')}</h2>
           <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
             Minimum {MIN_PASSWORD_LENGTH} characters.
           </p>
@@ -663,13 +663,17 @@ export default function SettingsPage() {
     )
   }
 
-  async function saveSection(keys: readonly { key: string; label: string }[], section: string) {
-    setSavingSection(section)
+  async function saveSection(
+    keys: readonly { key: string; label: string }[],
+    sectionId: string,
+    sectionLabel: string,
+  ) {
+    setSavingSection(sectionId)
     try {
       for (const { key } of keys) {
         await updateSetting(key, draft[key] ?? '')
       }
-      showToast(`${section} saved`, 'success')
+      showToast(t('page.settings.savedToast').replace('{section}', sectionLabel), 'success')
     } catch (e) {
       showToast(errorMessage(e, 'Save failed'), 'error')
     } finally {
@@ -712,9 +716,9 @@ export default function SettingsPage() {
             type="button"
             style={buttonPrimaryStyle}
             disabled={savingSection === sectionId || settingsLoading}
-            onClick={() => void saveSection(keys, sectionId)}
+            onClick={() => void saveSection(keys, sectionId, title)}
           >
-            {savingSection === sectionId ? 'Saving…' : 'Save'}
+            {savingSection === sectionId ? t('page.settings.saving') : t('page.settings.save')}
           </button>
         </div>
       </div>
@@ -810,28 +814,30 @@ export default function SettingsPage() {
   }
 
   const tocItems = [
-    { id: 'connect-supabase', label: 'Data & storage' },
-    { id: 'company', label: 'Company' },
-    { id: 'company-documents', label: 'Documents' },
-    { id: 'bank', label: 'Bank' },
-    { id: 'quote-settings', label: 'Quotes' },
-    { id: 'numbering', label: 'Numbering' },
-    { id: 'custom-fields', label: 'Custom fields' },
-    { id: 'pipelines', label: 'Pipelines' },
-    { id: 'workflows', label: 'Workflows' },
-    { id: 'workflow-runs', label: 'Workflow runs' },
-    { id: 'division-formats', label: 'Division formats' },
-    { id: 'wanders', label: 'Wanders' },
-    { id: 'system', label: 'System' },
-    { id: 'ctrm-lists', label: 'CTRM lists' },
-    { id: 'google-drive', label: 'Google Drive' },
-    { id: 'hubspot', label: 'HubSpot' },
-    { id: 'messages', label: 'Messages' },
-    { id: 'zoho', label: 'Zoho' },
-    ...(currentAuthMode() === 'local' ? [{ id: 'sheets-import', label: 'Sheets import' }] : []),
-    { id: 'two-step', label: 'Two-step' },
-    { id: 'account', label: 'Password' },
-    { id: 'users', label: 'Users' },
+    { id: 'connect-supabase', labelKey: 'page.settings.toc.dataStorage' },
+    { id: 'company', labelKey: 'page.settings.toc.company' },
+    { id: 'company-documents', labelKey: 'page.settings.toc.documents' },
+    { id: 'bank', labelKey: 'page.settings.toc.bank' },
+    { id: 'quote-settings', labelKey: 'page.settings.toc.quotes' },
+    { id: 'numbering', labelKey: 'page.settings.toc.numbering' },
+    { id: 'custom-fields', labelKey: 'page.settings.toc.customFields' },
+    { id: 'pipelines', labelKey: 'page.settings.toc.pipelines' },
+    { id: 'workflows', labelKey: 'page.settings.toc.workflows' },
+    { id: 'workflow-runs', labelKey: 'page.settings.toc.workflowRuns' },
+    { id: 'division-formats', labelKey: 'page.settings.toc.divisionFormats' },
+    { id: 'wanders', labelKey: 'page.settings.toc.wanders' },
+    { id: 'system', labelKey: 'page.settings.toc.system' },
+    { id: 'ctrm-lists', labelKey: 'page.settings.toc.ctrmLists' },
+    { id: 'google-drive', labelKey: 'page.settings.toc.googleDrive' },
+    { id: 'hubspot', labelKey: 'page.settings.toc.hubspot' },
+    { id: 'messages', labelKey: 'page.settings.toc.messages' },
+    { id: 'zoho', labelKey: 'page.settings.toc.zoho' },
+    ...(currentAuthMode() === 'local'
+      ? [{ id: 'sheets-import', labelKey: 'page.settings.toc.sheetsImport' }]
+      : []),
+    { id: 'two-step', labelKey: 'page.settings.toc.twoStep' },
+    { id: 'account', labelKey: 'page.settings.toc.password' },
+    { id: 'users', labelKey: 'page.settings.toc.users' },
   ]
 
   function jumpToSection(id: string) {
@@ -847,7 +853,7 @@ export default function SettingsPage() {
       <p style={pageSubtitleStyle}>{t('page.settings.subtitle')}</p>
 
       <nav
-        aria-label="Settings sections"
+        aria-label={t('page.settings.toc.aria')}
         style={{
           display: 'flex',
           flexWrap: 'wrap',
@@ -880,14 +886,14 @@ export default function SettingsPage() {
               whiteSpace: 'nowrap',
             }}
           >
-            {item.label}
+            {t(item.labelKey)}
           </button>
         ))}
       </nav>
 
       <div id="connect-supabase" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
         <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <HardDrive size={18} /> Data &amp; storage
+          <HardDrive size={18} /> {t('page.settings.section.dataStorage')}
         </h2>
         {isLocalMode || mode === 'local' ? (
           <>
@@ -1043,7 +1049,7 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {renderSection('Company info', 'Company', COMPANY_KEYS)}
+      {renderSection(t('page.settings.section.companyInfo'), 'Company', COMPANY_KEYS)}
 
       <div id="company-documents" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
         <div
@@ -1057,7 +1063,7 @@ export default function SettingsPage() {
           }}
         >
           <div>
-            <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Company documents</h2>
+            <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.settings.section.companyDocuments')}</h2>
             <p style={{ color: colors.muted2, fontSize: 12, margin: '6px 0 0', maxWidth: 560, lineHeight: 1.5 }}>
               Trade license, VAT certificate, and other company papers. Upload files to Google Drive,
               then paste the share link here. Central stores links only — not the files.
@@ -1127,19 +1133,19 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {renderSection('Bank details', 'Bank', BANK_KEYS)}
-      {renderSection('Quote / Invoice settings', 'Quote settings', QUOTE_KEYS)}
+      {renderSection(t('page.settings.section.bankDetails'), 'Bank', BANK_KEYS)}
+      {renderSection(t('page.settings.section.quoteInvoice'), 'Quote settings', QUOTE_KEYS)}
 
       <div id="numbering" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Document numbering</h2>
+          <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.settings.section.numbering')}</h2>
           <button
             type="button"
             style={buttonSecondaryStyle}
             disabled={numberingLoading}
             onClick={() => void loadNumbering()}
           >
-            {numberingLoading ? 'Loading…' : 'Refresh'}
+            {numberingLoading ? t('page.settings.loading') : t('page.settings.refresh')}
           </button>
         </div>
         <p style={{ margin: '8px 0 14px', fontSize: 13, color: colors.muted, lineHeight: 1.45 }}>
@@ -1210,7 +1216,7 @@ export default function SettingsPage() {
 
       <div id="custom-fields" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Custom fields</h2>
+          <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.settings.section.customFields')}</h2>
           {can(userRole, 'settings.manage') ? (
             <button type="button" style={buttonPrimaryStyle} onClick={openCustomFieldCreate}>
               <Plus size={16} style={{ marginRight: 6 }} />
@@ -1285,16 +1291,12 @@ export default function SettingsPage() {
       <WorkflowRunsCard />
 
       {renderSection(
-        'Division quotation formats (editable titles, closings, Connect partner name)',
+        t('page.settings.section.divisionFormats'),
         'Division formats',
         DIVISION_FORMAT_KEYS,
       )}
-      {renderSection(
-        'RR Wanders (TBC legal / tax / currency — not for live customer docs until confirmed)',
-        'Wanders',
-        WANDERS_KEYS,
-      )}
-      {renderSection('System', 'System', SYSTEM_KEYS)}
+      {renderSection(t('page.settings.section.wanders'), 'Wanders', WANDERS_KEYS)}
+      {renderSection(t('page.settings.section.system'), 'System', SYSTEM_KEYS)}
       <div id="ctrm-lists" style={{ scrollMarginTop: 72 }}>
         <CtrmListsCard />
       </div>
@@ -1306,7 +1308,7 @@ export default function SettingsPage() {
       </div>
 
       <div id="messages" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
-        <h2 style={sectionTitleStyle}>Message templates</h2>
+        <h2 style={sectionTitleStyle}>{t('page.settings.section.messageTemplates')}</h2>
         <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
           Tokens: <code>{'{{ref}}'}</code>, <code>{'{{client}}'}</code>, <code>{'{{contact}}'}</code>,{' '}
           <code>{'{{amount}}'}</code>, <code>{'{{company}}'}</code>, <code>{'{{title}}'}</code>,{' '}
@@ -1337,16 +1339,18 @@ export default function SettingsPage() {
             type="button"
             style={buttonPrimaryStyle}
             disabled={savingSection === 'Messages' || settingsLoading}
-            onClick={() => void saveSection(MESSAGE_KEYS, 'Messages')}
+            onClick={() =>
+              void saveSection(MESSAGE_KEYS, 'Messages', t('page.settings.section.messageTemplates'))
+            }
           >
-            {savingSection === 'Messages' ? 'Saving…' : 'Save templates'}
+            {savingSection === 'Messages' ? t('page.settings.saving') : t('page.settings.save')}
           </button>
         </div>
       </div>
 
       <div id="zoho" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
         <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Plug size={18} /> Mail &amp; calendar
+          <Plug size={18} /> {t('page.settings.section.mailCalendar')}
         </h2>
         <div style={{ ...fieldStyle, maxWidth: 360, marginBottom: 14 }}>
           <label style={labelStyle} htmlFor="mailCalendarProvider">
@@ -1525,7 +1529,7 @@ export default function SettingsPage() {
 
       {currentAuthMode() === 'local' && (
         <div id="sheets-import" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
-          <h2 style={sectionTitleStyle}>Import Google Sheets data</h2>
+          <h2 style={sectionTitleStyle}>{t('page.settings.section.sheetsImport')}</h2>
           <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
             Pull your existing CRM, quotes, invoices, and catalog from an Apps Script migration
             export into this browser. This replaces local data — download a backup first. Never
@@ -1557,7 +1561,7 @@ export default function SettingsPage() {
       </div>
 
       <div style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }} id="account">
-        <h2 style={sectionTitleStyle}>My password</h2>
+        <h2 style={sectionTitleStyle}>{t('page.settings.section.myPassword')}</h2>
         <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
           Change the password you use to sign in to Central. Minimum {MIN_PASSWORD_LENGTH} characters.
           {isLocalMode
@@ -1599,7 +1603,7 @@ export default function SettingsPage() {
       <div id="users" style={{ ...cardStyle, scrollMarginTop: 72 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
           <div>
-            <h2 style={{ ...sectionTitleStyle, margin: 0 }}>User management</h2>
+            <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.settings.section.userManagement')}</h2>
             <p style={{ color: colors.muted2, fontSize: 12, margin: '6px 0 0', maxWidth: 560, lineHeight: 1.5 }}>
               Add teammates with an <strong style={{ color: colors.text }}>@redreach.ae</strong> email,
               role, and an initial password. They sign in with email + password, then can change their

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useI18n } from '../../contexts/I18nContext'
 import { useSettings } from '../../contexts/SettingsContext'
 import { useToast } from '../../contexts/ToastContext'
 import { errorMessage } from '../../lib/errors'
@@ -15,6 +16,7 @@ import {
 
 /** M3 route soft-hide: optionally hide /sales and /ctrm from non-admin nav. */
 export default function PipelineDetailNavCard() {
+  const { t } = useI18n()
   const { settings, updateSetting } = useSettings()
   const { showToast } = useToast()
   const [value, setValue] = useState('no')
@@ -43,7 +45,7 @@ export default function PipelineDetailNavCard() {
 
   return (
     <section id="pipeline-detail-nav" style={{ ...cardStyle, marginBottom: 16, scrollMarginTop: 72 }}>
-      <h2 style={sectionTitleStyle}>Pipeline detail nav (M3 soft-hide)</h2>
+      <h2 style={sectionTitleStyle}>{t('page.settings.section.pipelineDetailNav')}</h2>
       <p style={{ color: colors.muted, fontSize: 13, margin: '0 0 12px', lineHeight: 1.5 }}>
         When on, non-admins no longer see <strong>AI CRM detail</strong> or <strong>CTRM detail</strong> in the
         sidebar. Use <strong>Pipeline</strong> instead. Direct URLs keep working; admins still see both links.

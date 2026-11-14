@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Loader2, RefreshCw } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { errorMessage } from '../lib/errors'
 import { getHubSpotNudge, type HubSpotSyncRun, listHubSpotRuns, runHubSpotSync, runSummary } from '../lib/hubspotSync'
@@ -14,6 +15,7 @@ const when = (iso: string) => new Date(iso).toLocaleString()
  */
 export default function HubSpotCard() {
   const { userRole, isLocalMode } = useAuth()
+  const { t } = useI18n()
   const { showToast } = useToast()
   const [runs, setRuns] = useState<HubSpotSyncRun[]>([])
   const [nudgeAt, setNudgeAt] = useState<string | null>(null)
@@ -56,7 +58,7 @@ export default function HubSpotCard() {
   const last = runs[0]
   return (
     <div style={{ ...cardStyle, marginBottom: 20 }}>
-      <h2 style={sectionTitleStyle}>HubSpot</h2>
+      <h2 style={sectionTitleStyle}>{t('page.settings.section.hubspot')}</h2>
       <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
         RR Central sends its accounts to HubSpot as companies, account contacts as contacts (matched by email) and AI CRM
         deals as deals in the Sales Pipeline, nightly and when you press Sync now. It is one way: changes made in HubSpot

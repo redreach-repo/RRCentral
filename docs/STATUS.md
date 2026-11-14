@@ -1,15 +1,15 @@
 # HighMast / RR Central status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** M1 — HighMast `PRODUCT` constant + sign-in / PWA chrome
+**Current milestone:** Continuous backlog — EN+AR Settings section chrome
 
 ## Shipped this turn
 
-- Added **`PRODUCT`** (`app/src/lib/product.ts`) and wired HighMast sign-in, PWA title/icons, guide eyebrow, digest subject, and gate copy
+- Wired **Settings** TOC pills and section headings (plus related Settings cards) through EN+AR catalogs
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR · platform tenancy · customization · outbox · tenant CI · chrome
+- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR · HighMast `PRODUCT` + sign-in/PWA chrome · platform tenancy · customization · outbox · tenant CI
 
 ## Still open (agent queue)
 
