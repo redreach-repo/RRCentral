@@ -201,6 +201,15 @@ values (
   'b0000000-0000-4000-8000-000000000001'
 );
 
+insert into public.inventory_movements (sku, qty_delta, reason, reference, tenant_id)
+values (
+  'TB-SKU-001',
+  5,
+  'Tenant B Secret Stock Move',
+  'TB-INV-001',
+  'b0000000-0000-4000-8000-000000000001'
+);
+
 insert into public.event_outbox (event_type, aggregate_type, aggregate_id, tenant_id, status)
 values (
   'finalize_quote',
@@ -293,6 +302,10 @@ select pg_temp.expect(
   'redreach admin cannot read tenant B products'
 );
 select pg_temp.expect(
+  (select count(*) from public.inventory_movements where reference = 'TB-INV-001') = 0,
+  'redreach admin cannot read tenant B inventory_movements'
+);
+select pg_temp.expect(
   (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 0,
   'redreach admin cannot read tenant B event_outbox'
 );
@@ -379,6 +392,10 @@ select pg_temp.expect(
 select pg_temp.expect(
   (select count(*) from public.products where sku = 'TB-SKU-001') = 1,
   'tenant B admin can read own products'
+);
+select pg_temp.expect(
+  (select count(*) from public.inventory_movements where reference = 'TB-INV-001') = 1,
+  'tenant B admin can read own inventory_movements'
 );
 select pg_temp.expect(
   (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 1,
@@ -592,6 +609,22 @@ begin
     raise exception 'TENANT TEST FAILED: tenant B admin forged product into redreach';
   end if;
   raise notice 'ok - tenant B cannot insert product into redreach tenant_id';
+end $$;
+
+do $$
+declare
+  failed boolean := false;
+begin
+  begin
+    insert into public.inventory_movements (sku, qty_delta, reason, tenant_id)
+    values ('FORGED-SKU', 1, 'Forged move', 'a0000000-0000-4000-8000-000000000001');
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: tenant B admin forged inventory_movement into redreach';
+  end if;
+  raise notice 'ok - tenant B cannot insert inventory_movement into redreach tenant_id';
 end $$;
 
 ------------------------------------------------------------ Append-only audit_log (authenticated cannot mutate)
