@@ -32,7 +32,7 @@ Status key: **exists** · **partial** · **missing**
 | EN+AR RTL | partial | M1 `I18nContext` + dir; guide + shell/nav + sales/finance/clients/admin/ops/delivery list chrome (Dashboard → Domains through Wanders, Settings/Account, CTRM weekly summary, ticket + account detail, CTRM fit sheet, quote/invoice/DN viewer, legal e-sign + quote-accept + client portal + monthly client report + Wanders tour-ops + monthly reports + weekly updates queue chrome); more page bodies later |
 | PWA installable | partial | Icons + maskable safe-zone from brand mark; theme `#C8321A`; still missing division logos |
 | Brand kits per tenant/company/BU | partial | M1 `brand_kits` + `app/public/brand`; missing Boost/Care/Trading assets |
-| In-app guide `/guide` | partial | CRM + billing + delivery + ops + admin packs live (`GUIDE_PACKS`); more packs / AR polish later |
+| In-app guide `/guide` | partial | CRM + billing + delivery + ops + finance + admin packs live (`GUIDE_PACKS`); more packs / AR polish later |
 
 ---
 

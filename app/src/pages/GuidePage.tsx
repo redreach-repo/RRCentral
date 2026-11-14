@@ -3,7 +3,7 @@ import { useI18n } from '../contexts/I18nContext'
 import { GUIDE_PACKS } from '../lib/guidePacks'
 import styles from './GuidePage.module.css'
 
-/** In-app guide — CRM + billing + delivery + ops + admin content packs (RRCRM M1+). */
+/** In-app guide — CRM + billing + delivery + ops + finance + admin content packs (RRCRM M1+). */
 export default function GuidePage() {
   const { t } = useI18n()
   return (
