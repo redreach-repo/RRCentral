@@ -15,6 +15,7 @@ import CtrmIssueBox from '../components/support/CtrmIssueBox'
 import { NO_TRADE_DATA_NOTE, isCtrmIssue } from '../lib/ctrmIssues'
 import { DELIVERY_LABELS, serviceWindow, type DeliveryStatus } from '../lib/whatsappTickets'
 import { errorMessage } from '../lib/errors'
+import { parseTicketReplyForm } from '../lib/schemas/ticketReply'
 import { parseTicketSummaryForm } from '../lib/schemas/ticketSummary'
 import { signOffFor, type AiThreadMessage } from '../lib/aiAssist'
 import { runAi } from '../lib/aiAssistStore'
@@ -138,11 +139,16 @@ export default function TicketPage() {
   }
 
   async function send(viaWhatsApp = false) {
-    if (!ticket || !reply.trim()) return
+    if (!ticket) return
+    const parsed = parseTicketReplyForm({ body: reply, internal })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
     setBusy(true)
     try {
-      if (viaWhatsApp) await sendWhatsAppReply(ticket.id, reply.trim())
-      else await addTicketMessage(ticket, reply.trim(), internal, author)
+      if (viaWhatsApp) await sendWhatsAppReply(ticket.id, parsed.data.body)
+      else await addTicketMessage(ticket, parsed.data.body, parsed.data.internal, author)
       setReply('')
       let logged = ''
       if (timeSpent > 0 && ticket.account_id && canLogTime) {
