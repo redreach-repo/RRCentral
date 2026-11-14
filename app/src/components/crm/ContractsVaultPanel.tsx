@@ -6,6 +6,7 @@ import { useSettings } from '../../contexts/SettingsContext'
 import { useToast } from '../../contexts/ToastContext'
 import { logActivity } from '../../lib/activity'
 import { errorMessage } from '../../lib/errors'
+import { parseVaultNdaForm } from '../../lib/schemas/vaultNda'
 import {
   createLegalDocument,
   createLegalSignLink,
@@ -100,8 +101,9 @@ export default function ContractsVaultPanel({
   }, [contacts])
 
   async function createNda() {
-    if (!partyName.trim()) {
-      showToast('Choose who will sign (contact name).', 'error')
+    const parsed = parseVaultNdaForm({ partyName, partyEmail })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setBusy(true)
@@ -111,8 +113,8 @@ export default function ContractsVaultPanel({
         crmId: entry.id,
         docType: 'nda',
         title: approved?.title || 'Non-disclosure agreement',
-        partyName: partyName.trim(),
-        partyEmail: partyEmail.trim(),
+        partyName: parsed.data.partyName,
+        partyEmail: parsed.data.partyEmail,
         partyCompany: entry.company_name,
         templateId: approved?.id || null,
         templateVersion: approved?.version ?? null,
