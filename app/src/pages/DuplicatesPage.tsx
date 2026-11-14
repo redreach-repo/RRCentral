@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { accountFills, findAccountDuplicates, findContactDuplicates, mergeSummary, suggestKeep, type DuplicateKind, type DuplicatePair } from '../lib/duplicates'
 import { accountWeights, dismissPair, loadDuplicateData, mergePair, type DuplicateData } from '../lib/duplicatesStore'
@@ -21,6 +22,7 @@ const nice = (t: string) => t.replace(/_/g, ' ')
  * over. Or mark the pair "Not a duplicate" so it stops showing.
  */
 export default function DuplicatesPage() {
+  const { t } = useI18n()
   const { userRole, user } = useAuth()
   const { showToast } = useToast()
   const [data, setData] = useState<DuplicateData | null>(null)
@@ -52,9 +54,9 @@ export default function DuplicatesPage() {
       <div className={docsStyles.page}>
         <header className={docsStyles.hero}>
           <div>
-            <p className={docsStyles.kicker}>Finance</p>
-            <h1 className={docsStyles.title}>Duplicates</h1>
-            <p className={docsStyles.subtitle}>Only managers and admins can merge duplicates.</p>
+            <p className={docsStyles.kicker}>{t('page.finance.kicker')}</p>
+            <h1 className={docsStyles.title}>{t('page.duplicates.title')}</h1>
+            <p className={docsStyles.subtitle}>{t('page.duplicates.restricted')}</p>
           </div>
         </header>
       </div>
@@ -86,12 +88,9 @@ export default function DuplicatesPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Finance</p>
-          <h1 className={docsStyles.title}>Duplicates</h1>
-          <p className={docsStyles.subtitle}>
-            Accounts and contacts that share a phone, an email, a website or a very similar name. Merging moves everything on the
-            duplicate (timeline, contacts, tickets, quotes, invoices, deals) to the one you keep, then removes the duplicate.
-          </p>
+          <p className={docsStyles.kicker}>{t('page.finance.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.duplicates.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.duplicates.subtitle')}</p>
         </div>
       </header>
       <div style={{ display: 'flex', gap: 8, margin: '12px 0 16px' }}>

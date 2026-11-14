@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — tenant isolation for income
+**Current milestone:** Continuous backlog — leftover list chrome EN+AR
 
 ## Shipped this turn
 
-- Expanded `tenant_isolation_test.sql` for **income** (read isolation + forged insert blocked)
+- Page-body EN+AR catalogs for **Templates**, **Duplicates**, and **Service agreement template** heroes
 
 ## Already on main
 
