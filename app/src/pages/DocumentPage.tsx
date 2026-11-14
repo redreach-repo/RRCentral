@@ -5,6 +5,7 @@ import { ArrowLeft, CloudUpload, Download, ExternalLink, FileUp, Link2, Mail, Me
 import { db } from '../lib/db'
 import { DIVISIONS, VAT_RATE } from '../lib/config'
 import type { Attachment, Client, CrmContact, CrmEntry, CustomerDocument, DeliveryNote, Invoice, LineItem, Quotation } from '../lib/types'
+import { useI18n } from '../contexts/I18nContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatAED } from '../lib/money'
@@ -74,6 +75,7 @@ import {
 export default function DocumentPage() {
   const { type = 'quote', id = '' } = useParams<{ type: string; id: string }>()
   const docType: PrintableDocType = parseDocumentType(type)
+  const { t } = useI18n()
   const { settings } = useSettings()
   const { showToast } = useToast()
   const { user, userRole } = useAuth()
@@ -635,7 +637,7 @@ export default function DocumentPage() {
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', background: '#f0f0f0', color: '#333', padding: 40 }}>
-        Loading document…
+        {t('page.document.loading')}
       </div>
     )
   }
@@ -643,8 +645,8 @@ export default function DocumentPage() {
   if (error || !doc) {
     return (
       <div style={{ minHeight: '100vh', background: '#f0f0f0', color: '#333', padding: 40 }}>
-        <p style={{ color: '#b91c1c' }}>{error || 'Document not found'}</p>
-        <Link to={backTo}>Back</Link>
+        <p style={{ color: '#b91c1c' }}>{error || t('page.document.notFound')}</p>
+        <Link to={backTo}>{t('page.document.back')}</Link>
       </div>
     )
   }
@@ -1184,14 +1186,14 @@ export default function DocumentPage() {
             fontSize: 13,
           }}
         >
-          <ArrowLeft size={16} /> Back
+          <ArrowLeft size={16} /> {t('page.document.back')}
         </Link>
         <ToolbarBtn onClick={switchViewerTheme}>
           {viewerTheme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-          {viewerTheme === 'dark' ? 'Light view' : 'Dark view'}
+          {viewerTheme === 'dark' ? t('page.document.lightView') : t('page.document.darkView')}
         </ToolbarBtn>
         <ToolbarBtn onClick={() => window.print()}>
-          <Printer size={14} /> Print
+          <Printer size={14} /> {t('page.document.print')}
         </ToolbarBtn>
         <label
           title="Choose how the PDF is laid out. Every page keeps the letterhead header and footer."
@@ -1207,7 +1209,7 @@ export default function DocumentPage() {
             fontWeight: 600,
           }}
         >
-          Pages
+          {t('page.document.pages')}
           <select
             value={pageLayout}
             onChange={(e) => setPageLayout(e.target.value as PdfPageLayout)}
@@ -1231,31 +1233,34 @@ export default function DocumentPage() {
           </select>
         </label>
         <ToolbarBtn onClick={() => void downloadPdf()} disabled={pdfBusy}>
-          <Download size={14} /> {pdfBusy ? 'Preparing…' : 'Download PDF'}
+          <Download size={14} />{' '}
+          {pdfBusy ? t('page.document.preparing') : t('page.document.download')}
         </ToolbarBtn>
         <ToolbarBtn onClick={() => void savePdfToDrive()} disabled={pdfBusy}>
-          <CloudUpload size={14} /> {pdfBusy ? 'Saving…' : 'Save to Drive'}
+          <CloudUpload size={14} />{' '}
+          {pdfBusy ? t('page.document.saving') : t('page.document.saveToDrive')}
         </ToolbarBtn>
         <ToolbarBtn onClick={() => void prepareEmail()} disabled={pdfBusy}>
-          <Mail size={14} /> Email PDF
+          <Mail size={14} /> {t('page.document.emailPdf')}
         </ToolbarBtn>
         <ToolbarBtn onClick={() => void shareWhatsApp()} accent>
-          <MessageCircle size={14} /> WhatsApp
+          <MessageCircle size={14} /> {t('page.document.whatsapp')}
         </ToolbarBtn>
         <ToolbarBtn onClick={() => setLinkMode('signed')}>
-          <Link2 size={14} /> Link signed
+          <Link2 size={14} /> {t('page.document.linkSigned')}
         </ToolbarBtn>
         <ToolbarBtn onClick={() => setLinkMode('communication')}>
-          <FileUp size={14} /> Link chat / email
+          <FileUp size={14} /> {t('page.document.linkChat')}
         </ToolbarBtn>
         {docType === 'quote' && quote && canManageAcceptLinks(userRole) && (canHaveAcceptLink(quote) || quote.status === 'Accepted') ? (
           <ToolbarBtn onClick={() => setAcceptOpen(true)}>
-            <Link2 size={14} /> Accept link
+            <Link2 size={14} /> {t('page.document.acceptLink')}
           </ToolbarBtn>
         ) : null}
         {docType === 'quote' && quote && canCreateDeliveryNoteFromQuote(quote) ? (
           <ToolbarBtn onClick={() => void createDnFromQuote()} disabled={dnBusy}>
-            <Truck size={14} /> {dnBusy ? 'Creating…' : 'Delivery note'}
+            <Truck size={14} />{' '}
+            {dnBusy ? t('page.document.creating') : t('page.document.deliveryNote')}
           </ToolbarBtn>
         ) : null}
       </div>
