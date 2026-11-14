@@ -32,7 +32,7 @@ export const SYSTEM_FUNCTIONS: SystemFunction[] = [
   { name: 'teetribe-order-sync', feature: 'Tee Tribe orders into RR Central', liveTest: '9' },
   { name: 'contract-invoices', feature: 'Contract invoices each morning', liveTest: '10' },
   { name: 'watchdog', feature: 'Daily watchdog list', liveTest: '11' },
-  { name: 'event-outbox', feature: 'Domain event outbox worker', liveTest: '—' },
+  { name: 'event-outbox', feature: 'Domain event outbox worker', liveTest: '33' },
   { name: 'payment-reminder', feature: 'One tap payment reminders', liveTest: '12' },
   { name: 'lead-intake', feature: 'Website and WhatsApp leads', liveTest: '15' },
   { name: 'quote-accept', feature: 'Quote accept links', liveTest: '16' },

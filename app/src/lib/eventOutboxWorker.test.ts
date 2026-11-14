@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  digestSignalAtFromJson,
   dispatchDomainEvent,
   nextAvailableAt,
   outcomeFor,
   OUTBOX_MAX_ATTEMPTS,
   planDomainHandlers,
   shouldDeadLetter,
+  summarizeOutboxHealth,
   webhookPayload,
   type OutboxRow,
 } from './eventOutboxWorker'
@@ -91,5 +93,26 @@ describe('eventOutboxWorker', () => {
       occurred_at: '2026-11-14T06:00:00.000Z',
       source: 'rrcentral.event_outbox',
     })
+  })
+
+  it('summarizes outbox queue health for System check', () => {
+    expect(summarizeOutboxHealth({ counts: { pending: 0, processing: 0, failed: 0 } })).toMatchObject({
+      state: 'green',
+      reason: 'Queue clear',
+    })
+    expect(
+      summarizeOutboxHealth({
+        counts: { pending: 0, processing: 0, failed: 0 },
+        hubspotNudgeAt: '2026-11-14T07:00:00.000Z',
+      }).reason,
+    ).toMatch(/nudge is waiting/)
+    expect(summarizeOutboxHealth({ counts: { pending: 2, processing: 1, failed: 0 } }).state).toBe('amber')
+    expect(summarizeOutboxHealth({ counts: { pending: 40, processing: 20, failed: 0 } }).state).toBe('amber')
+    expect(summarizeOutboxHealth({ counts: { pending: 0, processing: 0, failed: 3 } })).toMatchObject({
+      state: 'red',
+      reason: '3 dead-lettered events need attention',
+    })
+    expect(digestSignalAtFromJson('{"at":"2026-11-14T07:00:00Z","events":[]}')).toBe('2026-11-14T07:00:00.000Z')
+    expect(digestSignalAtFromJson('nope')).toBeNull()
   })
 })

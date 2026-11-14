@@ -165,3 +165,85 @@ export function webhookPayload(row: OutboxRow, now = new Date()) {
     source: 'rrcentral.event_outbox',
   }
 }
+
+export type OutboxQueueCounts = {
+  pending: number
+  processing: number
+  failed: number
+}
+
+export type OutboxHealthState = 'green' | 'amber' | 'red'
+
+export type OutboxHealth = {
+  state: OutboxHealthState
+  reason: string
+  counts: OutboxQueueCounts
+  hubspotNudgeAt: string | null
+  digestSignalAt: string | null
+}
+
+/** Turn queue counts + nudge flags into a System check style summary. */
+export function summarizeOutboxHealth(input: {
+  counts: OutboxQueueCounts
+  hubspotNudgeAt?: string | null
+  digestSignalAt?: string | null
+}): OutboxHealth {
+  const counts = {
+    pending: Math.max(0, Math.floor(input.counts.pending || 0)),
+    processing: Math.max(0, Math.floor(input.counts.processing || 0)),
+    failed: Math.max(0, Math.floor(input.counts.failed || 0)),
+  }
+  const hubspotNudgeAt = input.hubspotNudgeAt || null
+  const digestSignalAt = input.digestSignalAt || null
+  const waiting = counts.pending + counts.processing
+
+  if (counts.failed > 0) {
+    return {
+      state: 'red',
+      reason: `${counts.failed} dead-lettered event${counts.failed === 1 ? '' : 's'} need attention`,
+      counts,
+      hubspotNudgeAt,
+      digestSignalAt,
+    }
+  }
+  if (waiting >= 50) {
+    return {
+      state: 'amber',
+      reason: `${waiting} events waiting — worker may be behind or not scheduled`,
+      counts,
+      hubspotNudgeAt,
+      digestSignalAt,
+    }
+  }
+  if (waiting > 0) {
+    return {
+      state: 'amber',
+      reason: `${waiting} event${waiting === 1 ? '' : 's'} waiting for the next worker run`,
+      counts,
+      hubspotNudgeAt,
+      digestSignalAt,
+    }
+  }
+  return {
+    state: 'green',
+    reason: hubspotNudgeAt || digestSignalAt
+      ? 'Queue clear; a nudge is waiting for HubSpot or the morning digest'
+      : 'Queue clear',
+    counts,
+    hubspotNudgeAt,
+    digestSignalAt,
+  }
+}
+
+/** Parse digest_attention_signal JSON for its `at` timestamp (or null). */
+export function digestSignalAtFromJson(raw: string | null | undefined): string | null {
+  if (!raw || !raw.trim()) return null
+  try {
+    const parsed = JSON.parse(raw) as { at?: unknown }
+    if (typeof parsed.at !== 'string') return null
+    const t = Date.parse(parsed.at)
+    return Number.isFinite(t) ? new Date(t).toISOString() : null
+  } catch {
+    return null
+  }
+}
