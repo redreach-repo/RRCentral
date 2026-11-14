@@ -90,6 +90,25 @@ values (
   'b0000000-0000-4000-8000-000000000001'
 );
 
+insert into public.invoices (client, reference_number, status, tenant_id)
+values (
+  'Tenant B Secret Invoice',
+  'RR-TB-INV-1',
+  'Draft',
+  'b0000000-0000-4000-8000-000000000001'
+);
+
+insert into public.sales_deals (account_id, stage, next_action, next_action_date, tenant_id)
+select
+  id,
+  'lead',
+  'Call Tenant B',
+  '2026-12-01',
+  'b0000000-0000-4000-8000-000000000001'
+from public.accounts
+where reference = 'AC-TB-0001'
+limit 1;
+
 insert into public.event_outbox (event_type, aggregate_type, aggregate_id, tenant_id, status)
 values (
   'finalize_quote',
@@ -134,6 +153,14 @@ select pg_temp.expect(
   'redreach admin cannot read tenant B quotations'
 );
 select pg_temp.expect(
+  (select count(*) from public.invoices where reference_number = 'RR-TB-INV-1') = 0,
+  'redreach admin cannot read tenant B invoices'
+);
+select pg_temp.expect(
+  (select count(*) from public.sales_deals where next_action = 'Call Tenant B') = 0,
+  'redreach admin cannot read tenant B sales_deals'
+);
+select pg_temp.expect(
   (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 0,
   'redreach admin cannot read tenant B event_outbox'
 );
@@ -172,6 +199,14 @@ select pg_temp.expect(
 select pg_temp.expect(
   (select count(*) from public.quotations where reference_number = 'RR-TB-0001') = 1,
   'tenant B admin can read own quotations'
+);
+select pg_temp.expect(
+  (select count(*) from public.invoices where reference_number = 'RR-TB-INV-1') = 1,
+  'tenant B admin can read own invoices'
+);
+select pg_temp.expect(
+  (select count(*) from public.sales_deals where next_action = 'Call Tenant B') = 1,
+  'tenant B admin can read own sales_deals'
 );
 select pg_temp.expect(
   (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 1,
@@ -221,6 +256,22 @@ begin
     raise exception 'TENANT TEST FAILED: tenant B admin forged event_outbox into redreach';
   end if;
   raise notice 'ok - tenant B cannot insert event_outbox into redreach tenant_id';
+end $$;
+
+do $$
+declare
+  failed boolean := false;
+begin
+  begin
+    insert into public.invoices (client, reference_number, tenant_id)
+    values ('Forged invoice', 'RR-FORGED-1', 'a0000000-0000-4000-8000-000000000001');
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: tenant B admin forged invoice into redreach';
+  end if;
+  raise notice 'ok - tenant B cannot insert invoice into redreach tenant_id';
 end $$;
 
 ------------------------------------------------------------ Append-only audit_log (authenticated cannot mutate)
