@@ -256,6 +256,16 @@ values (
   'b0000000-0000-4000-8000-000000000001'
 );
 
+insert into public.pipeline_stages (pipeline_id, stage_key, label, tenant_id)
+select
+  id,
+  'tenant_b_secret_stage',
+  'Tenant B Secret Stage',
+  'b0000000-0000-4000-8000-000000000001'
+from public.pipelines
+where pipeline_key = 'tenant_b_secret'
+  and tenant_id = 'b0000000-0000-4000-8000-000000000001';
+
 insert into public.custom_field_definitions (
   object_type, field_key, label, tenant_id
 )
@@ -396,6 +406,10 @@ select pg_temp.expect(
   'redreach admin cannot read tenant B pipelines'
 );
 select pg_temp.expect(
+  (select count(*) from public.pipeline_stages where stage_key = 'tenant_b_secret_stage') = 0,
+  'redreach admin cannot read tenant B pipeline_stages'
+);
+select pg_temp.expect(
   (select count(*) from public.custom_field_definitions where field_key = 'tenant_b_secret_field') = 0,
   'redreach admin cannot read tenant B custom_field_definitions'
 );
@@ -518,6 +532,10 @@ select pg_temp.expect(
 select pg_temp.expect(
   (select count(*) from public.pipelines where pipeline_key = 'tenant_b_secret') = 1,
   'tenant B admin can read own pipelines'
+);
+select pg_temp.expect(
+  (select count(*) from public.pipeline_stages where stage_key = 'tenant_b_secret_stage') = 1,
+  'tenant B admin can read own pipeline_stages'
 );
 select pg_temp.expect(
   (select count(*) from public.custom_field_definitions where field_key = 'tenant_b_secret_field') = 1,
@@ -851,6 +869,28 @@ begin
     raise exception 'TENANT TEST FAILED: tenant B admin forged pipeline into redreach';
   end if;
   raise notice 'ok - tenant B cannot insert pipeline into redreach tenant_id';
+end $$;
+
+do $$
+declare
+  failed boolean := false;
+begin
+  begin
+    insert into public.pipeline_stages (pipeline_id, stage_key, label, tenant_id)
+    select
+      id,
+      'forged_stage',
+      'Forged Stage',
+      'a0000000-0000-4000-8000-000000000001'
+    from public.pipelines
+    where pipeline_key = 'tenant_b_secret';
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: tenant B admin forged pipeline_stage into redreach';
+  end if;
+  raise notice 'ok - tenant B cannot insert pipeline_stage into redreach tenant_id';
 end $$;
 
 do $$
