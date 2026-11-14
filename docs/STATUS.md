@@ -9,7 +9,7 @@
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome · pipeline density · ticket + account detail + fit sheet + document viewer i18n · pipeline_stages + workflow_runs + custom_field_values isolation
+- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR (incl. legal e-sign) · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome · pipeline density · ticket + account detail + fit sheet + document viewer i18n · pipeline_stages + workflow_runs + custom_field_values isolation
 
 ## Still open (agent queue)
 
