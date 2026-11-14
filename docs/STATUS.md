@@ -9,7 +9,7 @@
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs · Cmd+K · module flags (ops/finance/delivery/clients) · EN+AR · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome
+- Continuous backlog · Zod · Guide packs · Cmd+K · module flags (ops/finance/delivery/clients) · EN+AR (incl. ClientReport + Wanders tour-ops) · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome
 
 ## Still open (agent queue)
 

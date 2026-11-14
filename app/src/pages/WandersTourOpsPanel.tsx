@@ -22,6 +22,7 @@ import type {
   WandersDeal,
   WandersPartner,
 } from '../lib/types'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import StatusPill from '../components/StatusPill'
 import {
@@ -46,6 +47,7 @@ import { parseTourOpsLinkForm } from '../lib/schemas/tourOpsLink'
 type OpsTab = 'packages' | 'partners' | 'costs' | 'prices' | 'departures' | 'bookings'
 
 export default function WandersTourOpsPanel({ deals }: { deals: WandersDeal[] }) {
+  const { t } = useI18n()
   const { showToast } = useToast()
   const [tab, setTab] = useState<OpsTab>('packages')
   const [loading, setLoading] = useState(true)
@@ -222,18 +224,17 @@ export default function WandersTourOpsPanel({ deals }: { deals: WandersDeal[] })
   }
 
   if (loading) {
-    return <div style={{ ...cardStyle, color: colors.muted }}>Loading tour operations…</div>
+    return <div style={{ ...cardStyle, color: colors.muted }}>{t('page.wandersOps.loading')}</div>
   }
 
   return (
     <div>
       <div style={{ ...cardStyle, marginBottom: 12 }}>
-        <h2 style={{ ...sectionTitleStyle, marginTop: 0 }}>Tour products & operations</h2>
+        <h2 style={{ ...sectionTitleStyle, marginTop: 0 }}>{t('page.wandersOps.title')}</h2>
         <p style={{ margin: '0 0 10px', fontSize: 13, color: colors.muted }}>
-          Packages, partners, departures and bookings are first-class records — not Zoho Lead
-          description text. Customer leads remain on the Leads tab.
+          {t('page.wandersOps.subtitle')}
         </p>
-        <label style={labelStyle}>Active package</label>
+        <label style={labelStyle}>{t('page.wandersOps.activePackage')}</label>
         <select
           style={selectStyle}
           value={packageId}
@@ -250,12 +251,12 @@ export default function WandersTourOpsPanel({ deals }: { deals: WandersDeal[] })
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         {(
           [
-            ['packages', 'Packages'],
-            ['partners', 'Suppliers & coordinators'],
-            ['costs', 'Cost components'],
-            ['prices', 'Selling prices'],
-            ['departures', 'Departures'],
-            ['bookings', 'Customer bookings'],
+            ['packages', t('page.wandersOps.tabPackages')],
+            ['partners', t('page.wandersOps.tabPartners')],
+            ['costs', t('page.wandersOps.tabCosts')],
+            ['prices', t('page.wandersOps.tabPrices')],
+            ['departures', t('page.wandersOps.tabDepartures')],
+            ['bookings', t('page.wandersOps.tabBookings')],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -375,7 +376,7 @@ export default function WandersTourOpsPanel({ deals }: { deals: WandersDeal[] })
                         disabled={saving}
                         onClick={() => void persistComponent(c)}
                       >
-                        Save
+                        {t('page.wandersOps.save')}
                       </button>
                     </td>
                   </tr>
@@ -456,7 +457,7 @@ export default function WandersTourOpsPanel({ deals }: { deals: WandersDeal[] })
                 disabled={saving}
                 onClick={() => void persistPrice(p)}
               >
-                Save price
+                {t('page.wandersOps.savePrice')}
               </button>
             </div>
           ))}
@@ -565,7 +566,7 @@ export default function WandersTourOpsPanel({ deals }: { deals: WandersDeal[] })
                   disabled={saving}
                   onClick={() => void persistDeparture(d)}
                 >
-                  Save departure
+                  {t('page.wandersOps.saveDeparture')}
                 </button>
               </div>
             )
@@ -577,14 +578,14 @@ export default function WandersTourOpsPanel({ deals }: { deals: WandersDeal[] })
         <div style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
             <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>
-              Bookings link a lead/deal to package, departure, supplier and coordinator.
+              {t('page.wandersOps.bookingsHint')}
             </p>
             <button type="button" style={buttonPrimaryStyle} disabled={saving} onClick={() => void linkBookingFromDeal()}>
-              Link booking from lead
+              {t('page.wandersOps.linkFromLead')}
             </button>
           </div>
           {bookings.length === 0 ? (
-            <div style={{ color: colors.muted }}>No customer bookings yet.</div>
+            <div style={{ color: colors.muted }}>{t('page.wandersOps.noBookings')}</div>
           ) : (
             <div style={tableWrapStyle}>
               <table style={tableStyle}>
