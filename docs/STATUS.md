@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod Pipeline next-step patch
+**Current milestone:** Continuous backlog — M1 Zod build stage blocker note
 
 ## Shipped this turn
 
-- Zod `parseMyDealPatchForm` for Pipeline Next step (open-deal action/date rules)
+- Zod `parseBuildBlockerNote` when marking a Delivery build stage blocked
 
 ## Already on main
 
@@ -13,7 +13,7 @@
 
 ## Still open (agent queue)
 
-1. Merge #301–#303 queue  
+1. Merge overnight PR queue  
 2. Demo env hooks after Alfred provisions  
 
 ## Still externally blocked
