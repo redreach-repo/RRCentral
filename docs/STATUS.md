@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — tenant isolation for supplier commitments
+**Current milestone:** Continuous backlog — Settings and CTRM summary EN+AR
 
 ## Shipped this turn
 
-- Expanded `tenant_isolation_test.sql` for **supplier_commitments** (read isolation + forged insert blocked)
+- Page-body EN+AR catalogs for **Settings**, **Account**, and **CTRM weekly summary** chrome
 
 ## Already on main
 
