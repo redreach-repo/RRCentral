@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — EN+AR obligations board chrome
+**Current milestone:** Continuous backlog — EN+AR clause library chrome
 
 ## Shipped this turn
 
-- Wired **ObligationsBoardPage** filters, form, and row actions through EN+AR catalogs
+- Wired **ClauseLibraryPage** list, form labels, and actions through EN+AR catalogs
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR (incl. CTRM issues) · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome
+- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR (incl. CTRM issues + obligations board) · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome
 
 ## Still open (agent queue)
 

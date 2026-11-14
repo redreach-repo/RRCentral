@@ -124,17 +124,15 @@ export default function ClauseLibraryPage() {
       <p style={pageSubtitleStyle}>{t('page.clauseLibrary.subtitle')}</p>
 
       {missingTable ? (
-        <p style={{ color: colors.muted, fontSize: 13 }}>
-          Run <code>supabase/migrations/20261214090000_contract_clauses.sql</code> to enable the clause library.
-        </p>
+        <p style={{ color: colors.muted, fontSize: 13 }}>{t('page.clauseLibrary.missingTable')}</p>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 280px) 1fr', gap: 16 }}>
           <div style={card}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-              <strong style={{ fontSize: 14 }}>Clauses</strong>
+              <strong style={{ fontSize: 14 }}>{t('page.clauseLibrary.list')}</strong>
               {editing ? (
                 <button type="button" style={btnGhost} onClick={newClause}>
-                  New
+                  {t('page.clauseLibrary.new')}
                 </button>
               ) : null}
             </div>
@@ -168,13 +166,15 @@ export default function ClauseLibraryPage() {
                   </div>
                 </button>
               ))}
-              {!rows.length ? <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>No clauses yet.</p> : null}
+              {!rows.length ? (
+                <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>{t('page.clauseLibrary.empty')}</p>
+              ) : null}
             </div>
           </div>
 
           <div style={card}>
             <label style={{ display: 'grid', gap: 4, fontSize: 12, color: colors.muted }}>
-              Key
+              {t('page.clauseLibrary.key')}
               <input
                 style={input}
                 value={form.clause_key}
@@ -184,7 +184,7 @@ export default function ClauseLibraryPage() {
               />
             </label>
             <label style={{ display: 'grid', gap: 4, fontSize: 12, color: colors.muted }}>
-              Title
+              {t('page.clauseLibrary.titleField')}
               <input
                 style={input}
                 value={form.title}
@@ -194,7 +194,7 @@ export default function ClauseLibraryPage() {
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px', gap: 8 }}>
               <label style={{ display: 'grid', gap: 4, fontSize: 12, color: colors.muted }}>
-                Category
+                {t('page.clauseLibrary.category')}
                 <select
                   style={input}
                   value={form.category}
@@ -211,7 +211,7 @@ export default function ClauseLibraryPage() {
                 </select>
               </label>
               <label style={{ display: 'grid', gap: 4, fontSize: 12, color: colors.muted }}>
-                Status
+                {t('page.clauseLibrary.status')}
                 <select
                   style={input}
                   value={form.status}
@@ -226,7 +226,7 @@ export default function ClauseLibraryPage() {
                 </select>
               </label>
               <label style={{ display: 'grid', gap: 4, fontSize: 12, color: colors.muted }}>
-                Sort
+                {t('page.clauseLibrary.sort')}
                 <input
                   style={input}
                   type="number"
@@ -237,7 +237,7 @@ export default function ClauseLibraryPage() {
               </label>
             </div>
             <label style={{ display: 'grid', gap: 4, fontSize: 12, color: colors.muted }}>
-              Wording
+              {t('page.clauseLibrary.wording')}
               <textarea
                 style={{ ...input, minHeight: 180, resize: 'vertical' }}
                 value={form.body}
@@ -246,7 +246,7 @@ export default function ClauseLibraryPage() {
               />
             </label>
             <label style={{ display: 'grid', gap: 4, fontSize: 12, color: colors.muted }}>
-              Internal notes
+              {t('page.clauseLibrary.notes')}
               <input
                 style={input}
                 value={form.notes}
@@ -257,16 +257,20 @@ export default function ClauseLibraryPage() {
             {editing ? (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button type="button" style={btnPrimary} disabled={busy} onClick={() => void save()}>
-                  {busy ? 'Saving…' : selectedId ? 'Save clause' : 'Create clause'}
+                  {busy
+                    ? t('page.clauseLibrary.saving')
+                    : selectedId
+                      ? t('page.clauseLibrary.save')
+                      : t('page.clauseLibrary.create')}
                 </button>
                 {selected?.status === 'draft' ? (
                   <button type="button" style={btn} disabled={busy} onClick={() => void removeDraft()}>
-                    Delete draft
+                    {t('page.clauseLibrary.deleteDraft')}
                   </button>
                 ) : null}
               </div>
             ) : (
-              <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>Managers can edit the clause library.</p>
+              <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>{t('page.clauseLibrary.readOnly')}</p>
             )}
           </div>
         </div>
