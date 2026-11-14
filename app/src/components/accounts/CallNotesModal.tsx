@@ -4,6 +4,7 @@ import Modal from '../Modal'
 import type { ProposedRequirement } from '../../lib/aiAssist'
 import { runAi } from '../../lib/aiAssistStore'
 import { errorMessage } from '../../lib/errors'
+import { parseCallNotesForm } from '../../lib/schemas/callNotes'
 import { buttonPrimaryStyle, buttonSecondaryStyle, colors, inputStyle, labelStyle } from '../../lib/uiStyles'
 
 /**
@@ -54,10 +55,20 @@ export default function CallNotesModal({
   }, [open, initialNotes])
 
   async function find(text: string = notes) {
+    const parsed = parseCallNotesForm({ notes: text })
+    if (!parsed.ok) {
+      setError(parsed.error)
+      return
+    }
     setBusy(true)
     setError('')
     try {
-      const r = await runAi(accountId, { feature: 'call_notes', accountName, notes: text, existing })
+      const r = await runAi(accountId, {
+        feature: 'call_notes',
+        accountName,
+        notes: parsed.data.notes,
+        existing,
+      })
       setFound(r.requirements)
       setPicked(new Set(r.requirements.map((_, i) => i)))
     } catch (e) {
