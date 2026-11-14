@@ -70,11 +70,12 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'nav.item.system-check': 'System check',
     'guide.title': 'How we work in RR Central',
     'guide.body':
-      'Short paths for the sales day, money, and client care: My Day, Pipeline, quotations, support, NDAs, invoices and payments, then accounts, health, reports, updates, and obligations.',
+      'Short paths for the sales day, money, client care, and admin: My Day through obligations, then Settings, module flags, System check, Audit log, and App errors.',
     'guide.back': 'Back to app',
     'guide.pack.crm': 'Sales day',
     'guide.pack.billing': 'Billing and money',
     'guide.pack.delivery': 'Delivery and care',
+    'guide.pack.admin': 'Admin and platform',
     'guide.crm.myday.title': 'My Day',
     'guide.crm.myday.body':
       'Start here each morning. Log touches, set the next action and follow-up date, and mark Won or Lost with a reason.',
@@ -135,6 +136,26 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.delivery.obligations.body':
       'Track NDA and contract obligations after sign so renewals and follow-ups do not slip.',
     'guide.delivery.obligations.link': 'Open obligations',
+    'guide.admin.settings.title': 'Settings',
+    'guide.admin.settings.body':
+      'Company, bank, users, and integrations live here. Prefer Settings over editing env files on a running tenant.',
+    'guide.admin.settings.link': 'Open Settings',
+    'guide.admin.moduleFlags.title': 'Module flags',
+    'guide.admin.moduleFlags.body':
+      'Soft-hide Operations, Finance, or Delivery from the sidebar for everyone. Direct URLs still work.',
+    'guide.admin.moduleFlags.link': 'Open Module flags',
+    'guide.admin.systemCheck.title': 'System check',
+    'guide.admin.systemCheck.body':
+      'Ping Edge functions and the outbox without sending mail or changing data. Pair with App errors when something is red.',
+    'guide.admin.systemCheck.link': 'Open System check',
+    'guide.admin.audit.title': 'Audit log',
+    'guide.admin.audit.body':
+      'Who created, changed, or deleted key records. Written by the database, not editable from the app.',
+    'guide.admin.audit.link': 'Open Audit log',
+    'guide.admin.appErrors.title': 'App errors',
+    'guide.admin.appErrors.body':
+      'Browser and function failures saved for triage. Clear resolved rows after you fix the cause.',
+    'guide.admin.appErrors.link': 'Open App errors',
     'page.dashboard.title': 'Dashboard',
     'page.dashboard.loading': 'Loading metrics…',
     'page.dashboard.heroToday': 'Today',
@@ -307,11 +328,12 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'nav.item.system-check': 'فحص النظام',
     'guide.title': 'كيف نعمل في RR Central',
     'guide.body':
-      'مسارات قصيرة ليوم المبيعات والمال ورعاية العملاء: يومي، لوحة الصفقات، عروض الأسعار، الدعم، اتفاقيات السرية، الفواتير والمدفوعات، ثم الحسابات والصحة والتقارير والتحديثات والالتزامات.',
+      'مسارات قصيرة ليوم المبيعات والمال ورعاية العملاء والإدارة: من يومي إلى الالتزامات، ثم الإعدادات وأعلام الوحدات وفحص النظام وسجل التدقيق وأخطاء التطبيق.',
     'guide.back': 'العودة إلى التطبيق',
     'guide.pack.crm': 'يوم المبيعات',
     'guide.pack.billing': 'الفوترة والمال',
     'guide.pack.delivery': 'التسليم والرعاية',
+    'guide.pack.admin': 'الإدارة والمنصة',
     'guide.crm.myday.title': 'يومي',
     'guide.crm.myday.body':
       'ابدأ من هنا كل صباح. سجّل التواصل، حدّد الخطوة التالية وتاريخ المتابعة، وعلّم ربح أو خسارة مع السبب.',
@@ -372,6 +394,26 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.delivery.obligations.body':
       'تابع التزامات NDA والعقود بعد التوقيع حتى لا تفوت التجديدات والمتابعات.',
     'guide.delivery.obligations.link': 'فتح الالتزامات',
+    'guide.admin.settings.title': 'الإعدادات',
+    'guide.admin.settings.body':
+      'الشركة والبنك والمستخدمون والتكاملات هنا. فضّل الإعدادات على تعديل ملفات البيئة على مستأجر يعمل.',
+    'guide.admin.settings.link': 'فتح الإعدادات',
+    'guide.admin.moduleFlags.title': 'أعلام الوحدات',
+    'guide.admin.moduleFlags.body':
+      'أخفِ العمليات أو المالية أو التسليم من الشريط الجانبي للجميع. الروابط المباشرة تبقى تعمل.',
+    'guide.admin.moduleFlags.link': 'فتح أعلام الوحدات',
+    'guide.admin.systemCheck.title': 'فحص النظام',
+    'guide.admin.systemCheck.body':
+      'انبض دوال Edge والصندوق دون إرسال بريد أو تغيير بيانات. اربط مع أخطاء التطبيق عند الاحمرار.',
+    'guide.admin.systemCheck.link': 'فتح فحص النظام',
+    'guide.admin.audit.title': 'سجل التدقيق',
+    'guide.admin.audit.body':
+      'من أنشأ أو غيّر أو حذف السجلات الرئيسية. يكتبه قاعدة البيانات ولا يُعدَّل من التطبيق.',
+    'guide.admin.audit.link': 'فتح سجل التدقيق',
+    'guide.admin.appErrors.title': 'أخطاء التطبيق',
+    'guide.admin.appErrors.body':
+      'إخفاقات المتصفح والدوال محفوظة للفرز. امسح الصفوف المحلولة بعد إصلاح السبب.',
+    'guide.admin.appErrors.link': 'فتح أخطاء التطبيق',
     'page.dashboard.title': 'لوحة التحكم',
     'page.dashboard.loading': 'جارٍ تحميل المقاييس…',
     'page.dashboard.heroToday': 'اليوم',

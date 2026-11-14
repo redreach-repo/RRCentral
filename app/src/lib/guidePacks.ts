@@ -2,6 +2,7 @@
  * In-app guide content packs (RRCRM M1+).
  * Each pack is a titled list of short paths with deep links into the app.
  */
+import { GUIDE_ADMIN_SECTIONS } from './guideAdmin'
 import { GUIDE_BILLING_SECTIONS } from './guideBilling'
 import { GUIDE_CRM_SECTIONS, type GuideCrmSection } from './guideCrm'
 import { GUIDE_DELIVERY_SECTIONS } from './guideDelivery'
@@ -29,5 +30,10 @@ export const GUIDE_PACKS: GuidePack[] = [
     id: 'delivery',
     titleKey: 'guide.pack.delivery',
     sections: GUIDE_DELIVERY_SECTIONS,
+  },
+  {
+    id: 'admin',
+    titleKey: 'guide.pack.admin',
+    sections: GUIDE_ADMIN_SECTIONS,
   },
 ]
