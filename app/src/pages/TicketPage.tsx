@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { ArrowLeft, LifeBuoy, Lock, MessageCircle, Sparkles } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { useSettings } from '../contexts/SettingsContext'
 import EmptyState from '../components/EmptyState'
@@ -47,6 +48,7 @@ const aiButton: CSSProperties = {
 
 export default function TicketPage() {
   const { id = '' } = useParams<{ id: string }>()
+  const { t } = useI18n()
   const { user, userRole, appUserId } = useAuth()
   const { showToast } = useToast()
   const [ticket, setTicket] = useState<Ticket | null>(null)
@@ -93,7 +95,7 @@ export default function TicketPage() {
     void load()
   }, [load])
 
-  if (loading) return <div style={pageStyle}>Loading ticket…</div>
+  if (loading) return <div style={pageStyle}>{t('page.ticket.loading')}</div>
 
   const account = ticket?.account_id ? accounts.find((a) => a.id === ticket.account_id) : undefined
   // Local mode has no RLS, so apply the same staff rule here.
@@ -103,11 +105,11 @@ export default function TicketPage() {
       <div style={pageStyle}>
         <EmptyState
           icon={<LifeBuoy size={22} />}
-          title="Ticket not found"
-          subtitle="It may have been deleted, or it is on an account that is not assigned to you."
+          title={t('page.ticket.notFound')}
+          subtitle={t('page.ticket.notFoundSubtitle')}
         />
         <p style={{ textAlign: 'center' }}>
-          <Link to="/support">Back to support</Link>
+          <Link to="/support">{t('page.ticket.backToSupport')}</Link>
         </p>
       </div>
     )
@@ -260,7 +262,7 @@ export default function TicketPage() {
   return (
     <div style={pageStyle}>
       <Link to="/support" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: colors.muted, fontSize: 13 }}>
-        <ArrowLeft size={14} /> Support
+        <ArrowLeft size={14} /> {t('page.support.title')}
       </Link>
 
       <div style={{ ...cardStyle, margin: '12px 0 16px' }}>
@@ -269,7 +271,7 @@ export default function TicketPage() {
           {format(parseISO(ticket.created_at), 'd MMM yyyy, HH:mm')}
           {ticket.created_by ? ` by ${ticket.created_by}` : ''}
         </div>
-        <h1 style={{ ...pageTitleStyle, marginBottom: 6 }}>{ticket.subject || '(no subject)'}</h1>
+        <h1 style={{ ...pageTitleStyle, marginBottom: 6 }}>{ticket.subject || t('page.ticket.noSubject')}</h1>
         <div style={{ color: colors.muted, fontSize: 14, marginBottom: 14 }}>
           {account ? (
             <>
@@ -395,14 +397,16 @@ export default function TicketPage() {
 
       <section style={{ ...cardStyle, marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-          <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Conversation</h2>
+          <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.ticket.conversation')}</h2>
           {editable && account && messages.length ? (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button type="button" style={aiButton} disabled={Boolean(aiBusy)} onClick={() => void aiSummary()}>
-                <Sparkles size={13} /> {aiBusy === 'summary' ? 'Summarising…' : 'Summarise'}
+                <Sparkles size={13} />{' '}
+                {aiBusy === 'summary' ? t('page.ticket.summarising') : t('page.ticket.summarise')}
               </button>
               <button type="button" style={aiButton} disabled={Boolean(aiBusy)} onClick={() => void aiReply()}>
-                <Sparkles size={13} /> {aiBusy === 'reply' ? 'Drafting…' : 'Draft a reply'}
+                <Sparkles size={13} />{' '}
+                {aiBusy === 'reply' ? t('page.ticket.drafting') : t('page.ticket.draftReply')}
               </button>
             </div>
           ) : null}
@@ -466,10 +470,12 @@ export default function TicketPage() {
 
       {editable ? (
         <section style={cardStyle}>
-          <h2 style={sectionTitleStyle}>{internal ? 'Internal note' : 'Reply to the client'}</h2>
+          <h2 style={sectionTitleStyle}>
+            {internal ? t('page.ticket.noteTitle') : t('page.ticket.replyTitle')}
+          </h2>
           {isCtrmIssue(ticket) ? <p style={{ color: colors.muted, fontSize: 13, marginTop: 0 }}>{NO_TRADE_DATA_NOTE}</p> : null}
           <textarea
-            aria-label={internal ? 'Internal note' : 'Reply'}
+            aria-label={internal ? t('page.ticket.noteTitle') : t('page.ticket.replyTitle')}
             style={{ ...inputStyle, minHeight: 110, resize: 'vertical', marginBottom: 10 }}
             value={reply}
             onChange={(e) => setReply(e.target.value)}
@@ -505,7 +511,7 @@ export default function TicketPage() {
                   disabled={busy || !reply.trim() || !waWindow.open}
                   onClick={() => void send(true)}
                 >
-                  <MessageCircle size={14} /> Send on WhatsApp
+                  <MessageCircle size={14} /> {t('page.ticket.sendWhatsApp')}
                 </button>
               ) : null}
               <button
@@ -514,7 +520,7 @@ export default function TicketPage() {
                 disabled={busy || !reply.trim()}
                 onClick={() => void send()}
               >
-                {internal ? 'Add note' : 'Log reply'}
+                {internal ? t('page.ticket.addNote') : t('page.ticket.logReply')}
               </button>
             </div>
           </div>
