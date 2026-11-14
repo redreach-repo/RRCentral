@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — module flags Settings UI
+**Current milestone:** Continuous backlog — EN+AR nav catalogs
 
 ## Shipped this turn
 
-- Settings → **Module flags** card to soft-hide Operations (`moduleFlags` JSON); helpers `withModuleFlag` / `serializeModuleFlags`
+- Shell/nav EN+AR catalogs for every `APP_MODULES` label; Layout + Cmd+K use `navI18n` helpers (`nav.module.*` / `nav.item.*`)
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs · Cmd+K · module flags nav · QTSP · outbox · digest · HubSpot · System check · tenant/audit CI · a11y · chrome · pipeline density
+- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · QTSP · outbox · digest · HubSpot · System check · tenant/audit CI · a11y · chrome · pipeline density
 
 ## Still open (agent queue)
 

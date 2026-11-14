@@ -1,4 +1,5 @@
 import { visibleAppModules } from '../modules/nav'
+import { navItemKey, navModuleKey, translateNavLabel } from './navI18n'
 import type { UserRole } from './types'
 
 export type CommandPaletteItem = {
@@ -12,15 +13,18 @@ export type CommandPaletteItem = {
 export function commandPaletteItems(
   userRole: UserRole,
   settings: Record<string, string | undefined> = {},
+  translate: (key: string) => string = (key) => key,
 ): CommandPaletteItem[] {
   const rows: CommandPaletteItem[] = []
   for (const mod of visibleAppModules(userRole, settings)) {
+    const group = translateNavLabel(translate, navModuleKey(mod.id), mod.label)
     for (const item of mod.items) {
+      const label = translateNavLabel(translate, navItemKey(item.to), item.label)
       rows.push({
         to: item.to,
-        label: item.label,
-        group: mod.label,
-        keywords: `${item.label} ${mod.label} ${item.to}`.toLowerCase(),
+        label,
+        group,
+        keywords: `${label} ${group} ${item.label} ${mod.label} ${item.to}`.toLowerCase(),
       })
     }
   }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { commandPaletteItems, filterCommandPaletteItems } from '../lib/commandPalette'
 import { trapTabKey } from '../lib/focusTrap'
@@ -15,6 +16,7 @@ type Props = {
 export default function CommandPalette({ open, onClose }: Props) {
   const { userRole } = useAuth()
   const { settings } = useSettings()
+  const { t } = useI18n()
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
@@ -22,7 +24,7 @@ export default function CommandPalette({ open, onClose }: Props) {
   const panelRef = useRef<HTMLDivElement>(null)
   const previouslyFocused = useRef<HTMLElement | null>(null)
 
-  const all = useMemo(() => commandPaletteItems(userRole, settings), [userRole, settings])
+  const all = useMemo(() => commandPaletteItems(userRole, settings, t), [userRole, settings, t])
   const items = useMemo(() => filterCommandPaletteItems(all, query), [all, query])
 
   useEffect(() => {
@@ -83,7 +85,7 @@ export default function CommandPalette({ open, onClose }: Props) {
         className={styles.panel}
         role="dialog"
         aria-modal="true"
-        aria-label="Jump to"
+        aria-label={t('shell.jumpTo')}
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
       >
@@ -94,7 +96,7 @@ export default function CommandPalette({ open, onClose }: Props) {
             className={styles.input}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Jump to a page…"
+            placeholder={t('shell.jumpToPlaceholder')}
             aria-autocomplete="list"
             aria-controls="rr-command-list"
             aria-activedescendant={items[active] ? `rr-command-opt-${active}` : undefined}
