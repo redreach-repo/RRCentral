@@ -66,3 +66,30 @@ export function modulesEnabled(
     return flags[m.flag] !== false
   })
 }
+
+/** True when the flag is missing or explicitly true (modules default on). */
+export function isModuleFlagEnabled(flags: Record<string, boolean>, flag: string): boolean {
+  return flags[flag] !== false
+}
+
+/**
+ * Merge one flag into the map. Omits keys that are enabled (true) so the stored
+ * JSON stays small — only disabled modules are listed.
+ */
+export function withModuleFlag(
+  flags: Record<string, boolean>,
+  flag: string,
+  enabled: boolean,
+): Record<string, boolean> {
+  const next = { ...flags }
+  if (enabled) delete next[flag]
+  else next[flag] = false
+  return next
+}
+
+/** Serialize for app_settings.moduleFlags (empty object → empty string). */
+export function serializeModuleFlags(flags: Record<string, boolean>): string {
+  const disabled = Object.fromEntries(Object.entries(flags).filter(([, v]) => v === false))
+  if (Object.keys(disabled).length === 0) return ''
+  return JSON.stringify(disabled)
+}
