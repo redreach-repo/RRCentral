@@ -6,10 +6,10 @@ import {
   LEGAL_SIGN_ASSENT_BLURB,
   LEGAL_SIGN_DONE_BLURB,
   legalDocLabel,
-  signProblem,
   type LegalSignView,
 } from '../lib/legalDocuments'
 import { callLegalSign } from '../lib/legalDocumentStore'
+import { parseLegalSignForm } from '../lib/schemas/legalSign'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle } from '../lib/uiStyles'
 
 const wrap: CSSProperties = {
@@ -161,16 +161,19 @@ export default function LegalSignPage() {
   }
 
   async function sign() {
-    const problem = signProblem({ name, date, agreed, signaturePng })
-    setFormError(problem || '')
-    if (problem) return
+    const parsed = parseLegalSignForm({ name, date, agreed, signaturePng })
+    if (!parsed.ok) {
+      setFormError(parsed.error)
+      return
+    }
+    setFormError('')
     setBusy(true)
     const r = await callLegalSign(token, {
       action: 'sign',
-      name: name.trim(),
-      date,
+      name: parsed.data.name,
+      date: parsed.data.date,
       agreed: true,
-      signature_png: signaturePng,
+      signature_png: parsed.data.signature_png,
     })
     setBusy(false)
     if (r.ok) setView(r.data as unknown as LegalSignView)
