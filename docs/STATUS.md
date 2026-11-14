@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — ops guide pack
+**Current milestone:** Continuous backlog — finance guide pack
 
 ## Shipped this turn
 
-- Added **operations** content pack to `/guide` (Wanders, Catalog, Inventory, Templates, Domains)
+- Added **finance** content pack to `/guide` (Vendors, Reports, MRR, Utilisation, Duplicates)
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs (CRM/billing/delivery/admin) · Cmd+K · module flags · EN+AR · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome
+- Continuous backlog · Zod · Guide packs (CRM/billing/delivery/ops/admin) · Cmd+K · module flags · EN+AR · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome
 
 ## Still open (agent queue)
 

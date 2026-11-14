@@ -70,12 +70,13 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'nav.item.system-check': 'System check',
     'guide.title': 'How we work in RR Central',
     'guide.body':
-      'Short paths for the sales day, money, client care, operations, and admin: My Day through obligations, then Wanders through Domains, then Settings, module flags, System check, Audit log, and App errors.',
+      'Short paths for the sales day, money, client care, operations, finance, and admin: My Day through obligations, Wanders through Domains, Vendors through Duplicates, then Settings, module flags, System check, Audit log, and App errors.',
     'guide.back': 'Back to app',
     'guide.pack.crm': 'Sales day',
     'guide.pack.billing': 'Billing and money',
     'guide.pack.delivery': 'Delivery and care',
     'guide.pack.ops': 'Operations',
+    'guide.pack.finance': 'Finance and insight',
     'guide.pack.admin': 'Admin and platform',
     'guide.crm.myday.title': 'My Day',
     'guide.crm.myday.body':
@@ -177,6 +178,26 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.ops.domains.body':
       'Owned domains, registrar notes, and renewals so client sites do not expire quietly.',
     'guide.ops.domains.link': 'Open Domains',
+    'guide.finance.vendors.title': 'Vendors',
+    'guide.finance.vendors.body':
+      'Register suppliers, keep bank details honest, and link expenses or commitments back to the right vendor.',
+    'guide.finance.vendors.link': 'Open Vendors',
+    'guide.finance.reports.title': 'Reports',
+    'guide.finance.reports.body':
+      'Income, expenses, and VAT-style summaries for the period you pick — use paid invoices, not drafts.',
+    'guide.finance.reports.link': 'Open Reports',
+    'guide.finance.mrr.title': 'MRR',
+    'guide.finance.mrr.body':
+      'Recurring revenue from live contracts and packages so growth and churn show up without a spreadsheet.',
+    'guide.finance.mrr.link': 'Open MRR',
+    'guide.finance.insights.title': 'Utilisation',
+    'guide.finance.insights.body':
+      'Hours and capacity against package targets so delivery stays profitable and overloaded people surface early.',
+    'guide.finance.insights.link': 'Open Utilisation',
+    'guide.finance.duplicates.title': 'Duplicates',
+    'guide.finance.duplicates.body':
+      'Find likely duplicate companies or contacts before they split history across two records.',
+    'guide.finance.duplicates.link': 'Open Duplicates',
     'page.dashboard.title': 'Dashboard',
     'page.dashboard.loading': 'Loading metrics…',
     'page.dashboard.heroToday': 'Today',
@@ -663,12 +684,13 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'nav.item.system-check': 'فحص النظام',
     'guide.title': 'كيف نعمل في RR Central',
     'guide.body':
-      'مسارات قصيرة ليوم المبيعات والمال ورعاية العملاء والعمليات والإدارة: من يومي إلى الالتزامات، ثم Wanders إلى النطاقات، ثم الإعدادات وأعلام الوحدات وفحص النظام وسجل التدقيق وأخطاء التطبيق.',
+      'مسارات قصيرة ليوم المبيعات والمال ورعاية العملاء والعمليات والمالية والإدارة: من يومي إلى الالتزامات، وWanders إلى النطاقات، والموردين إلى المكررات، ثم الإعدادات وأعلام الوحدات وفحص النظام وسجل التدقيق وأخطاء التطبيق.',
     'guide.back': 'العودة إلى التطبيق',
     'guide.pack.crm': 'يوم المبيعات',
     'guide.pack.billing': 'الفوترة والمال',
     'guide.pack.delivery': 'التسليم والرعاية',
     'guide.pack.ops': 'العمليات',
+    'guide.pack.finance': 'المالية والرؤية',
     'guide.pack.admin': 'الإدارة والمنصة',
     'guide.crm.myday.title': 'يومي',
     'guide.crm.myday.body':
@@ -770,6 +792,26 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.ops.domains.body':
       'النطاقات المملوكة وملاحظات المسجّل والتجديدات حتى لا تنتهي مواقع العملاء بهدوء.',
     'guide.ops.domains.link': 'فتح النطاقات',
+    'guide.finance.vendors.title': 'الموردون',
+    'guide.finance.vendors.body':
+      'سجّل الموردين، حافظ على بيانات البنك صادقة، واربط المصروفات أو الالتزامات بالمورد الصحيح.',
+    'guide.finance.vendors.link': 'فتح الموردين',
+    'guide.finance.reports.title': 'التقارير',
+    'guide.finance.reports.body':
+      'ملخصات الدخل والمصروفات وضريبة القيمة المضافة للفترة التي تختارها — استخدم الفواتير المدفوعة لا المسودات.',
+    'guide.finance.reports.link': 'فتح التقارير',
+    'guide.finance.mrr.title': 'MRR',
+    'guide.finance.mrr.body':
+      'إيراد متكرر من العقود والحزم السارية حتى يظهر النمو والتسرب دون جدول بيانات.',
+    'guide.finance.mrr.link': 'فتح MRR',
+    'guide.finance.insights.title': 'الاستخدام',
+    'guide.finance.insights.body':
+      'الساعات والطاقة مقابل أهداف الحزم حتى يبقى التسليم مربحاً ويظهر المثقلون مبكراً.',
+    'guide.finance.insights.link': 'فتح الاستخدام',
+    'guide.finance.duplicates.title': 'المكررات',
+    'guide.finance.duplicates.body':
+      'اعثر على الشركات أو جهات الاتصال المكررة المحتملة قبل أن يتشتت التاريخ على سجلين.',
+    'guide.finance.duplicates.link': 'فتح المكررات',
     'page.dashboard.title': 'لوحة التحكم',
     'page.dashboard.loading': 'جارٍ تحميل المقاييس…',
     'page.dashboard.heroToday': 'اليوم',
