@@ -22,6 +22,7 @@ import {
 } from '../lib/customerPayments'
 import type { CustomerPayment, CustomerRefund, Quotation, SupplierCommitment } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
@@ -94,6 +95,7 @@ const emptyPay = (q?: Quotation | null): PayForm => ({
 })
 
 export default function PaymentsPage() {
+  const { t } = useI18n()
   const { user } = useAuth()
   const { showToast } = useToast()
   const [quotes, setQuotes] = useState<Quotation[]>([])
@@ -357,12 +359,9 @@ export default function PaymentsPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Finance</p>
-          <h1 className={docsStyles.title}>Payments</h1>
-          <p className={docsStyles.subtitle}>
-            RR Wanders multi-currency bookings — quotation, payment and supplier currencies may
-            differ. Original FC amounts are never overwritten.
-          </p>
+          <p className={docsStyles.kicker}>{t('page.finance.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.payments.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.payments.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
@@ -413,7 +412,7 @@ export default function PaymentsPage() {
               setPayOpen(true)
             }}
           >
-            <Plus size={16} /> Record payment
+            <Plus size={16} /> {t('page.payments.new')}
           </button>
         </div>
       </header>

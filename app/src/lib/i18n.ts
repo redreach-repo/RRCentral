@@ -180,6 +180,29 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.login.signIn': 'Sign in',
     'page.login.signingIn': 'Signing in…',
     'page.login.loading': 'Loading…',
+    'page.docs.kicker': 'Sales documents',
+    'page.quotations.title': 'Quotations',
+    'page.quotations.subtitle':
+      'Create, revise, and track quotations. Click Actions on a row to reveal every option.',
+    'page.quotations.new': 'New quotation',
+    'page.invoices.title': 'Invoices',
+    'page.invoices.subtitle':
+      'Billing and payment tracking. Click Actions on a row to reveal every option.',
+    'page.invoices.new': 'New invoice',
+    'page.deliveryNotes.title': 'Delivery notes',
+    'page.deliveryNotes.subtitle':
+      'Goods receipts from finalized quotations. Click Actions on a row for Edit, PDF, or Delete.',
+    'page.deliveryNotes.new': 'From quotation',
+    'page.finance.kicker': 'Finance',
+    'page.payments.title': 'Payments',
+    'page.payments.subtitle':
+      'RR Wanders multi-currency bookings — quotation, payment and supplier currencies may differ. Original FC amounts are never overwritten.',
+    'page.payments.new': 'Record payment',
+    'page.expenses.title': 'Expenses',
+    'page.expenses.subtitle':
+      'Vendor bills, supplier invoices, and receipts. Click Actions on a row to edit or delete.',
+    'page.expenses.new': 'Add expense',
+    'page.expenses.syncMonthly': 'Sync monthly',
   },
   ar: {
     'shell.company': 'الشركة',
@@ -353,6 +376,29 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.login.signIn': 'تسجيل الدخول',
     'page.login.signingIn': 'جارٍ تسجيل الدخول…',
     'page.login.loading': 'جارٍ التحميل…',
+    'page.docs.kicker': 'مستندات المبيعات',
+    'page.quotations.title': 'عروض الأسعار',
+    'page.quotations.subtitle':
+      'أنشئ وعدّل وتتبع عروض الأسعار. انقر الإجراءات على صف لإظهار كل خيار.',
+    'page.quotations.new': 'عرض سعر جديد',
+    'page.invoices.title': 'الفواتير',
+    'page.invoices.subtitle':
+      'تتبع الفوترة والدفع. انقر الإجراءات على صف لإظهار كل خيار.',
+    'page.invoices.new': 'فاتورة جديدة',
+    'page.deliveryNotes.title': 'مذكرات التسليم',
+    'page.deliveryNotes.subtitle':
+      'إيصالات بضاعة من عروض معتمدة. انقر الإجراءات على صف للتعديل أو PDF أو الحذف.',
+    'page.deliveryNotes.new': 'من عرض سعر',
+    'page.finance.kicker': 'المالية',
+    'page.payments.title': 'المدفوعات',
+    'page.payments.subtitle':
+      'حجوزات RR Wanders متعددة العملات — قد تختلف عملات العرض والدفع والمورد. مبالغ العملة الأجنبية الأصلية لا تُستبدل.',
+    'page.payments.new': 'تسجيل دفعة',
+    'page.expenses.title': 'المصروفات',
+    'page.expenses.subtitle':
+      'فواتير الموردين وإيصالات المشتريات. انقر الإجراءات على صف للتعديل أو الحذف.',
+    'page.expenses.new': 'إضافة مصروف',
+    'page.expenses.syncMonthly': 'مزامنة شهرية',
   },
 }
 

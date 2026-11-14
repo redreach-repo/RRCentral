@@ -20,6 +20,7 @@ import {
   shouldShowQuoteContactPicker,
 } from '../lib/quoteContact'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { can } from '../lib/permissions'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
@@ -179,6 +180,7 @@ const emptyForm = (defaults?: Partial<QuoteForm>): QuoteForm => ({
 })
 
 export default function QuotationsPage() {
+  const { t } = useI18n()
   const { user, userRole, appUserId } = useAuth()
   const { settings, updateSetting } = useSettings()
   const { showToast } = useToast()
@@ -1336,14 +1338,12 @@ export default function QuotationsPage() {
     <div className={qStyles.page}>
       <header className={qStyles.hero}>
         <div>
-          <p className={qStyles.kicker}>Sales documents</p>
-          <h1 className={qStyles.title}>Quotations</h1>
-          <p className={qStyles.subtitle}>
-            Create, revise, and track quotations. Click Actions on a row to reveal every option.
-          </p>
+          <p className={qStyles.kicker}>{t('page.docs.kicker')}</p>
+          <h1 className={qStyles.title}>{t('page.quotations.title')}</h1>
+          <p className={qStyles.subtitle}>{t('page.quotations.subtitle')}</p>
         </div>
         <button type="button" className={qStyles.newBtn} onClick={() => void openCreate()}>
-          <Plus size={16} /> New quotation
+          <Plus size={16} /> {t('page.quotations.new')}
         </button>
       </header>
 

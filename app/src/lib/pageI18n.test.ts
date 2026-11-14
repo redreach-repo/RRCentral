@@ -45,10 +45,28 @@ const PAGE_KEYS = [
   'page.login.signIn',
   'page.login.signingIn',
   'page.login.loading',
+  'page.docs.kicker',
+  'page.quotations.title',
+  'page.quotations.subtitle',
+  'page.quotations.new',
+  'page.invoices.title',
+  'page.invoices.subtitle',
+  'page.invoices.new',
+  'page.deliveryNotes.title',
+  'page.deliveryNotes.subtitle',
+  'page.deliveryNotes.new',
+  'page.finance.kicker',
+  'page.payments.title',
+  'page.payments.subtitle',
+  'page.payments.new',
+  'page.expenses.title',
+  'page.expenses.subtitle',
+  'page.expenses.new',
+  'page.expenses.syncMonthly',
 ] as const
 
 describe('page body i18n catalogs', () => {
-  it('has EN and AR entries for Dashboard, My Day, Pipeline, and Login chrome', () => {
+  it('has EN and AR entries for sales and finance page chrome', () => {
     for (const key of PAGE_KEYS) {
       expect(t('en', key)).not.toBe(key)
       expect(t('ar', key)).not.toBe(key)

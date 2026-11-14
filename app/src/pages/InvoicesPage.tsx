@@ -18,6 +18,7 @@ import type { Account, Client, Invoice, PaymentLogEntry } from '../lib/types'
 import { accountTypeLabel } from '../lib/accounts'
 import { listAccounts } from '../lib/accountsStore'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { can, roleAtLeast } from '../lib/permissions'
 import PaymentRemindersCard from '../components/invoices/PaymentRemindersCard'
 import { useSettings } from '../contexts/SettingsContext'
@@ -149,6 +150,7 @@ async function syncIncome(inv: {
 }
 
 export default function InvoicesPage() {
+  const { t } = useI18n()
   const { user, userRole } = useAuth()
   const { settings } = useSettings()
   const { showToast } = useToast()
@@ -733,14 +735,12 @@ export default function InvoicesPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Sales documents</p>
-          <h1 className={docsStyles.title}>Invoices</h1>
-          <p className={docsStyles.subtitle}>
-            Billing and payment tracking. Click Actions on a row to reveal every option.
-          </p>
+          <p className={docsStyles.kicker}>{t('page.docs.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.invoices.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.invoices.subtitle')}</p>
         </div>
         <button type="button" className={docsStyles.newBtn} onClick={openCreate}>
-          <Plus size={16} /> New invoice
+          <Plus size={16} /> {t('page.invoices.new')}
         </button>
       </header>
 
