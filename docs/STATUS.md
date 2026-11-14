@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — EN+AR domains chrome
+**Current milestone:** Continuous backlog — EN+AR app errors chrome
 
 ## Shipped this turn
 
-- Wired **DomainsPage** renewals, table, form, and archive modal through EN+AR catalogs
+- Wired **AppErrorsPage** gates, period filter, and group chrome through EN+AR catalogs
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR (incl. NDA + build templates + agreement template) · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome
+- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR (incl. agreement template + domains) · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome
 
 ## Still open (agent queue)
 
