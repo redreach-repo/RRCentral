@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — in-app CRM guide pack
+**Current milestone:** Continuous backlog — Cmd+K jump palette
 
 ## Shipped this turn
 
-- Guide `/guide` CRM day-to-day pack (My Day, Pipeline, quotes, support, contracts vault) with EN+AR copy
+- Cmd/Ctrl+K command palette jumps to any nav page the signed-in role can open
 
 ## Already on main
 
-- Continuous backlog through M3 Pipeline façade notes · Zod contracts · route soft-hide · QTSP · `pipeline_deals_v`
+- Continuous backlog through M3 Pipeline façade notes · Zod contracts · Guide CRM pack · QTSP · `pipeline_deals_v`
 
 ## Still open (agent queue)
 
