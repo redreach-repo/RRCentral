@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Poin
 import { useLocation } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import BrandLogo from '../components/BrandLogo'
+import { useI18n } from '../contexts/I18nContext'
 import {
   LEGAL_SIGN_ASSENT_BLURB,
   LEGAL_SIGN_DONE_BLURB,
@@ -27,6 +28,7 @@ function SignaturePad({
 }: {
   onChange: (dataUrl: string) => void
 }) {
+  const { t } = useI18n()
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const drawing = useRef(false)
 
@@ -109,7 +111,7 @@ function SignaturePad({
         onPointerCancel={end}
       />
       <button type="button" style={{ ...buttonSecondaryStyle, marginTop: 8 }} onClick={clear}>
-        Clear signature
+        {t('page.legalSign.clearSignature')}
       </button>
     </div>
   )
@@ -117,6 +119,7 @@ function SignaturePad({
 
 /** Client e-sign page for NDAs / legal docs (/sign#token). No login. */
 export default function LegalSignPage() {
+  const { t } = useI18n()
   const { hash } = useLocation()
   const token = decodeURIComponent(hash.replace(/^#/, ''))
   const [view, setView] = useState<LegalSignView | null>(null)
@@ -142,8 +145,8 @@ export default function LegalSignPage() {
   }, [load])
 
   useEffect(() => {
-    document.title = view ? view.title : 'Sign document'
-  }, [view])
+    document.title = view ? view.title : t('page.legalSign.docTitle')
+  }, [view, t])
 
   async function openPdf() {
     setBusy(true)
@@ -187,7 +190,7 @@ export default function LegalSignPage() {
           <BrandLogo height={32} />
           <section style={cardStyle}>
             <p style={{ margin: 0, color: error ? colors.text : colors.muted }}>
-              {loading ? 'Loading your document…' : error}
+              {loading ? t('page.legalSign.loading') : error}
             </p>
           </section>
         </div>
@@ -196,6 +199,7 @@ export default function LegalSignPage() {
   }
 
   const label = legalDocLabel(view.doc_type)
+  const companyForAgree = view.company || t('page.legalSign.myCompany')
 
   return (
     <div style={wrap}>
@@ -208,34 +212,46 @@ export default function LegalSignPage() {
         <section style={cardStyle}>
           <h1 style={{ fontSize: 22, margin: '0 0 4px' }}>{view.title}</h1>
           <p style={{ ...muted, margin: '0 0 12px' }}>
-            For {view.company}
-            {view.party_name ? ` · Attn: ${view.party_name}` : ''}
+            {t('page.legalSign.forCompany').replace('{company}', view.company)}
+            {view.party_name
+              ? t('page.legalSign.attn').replace('{name}', view.party_name)
+              : ''}
           </p>
           {view.has_pdf ? (
             <button type="button" style={buttonSecondaryStyle} disabled={busy} onClick={() => void openPdf()}>
-              Open the PDF
+              {t('page.legalSign.openPdf')}
             </button>
           ) : null}
         </section>
 
         {view.status === 'signed' ? (
           <section style={{ ...cardStyle, borderLeft: `4px solid ${colors.success}` }}>
-            <h2 style={{ fontSize: 18, margin: '0 0 6px' }}>Signed. Thank you.</h2>
+            <h2 style={{ fontSize: 18, margin: '0 0 6px' }}>{t('page.legalSign.signedThanks')}</h2>
             <p style={{ margin: 0, fontSize: 14 }}>
-              Signed by {view.signed_name}
-              {view.signed_at ? ` on ${format(parseISO(view.signed_at), 'd MMM yyyy, HH:mm')}` : ''}
-              {view.company ? ` for ${view.company}` : ''}. {LEGAL_SIGN_DONE_BLURB}
+              {t('page.legalSign.signedBy').replace('{name}', view.signed_name || '')}
+              {view.signed_at
+                ? t('page.legalSign.signedOn').replace(
+                    '{when}',
+                    format(parseISO(view.signed_at), 'd MMM yyyy, HH:mm'),
+                  )
+                : ''}
+              {view.company
+                ? t('page.legalSign.signedFor').replace('{company}', view.company)
+                : ''}
+              . {LEGAL_SIGN_DONE_BLURB}
             </p>
           </section>
         ) : (
           <section style={cardStyle}>
-            <h2 style={{ fontSize: 18, margin: '0 0 6px' }}>Sign this {label}</h2>
+            <h2 style={{ fontSize: 18, margin: '0 0 6px' }}>
+              {t('page.legalSign.signThis').replace('{label}', label)}
+            </h2>
             <p style={{ ...muted, margin: '0 0 12px' }}>{LEGAL_SIGN_ASSENT_BLURB}</p>
             <div style={{ display: 'grid', gap: 10 }}>
-              <label style={labelStyle}>Signature</label>
+              <label style={labelStyle}>{t('page.legalSign.signature')}</label>
               <SignaturePad onChange={setSignaturePng} />
               <label style={labelStyle} htmlFor="sign-name">
-                Full name
+                {t('page.legalSign.fullName')}
               </label>
               <input
                 id="sign-name"
@@ -245,16 +261,18 @@ export default function LegalSignPage() {
                 onChange={(e) => setName(e.target.value)}
               />
               <label style={labelStyle} htmlFor="sign-date">
-                Date
+                {t('page.legalSign.date')}
               </label>
               <input id="sign-date" type="date" style={inputStyle} value={date} onChange={(e) => setDate(e.target.value)} />
               <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 14 }}>
                 <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
-                I have read this {label} and agree to sign it on behalf of {view.company || 'my company'}.
+                {t('page.legalSign.agree')
+                  .replace('{label}', label)
+                  .replace('{company}', companyForAgree)}
               </label>
               {formError ? <p style={{ color: colors.danger, fontSize: 13, margin: 0 }}>{formError}</p> : null}
               <button type="button" style={buttonPrimaryStyle} disabled={busy} onClick={() => void sign()}>
-                {busy ? 'Saving…' : 'Sign and submit'}
+                {busy ? t('page.legalSign.saving') : t('page.legalSign.submit')}
               </button>
             </div>
           </section>
