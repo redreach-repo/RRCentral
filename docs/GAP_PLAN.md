@@ -18,15 +18,15 @@ Status key: **exists** · **partial** · **missing**
 | Zod validation everywhere | partial | Login, password, app-user, account, ticket form schemas; keep expanding forms/API |
 | Module registry manifests | partial | M1 `APP_MODULES`; Layout + Cmd+K use `visibleAppModules`; Settings Module flags card (`overview`, `sales`, `ops`, `finance`, `delivery`, `clients`); Admin stays always on; more polish later |
 | Domain events / `event_outbox` | partial | M1 enqueue + worker + HubSpot/digest/webhook handlers; digest + HubSpot nudge consumption live |
-| Public REST API + webhooks | missing | M11 (or earlier for partners) |
+| Public REST API + webhooks | partial | M11 first slice: `api_keys` / `webhook_endpoints` + `public-api` health; resource routes next |
 | Exact money `numeric` / no float | partial | SQL numeric exists; TS `number`+round — fix path in M7 |
 | Tenant / company / BU model | partial | M1 tables + seed + `tenant_id` retrofit; company switcher live |
 | RLS on every table | exists | M1 RESTRICTIVE tenant isolation on stamped tables |
 | Cross-tenant CI tests | partial | `tenant_isolation_test.sql` covers CRM, vendors, accounts, quotations, invoices, sales_deals, expenses, delivery_notes, payment_log, contracts, tickets, ctrm_deals, legal_documents, owned_domains, customer_documents, products, inventory_movements, quote_templates, income, follow_up_updates, supplier_commitments, saved_views, pipelines, pipeline_stages, custom_field_definitions, custom_field_values, numbering_sequences, brand_kits, business_units, workflow_definitions, workflow_runs, event_outbox + audit append-only; keep expanding stamped tables |
 | Roles + record rules + field permissions | partial | Fixed 5 roles; field-mask API started (`fieldPermissions`); record rules later |
-| Maker-checker | missing | M7/M8 for money/payroll |
+| Maker-checker | partial | M7 first slice: `approval_requests` + Approvals queue; wire into pay flows next |
 | Customization layer (fields, pipelines, objects, workflows, templates, views, dashboards, labels, numbering) | partial | M2 layer largely in: numbering, fields, views, pipelines, workflow defs + runner (approval/notify); more step types / dashboards later |
-| Industry packs | missing | M12 |
+| Industry packs | partial | M12 first slice: pack catalog + Settings flag; activation wiring next |
 | Shell: Inbox/Sales/… areas, Cmd+K, AI button | partial | Accordion nav exists; restructure shell in M1 |
 | Company switcher | partial | M1 top-bar switcher; multi-company ops still thin |
 | EN+AR RTL | partial | M1 `I18nContext` + dir; guide + shell/nav + sales/finance/clients/admin/ops/delivery list chrome (Dashboard → Domains through Wanders, Settings/Account, CTRM weekly summary, ticket + account detail, CTRM fit sheet, quote/invoice/DN viewer, legal e-sign + quote-accept + client portal + monthly client report + Wanders tour-ops + monthly reports + weekly updates queue + client health + module-flags Settings card + CTRM issues + obligations board + clause library + NDA template + build templates + agreement template + domains + app errors + Settings section chrome); more page bodies later |
@@ -44,15 +44,15 @@ Status key: **exists** · **partial** · **missing**
 | 6.2 CRM and sales | partial | Strong ops CRM; three pipelines; Pipeline-first soft-retire (M3 slice 4); schema merge later (ask) |
 | 6.3 Email and calendar | partial | Zoho + Gmail Phase A + M365 Phase A/B (incl. inbox); Gmail inbox still CASA-gated; IMAP deferred |
 | 6.4 Contracts and e-sign | partial | NDA `/sign` + clauses + obligations board + spawn-on-sign; QTSP → M5 later |
-| 6.5 HR | missing | M6 |
-| 6.6 Payroll | missing | M8 UAE pack |
+| 6.5 HR | partial | M6 first slice: `hr_employees` + People page |
+| 6.6 Payroll | partial | M8 first slice: payroll runs + WPS/gratuity draft helpers (not legal advice) |
 | 6.7 Accounting (ledger) | partial | Invoices/payments/expenses/reports; **no** journals/CoA/immutability → M7 |
 | 6.8 Inventory and purchasing | partial | Catalog/inventory thin; DN as delivery doc → M9 |
 | 6.9 Delivery (projects/support) | partial | AI CRM delivery + tickets strong; generalize projects → M3/M9 continuity |
-| 6.10 Marketing | missing | M10+ / later; hashtag rules N/A today |
+| 6.10 Marketing | partial | M10 first slice: `marketing_campaigns` + Campaigns page |
 | 6.11 Documents and knowledge | partial | Drive + customer_documents; not full DMS → expand with M5/M11 |
 | 6.12 Planning and reports | partial | Reports/MRR/insights; no goals/scenarios builder → M12-ish / planning |
-| 6.13 Tenant billing | missing | Stripe today is customer invoices + Tee Tribe; SaaS Billing → M11 |
+| 6.13 Tenant billing | partial | M11 first slice: `tenant_subscriptions` + plan catalog; Stripe SaaS checkout next |
 | 6.14 Demo / showcase | missing | M3a after CRM rebuild |
 
 ---
@@ -77,7 +77,7 @@ Status key: **exists** · **partial** · **missing**
 | Requirement | Status | Step |
 |-------------|--------|------|
 | UAE VAT codes / TRN / e-invoice ready model | partial | VAT on docs; no CoA tax engine → M7 + COMPLIANCE_NOTES |
-| WPS / gratuity | missing | M8 + verify law |
+| WPS / gratuity | partial | M8 draft CSV + accrual helper shipped; **verify law** before live use |
 | Arabic bilingual PDFs | missing | M1/M7 |
 | Import/export every list | partial | Some CSV; not universal → M1 framework |
 | Keep RR Central workflows | exists | Must not break §B.3 during M1–M3 |

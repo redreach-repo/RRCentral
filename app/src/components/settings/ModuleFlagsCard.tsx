@@ -73,7 +73,7 @@ export default function ModuleFlagsCard() {
         {t('page.settings.moduleFlags.bodyLead')}{' '}
         <code style={{ fontSize: 12 }}>moduleFlags</code> {t('page.settings.moduleFlags.bodyMid')}{' '}
         <code style={{ fontSize: 12 }}>
-          {'{"overview":false,"sales":false,"ops":false,"finance":false,"delivery":false,"clients":false}'}
+          {'{"overview":false,"hr":false,"payroll":false,"marketing":false,"saasBilling":false,"industryPacks":false}'}
         </code>
         ).
       </p>

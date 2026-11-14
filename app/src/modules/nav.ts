@@ -24,7 +24,9 @@ import {
   HeartPulse,
   Info,
   KeyRound,
+  Layers,
   LayoutDashboard,
+  Megaphone,
   LayoutTemplate,
   LifeBuoy,
   MessageSquareWarning,
@@ -41,6 +43,7 @@ import {
   Users,
   Wallet,
   Wrench,
+  CreditCard,
 } from 'lucide-react'
 import { WorshipHubIcon } from '../components/worshiphub/WorshipHubIcon'
 import { shouldHidePipelineDetailNavItem } from '../lib/pipelineDetailNav'
@@ -142,6 +145,41 @@ export const APP_MODULES: ModuleManifest[] = [
     ],
   },
   {
+    id: 'hr',
+    label: 'HR',
+    icon: Users,
+    flag: 'hr',
+    items: [{ to: '/hr/people', label: 'People', icon: Users, minRole: 'manager' }],
+  },
+  {
+    id: 'payroll',
+    label: 'Payroll',
+    icon: Wallet,
+    flag: 'payroll',
+    items: [{ to: '/payroll', label: 'Payroll runs', icon: Wallet, minRole: 'manager' }],
+  },
+  {
+    id: 'marketing',
+    label: 'Marketing',
+    icon: Megaphone,
+    flag: 'marketing',
+    items: [{ to: '/marketing', label: 'Campaigns', icon: Megaphone, minRole: 'manager' }],
+  },
+  {
+    id: 'saasBilling',
+    label: 'SaaS billing',
+    icon: CreditCard,
+    flag: 'saasBilling',
+    items: [{ to: '/saas-billing', label: 'HighMast plan', icon: CreditCard, minRole: 'admin' }],
+  },
+  {
+    id: 'industryPacks',
+    label: 'Industry packs',
+    icon: Layers,
+    flag: 'industryPacks',
+    items: [{ to: '/industry-packs', label: 'Packs', icon: Layers, minRole: 'admin' }],
+  },
+  {
     id: 'admin',
     label: 'Admin',
     icon: Settings,
@@ -154,6 +192,8 @@ export const APP_MODULES: ModuleManifest[] = [
         roles: ['manager', 'sales', 'staff', 'viewer'],
         forStaff: true,
       },
+      { to: '/approvals', label: 'Approvals', icon: ShieldCheck, minRole: 'manager' },
+      { to: '/public-api', label: 'API and webhooks', icon: KeyRound, minRole: 'admin' },
       { to: '/audit-log', label: 'Audit log', icon: ShieldCheck, minRole: 'admin' },
       { to: '/app-errors', label: 'App errors', icon: Bug, minRole: 'admin' },
       { to: '/system-check', label: 'System check', icon: Activity, minRole: 'admin' },
