@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod Wanders deal
+**Current milestone:** Continuous backlog — M1 Zod invoice payment
 
 ## Shipped this turn
 
-- Zod `parseWandersDealForm` / `parseWandersTermsAcceptForm` on Wanders save and terms acceptance
+- Zod `parseInvoicePaymentForm` before recording a payment on an invoice
 
 ## Already on main
 
@@ -14,8 +14,7 @@
 ## Still open (agent queue)
 
 1. More M1 Zod  
-2. M3 inventory UI + metrics PRs  
-3. Demo env hooks after Alfred provisions  
+2. Demo env hooks after Alfred provisions  
 
 ## Still externally blocked
 
