@@ -63,6 +63,7 @@ import { getUsageSource, saveUsageSource } from '../../lib/usageImportStore'
 import { canViewField } from '../../lib/fieldPermissions'
 import { can } from '../../lib/permissions'
 import { errorMessage } from '../../lib/errors'
+import { parseBuildBlockerNote } from '../../lib/schemas/buildBlocker'
 import { parseDeliveryContractForm } from '../../lib/schemas/deliveryContract'
 import { parseDeliveryRequirementForm } from '../../lib/schemas/deliveryRequirement'
 import { parseTimeEntryForm } from '../../lib/schemas/timeEntry'
@@ -489,7 +490,12 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
     if (status === 'blocked') {
       const note = window.prompt(`What is blocking ${stageLabel(s.stage)}?`, s.blocker_note || '')
       if (note === null) return
-      blocker_note = note.trim()
+      const parsed = parseBuildBlockerNote({ note })
+      if (!parsed.ok) {
+        showToast(parsed.error, 'error')
+        return
+      }
+      blocker_note = parsed.data.note
     } else {
       blocker_note = ''
     }
