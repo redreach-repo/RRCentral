@@ -61,6 +61,8 @@ export const APP_MODULES: ModuleManifest[] = [
     id: 'sales',
     label: 'Sales',
     icon: Users,
+    /** Soft-hide via app_settings.moduleFlags JSON, e.g. {"sales":false}. */
+    flag: 'sales',
     items: [
       { to: '/quick-add', label: 'Quick add', icon: PhoneCall, minRole: 'sales', section: 'Work' },
       { to: '/deals', label: 'Pipeline', icon: Briefcase, forStaff: true, section: 'Work' },
