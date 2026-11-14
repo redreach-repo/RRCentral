@@ -1,4 +1,5 @@
 /** M1 i18n skeleton — EN default, AR RTL ready. Full catalogs land later. */
+import { EXTENSION_STRINGS } from '../modules/extensions/strings'
 
 export type Locale = 'en' | 'ar'
 
@@ -1970,7 +1971,13 @@ const STRINGS: Record<Locale, Record<string, string>> = {
 }
 
 export function t(locale: Locale, key: string): string {
-  return STRINGS[locale]?.[key] ?? STRINGS.en[key] ?? key
+  return (
+    STRINGS[locale]?.[key] ??
+    EXTENSION_STRINGS[locale]?.[key] ??
+    STRINGS.en[key] ??
+    EXTENSION_STRINGS.en[key] ??
+    key
+  )
 }
 
 export function localeDir(locale: Locale): 'ltr' | 'rtl' {
