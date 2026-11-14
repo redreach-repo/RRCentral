@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import { useI18n } from '../../contexts/I18nContext'
 import { useToast } from '../../contexts/ToastContext'
 import { can } from '../../lib/permissions'
 import { errorMessage } from '../../lib/errors'
@@ -11,6 +12,7 @@ import type { UserRole } from '../../lib/types'
 /** Settings card: your own two step sign in, and for admins who on the team has it. */
 export default function TwoStepCard() {
   const { userRole, isLocalMode } = useAuth()
+  const { t } = useI18n()
   const { showToast } = useToast()
   const [team, setTeam] = useState<TeamTwoStep[] | null>(null)
   const [busy, setBusy] = useState(false)
@@ -42,7 +44,7 @@ export default function TwoStepCard() {
   return (
     <div style={{ ...cardStyle, marginBottom: 20 }}>
       <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <ShieldCheck size={18} /> Two step sign in
+        <ShieldCheck size={18} /> {t('page.settings.section.twoStep')}
       </h2>
       <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
         {required

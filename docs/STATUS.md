@@ -9,7 +9,7 @@
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR · HighMast `PRODUCT` · platform tenancy · chrome
+- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR (incl. Settings section chrome) · HighMast `PRODUCT` + sign-in/PWA chrome · platform tenancy · customization · outbox · tenant CI
 
 ## Still open (agent queue)
 
