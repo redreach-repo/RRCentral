@@ -2088,6 +2088,61 @@ function phoneDigits(raw) {
 
 // src/lib/dailyDigest.ts
 var day2 = (iso) => format(parseISO(iso.slice(0, 10)), "d MMM");
+var OUTBOX_LABELS = {
+  finalize_quote: "Quote finalized",
+  revise_quote: "Quote revised",
+  mark_paid: "Invoice marked paid",
+  pay_link: "Payment link sent",
+  convert_invoice: "Quote converted to invoice",
+  save_invoice: "Invoice saved",
+  snooze_followup: "Follow-up snoozed",
+  clear_followup: "Follow-up cleared",
+  call_crm: "CRM call logged",
+  call_logged: "Call logged",
+  update_delivery_note: "Delivery note updated"
+};
+function outboxPath(eventType, aggregateType, aggregateId) {
+  const id = (aggregateId || "").trim();
+  if (aggregateType === "quotation" || /quote/.test(eventType)) return id ? `/quotations` : "/quotations";
+  if (aggregateType === "invoice" || /invoice|paid|pay_link/.test(eventType)) return "/invoices";
+  if (aggregateType === "delivery_note" || /delivery/.test(eventType)) return "/delivery-notes";
+  if (aggregateType === "crm" || /followup|call_crm|call_logged/.test(eventType)) return "/follow-ups";
+  return "/app";
+}
+function parseDigestAttentionSignal(raw, now = /* @__PURE__ */ new Date()) {
+  if (!raw || !raw.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    const at = typeof parsed.at === "string" ? Date.parse(parsed.at) : NaN;
+    if (Number.isFinite(at) && now.getTime() - at > 36 * 60 * 60 * 1e3) return [];
+    const events = Array.isArray(parsed.events) ? parsed.events : [];
+    const lines = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const ev of events) {
+      if (!ev || typeof ev !== "object") continue;
+      const row = ev;
+      const eventType = typeof row.event_type === "string" ? row.event_type.trim() : "";
+      if (!eventType) continue;
+      const aggregateType = typeof row.aggregate_type === "string" ? row.aggregate_type.trim() : "";
+      const aggregateId = typeof row.aggregate_id === "string" ? row.aggregate_id.trim() : "";
+      const key = `${eventType}:${aggregateType}:${aggregateId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const label = OUTBOX_LABELS[eventType] || eventType.replace(/_/g, " ");
+      const detail = [aggregateType, aggregateId].filter(Boolean).join(" \xB7 ") || "Recent CRM activity";
+      lines.push({
+        name: label,
+        detail,
+        path: outboxPath(eventType, aggregateType, aggregateId),
+        urgent: eventType === "mark_paid" || eventType === "finalize_quote"
+      });
+      if (lines.length >= 8) break;
+    }
+    return lines;
+  } catch {
+    return [];
+  }
+}
 function buildDigest(input) {
   const { now } = input;
   const nameOf = new Map(input.accounts.map((a) => [a.id, a.name]));
@@ -2176,7 +2231,8 @@ function buildDigest(input) {
       detail: renewalText(r),
       path: `/accounts/${r.accountId}`,
       urgent: isUrgentRenewal(r)
-    }))
+    })),
+    outboxSignals: parseDigestAttentionSignal(input.outboxSignalJson, now)
   };
 }
 function watchLines(watch, kind) {
@@ -2233,6 +2289,14 @@ function digestSections(d) {
   }
   if (d.contractDrafts?.length) {
     sections.push({ key: "contractDrafts", title: "Contract invoices", empty: "", items: d.contractDrafts });
+  }
+  if (d.outboxSignals?.length) {
+    sections.push({
+      key: "outboxSignals",
+      title: "Recent CRM activity (outbox)",
+      empty: "",
+      items: d.outboxSignals
+    });
   }
   if (d.appErrors?.length) {
     sections.push({ key: "appErrors", title: "App errors in the last day", empty: "", items: d.appErrors });
@@ -2296,5 +2360,6 @@ export {
   digestEmail,
   digestSections,
   digestTargets,
-  digestWhatsAppValues
+  digestWhatsAppValues,
+  parseDigestAttentionSignal
 };

@@ -195,7 +195,31 @@ Deno.serve(withErrorLog("daily-digest", async (req) => {
     // CTRM Next renewal dates (Wave 5, PR Y).
     const ctrmTerms = await selectAll(sb, "ctrm_client_terms", "account_id, renewal_date, notice_days", (q) =>
       q.not("renewal_date", "is", null)).catch(() => [])
-    digest = buildDigest({ now, accounts, contracts, packages, entries, tickets, deals, errors, watch, contractDrafts: drafts.length, sentQuotes, quoteDeals, leads, ctrmIssues, ctrmTerms }) as Digest
+    // Activity signal from the event-outbox worker (HubSpot/digest handlers).
+    const { data: outboxSetting } = await sb
+      .from("app_settings")
+      .select("value")
+      .eq("key", "digest_attention_signal")
+      .maybeSingle()
+    const outboxSignalJson = typeof outboxSetting?.value === "string" ? outboxSetting.value : null
+    digest = buildDigest({
+      now,
+      accounts,
+      contracts,
+      packages,
+      entries,
+      tickets,
+      deals,
+      errors,
+      watch,
+      contractDrafts: drafts.length,
+      sentQuotes,
+      quoteDeals,
+      leads,
+      ctrmIssues,
+      ctrmTerms,
+      outboxSignalJson,
+    }) as Digest
   } catch (e) {
     return json({ error: `Could not build the digest: ${(e as Error).message}`.slice(0, 300) }, 500)
   }
@@ -216,6 +240,8 @@ Deno.serve(withErrorLog("daily-digest", async (req) => {
 
   if (trigger === "schedule" && count === 0) {
     await finish({ message: "Nothing needed attention, so nothing was sent." })
+    // Drop a stale/empty attention signal so it does not linger for tomorrow.
+    await sb.from("app_settings").delete().eq("key", "digest_attention_signal").catch(() => {})
     return json({ skipped: true, items: 0, message: "Nothing needed attention, so nothing was sent." })
   }
 
@@ -270,6 +296,15 @@ Deno.serve(withErrorLog("daily-digest", async (req) => {
     whatsapp_status: whatsappStatus,
     message: messages.join(" ").slice(0, 1000),
   })
+
+  // Clear the outbox attention signal once the digest has been recorded, so the
+  // same events are not repeated tomorrow. Keep it only when every configured
+  // channel failed (so a later "Send now" or tomorrow's run can retry).
+  const bothFailed = emailStatus === "error" && whatsappStatus === "error"
+  if (!bothFailed) {
+    await sb.from("app_settings").delete().eq("key", "digest_attention_signal").catch(() => {})
+  }
+
   return json({
     items: count,
     email: emailStatus,

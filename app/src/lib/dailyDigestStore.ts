@@ -41,6 +41,11 @@ export async function loadDigestPreview(now: Date = new Date()): Promise<Digest>
   ])
   const leads = await listRecentLeads(new Date(dayAgo))
   const ctrmTerms = await listTerms().catch(() => [])
+  const { data: outboxSetting } = await db
+    .from('app_settings')
+    .select('value')
+    .eq('key', 'digest_attention_signal')
+    .maybeSingle()
   return buildDigest({
     now,
     accounts,
@@ -56,6 +61,7 @@ export async function loadDigestPreview(now: Date = new Date()): Promise<Digest>
     leads,
     ctrmIssues: tickets,
     ctrmTerms,
+    outboxSignalJson: typeof outboxSetting?.value === 'string' ? outboxSetting.value : null,
   })
 }
 

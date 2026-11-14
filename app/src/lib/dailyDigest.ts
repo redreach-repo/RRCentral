@@ -63,6 +63,8 @@ export type Digest = {
   ctrmIssues?: DigestItem[]
   /** CTRM Next renewals on their 90, 60 and 30 day marks, the last 14 days and the notice week. */
   ctrmRenewals?: DigestItem[]
+  /** Recent activity from the event outbox (HubSpot/digest handlers). */
+  outboxSignals?: DigestItem[]
 }
 
 /** An open watch_items row, as much as the digest needs. */
@@ -99,9 +101,77 @@ export type DigestInput = {
   ctrmIssues?: IssueRow[]
   /** ctrm_client_terms rows (optional). */
   ctrmTerms?: Pick<CtrmClientTerms, 'account_id' | 'renewal_date' | 'notice_days'>[]
+  /**
+   * Raw `app_settings.digest_attention_signal` JSON from the outbox worker
+   * (`{ at, events: [{ event_type, aggregate_type, aggregate_id }] }`).
+   */
+  outboxSignalJson?: string | null
 }
 
 const day = (iso: string) => format(parseISO(iso.slice(0, 10)), 'd MMM')
+
+const OUTBOX_LABELS: Record<string, string> = {
+  finalize_quote: 'Quote finalized',
+  revise_quote: 'Quote revised',
+  mark_paid: 'Invoice marked paid',
+  pay_link: 'Payment link sent',
+  convert_invoice: 'Quote converted to invoice',
+  save_invoice: 'Invoice saved',
+  snooze_followup: 'Follow-up snoozed',
+  clear_followup: 'Follow-up cleared',
+  call_crm: 'CRM call logged',
+  call_logged: 'Call logged',
+  update_delivery_note: 'Delivery note updated',
+}
+
+function outboxPath(eventType: string, aggregateType: string, aggregateId: string): string {
+  const id = (aggregateId || '').trim()
+  if (aggregateType === 'quotation' || /quote/.test(eventType)) return id ? `/quotations` : '/quotations'
+  if (aggregateType === 'invoice' || /invoice|paid|pay_link/.test(eventType)) return '/invoices'
+  if (aggregateType === 'delivery_note' || /delivery/.test(eventType)) return '/delivery-notes'
+  if (aggregateType === 'crm' || /followup|call_crm|call_logged/.test(eventType)) return '/follow-ups'
+  return '/app'
+}
+
+/** Turn the outbox worker's attention JSON into digest lines (at most 8). */
+export function parseDigestAttentionSignal(raw: string | null | undefined, now = new Date()): DigestItem[] {
+  if (!raw || !raw.trim()) return []
+  try {
+    const parsed = JSON.parse(raw) as {
+      at?: unknown
+      events?: unknown
+    }
+    const at = typeof parsed.at === 'string' ? Date.parse(parsed.at) : NaN
+    // Ignore stale signals older than 36 hours so a stuck setting does not linger.
+    if (Number.isFinite(at) && now.getTime() - at > 36 * 60 * 60 * 1000) return []
+    const events = Array.isArray(parsed.events) ? parsed.events : []
+    const lines: DigestItem[] = []
+    const seen = new Set<string>()
+    for (const ev of events) {
+      if (!ev || typeof ev !== 'object') continue
+      const row = ev as Record<string, unknown>
+      const eventType = typeof row.event_type === 'string' ? row.event_type.trim() : ''
+      if (!eventType) continue
+      const aggregateType = typeof row.aggregate_type === 'string' ? row.aggregate_type.trim() : ''
+      const aggregateId = typeof row.aggregate_id === 'string' ? row.aggregate_id.trim() : ''
+      const key = `${eventType}:${aggregateType}:${aggregateId}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      const label = OUTBOX_LABELS[eventType] || eventType.replace(/_/g, ' ')
+      const detail = [aggregateType, aggregateId].filter(Boolean).join(' · ') || 'Recent CRM activity'
+      lines.push({
+        name: label,
+        detail,
+        path: outboxPath(eventType, aggregateType, aggregateId),
+        urgent: eventType === 'mark_paid' || eventType === 'finalize_quote',
+      })
+      if (lines.length >= 8) break
+    }
+    return lines
+  } catch {
+    return []
+  }
+}
 
 export function buildDigest(input: DigestInput): Digest {
   const { now } = input
@@ -209,6 +279,7 @@ export function buildDigest(input: DigestInput): Digest {
       path: `/accounts/${r.accountId}`,
       urgent: isUrgentRenewal(r),
     })),
+    outboxSignals: parseDigestAttentionSignal(input.outboxSignalJson, now),
   }
 }
 
@@ -281,6 +352,14 @@ export function digestSections(d: Digest): DigestSection[] {
   }
   if (d.contractDrafts?.length) {
     sections.push({ key: 'contractDrafts', title: 'Contract invoices', empty: '', items: d.contractDrafts })
+  }
+  if (d.outboxSignals?.length) {
+    sections.push({
+      key: 'outboxSignals',
+      title: 'Recent CRM activity (outbox)',
+      empty: '',
+      items: d.outboxSignals,
+    })
   }
   if (d.appErrors?.length) {
     sections.push({ key: 'appErrors', title: 'App errors in the last day', empty: '', items: d.appErrors })

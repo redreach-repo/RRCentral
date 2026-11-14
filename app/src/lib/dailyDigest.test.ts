@@ -6,6 +6,7 @@ import {
   digestSections,
   digestTargets,
   digestWhatsAppValues,
+  parseDigestAttentionSignal,
   type DigestInput,
 } from './dailyDigest'
 import type { Contract } from './types'
@@ -201,5 +202,43 @@ describe('digest app errors', () => {
     const d = buildDigest(input())
     expect(d.appErrors).toEqual([])
     expect(digestSections(d).some((s) => s.key === 'appErrors')).toBe(false)
+  })
+})
+
+describe('parseDigestAttentionSignal', () => {
+  it('returns empty for blank, invalid, or stale JSON', () => {
+    expect(parseDigestAttentionSignal(null, now)).toEqual([])
+    expect(parseDigestAttentionSignal('not-json', now)).toEqual([])
+    expect(
+      parseDigestAttentionSignal(
+        JSON.stringify({
+          at: '2026-10-20T04:00:00Z',
+          events: [{ event_type: 'finalize_quote', aggregate_type: 'quotation', aggregate_id: 'q1' }],
+        }),
+        now,
+      ),
+    ).toEqual([])
+  })
+
+  it('maps recent outbox events into digest lines and a section', () => {
+    const raw = JSON.stringify({
+      at: '2026-10-22T02:00:00Z',
+      events: [
+        { event_type: 'finalize_quote', aggregate_type: 'quotation', aggregate_id: 'q1' },
+        { event_type: 'mark_paid', aggregate_type: 'invoice', aggregate_id: 'i1' },
+        { event_type: 'finalize_quote', aggregate_type: 'quotation', aggregate_id: 'q1' },
+        { event_type: 'call_crm', aggregate_type: 'crm', aggregate_id: 'c1' },
+      ],
+    })
+    const lines = parseDigestAttentionSignal(raw, now)
+    expect(lines).toEqual([
+      { name: 'Quote finalized', detail: 'quotation · q1', path: '/quotations', urgent: true },
+      { name: 'Invoice marked paid', detail: 'invoice · i1', path: '/invoices', urgent: true },
+      { name: 'CRM call logged', detail: 'crm · c1', path: '/follow-ups', urgent: false },
+    ])
+    const d = buildDigest(input({ outboxSignalJson: raw }))
+    expect(d.outboxSignals).toEqual(lines)
+    expect(digestSections(d).some((s) => s.key === 'outboxSignals')).toBe(true)
+    expect(digestCount(d)).toBe(3)
   })
 })
