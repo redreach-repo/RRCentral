@@ -31,6 +31,11 @@ import {
   type DealRow,
 } from '../lib/myDeals'
 import { loadMyDeals, moveMyDeal, patchMyDeal } from '../lib/myDealsStore'
+import {
+  crmAccountCoverage,
+  formatInventoryDigest,
+  openDealInvariantSummary,
+} from '../lib/pipelineInventory'
 import { can } from '../lib/permissions'
 import type { AppUser } from '../lib/types'
 import {
@@ -207,6 +212,16 @@ export default function MyDealsPage() {
   const shown = useMemo(() => sortDeals(filterDeals(deals, filters)), [deals, filters])
   const totals = dealTotals(shown)
   const sources = useMemo(() => dealSources(deals), [deals])
+  const inventoryDigest = useMemo(() => {
+    const crmRows = deals.filter((d) => d.pipeline === 'crm')
+    const linkedCount = crmRows.filter((d) => d.account_id).length
+    const coverage = crmAccountCoverage(linkedCount, linkPlan)
+    const gaps = deals
+      .filter((d) => d.open && (!d.next_action.trim() || !d.next_action_date))
+      .map((d) => ({ key: d.key }))
+    const invariants = openDealInvariantSummary(deals, gaps)
+    return formatInventoryDigest(coverage, invariants)
+  }, [deals, linkPlan])
   const set = (patch: Partial<DealFilters>) => {
     setFilters((f) => ({ ...f, ...patch }))
     if (patch.pipeline !== undefined) {
@@ -580,6 +595,20 @@ export default function MyDealsPage() {
       </header>
 
       {filterBar}
+
+      {!loading && deals.length ? (
+        <p
+          role="status"
+          style={{
+            margin: '0 0 12px',
+            fontSize: 12,
+            color: colors.muted,
+            lineHeight: 1.45,
+          }}
+        >
+          Inventory: {inventoryDigest}
+        </p>
+      ) : null}
 
       {!loading && (linkPlan.unique.length || linkPlan.ambiguous.length || linkPlan.none.length) ? (
         <div
