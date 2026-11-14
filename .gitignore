@@ -7,6 +7,8 @@ source.xlsx
 appscript/node_modules/
 appscript/.clasp.json
 app/dist/
+app/test-results/
+app/playwright-report/
 .env
 .env.local
 .env.*
