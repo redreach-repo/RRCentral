@@ -9,7 +9,7 @@
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR (incl. CTRM issues + obligations + clause library + NDA template) · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome
+- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR (incl. CTRM issues + obligations + clause library + NDA + build templates) · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome
 
 ## Still open (agent queue)
 
