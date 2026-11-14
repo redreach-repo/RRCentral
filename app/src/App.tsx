@@ -1,4 +1,6 @@
+import { Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { EXTENSION_MODULES } from './modules/extensions'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { SettingsProvider } from './contexts/SettingsContext'
 import { ToastProvider } from './contexts/ToastContext'
@@ -189,6 +191,14 @@ export default function App() {
               <Route path="audit-log" element={<AuditLogPage />} />
               <Route path="app-errors" element={<AppErrorsPage />} />
               <Route path="system-check" element={<SystemCheckPage />} />
+              {/* Gap plan modules (docs/MODULE_BUILD_PLAN.md): one folder each under modules/extensions. */}
+              {EXTENSION_MODULES.flatMap((ext) => ext.routes).map((route) => (
+                <Route
+                  key={route.path}
+                  path={route.path.replace(/^\/+/, '')}
+                  element={<Suspense fallback={null}>{route.element}</Suspense>}
+                />
+              ))}
             </Route>
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
