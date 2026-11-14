@@ -45,6 +45,10 @@ export const SETTINGS_MODULE_FLAGS: { flag: string; label: string }[] = [
     flag: 'finance',
     label: 'Finance (Payments, Expenses, Vendors, Reports, MRR, Utilisation)',
   },
+  {
+    flag: 'delivery',
+    label: 'Delivery (WorshipHub, Packages, templates, NDA, clauses, obligations)',
+  },
 ]
 
 /**
