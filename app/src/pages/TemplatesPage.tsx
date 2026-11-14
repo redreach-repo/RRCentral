@@ -4,6 +4,7 @@ import { FilePlus2, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS } from '../lib/config'
 import type { QuoteTemplate } from '../lib/types'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
@@ -66,6 +67,7 @@ function parseItems(json: unknown): DraftLineItem[] {
 }
 
 export default function TemplatesPage() {
+  const { t } = useI18n()
   const { showToast } = useToast()
   const navigate = useNavigate()
   const [templates, setTemplates] = useState<QuoteTemplate[]>([])
@@ -181,9 +183,9 @@ export default function TemplatesPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Operations</p>
-          <h1 className={docsStyles.title}>Templates</h1>
-          <p className={docsStyles.subtitle}>Reusable quotation line-item sets</p>
+          <p className={docsStyles.kicker}>{t('page.ops.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.quoteTemplates.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.quoteTemplates.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
@@ -193,10 +195,11 @@ export default function TemplatesPage() {
             disabled={syncing}
             onClick={() => void syncSkuTemplates()}
           >
-            <RefreshCw size={16} /> {syncing ? 'Syncing…' : 'Load SKU templates'}
+            <RefreshCw size={16} />{' '}
+            {syncing ? t('page.quoteTemplates.syncing') : t('page.quoteTemplates.syncSkus')}
           </button>
           <button type="button" className={docsStyles.newBtn} onClick={openCreate}>
-            <Plus size={16} /> New template
+            <Plus size={16} /> {t('page.quoteTemplates.new')}
           </button>
         </div>
       </header>
