@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { addMonths, format, startOfMonth } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { CLIENT_REPORT_STATUSES, CLIENT_REPORT_SUMMARY_MAX, monthLabelOf, reportMonthFor, reportRecipients } from '../lib/clientReports'
 import { buildReportDrafts, loadReportQueue, saveReportSummary, sendReport, setReportSkipped, type ReportContact, type ReportQueue } from '../lib/clientReportsStore'
@@ -27,6 +28,7 @@ const muted = { color: colors.muted, fontSize: 13 }
  * someone checks it here and presses Send.
  */
 export default function ClientReportsPage() {
+  const { t } = useI18n()
   const { userRole } = useAuth()
   const { showToast } = useToast()
   const months = useMemo(() => {
@@ -68,12 +70,9 @@ export default function ClientReportsPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Clients</p>
-          <h1 className={docsStyles.title}>Monthly reports</h1>
-          <p className={docsStyles.subtitle}>
-            On the 1st each AI CRM client gets a report for the month before, with a summary drafted by AI. Check the summary, fix
-            anything, then send it. Nothing goes to a client without someone pressing Send.
-          </p>
+          <p className={docsStyles.kicker}>{t('page.clients.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.clientReports.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.clientReports.subtitle')}</p>
         </div>
       </header>
 

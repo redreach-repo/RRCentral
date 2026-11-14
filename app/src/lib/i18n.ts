@@ -214,6 +214,15 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.support.subtitle':
       'One queue for AI CRM clients and WorshipHub churches. The clock counts working hours only.',
     'page.support.new': 'New ticket',
+    'page.clientHealth.title': 'Client health',
+    'page.clientHealth.subtitle':
+      'A score out of 100 for each client with a running contract, from four parts worth 25 each: usage against their plan, support tickets, monthly report calls attended, and overdue invoices. Below 50, or any warning sign, shows a churn warning. Lowest scores first.',
+    'page.clientReports.title': 'Monthly reports',
+    'page.clientReports.subtitle':
+      'On the 1st each AI CRM client gets a report for the month before, with a summary drafted by AI. Check the summary, fix anything, then send it. Nothing goes to a client without someone pressing Send.',
+    'page.clientUpdates.title': 'Weekly updates',
+    'page.clientUpdates.subtitle':
+      'Every Thursday each CTRM Next client gets a short update drafted from their issues and sessions: what was fixed this week, what is still open and what comes next. Check the wording, then send it by email or WhatsApp. Nothing goes to a client until someone taps Send.',
     'page.followups.title': 'Follow-ups',
     'page.followups.subtitleLead': 'Overdue and upcoming CRM actions',
     'page.followups.calendarSyncOn': ' · {provider} Calendar sync on',
@@ -472,6 +481,15 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.support.subtitle':
       'طابور واحد لعملاء AI CRM وكنائس WorshipHub. الساعة تحسب ساعات العمل فقط.',
     'page.support.new': 'تذكرة جديدة',
+    'page.clientHealth.title': 'صحة العميل',
+    'page.clientHealth.subtitle':
+      'درجة من 100 لكل عميل بعقد ساري، من أربعة أجزاء بـ 25 لكل منها: الاستخدام مقابل الخطة، تذاكر الدعم، حضور مكالمات التقرير الشهري، والفواتير المتأخرة. دون 50 أو أي علامة تحذير تظهر تحذير تسرب. الأدنى أولاً.',
+    'page.clientReports.title': 'التقارير الشهرية',
+    'page.clientReports.subtitle':
+      'في الأول من كل شهر يحصل كل عميل AI CRM على تقرير للشهر السابق بملخص مسودة بالذكاء الاصطناعي. راجع الملخص وصحّح ثم أرسل. لا يصل شيء للعميل دون ضغط إرسال.',
+    'page.clientUpdates.title': 'التحديثات الأسبوعية',
+    'page.clientUpdates.subtitle':
+      'كل خميس يحصل كل عميل CTRM Next على تحديث قصير من مشكلاته وجلساته: ما أُصلح هذا الأسبوع، وما زال مفتوحاً، وما يلي. راجع الصياغة ثم أرسل بالبريد أو واتساب. لا يصل شيء حتى يضغط أحد إرسال.',
     'page.followups.title': 'المتابعات',
     'page.followups.subtitleLead': 'إجراءات CRM المتأخرة والقادمة',
     'page.followups.calendarSyncOn': ' · مزامنة تقويم {provider} مفعّلة',
