@@ -29,7 +29,7 @@ Status key: **exists** · **partial** · **missing**
 | Industry packs | missing | M12 |
 | Shell: Inbox/Sales/… areas, Cmd+K, AI button | partial | Accordion nav exists; restructure shell in M1 |
 | Company switcher | partial | M1 top-bar switcher; multi-company ops still thin |
-| EN+AR RTL | partial | M1 `I18nContext` + dir; guide + shell/nav + sales/finance/clients/admin/ops/delivery list chrome (Dashboard → Domains through Wanders, Settings/Account, CTRM weekly summary, ticket + account detail, CTRM fit sheet, quote/invoice/DN viewer chrome); more page bodies later |
+| EN+AR RTL | partial | M1 `I18nContext` + dir; guide + shell/nav + sales/finance/clients/admin/ops/delivery list chrome (Dashboard → Domains through Wanders, Settings/Account, CTRM weekly summary, ticket + account detail, CTRM fit sheet, quote/invoice/DN viewer, legal e-sign chrome); more page bodies later |
 | PWA installable | partial | Icons + maskable safe-zone from brand mark; theme `#C8321A`; still missing division logos |
 | Brand kits per tenant/company/BU | partial | M1 `brand_kits` + `app/public/brand`; missing Boost/Care/Trading assets |
 | In-app guide `/guide` | partial | CRM + billing + delivery + admin packs live (`GUIDE_PACKS`); more packs / AR polish later |
