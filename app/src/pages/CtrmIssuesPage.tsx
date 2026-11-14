@@ -29,8 +29,8 @@ export default function CtrmIssuesPage() {
 
   useEffect(() => {
     Promise.all([listTickets(), listAccounts(), listTeam()])
-      .then(([t, a, u]) => {
-        setTickets(t.filter(isCtrmIssue))
+      .then(([list, a, u]) => {
+        setTickets(list.filter(isCtrmIssue))
         setAccounts(a.rows)
         setTeam(u)
       })
@@ -40,11 +40,18 @@ export default function CtrmIssuesPage() {
   const now = useMemo(() => new Date(), [])
   const groups = useMemo(() => {
     const names = new Map(accounts.map((a) => [a.id, a.name]))
-    const list = (tickets || []).filter((t) => showAll || isOpenTicket(t))
-    return groupIssuesByClient(list, (id) => (id ? names.get(id) ?? 'Account' : 'No client yet'), now)
-  }, [tickets, accounts, showAll, now])
+    const list = (tickets || []).filter((issue) => showAll || isOpenTicket(issue))
+    return groupIssuesByClient(
+      list,
+      (id) =>
+        id
+          ? names.get(id) ?? t('page.ctrmIssues.accountFallback')
+          : t('page.ctrmIssues.noClient'),
+      now,
+    )
+  }, [tickets, accounts, showAll, now, t])
   const openCount = (tickets || []).filter(isOpenTicket).length
-  const flagged = (tickets || []).filter((t) => needsClientUpdate(t, now)).length
+  const flagged = (tickets || []).filter((issue) => needsClientUpdate(issue, now)).length
   const owner = (id: string | null) => team.find((u) => u.id === id)?.name || team.find((u) => u.id === id)?.email || 'Nobody'
 
   return (
@@ -55,15 +62,23 @@ export default function CtrmIssuesPage() {
       </p>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '12px 0 16px' }}>
         <button type="button" style={tab(!showAll)} onClick={() => setShowAll(false)}>
-          Open ({openCount})
+          {t('page.ctrmIssues.open').replace('{n}', String(openCount))}
         </button>
         <button type="button" style={tab(showAll)} onClick={() => setShowAll(true)}>
-          All
+          {t('page.ctrmIssues.all')}
         </button>
-        {flagged ? <span style={{ color: colors.danger, fontSize: 13 }}>{flagged} waiting for an update to the client</span> : null}
+        {flagged ? (
+          <span style={{ color: colors.danger, fontSize: 13 }}>
+            {t('page.ctrmIssues.flagged').replace('{n}', String(flagged))}
+          </span>
+        ) : null}
       </div>
-      {!tickets ? <p style={muted}>Loading…</p> : null}
-      {tickets && !groups.length ? <p style={muted}>{showAll ? 'No CTRM Next issues logged yet.' : 'No open CTRM Next issues.'}</p> : null}
+      {!tickets ? <p style={muted}>{t('page.ctrmIssues.loading')}</p> : null}
+      {tickets && !groups.length ? (
+        <p style={muted}>
+          {showAll ? t('page.ctrmIssues.emptyAll') : t('page.ctrmIssues.emptyOpen')}
+        </p>
+      ) : null}
       <div style={{ display: 'grid', gap: 12 }}>
         {groups.map((g) => (
           <section key={g.accountId ?? 'none'} style={{ ...cardStyle, borderColor: g.flagged ? colors.danger : colors.border }}>
@@ -71,23 +86,26 @@ export default function CtrmIssuesPage() {
               {g.accountId ? <Link to={`/accounts/${g.accountId}`}>{g.name}</Link> : g.name}{' '}
               <span style={{ ...muted, fontWeight: 400 }}>
                 ({g.issues.length}
-                {g.flagged ? `, ${g.flagged} need an update` : ''})
+                {g.flagged
+                  ? t('page.ctrmIssues.needUpdate').replace('{n}', String(g.flagged))
+                  : ''}
+                )
               </span>
             </h2>
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
-              {g.issues.map((t) => {
-                const late = needsClientUpdate(t, now)
+              {g.issues.map((issue) => {
+                const late = needsClientUpdate(issue, now)
                 return (
-                  <li key={t.id} style={{ border: `1px solid ${late ? colors.danger : colors.border}`, borderRadius: 8, padding: '8px 10px' }}>
-                    <Link to={`/support/${t.id}`} style={{ fontWeight: 600 }}>
-                      {t.subject || '(no subject)'}
+                  <li key={issue.id} style={{ border: `1px solid ${late ? colors.danger : colors.border}`, borderRadius: 8, padding: '8px 10px' }}>
+                    <Link to={`/support/${issue.id}`} style={{ fontWeight: 600 }}>
+                      {issue.subject || t('page.ctrmIssues.noSubject')}
                     </Link>
                     <div style={muted}>
-                      {optionLabel(TICKET_STATUSES, t.status)} · raised {format(new Date(t.created_at), 'd MMM')} · vendor: {vendorStatusLabel(t.vendor_status)}
-                      {t.vendor_ticket_ref ? ` (${t.vendor_ticket_ref})` : ''} · owner: {owner(t.assignee_user_id)}
+                      {optionLabel(TICKET_STATUSES, issue.status)} · raised {format(new Date(issue.created_at), 'd MMM')} · vendor: {vendorStatusLabel(issue.vendor_status)}
+                      {issue.vendor_ticket_ref ? ` (${issue.vendor_ticket_ref})` : ''} · owner: {owner(issue.assignee_user_id)}
                     </div>
                     <div style={{ ...muted, color: late ? colors.danger : colors.muted }}>
-                      {t.client_updated_at ? `Client last updated ${format(new Date(t.client_updated_at), 'd MMM')}` : 'Client not updated yet'}
+                      {issue.client_updated_at ? `Client last updated ${format(new Date(issue.client_updated_at), 'd MMM')}` : 'Client not updated yet'}
                       {late ? `, more than ${CLIENT_UPDATE_DAYS} working days ago` : ''}
                     </div>
                   </li>
