@@ -17,12 +17,6 @@ import {
 } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
-const KIND_LABEL: Record<AppError['kind'], string> = {
-  browser: 'Error',
-  crash: 'Page crashed',
-  function: 'Server function',
-}
-
 export default function AppErrorsPage() {
   const { t } = useI18n()
   const { userRole } = useAuth()
@@ -33,6 +27,12 @@ export default function AppErrorsPage() {
   const [problem, setProblem] = useState('')
   const [open, setOpen] = useState('')
 
+  const kindLabel = (kind: AppError['kind']) => {
+    if (kind === 'browser') return t('page.appErrors.kindBrowser')
+    if (kind === 'crash') return t('page.appErrors.kindCrash')
+    return t('page.appErrors.kindFunction')
+  }
+
   const load = useCallback(async () => {
     setLoading(true)
     setProblem('')
@@ -41,13 +41,13 @@ export default function AppErrorsPage() {
     } catch (e) {
       setProblem(
         isMissingRelationError(e)
-          ? 'Error monitoring is not set up yet. Run the item 14 SQL in Supabase.'
+          ? t('page.appErrors.missingTable')
           : errorMessage(e, 'Could not load errors'),
       )
     } finally {
       setLoading(false)
     }
-  }, [days])
+  }, [days, t])
 
   useEffect(() => {
     if (isAuditAvailable()) void load()
@@ -69,14 +69,18 @@ export default function AppErrorsPage() {
   if (!can(userRole, 'audit.read')) {
     return (
       <div className={docsStyles.page}>
-        <EmptyState title="Admins only" subtitle="Ask an admin if you need to see app errors." />
+        <EmptyState title={t('page.appErrors.adminsOnly')} subtitle={t('page.appErrors.adminsOnlySub')} />
       </div>
     )
   }
   if (!isAuditAvailable()) {
     return (
       <div className={docsStyles.page}>
-        <EmptyState icon={<Bug size={28} />} title="Error monitoring runs in cloud mode" subtitle="Connect Supabase in Settings." />
+        <EmptyState
+          icon={<Bug size={28} />}
+          title={t('page.appErrors.cloudOnly')}
+          subtitle={t('page.appErrors.cloudOnlySub')}
+        />
       </div>
     )
   }
@@ -90,11 +94,16 @@ export default function AppErrorsPage() {
           <p className={docsStyles.subtitle}>{t('page.appErrors.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <select style={selectStyle} value={days} onChange={(e) => setDays(Number(e.target.value))} aria-label="Period">
-            <option value={1}>Last 24 hours</option>
-            <option value={7}>Last 7 days</option>
-            <option value={30}>Last 30 days</option>
-            <option value={90}>Last 90 days</option>
+          <select
+            style={selectStyle}
+            value={days}
+            onChange={(e) => setDays(Number(e.target.value))}
+            aria-label={t('page.appErrors.period')}
+          >
+            <option value={1}>{t('page.appErrors.last24h')}</option>
+            <option value={7}>{t('page.appErrors.last7d')}</option>
+            <option value={30}>{t('page.appErrors.last30d')}</option>
+            <option value={90}>{t('page.appErrors.last90d')}</option>
           </select>
           <button
             type="button"
@@ -110,7 +119,7 @@ export default function AppErrorsPage() {
       {problem ? (
         <div style={{ ...cardStyle, color: colors.danger }}>{problem}</div>
       ) : !loading && groups.length === 0 ? (
-        <EmptyState icon={<Bug size={28} />} title="No errors in this period" />
+        <EmptyState icon={<Bug size={28} />} title={t('page.appErrors.empty')} />
       ) : (
         <div style={{ display: 'grid', gap: 10 }}>
           {groups.map((g) => (
@@ -123,13 +132,25 @@ export default function AppErrorsPage() {
                 >
                   <div style={{ fontWeight: 600, wordBreak: 'break-word' }}>{g.latest.message}</div>
                   <div style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>
-                    {KIND_LABEL[g.latest.kind]}, {g.count} {g.count === 1 ? 'time' : 'times'}, last{' '}
-                    {format(parseISO(g.latest.created_at), 'd MMM, HH:mm')} on {g.latest.page || 'unknown page'}
-                    {g.people.length ? `, ${g.people.join(', ')}` : ''}
+                    {t('page.appErrors.meta')
+                      .replace('{kind}', kindLabel(g.latest.kind))
+                      .replace('{count}', String(g.count))
+                      .replace(
+                        '{times}',
+                        g.count === 1 ? t('page.appErrors.timeOne') : t('page.appErrors.timeMany'),
+                      )
+                      .replace('{when}', format(parseISO(g.latest.created_at), 'd MMM, HH:mm'))
+                      .replace('{page}', g.latest.page || t('page.appErrors.unknownPage'))
+                      .replace(
+                        '{people}',
+                        g.people.length
+                          ? t('page.appErrors.peopleSuffix').replace('{list}', g.people.join(', '))
+                          : '',
+                      )}
                   </div>
                 </button>
                 <button type="button" style={{ ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }} onClick={() => void clearGroup(g.key)}>
-                  Mark fixed
+                  {t('page.appErrors.markFixed')}
                 </button>
               </div>
               {open === g.key && g.latest.detail ? (
