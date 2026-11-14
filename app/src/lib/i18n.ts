@@ -13,8 +13,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'shell.signOut': 'Sign out',
     'guide.title': 'How we work in RR Central',
     'guide.body':
-      'Short paths for the sales day: My Day briefing, Pipeline board, quotations, support tickets, and NDAs in the vault.',
+      'Short paths for the sales day and for money: My Day, Pipeline, quotations, support, NDAs, then invoices, payments, delivery notes, expenses, and the morning digest.',
     'guide.back': 'Back to app',
+    'guide.pack.crm': 'Sales day',
+    'guide.pack.billing': 'Billing and money',
     'guide.crm.myday.title': 'My Day',
     'guide.crm.myday.body':
       'Start here each morning. Log touches, set the next action and follow-up date, and mark Won or Lost with a reason.',
@@ -35,14 +37,36 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.crm.contracts.body':
       'From a My Day company, create an NDA draft for the right signer, send for signature, and track obligations after sign.',
     'guide.crm.contracts.link': 'Open My Day (vault on the company)',
+    'guide.billing.invoices.title': 'Invoices',
+    'guide.billing.invoices.body':
+      'Raise from a quote or by hand, finalize for an RR number, send pay links, and mark paid when the money lands.',
+    'guide.billing.invoices.link': 'Open invoices',
+    'guide.billing.payments.title': 'Payments',
+    'guide.billing.payments.body':
+      'Record bank transfers and card settlements against invoices so reports and the digest stay honest.',
+    'guide.billing.payments.link': 'Open payments',
+    'guide.billing.deliveryNotes.title': 'Delivery notes',
+    'guide.billing.deliveryNotes.body':
+      'Issue a DN from a quote or invoice, get it signed, and file the copy under the client in Google Drive.',
+    'guide.billing.deliveryNotes.link': 'Open delivery notes',
+    'guide.billing.expenses.title': 'Expenses',
+    'guide.billing.expenses.body':
+      'Log supplier bills and costs, optionally against a quote, so gross profit on deals stays visible.',
+    'guide.billing.expenses.link': 'Open expenses',
+    'guide.billing.digest.title': 'Morning digest',
+    'guide.billing.digest.body':
+      'On Packages and rates, add who gets the morning email or WhatsApp of what needs attention (tickets, renewals, outbox activity).',
+    'guide.billing.digest.link': 'Open Packages and rates',
   },
   ar: {
     'shell.company': 'الشركة',
     'shell.signOut': 'تسجيل الخروج',
     'guide.title': 'كيف نعمل في RR Central',
     'guide.body':
-      'مسارات قصيرة ليوم المبيعات: ملخص يومي، لوحة الصفقات، عروض الأسعار، تذاكر الدعم، واتفاقيات السرية في الخزنة.',
+      'مسارات قصيرة ليوم المبيعات والمال: يومي، لوحة الصفقات، عروض الأسعار، الدعم، اتفاقيات السرية، ثم الفواتير والمدفوعات ومذكرات التسليم والمصروفات والملخص الصباحي.',
     'guide.back': 'العودة إلى التطبيق',
+    'guide.pack.crm': 'يوم المبيعات',
+    'guide.pack.billing': 'الفوترة والمال',
     'guide.crm.myday.title': 'يومي',
     'guide.crm.myday.body':
       'ابدأ من هنا كل صباح. سجّل التواصل، حدّد الخطوة التالية وتاريخ المتابعة، وعلّم ربح أو خسارة مع السبب.',
@@ -63,6 +87,26 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.crm.contracts.body':
       'من شركة في يومي، أنشئ مسودة NDA للموقّع الصحيح، أرسل للتوقيع، وتابع الالتزامات بعد التوقيع.',
     'guide.crm.contracts.link': 'فتح يومي (الخزنة على الشركة)',
+    'guide.billing.invoices.title': 'الفواتير',
+    'guide.billing.invoices.body':
+      'أنشئ من عرض أو يدوياً، اعتمد رقم RR، أرسل رابط الدفع، وعلّم مدفوعاً عند وصول المال.',
+    'guide.billing.invoices.link': 'فتح الفواتير',
+    'guide.billing.payments.title': 'المدفوعات',
+    'guide.billing.payments.body':
+      'سجّل التحويلات البنكية ومدفوعات البطاقة على الفواتير حتى تبقى التقارير والملخص صادقة.',
+    'guide.billing.payments.link': 'فتح المدفوعات',
+    'guide.billing.deliveryNotes.title': 'مذكرات التسليم',
+    'guide.billing.deliveryNotes.body':
+      'أصدر مذكرة من عرض أو فاتورة، احصل على التوقيع، واحفظ النسخة تحت العميل في Google Drive.',
+    'guide.billing.deliveryNotes.link': 'فتح مذكرات التسليم',
+    'guide.billing.expenses.title': 'المصروفات',
+    'guide.billing.expenses.body':
+      'سجّل فواتير الموردين والتكاليف، اختيارياً مقابل عرض، حتى يبقى إجمالي ربح الصفقات واضحاً.',
+    'guide.billing.expenses.link': 'فتح المصروفات',
+    'guide.billing.digest.title': 'الملخص الصباحي',
+    'guide.billing.digest.body':
+      'في الحزم والأسعار، أضف من يتلقى بريد أو واتساب الصباح بما يحتاج انتباهاً (التذاكر والتجديدات ونشاط الصندوق).',
+    'guide.billing.digest.link': 'فتح الحزم والأسعار',
   },
 }
 
