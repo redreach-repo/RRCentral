@@ -103,3 +103,13 @@ No database migrations. Documentation and `brand-assets/` only.
 **Rollback**
 - `drop function public.rr_claim_event_outbox(int);`
 
+
+## M6–M12 — `20261217120000_feature_slices_m6_m12.sql`
+
+**What**
+- First-slice tables: `hr_employees`, `payroll_runs`/`payroll_lines`, `marketing_campaigns`, `tenant_subscriptions`, `industry_packs`/`tenant_industry_packs`, `approval_requests`, `api_keys`, `webhook_endpoints`
+- RLS + restrictive tenant isolation; new module flags default hidden when no `moduleFlags` row exists
+- Seeds two industry packs
+
+**Rollback**
+- Forward-only preferred. Drop new tables only after confirming no production data.

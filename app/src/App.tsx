@@ -7,6 +7,13 @@ import { ThemeProvider } from './contexts/ThemeContext'
 import { I18nProvider } from './contexts/I18nContext'
 import GuidePage from './pages/GuidePage'
 import AboutProductPage from './pages/AboutProductPage'
+import HrPeoplePage from './pages/HrPeoplePage'
+import PayrollPage from './pages/PayrollPage'
+import MarketingPage from './pages/MarketingPage'
+import SaasBillingPage from './pages/SaasBillingPage'
+import IndustryPacksPage from './pages/IndustryPacksPage'
+import ApprovalsPage from './pages/ApprovalsPage'
+import PublicApiPage from './pages/PublicApiPage'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
@@ -148,6 +155,13 @@ export default function App() {
               <Route path="app" element={<HomeRoute />} />
               <Route path="guide" element={<GuidePage />} />
               <Route path="about-product" element={<AboutProductPage />} />
+              <Route path="hr/people" element={<HrPeoplePage />} />
+              <Route path="payroll" element={<PayrollPage />} />
+              <Route path="marketing" element={<MarketingPage />} />
+              <Route path="saas-billing" element={<SaasBillingPage />} />
+              <Route path="industry-packs" element={<IndustryPacksPage />} />
+              <Route path="approvals" element={<ApprovalsPage />} />
+              <Route path="public-api" element={<PublicApiPage />} />
               <Route path="accounts" element={<AccountsPage />} />
               <Route path="accounts/:id" element={<AccountDetailPage />} />
               <Route path="delivery-settings" element={<DeliverySettingsPage />} />

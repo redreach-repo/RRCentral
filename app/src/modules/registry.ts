@@ -61,6 +61,26 @@ export const SETTINGS_MODULE_FLAGS: { flag: string; labelKey: string }[] = [
     flag: 'clients',
     labelKey: 'page.settings.moduleFlags.clients',
   },
+  {
+    flag: 'hr',
+    labelKey: 'page.settings.moduleFlags.hr',
+  },
+  {
+    flag: 'payroll',
+    labelKey: 'page.settings.moduleFlags.payroll',
+  },
+  {
+    flag: 'marketing',
+    labelKey: 'page.settings.moduleFlags.marketing',
+  },
+  {
+    flag: 'saasBilling',
+    labelKey: 'page.settings.moduleFlags.saasBilling',
+  },
+  {
+    flag: 'industryPacks',
+    labelKey: 'page.settings.moduleFlags.industryPacks',
+  },
 ]
 
 /**

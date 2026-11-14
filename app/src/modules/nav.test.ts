@@ -3,7 +3,7 @@ import { HIDE_PIPELINE_DETAIL_NAV_KEY } from '../lib/pipelineDetailNav'
 import { APP_MODULES, moduleIdForPath, titleForPath, visibleAppModules } from './nav'
 
 describe('APP_MODULES', () => {
-  it('lists the seven shell sections in order', () => {
+  it('lists the shell sections in order', () => {
     expect(APP_MODULES.map((m) => m.id)).toEqual([
       'overview',
       'sales',
@@ -11,6 +11,11 @@ describe('APP_MODULES', () => {
       'delivery',
       'ops',
       'finance',
+      'hr',
+      'payroll',
+      'marketing',
+      'saasBilling',
+      'industryPacks',
       'admin',
     ])
   })
