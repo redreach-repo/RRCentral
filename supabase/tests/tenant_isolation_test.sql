@@ -276,6 +276,19 @@ values (
   'b0000000-0000-4000-8000-000000000001'
 );
 
+insert into public.custom_field_values (
+  definition_id, object_type, record_id, value, tenant_id
+)
+select
+  id,
+  'account',
+  'tenant-b-secret-record',
+  '"Tenant B Secret Value"'::jsonb,
+  'b0000000-0000-4000-8000-000000000001'
+from public.custom_field_definitions
+where field_key = 'tenant_b_secret_field'
+  and tenant_id = 'b0000000-0000-4000-8000-000000000001';
+
 insert into public.workflow_definitions (
   workflow_key, name, description, tenant_id
 )
@@ -424,6 +437,10 @@ select pg_temp.expect(
   'redreach admin cannot read tenant B custom_field_definitions'
 );
 select pg_temp.expect(
+  (select count(*) from public.custom_field_values where record_id = 'tenant-b-secret-record') = 0,
+  'redreach admin cannot read tenant B custom_field_values'
+);
+select pg_temp.expect(
   (select count(*) from public.workflow_definitions where workflow_key = 'tenant_b_secret') = 0,
   'redreach admin cannot read tenant B workflow_definitions'
 );
@@ -554,6 +571,10 @@ select pg_temp.expect(
 select pg_temp.expect(
   (select count(*) from public.custom_field_definitions where field_key = 'tenant_b_secret_field') = 1,
   'tenant B admin can read own custom_field_definitions'
+);
+select pg_temp.expect(
+  (select count(*) from public.custom_field_values where record_id = 'tenant-b-secret-record') = 1,
+  'tenant B admin can read own custom_field_values'
 );
 select pg_temp.expect(
   (select count(*) from public.workflow_definitions where workflow_key = 'tenant_b_secret') = 1,
@@ -932,6 +953,31 @@ begin
     raise exception 'TENANT TEST FAILED: tenant B admin forged custom_field_definition into redreach';
   end if;
   raise notice 'ok - tenant B cannot insert custom_field_definition into redreach tenant_id';
+end $$;
+
+do $$
+declare
+  failed boolean := false;
+begin
+  begin
+    insert into public.custom_field_values (
+      definition_id, object_type, record_id, value, tenant_id
+    )
+    select
+      id,
+      'account',
+      'forged-record',
+      '"Forged Value"'::jsonb,
+      'a0000000-0000-4000-8000-000000000001'
+    from public.custom_field_definitions
+    where field_key = 'tenant_b_secret_field';
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: tenant B admin forged custom_field_value into redreach';
+  end if;
+  raise notice 'ok - tenant B cannot insert custom_field_value into redreach tenant_id';
 end $$;
 
 do $$
