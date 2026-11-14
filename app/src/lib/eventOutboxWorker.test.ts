@@ -4,7 +4,9 @@ import {
   nextAvailableAt,
   outcomeFor,
   OUTBOX_MAX_ATTEMPTS,
+  planDomainHandlers,
   shouldDeadLetter,
+  webhookPayload,
   type OutboxRow,
 } from './eventOutboxWorker'
 
@@ -32,10 +34,28 @@ describe('eventOutboxWorker', () => {
     expect(shouldDeadLetter(OUTBOX_MAX_ATTEMPTS)).toBe(true)
   })
 
-  it('acks normal activity events', () => {
+  it('plans HubSpot + digest + webhook for quote finalize', () => {
+    expect(planDomainHandlers(base).effects).toEqual([
+      'hubspot_nudge',
+      'digest_signal',
+      'webhook_emit',
+    ])
+  })
+
+  it('plans webhook-only for obscure archive events', () => {
+    expect(
+      planDomainHandlers({
+        ...base,
+        event_type: 'archive_vendor',
+        aggregate_type: 'vendor',
+      }).effects,
+    ).toEqual(['webhook_emit'])
+  })
+
+  it('acks normal activity events with a plan detail', () => {
     expect(dispatchDomainEvent(base)).toEqual({
       ok: true,
-      detail: 'acked finalize_quote on quotation',
+      detail: 'finalize_quote → hubspot_nudge+digest_signal+webhook_emit',
     })
   })
 
@@ -57,6 +77,19 @@ describe('eventOutboxWorker', () => {
     expect(outcomeFor(base, { ok: false, error: 'nope', retryable: false }, now)).toEqual({
       action: 'failed',
       error: 'nope',
+    })
+  })
+
+  it('builds a stable webhook payload', () => {
+    const now = new Date('2026-11-14T06:00:00Z')
+    expect(webhookPayload(base, now)).toEqual({
+      id: '1',
+      event_type: 'finalize_quote',
+      aggregate_type: 'quotation',
+      aggregate_id: 'Q-1',
+      payload: {},
+      occurred_at: '2026-11-14T06:00:00.000Z',
+      source: 'rrcentral.event_outbox',
     })
   })
 })

@@ -1,16 +1,22 @@
 # Event outbox worker
 
 The `event-outbox` Edge Function drains `event_outbox` (filled by
-`enqueueDomainEvent` / `logActivity`): claim a batch, run handlers, mark done,
-retry with exponential backoff, or dead-letter after 8 attempts.
+`enqueueDomainEvent` / `logActivity`): claim a batch, run domain handlers,
+mark done, retry with exponential backoff, or dead-letter after 8 attempts.
 
-Pure rules: `app/src/lib/eventOutboxWorker.ts`. Claim RPC:
+Pure classification: `app/src/lib/eventOutboxWorker.ts`. Claim RPC:
 `rr_claim_event_outbox` in `supabase/migrations/20261216120000_event_outbox_claim.sql`
 (FOR UPDATE SKIP LOCKED + 10-minute lease recovery).
 
-Handlers today acknowledge activity-mirrored events so the queue drains.
-Domain side effects (digest nudges, webhooks, HubSpot) plug into
-`dispatchDomainEvent` later.
+## Domain handlers
+
+| Effect | When | What it does |
+| --- | --- | --- |
+| **HubSpot nudge** | CRM / quote / invoice / deal activity | Sets `app_settings.hubspot_sync_requested_at`. If `HUBSPOT_CRON_SECRET` is set, also POSTs `hubspot-sync` once per batch. |
+| **Digest signal** | Quotes finalized, payments, follow-ups, calls, DNs | Writes `app_settings.digest_attention_signal` JSON (`{ at, events[] }`) for the morning digest to surface. |
+| **Webhook** | Every event, when configured | POSTs the event JSON to `app_settings.outbound_webhook_url`. Failures retry the outbox row. |
+
+Unknown activity types still drain (webhook only if configured, otherwise ack).
 
 ## Set it up
 
@@ -18,11 +24,20 @@ Domain side effects (digest nudges, webhooks, HubSpot) plug into
 in Supabase → **SQL Editor** (or your usual migration path). Safe to run again.
 
 **2. Secret.** Edge Functions → **Secrets** → `OUTBOX_CRON_SECRET` = long random text.
+Optional: `HUBSPOT_CRON_SECRET` (same value as HubSpot sync) so the worker can invoke HubSpot immediately.
 
-**3. Deploy.** Actions → **Deploy Edge Functions** → pick `event-outbox`.
+**3. Optional webhook.** Settings / SQL:
+
+```sql
+insert into public.app_settings (key, value)
+values ('outbound_webhook_url', 'https://example.com/hooks/rrcentral')
+on conflict (key) do update set value = excluded.value;
+```
+
+**4. Deploy.** Actions → **Deploy Edge Functions** → pick `event-outbox`.
 **System check** should list “Domain event outbox worker”.
 
-**4. Schedule** (every 5 minutes):
+**5. Schedule** (every 5 minutes):
 
 ```sql
 select cron.unschedule('rr-event-outbox')

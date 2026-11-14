@@ -1,8 +1,7 @@
-// Event outbox worker: claim pending domain events, dispatch handlers, retry
-// with backoff, and dead-letter after max attempts.
+// Event outbox worker: claim pending domain events, run domain handlers
+// (HubSpot nudge, digest signal, optional webhook), retry with backoff, DLQ.
 //
-// Pure dispatch rules live in app/src/lib/eventOutboxWorker.ts (mirrored below
-// so the Edge Function stays self-contained without a bundle step).
+// Pure classification lives in app/src/lib/eventOutboxWorker.ts (mirrored below).
 //
 // Called two ways:
 //  * Schedule: header x-cron-secret = OUTBOX_CRON_SECRET (every few minutes).
@@ -30,6 +29,44 @@ type OutboxRow = {
 type DispatchResult =
   | { ok: true; detail?: string }
   | { ok: false; error: string; retryable?: boolean }
+
+type HandlerEffect = "hubspot_nudge" | "digest_signal" | "webhook_emit"
+
+const HUBSPOT_EVENT_TYPES = new Set([
+  "create_crm",
+  "update_crm",
+  "call_crm",
+  "call_logged",
+  "snooze_followup",
+  "clear_followup",
+  "save_wanders_deal",
+  "create",
+  "finalize_quote",
+  "revise_quote",
+  "convert_invoice",
+  "mark_paid",
+  "save_invoice",
+])
+
+const HUBSPOT_AGGREGATES = new Set([
+  "crm",
+  "sales_deal",
+  "account",
+  "quotation",
+  "invoice",
+])
+
+const DIGEST_EVENT_TYPES = new Set([
+  "finalize_quote",
+  "mark_paid",
+  "pay_link",
+  "convert_invoice",
+  "snooze_followup",
+  "clear_followup",
+  "call_crm",
+  "call_logged",
+  "update_delivery_note",
+])
 
 const DEFAULT_ORIGINS = [
   "https://redreach-repo.github.io",
@@ -60,6 +97,24 @@ function nextAvailableAt(attempts: number, now = new Date()): Date {
   return new Date(now.getTime() + ms)
 }
 
+function planDomainHandlers(row: OutboxRow): { effects: HandlerEffect[]; detail: string } {
+  const type = (row.event_type || "").trim()
+  const aggregate = (row.aggregate_type || "").trim()
+  if (!type) return { effects: [], detail: "blank event_type" }
+  if (type === "__fail_test__" || type === "__poison_test__") {
+    return { effects: [], detail: type }
+  }
+  const effects: HandlerEffect[] = []
+  const hubspot =
+    HUBSPOT_EVENT_TYPES.has(type) ||
+    (HUBSPOT_AGGREGATES.has(aggregate) &&
+      /^(create|update|save|finalize|mark_|convert_)/.test(type))
+  if (hubspot) effects.push("hubspot_nudge")
+  if (DIGEST_EVENT_TYPES.has(type)) effects.push("digest_signal")
+  effects.push("webhook_emit")
+  return { effects, detail: `${type} → ${effects.join("+") || "ack"}` }
+}
+
 function dispatchDomainEvent(row: OutboxRow): DispatchResult {
   const type = (row.event_type || "").trim()
   if (!type) return { ok: false, error: "blank event_type", retryable: false }
@@ -68,12 +123,40 @@ function dispatchDomainEvent(row: OutboxRow): DispatchResult {
       return { ok: false, error: "forced failure", retryable: true }
     case "__poison_test__":
       return { ok: false, error: "non-retryable poison", retryable: false }
-    default:
-      return {
-        ok: true,
-        detail: `acked ${type} on ${row.aggregate_type || "aggregate"}`,
-      }
+    default: {
+      const plan = planDomainHandlers(row)
+      return { ok: true, detail: plan.detail }
+    }
   }
+}
+
+function webhookPayload(row: OutboxRow, now = new Date()) {
+  return {
+    id: row.id,
+    event_type: row.event_type,
+    aggregate_type: row.aggregate_type,
+    aggregate_id: row.aggregate_id,
+    payload: row.payload || {},
+    occurred_at: now.toISOString(),
+    source: "rrcentral.event_outbox",
+  }
+}
+
+async function upsertSetting(sb: SupabaseClient, key: string, value: string) {
+  const { data: existing } = await sb.from("app_settings").select("key").eq("key", key).maybeSingle()
+  if (existing) {
+    const { error } = await sb.from("app_settings").update({ value }).eq("key", key)
+    if (error) throw new Error(`settings update ${key}: ${error.message}`)
+  } else {
+    const { error } = await sb.from("app_settings").insert({ key, value })
+    if (error) throw new Error(`settings insert ${key}: ${error.message}`)
+  }
+}
+
+async function readSetting(sb: SupabaseClient, key: string): Promise<string> {
+  const { data, error } = await sb.from("app_settings").select("value").eq("key", key).maybeSingle()
+  if (error) throw new Error(`settings read ${key}: ${error.message}`)
+  return typeof data?.value === "string" ? data.value : ""
 }
 
 async function markDone(sb: SupabaseClient, id: string) {
@@ -114,6 +197,51 @@ async function markFailed(sb: SupabaseClient, id: string, err: string) {
     })
     .eq("id", id)
   if (error) throw new Error(`failed ${id}: ${error.message}`)
+}
+
+/** Run side effects for one row. HubSpot batch invoke is deferred. */
+async function runEffects(
+  sb: SupabaseClient,
+  row: OutboxRow,
+  effects: HandlerEffect[],
+  webhookUrl: string,
+  digestBuf: Array<Record<string, string>>,
+  flags: { hubspot: boolean },
+): Promise<DispatchResult> {
+  try {
+    for (const effect of effects) {
+      if (effect === "hubspot_nudge") {
+        flags.hubspot = true
+      } else if (effect === "digest_signal") {
+        digestBuf.push({
+          event_type: row.event_type,
+          aggregate_type: row.aggregate_type,
+          aggregate_id: row.aggregate_id,
+        })
+      } else if (effect === "webhook_emit") {
+        if (!webhookUrl) continue
+        const res = await fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(webhookPayload(row)),
+          signal: AbortSignal.timeout(8_000),
+        })
+        if (!res.ok) {
+          const text = await res.text().catch(() => "")
+          return {
+            ok: false,
+            error: `webhook ${res.status}: ${text.slice(0, 200) || res.statusText}`,
+            retryable: true,
+          }
+        }
+        await res.body?.cancel().catch(() => {})
+      }
+    }
+    return { ok: true, detail: planDomainHandlers(row).detail }
+  } catch (e) {
+    const err = e instanceof Error ? e : new Error(String(e))
+    return { ok: false, error: err.message || "handler failed", retryable: true }
+  }
 }
 
 Deno.serve(withErrorLog("event-outbox", async (req) => {
@@ -162,7 +290,6 @@ Deno.serve(withErrorLog("event-outbox", async (req) => {
     p_limit: batch,
   })
   if (claimError) {
-    // Migration not applied yet — fail clearly so System check / cron surface it.
     return json({ error: `claim failed: ${claimError.message}` }, 500)
   }
 
@@ -170,16 +297,38 @@ Deno.serve(withErrorLog("event-outbox", async (req) => {
   let done = 0
   let retried = 0
   let failed = 0
+  let hubspotNudged = false
+  let hubspotInvoked = false
+  let digestEvents = 0
+  let webhooksSent = 0
+
+  const webhookUrl = (await readSetting(sb, "outbound_webhook_url").catch(() => "")).trim()
+  const digestBuf: Array<Record<string, string>> = []
+  const flags = { hubspot: false }
 
   for (const row of rows) {
-    const result = dispatchDomainEvent(row)
+    const classify = dispatchDomainEvent(row)
+    if (!classify.ok) {
+      if (classify.retryable === false || row.attempts >= OUTBOX_MAX_ATTEMPTS) {
+        await markFailed(sb, row.id, classify.error)
+        failed++
+      } else {
+        await markRetry(sb, row.id, row.attempts, classify.error)
+        retried++
+      }
+      continue
+    }
+
+    const plan = planDomainHandlers(row)
+    const beforeDigest = digestBuf.length
+    const result = await runEffects(sb, row, plan.effects, webhookUrl, digestBuf, flags)
+    if (webhookUrl && plan.effects.includes("webhook_emit") && result.ok) webhooksSent++
+    digestEvents += digestBuf.length - beforeDigest
+
     if (result.ok) {
       await markDone(sb, row.id)
       done++
-      continue
-    }
-    const retryable = result.retryable !== false
-    if (!retryable || row.attempts >= OUTBOX_MAX_ATTEMPTS) {
+    } else if (result.retryable === false || row.attempts >= OUTBOX_MAX_ATTEMPTS) {
       await markFailed(sb, row.id, result.error)
       failed++
     } else {
@@ -188,10 +337,50 @@ Deno.serve(withErrorLog("event-outbox", async (req) => {
     }
   }
 
+  if (flags.hubspot) {
+    const when = new Date().toISOString()
+    await upsertSetting(sb, "hubspot_sync_requested_at", when)
+    hubspotNudged = true
+    const hubSecret = Deno.env.get("HUBSPOT_CRON_SECRET") || ""
+    if (hubSecret) {
+      try {
+        const res = await fetch(`${supabaseUrl.replace(/\/$/, "")}/functions/v1/hubspot-sync`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-cron-secret": hubSecret,
+            Authorization: `Bearer ${serviceKey}`,
+          },
+          body: "{}",
+          signal: AbortSignal.timeout(20_000),
+        })
+        hubspotInvoked = res.ok
+        await res.body?.cancel().catch(() => {})
+      } catch {
+        // Nudge is enough; nightly cron will pick up hubspot_sync_requested_at.
+      }
+    }
+  }
+
+  if (digestBuf.length) {
+    const signal = {
+      at: new Date().toISOString(),
+      events: digestBuf.slice(0, 50),
+    }
+    await upsertSetting(sb, "digest_attention_signal", JSON.stringify(signal))
+  }
+
   return json({
     claimed: rows.length,
     done,
     retried,
     failed,
+    handlers: {
+      hubspot_nudged: hubspotNudged,
+      hubspot_invoked: hubspotInvoked,
+      digest_events: digestEvents,
+      webhooks_sent: webhooksSent,
+      webhook_configured: Boolean(webhookUrl),
+    },
   })
 }, { secrets: ["OUTBOX_CRON_SECRET"] }))
