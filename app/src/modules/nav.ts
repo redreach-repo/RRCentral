@@ -42,7 +42,10 @@ import {
   Wrench,
 } from 'lucide-react'
 import { WorshipHubIcon } from '../components/worshiphub/WorshipHubIcon'
-import { modulesEnabled, type ModuleManifest, type ModuleNavItem } from './registry'
+import { shouldHidePipelineDetailNavItem } from '../lib/pipelineDetailNav'
+import { roleAtLeast } from '../lib/permissions'
+import type { UserRole } from '../lib/types'
+import { modulesEnabled, parseModuleFlags, type ModuleManifest, type ModuleNavItem } from './registry'
 
 export const APP_MODULES: ModuleManifest[] = [
   {
@@ -102,6 +105,8 @@ export const APP_MODULES: ModuleManifest[] = [
     id: 'ops',
     label: 'Operations',
     icon: Wrench,
+    /** Soft-hide via app_settings.moduleFlags JSON, e.g. {"ops":false}. */
+    flag: 'ops',
     items: [
       { to: '/app/wanders', label: 'Wanders', icon: Plane },
       { to: '/catalog', label: 'Catalog', icon: Package },
@@ -190,4 +195,37 @@ export function titleForPath(pathname: string, modules: ModuleManifest[] = APP_M
 
 export function enabledAppModules(flags: Record<string, boolean> = {}): ModuleManifest[] {
   return modulesEnabled(APP_MODULES, flags)
+}
+
+/** Whether a nav item is shown for this role (mirrors Layout / Cmd+K). */
+export function navItemVisible(
+  item: ModuleNavItem,
+  userRole: UserRole,
+  settings: Record<string, string | undefined> = {},
+): boolean {
+  if (userRole === 'staff' && !item.forStaff) return false
+  // Soft-hide must run before minRole — /sales and /ctrm both set minRole: sales.
+  if (shouldHidePipelineDetailNavItem(item.to, settings, userRole)) return false
+  if (item.roles) return item.roles.includes(userRole)
+  if (item.minRole) return roleAtLeast(userRole, item.minRole)
+  return true
+}
+
+/**
+ * Modules after feature flags, with items filtered by role / settings.
+ * Empty modules are dropped. Used by Layout and the command palette.
+ */
+export function visibleAppModules(
+  userRole: UserRole,
+  settings: Record<string, string | undefined> = {},
+  flags?: Record<string, boolean>,
+  modules: ModuleManifest[] = APP_MODULES,
+): ModuleManifest[] {
+  const resolvedFlags = flags ?? parseModuleFlags(settings)
+  return modulesEnabled(modules, resolvedFlags)
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => navItemVisible(item, userRole, settings)),
+    }))
+    .filter((group) => group.items.length > 0)
 }

@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — tenant + audit CI
+**Current milestone:** Continuous backlog — module flags / nav permissions
 
 ## Shipped this turn
 
-- Expanded `tenant_isolation_test.sql`: accounts, quotations, `event_outbox`, plus append-only `audit_log` (authenticated cannot insert/update/delete)
+- Module registry flags + role filtering centralized (`visibleAppModules` / `parseModuleFlags`); Layout and Cmd+K consume them; Operations soft-hide via `app_settings.moduleFlags` JSON `{"ops":false}`
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide · Cmd+K · QTSP · outbox worker · domain handlers · digest signal · HubSpot nudge · System check outbox · a11y · minimal chrome · pipeline density
+- Continuous backlog · Zod · Guide · Cmd+K · QTSP · outbox · digest · HubSpot nudge · System check outbox · tenant/audit CI · a11y · minimal chrome · pipeline density
 
 ## Still open (agent queue)
 
