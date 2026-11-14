@@ -143,9 +143,7 @@ export default function ObligationsBoardPage() {
       </p>
 
       {missingTable ? (
-        <p style={{ color: colors.muted, fontSize: 13 }}>
-          Run <code>supabase/migrations/20261214100000_contract_obligations.sql</code> to enable the board.
-        </p>
+        <p style={{ color: colors.muted, fontSize: 13 }}>{t('page.obligations.missingTable')}</p>
       ) : (
         <>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 12 }}>
@@ -160,22 +158,24 @@ export default function ObligationsBoardPage() {
                 }}
                 onClick={() => setFilter(f)}
               >
-                {f === 'all' ? 'All' : obligationStatusLabel(f)}
+                {f === 'all' ? t('page.obligations.filterAll') : obligationStatusLabel(f)}
               </button>
             ))}
             {canEdit ? (
               <button type="button" style={btnPrimary} onClick={startNew}>
-                New obligation
+                {t('page.obligations.new')}
               </button>
             ) : null}
           </div>
 
           {showForm && canEdit ? (
             <section style={{ ...card, marginBottom: 16 }}>
-              <strong style={{ fontSize: 14 }}>{editingId ? 'Edit obligation' : 'New obligation'}</strong>
+              <strong style={{ fontSize: 14 }}>
+                {editingId ? t('page.obligations.edit') : t('page.obligations.new')}
+              </strong>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 <label style={{ display: 'grid', gap: 4, fontSize: 12, color: colors.muted }}>
-                  Company
+                  {t('page.obligations.company')}
                   <input
                     style={input}
                     value={form.company_name}
@@ -183,7 +183,7 @@ export default function ObligationsBoardPage() {
                   />
                 </label>
                 <label style={{ display: 'grid', gap: 4, fontSize: 12, color: colors.muted }}>
-                  Title
+                  {t('page.obligations.titleField')}
                   <input
                     style={input}
                     value={form.title}
@@ -191,7 +191,7 @@ export default function ObligationsBoardPage() {
                   />
                 </label>
                 <label style={{ display: 'grid', gap: 4, fontSize: 12, color: colors.muted }}>
-                  Owner
+                  {t('page.obligations.owner')}
                   <select
                     style={input}
                     value={form.owner_party}
@@ -207,7 +207,7 @@ export default function ObligationsBoardPage() {
                   </select>
                 </label>
                 <label style={{ display: 'grid', gap: 4, fontSize: 12, color: colors.muted }}>
-                  Due date
+                  {t('page.obligations.dueDate')}
                   <input
                     style={input}
                     type="date"
@@ -216,7 +216,7 @@ export default function ObligationsBoardPage() {
                   />
                 </label>
                 <label style={{ display: 'grid', gap: 4, fontSize: 12, color: colors.muted }}>
-                  Status
+                  {t('page.obligations.status')}
                   <select
                     style={input}
                     value={form.status}
@@ -233,7 +233,7 @@ export default function ObligationsBoardPage() {
                 </label>
               </div>
               <label style={{ display: 'grid', gap: 4, fontSize: 12, color: colors.muted }}>
-                Details
+                {t('page.obligations.details')}
                 <textarea
                   style={{ ...input, minHeight: 72, resize: 'vertical' }}
                   value={form.description}
@@ -242,10 +242,10 @@ export default function ObligationsBoardPage() {
               </label>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="button" style={btnPrimary} disabled={busy} onClick={() => void save()}>
-                  {busy ? 'Saving…' : 'Save'}
+                  {busy ? t('page.obligations.saving') : t('page.obligations.save')}
                 </button>
                 <button type="button" style={btn} onClick={() => setShowForm(false)}>
-                  Cancel
+                  {t('page.obligations.cancel')}
                 </button>
               </div>
             </section>
@@ -269,7 +269,7 @@ export default function ObligationsBoardPage() {
                         {row.company_name} · {obligationOwnerLabel(row.owner_party)} ·{' '}
                         {obligationStatusLabel(row.status)}
                         {row.due_date ? ` · due ${row.due_date}` : ''}
-                        {overdue ? ' · overdue' : ''}
+                        {overdue ? t('page.obligations.overdue') : ''}
                       </div>
                       {row.description ? (
                         <p style={{ margin: '8px 0 0', fontSize: 13, color: colors.text }}>{row.description}</p>
@@ -278,16 +278,16 @@ export default function ObligationsBoardPage() {
                     {canEdit ? (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         <button type="button" style={btnGhost} disabled={busy} onClick={() => startEdit(row)}>
-                          Edit
+                          {t('page.obligations.editRow')}
                         </button>
                         {row.status === 'open' ? (
                           <button type="button" style={btnPrimary} disabled={busy} onClick={() => void mark(row.id, 'done')}>
-                            Mark done
+                            {t('page.obligations.markDone')}
                           </button>
                         ) : null}
                         {row.status === 'done' ? (
                           <button type="button" style={btnGhost} disabled={busy} onClick={() => void mark(row.id, 'open')}>
-                            Reopen
+                            {t('page.obligations.reopen')}
                           </button>
                         ) : null}
                         {row.status !== 'cancelled' ? (
@@ -297,7 +297,7 @@ export default function ObligationsBoardPage() {
                             disabled={busy}
                             onClick={() => void mark(row.id, 'cancelled')}
                           >
-                            Cancel
+                            {t('page.obligations.cancelRow')}
                           </button>
                         ) : null}
                       </div>
@@ -307,7 +307,7 @@ export default function ObligationsBoardPage() {
               )
             })}
             {!visible.length ? (
-              <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>No obligations in this filter.</p>
+              <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>{t('page.obligations.empty')}</p>
             ) : null}
           </div>
         </>
