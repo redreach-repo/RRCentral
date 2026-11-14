@@ -4,6 +4,7 @@ import GmailCalendarCard from '../components/GmailCalendarCard'
 import GoogleDriveCard from '../components/GoogleDriveCard'
 import M365MailCalendarCard from '../components/M365MailCalendarCard'
 import HubSpotCard from '../components/HubSpotCard'
+import ModuleFlagsCard from '../components/settings/ModuleFlagsCard'
 import PipelineDetailNavCard from '../components/settings/PipelineDetailNavCard'
 import PipelinesSettingsCard from '../components/settings/PipelinesSettingsCard'
 import WorkflowRunsCard from '../components/settings/WorkflowRunsCard'
@@ -1277,6 +1278,7 @@ export default function SettingsPage() {
 
       <PipelinesSettingsCard />
       <PipelineDetailNavCard />
+      <ModuleFlagsCard />
       <WorkflowsSettingsCard />
       <WorkflowRunsCard />
 
