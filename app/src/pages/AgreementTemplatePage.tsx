@@ -47,7 +47,6 @@ import {
 } from '../lib/uiStyles'
 
 const smallBtn: CSSProperties = { ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }
-const STATUS_LABEL = { draft: 'Draft', approved: 'Approved, in use', retired: 'Replaced' } as const
 const day = (iso: string | null) => (iso ? format(parseISO(iso), 'd MMM yyyy') : '')
 
 export default function AgreementTemplatePage() {
@@ -67,12 +66,18 @@ export default function AgreementTemplatePage() {
   const [clauses, setClauses] = useState<ContractClause[]>([])
   const textRef = useRef<HTMLTextAreaElement>(null)
 
+  const statusLabel = (status: AgreementTemplate['status']) => {
+    if (status === 'draft') return t('page.agreementTemplate.statusDraft')
+    if (status === 'approved') return t('page.agreementTemplate.statusApproved')
+    return t('page.agreementTemplate.statusRetired')
+  }
+
   const load = useCallback(async (select?: string) => {
     try {
       const r = await listAgreementTemplates()
       setTemplates(r.rows)
       setMissingTable(r.missingTable)
-      const pick = r.rows.find((t) => t.id === select) ?? templateInUse(r.rows)
+      const pick = r.rows.find((row) => row.id === select) ?? templateInUse(r.rows)
       setSelectedId(pick?.id ?? '')
       setTitle(pick?.title ?? DEFAULT_AGREEMENT_TITLE)
       setBody(pick?.body ?? DEFAULT_AGREEMENT_BODY)
@@ -91,7 +96,7 @@ export default function AgreementTemplatePage() {
       .catch(() => setClauses([]))
   }, [])
 
-  const selected = templates.find((t) => t.id === selectedId) ?? null
+  const selected = templates.find((row) => row.id === selectedId) ?? null
   const inUse = templateInUse(templates)
   const editing = canEdit && !missingTable && (!selected || selected.status === 'draft')
   const dirty = selected ? selected.body !== body || selected.title !== title : true
@@ -102,11 +107,11 @@ export default function AgreementTemplatePage() {
     [selected, body, sample],
   )
 
-  function choose(t: AgreementTemplate) {
-    if (dirty && editing && !window.confirm('Leave without saving your changes?')) return
-    setSelectedId(t.id)
-    setTitle(t.title)
-    setBody(t.body)
+  function choose(row: AgreementTemplate) {
+    if (dirty && editing && !window.confirm(t('page.agreementTemplate.leaveUnsaved'))) return
+    setSelectedId(row.id)
+    setTitle(row.title)
+    setBody(row.body)
   }
 
   async function run(fn: () => Promise<string | void>, failure: string, success?: string) {
@@ -164,37 +169,36 @@ export default function AgreementTemplatePage() {
       </div>
 
       {missingTable ? (
-        <p style={{ color: colors.warn, fontSize: 13, margin: 0 }}>
-          The agreement table is not set up yet. Run the Item 10 SQL in Supabase to save and approve the template. Until
-          then, agreements use the starter wording below and are marked DRAFT.
-        </p>
+        <p style={{ color: colors.warn, fontSize: 13, margin: 0 }}>{t('page.agreementTemplate.missingTable')}</p>
       ) : null}
 
-      <section style={cardStyle} aria-label="Template in use">
-        <h2 style={sectionTitleStyle}>In use now</h2>
+      <section style={cardStyle} aria-label={t('page.agreementTemplate.inUseNow')}>
+        <h2 style={sectionTitleStyle}>{t('page.agreementTemplate.inUseNow')}</h2>
         {inUse?.status === 'approved' ? (
           <p style={{ margin: 0, fontSize: 13 }}>
             <CheckCircle2 size={14} style={{ color: colors.success, verticalAlign: -2, marginRight: 6 }} />
-            Version {inUse.version}, approved by {inUse.approved_by} on {day(inUse.approved_at)}.
+            {t('page.agreementTemplate.approvedLine')
+              .replace('{version}', String(inUse.version))
+              .replace('{by}', inUse.approved_by || '')
+              .replace('{date}', day(inUse.approved_at))}
             {inUse.approval_note ? <span style={{ color: colors.muted }}> {inUse.approval_note}</span> : null}
           </p>
         ) : (
-          <p style={{ margin: 0, fontSize: 13, color: colors.warn }}>
-            No version is approved yet, so agreements are marked DRAFT and should not be sent for signature. Send the
-            sample PDF to your lawyer, make their changes here, then mark it approved.
-          </p>
+          <p style={{ margin: 0, fontSize: 13, color: colors.warn }}>{t('page.agreementTemplate.noApproved')}</p>
         )}
         {templates.length ? (
           <ul style={{ listStyle: 'none', padding: 0, margin: '12px 0 0', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {templates.map((t) => (
-              <li key={t.id}>
+            {templates.map((row) => (
+              <li key={row.id}>
                 <button
                   type="button"
-                  onClick={() => choose(t)}
-                  aria-pressed={t.id === selectedId}
-                  style={{ ...smallBtn, borderColor: t.id === selectedId ? colors.accent : undefined }}
+                  onClick={() => choose(row)}
+                  aria-pressed={row.id === selectedId}
+                  style={{ ...smallBtn, borderColor: row.id === selectedId ? colors.accent : undefined }}
                 >
-                  Version {t.version}: {STATUS_LABEL[t.status]}
+                  {t('page.agreementTemplate.versionStatus')
+                    .replace('{version}', String(row.version))
+                    .replace('{status}', statusLabel(row.status))}
                 </button>
               </li>
             ))}
@@ -203,11 +207,13 @@ export default function AgreementTemplatePage() {
       </section>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: 16, alignItems: 'start' }}>
-        <section style={cardStyle} aria-label="Wording">
+        <section style={cardStyle} aria-label={t('page.agreementTemplate.wording')}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <h2 style={{ ...sectionTitleStyle, margin: 0 }}>
-              {selected ? `Version ${selected.version}` : 'Starter wording'}
-              {selected && selected.status !== 'draft' ? ' (locked)' : ''}
+              {selected
+                ? t('page.agreementTemplate.versionHeading').replace('{version}', String(selected.version))
+                : t('page.agreementTemplate.starterWording')}
+              {selected && selected.status !== 'draft' ? t('page.agreementTemplate.locked') : ''}
             </h2>
             {canEdit && !missingTable ? (
               <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -235,7 +241,8 @@ export default function AgreementTemplatePage() {
                       )
                     }}
                   >
-                    <Save size={12} /> {selected ? 'Save draft' : 'Save as a draft'}
+                    <Save size={12} />{' '}
+                    {selected ? t('page.agreementTemplate.saveDraft') : t('page.agreementTemplate.saveAsDraft')}
                   </button>
                 ) : (
                   <button
@@ -250,7 +257,7 @@ export default function AgreementTemplatePage() {
                       )
                     }
                   >
-                    <Copy size={12} /> Start a new draft from this
+                    <Copy size={12} /> {t('page.agreementTemplate.startNewDraft')}
                   </button>
                 )}
                 {selected?.status === 'draft' ? (
@@ -259,18 +266,20 @@ export default function AgreementTemplatePage() {
                       type="button"
                       style={smallBtn}
                       disabled={busy || dirty || problems.unknown.length > 0}
-                      title={dirty ? 'Save the draft first' : undefined}
+                      title={dirty ? t('page.agreementTemplate.saveDraftFirst') : undefined}
                       onClick={() => setApproving({ by: '', on: format(new Date(), 'yyyy-MM-dd'), note: '' })}
                     >
-                      <FileSignature size={12} /> Mark approved by lawyer
+                      <FileSignature size={12} /> {t('page.agreementTemplate.markApproved')}
                     </button>
                     <button
                       type="button"
                       style={{ ...smallBtn, color: colors.danger }}
                       disabled={busy}
-                      aria-label="Delete this draft"
+                      aria-label={t('page.agreementTemplate.deleteDraft')}
                       onClick={() =>
-                        window.confirm(`Delete draft version ${selected.version}?`) &&
+                        window.confirm(
+                          t('page.agreementTemplate.deleteConfirm').replace('{version}', String(selected.version)),
+                        ) &&
                         void run(() => deleteAgreementDraft(selected), 'Could not delete the draft', 'Draft deleted')
                       }
                     >
@@ -284,7 +293,7 @@ export default function AgreementTemplatePage() {
 
           <div style={{ ...fieldStyle, marginTop: 12 }}>
             <label style={labelStyle} htmlFor="agreement-title">
-              Name
+              {t('page.agreementTemplate.name')}
             </label>
             <input
               id="agreement-title"
@@ -296,7 +305,7 @@ export default function AgreementTemplatePage() {
           </div>
           <div style={fieldStyle}>
             <label style={labelStyle} htmlFor="agreement-body">
-              Wording
+              {t('page.agreementTemplate.wording')}
             </label>
             <textarea
               id="agreement-body"
@@ -307,32 +316,35 @@ export default function AgreementTemplatePage() {
               onChange={(e) => setBody(e.target.value)}
             />
             <p style={{ color: colors.muted, fontSize: 12, margin: '6px 0 0' }}>
-              A line starting with # is the title, ## a heading and - a bullet point. A line that says [signatures] adds
-              the signature boxes. Words in double curly brackets are filled in from the contract.
+              {t('page.agreementTemplate.wordingHint')}
             </p>
           </div>
 
           {problems.unknown.length ? (
             <p style={{ color: colors.danger, fontSize: 13, margin: '8px 0 0' }}>
-              RR Central does not know {problems.unknown.map((k) => `{{${k}}}`).join(', ')}. Pick from the list below so
-              it can be filled in.
+              {t('page.agreementTemplate.unknownPlaceholders').replace(
+                '{list}',
+                problems.unknown.map((k) => `{{${k}}}`).join(', '),
+              )}
             </p>
           ) : null}
           {problems.missing.length ? (
             <p style={{ color: colors.warn, fontSize: 13, margin: '8px 0 0' }}>
-              The wording leaves out {problems.missing.map((k) => `{{${k}}}`).join(', ')}. Every agreement should show
-              the usage caps and the early exit fee.
+              {t('page.agreementTemplate.missingPlaceholders').replace(
+                '{list}',
+                problems.missing.map((k) => `{{${k}}}`).join(', '),
+              )}
             </p>
           ) : null}
 
           {editing ? (
             <details style={{ marginTop: 12 }}>
-              <summary style={{ cursor: 'pointer', fontSize: 13 }}>Things that can be filled in</summary>
+              <summary style={{ cursor: 'pointer', fontSize: 13 }}>{t('page.agreementTemplate.fillable')}</summary>
               <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 0', display: 'grid', gap: 4 }}>
                 {AGREEMENT_PLACEHOLDERS.map((p) => (
                   <li key={p.key} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12 }}>
                     <button type="button" style={{ ...smallBtn, padding: '3px 8px' }} onClick={() => insert(p.key)}>
-                      Add
+                      {t('page.agreementTemplate.add')}
                     </button>
                     <code>{`{{${p.key}}}`}</code>
                     <span style={{ color: colors.muted }}>{p.label}</span>
@@ -345,9 +357,9 @@ export default function AgreementTemplatePage() {
           {editing ? (
             <details style={{ marginTop: 12 }}>
               <summary style={{ cursor: 'pointer', fontSize: 13 }}>
-                Insert clause{' '}
+                {t('page.agreementTemplate.insertClause')}{' '}
                 <Link to="/clause-library" style={{ color: colors.accent, marginLeft: 6 }} onClick={(e) => e.stopPropagation()}>
-                  Manage library
+                  {t('page.agreementTemplate.manageLibrary')}
                 </Link>
               </summary>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
@@ -363,29 +375,33 @@ export default function AgreementTemplatePage() {
                   </button>
                 ))}
                 {!clauses.length ? (
-                  <span style={{ fontSize: 12, color: colors.muted }}>No active clauses yet.</span>
+                  <span style={{ fontSize: 12, color: colors.muted }}>{t('page.agreementTemplate.noActiveClauses')}</span>
                 ) : null}
               </div>
             </details>
           ) : null}
         </section>
 
-        <section style={cardStyle} aria-label="Preview">
+        <section style={cardStyle} aria-label={t('page.agreementTemplate.preview')}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Preview with a sample client</h2>
+            <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.agreementTemplate.preview')}</h2>
             <button type="button" style={smallBtn} onClick={samplePdf}>
-              <Download size={12} /> Sample PDF
+              <Download size={12} /> {t('page.agreementTemplate.samplePdf')}
             </button>
           </div>
           <p style={{ color: colors.muted, fontSize: 12, margin: '6px 0 10px' }}>
-            Sample Dental Clinic on the Growth package, option B, with 10% off for 3 months. Send this PDF to your lawyer
-            to review.
+            {t('page.agreementTemplate.previewHint')}
           </p>
           <AgreementPreview blocks={preview.blocks} />
         </section>
       </div>
 
-      <Modal open={Boolean(approving)} title="Mark approved by lawyer" onClose={() => setApproving(null)} width={480}>
+      <Modal
+        open={Boolean(approving)}
+        title={t('page.agreementTemplate.approveModalTitle')}
+        onClose={() => setApproving(null)}
+        width={480}
+      >
         {approving && selected ? (
           <form
             onSubmit={(e) => {
@@ -416,12 +432,14 @@ export default function AgreementTemplatePage() {
             }}
           >
             <p style={{ margin: '0 0 12px', fontSize: 13, color: colors.muted }}>
-              Once approved, version {selected.version} is used for every new agreement and its wording is locked.
-              {inUse?.status === 'approved' ? ` Version ${inUse.version} is kept as a record.` : ''}
+              {t('page.agreementTemplate.approveBlurb').replace('{version}', String(selected.version))}
+              {inUse?.status === 'approved'
+                ? t('page.agreementTemplate.approveKept').replace('{version}', String(inUse.version))
+                : ''}
             </p>
             <div style={fieldStyle}>
               <label style={labelStyle} htmlFor="approved-by">
-                Lawyer who approved it
+                {t('page.agreementTemplate.lawyerName')}
               </label>
               <input
                 id="approved-by"
@@ -429,12 +447,12 @@ export default function AgreementTemplatePage() {
                 required
                 value={approving.by}
                 onChange={(e) => setApproving({ ...approving, by: e.target.value })}
-                placeholder="Name and firm"
+                placeholder={t('page.agreementTemplate.lawyerPlaceholder')}
               />
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle} htmlFor="approved-on">
-                Approved on
+                {t('page.agreementTemplate.approvedOn')}
               </label>
               <input
                 id="approved-on"
@@ -447,22 +465,22 @@ export default function AgreementTemplatePage() {
             </div>
             <div style={fieldStyle}>
               <label style={labelStyle} htmlFor="approval-note">
-                Note (optional)
+                {t('page.agreementTemplate.note')}
               </label>
               <input
                 id="approval-note"
                 style={inputStyle}
                 value={approving.note}
                 onChange={(e) => setApproving({ ...approving, note: e.target.value })}
-                placeholder="For example, approved by email on 3 November"
+                placeholder={t('page.agreementTemplate.notePlaceholder')}
               />
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
               <button type="button" style={buttonSecondaryStyle} onClick={() => setApproving(null)}>
-                Cancel
+                {t('page.agreementTemplate.cancel')}
               </button>
               <button type="submit" style={buttonPrimaryStyle} disabled={busy || !approving.by.trim()}>
-                Approve version {selected.version}
+                {t('page.agreementTemplate.approveVersion').replace('{version}', String(selected.version))}
               </button>
             </div>
           </form>
