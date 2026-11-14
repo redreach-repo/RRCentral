@@ -54,6 +54,7 @@ import {
 import { canViewField } from '../lib/fieldPermissions'
 import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
+import { parseAccountContactForm, parseAccountNoteForm } from '../lib/schemas/accountContact'
 import { formatAED } from '../lib/money'
 import type {
   Account,
@@ -255,10 +256,15 @@ export default function AccountDetailPage() {
   }
 
   async function handleAddNote() {
-    if (!account || !noteBody.trim()) return
+    if (!account) return
+    const parsed = parseAccountNoteForm({ kind: noteKind, body: noteBody })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
     setSaving(true)
     try {
-      await addActivity(account.id, noteKind, noteBody.trim(), author)
+      await addActivity(account.id, parsed.data.kind, parsed.data.body, author)
       setNoteBody('')
       setTimeline(await listActivities(account.id))
     } catch (e) {
@@ -270,19 +276,19 @@ export default function AccountDetailPage() {
 
   async function handleSaveContact() {
     if (!account || !contactModal) return
-    const form = contactModal.form
-    if (!form.name.trim()) {
-      showToast('Add a name for the contact', 'error')
+    const parsed = parseAccountContactForm(contactModal.form)
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setSaving(true)
     try {
       await saveContact(
         account.id,
-        { ...form, name: form.name.trim(), email: form.email.trim() },
+        parsed.data,
         contactModal.id,
       )
-      if (!contactModal.id) await logAccountEvent(account.id, `Contact added: ${form.name.trim()}`, author)
+      if (!contactModal.id) await logAccountEvent(account.id, `Contact added: ${parsed.data.name}`, author)
       const [c, t] = await Promise.all([listContacts(account.id), listActivities(account.id)])
       try {
         await syncAccountContactsToCrm(account, c)
