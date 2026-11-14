@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — sales/ops page body EN+AR
+**Current milestone:** Continuous backlog — tenant isolation for supplier commitments
 
 ## Shipped this turn
 
-- Page-body EN+AR catalogs for **Quick add**, **CTRM issues**, and **RR Wanders CRM** heroes
+- Expanded `tenant_isolation_test.sql` for **supplier_commitments** (read isolation + forged insert blocked)
 
 ## Already on main
 
