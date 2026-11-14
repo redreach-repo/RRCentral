@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — tenant isolation for pipelines
+**Current milestone:** Continuous backlog — tenant isolation for custom field definitions
 
 ## Shipped this turn
 
-- Expanded `tenant_isolation_test.sql` for **pipelines** (read isolation + forged insert blocked)
+- Expanded `tenant_isolation_test.sql` for **custom_field_definitions** (read isolation + forged insert blocked)
 
 ## Already on main
 
