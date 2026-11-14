@@ -90,5 +90,16 @@ No database migrations. Documentation and `brand-assets/` only.
 **Rollback**
 - Delete by `module_id` in (`crm`,`quotations`) and those names.
 
+## M1 — `20261216120000_event_outbox_claim.sql`
 
+**What**
+- `rr_claim_event_outbox(limit)` — FOR UPDATE SKIP LOCKED claim + 10-minute lease recovery for `event_outbox`
+- Service-role only; used by the `event-outbox` Edge Function
+
+**Dry-run / tests**
+- Unit: `app/src/lib/eventOutboxWorker.test.ts`
+- Edge auth: `supabase/tests/functions/public_functions_test.ts`
+
+**Rollback**
+- `drop function public.rr_claim_event_outbox(int);`
 

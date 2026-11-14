@@ -44,6 +44,7 @@ import type { ModuleNavItem } from '../modules/registry'
 import BrandLogo from './BrandLogo'
 import CommandPalette from './CommandPalette'
 import ErrorBoundary from './ErrorBoundary'
+import RouteAnnouncer from './RouteAnnouncer'
 import styles from './Layout.module.css'
 
 type NavItem = ModuleNavItem
@@ -227,6 +228,10 @@ export default function Layout() {
 
   return (
     <div className={`${styles.shell} ${phoneShell ? styles.shellPhone : ''}`}>
+      <a href="#main-content" className="rr-skip-link">
+        Skip to main content
+      </a>
+      <RouteAnnouncer />
       <div className={styles.ambient} aria-hidden />
       {isLocalMode && (
         <div className={styles.localBanner} role="alert">
@@ -441,7 +446,7 @@ export default function Layout() {
           </div>
         </header>
 
-        <main className={styles.content}>
+        <main id="main-content" className={styles.content} tabIndex={-1}>
           <ErrorBoundary key={location.pathname}>
             <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} />
             <Outlet />
