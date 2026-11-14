@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — tenant isolation for products
+**Current milestone:** Continuous backlog — sales detail page body EN+AR
 
 ## Shipped this turn
 
-- Expanded `tenant_isolation_test.sql` for **products** (read isolation + forged insert blocked)
+- Page-body EN+AR catalogs for **AI CRM detail**, **CTRM detail**, and **Google Drive** heroes
 
 ## Already on main
 

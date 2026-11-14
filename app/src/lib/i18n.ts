@@ -173,6 +173,19 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.deals.title': 'Pipeline',
     'page.deals.subtitle':
       'CRM, AI CRM sales, and CTRM Next in one board. Drag a card or change its stage here.',
+    'page.salesDetail.title': 'AI CRM detail',
+    'page.salesDetail.subtitle':
+      'Fine-grained AI CRM stages and Make contract. Day-to-day chasing lives on Pipeline.',
+    'page.salesDetail.new': 'New deal',
+    'page.ctrmDetail.title': 'CTRM detail',
+    'page.ctrmDetail.subtitle':
+      'Fine-grained CTRM Next stages, regions, and commission. Day-to-day chasing lives on Pipeline.',
+    'page.ctrmDetail.weeklySummary': 'Weekly summary',
+    'page.ctrmDetail.new': 'New deal',
+    'page.customerFiles.title': 'Google Drive',
+    'page.customerFiles.subtitle':
+      'Every customer document lives in Google Drive. RR Central keeps the folder links — quotes, invoices, delivery notes, communications, purchasing, and signed copies.',
+    'page.customerFiles.openDrive': 'Open in Drive',
     'page.login.title': 'RED REACH Central',
     'page.login.subtitle': 'Multi-division CRM & quoting for Red Reach Middle East FZE',
     'page.login.email': 'Email (@redreach.ae)',
@@ -440,6 +453,19 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.deals.title': 'خط الأنابيب',
     'page.deals.subtitle':
       'CRM ومبيعات AI CRM وCTRM Next في لوحة واحدة. اسحب بطاقة أو غيّر مرحلتها هنا.',
+    'page.salesDetail.title': 'تفاصيل AI CRM',
+    'page.salesDetail.subtitle':
+      'مراحل AI CRM التفصيلية وعقد Make. المتابعة اليومية على خط الأنابيب.',
+    'page.salesDetail.new': 'صفقة جديدة',
+    'page.ctrmDetail.title': 'تفاصيل CTRM',
+    'page.ctrmDetail.subtitle':
+      'مراحل CTRM Next والمناطق والعمولة. المتابعة اليومية على خط الأنابيب.',
+    'page.ctrmDetail.weeklySummary': 'الملخص الأسبوعي',
+    'page.ctrmDetail.new': 'صفقة جديدة',
+    'page.customerFiles.title': 'Google Drive',
+    'page.customerFiles.subtitle':
+      'كل مستند عميل يعيش في Google Drive. RR Central يحتفظ بروابط المجلدات — العروض والفواتير وإشعارات التسليم والمراسلات والمشتريات والنسخ الموقّعة.',
+    'page.customerFiles.openDrive': 'فتح في Drive',
     'page.login.title': 'RED REACH Central',
     'page.login.subtitle': 'CRM وعروض أسعار متعددة الأقسام لـ Red Reach Middle East FZE',
     'page.login.email': 'البريد (@redreach.ae)',
