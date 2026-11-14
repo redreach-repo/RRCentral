@@ -166,6 +166,16 @@ from public.accounts
 where reference = 'AC-TB-0001'
 limit 1;
 
+insert into public.legal_documents (company_name, title, doc_type, status, notes, tenant_id)
+values (
+  'Tenant B Secret Account',
+  'Tenant B Secret NDA',
+  'nda',
+  'draft',
+  'Tenant B Secret Legal',
+  'b0000000-0000-4000-8000-000000000001'
+);
+
 insert into public.event_outbox (event_type, aggregate_type, aggregate_id, tenant_id, status)
 values (
   'finalize_quote',
@@ -242,6 +252,10 @@ select pg_temp.expect(
   'redreach admin cannot read tenant B ctrm_deals'
 );
 select pg_temp.expect(
+  (select count(*) from public.legal_documents where notes = 'Tenant B Secret Legal') = 0,
+  'redreach admin cannot read tenant B legal_documents'
+);
+select pg_temp.expect(
   (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 0,
   'redreach admin cannot read tenant B event_outbox'
 );
@@ -312,6 +326,10 @@ select pg_temp.expect(
 select pg_temp.expect(
   (select count(*) from public.ctrm_deals where next_action = 'Call Tenant B CTRM') = 1,
   'tenant B admin can read own ctrm_deals'
+);
+select pg_temp.expect(
+  (select count(*) from public.legal_documents where notes = 'Tenant B Secret Legal') = 1,
+  'tenant B admin can read own legal_documents'
 );
 select pg_temp.expect(
   (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 1,
@@ -461,6 +479,22 @@ begin
     raise exception 'TENANT TEST FAILED: tenant B admin forged ticket into redreach';
   end if;
   raise notice 'ok - tenant B cannot insert ticket into redreach tenant_id';
+end $$;
+
+do $$
+declare
+  failed boolean := false;
+begin
+  begin
+    insert into public.legal_documents (company_name, title, tenant_id)
+    values ('Forged Co', 'Forged NDA', 'a0000000-0000-4000-8000-000000000001');
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: tenant B admin forged legal_document into redreach';
+  end if;
+  raise notice 'ok - tenant B cannot insert legal_document into redreach tenant_id';
 end $$;
 
 ------------------------------------------------------------ Append-only audit_log (authenticated cannot mutate)
