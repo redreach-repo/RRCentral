@@ -1,0 +1,41 @@
+{
+  "product": "HighMast",
+  "endorsement": "by Red Reach",
+  "route": "A — H with rising mast and light",
+  "colors": {
+    "highmastRed": "#C8321A",
+    "highmastOrange": "#E8872A",
+    "charcoal": "#1A1A1A",
+    "grey": "#6E6E6E",
+    "warmGrey": "#B8B2AC",
+    "paper": "#F7F4F1"
+  },
+  "files": {
+    "dir": "A-h-mast",
+    "darkBackgrounds": [
+      "A_symbol_reverse.svg",
+      "A_symbol_reverse.png",
+      "A_symbol_white.svg",
+      "A_symbol_white.png",
+      "A_stacked_reverse.png",
+      "A_stacked_reverse_by-red-reach.png",
+      "A_horizontal_reverse.png",
+      "A_horizontal_reverse_by-red-reach.png",
+      "A_horizontal_reverse_by-red-reach_warmgrey.png",
+      "A_horizontal_reverse_white.png",
+      "A_horizontal_reverse_white_alt.png",
+      "A_app-icon_full.png",
+      "A_app-icon_dark.png",
+      "A_favicon_full.png"
+    ],
+    "lightBackgrounds": [
+      "A_horizontal_black.png",
+      "A_horizontal_black_by-red-reach.png",
+      "A_horizontal_duo.png",
+      "A_horizontal_duo_by-red-reach.png",
+      "A_stacked_black.png",
+      "A_stacked_black_by-red-reach.png"
+    ],
+    "note": "PNG renders from design export classified 14 Nov 2026. Black mono / duo lockups are for light backgrounds (they disappear on black). A_symbol_reverse.svg is a geometric vector of route A. Full SVG wordmark zip still preferred when available. Never use charcoal/duo wordmarks on dark surfaces."
+  }
+}

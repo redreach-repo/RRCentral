@@ -15,7 +15,7 @@
   z-index: 0;
   /* Single quiet wash — minimalist, brand-tinted only */
   background:
-    radial-gradient(720px 360px at 0% 0%, rgba(232, 93, 4, 0.06), transparent 60%);
+    radial-gradient(720px 360px at 0% 0%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 60%);
   opacity: 0.9;
 }
 
@@ -109,6 +109,32 @@
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+.sideFooter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.sideFooterMark {
+  width: 16px;
+  height: auto;
+  flex-shrink: 0;
+  opacity: 0.95;
+}
+
+.sideFooterLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .phoneShortcuts {
@@ -307,8 +333,8 @@
   align-items: center;
   gap: 14px;
   padding: 0 var(--space-page, 28px);
-  background: rgba(11, 12, 14, 0.82);
-  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border-bottom: 1px solid var(--border);
   backdrop-filter: blur(10px);
   position: sticky;
   top: 0;
@@ -338,7 +364,7 @@
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--text-muted);
 }
 
 .title {

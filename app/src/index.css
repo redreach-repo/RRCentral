@@ -1,34 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
+@import './styles/tokens.css';
 
 *,
 *::before,
 *::after {
   box-sizing: border-box;
-}
-
-:root {
-  /* Minimal CRM surface — Red Reach ink + sparingly used orange */
-  --bg: #0b0c0e;
-  --bg-elevated: #111214;
-  --sidebar: #0f1012;
-  --surface: #141518;
-  --surface-2: #181a1e;
-  --accent: #e85d04;
-  --accent-soft: #ff9f4a;
-  --accent-muted: rgba(232, 93, 4, 0.14);
-  --card: rgba(255, 255, 255, 0.03);
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.12);
-  --text: #f4f5f7;
-  --muted: rgba(244, 245, 247, 0.58);
-  --muted-2: rgba(244, 245, 247, 0.38);
-  --success: #3ecf8e;
-  --danger: #f07178;
-  --warn: #e6b450;
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 40px rgba(0, 0, 0, 0.35);
-  --radius: 10px;
-  --radius-sm: 8px;
-  --space-page: clamp(20px, 2.4vw, 32px);
 }
 
 html {
@@ -91,17 +67,17 @@ img {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--text) 18%, transparent);
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(232, 93, 4, 0.4);
+  background: color-mix(in srgb, var(--primary) 45%, transparent);
 }
 
 ::selection {
-  background: rgba(232, 93, 4, 0.32);
-  color: #fff;
+  background: color-mix(in srgb, var(--primary) 35%, transparent);
+  color: var(--on-primary);
 }
 
 /* rr-a11y */
@@ -136,12 +112,12 @@ img {
 .rr-skip-link:focus,
 .rr-skip-link:focus-visible {
   transform: translateY(0);
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 

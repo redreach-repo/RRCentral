@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { SettingsProvider } from './contexts/SettingsContext'
 import { ToastProvider } from './contexts/ToastContext'
 import { TenantProvider } from './contexts/TenantContext'
+import { ThemeProvider } from './contexts/ThemeContext'
 import { I18nProvider } from './contexts/I18nContext'
 import GuidePage from './pages/GuidePage'
 import Layout from './components/Layout'
@@ -80,6 +81,7 @@ function HomeRoute() {
 export default function App() {
   return (
     <AuthProvider>
+      <ThemeProvider>
       <I18nProvider>
       <SettingsProvider>
         <TenantProvider>
@@ -192,6 +194,7 @@ export default function App() {
         </TenantProvider>
       </SettingsProvider>
       </I18nProvider>
+      </ThemeProvider>
     </AuthProvider>
   )
 }

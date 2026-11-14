@@ -1,3 +1,8 @@
+# Brand assets
+
+- highmast/: HighMast product logo files, route A (SVG)
+- the rest: Red Reach assets below
+
 # Red Reach brand assets
 
 Seed assets for the Red Reach tenant brand kit (spec section 5.1 and Appendix C).

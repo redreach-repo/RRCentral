@@ -8,14 +8,15 @@ describe('PRODUCT', () => {
     expect(PRODUCT.endorsement).toBe('by Red Reach')
   })
 
-  it('keeps the Master Spec brand red', () => {
+  it('keeps the Master Spec brand colours', () => {
     expect(PRODUCT.colors.red).toBe('#C8321A')
     expect(PRODUCT.colors.orange).toBe('#E8872A')
   })
 
-  it('builds brand asset URLs under public/brand/highmast', () => {
+  it('builds Appendix C asset URLs under A-h-mast', () => {
     const assets = productAssetUrls('/RRCentral/')
-    expect(assets.symbol).toBe('/RRCentral/brand/highmast/highmast-symbol.png')
-    expect(assets.stacked).toBe('/RRCentral/brand/highmast/highmast-stacked.png')
+    expect(assets.stackedReverse).toBe('/RRCentral/brand/highmast/A-h-mast/A_stacked_reverse.png')
+    expect(assets.symbolReverse).toContain('A_symbol_reverse.svg')
+    expect(assets.appIconFull).toContain('A_app-icon_full.png')
   })
 })
