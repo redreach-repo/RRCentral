@@ -266,6 +266,19 @@ const STRINGS: Record<Locale, Record<string, string>> = {
       'Every server function gets a harmless ping (it does not send, import or change anything), next to its last failure. Each row names its test in docs/LIVE_TEST.md. Full error details are on',
     'page.systemCheck.appErrors': 'App errors',
     'page.systemCheck.subtitleTrail': '.',
+    'page.delivery.kicker': 'Delivery',
+    'page.worshipHub.title': 'WorshipHub',
+    'page.worshipHub.subtitle':
+      'WorshipHub churches that Red Reach runs and supports. Member and visitor data stays in WorshipHub.',
+    'page.worshipHub.refresh': 'Refresh',
+    'page.worshipHub.addChurch': 'Add a church',
+    'page.packages.title': 'Packages and rates',
+    'page.packages.subtitle':
+      'The AI CRM package catalogue, the rates used for overage and profitability, and support response times. Prices exclude 5% VAT. Changes apply to new contracts; existing contracts keep the fees saved on them.',
+    'page.buildTemplates.title': 'Build templates',
+    'page.buildTemplates.subtitle':
+      'A ready build checklist and starter configuration for each package. On a client, Start from template copies the checklist into their build and the starter configuration into their requirements. Changes here apply to the next client, not to builds already started.',
+    'page.buildTemplates.new': 'New template',
     'page.ops.kicker': 'Operations',
     'page.catalog.title': 'Catalog',
     'page.catalog.subtitle': 'Brand catalogues and products across divisions',
@@ -546,6 +559,19 @@ const STRINGS: Record<Locale, Record<string, string>> = {
       'كل دالة خادم تحصل على نبضة غير ضارة (لا ترسل ولا تستورد ولا تغيّر شيئاً)، بجانب آخر فشل. كل صف يسمي اختباره في docs/LIVE_TEST.md. تفاصيل الأخطاء الكاملة على',
     'page.systemCheck.appErrors': 'أخطاء التطبيق',
     'page.systemCheck.subtitleTrail': '.',
+    'page.delivery.kicker': 'التسليم',
+    'page.worshipHub.title': 'WorshipHub',
+    'page.worshipHub.subtitle':
+      'كنائس WorshipHub التي تديرها وتدعمها Red Reach. بيانات الأعضاء والزوار تبقى في WorshipHub.',
+    'page.worshipHub.refresh': 'تحديث',
+    'page.worshipHub.addChurch': 'إضافة كنيسة',
+    'page.packages.title': 'الباقات والأسعار',
+    'page.packages.subtitle':
+      'كتالوج باقات AI CRM والأسعار المستخدمة للزيادة والربحية وأوقات استجابة الدعم. الأسعار بلا ضريبة 5%. التغييرات تنطبق على العقود الجديدة؛ العقود الحالية تحتفظ بالرسوم المحفوظة عليها.',
+    'page.buildTemplates.title': 'قوالب البناء',
+    'page.buildTemplates.subtitle':
+      'قائمة تحقق جاهزة وإعداد أولي لكل باقة. على العميل، ابدأ من قالب ينسخ القائمة إلى بنائه والإعداد إلى متطلباته. التغييرات هنا تنطبق على العميل التالي لا على البناءات التي بدأت.',
+    'page.buildTemplates.new': 'قالب جديد',
     'page.ops.kicker': 'العمليات',
     'page.catalog.title': 'الكتالوج',
     'page.catalog.subtitle': 'كتالوجات العلامات والمنتجات عبر الأقسام',

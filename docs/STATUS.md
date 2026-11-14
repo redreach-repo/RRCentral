@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — tenant isolation for inventory movements
+**Current milestone:** Continuous backlog — delivery page body EN+AR
 
 ## Shipped this turn
 
-- Expanded `tenant_isolation_test.sql` for **inventory_movements** (read isolation + forged insert blocked)
+- Page-body EN+AR catalogs for **WorshipHub**, **Packages and rates**, and **Build templates** heroes
 
 ## Already on main
 

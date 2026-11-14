@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { ClipboardList, Copy, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import Modal from '../components/Modal'
@@ -60,6 +61,7 @@ type ItemForm = {
 }
 
 export default function BuildTemplatesPage() {
+  const { t } = useI18n()
   const { userRole } = useAuth()
   const { showToast } = useToast()
   const canEdit = can(userRole, 'delivery.packages')
@@ -215,13 +217,9 @@ export default function BuildTemplatesPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Delivery</p>
-          <h1 className={docsStyles.title}>Build templates</h1>
-          <p className={docsStyles.subtitle}>
-            A ready build checklist and starter configuration for each package. On a client, Start from template copies
-            the checklist into their build and the starter configuration into their requirements. Changes here apply to
-            the next client, not to builds already started.
-          </p>
+          <p className={docsStyles.kicker}>{t('page.delivery.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.buildTemplates.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.buildTemplates.subtitle')}</p>
         </div>
         {canEdit ? (
           <button
@@ -229,7 +227,7 @@ export default function BuildTemplatesPage() {
             className={docsStyles.newBtn}
             onClick={() => setTemplateForm({ name: '', description: '', package_id: '', active: true })}
           >
-            <Plus size={14} /> New template
+            <Plus size={14} /> {t('page.buildTemplates.new')}
           </button>
         ) : null}
       </header>
