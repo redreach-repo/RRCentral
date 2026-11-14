@@ -37,8 +37,8 @@ import { elapsedLabel } from '../lib/timeTracking'
 import { useRecurringDeductionsSync } from '../hooks/useRecurringDeductionsSync'
 import { usePhoneShell } from '../hooks/useMediaQuery'
 import { can, roleAtLeast } from '../lib/permissions'
-import type { UserRole } from '../lib/types'
 import {
+  APP_MODULES,
   itemMatchesPath,
   moduleIdForPath,
   navItemVisible,
@@ -130,7 +130,7 @@ export default function Layout() {
   const [expandedIds, setExpandedIds] = useState<string[]>(() => {
     const fromPath = moduleIdForPath(location.pathname)
     const saved = readSavedSection()
-    const seed = saved && navGroups.some((g) => g.id === saved) ? saved : fromPath
+    const seed = saved && APP_MODULES.some((g) => g.id === saved) ? saved : fromPath
     return Array.from(new Set([fromPath, seed].filter(Boolean)))
   })
 
