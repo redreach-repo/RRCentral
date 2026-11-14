@@ -15,7 +15,7 @@ The gap plan only has one line per module and MASTER_SPEC v1.2 is not in the rep
 1. **One concern per PR.** One module per PR. If a module is too big, split it into numbered PRs (e.g. "HR 1/2"), each one usable on its own.
 2. **Draft PRs only. Never merge.** Alfred merges.
 3. **No live data, no live setup.** Do not apply SQL to the live Supabase project, set secrets, deploy functions, or touch Stripe live mode. Write the SQL and the setup steps in the PR and in `docs/modules/<module>.md`; Alfred runs them through the SQL copy page and the "Deploy Edge Functions" Actions button. Alfred has no local checkout, so never give him CLI commands.
-4. **RLS on every new table**, plus the RESTRICTIVE `"Tenant isolation"` policy (`rr_same_tenant(tenant_id)`) and a `tenant_id uuid not null default` the Red Reach tenant, the same pattern as `20261213170000_pipelines_workflows.sql`.
+4. **RLS on every new table** (and drop the broad `"Staff full access"` / `"Viewers read"` policies that older migrations add to every table when CI re-runs them), plus the RESTRICTIVE `"Tenant isolation"` policy (`rr_same_tenant(tenant_id)`) and a `tenant_id uuid not null default` the Red Reach tenant, the same pattern as `20261213170000_pipelines_workflows.sql`.
 5. **Migrations safe to re-run** (`create table if not exists`, `drop policy if exists` then `create policy`, `create or replace function`, `on conflict do nothing`). `supabase/tests/run.sh` applies every migration twice in CI.
 6. **Tests:** unit tests (Vitest) for the logic, plus a SQL test file `supabase/tests/modules/<module>_test.sql` with an access check for every role (admin, manager, sales, staff, viewer, and anon where relevant) and a cross-tenant check. A NOTICE containing `TEST FAILED` or any `ERROR:` fails CI. Start the file with `begin;` and `\ir _fixtures.sql` (one user per role in tenant A, an admin in tenant B, `pg_temp.login('sales')` etc.) and end with `rollback;`.
 7. **Not stacked.** Each PR branches from `main`. Keep it current with `main` so Alfred never sees GitHub's conflict editor. If two of one agent's PRs must touch the same line, say the merge order in the PR body.
@@ -42,7 +42,7 @@ This PR adds plug-in slots so a module PR only adds new files:
 **Files that are still shared** (append a block, keep it small, rebase before pushing):
 `supabase/config.toml` (only for `verify_jwt = false` functions), `supabase/tests/functions/public_functions_test.ts` (`GUARDS` entry for that function), Status goes in `docs/modules/<module>.md`, not in this file.
 
-**Do not edit** in a module PR: `App.tsx`, `modules/nav.ts`, `lib/i18n.ts`, `lib/localDb.ts`, `supabase/tests/rls_test.sql`, `tenant_isolation_test.sql`, `run.sh`, `.github/workflows/*`. New module tables are Supabase only; local (IndexedDB) mode shows a "run the SQL first" note instead of a store.
+**Do not edit** in a module PR: `App.tsx`, `modules/nav.ts`, `lib/i18n.ts`, `lib/localDb.ts`, `supabase/tests/rls_test.sql`, `tenant_isolation_test.sql`, `run.sh`, `.github/workflows/*`. New module tables are Supabase only; pages show `modules/extensions/_shared/SetupNotice.tsx` in local (IndexedDB) mode or when the SQL has not been run.
 
 ---
 
