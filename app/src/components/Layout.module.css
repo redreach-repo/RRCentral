@@ -333,8 +333,8 @@
   align-items: center;
   gap: 14px;
   padding: 0 var(--space-page, 28px);
-  background: rgba(11, 12, 14, 0.82);
-  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border-bottom: 1px solid var(--border);
   backdrop-filter: blur(10px);
   position: sticky;
   top: 0;
@@ -364,7 +364,7 @@
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.38);
+  color: var(--text-muted);
 }
 
 .title {
