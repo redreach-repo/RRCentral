@@ -279,9 +279,7 @@ export default function DomainsPage() {
 
       {missingTable ? (
         <div style={{ ...cardStyle, color: colors.muted, lineHeight: 1.55, marginBottom: 16 }}>
-          The <code>owned_domains</code> table is not on this database yet. Run{' '}
-          <code>supabase/migrations/20261008120000_owned_domains.sql</code> in the Supabase SQL
-          editor, then refresh. Local mode creates the store automatically after a reload.
+          {t('page.domains.missingTable')}
         </div>
       ) : null}
 
@@ -295,7 +293,7 @@ export default function DomainsPage() {
             lineHeight: 1.55,
           }}
         >
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Upcoming renewals</div>
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>{t('page.domains.upcomingRenewals')}</div>
           <ul style={{ margin: 0, paddingLeft: 18, color: colors.muted }}>
             {renewalAlerts.slice(0, 8).map((a) => (
               <li key={a.id} style={{ marginBottom: 4 }}>
@@ -304,7 +302,7 @@ export default function DomainsPage() {
                 </strong>{' '}
                 · {domainAlertLabel(a)}
                 {a.registrar ? ` · ${a.registrar}` : ''}
-                {a.autoRenew ? ' · auto-renew on' : ''}
+                {a.autoRenew ? t('page.domains.autoRenewOn') : ''}
               </li>
             ))}
           </ul>
@@ -314,20 +312,20 @@ export default function DomainsPage() {
       <div style={{ marginBottom: 16 }}>
         <input
           style={{ ...inputStyle, maxWidth: 360 }}
-          placeholder="Search domain, registrar, DNS…"
+          placeholder={t('page.domains.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
 
       {loading ? (
-        <div style={{ ...cardStyle, color: colors.muted }}>Loading domains…</div>
+        <div style={{ ...cardStyle, color: colors.muted }}>{t('page.domains.loading')}</div>
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={<Globe size={22} />}
-          title="No domains yet"
-          subtitle="Add redreach.ae, teetribe.com, and any other domains you own so renewals are not missed."
-          actionLabel="Add domain"
+          title={t('page.domains.emptyTitle')}
+          subtitle={t('page.domains.emptySubtitle')}
+          actionLabel={t('page.domains.add')}
           onAction={openCreate}
         />
       ) : (
@@ -336,11 +334,11 @@ export default function DomainsPage() {
             <table style={tableStyle}>
               <thead>
                 <tr>
-                  <th style={thStyle}>Domain</th>
-                  <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Registrar</th>
-                  <th style={thStyle}>Expires</th>
-                  <th style={thStyle}>DNS / hosting</th>
+                  <th style={thStyle}>{t('page.domains.colDomain')}</th>
+                  <th style={thStyle}>{t('page.domains.colStatus')}</th>
+                  <th style={thStyle}>{t('page.domains.colRegistrar')}</th>
+                  <th style={thStyle}>{t('page.domains.colExpires')}</th>
+                  <th style={thStyle}>{t('page.domains.colDnsHosting')}</th>
                   <th style={thStyle}></th>
                 </tr>
               </thead>
@@ -360,7 +358,8 @@ export default function DomainsPage() {
                                 rel="noreferrer"
                                 style={{ color: colors.accent }}
                               >
-                                Open site <ExternalLink size={10} style={{ verticalAlign: -1 }} />
+                                {t('page.domains.openSite')}{' '}
+                                <ExternalLink size={10} style={{ verticalAlign: -1 }} />
                               </a>
                             ) : (
                               d.website_url
@@ -372,7 +371,7 @@ export default function DomainsPage() {
                       <td style={tdStyle}>
                         {d.registrar || '—'}
                         {d.auto_renew ? (
-                          <div style={{ fontSize: 11, color: colors.muted2 }}>Auto-renew</div>
+                          <div style={{ fontSize: 11, color: colors.muted2 }}>{t('page.domains.autoRenew')}</div>
                         ) : null}
                       </td>
                       <td style={tdStyle}>
@@ -422,16 +421,16 @@ export default function DomainsPage() {
 
       <Modal
         open={open}
-        title={editing ? 'Edit domain' : 'Add domain'}
+        title={editing ? t('page.domains.editModal') : t('page.domains.addModal')}
         onClose={() => setOpen(false)}
         width={720}
       >
         <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.45 }}>
-          Record registrar login hints (not passwords), renewal dates, and where DNS / hosting live.
+          {t('page.domains.formHint')}
         </p>
         <div style={formGridStyle}>
           <div style={{ ...fieldStyle, gridColumn: '1 / -1' }}>
-            <label style={labelStyle}>Domain *</label>
+            <label style={labelStyle}>{t('page.domains.domainField')}</label>
             <input
               style={inputStyle}
               value={form.domain_name}
@@ -441,7 +440,7 @@ export default function DomainsPage() {
             />
           </div>
           <div style={fieldStyle}>
-            <label style={labelStyle}>Status</label>
+            <label style={labelStyle}>{t('page.domains.status')}</label>
             <select
               style={selectStyle}
               value={form.status}
@@ -457,34 +456,34 @@ export default function DomainsPage() {
             </select>
           </div>
           <div style={fieldStyle}>
-            <label style={labelStyle}>Managed by</label>
+            <label style={labelStyle}>{t('page.domains.managedBy')}</label>
             <input
               style={inputStyle}
               value={form.managed_by}
               onChange={(e) => setForm((f) => ({ ...f, managed_by: e.target.value }))}
-              placeholder="Email or name"
+              placeholder={t('page.domains.managedByPlaceholder')}
             />
           </div>
           <div style={fieldStyle}>
-            <label style={labelStyle}>Registrar</label>
+            <label style={labelStyle}>{t('page.domains.registrar')}</label>
             <input
               style={inputStyle}
               value={form.registrar}
               onChange={(e) => setForm((f) => ({ ...f, registrar: e.target.value }))}
-              placeholder="GoDaddy, Namecheap, Cloudflare…"
+              placeholder={t('page.domains.registrarPlaceholder')}
             />
           </div>
           <div style={fieldStyle}>
-            <label style={labelStyle}>Registrar account hint</label>
+            <label style={labelStyle}>{t('page.domains.registrarAccount')}</label>
             <input
               style={inputStyle}
               value={form.registrar_account}
               onChange={(e) => setForm((f) => ({ ...f, registrar_account: e.target.value }))}
-              placeholder="Login email / team account — not the password"
+              placeholder={t('page.domains.registrarAccountPlaceholder')}
             />
           </div>
           <div style={fieldStyle}>
-            <label style={labelStyle}>Registered on</label>
+            <label style={labelStyle}>{t('page.domains.registeredOn')}</label>
             <input
               type="date"
               style={inputStyle}
@@ -493,7 +492,7 @@ export default function DomainsPage() {
             />
           </div>
           <div style={fieldStyle}>
-            <label style={labelStyle}>Expires on</label>
+            <label style={labelStyle}>{t('page.domains.expiresOn')}</label>
             <input
               type="date"
               style={inputStyle}
@@ -517,22 +516,22 @@ export default function DomainsPage() {
               onChange={(e) => setForm((f) => ({ ...f, auto_renew: e.target.checked }))}
             />
             <span style={{ fontSize: 13, color: colors.text, lineHeight: 1.4 }}>
-              Auto-renew enabled at registrar
+              {t('page.domains.autoRenewEnabled')}
             </span>
           </label>
           <div style={fieldStyle}>
-            <label style={labelStyle}>Renewal cost (AED)</label>
+            <label style={labelStyle}>{t('page.domains.renewalCost')}</label>
             <input
               type="number"
               step="0.01"
               style={inputStyle}
               value={form.cost_aed}
               onChange={(e) => setForm((f) => ({ ...f, cost_aed: e.target.value }))}
-              placeholder="Optional"
+              placeholder={t('page.domains.optional')}
             />
           </div>
           <div style={fieldStyle}>
-            <label style={labelStyle}>Billing cycle</label>
+            <label style={labelStyle}>{t('page.domains.billingCycle')}</label>
             <select
               style={selectStyle}
               value={form.billing_cycle}
@@ -551,34 +550,34 @@ export default function DomainsPage() {
             </select>
           </div>
           <div style={fieldStyle}>
-            <label style={labelStyle}>DNS provider</label>
+            <label style={labelStyle}>{t('page.domains.dnsProvider')}</label>
             <input
               style={inputStyle}
               value={form.dns_provider}
               onChange={(e) => setForm((f) => ({ ...f, dns_provider: e.target.value }))}
-              placeholder="Cloudflare, registrar DNS…"
+              placeholder={t('page.domains.dnsPlaceholder')}
             />
           </div>
           <div style={fieldStyle}>
-            <label style={labelStyle}>Hosting</label>
+            <label style={labelStyle}>{t('page.domains.hosting')}</label>
             <input
               style={inputStyle}
               value={form.hosting_provider}
               onChange={(e) => setForm((f) => ({ ...f, hosting_provider: e.target.value }))}
-              placeholder="GitHub Pages, Vercel, cPanel…"
+              placeholder={t('page.domains.hostingPlaceholder')}
             />
           </div>
           <div style={{ ...fieldStyle, gridColumn: '1 / -1' }}>
-            <label style={labelStyle}>Nameservers</label>
+            <label style={labelStyle}>{t('page.domains.nameservers')}</label>
             <input
               style={inputStyle}
               value={form.nameservers}
               onChange={(e) => setForm((f) => ({ ...f, nameservers: e.target.value }))}
-              placeholder="ns1…, ns2… (comma or space separated)"
+              placeholder={t('page.domains.nameserversPlaceholder')}
             />
           </div>
           <div style={{ ...fieldStyle, gridColumn: '1 / -1' }}>
-            <label style={labelStyle}>Website URL</label>
+            <label style={labelStyle}>{t('page.domains.websiteUrl')}</label>
             <input
               style={inputStyle}
               value={form.website_url}
@@ -587,38 +586,39 @@ export default function DomainsPage() {
             />
           </div>
           <div style={{ ...fieldStyle, gridColumn: '1 / -1' }}>
-            <label style={labelStyle}>Notes</label>
+            <label style={labelStyle}>{t('page.domains.notes')}</label>
             <textarea
               style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }}
               value={form.notes}
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-              placeholder="Purpose, linked products, transfer lock, etc."
+              placeholder={t('page.domains.notesPlaceholder')}
             />
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setOpen(false)}>
-            Cancel
+            {t('page.domains.cancel')}
           </button>
           <button type="button" style={buttonPrimaryStyle} onClick={() => void save()} disabled={saving}>
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? t('page.domains.saving') : t('page.domains.save')}
           </button>
         </div>
       </Modal>
 
       <Modal
         open={!!deleteTarget}
-        title="Archive domain?"
+        title={t('page.domains.archiveTitle')}
         onClose={() => setDeleteTarget(null)}
         width={420}
       >
         <p style={{ color: colors.muted, lineHeight: 1.5 }}>
-          Archive <strong style={{ color: colors.text }}>{deleteTarget?.domain_name}</strong>? It
-          will leave the active list (you can restore later from the database if needed).
+          {t('page.domains.archiveBodyLead')}
+          <strong style={{ color: colors.text }}>{deleteTarget?.domain_name}</strong>
+          {t('page.domains.archiveBodyTrail')}
         </p>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setDeleteTarget(null)}>
-            Cancel
+            {t('page.domains.cancel')}
           </button>
           <button
             type="button"
@@ -626,7 +626,7 @@ export default function DomainsPage() {
             onClick={() => void confirmDelete()}
             disabled={saving}
           >
-            {saving ? 'Archiving…' : 'Archive'}
+            {saving ? t('page.domains.archiving') : t('page.domains.archive')}
           </button>
         </div>
       </Modal>
