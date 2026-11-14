@@ -8,8 +8,8 @@ export type ViewerTheme = 'light' | 'dark'
 export const VIEWER_THEME_KEY = 'rr.documentViewer.theme'
 
 export const VIEWER_BACKDROP: Record<ViewerTheme, string> = {
-  light: '#f0f0f0',
-  dark: '#0b0c0e',
+  light: '#F7F4F1',
+  dark: '#141414',
 }
 
 export function parseViewerTheme(value: string | null | undefined): ViewerTheme {

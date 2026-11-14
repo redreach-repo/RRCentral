@@ -140,7 +140,7 @@
   color: var(--text, #f4f5f7);
   border-color: var(--border-strong, rgba(255, 255, 255, 0.12));
   background: rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 -2px 0 var(--accent, #e85d04);
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 
 .toolbarSearch {
@@ -342,7 +342,7 @@
 .dueTileActive {
   border-color: var(--border-strong, rgba(255, 255, 255, 0.12));
   background: rgba(255, 255, 255, 0.04);
-  box-shadow: inset 2px 0 0 var(--accent, #e85d04);
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .dueTileValue {
@@ -470,7 +470,7 @@
   color: var(--text, #f4f5f7);
   border-color: transparent;
   background: rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 -2px 0 var(--accent, #e85d04);
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 
 .sheetActions {
@@ -620,7 +620,7 @@
 }
 
 .boardLogBtn:hover {
-  border-color: var(--accent, #e85d04);
+  border-color: var(--accent);
   color: var(--accent-soft, #ff9f4a);
 }
 

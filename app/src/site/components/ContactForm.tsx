@@ -7,6 +7,7 @@ import {
   type WebsiteInquiryInput,
 } from '../../lib/websiteLeads'
 import { fetchLeadFormToken, pageUtm, sendLead } from '../../lib/leadIntakeStore'
+import { PRODUCT } from '../../lib/product'
 
 const EMPTY: WebsiteInquiryInput = {
   name: '',
@@ -75,7 +76,7 @@ export default function ContactForm({
   if (status === 'sent') {
     return (
       <div className="site-form-success">
-        Received. The team will follow up. This enquiry is now in RR Central as a lead.
+        Received. The team will follow up. This enquiry is now in {PRODUCT.name} as a lead.
       </div>
     )
   }
@@ -141,7 +142,7 @@ export default function ContactForm({
       </label>
       {status === 'fallback' && (
         <p className="site-form-error">
-          We could not store this in Central just now.{' '}
+          We could not store this in {PRODUCT.name} just now.{' '}
           <a href={mailtoForInquiry(form)}>Email info@redreach.ae instead</a>.
         </p>
       )}

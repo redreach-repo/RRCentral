@@ -6,7 +6,7 @@
   --q-faint: var(--muted-2, rgba(244, 245, 247, 0.38));
   --q-line: var(--border, rgba(255, 255, 255, 0.08));
   --q-panel: rgba(255, 255, 255, 0.03);
-  --q-accent: var(--accent, #e85d04);
+  --q-accent: var(--accent);
   color: var(--q-ink);
   min-height: 100%;
   padding: 0 0 40px;

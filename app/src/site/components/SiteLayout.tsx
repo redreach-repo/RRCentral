@@ -6,6 +6,7 @@ import SiteWordmark from './SiteWordmark'
 import { siteAsset } from '../assets'
 import { SITE, VERTICALS } from '../data/verticals'
 import { playbookByPath, verticalPath } from '../data/playbooks'
+import { PRODUCT } from '../../lib/product'
 import '../site.css'
 
 export default function SiteLayout() {
@@ -68,8 +69,8 @@ export default function SiteLayout() {
             <Link to="/contact" className="site-nav-cta">
               Talk to us
             </Link>
-            <Link to={centralTo} className="site-central-link" title="Open RED REACH Central CRM">
-              Central
+            <Link to={centralTo} className="site-central-link" title={`Open ${PRODUCT.name}`}>
+              {PRODUCT.name}
             </Link>
           </nav>
           <button
@@ -106,7 +107,7 @@ export default function SiteLayout() {
             Contact
           </Link>
           <Link to={centralTo} className="site-central-link" onClick={() => setOpen(false)}>
-            Central
+            {PRODUCT.name}
           </Link>
         </div>
         <div className="site-page" key={location.pathname}>
@@ -159,7 +160,7 @@ export default function SiteLayout() {
                 </p>
                 <p>
                   <Link to={centralTo} className="site-central-link">
-                    Central
+                    {PRODUCT.name}
                   </Link>
                 </p>
               </div>

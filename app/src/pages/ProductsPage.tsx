@@ -13,6 +13,7 @@ import { createAccount, listAccounts } from '../lib/accountsStore'
 import { billingLabel, churchView, hasBillingIssue, joinRequests, renewalSoon } from '../lib/worshiphub'
 import { fetchLiveTenants, listChurchProfiles, saveChurchProfile, type LiveResult } from '../lib/worshiphubStore'
 import { errorMessage } from '../lib/errors'
+import { PRODUCT } from '../lib/product'
 import type { Account, WorshipChurchProfile, WorshipTenant } from '../lib/types'
 import {
   buttonSecondaryStyle,
@@ -179,7 +180,7 @@ export default function ProductsPage() {
             These churches signed up and are waiting for Red Reach to review them.{' '}
             {userRole === 'admin'
               ? 'Accept, verify, reject or delete them here. Each change is made on WorshipHub and kept in the audit log.'
-              : 'An RR Central admin can accept or reject them here, or in WorshipHub app admin.'}
+              : `A ${PRODUCT.name} admin can accept or reject them here, or in WorshipHub app admin.`}
           </p>
           <div style={{ display: 'grid', gap: 10 }}>
             {requests.map((t) => (
@@ -226,8 +227,10 @@ export default function ProductsPage() {
       ) : null}
 
       {unlinked.length ? (
-        <section style={{ ...cardStyle, marginBottom: 16 }} aria-label="Churches not in RR Central">
-          <h2 style={sectionTitleStyle}>In WorshipHub, not in RR Central yet ({unlinked.length})</h2>
+        <section style={{ ...cardStyle, marginBottom: 16 }} aria-label={`Churches not in ${PRODUCT.name}`}>
+          <h2 style={sectionTitleStyle}>
+            In WorshipHub, not in {PRODUCT.name} yet ({unlinked.length})
+          </h2>
           <div style={{ display: 'grid', gap: 8 }}>
             {unlinked.map((t) => (
               <div key={t.slug} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -293,7 +296,7 @@ export default function ProductsPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ textAlign: 'left', color: colors.muted }}>
-                {['Church', 'Plan', 'Billing', 'Renewal', 'Users', 'Contact', 'RR Central', ...(userRole === 'admin' ? ['On WorshipHub'] : [])].map((h) => (
+                {['Church', 'Plan', 'Billing', 'Renewal', 'Users', 'Contact', PRODUCT.name, ...(userRole === 'admin' ? ['On WorshipHub'] : [])].map((h) => (
                   <th key={h} style={{ padding: '6px 8px', fontWeight: 600, whiteSpace: 'nowrap' }}>
                     {h}
                   </th>

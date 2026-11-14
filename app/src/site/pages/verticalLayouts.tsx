@@ -332,7 +332,7 @@ export function TradeLayout({ vertical, playbook, onOpenShot }: LayoutProps) {
               <br />
               <em>requirement.</em>
             </h2>
-            <p className="site-lede">Share the spec. It is filed in Central so the sourcing desk can follow up.</p>
+            <p className="site-lede">Share the spec. It is filed in HighMast so the sourcing desk can follow up.</p>
           </div>
           <ContactForm
             compact
@@ -538,7 +538,7 @@ function Brief({ vertical, playbook }: { vertical: Vertical; playbook: VerticalP
             <em>{briefAccent(playbook.layout)}</em>
           </h2>
           <p className="site-lede">
-            Share the brief for {vertical.brand}. It is filed in Central so the right team can follow up.
+            Share the brief for {vertical.brand}. It is filed in HighMast so the right team can follow up.
           </p>
         </div>
         <ContactForm

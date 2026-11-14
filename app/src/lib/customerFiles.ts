@@ -9,6 +9,7 @@ import type {
   Invoice,
   Quotation,
 } from './types'
+import { PRODUCT } from './product'
 
 export const COMMUNICATION_KINDS: {
   id: 'email' | 'whatsapp' | 'call_notes' | 'communication'
@@ -64,7 +65,7 @@ export const CUSTOMER_FOLDER_SECTIONS: {
   {
     id: 'contracts',
     label: 'Contracts & NDAs',
-    hint: 'NDAs and agreements signed via RR Central or filed on Google Drive',
+    hint: `NDAs and agreements signed via ${PRODUCT.name} or filed on Google Drive`,
     mode: 'signed',
     signedCategory: 'signed_nda',
     uploadButton: 'Add signed NDA / contract',
@@ -612,7 +613,7 @@ export async function uploadPdfToCustomerDrive(opts: {
     title: opts.title,
     driveUrl: uploaded.url,
     relatedRef: opts.relatedRef,
-    notes: opts.notes || 'Saved from RR Central PDF',
+    notes: opts.notes || `Saved from ${PRODUCT.name} PDF`,
     uploadedBy: opts.uploadedBy,
   })
 }

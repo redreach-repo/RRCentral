@@ -1,5 +1,6 @@
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseConfig'
 import type { UserRole } from './types'
+import { PRODUCT } from './product'
 
 /**
  * Two step sign in: after the password, admins and managers enter a 6 digit
@@ -58,7 +59,7 @@ export async function startEnrollment(): Promise<Enrollment> {
   for (const f of list?.all ?? []) {
     if (f.status !== 'verified') await auth.mfa.unenroll({ factorId: f.id })
   }
-  const { data, error } = await auth.mfa.enroll({ factorType: 'totp', friendlyName: `RR Central ${new Date().toISOString().slice(0, 10)}` })
+  const { data, error } = await auth.mfa.enroll({ factorType: 'totp', friendlyName: `${PRODUCT.name} ${new Date().toISOString().slice(0, 10)}` })
   if (error) throw error
   return { factorId: data.id, qrCode: data.totp.qr_code, secret: data.totp.secret }
 }

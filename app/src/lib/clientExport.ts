@@ -9,6 +9,7 @@
 import { format } from 'date-fns'
 import type { Account } from './types'
 import { strToU8, zipSync } from 'fflate'
+import { PRODUCT } from './product'
 
 export type ExportMode = 'client' | 'full'
 
@@ -100,7 +101,7 @@ export function exportReadme(
     `Made by ${meta.companyName} on ${format(meta.when, "d MMMM yyyy 'at' HH:mm")}${meta.madeBy ? ` by ${meta.madeBy}` : ''}.`,
     '',
     mode === 'client'
-      ? 'This is all the information we hold about your account in RR Central, our client management system.'
+      ? `This is all the information we hold about your account in ${PRODUCT.name}, our client management system.`
       : 'Full export for our records, including internal notes and costs. Do not send this one to the client.',
     '',
     'Each spreadsheet (.csv) opens in Excel, Numbers or Google Sheets. everything.json has the same data for importing into another system.',

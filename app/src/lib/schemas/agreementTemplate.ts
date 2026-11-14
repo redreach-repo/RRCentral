@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { checkTemplate } from '../serviceAgreement'
 import { firstZodError } from './common'
+import { PRODUCT } from '../product'
 
 export type AgreementDraftFormInput = {
   title: string
@@ -22,7 +23,7 @@ export const agreementDraftFormSchema = z
     if (problems.unknown.length) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: `RR Central does not know ${problems.unknown.map((k) => `{{${k}}}`).join(', ')}. Pick from the known merge fields.`,
+        message: `${PRODUCT.name} does not know ${problems.unknown.map((k) => `{{${k}}}`).join(', ')}. Pick from the known merge fields.`,
         path: ['body'],
       })
     }

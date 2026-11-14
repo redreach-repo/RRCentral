@@ -1,8 +1,9 @@
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseConfig'
+import { PRODUCT } from './product'
 
 /** Makes (or reuses) the card payment link for an invoice. */
 export async function getInvoicePayLink(invoiceId: string): Promise<{ url: string; amount: number; currency: string }> {
-  if (!isSupabaseConfigured()) throw new Error('Card payment links only work when RR Central is connected to the cloud.')
+  if (!isSupabaseConfigured()) throw new Error(`Card payment links only work when ${PRODUCT.name} is connected to the cloud.`)
   const { data, error } = await getSupabaseClient().functions.invoke('invoice-pay-link', { body: { invoice_id: invoiceId } })
   if (error) {
     let message = 'The payment link could not be made. Try again later.'

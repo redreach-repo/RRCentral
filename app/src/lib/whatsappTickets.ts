@@ -7,6 +7,7 @@
  * (bundled by app/scripts/build-support-function.mjs). Only pure code here.
  */
 import { normalizePhone } from './whatsapp'
+import { PRODUCT } from './product'
 
 /** WhatsApp lets a business reply freely for 24 hours after the client's last message. */
 export const SERVICE_WINDOW_HOURS = 24
@@ -74,7 +75,7 @@ export function messageText(m: Obj): string | null {
     return str(obj(i.button_reply).title) || str(obj(i.list_reply).title) || '[Reply to a menu]'
   }
   if (type === 'reaction' || type === 'system' || type === 'ephemeral') return null
-  return '[A message RR Central cannot show] Open WhatsApp to see it.'
+  return `[A message ${PRODUCT.name} cannot show] Open WhatsApp to see it.`
 }
 
 /** Reads Meta's webhook payload: new client messages and delivery updates for messages we sent. */

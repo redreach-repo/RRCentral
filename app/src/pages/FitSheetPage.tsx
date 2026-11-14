@@ -65,7 +65,7 @@ export default function FitSheetPage() {
           <ArrowLeft size={16} /> {t('page.fitSheet.back')}
         </Link>
         {sheet ? (
-          <button type="button" style={{ ...bar, background: '#e85d04', color: '#fff' }} disabled={busy} onClick={() => void download()}>
+          <button type="button" style={{ ...bar, background: 'var(--primary)', color: 'var(--on-primary)' }} disabled={busy} onClick={() => void download()}>
             <Download size={16} /> {busy ? t('page.fitSheet.makingPdf') : t('page.fitSheet.download')}
           </button>
         ) : null}

@@ -5,6 +5,7 @@ import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { errorMessage } from '../lib/errors'
 import { getHubSpotNudge, type HubSpotSyncRun, listHubSpotRuns, runHubSpotSync, runSummary } from '../lib/hubspotSync'
+import { PRODUCT } from '../lib/product'
 import { buttonPrimaryStyle, cardStyle, colors, sectionTitleStyle } from '../lib/uiStyles'
 
 const when = (iso: string) => new Date(iso).toLocaleString()
@@ -60,13 +61,15 @@ export default function HubSpotCard() {
     <div style={{ ...cardStyle, marginBottom: 20 }}>
       <h2 style={sectionTitleStyle}>{t('page.settings.section.hubspot')}</h2>
       <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
-        RR Central sends its accounts to HubSpot as companies, account contacts as contacts (matched by email) and AI CRM
-        deals as deals in the Sales Pipeline, nightly and when you press Sync now. It is one way: changes made in HubSpot
-        do not come back, and deleting something here leaves it in HubSpot. Deal amounts are the first year value,
-        converted from AED to US dollars at 3.6725.
+        {PRODUCT.name} sends its accounts to HubSpot as companies, account contacts as contacts (matched by email) and AI
+        CRM deals as deals in the Sales Pipeline, nightly and when you press Sync now. It is one way: changes made in
+        HubSpot do not come back, and deleting something here leaves it in HubSpot. Deal amounts are the first year
+        value, converted from AED to US dollars at 3.6725.
       </p>
       {isLocalMode ? (
-        <p style={{ fontSize: 13, color: colors.muted }}>HubSpot needs RR Central connected to Supabase.</p>
+        <p style={{ fontSize: 13, color: colors.muted }}>
+          HubSpot needs {PRODUCT.name} connected to Supabase.
+        </p>
       ) : !canSync ? (
         <p style={{ fontSize: 13, color: colors.muted }}>Managers and admins run the HubSpot sync.</p>
       ) : loading ? (

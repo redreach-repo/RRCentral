@@ -15,6 +15,7 @@ import type {
   SendMailOpts,
   TeamMeetingInput,
 } from './mailCalendar/types'
+import { PRODUCT } from './product'
 
 export type M365Status = {
   configured: boolean
@@ -58,7 +59,7 @@ export function m365CalendarWebUrl(): string {
 
 async function callM365<T>(body: Record<string, unknown>): Promise<T> {
   if (!isSupabaseConfigured()) {
-    throw new Error('Microsoft 365 needs RR Central connected to Supabase')
+    throw new Error(`Microsoft 365 needs ${PRODUCT.name} connected to Supabase`)
   }
   const { data, error } = await getSupabaseClient().functions.invoke('m365-mail-calendar', { body })
   if (error) {

@@ -3,6 +3,7 @@ import type { AiInput, ProposedRequirement } from './aiAssist'
 import { isMissingRelationError } from './errors'
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseConfig'
 import type { AiUsageLog } from './types'
+import { PRODUCT } from './product'
 
 export type AiResult = {
   text: string
@@ -11,7 +12,7 @@ export type AiResult = {
   costUsd: number
 }
 
-export const AI_LOCAL_MODE = 'AI help works once RR Central is connected to Supabase.'
+export const AI_LOCAL_MODE = `AI help works once ${PRODUCT.name} is connected to Supabase.`
 
 async function invokeAi(body: { account_id: string; input: AiInput }): Promise<AiResult> {
   if (!isSupabaseConfigured()) throw new Error(AI_LOCAL_MODE)

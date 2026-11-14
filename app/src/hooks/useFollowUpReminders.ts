@@ -9,6 +9,7 @@ import {
   type ReminderCounts,
 } from '../lib/followUpReminders'
 import type { CrmEntry } from '../lib/types'
+import { PRODUCT } from '../lib/product'
 
 const REFRESH_MS = 10 * 60 * 1000
 
@@ -43,7 +44,7 @@ export function useFollowUpReminders(userEmail: string | undefined) {
 
       const message = reminderMessage(next)
       if (message && notificationState() === 'granted' && shouldNotifyToday()) {
-        new Notification('RED REACH Central', { body: message, tag: 'rr-followups' })
+        new Notification(PRODUCT.name, { body: message, tag: 'rr-followups' })
         markNotifiedToday()
       }
     } catch {

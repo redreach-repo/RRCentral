@@ -63,6 +63,7 @@ import { getUsageSource, saveUsageSource } from '../../lib/usageImportStore'
 import { canViewField } from '../../lib/fieldPermissions'
 import { can } from '../../lib/permissions'
 import { errorMessage } from '../../lib/errors'
+import { PRODUCT } from '../../lib/product'
 import { parseBuildBlockerNote } from '../../lib/schemas/buildBlocker'
 import { parseDeliveryContractForm } from '../../lib/schemas/deliveryContract'
 import { parseDeliveryRequirementForm } from '../../lib/schemas/deliveryRequirement'
@@ -1227,7 +1228,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
           </div>
           <p style={{ ...mutedNote, fontSize: 12, marginTop: 10 }}>
             Excludes VAT. Tool cost is the package estimate plus AI and lead credit spend for the month
-            {assistUsd > 0 ? `, and $${assistUsd.toFixed(2)} of AI help used in RR Central` : ''}. Only admins and managers
+            {assistUsd > 0 ? `, and $${assistUsd.toFixed(2)} of AI help used in ${PRODUCT.name}` : ''}. Only admins and managers
             see this.
           </p>
         </section>

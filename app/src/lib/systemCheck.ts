@@ -1,4 +1,5 @@
 import type { AppError } from './errorReporting'
+import { PRODUCT } from './product'
 
 /**
  * System check: every Edge Function, pinged with ?ping=1 (the shared
@@ -29,7 +30,7 @@ export const SYSTEM_FUNCTIONS: SystemFunction[] = [
   { name: 'hubspot-sync', feature: 'Accounts, contacts and deals to HubSpot', liveTest: '32' },
   { name: 'manage-auth-user', feature: 'Set team login passwords', liveTest: '9' },
   { name: 'create-checkout-session', feature: 'Shop checkout (Stripe)', liveTest: '9' },
-  { name: 'teetribe-order-sync', feature: 'Tee Tribe orders into RR Central', liveTest: '9' },
+  { name: 'teetribe-order-sync', feature: `Tee Tribe orders into ${PRODUCT.name}`, liveTest: '9' },
   { name: 'contract-invoices', feature: 'Contract invoices each morning', liveTest: '10' },
   { name: 'watchdog', feature: 'Daily watchdog list', liveTest: '11' },
   { name: 'event-outbox', feature: 'Domain event outbox worker', liveTest: '33' },

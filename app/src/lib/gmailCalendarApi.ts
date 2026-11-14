@@ -14,6 +14,7 @@ import type {
   SendMailOpts,
   TeamMeetingInput,
 } from './mailCalendar/types'
+import { PRODUCT } from './product'
 
 export type GmailStatus = {
   configured: boolean
@@ -57,7 +58,7 @@ export function gmailCalendarWebUrl(_settings?: ProviderSettings): string {
 
 async function callGmail<T>(body: Record<string, unknown>): Promise<T> {
   if (!isSupabaseConfigured()) {
-    throw new Error('Gmail needs RR Central connected to Supabase')
+    throw new Error(`Gmail needs ${PRODUCT.name} connected to Supabase`)
   }
   const { data, error } = await getSupabaseClient().functions.invoke('gmail-calendar', { body })
   if (error) {

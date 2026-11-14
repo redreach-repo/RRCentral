@@ -3,10 +3,11 @@ import { db } from './db'
 import { errorCode } from './errors'
 import { meetingActivityBody, type FirefliesMeeting } from './fireflies'
 import { getSupabaseClient, isSupabaseConfigured } from './supabaseConfig'
+import { PRODUCT } from './product'
 
 /** Reads a meeting from Fireflies through the fireflies-fetch function. */
 export async function fetchFirefliesMeeting(accountId: string, meeting: string): Promise<FirefliesMeeting> {
-  if (!isSupabaseConfigured()) throw new Error('Fireflies only works when RR Central is connected to the cloud.')
+  if (!isSupabaseConfigured()) throw new Error(`Fireflies only works when ${PRODUCT.name} is connected to the cloud.`)
   const { data, error } = await getSupabaseClient().functions.invoke('fireflies-fetch', { body: { account_id: accountId, meeting } })
   if (error) {
     let message = 'Fireflies could not be reached. Try again later.'
