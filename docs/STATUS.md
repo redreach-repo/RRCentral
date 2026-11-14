@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod CRM outcome
+**Current milestone:** Continuous backlog — M1 Zod Wanders deal
 
 ## Shipped this turn
 
-- Zod `parseCrmOutcomeForm` for Won/Lost quick outcome on My Day
+- Zod `parseWandersDealForm` / `parseWandersTermsAcceptForm` on Wanders save and terms acceptance
 
 ## Already on main
 
