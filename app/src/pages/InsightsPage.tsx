@@ -22,6 +22,7 @@ import {
 import { canViewField } from '../lib/fieldPermissions'
 import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
+import { parseInsightsCapacityForm } from '../lib/schemas/insightsCapacity'
 import { formatAED } from '../lib/money'
 import type { Account, Contract, DeliveryPackage, TimeEntry, UsageRecord } from '../lib/types'
 import type { AiUsageRow } from '../lib/aiAssist'
@@ -110,13 +111,13 @@ export default function InsightsPage() {
   const nameOf = useMemo(() => new Map((data?.accounts ?? []).map((a) => [a.id, a.name])), [data])
 
   async function saveCapacity() {
-    const n = Number(capacityDraft)
-    if (!Number.isFinite(n) || n <= 0 || n > 2000) {
-      showToast('Enter the hours a month you can deliver, for example 100', 'error')
+    const parsed = parseInsightsCapacityForm({ hours: capacityDraft })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     try {
-      await updateSetting(CAPACITY_SETTING_KEY, String(n))
+      await updateSetting(CAPACITY_SETTING_KEY, String(parsed.data.hours))
       showToast('Capacity saved', 'success')
     } catch (e) {
       showToast(errorMessage(e, 'Could not save'), 'error')
