@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod quotation finalize
+**Current milestone:** Continuous backlog — M1 Zod delivery note from quote
 
 ## Shipped this turn
 
-- Zod `parseQuotationFinalizeForm` requires a client before allocating a quotation reference
+- Zod `parseDeliveryNoteFromQuoteForm` requires a quotation pick before creating a delivery note
 
 ## Already on main
 
