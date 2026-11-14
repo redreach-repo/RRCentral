@@ -40,7 +40,12 @@ end;
 $$;
 
 revoke all on function public.rr_claim_event_outbox(int) from public;
-grant execute on function public.rr_claim_event_outbox(int) to service_role;
+do $$ begin
+  -- Present on Supabase; created in CI by supabase/tests/supabase_stub.sql.
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant execute on function public.rr_claim_event_outbox(int) to service_role;
+  end if;
+end $$;
 
 comment on function public.rr_claim_event_outbox(int) is
   'RRCRM M1: claim pending event_outbox rows for the event-outbox Edge Function.';
