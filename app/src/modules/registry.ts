@@ -38,6 +38,10 @@ export const MODULE_FLAGS_KEY = 'moduleFlags'
 /** Soft-hide toggles exposed on Settings → Module flags (must match module `flag` keys). */
 export const SETTINGS_MODULE_FLAGS: { flag: string; label: string }[] = [
   {
+    flag: 'overview',
+    label: 'Overview (Dashboard, Guide)',
+  },
+  {
     flag: 'sales',
     label: 'Sales (Pipeline, My Day, Follow-ups, quotes, invoices, Drive)',
   },
