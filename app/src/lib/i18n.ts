@@ -70,10 +70,11 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'nav.item.system-check': 'System check',
     'guide.title': 'How we work in RR Central',
     'guide.body':
-      'Short paths for the sales day and for money: My Day, Pipeline, quotations, support, NDAs, then invoices, payments, delivery notes, expenses, and the morning digest.',
+      'Short paths for the sales day, money, and client care: My Day, Pipeline, quotations, support, NDAs, invoices and payments, then accounts, health, reports, updates, and obligations.',
     'guide.back': 'Back to app',
     'guide.pack.crm': 'Sales day',
     'guide.pack.billing': 'Billing and money',
+    'guide.pack.delivery': 'Delivery and care',
     'guide.crm.myday.title': 'My Day',
     'guide.crm.myday.body':
       'Start here each morning. Log touches, set the next action and follow-up date, and mark Won or Lost with a reason.',
@@ -114,6 +115,26 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.billing.digest.body':
       'On Packages and rates, add who gets the morning email or WhatsApp of what needs attention (tickets, renewals, outbox activity).',
     'guide.billing.digest.link': 'Open Packages and rates',
+    'guide.delivery.accounts.title': 'Accounts',
+    'guide.delivery.accounts.body':
+      'Open the account record for contracts, build stages, time, and Drive files once a deal is live.',
+    'guide.delivery.accounts.link': 'Open accounts',
+    'guide.delivery.health.title': 'Client health',
+    'guide.delivery.health.body':
+      'Scan usage, tickets, and renewals so at-risk clients surface before the morning digest.',
+    'guide.delivery.health.link': 'Open client health',
+    'guide.delivery.reports.title': 'Monthly reports',
+    'guide.delivery.reports.body':
+      'Draft the monthly client report from usage and tickets, then send or file under the account.',
+    'guide.delivery.reports.link': 'Open monthly reports',
+    'guide.delivery.updates.title': 'Weekly updates',
+    'guide.delivery.updates.body':
+      'Write a short weekly update for the account owner so delivery stays visible without a meeting.',
+    'guide.delivery.updates.link': 'Open weekly updates',
+    'guide.delivery.obligations.title': 'Obligations',
+    'guide.delivery.obligations.body':
+      'Track NDA and contract obligations after sign so renewals and follow-ups do not slip.',
+    'guide.delivery.obligations.link': 'Open obligations',
     'page.dashboard.title': 'Dashboard',
     'page.dashboard.loading': 'Loading metrics…',
     'page.dashboard.heroToday': 'Today',
@@ -222,10 +243,11 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'nav.item.system-check': 'فحص النظام',
     'guide.title': 'كيف نعمل في RR Central',
     'guide.body':
-      'مسارات قصيرة ليوم المبيعات والمال: يومي، لوحة الصفقات، عروض الأسعار، الدعم، اتفاقيات السرية، ثم الفواتير والمدفوعات ومذكرات التسليم والمصروفات والملخص الصباحي.',
+      'مسارات قصيرة ليوم المبيعات والمال ورعاية العملاء: يومي، لوحة الصفقات، عروض الأسعار، الدعم، اتفاقيات السرية، الفواتير والمدفوعات، ثم الحسابات والصحة والتقارير والتحديثات والالتزامات.',
     'guide.back': 'العودة إلى التطبيق',
     'guide.pack.crm': 'يوم المبيعات',
     'guide.pack.billing': 'الفوترة والمال',
+    'guide.pack.delivery': 'التسليم والرعاية',
     'guide.crm.myday.title': 'يومي',
     'guide.crm.myday.body':
       'ابدأ من هنا كل صباح. سجّل التواصل، حدّد الخطوة التالية وتاريخ المتابعة، وعلّم ربح أو خسارة مع السبب.',
@@ -266,6 +288,26 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.billing.digest.body':
       'في الحزم والأسعار، أضف من يتلقى بريد أو واتساب الصباح بما يحتاج انتباهاً (التذاكر والتجديدات ونشاط الصندوق).',
     'guide.billing.digest.link': 'فتح الحزم والأسعار',
+    'guide.delivery.accounts.title': 'الحسابات',
+    'guide.delivery.accounts.body':
+      'افتح سجل الحساب للعقود ومراحل البناء والوقت وملفات Drive بعد أن تصبح الصفقة حية.',
+    'guide.delivery.accounts.link': 'فتح الحسابات',
+    'guide.delivery.health.title': 'صحة العميل',
+    'guide.delivery.health.body':
+      'راجع الاستخدام والتذاكر والتجديدات حتى يظهر العملاء المعرّضون للخطر قبل الملخص الصباحي.',
+    'guide.delivery.health.link': 'فتح صحة العميل',
+    'guide.delivery.reports.title': 'التقارير الشهرية',
+    'guide.delivery.reports.body':
+      'صغ التقرير الشهري من الاستخدام والتذاكر، ثم أرسله أو احفظه تحت الحساب.',
+    'guide.delivery.reports.link': 'فتح التقارير الشهرية',
+    'guide.delivery.updates.title': 'التحديثات الأسبوعية',
+    'guide.delivery.updates.body':
+      'اكتب تحديثاً أسبوعياً قصيراً لمالك الحساب حتى يبقى التسليم واضحاً دون اجتماع.',
+    'guide.delivery.updates.link': 'فتح التحديثات الأسبوعية',
+    'guide.delivery.obligations.title': 'الالتزامات',
+    'guide.delivery.obligations.body':
+      'تابع التزامات NDA والعقود بعد التوقيع حتى لا تفوت التجديدات والمتابعات.',
+    'guide.delivery.obligations.link': 'فتح الالتزامات',
     'page.dashboard.title': 'لوحة التحكم',
     'page.dashboard.loading': 'جارٍ تحميل المقاييس…',
     'page.dashboard.heroToday': 'اليوم',

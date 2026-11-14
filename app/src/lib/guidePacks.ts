@@ -4,6 +4,7 @@
  */
 import { GUIDE_BILLING_SECTIONS } from './guideBilling'
 import { GUIDE_CRM_SECTIONS, type GuideCrmSection } from './guideCrm'
+import { GUIDE_DELIVERY_SECTIONS } from './guideDelivery'
 
 export type GuideSection = GuideCrmSection
 
@@ -23,5 +24,10 @@ export const GUIDE_PACKS: GuidePack[] = [
     id: 'billing',
     titleKey: 'guide.pack.billing',
     sections: GUIDE_BILLING_SECTIONS,
+  },
+  {
+    id: 'delivery',
+    titleKey: 'guide.pack.delivery',
+    sections: GUIDE_DELIVERY_SECTIONS,
   },
 ]
