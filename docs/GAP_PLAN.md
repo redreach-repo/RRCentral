@@ -22,7 +22,7 @@ Status key: **exists** · **partial** · **missing**
 | Exact money `numeric` / no float | partial | SQL numeric exists; TS `number`+round — fix path in M7 |
 | Tenant / company / BU model | partial | M1 tables + seed + `tenant_id` retrofit; company switcher live |
 | RLS on every table | exists | M1 RESTRICTIVE tenant isolation on stamped tables |
-| Cross-tenant CI tests | partial | `tenant_isolation_test.sql` in `run.sh`; expand coverage next |
+| Cross-tenant CI tests | partial | `tenant_isolation_test.sql` covers CRM, vendors, accounts, quotations, event_outbox + audit append-only; keep expanding stamped tables |
 | Roles + record rules + field permissions | partial | Fixed 5 roles; field-mask API started (`fieldPermissions`); record rules later |
 | Maker-checker | missing | M7/M8 for money/payroll |
 | Customization layer (fields, pipelines, objects, workflows, templates, views, dashboards, labels, numbering) | partial | M2 layer largely in: numbering, fields, views, pipelines, workflow defs + runner (approval/notify); more step types / dashboards later |
@@ -65,7 +65,7 @@ Status key: **exists** · **partial** · **missing**
 | AI gateway + tools-as-user + pgvector | partial | `ai-assist` Edge; no gateway/retrieval/action queue → M10 (light from M4) |
 | AI human approval queue | missing | M10 |
 | Field-level encryption (salary, IBAN, tokens) | missing | M1 for tokens; M6/M8 for HR fields |
-| Append-only audit | partial | `audit_log` exists; verify triggers block UPDATE/DELETE |
+| Append-only audit | partial | `audit_log` exists; CI asserts authenticated cannot INSERT/UPDATE/DELETE (REVOKE); prune stays security definer |
 | Sentry / structured logs | missing | M0/M1 add |
 | Soft delete / retention tooling | partial | Soft patterns vary; DSR tooling missing |
 | Demo isolation + outbound block | missing | M3a |
