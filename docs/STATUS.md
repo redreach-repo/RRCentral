@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — EN+AR monthly client report chrome
+**Current milestone:** Continuous backlog — EN+AR Wanders tour-ops chrome
 
 ## Shipped this turn
 
-- Wired **ClientReportPage** loading / toolbar / summary + hours chrome through EN+AR catalogs
+- Wired **WandersTourOpsPanel** loading / tabs / save + bookings chrome through EN+AR catalogs
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR · QTSP · outbox · digest · HubSpot · System check · tenant CI (incl. business_units) · a11y · chrome
+- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR (incl. ClientReport) · QTSP · outbox · digest · HubSpot · System check · tenant CI (incl. business_units) · a11y · chrome
 
 ## Still open (agent queue)
 
