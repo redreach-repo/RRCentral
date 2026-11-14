@@ -1,19 +1,28 @@
-# RR Central / RRCRM — Repository audit (M0)
+# HighMast — Repository audit (M0 refresh)
 
-**Date:** 13 November 2026 (Asia/Dubai)  
-**Authority:** RRCRM Master Specification v1.1  
-**Scope:** Read-only audit of the live Red Reach operations app. No product code was changed in this step.  
+**Date:** 14 November 2026 (Asia/Dubai)  
+**Authority:** HighMast Master Specification v1.2 (14 November 2026)  
+**Scope:** Read-only audit of the live Red Reach operations app (still named RR Central in this repo). No product code was changed in this step.  
 **Repo:** `redreach-repo/RRCentral` (Vite + React SPA, Supabase Postgres / Auth / Storage / Edge Functions, Stripe, GitHub Pages).
+
+Product name **HighMast** (by Red Reach) is decided. This audit uses “RR Central” for the existing app and “HighMast” for the target platform. User-facing rename and a `PRODUCT` constant are **not** done yet (spec §0 rule 15 / §5.2).
 
 ---
 
 ## 1. Executive summary
 
-RR Central is a **single-tenant** operations suite for Red Reach Middle East FZE. It already covers CRM/pipelines, quotes→invoices→delivery notes, accounts/delivery/support, finance lists, Drive, WhatsApp/email intake, NDA e-sign, contract auto-billing, WorshipHub, Wanders, and Tee Tribe shop — with **89 public tables, all RLS-enabled**.
+RR Central is a **working single-customer operations suite** that Red Reach runs today. Capability is broad: CRM/pipelines, quotes→invoices→delivery notes, accounts/delivery/support, finance lists, Drive, WhatsApp/email intake, NDA and agreement e-sign, clause library, obligations, contract auto-billing, WorshipHub, Wanders, Tee Tribe shop, Cmd+K, module soft-hide flags, EN+AR chrome on many pages, and an event outbox.
 
-It is **not** yet a multi-tenant subscription platform. There is no `tenant_id`, no customization layer, no double-entry ledger, no HR/payroll, and no full mail sync beyond Zoho Mail/Calendar proxy. TypeScript `strict` is on in the main app.
+**Platform foundations already in migrations (post–original M0):**
 
-**M0 RLS criterion:** pass — every `CREATE TABLE` in `supabase/migrations` has RLS enabled. Tables with RLS and **no policies** (deny-all to anon/authenticated; service-role only): `drive_connection`, `gmail_connection`, `m365_connection`, `worship_setup_log`. `contract_clauses` has staff-read / manager-edit policies (M5).
+- `tenants` / `companies` / `business_units` / `brand_kits` with `tenant_id` stamp and restrictive tenant RLS (M1)
+- Customization layer: custom fields, saved views, pipelines/stages, workflows, numbering, event outbox (M2)
+- Mail connectors beyond Zoho: Gmail + M365 Edge Functions (M4 partial)
+- Contracts seed: clause library, obligations, templates, public sign (M5 partial)
+
+**Still not a full HighMast subscription platform:** no SaaS tenant billing / onboarding wizard, no HR/payroll, no double-entry ledger, no full inventory/purchasing, no theme studio as specified in §5.3, no demo environment as in §6.14, no Sentry, no field-level encryption for salaries/bank/IDs. TypeScript `strict` is on in the main app. Money in SQL is `numeric`; TypeScript still often uses `number`.
+
+**RLS:** every public table created in `supabase/migrations` enables RLS. Cross-tenant isolation is covered by `/workspace/supabase/tests/tenant_isolation_test.sql` and CI. Deny-all (service-role only) tables include OAuth connection stores (`drive_connection`, `gmail_connection`, `m365_connection`) and `worship_setup_log`.
 
 ---
 
@@ -21,32 +30,37 @@ It is **not** yet a multi-tenant subscription platform. There is no `tenant_id`,
 
 | Layer | Today |
 |-------|--------|
-| Web | Vite + React SPA, TypeScript (`strict: true` in app and Tee Tribe) |
+| Web | Vite + React SPA, TypeScript `strict: true` (`/workspace/app`) |
 | Auth | Supabase Auth email/password when configured; else IndexedDB **local mode** |
-| DB | Supabase Postgres + RLS; migrations applied by hand / CI |
-| Jobs | `pg_cron` + `pg_net` → Edge Functions with cron secrets; browser fallback for contract billing |
-| Storage | Supabase Storage / Drive uploads via Edge Function |
+| DB | Supabase Postgres + RLS; migrations in CI (`/workspace/supabase/tests/run.sh`) |
+| Jobs | `pg_cron` + `pg_net` → Edge Functions with cron secrets; event-outbox claim/dispatch |
+| Storage | Supabase Storage; Google Drive via Edge Function |
 | Hosting | GitHub Pages for SPA; Edge Functions on Supabase |
-| Payments | Stripe (invoice pay links + Tee Tribe Checkout) |
-| Observability | No Sentry in repo |
+| Payments | Stripe (invoice pay links + Tee Tribe Checkout) — **not** HighMast SaaS Billing yet |
+| Observability | No Sentry in repo; `app_errors` + App Errors page |
+| Brand assets | `/workspace/brand-assets/redreach/` (+ Tee Tribe client mark). **No** `brand-assets/highmast/` in repo yet |
 
 ---
 
 ## 3. Auth and roles
 
-| Piece | Path / behaviour |
-|-------|------------------|
-| Session | `app/src/contexts/AuthContext.tsx` — Supabase session or local fake session |
-| Gate | `ProtectedRoute` + `TwoStepGate`; membership via `app_users`; `@redreach.ae` login domain |
-| Roles | `admin` · `manager` · `sales` · `staff` · `viewer` (`app/src/lib/permissions.ts`) |
-| Admin Auth API | Edge `manage-auth-user`, optional `bootstrap-admin` |
-| App auth | UI permission checks + Postgres helpers (`rr_is_staff`, `rr_can_read_account`, …) |
+| Piece | Behaviour |
+|-------|-----------|
+| Session | `/workspace/app/src/contexts/AuthContext.tsx` — Supabase session or local fake session |
+| Gate | `ProtectedRoute` + `TwoStepGate`; membership via `app_users`; login limited to `@redreach.ae` |
+| Roles | `admin` · `manager` · `sales` · `staff` · `viewer` (`/workspace/app/src/lib/permissions.ts`) |
+| MFA | Supabase Auth TOTP required for admin/manager after password (`twoStep.ts`, `TwoStepGate`) |
+| Field masks | `/workspace/app/src/lib/fieldPermissions.ts` (commission, profit, TRN, bank) |
+| Admin Auth API | Edge `manage-auth-user`; optional `bootstrap-admin` |
+| Not present | Passkeys, SAML/OIDC SSO, SCIM, magic-link staff login |
 
-Local mode bypasses RLS (single-browser IndexedDB). Production expects Supabase.
+Local mode bypasses Postgres RLS (single-browser IndexedDB). Production expects Supabase.
 
 ---
 
-## 4. Routes
+## 4. Routes and pages
+
+**Router:** `/workspace/app/src/App.tsx` · **Pages:** `/workspace/app/src/pages/` (52) · Shop: `/workspace/app/src/shop/`
 
 ### Public
 `/` → `/login` · `/login` · `/portal` · `/accept` · `/sign` · `/shop/*` · `/teetribe` → `/shop` · `*` → `/login`
@@ -54,96 +68,102 @@ Local mode bypasses RLS (single-browser IndexedDB). Production expects Supabase.
 ### Protected (no Layout)
 `/ctrm/summary` · `/accounts/:id/report` · `/accounts/:id/fit-sheet` · `/document/:type/:id`
 
-### Protected (Layout)
-| Path | Page |
-|------|------|
-| `/app` | Dashboard (staff → `/accounts`) |
-| `/crm` | My Day (legacy CRM) |
-| `/quick-add` | Phone lead/call |
-| `/deals` | Unified pipeline |
-| `/sales` | AI CRM sales stages |
-| `/ctrm` | CTRM detail |
-| `/follow-ups` | Follow-ups |
-| `/quotations` · `/invoices` · `/delivery-notes` | Docs |
-| `/customer-files` | Google Drive index |
-| `/accounts` · `/accounts/:id` | Accounts hub |
-| `/support` · `/support/:id` | Support desk |
-| `/ctrm-issues` | CTRM ticket aggregator |
-| `/client-health` · `/client-reports` · `/client-updates` | CS queues |
-| `/products` | WorshipHub |
-| `/delivery-settings` · `/build-templates` | Packages / build templates |
-| `/agreement-template` · `/nda-template` | Legal templates |
-| `/app/wanders` | RR Wanders |
-| `/catalog` · `/inventory` · `/templates` · `/domains` | Ops |
-| `/payments` · `/expenses` · `/vendors` · `/reports` | Finance |
-| `/mrr` · `/insights` · `/duplicates` | Manager finance |
-| `/settings` · `/audit-log` · `/app-errors` · `/system-check` | Admin |
+### Protected (Layout) — by nav area
 
-Nav: accordion sidebar (Overview / Sales / Clients / Delivery / Operations / Finance / Admin). Phone: Home · My Day · Quotes · Follow-ups + Shortcuts drawer.
+| Area | Paths |
+|------|--------|
+| Overview | `/app` Dashboard · `/guide` |
+| Sales | `/quick-add` · `/deals` · `/crm` · `/follow-ups` · `/sales` · `/ctrm` · `/quotations` · `/invoices` · `/delivery-notes` · `/customer-files` |
+| Clients | `/accounts` · `/support` · `/support/:id` · `/ctrm-issues` · `/client-health` · `/client-reports` · `/client-updates` |
+| Delivery | `/products` · `/delivery-settings` · `/build-templates` · `/agreement-template` · `/nda-template` · `/clause-library` · `/obligations` |
+| Ops | `/app/wanders` · `/catalog` · `/inventory` · `/templates` · `/domains` |
+| Finance | `/payments` · `/expenses` · `/vendors` · `/reports` · `/mrr` · `/insights` · `/duplicates` |
+| Admin | `/settings` · `/audit-log` · `/app-errors` · `/system-check` |
+
+**Nav source:** `/workspace/app/src/modules/nav.ts` · soft-hide flags in `app_settings.moduleFlags` via `/workspace/app/src/modules/registry.ts` (overview/sales/ops/finance/delivery/clients; **admin never soft-hidden**).
+
+**Known routing quirks**
+
+- Catch-all `*` always navigates to `/login` (even for signed-in users).
+- Soft-hidden modules and pipeline detail soft-hide still allow deep links; pages mostly self-check with `can()`.
+- Marketing site pages under `/workspace/app/src/site/` are archived (not routed).
 
 ---
 
-## 5. Database tables and RLS
+## 5. Database
 
-**Count:** 89 tables under `supabase/migrations` with RLS enabled.  
-**CI:** `supabase/tests/run.sh` includes `rls_test.sql` in the migrations job.
+**Migrations:** 84 files under `/workspace/supabase/migrations/` (plus Tee Tribe commerce migration under `/workspace/teetribe/supabase/migrations/`).
 
-### Intentional deny-all (RLS on, no policies)
-- `drive_connection` — OAuth refresh; service role only  
-- `gmail_connection` — Gmail/Calendar OAuth refresh; service role only  
-- `m365_connection` — Microsoft 365 OAuth refresh; service role only  
-- `worship_setup_log` — service role only  
+### Table groups (representative)
 
-### Dual / overlapping models (debt)
-- Legacy `crm` + `clients` alongside `accounts` / `account_contacts` / `account_activities`
-- `sales_deals` and `ctrm_deals` as separate pipelines; `/deals` unifies in UI
-- Nullable `account_id` on crm/quotes/invoices/clients; soft name match until linked
+| Group | Examples |
+|-------|----------|
+| Core | `app_users`, `app_settings`, `app_errors`, `audit_log`, `activity_log` |
+| Platform | `tenants`, `companies`, `business_units`, `brand_kits` |
+| Customization | `custom_field_*`, `saved_views`, `pipelines`, `pipeline_stages`, `workflow_*`, `numbering_sequences`, `event_outbox` |
+| CRM | `crm`, `clients`, `accounts`, `account_contacts`, `account_activities`, `sales_deals`, follow-ups, inquiries |
+| CTRM | `ctrm_deals`, fit sheets, sessions, client terms, issues |
+| Finance docs | `quotations`, `invoices`, `delivery_notes`, `line_items`, `payment_log`, `income`, `expenses`, `vendors`, `fx_rates` |
+| Delivery | `contracts`, `contract_invoices`, build templates/tasks, packages, `usage_*`, `time_entries` |
+| Legal | `legal_documents`, `legal_sign_*`, `nda_templates`, `agreement_templates`, `contract_clauses`, `contract_obligations`, quote accept |
+| Support | `tickets`, `ticket_messages`, `sla_policies` |
+| Inventory / ops | `products`, `inventory_movements`, `quote_templates`, `owned_domains` |
+| Wanders | `wanders_*`, tour packages / bookings |
+| Integrations | `drive_connection`, `gmail_connection`, `m365_connection`, HubSpot sync tables, portal, digest, watch items, `ai_usage_log` |
 
-### Full table list (alphabetical)
-`account_activities`, `account_contacts`, `account_link_log`, `accounts`, `activity_log`, `agreement_templates`, `ai_usage_log`, `app_errors`, `app_settings`, `app_users`, `attachments`, `audit_log`, `build_stages`, `build_tasks`, `build_template_items`, `build_templates`, `client_report_drafts`, `client_update_drafts`, `clients`, `company_documents`, `contract_clauses`, `contract_obligations`, `contract_invoices`, `contracts`, `crm`, `ctrm_client_terms`, `ctrm_deal_commissions`, `ctrm_deal_stage_changes`, `ctrm_deals`, `ctrm_fit_sheets`, `ctrm_sessions`, `customer_bookings`, `customer_documents`, `customer_payments`, `customer_refunds`, `delivery_notes`, `delivery_packages`, `digest_recipients`, `digest_runs`, `drive_connection`, `duplicate_dismissals`, `expenses`, `follow_up_updates`, `fx_rates`, `hubspot_links`, `hubspot_sync_runs`, `income`, `inventory_movements`, `invoice_reminders`, `invoices`, `legal_documents`, `legal_sign_links`, `legal_sign_pdfs`, `legal_signatures`, `line_items`, `message_templates`, `nda_templates`, `owned_domains`, `package_cost_components`, `package_selling_prices`, `payment_log`, `portal_access`, `portal_uploads`, `products`, `quotations`, `quote_accept_links`, `quote_accept_pdfs`, `quote_acceptances`, `quote_templates`, `report_calls`, `requirements`, `sales_deals`, `scheduled_departures`, `sla_policies`, `supplier_commitments`, `ticket_messages`, `tickets`, `time_entries`, `tour_packages`, `usage_import_runs`, `usage_records`, `usage_sources`, `vendors`, `wanders_deals`, `wanders_partners`, `wanders_passengers`, `wanders_terms_acceptances`, `watch_items`, `website_inquiries`, `worship_church_profiles`, `worship_setup_log`
-
-### Local IndexedDB
-`app/src/lib/localDb.ts` — subset of stores; cloud-only tables omitted. No RLS in local mode.
-
-### Tee Tribe separate schema
-`teetribe/supabase/migrations/` — commerce tables with RLS (admins, products, orders, …). Bundled SPA at `/shop`.
+**CI isolation:** `/workspace/supabase/tests/rls_test.sql`, `/workspace/supabase/tests/tenant_isolation_test.sql`.
 
 ---
 
-## 6. Edge Functions (API surface)
+## 6. Edge Functions
+
+Under `/workspace/supabase/functions/`:
 
 | Function | Purpose |
 |----------|---------|
-| `ai-assist` | Claude helpers; `ai_usage_log` |
-| `bootstrap-admin` | Optional one-shot admin |
+| `ai-assist` | Claude helpers; usage log |
+| `bootstrap-admin` | Optional one-shot admin (secret-gated, off by default) |
 | `client-portal` | Token portal |
-| `client-reports` / `client-updates` | Monthly / weekly CS send |
-| `contract-invoices` | Daily draft contract invoices |
+| `client-reports` / `client-updates` | Monthly / weekly client comms |
+| `contract-invoices` | Contract auto draft invoices |
 | `create-checkout-session` | Tee Tribe Stripe Checkout |
-| `daily-digest` | Morning attention digest |
-| `fireflies-fetch` | Meeting notes → timeline |
-| `google-drive` | OAuth + folders/uploads |
+| `daily-digest` | Morning digest |
+| `event-outbox` | Outbox claim/dispatch |
+| `fireflies-fetch` | Manual Fireflies → timeline |
+| `gmail-calendar` | Gmail send + Google Calendar |
+| `google-drive` | Drive OAuth and filing |
 | `hubspot-sync` | One-way CRM → HubSpot |
-| `invoice-pay-link` / `stripe-invoice-webhook` / `payment-reminder` | Collection |
-| `lead-intake` | Website/WA leads |
-| `legal-sign` / `quote-accept` | Public token flows |
-| `manage-auth-user` | Staff Auth admin |
-| `support-email-in` / `whatsapp-in` / `whatsapp-send` | Support channels |
-| `teetribe-order-sync` | Paid orders → CRM note |
+| `invoice-pay-link` / `stripe-invoice-webhook` | Invoice Stripe pay |
+| `lead-intake` | Website / WA / landing leads |
+| `legal-sign` | Public NDA sign |
+| `m365-mail-calendar` | Microsoft 365 mail + calendar |
+| `manage-auth-user` | Admin Auth user password set |
+| `payment-reminder` | Invoice reminders |
+| `quote-accept` | Public quote accept |
+| `support-email-in` | Inbound → tickets |
+| `teetribe-order-sync` | Shop orders → CRM |
 | `usage-import` | Meta WA + Anthropic spend |
-| `watchdog` | Stale/overdue watch list |
-| `worshiphub-read` / `worshiphub-manage` | Church product |
-| `zoho-proxy` | Zoho Mail + Calendar |
+| `watchdog` | Stale/overdue watch items |
+| `whatsapp-in` / `whatsapp-send` | WhatsApp tickets |
+| `worshiphub-manage` / `worshiphub-read` | WorshipHub product admin |
+| `zoho-proxy` | Zoho Mail/Calendar CORS proxy |
 
 ---
 
-## 7. Environment variables (names only)
+## 7. Environment variables (names only — no values)
 
-Client: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_APP_ENV`, `VITE_BASE`, `VITE_RELEASE`, `VITE_CHECKOUT_API_URL`, …
-
-Server / Edge (sample): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_CLIENT_*`, `HUBSPOT_*`, `WHATSAPP_*`, `META_*`, `ZOHO` via proxy secrets, `ANTHROPIC_*`, `FIREFLIES_API_KEY`, `STRIPE_*` / `RR_STRIPE_*`, `WORSHIPHUB_*`, various `*_CRON_SECRET`, `LEAD_INTAKE_SECRET`, `SUPPORT_INBOUND_SECRET`, `ALLOWED_ORIGINS`, `APP_URL`, bootstrap secrets.
-
-**Never commit values.** CI scans Pages bundle for service_role leakage.
+| Category | Names |
+|----------|--------|
+| Supabase (client) | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
+| Supabase (edge) | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` |
+| Stripe | `STRIPE_SECRET_KEY`, `STRIPE_RESTRICTED_KEY`, `RR_STRIPE_*`, Tee Tribe checkout keys |
+| Google | `GOOGLE_CLIENT_ID/SECRET`, `GOOGLE_MAIL_CLIENT_ID/SECRET` |
+| Microsoft | `MICROSOFT_CLIENT_ID/SECRET`, `MICROSOFT_TENANT_ID` |
+| HubSpot | `HUBSPOT_ACCESS_TOKEN`, `HUBSPOT_CRON_SECRET` |
+| Meta / WhatsApp | `WHATSAPP_*`, `META_*`, template language vars |
+| AI | `ANTHROPIC_API_KEY`, `ANTHROPIC_ADMIN_KEY` |
+| Other | `FIREFLIES_API_KEY`, `WORSHIPHUB_*`, many `*_CRON_SECRET` / ingress secrets |
+| Zoho | Tokens in `app_settings` (no dedicated Deno secret names) |
 
 ---
 
@@ -151,93 +171,105 @@ Server / Edge (sample): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_R
 
 | Service | Status |
 |---------|--------|
-| Supabase | Core |
-| Stripe | Invoice pay + Tee Tribe |
-| Google Drive | Live (replaced WorkDrive) |
-| Zoho Mail/Calendar | Live via proxy; **no Zoho CRM module sync** |
+| Supabase | Core platform |
+| Stripe | Customer invoice pay + Tee Tribe; not HighMast plan billing |
+| Zoho Mail/Calendar | Via proxy (dogfood) |
+| Google Drive / Gmail / Calendar | Edge OAuth |
+| Microsoft 365 | Edge OAuth (partial) |
 | HubSpot | One-way push |
-| WhatsApp (Meta) | Tickets + digests/reminders |
-| Anthropic | AI assist, reports, usage |
+| Meta WhatsApp | Tickets + digests |
+| Anthropic | AI assist / drafts |
 | Fireflies | Manual fetch |
-| WorshipHub API | Products page |
-| Gemini | Not in repo |
-| Sentry | Not in repo |
+| WorshipHub | Product connector (Red Reach–specific) |
+| **Missing vs §3 / §10** | Sentry, Inngest/Trigger.dev (pg_cron chosen de facto), KMS field encryption, SaaS billing |
 
 ---
 
-## 9. Scheduled jobs
+## 9. What works (keep)
 
-Documented `pg_cron` → Edge: usage-import, daily-digest, watchdog, contract-invoices, client-reports, client-updates, hubspot-sync.  
-Browser: `useContractBillingSync` if cron stale >36h.  
-GitHub Actions: nightly DB backup (`backup.yml`).
+Core ops workflows that must keep working (spec Appendix B.3):
 
-**Job runner choice (spec M0):** today = **pg_cron + Edge Functions**. Recorded in `docs/STATUS.md`; revisit if Inngest/Trigger.dev needed for multi-tenant scale.
+1. Quote → invoice → delivery note (+ Drive PDF)
+2. Client quote accept → Signed deal + draft contract
+3. Supplier invoice → expense → GP against quote
+4. Contract auto-billing drafts → finalize / reminders / Stripe
+5. NDA e-sign → stamped PDF to Drive/vault
+6. Support intake (email / WhatsApp / form) + SLA + AI draft
+7. Follow-up loop (queue, WhatsApp/email, calendar)
+8. Lead intake → CRM / sales / CTRM
 
----
-
-## 10. Money handling
-
-- **SQL:** `numeric(12,2)` / similar — no float money columns in RR migrations.  
-- **TS:** `number` + `roundMoney` (`Math.round(n*100)/100`).  
-- **Spec debt:** IEEE float in the browser; master spec requires exact `numeric` + no float for money (M1+ accounting).
-
----
-
-## 11. What works (production-critical)
-
-1. Quote → invoice → DN (+ PDF/Drive/signed)  
-2. Quote accept link → Signed + draft contract  
-3. Supplier invoice → expense → GP vs quote  
-4. Contract auto-billing + reminders + Stripe  
-5. NDA e-sign vault  
-6. Support email/WhatsApp + SLA  
-7. Follow-ups + Zoho Calendar  
-8. Lead intake / Quick add / inquiries  
-9. Accounts delivery (contracts, build, time, usage)  
-10. Dashboard attention + watchdog/digest  
+Also solid: accounts hub, permissions/field masks, audit log, system check, Cmd+K, module flags, EN+AR shell + many page bodies, outbox, tenant CI stamps, customization seeds.
 
 ---
 
-## 12. Broken / thin / technical debt
+## 10. What is partial or thin
 
-| Item | Notes |
-|------|-------|
-| Dual CRM | Legacy My Day `crm` vs Accounts + sales/CTRM deals |
-| No multi-tenancy | Single Red Reach org; no `tenant_id` |
-| Accounting | Cash-style income/expenses/payments/reports — **not** double-entry ledger |
-| Inventory | SKU + manual adjust; no PO/WMS |
-| HubSpot | Push only |
-| Fireflies | Paste ID |
-| CTRM issues | Thin ticket grouper |
-| Wanders | Rich schema; less polish than Threads docs path |
-| TypeScript | App `strict: true` (M1 leftover closed) |
-| No Arabic/RTL | English only UI strings |
-| No module registry / workflows / custom fields | Hardcoded entities |
-| Red Reach–specific in core | WorshipHub, Tee Tribe, Wanders, CTRM commissions mixed into shared SPA |
-| History | Past service_role / dump risks noted in `docs/SECURITY.md` |
-| Brand assets | Low-res division logos; no SVG; no Boost/Care/Trading; black unit labels on dark |
-
----
-
-## 13. CI today
-
-`.github/workflows/ci.yml`: app lint/typecheck/test/build/bundle scans · edge deno check · migrations + RLS tests · function-health.  
-Also: Pages deploy, function deploy (manual), backup, staging DB, rollback.
-
-**Gap vs spec M0:** no dedicated “every table has RLS policy or intentional deny-all” CI assertion beyond existing RLS tests; no CodeQL/gitleaks called out as required gates (npm audit + bundle scan exist).
+| Area | Reality |
+|------|---------|
+| Multi-tenancy | Schema + RLS + single seeded Red Reach tenant; no multi-tenant SaaS UX / billing |
+| Brand / theme studio | `brand_kits` table exists; §5.3 studio, HighMast `PRODUCT` constant, highmast assets missing |
+| EN+AR | Shell + many pages; more page bodies and terminology still English-hardcoded |
+| Dual CRM | `/crm` My Day beside `/accounts` + `/deals` / `/sales` / `/ctrm` (M3 unify still open) |
+| Mail | Zoho + Gmail + M365 partial; full sync / IMAP / private labels incomplete |
+| Contracts | Templates, clauses, obligations, sign — not full §6.4 (QTSP, maker-checker packs) |
+| Accounting | Lists + reports over quotes/payments/expenses — **no** CoA / journals / immutability |
+| Inventory | SKU / manual stock — no PO → goods-in |
+| HubSpot | One-way only |
+| Fireflies | Manual ID fetch |
+| CTRM issues | Thin board |
+| Wanders / WorshipHub / Tee Tribe | Red Reach–specific; must become pack/connector, not shared core (Appendix B.7) |
+| Demo (§6.14) | Blocked on Alfred-provisioned demo Supabase / env |
 
 ---
 
-## 14. Brand assets received (Appendix C)
+## 11. What is missing (HighMast v1.2)
 
-Placed at repo root `brand-assets/` with `brand.json` and README. Includes company logo, Connect/Marketing/Threads/Wanders, square mark + derived PWA sizes, Tee Tribe client mark. Missing: Boost, Care, Trading, SVGs, light variants.
+Relative to the master spec (non-exhaustive; see also `GAP_PLAN.md`):
+
+- HighMast product brand wiring (`PRODUCT`, assets Appendix C.1, sign-in chrome)
+- Theme studio as specified (§5.3) and tenant-themed PDFs/emails end-to-end
+- HR, payroll (UAE pack), double-entry accounting, full inventory/purchasing
+- Marketing module, planning module, full DMS
+- Tenant billing (Stripe Billing), onboarding wizard, super-admin console
+- Demo environment + synthetic data + outbound blocks (§6.14)
+- AI gateway / action queue / pgvector retrieval as in §9
+- Field-level encryption, Sentry, SOC2 evidence tooling
+- Passkeys / SSO; maker-checker on payroll/payments
+- Industry packs installer UX
 
 ---
 
-## 15. Open decisions (flag to Alfred — do not guess)
+## 12. Technical debt
 
-From master spec §19: product name/domain, UAE data residency, job runner long-term, pricing, e-sign level, pilot customers, AI providers, accountant/payroll/legal reviewers, Arabic reviewers, Supabase vs self-managed, demo self-serve vs presenter, fictional demo stories, Arabic in first demo.
+- Dual CRM models and soft-retire paths still in flight
+- Workflow runner: several step types “not implemented yet” (`workflowRunner.ts`)
+- TS money as `number` vs SQL `numeric`
+- Hardcoded “Red Reach” / RR Central strings in UI (conflicts with §0.15 / §5.2 until `PRODUCT` + brand kits)
+- Catch-all route → login; phone shortcuts subset of desktop nav
+- Original M0 AUDIT text was stale on tenancy / i18n / module registry — **this refresh supersedes it**
 
 ---
 
-*End of AUDIT.md — M0*
+## 13. Brand assets on disk
+
+| Path | Notes |
+|------|--------|
+| `/workspace/brand-assets/redreach/` | Company + Connect/Marketing/Threads/Wanders PNGs/JPGs; square mark + derived sizes |
+| `/workspace/brand-assets/clients/tee-tribe.jpg` | Client only — never tenant branding; exclude from demo |
+| `/workspace/brand-assets/highmast/` | **Absent** — Appendix C.1 assets not in repo yet |
+| Still needed from Alfred | Boost/Care/Trading logos; SVG sources; light logo variants; colour/font confirmation |
+
+---
+
+## 14. Acceptance for this audit step
+
+- [x] Routes / pages inventoried  
+- [x] Tables / migrations / RLS posture summarized  
+- [x] Edge Functions listed  
+- [x] Auth method recorded  
+- [x] Env var **names** categorized (no secrets)  
+- [x] Third parties listed  
+- [x] Works / partial / missing / debt called out  
+- [ ] No application code changed in this step  
+
+**Next (spec §0 step 3):** refresh `docs/GAP_PLAN.md` against HighMast Master Spec **v1.2** (current gap plan still cites v1.1). Then resume milestone work (STATUS continuous backlog / M3a blocked items as noted).
