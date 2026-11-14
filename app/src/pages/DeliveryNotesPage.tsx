@@ -40,6 +40,7 @@ import {
 } from '../lib/signedDeliveryNotes'
 import { errorMessage } from '../lib/errors'
 import { parseDeliveryNoteForm } from '../lib/schemas/deliveryNote'
+import { parseDeliveryNoteFromQuoteForm } from '../lib/schemas/deliveryNoteFromQuote'
 import { type DraftLineItem } from '../lib/lineItems'
 import { sortByDateDesc } from '../lib/finance'
 import {
@@ -189,7 +190,12 @@ export default function DeliveryNotesPage() {
   }, [notes, search, tab])
 
   async function createFromQuote() {
-    const quote = quotes.find((q) => q.id === quotePick)
+    const parsed = parseDeliveryNoteFromQuoteForm({ quoteId: quotePick })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
+    const quote = quotes.find((q) => q.id === parsed.data.quoteId)
     if (!quote) {
       showToast('Select a quotation', 'error')
       return
