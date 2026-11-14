@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — tenant isolation for workflow definitions
+**Current milestone:** Continuous backlog — guide admin pack
 
 ## Shipped this turn
 
-- Expanded `tenant_isolation_test.sql` for **workflow_definitions** (read isolation + forged insert blocked)
+- In-app guide fourth content pack (**Admin and platform**): Settings, module flags, System check, Audit log, App errors — EN+AR
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome · pipeline density · ticket detail i18n
+- Continuous backlog · Zod · Guide CRM/billing/delivery · Cmd+K · module flags · EN+AR · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome · pipeline density · ticket detail i18n · workflow_definitions isolation
 
 ## Still open (agent queue)
 
