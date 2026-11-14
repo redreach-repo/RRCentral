@@ -145,6 +145,27 @@ from public.accounts
 where reference = 'AC-TB-0001'
 limit 1;
 
+insert into public.tickets (account_id, subject, tenant_id)
+select
+  id,
+  'Tenant B Secret Ticket',
+  'b0000000-0000-4000-8000-000000000001'
+from public.accounts
+where reference = 'AC-TB-0001'
+limit 1;
+
+insert into public.ctrm_deals (account_id, stage, region, next_action, next_action_date, tenant_id)
+select
+  id,
+  'identified',
+  'middle_east',
+  'Call Tenant B CTRM',
+  '2026-12-01',
+  'b0000000-0000-4000-8000-000000000001'
+from public.accounts
+where reference = 'AC-TB-0001'
+limit 1;
+
 insert into public.event_outbox (event_type, aggregate_type, aggregate_id, tenant_id, status)
 values (
   'finalize_quote',
@@ -213,6 +234,14 @@ select pg_temp.expect(
   'redreach admin cannot read tenant B contracts'
 );
 select pg_temp.expect(
+  (select count(*) from public.tickets where subject = 'Tenant B Secret Ticket') = 0,
+  'redreach admin cannot read tenant B tickets'
+);
+select pg_temp.expect(
+  (select count(*) from public.ctrm_deals where next_action = 'Call Tenant B CTRM') = 0,
+  'redreach admin cannot read tenant B ctrm_deals'
+);
+select pg_temp.expect(
   (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 0,
   'redreach admin cannot read tenant B event_outbox'
 );
@@ -275,6 +304,14 @@ select pg_temp.expect(
 select pg_temp.expect(
   (select count(*) from public.contracts where notes = 'Tenant B Secret Contract') = 1,
   'tenant B admin can read own contracts'
+);
+select pg_temp.expect(
+  (select count(*) from public.tickets where subject = 'Tenant B Secret Ticket') = 1,
+  'tenant B admin can read own tickets'
+);
+select pg_temp.expect(
+  (select count(*) from public.ctrm_deals where next_action = 'Call Tenant B CTRM') = 1,
+  'tenant B admin can read own ctrm_deals'
 );
 select pg_temp.expect(
   (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 1,
@@ -406,6 +443,24 @@ begin
     raise exception 'TENANT TEST FAILED: tenant B admin forged contract into redreach';
   end if;
   raise notice 'ok - tenant B cannot insert contract into redreach tenant_id';
+end $$;
+
+do $$
+declare
+  failed boolean := false;
+  acct uuid;
+begin
+  select id into acct from public.accounts where reference = 'AC-TB-0001' limit 1;
+  begin
+    insert into public.tickets (account_id, subject, tenant_id)
+    values (acct, 'Forged ticket', 'a0000000-0000-4000-8000-000000000001');
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: tenant B admin forged ticket into redreach';
+  end if;
+  raise notice 'ok - tenant B cannot insert ticket into redreach tenant_id';
 end $$;
 
 ------------------------------------------------------------ Append-only audit_log (authenticated cannot mutate)
