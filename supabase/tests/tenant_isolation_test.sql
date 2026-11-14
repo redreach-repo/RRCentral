@@ -217,6 +217,65 @@ values (
   'b0000000-0000-4000-8000-000000000001'
 );
 
+insert into public.income (client_source, reference_number, description, tenant_id)
+values (
+  'Tenant B Secret Client',
+  'INC-TB-0001',
+  'Tenant B Secret Income',
+  'b0000000-0000-4000-8000-000000000001'
+);
+
+insert into public.follow_up_updates (company, update_text, tenant_id)
+values (
+  'Tenant B Secret Lead',
+  'Tenant B Secret Follow-up Note',
+  'b0000000-0000-4000-8000-000000000001'
+);
+
+insert into public.supplier_commitments (quote_ref, supplier_name, notes, tenant_id)
+values (
+  'RR-TB-0001',
+  'Tenant B Secret Supplier',
+  'Tenant B Secret Supplier Commitment',
+  'b0000000-0000-4000-8000-000000000001'
+);
+
+insert into public.saved_views (module_id, name, tenant_id)
+values (
+  'crm',
+  'Tenant B Secret View',
+  'b0000000-0000-4000-8000-000000000001'
+);
+
+insert into public.pipelines (pipeline_key, name, object_type, description, tenant_id)
+values (
+  'tenant_b_secret',
+  'Tenant B Secret Pipeline',
+  'deal',
+  'Tenant B Secret Pipeline Notes',
+  'b0000000-0000-4000-8000-000000000001'
+);
+
+insert into public.custom_field_definitions (
+  object_type, field_key, label, tenant_id
+)
+values (
+  'account',
+  'tenant_b_secret_field',
+  'Tenant B Secret Field',
+  'b0000000-0000-4000-8000-000000000001'
+);
+
+insert into public.workflow_definitions (
+  workflow_key, name, description, tenant_id
+)
+values (
+  'tenant_b_secret',
+  'Tenant B Secret Workflow',
+  'Tenant B Secret Workflow Notes',
+  'b0000000-0000-4000-8000-000000000001'
+);
+
 insert into public.event_outbox (event_type, aggregate_type, aggregate_id, tenant_id, status)
 values (
   'finalize_quote',
@@ -317,6 +376,34 @@ select pg_temp.expect(
   'redreach admin cannot read tenant B quote_templates'
 );
 select pg_temp.expect(
+  (select count(*) from public.income where reference_number = 'INC-TB-0001') = 0,
+  'redreach admin cannot read tenant B income'
+);
+select pg_temp.expect(
+  (select count(*) from public.follow_up_updates where update_text = 'Tenant B Secret Follow-up Note') = 0,
+  'redreach admin cannot read tenant B follow_up_updates'
+);
+select pg_temp.expect(
+  (select count(*) from public.supplier_commitments where notes = 'Tenant B Secret Supplier Commitment') = 0,
+  'redreach admin cannot read tenant B supplier_commitments'
+);
+select pg_temp.expect(
+  (select count(*) from public.saved_views where name = 'Tenant B Secret View') = 0,
+  'redreach admin cannot read tenant B saved_views'
+);
+select pg_temp.expect(
+  (select count(*) from public.pipelines where pipeline_key = 'tenant_b_secret') = 0,
+  'redreach admin cannot read tenant B pipelines'
+);
+select pg_temp.expect(
+  (select count(*) from public.custom_field_definitions where field_key = 'tenant_b_secret_field') = 0,
+  'redreach admin cannot read tenant B custom_field_definitions'
+);
+select pg_temp.expect(
+  (select count(*) from public.workflow_definitions where workflow_key = 'tenant_b_secret') = 0,
+  'redreach admin cannot read tenant B workflow_definitions'
+);
+select pg_temp.expect(
   (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 0,
   'redreach admin cannot read tenant B event_outbox'
 );
@@ -411,6 +498,34 @@ select pg_temp.expect(
 select pg_temp.expect(
   (select count(*) from public.quote_templates where description = 'Tenant B Secret Quote Template') = 1,
   'tenant B admin can read own quote_templates'
+);
+select pg_temp.expect(
+  (select count(*) from public.income where reference_number = 'INC-TB-0001') = 1,
+  'tenant B admin can read own income'
+);
+select pg_temp.expect(
+  (select count(*) from public.follow_up_updates where update_text = 'Tenant B Secret Follow-up Note') = 1,
+  'tenant B admin can read own follow_up_updates'
+);
+select pg_temp.expect(
+  (select count(*) from public.supplier_commitments where notes = 'Tenant B Secret Supplier Commitment') = 1,
+  'tenant B admin can read own supplier_commitments'
+);
+select pg_temp.expect(
+  (select count(*) from public.saved_views where name = 'Tenant B Secret View') = 1,
+  'tenant B admin can read own saved_views'
+);
+select pg_temp.expect(
+  (select count(*) from public.pipelines where pipeline_key = 'tenant_b_secret') = 1,
+  'tenant B admin can read own pipelines'
+);
+select pg_temp.expect(
+  (select count(*) from public.custom_field_definitions where field_key = 'tenant_b_secret_field') = 1,
+  'tenant B admin can read own custom_field_definitions'
+);
+select pg_temp.expect(
+  (select count(*) from public.workflow_definitions where workflow_key = 'tenant_b_secret') = 1,
+  'tenant B admin can read own workflow_definitions'
 );
 select pg_temp.expect(
   (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 1,
@@ -656,6 +771,125 @@ begin
     raise exception 'TENANT TEST FAILED: tenant B admin forged quote_template into redreach';
   end if;
   raise notice 'ok - tenant B cannot insert quote_template into redreach tenant_id';
+end $$;
+
+do $$
+declare
+  failed boolean := false;
+begin
+  begin
+    insert into public.income (client_source, reference_number, tenant_id)
+    values ('Forged Client', 'INC-FORGED', 'a0000000-0000-4000-8000-000000000001');
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: tenant B admin forged income into redreach';
+  end if;
+  raise notice 'ok - tenant B cannot insert income into redreach tenant_id';
+end $$;
+
+do $$
+declare
+  failed boolean := false;
+begin
+  begin
+    insert into public.follow_up_updates (company, update_text, tenant_id)
+    values ('Forged Co', 'Forged note', 'a0000000-0000-4000-8000-000000000001');
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: tenant B admin forged follow_up_update into redreach';
+  end if;
+  raise notice 'ok - tenant B cannot insert follow_up_update into redreach tenant_id';
+end $$;
+
+do $$
+declare
+  failed boolean := false;
+begin
+  begin
+    insert into public.supplier_commitments (supplier_name, notes, tenant_id)
+    values ('Forged Supplier', 'Forged commitment', 'a0000000-0000-4000-8000-000000000001');
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: tenant B admin forged supplier_commitment into redreach';
+  end if;
+  raise notice 'ok - tenant B cannot insert supplier_commitment into redreach tenant_id';
+end $$;
+
+do $$
+declare
+  failed boolean := false;
+begin
+  begin
+    insert into public.saved_views (module_id, name, tenant_id)
+    values ('crm', 'Forged View', 'a0000000-0000-4000-8000-000000000001');
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: tenant B admin forged saved_view into redreach';
+  end if;
+  raise notice 'ok - tenant B cannot insert saved_view into redreach tenant_id';
+end $$;
+
+do $$
+declare
+  failed boolean := false;
+begin
+  begin
+    insert into public.pipelines (pipeline_key, name, object_type, tenant_id)
+    values ('forged_pipeline', 'Forged Pipeline', 'deal', 'a0000000-0000-4000-8000-000000000001');
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: tenant B admin forged pipeline into redreach';
+  end if;
+  raise notice 'ok - tenant B cannot insert pipeline into redreach tenant_id';
+end $$;
+
+do $$
+declare
+  failed boolean := false;
+begin
+  begin
+    insert into public.custom_field_definitions (
+      object_type, field_key, label, tenant_id
+    )
+    values (
+      'account',
+      'forged_field',
+      'Forged Field',
+      'a0000000-0000-4000-8000-000000000001'
+    );
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: tenant B admin forged custom_field_definition into redreach';
+  end if;
+  raise notice 'ok - tenant B cannot insert custom_field_definition into redreach tenant_id';
+end $$;
+
+do $$
+declare
+  failed boolean := false;
+begin
+  begin
+    insert into public.workflow_definitions (workflow_key, name, tenant_id)
+    values ('forged_workflow', 'Forged Workflow', 'a0000000-0000-4000-8000-000000000001');
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: tenant B admin forged workflow_definition into redreach';
+  end if;
+  raise notice 'ok - tenant B cannot insert workflow_definition into redreach tenant_id';
 end $$;
 
 ------------------------------------------------------------ Append-only audit_log (authenticated cannot mutate)

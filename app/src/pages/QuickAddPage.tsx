@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Phone } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { errorMessage } from '../lib/errors'
 import {
@@ -35,6 +36,7 @@ const SOURCES = ['Phone call', 'Referral', 'Walk in', 'Event', 'WhatsApp', 'Webs
  * up and one tap logs the call. A new number becomes a lead with just a name.
  */
 export default function QuickAddPage() {
+  const { t } = useI18n()
   const { user, appUserId, userRole } = useAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
@@ -129,15 +131,15 @@ export default function QuickAddPage() {
   if (userRole === 'viewer' || userRole === 'staff') {
     return (
       <div style={pageStyle}>
-        <h1 style={pageTitleStyle}>Quick add</h1>
-        <p style={{ color: colors.muted }}>Quick add is for the sales team. Log calls on the account timeline instead.</p>
+        <h1 style={pageTitleStyle}>{t('page.quickAdd.title')}</h1>
+        <p style={{ color: colors.muted }}>{t('page.quickAdd.restricted')}</p>
       </div>
     )
   }
 
   return (
     <div style={{ ...pageStyle, maxWidth: 620 }}>
-      <h1 style={pageTitleStyle}>Quick add</h1>
+      <h1 style={pageTitleStyle}>{t('page.quickAdd.title')}</h1>
       <section style={cardStyle}>
         <label style={labelStyle} htmlFor="quick-phone">
           Phone number
