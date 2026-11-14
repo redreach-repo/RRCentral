@@ -57,6 +57,7 @@ import {
 import docsStyles from '../styles/docsList.module.css'
 import { buildWhatsAppUrl } from '../lib/whatsapp'
 import { errorMessage } from '../lib/errors'
+import { parseWandersDealForm, parseWandersTermsAcceptForm } from '../lib/schemas/wandersDeal'
 
 type Tab = 'trip' | 'passengers' | 'commercial' | 'terms' | 'packages'
 type Mode = 'leads' | 'tourops'
@@ -145,13 +146,14 @@ export default function WandersPage() {
 
   async function saveDeal() {
     if (!form) return
-    if (!form.client_name.trim()) {
-      showToast('Client / booker name is required', 'error')
+    const parsed = parseWandersDealForm({ client_name: form.client_name })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setSaving(true)
     try {
-      const saved = await saveWandersDeal(form, user?.email || '')
+      const saved = await saveWandersDeal({ ...form, client_name: parsed.data.client_name }, user?.email || '')
       setDeals((prev) => {
         const others = prev.filter((d) => d.id !== saved.id)
         return [saved, ...others]
@@ -168,17 +170,21 @@ export default function WandersPage() {
 
   async function recordTermsAcceptance() {
     if (!form) return
-    if (!form.terms_version) {
-      showToast('Terms version required before acceptance', 'error')
+    const acceptedByRaw = window.prompt('Accepted by (customer name)', form.lead_contact || form.client_name)
+    if (acceptedByRaw == null) return
+    const parsed = parseWandersTermsAcceptForm({
+      terms_version: form.terms_version || '',
+      accepted_by: acceptedByRaw,
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
-    const acceptedBy = window.prompt('Accepted by (customer name)', form.lead_contact || form.client_name)
-    if (!acceptedBy) return
     setSaving(true)
     try {
       const { deal } = await acceptWandersTerms({
-        deal: form,
-        acceptedBy,
+        deal: { ...form, terms_version: parsed.data.terms_version },
+        acceptedBy: parsed.data.accepted_by,
         method: 'Recorded in CRM',
         userEmail: user?.email || '',
         governingLaw: settings.wandersGoverningLaw,
