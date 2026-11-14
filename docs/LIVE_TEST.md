@@ -46,6 +46,7 @@ Deploying a function: GitHub → RRCentral → **Actions** → **Deploy Edge Fun
 | 27 | CTRM Next client issues | `daily-digest` (redeploy) |
 | 28 | CTRM Next sessions | none (SQL only) |
 | 29 | CTRM Next renewal dates | `daily-digest` (redeploy) |
+| 33 | Domain event outbox worker | `event-outbox` |
 
 ---
 
@@ -582,4 +583,19 @@ sync" and no button.
 **If it fails.** "HubSpot is not set up yet" means `HUBSPOT_ACCESS_TOKEN` is missing. "HubSpot 401" means the token
 is wrong or the app was deleted; "HubSpot 403" means a scope from step 2 is missing. "Stopped early" is normal on a big
 first sync: press Sync now again.
+
+## 33. Domain event outbox worker
+
+**Trigger.** Run the outbox claim SQL, add `OUTBOX_CRON_SECRET`, deploy `event-outbox` (docs/event-outbox.md). As an
+admin open **System check** and press **Check again**. Then finalize a quote (or mark an invoice paid) and wait for
+the outbox schedule (or POST the function with your JWT).
+
+**You should see.** System check lists `event-outbox` as OK (or Down with `OUTBOX_CRON_SECRET` if the secret is
+missing). The Outbox card above the table shows pending / processing / failed counts. After activity, pending goes up
+briefly then clears; a HubSpot nudge and/or digest signal timestamp may appear until HubSpot sync or the morning
+digest clears them. Failed stays at 0 unless a dead-lettered row needs attention.
+
+**If it fails.** System check row "Domain event outbox worker" Down with the secret name means Secrets is incomplete.
+Pending stuck high means the schedule SQL or secret does not match. Failed > 0: open `event_outbox` (status
+`failed`) and check `last_error`.
 

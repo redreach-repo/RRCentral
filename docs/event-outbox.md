@@ -35,7 +35,9 @@ on conflict (key) do update set value = excluded.value;
 ```
 
 **4. Deploy.** Actions → **Deploy Edge Functions** → pick `event-outbox`.
-**System check** should list “Domain event outbox worker”.
+**System check** should list “Domain event outbox worker” (live test 33) and show an
+**Outbox** card with pending / processing / failed counts plus any HubSpot or digest
+nudge still waiting.
 
 **5. Schedule** (every 5 minutes):
 

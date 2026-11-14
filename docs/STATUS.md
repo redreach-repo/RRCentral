@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — HubSpot outbox nudge
+**Current milestone:** Continuous backlog — outbox System check
 
 ## Shipped this turn
 
-- `hubspot-sync` honors/clears `hubspot_sync_requested_at` (outbox nudge), optional `only_if_requested` poller, Settings card shows pending nudge — see `docs/hubspot-sync.md`
+- System check Outbox card (pending/processing/failed + HubSpot/digest nudges) and LIVE_TEST 33 for `event-outbox` — see `docs/event-outbox.md` / `docs/LIVE_TEST.md`
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide · Cmd+K · QTSP · outbox worker · domain handlers · digest signal · a11y · minimal chrome · pipeline density
+- Continuous backlog · Zod · Guide · Cmd+K · QTSP · outbox worker · domain handlers · digest signal · HubSpot nudge · a11y · minimal chrome · pipeline density
 
 ## Still open (agent queue)
 

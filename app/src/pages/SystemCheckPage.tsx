@@ -7,8 +7,9 @@ import EmptyState from '../components/EmptyState'
 import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
 import { isAuditAvailable } from '../lib/auditLog'
+import type { OutboxHealth } from '../lib/eventOutboxWorker'
 import { summarise, type CheckState, type FunctionCheck } from '../lib/systemCheck'
-import { runSystemCheck } from '../lib/systemCheckStore'
+import { loadOutboxHealth, runSystemCheck } from '../lib/systemCheckStore'
 import {
   cardStyle,
   colors,
@@ -25,6 +26,7 @@ const STATE_LABEL: Record<CheckState, string> = { green: 'OK', amber: 'Check', r
 export default function SystemCheckPage() {
   const { userRole } = useAuth()
   const [checks, setChecks] = useState<FunctionCheck[]>([])
+  const [outbox, setOutbox] = useState<OutboxHealth | null>(null)
   const [loading, setLoading] = useState(false)
   const [problem, setProblem] = useState('')
   const [checkedAt, setCheckedAt] = useState<Date | null>(null)
@@ -35,7 +37,9 @@ export default function SystemCheckPage() {
     setLoading(true)
     setProblem('')
     try {
-      setChecks(await runSystemCheck())
+      const [nextChecks, nextOutbox] = await Promise.all([runSystemCheck(), loadOutboxHealth()])
+      setChecks(nextChecks)
+      setOutbox(nextOutbox)
       setCheckedAt(new Date())
     } catch (e) {
       setProblem(errorMessage(e, 'Could not run the check'))
@@ -96,54 +100,72 @@ export default function SystemCheckPage() {
       {problem ? (
         <div style={{ ...cardStyle, color: colors.danger }}>{problem}</div>
       ) : (
-        <div style={tableWrapStyle}>
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th style={thStyle}>State</th>
-                <th style={thStyle}>Function</th>
-                <th style={thStyle}>Why</th>
-                <th style={thStyle}>Last error</th>
-                <th style={thStyle}>Live test</th>
-              </tr>
-            </thead>
-            <tbody>
-              {checks.map((c) => (
-                <tr key={c.fn.name}>
-                  <td style={tdStyle}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, color: STATE_COLOR[c.state] }}>
-                      <span aria-hidden style={{ width: 10, height: 10, borderRadius: 5, background: STATE_COLOR[c.state] }} />
-                      {STATE_LABEL[c.state]}
-                    </span>
-                  </td>
-                  <td style={tdStyle}>
-                    <div style={{ fontWeight: 600 }}>{c.fn.feature}</div>
-                    <div style={{ fontSize: 12, color: colors.muted2 }}>{c.fn.name}</div>
-                  </td>
-                  <td style={tdStyle}>{c.reason}</td>
-                  <td style={{ ...tdStyle, maxWidth: 360, wordBreak: 'break-word' }}>
-                    {c.lastError ? (
-                      <>
-                        <div>{c.lastError.message}</div>
-                        <div style={{ fontSize: 12, color: colors.muted2 }}>{format(parseISO(c.lastError.created_at), 'd MMM, HH:mm')}</div>
-                      </>
-                    ) : (
-                      <span style={{ color: colors.muted2 }}>None in 30 days</span>
-                    )}
-                  </td>
-                  <td style={tdStyle}>Test {c.fn.liveTest}</td>
-                </tr>
-              ))}
-              {loading && !checks.length ? (
+        <>
+          {outbox ? (
+            <div style={{ ...cardStyle, marginBottom: 16 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, color: STATE_COLOR[outbox.state] }}>
+                  <span aria-hidden style={{ width: 10, height: 10, borderRadius: 5, background: STATE_COLOR[outbox.state] }} />
+                  Outbox {STATE_LABEL[outbox.state]}
+                </span>
+                <span style={{ fontSize: 13, color: colors.muted }}>{outbox.reason}</span>
+              </div>
+              <p style={{ margin: 0, fontSize: 13, color: colors.muted2 }}>
+                Pending {outbox.counts.pending} · Processing {outbox.counts.processing} · Failed {outbox.counts.failed}
+                {outbox.hubspotNudgeAt ? ` · HubSpot nudge ${format(parseISO(outbox.hubspotNudgeAt), 'd MMM, HH:mm')}` : ''}
+                {outbox.digestSignalAt ? ` · Digest signal ${format(parseISO(outbox.digestSignalAt), 'd MMM, HH:mm')}` : ''}
+              </p>
+            </div>
+          ) : null}
+          <div style={tableWrapStyle}>
+            <table style={tableStyle}>
+              <thead>
                 <tr>
-                  <td style={tdStyle} colSpan={5}>
-                    Checking every function…
-                  </td>
+                  <th style={thStyle}>State</th>
+                  <th style={thStyle}>Function</th>
+                  <th style={thStyle}>Why</th>
+                  <th style={thStyle}>Last error</th>
+                  <th style={thStyle}>Live test</th>
                 </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {checks.map((c) => (
+                  <tr key={c.fn.name}>
+                    <td style={tdStyle}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, color: STATE_COLOR[c.state] }}>
+                        <span aria-hidden style={{ width: 10, height: 10, borderRadius: 5, background: STATE_COLOR[c.state] }} />
+                        {STATE_LABEL[c.state]}
+                      </span>
+                    </td>
+                    <td style={tdStyle}>
+                      <div style={{ fontWeight: 600 }}>{c.fn.feature}</div>
+                      <div style={{ fontSize: 12, color: colors.muted2 }}>{c.fn.name}</div>
+                    </td>
+                    <td style={tdStyle}>{c.reason}</td>
+                    <td style={{ ...tdStyle, maxWidth: 360, wordBreak: 'break-word' }}>
+                      {c.lastError ? (
+                        <>
+                          <div>{c.lastError.message}</div>
+                          <div style={{ fontSize: 12, color: colors.muted2 }}>{format(parseISO(c.lastError.created_at), 'd MMM, HH:mm')}</div>
+                        </>
+                      ) : (
+                        <span style={{ color: colors.muted2 }}>None in 30 days</span>
+                      )}
+                    </td>
+                    <td style={tdStyle}>Test {c.fn.liveTest}</td>
+                  </tr>
+                ))}
+                {loading && !checks.length ? (
+                  <tr>
+                    <td style={tdStyle} colSpan={5}>
+                      Checking every function…
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   )
