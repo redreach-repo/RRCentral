@@ -1,23 +1,24 @@
 # HighMast / RR Central status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** M1 — HighMast axe accessibility suite
+**Current milestone:** M1 — HighMast About + Powered by
 
 ## Shipped this turn
 
-- Automated axe checks (WCAG 2.1 A/AA) for sign-in, Home, list, form, and PDF chrome in light and dark (`app/src/a11y/`)
-- Login form errors wired with `aria-invalid` / `aria-describedby`
+- In-app About (`/about-product`) with HighMast mark, endorsement, tagline; sidebar footer links here
+- `PRODUCT.poweredBy` on quote/invoice/DN letterhead and daily digest email
+- EN+AR About chrome keys
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR · HighMast PRODUCT + brand tokens/sign-in/shell · chrome name sweep · WhatsApp bundle rebuild · platform tenancy · customization · outbox · tenant CI
+- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR · HighMast PRODUCT + tokens/sign-in/shell · chrome sweep · axe suite · platform tenancy · customization · outbox · tenant CI
 
 ## Still open (agent queue)
 
 1. Theme studio (§5.3) later  
 2. Official SVG wordmark masters when zip lands  
 3. Demo env hooks after Alfred provisions  
-4. Expand axe beyond chrome fixtures into live React mounts where practical  
+4. Expand axe to live React mounts where practical  
 
 ## Still externally blocked
 

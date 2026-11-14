@@ -1800,6 +1800,8 @@ var PRODUCT = {
   endorsement: "by Red Reach",
   tagline: "CRM, quoting, delivery and finance for growing teams",
   description: "HighMast \u2014 CRM, quoting, delivery and finance by Red Reach",
+  /** Tenant document and email footers. */
+  poweredBy: "Powered by HighMast",
   colors: {
     red: "#C8321A",
     orange: "#E8872A",
@@ -2351,6 +2353,7 @@ function digestEmail(d, appUrl) {
   lines.push(
     `You get this because you are on the daily digest list in ${PRODUCT.name} (Packages and rates).`
   );
+  lines.push(PRODUCT.poweredBy);
   return { subject, body: lines.join("\n") };
 }
 function digestWhatsAppValues(d) {

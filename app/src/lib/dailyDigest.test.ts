@@ -155,6 +155,7 @@ describe('digest messages', () => {
     expect(body).toContain('Renewals in the next 60 days (1)\n  - Acme: renews in 49 days (10 Dec)\n    https://example.com/RRCentral/accounts/a1')
     expect(body).toContain('Tickets near or past their reply time (0)\n  Every open ticket is on time.')
     expect(body).toContain('Open the dashboard: https://example.com/RRCentral/app')
+    expect(body).toContain('Powered by HighMast')
     expect(body).not.toContain('—')
   })
 

@@ -368,7 +368,13 @@ export default function Layout() {
             )
           })}
         </nav>
-        <div className={styles.sideFooter}>
+        <Link
+          to="/about-product"
+          className={styles.sideFooter}
+          title={t('page.about.title')}
+          aria-label={t('page.about.openAbout')}
+          onClick={() => setSidebarOpen(false)}
+        >
           <img
             src={highmastAssets.symbolReverse}
             alt=""
@@ -377,7 +383,7 @@ export default function Layout() {
             className={styles.sideFooterMark}
           />
           <span className={styles.sideFooterLabel}>{PRODUCT.name}</span>
-        </div>
+        </Link>
       </aside>
 
       <div className={styles.main}>

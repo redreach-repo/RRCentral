@@ -8,6 +8,7 @@ describe('commandPaletteItems', () => {
     expect(tos).toContain('/deals')
     expect(tos).toContain('/crm')
     expect(tos).toContain('/guide')
+    expect(tos).toContain('/about-product')
   })
 
   it('hides sales-only destinations for staff when marked', () => {

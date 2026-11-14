@@ -6,6 +6,7 @@ import { TenantProvider } from './contexts/TenantContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { I18nProvider } from './contexts/I18nContext'
 import GuidePage from './pages/GuidePage'
+import AboutProductPage from './pages/AboutProductPage'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
@@ -146,6 +147,7 @@ export default function App() {
             >
               <Route path="app" element={<HomeRoute />} />
               <Route path="guide" element={<GuidePage />} />
+              <Route path="about-product" element={<AboutProductPage />} />
               <Route path="accounts" element={<AccountsPage />} />
               <Route path="accounts/:id" element={<AccountDetailPage />} />
               <Route path="delivery-settings" element={<DeliverySettingsPage />} />

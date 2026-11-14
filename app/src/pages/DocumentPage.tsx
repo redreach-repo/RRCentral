@@ -26,6 +26,7 @@ import {
   loadSignedDeliveryNoteAttachments,
 } from '../lib/signedDeliveryNotes'
 import { errorMessage } from '../lib/errors'
+import { PRODUCT } from '../lib/product'
 import { buildWhatsAppUrl } from '../lib/whatsapp'
 import { resolveLogoUrl } from '../lib/brand'
 import {
@@ -1151,8 +1152,11 @@ export default function DocumentPage() {
 
   const letterheadFooter = (
     <div className={styles.footerBar} data-pdf-footer>
-      {settings.tagline || 'Multi-division commerce · UAE'}
-      {settings.website ? ` · ${settings.website}` : ''}
+      <div>
+        {settings.tagline || 'Multi-division commerce · UAE'}
+        {settings.website ? ` · ${settings.website}` : ''}
+      </div>
+      <div className={styles.footerPowered}>{PRODUCT.poweredBy}</div>
     </div>
   )
 
