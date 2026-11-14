@@ -1,19 +1,16 @@
 /* Quotations — table layout with cleaner chrome */
 
 .page {
-  --q-ink: #f2f4f7;
-  --q-muted: rgba(242, 244, 247, 0.62);
-  --q-faint: rgba(242, 244, 247, 0.4);
-  --q-line: rgba(255, 255, 255, 0.1);
-  --q-panel: rgba(18, 22, 28, 0.78);
-  --q-accent: #e85d04;
+  --q-ink: var(--text, #f4f5f7);
+  --q-muted: var(--muted, rgba(244, 245, 247, 0.58));
+  --q-faint: var(--muted-2, rgba(244, 245, 247, 0.38));
+  --q-line: var(--border, rgba(255, 255, 255, 0.08));
+  --q-panel: rgba(255, 255, 255, 0.03);
+  --q-accent: var(--accent, #e85d04);
   color: var(--q-ink);
   min-height: 100%;
   padding: 0 0 40px;
-  background:
-    radial-gradient(900px 420px at 8% -10%, rgba(232, 93, 4, 0.14), transparent 60%),
-    radial-gradient(700px 360px at 100% 0%, rgba(56, 95, 120, 0.16), transparent 55%),
-    linear-gradient(180deg, #0f1216 0%, #12161c 48%, #101318 100%);
+  background: transparent;
 }
 
 .hero {
@@ -30,18 +27,18 @@
 .kicker {
   margin: 0 0 6px;
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
+  font-weight: 650;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--q-accent);
+  color: var(--q-faint);
 }
 
 .title {
   margin: 0;
-  font-size: clamp(26px, 2.8vw, 34px);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
+  font-size: clamp(22px, 2.2vw, 28px);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
 }
 
 .subtitle {
@@ -55,13 +52,13 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 42px;
-  padding: 0 18px;
+  height: 38px;
+  padding: 0 16px;
   border: none;
-  border-radius: 12px;
+  border-radius: 8px;
   background: var(--q-accent);
   color: #fff;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 650;
   cursor: pointer;
   font-family: inherit;
@@ -84,7 +81,7 @@
   display: flex;
   gap: 4px;
   padding: 4px;
-  border-radius: 14px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--q-line);
   overflow-x: auto;

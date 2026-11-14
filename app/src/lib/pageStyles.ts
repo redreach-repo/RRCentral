@@ -1,16 +1,16 @@
 import type { CSSProperties } from 'react'
 
 export const colors = {
-  bg: '#121417',
-  card: 'rgba(255,255,255,0.06)',
-  border: 'rgba(255,255,255,0.12)',
+  bg: '#0b0c0e',
+  card: 'rgba(255,255,255,0.03)',
+  border: 'rgba(255,255,255,0.08)',
   accent: '#e85d04',
-  text: '#ffffff',
-  muted: 'rgba(255,255,255,0.7)',
-  muted2: 'rgba(255,255,255,0.45)',
-  danger: '#ef4444',
-  success: '#22c55e',
-  warn: '#f59e0b',
+  text: '#f4f5f7',
+  muted: 'rgba(244,245,247,0.58)',
+  muted2: 'rgba(244,245,247,0.38)',
+  danger: '#f07178',
+  success: '#3ecf8e',
+  warn: '#e6b450',
   info: '#3b82f6',
 } as const
 
@@ -46,7 +46,7 @@ export const pageSub: CSSProperties = {
 export const card: CSSProperties = {
   background: colors.card,
   border: `1px solid ${colors.border}`,
-  borderRadius: 12,
+  borderRadius: 10,
   padding: 16,
 }
 
@@ -107,7 +107,7 @@ export const label: CSSProperties = {
 
 export const tableWrap: CSSProperties = {
   overflowX: 'auto',
-  borderRadius: 12,
+  borderRadius: 10,
   border: `1px solid ${colors.border}`,
   background: colors.card,
 }
@@ -156,7 +156,7 @@ export const overlay: CSSProperties = {
 }
 
 export const modal: CSSProperties = {
-  background: '#1a1d22',
+  background: '#141518',
   border: `1px solid ${colors.border}`,
   borderRadius: 14,
   width: '100%',
@@ -179,7 +179,7 @@ export const modalHeader: CSSProperties = {
   borderBottom: `1px solid ${colors.border}`,
   position: 'sticky',
   top: 0,
-  background: '#1a1d22',
+  background: '#141518',
   zIndex: 1,
 }
 
@@ -199,7 +199,7 @@ export const modalFooter: CSSProperties = {
   borderTop: `1px solid ${colors.border}`,
   position: 'sticky',
   bottom: 0,
-  background: '#1a1d22',
+  background: '#141518',
 }
 
 export const formGrid: CSSProperties = {

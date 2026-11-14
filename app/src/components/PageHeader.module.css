@@ -4,8 +4,7 @@
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-  margin-bottom: 24px;
-  animation: rise 0.45s ease both;
+  margin-bottom: 22px;
 }
 
 .copy {
@@ -15,21 +14,18 @@
 
 .title {
   margin: 0 0 4px;
-  font-size: clamp(1.35rem, 1.1rem + 0.8vw, 1.75rem);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: clamp(1.25rem, 1.05rem + 0.6vw, 1.55rem);
+  font-weight: 650;
+  letter-spacing: -0.025em;
   line-height: 1.2;
-  background: linear-gradient(120deg, #fff 0%, #ffe0c2 55%, #ff9f4a 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--text, #f4f5f7);
 }
 
 .subtitle {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--muted, rgba(244, 245, 247, 0.58));
   line-height: 1.45;
-  max-width: 52rem;
+  max-width: 48rem;
 }
 
 .actions {
@@ -37,17 +33,6 @@
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-}
-
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
 }
 
 /* Phones + large phones / fold portrait */
@@ -72,7 +57,7 @@
   }
 
   .title {
-    font-size: clamp(1.25rem, 1.05rem + 1.2vw, 1.55rem);
+    font-size: clamp(1.2rem, 1.05rem + 1vw, 1.4rem);
   }
 }
 

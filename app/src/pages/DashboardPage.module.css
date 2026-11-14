@@ -10,14 +10,11 @@
 .hero {
   position: relative;
   overflow: hidden;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: clamp(22px, 3vw, 32px);
-  background:
-    radial-gradient(ellipse 80% 90% at 100% 0%, rgba(232, 93, 4, 0.22), transparent 55%),
-    radial-gradient(ellipse 60% 70% at 0% 100%, rgba(255, 255, 255, 0.04), transparent 50%),
-    linear-gradient(160deg, rgba(28, 30, 34, 0.95) 0%, rgba(18, 20, 23, 0.98) 100%);
-  animation: fadeUp 0.45s ease both;
+  border-radius: 12px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  padding: clamp(20px, 2.5vw, 28px);
+  background: rgba(255, 255, 255, 0.025);
+  animation: fadeUp 0.35s ease both;
 }
 
 .heroEyebrow {
@@ -63,32 +60,30 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 11px 16px;
-  border-radius: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
   font-size: 13px;
   font-weight: 650;
   text-decoration: none;
   transition:
-    transform 0.18s ease,
-    background 0.18s ease,
-    border-color 0.18s ease;
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .heroPrimary {
-  background: #e85d04;
+  background: var(--accent, #e85d04);
   color: #fff;
   border: 1px solid transparent;
 }
 
 .heroPrimary:hover {
-  transform: translateY(-1px);
   background: #f06a14;
 }
 
 .heroSecondary {
-  background: rgba(255, 255, 255, 0.05);
+  background: transparent;
   color: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
 }
 
 .heroSecondary:hover {
@@ -176,8 +171,8 @@
 .moneyCard {
   position: relative;
   padding: 18px 18px 16px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.035);
   min-width: 0;
   transition: border-color 0.18s ease;
@@ -220,7 +215,7 @@
   color: inherit;
   padding: 14px 16px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(0, 0, 0, 0.18);
   transition:
     border-color 0.18s ease,
@@ -254,7 +249,7 @@
 .stageChip {
   text-decoration: none;
   color: inherit;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 999px;
   padding: 8px 14px;
   background: rgba(255, 255, 255, 0.03);
@@ -283,8 +278,8 @@
 
 /* —— Surface panels —— */
 .surface {
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.035);
   padding: 18px;
 }
@@ -306,7 +301,7 @@
   margin: 0;
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.035);
   color: inherit;
   font: inherit;

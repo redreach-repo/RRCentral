@@ -13,7 +13,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
           minHeight: '100vh',
           display: 'grid',
           placeItems: 'center',
-          background: '#121417',
+          background: '#0b0c0e',
           color: 'rgba(255,255,255,0.6)',
           fontFamily: "'DM Sans', sans-serif",
         }}
@@ -35,7 +35,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
           minHeight: '100vh',
           display: 'grid',
           placeItems: 'center',
-          background: '#121417',
+          background: '#0b0c0e',
           color: 'rgba(255,255,255,0.85)',
           fontFamily: "'DM Sans', sans-serif",
           padding: 16,

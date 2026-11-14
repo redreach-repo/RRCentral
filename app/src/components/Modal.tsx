@@ -29,13 +29,13 @@ const overlayStyle: CSSProperties = {
 }
 
 const cardStyle: CSSProperties = {
-  background: '#1a1d22',
+  background: 'var(--surface, #141518)',
   border: `1px solid ${colors.border}`,
-  borderRadius: 12,
+  borderRadius: 10,
   width: '100%',
   maxHeight: '90dvh',
   overflow: 'auto',
-  boxShadow: '0 20px 60px rgba(0,0,0,0.45)',
+  boxShadow: 'var(--shadow, 0 12px 40px rgba(0,0,0,0.35))',
   animation: 'rrModalSlideIn 180ms ease-out',
 }
 
@@ -48,7 +48,7 @@ const headerStyle: CSSProperties = {
   borderBottom: `1px solid ${colors.border}`,
   position: 'sticky',
   top: 0,
-  background: '#1a1d22',
+  background: 'var(--surface, #141518)',
   zIndex: 1,
 }
 
