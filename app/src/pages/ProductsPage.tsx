@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { BellRing, Church, ExternalLink, Plus, RefreshCw } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import ChurchActionButtons from '../components/worshiphub/ChurchActionButtons'
@@ -23,6 +24,7 @@ import docsStyles from '../styles/docsList.module.css'
 
 /** Products Red Reach runs and supports. Today that is WorshipHub. */
 export default function ProductsPage() {
+  const { t } = useI18n()
   const { user, userRole, appUserId } = useAuth()
   const { showToast } = useToast()
   const [accounts, setAccounts] = useState<Account[]>([])
@@ -137,11 +139,9 @@ export default function ProductsPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Delivery</p>
-          <h1 className={docsStyles.title}>WorshipHub</h1>
-          <p className={docsStyles.subtitle}>
-            WorshipHub churches that Red Reach runs and supports. Member and visitor data stays in WorshipHub.
-          </p>
+          <p className={docsStyles.kicker}>{t('page.delivery.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.worshipHub.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.worshipHub.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button
@@ -151,10 +151,10 @@ export default function ProductsPage() {
             onClick={() => void refreshLive()}
             disabled={!live}
           >
-            <RefreshCw size={15} /> Refresh
+            <RefreshCw size={15} /> {t('page.worshipHub.refresh')}
           </button>
           <Link to="/accounts?type=worship_church" className={docsStyles.newBtn} style={{ textDecoration: 'none' }}>
-            <Plus size={16} /> Add a church
+            <Plus size={16} /> {t('page.worshipHub.addChurch')}
           </Link>
         </div>
       </header>
