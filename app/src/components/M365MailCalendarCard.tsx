@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Loader2, Plug } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { errorMessage } from '../lib/errors'
 import {
@@ -15,6 +16,7 @@ import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, sectionTit
 /** Settings card: connect Microsoft 365 send + calendar (Phase A). */
 export default function M365MailCalendarCard() {
   const { userRole, isLocalMode } = useAuth()
+  const { t } = useI18n()
   const { showToast } = useToast()
   const [status, setStatus] = useState<M365Status>(M365_OFF)
   const [loading, setLoading] = useState(true)
@@ -79,7 +81,7 @@ export default function M365MailCalendarCard() {
   return (
     <div id="m365" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
       <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <Plug size={18} /> Microsoft 365
+        <Plug size={18} /> {t('page.settings.section.m365')}
       </h2>
       <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.55 }}>
         Phase A+B: send, inbox/sent, and calendar with delegated{' '}

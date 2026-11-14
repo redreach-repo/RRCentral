@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
+import { useI18n } from '../../contexts/I18nContext'
 import { useToast } from '../../contexts/ToastContext'
 import { errorMessage } from '../../lib/errors'
 import { can } from '../../lib/permissions'
@@ -36,6 +37,7 @@ const tdStyle: CSSProperties = {
 /** Settings → pending workflow approvals and recent runs. */
 export default function WorkflowRunsCard() {
   const { user, userRole } = useAuth()
+  const { t } = useI18n()
   const { showToast } = useToast()
   const manage = can(userRole, 'settings.manage') || userRole === 'admin' || userRole === 'manager'
   const [pending, setPending] = useState<WorkflowRun[]>([])
@@ -85,9 +87,9 @@ export default function WorkflowRunsCard() {
   return (
     <div id="workflow-runs" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Workflow runs</h2>
+        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.settings.section.workflowRuns')}</h2>
         <button type="button" style={buttonSecondaryStyle} onClick={() => void load()} disabled={loading}>
-          {loading ? 'Loading…' : 'Refresh'}
+          {loading ? t('page.settings.loading') : t('page.settings.refresh')}
         </button>
       </div>
       <p style={{ margin: '8px 0 14px', fontSize: 13, color: colors.muted, lineHeight: 1.45 }}>

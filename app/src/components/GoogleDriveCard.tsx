@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CloudUpload, ExternalLink, Loader2, Plug } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { useDriveStatus } from '../hooks/useDriveStatus'
 import { errorMessage } from '../lib/errors'
@@ -16,6 +17,7 @@ const linkBtn = { ...buttonSecondaryStyle, display: 'inline-flex', alignItems: '
  */
 export default function GoogleDriveCard() {
   const { user, userRole, isLocalMode } = useAuth()
+  const { t } = useI18n()
   const { showToast } = useToast()
   const { status, loading, error, reload } = useDriveStatus()
   const [busy, setBusy] = useState(false)
@@ -94,7 +96,7 @@ export default function GoogleDriveCard() {
 
   return (
     <div style={{ ...cardStyle, marginBottom: 20 }}>
-      <h2 style={sectionTitleStyle}>Google Drive</h2>
+      <h2 style={sectionTitleStyle}>{t('page.settings.section.googleDrive')}</h2>
       <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
         All documents live in Google Drive; RR Central only keeps the share links. Once connected, RR Central makes a
         folder per client under <strong>RR Central / Customers</strong>, files matched emails and portal uploads there,

@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'
 import Modal from '../Modal'
 import SimpleRowActions from '../SimpleRowActions'
 import { useAuth } from '../../contexts/AuthContext'
+import { useI18n } from '../../contexts/I18nContext'
 import { useToast } from '../../contexts/ToastContext'
 import { errorMessage } from '../../lib/errors'
 import { can } from '../../lib/permissions'
@@ -49,6 +50,7 @@ const tdStyle: CSSProperties = {
 /** Settings → Pipelines: view/edit tenant pipeline stages. */
 export default function PipelinesSettingsCard() {
   const { userRole } = useAuth()
+  const { t } = useI18n()
   const { showToast } = useToast()
   const manage = can(userRole, 'settings.manage')
   const [pipelines, setPipelines] = useState<Pipeline[]>([])
@@ -174,7 +176,7 @@ export default function PipelinesSettingsCard() {
   return (
     <div id="pipelines" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Pipelines</h2>
+        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.settings.section.pipelines')}</h2>
         {manage && selected ? (
           <button type="button" style={buttonPrimaryStyle} onClick={openCreate}>
             <Plus size={16} style={{ marginRight: 6 }} />

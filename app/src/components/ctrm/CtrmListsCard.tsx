@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useI18n } from '../../contexts/I18nContext'
 import { useSettings } from '../../contexts/SettingsContext'
 import { useToast } from '../../contexts/ToastContext'
 import { errorMessage } from '../../lib/errors'
@@ -8,6 +9,7 @@ import { buttonPrimaryStyle, cardStyle, colors, fieldStyle, inputStyle, labelSty
 
 /** Settings card for the CTRM Next pick lists, one item per line. */
 export default function CtrmListsCard() {
+  const { t } = useI18n()
   const { settings, updateSetting } = useSettings()
   const { showToast } = useToast()
   const [draft, setDraft] = useState<Record<string, string>>({})
@@ -31,7 +33,7 @@ export default function CtrmListsCard() {
 
   return (
     <div style={{ ...cardStyle, marginBottom: 20 }}>
-      <h2 style={sectionTitleStyle}>CTRM Next lists</h2>
+      <h2 style={sectionTitleStyle}>{t('page.settings.section.ctrmLists')}</h2>
       <p style={{ color: colors.muted, fontSize: 13, marginTop: 0 }}>One item per line. Leave a list empty to go back to the standard one.</p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
         {CTRM_LISTS.map((l) => (
