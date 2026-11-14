@@ -4,7 +4,6 @@ import BrandLogo from '../components/BrandLogo'
 import {
   PORTAL_MESSAGE_MAX,
   PORTAL_UPLOAD_TYPES,
-  acceptProblem,
   portalUploadProblem,
   safeUploadName,
   type PortalInvoice,
@@ -13,6 +12,7 @@ import {
   type PortalUsage,
   type PortalView,
 } from '../lib/clientPortal'
+import { parseQuoteAcceptForm } from '../lib/schemas/quoteAccept'
 import { fileToBase64, loadPortal, portalAction } from '../lib/clientPortalStore'
 import { formatAED } from '../lib/money'
 import { invoiceKindLabel } from '../lib/documentRefs'
@@ -457,9 +457,15 @@ function QuoteRow({ token, quote, onDone }: { token: string; quote: PortalQuote;
 
   const accept = async () => {
     const ok = await run(async () => {
-      const problem = acceptProblem({ name, date, agreed })
-      if (problem) return problem
-      const r = await portalAction(token, { action: 'accept_quote', quote_id: quote.id, name, date, agreed })
+      const parsed = parseQuoteAcceptForm({ name, date, agreed })
+      if (!parsed.ok) return parsed.error
+      const r = await portalAction(token, {
+        action: 'accept_quote',
+        quote_id: quote.id,
+        name: parsed.data.name,
+        date: parsed.data.date,
+        agreed: true,
+      })
       return r.ok ? null : r.message
     }, 'Thank you. The quote is accepted and Red Reach will be in touch.')
     if (ok) {
