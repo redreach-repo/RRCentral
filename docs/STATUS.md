@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — guide admin pack
+**Current milestone:** Continuous backlog — module flags for Clients
 
 ## Shipped this turn
 
-- In-app guide fourth content pack (**Admin and platform**): Settings, module flags, System check, Audit log, App errors — EN+AR
+- Settings Module flags card can soft-hide **Clients** (`{"clients":false}`)
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide CRM/billing/delivery · Cmd+K · module flags · EN+AR · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome · pipeline density · ticket detail i18n · workflow_definitions isolation
+- Continuous backlog · Zod · Guide packs (incl. admin) · Cmd+K · module flags · EN+AR · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome · pipeline density · ticket detail i18n · workflow_definitions isolation
 
 ## Still open (agent queue)
 

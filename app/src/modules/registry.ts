@@ -49,6 +49,10 @@ export const SETTINGS_MODULE_FLAGS: { flag: string; label: string }[] = [
     flag: 'delivery',
     label: 'Delivery (WorshipHub, Packages, templates, NDA, clauses, obligations)',
   },
+  {
+    flag: 'clients',
+    label: 'Clients (Accounts, Support, CTRM issues, health, reports, updates)',
+  },
 ]
 
 /**
