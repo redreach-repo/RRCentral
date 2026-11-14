@@ -1507,7 +1507,11 @@ export default function SettingsPage() {
             style={buttonPrimaryStyle}
             disabled={savingSection === 'Mail & calendar' || settingsLoading}
             onClick={() =>
-              void saveSection([...MAIL_CALENDAR_PROVIDER_KEYS, ...ZOHO_KEYS], 'Mail & calendar')
+              void saveSection(
+                [...MAIL_CALENDAR_PROVIDER_KEYS, ...ZOHO_KEYS],
+                'Mail & calendar',
+                t('page.settings.section.mailCalendar'),
+              )
             }
           >
             {savingSection === 'Mail & calendar' ? 'Saving…' : 'Save mail & calendar'}
