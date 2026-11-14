@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod insights capacity
+**Current milestone:** Continuous backlog — M1 Zod CRM outcome
 
 ## Shipped this turn
 
-- Zod `parseInsightsCapacityForm` for monthly delivery capacity on Insights
+- Zod `parseCrmOutcomeForm` for Won/Lost quick outcome on My Day
 
 ## Already on main
 
