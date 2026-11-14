@@ -33,6 +33,7 @@ import {
 } from '../lib/wandersDeals'
 import type { TourPackage, WandersDeal, WandersPassenger } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
@@ -63,6 +64,7 @@ type Tab = 'trip' | 'passengers' | 'commercial' | 'terms' | 'packages'
 type Mode = 'leads' | 'tourops'
 
 export default function WandersPage() {
+  const { t } = useI18n()
   const { user, userRole } = useAuth()
   const { settings, refresh } = useSettings()
   const { showToast } = useToast()
@@ -273,12 +275,12 @@ export default function WandersPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Operations</p>
-          <h1 className={docsStyles.title}>RR Wanders CRM</h1>
+          <p className={docsStyles.kicker}>{t('page.ops.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.wanders.title')}</h1>
           <p className={docsStyles.subtitle}>
-            Travel deals, packages, partners, departures and bookings — separate from RR Threads. Base
-            currency: <strong>{baseCurrency}</strong>
-            {baseCurrency === 'TBC' ? ' (confirm in Settings before production)' : ''}.
+            {t('page.wanders.subtitleLead')} <strong>{baseCurrency}</strong>
+            {baseCurrency === 'TBC' ? t('page.wanders.tbcHint') : ''}
+            {t('page.wanders.subtitleTrail')}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -290,7 +292,7 @@ export default function WandersPage() {
             }}
             onClick={() => setMode('leads')}
           >
-            Customer leads
+            {t('page.wanders.leads')}
           </button>
           <button
             type="button"
@@ -300,11 +302,11 @@ export default function WandersPage() {
             }}
             onClick={() => setMode('tourops')}
           >
-            Tour products & ops
+            {t('page.wanders.tourOps')}
           </button>
           {mode === 'leads' ? (
             <button type="button" className={docsStyles.newBtn} onClick={newDeal}>
-              <Plus size={16} /> New enquiry
+              <Plus size={16} /> {t('page.wanders.newEnquiry')}
             </button>
           ) : null}
         </div>

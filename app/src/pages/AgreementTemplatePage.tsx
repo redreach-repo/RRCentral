@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { CheckCircle2, Copy, Download, FileSignature, Save, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
@@ -50,6 +51,7 @@ const STATUS_LABEL = { draft: 'Draft', approved: 'Approved, in use', retired: 'R
 const day = (iso: string | null) => (iso ? format(parseISO(iso), 'd MMM yyyy') : '')
 
 export default function AgreementTemplatePage() {
+  const { t } = useI18n()
   const { userRole, user } = useAuth()
   const { settings } = useSettings()
   const { showToast } = useToast()
@@ -157,13 +159,8 @@ export default function AgreementTemplatePage() {
   return (
     <div style={pageStyle}>
       <div>
-        <h1 style={pageTitleStyle}>Service agreement template</h1>
-        <p style={pageSubtitleStyle}>
-          The wording for every client's service agreement. On a client's Contract card, Service agreement fills it in
-          from the contract: fees, term, usage caps, the early exit fee and the data protection terms. Ask your lawyer to
-          check it once, then mark it approved. Approved wording is locked; any change starts a new version for the
-          lawyer to approve.
-        </p>
+        <h1 style={pageTitleStyle}>{t('page.agreementTemplate.title')}</h1>
+        <p style={pageSubtitleStyle}>{t('page.agreementTemplate.subtitle')}</p>
       </div>
 
       {missingTable ? (

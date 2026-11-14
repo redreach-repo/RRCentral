@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { addDays, format, parseISO } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { runAi } from '../lib/aiAssistStore'
 import { buildUpdateDrafts, loadUpdateQueue, saveUpdateBody, sendUpdate, setUpdateSkipped, type UpdateContact, type UpdateQueue } from '../lib/clientUpdatesStore'
@@ -29,6 +30,7 @@ const muted = { color: colors.muted, fontSize: 13 }
  * sessions; nothing goes out until someone taps Send by email or WhatsApp.
  */
 export default function ClientUpdatesPage() {
+  const { t } = useI18n()
   const { userRole, user } = useAuth()
   const { showToast } = useToast()
   const weeks = useMemo(() => {
@@ -78,13 +80,9 @@ export default function ClientUpdatesPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Clients</p>
-          <h1 className={docsStyles.title}>Weekly updates</h1>
-          <p className={docsStyles.subtitle}>
-            Every Thursday each CTRM Next client gets a short update drafted from their issues and sessions: what was fixed this
-            week, what is still open and what comes next. Check the wording, then send it by email or WhatsApp. Nothing goes to a
-            client until someone taps Send.
-          </p>
+          <p className={docsStyles.kicker}>{t('page.clients.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.clientUpdates.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.clientUpdates.subtitle')}</p>
         </div>
       </header>
 

@@ -4,6 +4,7 @@ import { ExternalLink, Globe, Plus } from 'lucide-react'
 import { db } from '../lib/db'
 import type { OwnedDomain, OwnedDomainBillingCycle, OwnedDomainStatus } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
@@ -87,6 +88,7 @@ function formatDate(value: string | null | undefined): string {
 }
 
 export default function DomainsPage() {
+  const { t } = useI18n()
   const { user } = useAuth()
   const { showToast } = useToast()
   const [domains, setDomains] = useState<OwnedDomain[]>([])
@@ -261,12 +263,9 @@ export default function DomainsPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Operations</p>
-          <h1 className={docsStyles.title}>Domains</h1>
-          <p className={docsStyles.subtitle}>
-            Track every domain you own — registrar, renewals, DNS, and hosting. Renewal alerts show
-            on the dashboard when expiry is within 90 days.
-          </p>
+          <p className={docsStyles.kicker}>{t('page.ops.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.domains.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.domains.subtitle')}</p>
         </div>
         <button
           type="button"
@@ -274,7 +273,7 @@ export default function DomainsPage() {
           onClick={openCreate}
           disabled={missingTable}
         >
-          <Plus size={16} /> Add domain
+          <Plus size={16} /> {t('page.domains.add')}
         </button>
       </header>
 

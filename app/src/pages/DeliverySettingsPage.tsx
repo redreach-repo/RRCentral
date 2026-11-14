@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Package } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
@@ -66,6 +67,7 @@ function toDraft(p: DeliveryPackage): PackageDraft {
 }
 
 export default function DeliverySettingsPage() {
+  const { t } = useI18n()
   const { userRole } = useAuth()
   const { settings, updateSetting } = useSettings()
   const { showToast } = useToast()
@@ -168,12 +170,9 @@ export default function DeliverySettingsPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Delivery</p>
-          <h1 className={docsStyles.title}>Packages and rates</h1>
-          <p className={docsStyles.subtitle}>
-            The AI CRM package catalogue, the rates used for overage and profitability, and support response times. Prices exclude 5% VAT.
-            Changes apply to new contracts; existing contracts keep the fees saved on them.
-          </p>
+          <p className={docsStyles.kicker}>{t('page.delivery.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.packages.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.packages.subtitle')}</p>
         </div>
       </header>
 

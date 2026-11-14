@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertTriangle } from 'lucide-react'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { HEALTH_BAND_COLORS, HEALTH_BAND_LABELS, type HealthBand } from '../lib/clientHealth'
 import { loadClientHealth, type HealthRow } from '../lib/clientHealthStore'
@@ -19,6 +20,7 @@ import docsStyles from '../styles/docsList.module.css'
 const BANDS: HealthBand[] = ['at_risk', 'watch', 'healthy']
 
 export default function ClientHealthPage() {
+  const { t } = useI18n()
   const { showToast } = useToast()
   const [rows, setRows] = useState<HealthRow[] | null>(null)
 
@@ -38,13 +40,9 @@ export default function ClientHealthPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Clients</p>
-          <h1 className={docsStyles.title}>Client health</h1>
-          <p className={docsStyles.subtitle}>
-            A score out of 100 for each client with a running contract, from four parts worth 25 each: usage against their
-            plan, support tickets, monthly report calls attended, and overdue invoices. Below 50, or any warning sign, shows a
-            churn warning. Lowest scores first.
-          </p>
+          <p className={docsStyles.kicker}>{t('page.clients.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.clientHealth.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.clientHealth.subtitle')}</p>
         </div>
       </header>
 

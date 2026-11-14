@@ -194,6 +194,19 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.deals.title': 'Pipeline',
     'page.deals.subtitle':
       'CRM, AI CRM sales, and CTRM Next in one board. Drag a card or change its stage here.',
+    'page.salesDetail.title': 'AI CRM detail',
+    'page.salesDetail.subtitle':
+      'Fine-grained AI CRM stages and Make contract. Day-to-day chasing lives on Pipeline.',
+    'page.salesDetail.new': 'New deal',
+    'page.ctrmDetail.title': 'CTRM detail',
+    'page.ctrmDetail.subtitle':
+      'Fine-grained CTRM Next stages, regions, and commission. Day-to-day chasing lives on Pipeline.',
+    'page.ctrmDetail.weeklySummary': 'Weekly summary',
+    'page.ctrmDetail.new': 'New deal',
+    'page.customerFiles.title': 'Google Drive',
+    'page.customerFiles.subtitle':
+      'Every customer document lives in Google Drive. RR Central keeps the folder links — quotes, invoices, delivery notes, communications, purchasing, and signed copies.',
+    'page.customerFiles.openDrive': 'Open in Drive',
     'page.login.title': 'RED REACH Central',
     'page.login.subtitle': 'Multi-division CRM & quoting for Red Reach Middle East FZE',
     'page.login.email': 'Email (@redreach.ae)',
@@ -235,6 +248,31 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.support.subtitle':
       'One queue for AI CRM clients and WorshipHub churches. The clock counts working hours only.',
     'page.support.new': 'New ticket',
+    'page.ticket.loading': 'Loading ticket…',
+    'page.ticket.notFound': 'Ticket not found',
+    'page.ticket.notFoundSubtitle':
+      'It may have been deleted, or it is on an account that is not assigned to you.',
+    'page.ticket.backToSupport': 'Back to support',
+    'page.ticket.noSubject': '(no subject)',
+    'page.ticket.conversation': 'Conversation',
+    'page.ticket.summarise': 'Summarise',
+    'page.ticket.summarising': 'Summarising…',
+    'page.ticket.draftReply': 'Draft a reply',
+    'page.ticket.drafting': 'Drafting…',
+    'page.ticket.replyTitle': 'Reply to the client',
+    'page.ticket.noteTitle': 'Internal note',
+    'page.ticket.logReply': 'Log reply',
+    'page.ticket.addNote': 'Add note',
+    'page.ticket.sendWhatsApp': 'Send on WhatsApp',
+    'page.clientHealth.title': 'Client health',
+    'page.clientHealth.subtitle':
+      'A score out of 100 for each client with a running contract, from four parts worth 25 each: usage against their plan, support tickets, monthly report calls attended, and overdue invoices. Below 50, or any warning sign, shows a churn warning. Lowest scores first.',
+    'page.clientReports.title': 'Monthly reports',
+    'page.clientReports.subtitle':
+      'On the 1st each AI CRM client gets a report for the month before, with a summary drafted by AI. Check the summary, fix anything, then send it. Nothing goes to a client without someone pressing Send.',
+    'page.clientUpdates.title': 'Weekly updates',
+    'page.clientUpdates.subtitle':
+      'Every Thursday each CTRM Next client gets a short update drafted from their issues and sessions: what was fixed this week, what is still open and what comes next. Check the wording, then send it by email or WhatsApp. Nothing goes to a client until someone taps Send.',
     'page.followups.title': 'Follow-ups',
     'page.followups.subtitleLead': 'Overdue and upcoming CRM actions',
     'page.followups.calendarSyncOn': ' · {provider} Calendar sync on',
@@ -257,6 +295,19 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.insights.subtitle':
       'How much of your delivery time is used, so you know when to hire, and how each client\'s profit moves month to month. Amounts exclude VAT.',
     'page.admin.kicker': 'Admin',
+    'page.settings.title': 'Settings',
+    'page.settings.subtitle': 'Company details, data storage, and user access',
+    'page.account.title': 'Account',
+    'page.account.subtitle': 'Change the password you use to sign in.',
+    'page.ctrmSummary.loading': 'Loading summary…',
+    'page.ctrmSummary.back': 'Back to Pipeline',
+    'page.ctrmSummary.weekOf': 'Week of',
+    'page.ctrmSummary.copy': 'Copy as text',
+    'page.ctrmSummary.print': 'Print or save as PDF',
+    'page.ctrmSummary.kicker': 'Red Reach for CTRM Next, weekly pipeline',
+    'page.ctrmSummary.weekRange': 'Week of {start} to {end}',
+    'page.ctrmSummary.emptyLead': 'There are no deals yet, so this summary is empty.',
+    'page.ctrmSummary.emptyLink': 'Add the first deal on the CTRM stage board.',
     'page.audit.title': 'Audit log',
     'page.audit.subtitle':
       'Every create, change and delete on key records, who did it and what changed. Recorded by the database, so it cannot be edited from the app. Secrets are hidden.',
@@ -265,6 +316,77 @@ const STRINGS: Record<Locale, Record<string, string>> = {
       'Every server function gets a harmless ping (it does not send, import or change anything), next to its last failure. Each row names its test in docs/LIVE_TEST.md. Full error details are on',
     'page.systemCheck.appErrors': 'App errors',
     'page.systemCheck.subtitleTrail': '.',
+    'page.delivery.kicker': 'Delivery',
+    'page.worshipHub.title': 'WorshipHub',
+    'page.worshipHub.subtitle':
+      'WorshipHub churches that Red Reach runs and supports. Member and visitor data stays in WorshipHub.',
+    'page.worshipHub.refresh': 'Refresh',
+    'page.worshipHub.addChurch': 'Add a church',
+    'page.packages.title': 'Packages and rates',
+    'page.packages.subtitle':
+      'The AI CRM package catalogue, the rates used for overage and profitability, and support response times. Prices exclude 5% VAT. Changes apply to new contracts; existing contracts keep the fees saved on them.',
+    'page.buildTemplates.title': 'Build templates',
+    'page.buildTemplates.subtitle':
+      'A ready build checklist and starter configuration for each package. On a client, Start from template copies the checklist into their build and the starter configuration into their requirements. Changes here apply to the next client, not to builds already started.',
+    'page.buildTemplates.new': 'New template',
+    'page.ndaTemplate.title': 'NDA template',
+    'page.ndaTemplate.subtitle':
+      'Lawyer-approved wording for NDAs sent from the CRM contracts vault. Clients capture assent via a private link (electronic signing record — not a UAE Qualified E-Signature). The signed PDF is filed to Google Drive when Drive is connected.',
+    'page.clauseLibrary.title': 'Clause library',
+    'page.clauseLibrary.subtitle':
+      'Reusable contract / NDA wording blocks for M5. Compose into templates later. This is a wording library — not a UAE Qualified E-Signature.',
+    'page.obligations.title': 'Obligations board',
+    'page.obligations.subtitleLead':
+      'Track follow-through from NDAs and agreements (return materials, renewals, survivor duties). Not a UAE Qualified E-Signature. Clause wording lives in the',
+    'page.obligations.clauseLibrary': 'clause library',
+    'page.obligations.subtitleTrail': '.',
+    'page.agreementTemplate.title': 'Service agreement template',
+    'page.agreementTemplate.subtitle':
+      "The wording for every client's service agreement. On a client's Contract card, Service agreement fills it in from the contract: fees, term, usage caps, the early exit fee and the data protection terms. Ask your lawyer to check it once, then mark it approved. Approved wording is locked; any change starts a new version for the lawyer to approve.",
+    'page.duplicates.title': 'Duplicates',
+    'page.duplicates.subtitle':
+      'Accounts and contacts that share a phone, an email, a website or a very similar name. Merging moves everything on the duplicate (timeline, contacts, tickets, quotes, invoices, deals) to the one you keep, then removes the duplicate.',
+    'page.duplicates.restricted': 'Only managers and admins can merge duplicates.',
+    'page.quoteTemplates.title': 'Templates',
+    'page.quoteTemplates.subtitle': 'Reusable quotation line-item sets',
+    'page.quoteTemplates.syncSkus': 'Load SKU templates',
+    'page.quoteTemplates.syncing': 'Syncing…',
+    'page.quoteTemplates.new': 'New template',
+    'page.quickAdd.title': 'Quick add',
+    'page.quickAdd.restricted':
+      'Quick add is for the sales team. Log calls on the account timeline instead.',
+    'page.ctrmIssues.title': 'CTRM issues',
+    'page.ctrmIssues.subtitle':
+      'Problems CTRM Next clients have raised, grouped by client. The vendor ticket number and status are typed in by hand. An issue turns red when the client has had no update for {days} working days. Log a new one from the client\'s account (Client issues → Log an issue).',
+    'page.wanders.title': 'RR Wanders CRM',
+    'page.wanders.subtitleLead':
+      'Travel deals, packages, partners, departures and bookings — separate from RR Threads. Base currency:',
+    'page.wanders.tbcHint': ' (confirm in Settings before production)',
+    'page.wanders.subtitleTrail': '.',
+    'page.wanders.leads': 'Customer leads',
+    'page.wanders.tourOps': 'Tour products & ops',
+    'page.wanders.newEnquiry': 'New enquiry',
+    'page.ops.kicker': 'Operations',
+    'page.catalog.title': 'Catalog',
+    'page.catalog.subtitle': 'Brand catalogues and products across divisions',
+    'page.catalog.add': 'Add product',
+    'page.catalog.syncSkus': 'Sync catalogue SKUs',
+    'page.catalog.syncing': 'Syncing…',
+    'page.catalog.loadServices': 'Load Marketing / Connect / Trading',
+    'page.inventory.title': 'Inventory',
+    'page.inventory.subtitle':
+      'Manual stock by SKU · available = on hand − reserved{low}. Sync pulls catalogue SKUs; quote/catalog stock hooks are not automatic yet.',
+    'page.inventory.lowStock': ' · {n} low stock',
+    'page.inventory.syncSkus': 'Sync catalogue SKUs',
+    'page.domains.title': 'Domains',
+    'page.domains.subtitle':
+      'Track every domain you own — registrar, renewals, DNS, and hosting. Renewal alerts show on the dashboard when expiry is within 90 days.',
+    'page.domains.add': 'Add domain',
+    'page.appErrors.title': 'App errors',
+    'page.appErrors.subtitle':
+      'Errors people hit in RR Central, grouped by message, newest first. The daily digest email lists the last day\'s. Mark one as fixed once it is dealt with.',
+    'page.appErrors.refresh': 'Refresh',
+    'page.appErrors.loading': 'Loading',
   },
   ar: {
     'shell.company': 'الشركة',
@@ -452,6 +574,19 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.deals.title': 'خط الأنابيب',
     'page.deals.subtitle':
       'CRM ومبيعات AI CRM وCTRM Next في لوحة واحدة. اسحب بطاقة أو غيّر مرحلتها هنا.',
+    'page.salesDetail.title': 'تفاصيل AI CRM',
+    'page.salesDetail.subtitle':
+      'مراحل AI CRM التفصيلية وعقد Make. المتابعة اليومية على خط الأنابيب.',
+    'page.salesDetail.new': 'صفقة جديدة',
+    'page.ctrmDetail.title': 'تفاصيل CTRM',
+    'page.ctrmDetail.subtitle':
+      'مراحل CTRM Next والمناطق والعمولة. المتابعة اليومية على خط الأنابيب.',
+    'page.ctrmDetail.weeklySummary': 'الملخص الأسبوعي',
+    'page.ctrmDetail.new': 'صفقة جديدة',
+    'page.customerFiles.title': 'Google Drive',
+    'page.customerFiles.subtitle':
+      'كل مستند عميل يعيش في Google Drive. RR Central يحتفظ بروابط المجلدات — العروض والفواتير وإشعارات التسليم والمراسلات والمشتريات والنسخ الموقّعة.',
+    'page.customerFiles.openDrive': 'فتح في Drive',
     'page.login.title': 'RED REACH Central',
     'page.login.subtitle': 'CRM وعروض أسعار متعددة الأقسام لـ Red Reach Middle East FZE',
     'page.login.email': 'البريد (@redreach.ae)',
@@ -493,6 +628,31 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.support.subtitle':
       'طابور واحد لعملاء AI CRM وكنائس WorshipHub. الساعة تحسب ساعات العمل فقط.',
     'page.support.new': 'تذكرة جديدة',
+    'page.ticket.loading': 'جارٍ تحميل التذكرة…',
+    'page.ticket.notFound': 'التذكرة غير موجودة',
+    'page.ticket.notFoundSubtitle':
+      'ربما حُذفت، أو هي على حساب غير مسند إليك.',
+    'page.ticket.backToSupport': 'العودة إلى الدعم',
+    'page.ticket.noSubject': '(بلا موضوع)',
+    'page.ticket.conversation': 'المحادثة',
+    'page.ticket.summarise': 'تلخيص',
+    'page.ticket.summarising': 'جارٍ التلخيص…',
+    'page.ticket.draftReply': 'مسودة رد',
+    'page.ticket.drafting': 'جارٍ إعداد المسودة…',
+    'page.ticket.replyTitle': 'الرد على العميل',
+    'page.ticket.noteTitle': 'ملاحظة داخلية',
+    'page.ticket.logReply': 'تسجيل الرد',
+    'page.ticket.addNote': 'إضافة ملاحظة',
+    'page.ticket.sendWhatsApp': 'إرسال عبر واتساب',
+    'page.clientHealth.title': 'صحة العميل',
+    'page.clientHealth.subtitle':
+      'درجة من 100 لكل عميل بعقد ساري، من أربعة أجزاء بـ 25 لكل منها: الاستخدام مقابل الخطة، تذاكر الدعم، حضور مكالمات التقرير الشهري، والفواتير المتأخرة. دون 50 أو أي علامة تحذير تظهر تحذير تسرب. الأدنى أولاً.',
+    'page.clientReports.title': 'التقارير الشهرية',
+    'page.clientReports.subtitle':
+      'في الأول من كل شهر يحصل كل عميل AI CRM على تقرير للشهر السابق بملخص مسودة بالذكاء الاصطناعي. راجع الملخص وصحّح ثم أرسل. لا يصل شيء للعميل دون ضغط إرسال.',
+    'page.clientUpdates.title': 'التحديثات الأسبوعية',
+    'page.clientUpdates.subtitle':
+      'كل خميس يحصل كل عميل CTRM Next على تحديث قصير من مشكلاته وجلساته: ما أُصلح هذا الأسبوع، وما زال مفتوحاً، وما يلي. راجع الصياغة ثم أرسل بالبريد أو واتساب. لا يصل شيء حتى يضغط أحد إرسال.',
     'page.followups.title': 'المتابعات',
     'page.followups.subtitleLead': 'إجراءات CRM المتأخرة والقادمة',
     'page.followups.calendarSyncOn': ' · مزامنة تقويم {provider} مفعّلة',
@@ -515,6 +675,19 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.insights.subtitle':
       'كم من وقت التسليم يُستخدم لتعرف متى توظّف، وكيف يتحرك ربح كل عميل شهراً بعد شهر. المبالغ بلا ضريبة.',
     'page.admin.kicker': 'الإدارة',
+    'page.settings.title': 'الإعدادات',
+    'page.settings.subtitle': 'تفاصيل الشركة وتخزين البيانات وصلاحيات المستخدمين',
+    'page.account.title': 'الحساب',
+    'page.account.subtitle': 'غيّر كلمة المرور التي تستخدمها لتسجيل الدخول.',
+    'page.ctrmSummary.loading': 'جارٍ تحميل الملخص…',
+    'page.ctrmSummary.back': 'العودة إلى خط الأنابيب',
+    'page.ctrmSummary.weekOf': 'أسبوع',
+    'page.ctrmSummary.copy': 'نسخ كنص',
+    'page.ctrmSummary.print': 'طباعة أو حفظ PDF',
+    'page.ctrmSummary.kicker': 'Red Reach لـ CTRM Next، خط الأنابيب الأسبوعي',
+    'page.ctrmSummary.weekRange': 'أسبوع من {start} إلى {end}',
+    'page.ctrmSummary.emptyLead': 'لا توجد صفقات بعد، لذا هذا الملخص فارغ.',
+    'page.ctrmSummary.emptyLink': 'أضف أول صفقة على لوحة مراحل CTRM.',
     'page.audit.title': 'سجل التدقيق',
     'page.audit.subtitle':
       'كل إنشاء وتغيير وحذف على السجلات الرئيسية، ومن فعله وما تغيّر. يسجّله قاعدة البيانات فلا يُعدَّل من التطبيق. الأسرار مخفية.',
@@ -523,6 +696,77 @@ const STRINGS: Record<Locale, Record<string, string>> = {
       'كل دالة خادم تحصل على نبضة غير ضارة (لا ترسل ولا تستورد ولا تغيّر شيئاً)، بجانب آخر فشل. كل صف يسمي اختباره في docs/LIVE_TEST.md. تفاصيل الأخطاء الكاملة على',
     'page.systemCheck.appErrors': 'أخطاء التطبيق',
     'page.systemCheck.subtitleTrail': '.',
+    'page.delivery.kicker': 'التسليم',
+    'page.worshipHub.title': 'WorshipHub',
+    'page.worshipHub.subtitle':
+      'كنائس WorshipHub التي تديرها وتدعمها Red Reach. بيانات الأعضاء والزوار تبقى في WorshipHub.',
+    'page.worshipHub.refresh': 'تحديث',
+    'page.worshipHub.addChurch': 'إضافة كنيسة',
+    'page.packages.title': 'الباقات والأسعار',
+    'page.packages.subtitle':
+      'كتالوج باقات AI CRM والأسعار المستخدمة للزيادة والربحية وأوقات استجابة الدعم. الأسعار بلا ضريبة 5%. التغييرات تنطبق على العقود الجديدة؛ العقود الحالية تحتفظ بالرسوم المحفوظة عليها.',
+    'page.buildTemplates.title': 'قوالب البناء',
+    'page.buildTemplates.subtitle':
+      'قائمة تحقق جاهزة وإعداد أولي لكل باقة. على العميل، ابدأ من قالب ينسخ القائمة إلى بنائه والإعداد إلى متطلباته. التغييرات هنا تنطبق على العميل التالي لا على البناءات التي بدأت.',
+    'page.buildTemplates.new': 'قالب جديد',
+    'page.ndaTemplate.title': 'قالب اتفاقية عدم الإفصاح',
+    'page.ndaTemplate.subtitle':
+      'صياغة معتمدة من المحامي لاتفاقيات عدم الإفصاح من خزنة عقود CRM. يوافق العملاء عبر رابط خاص (سجل توقيع إلكتروني — ليس توقيعاً مؤهلاً إماراتياً). يُحفظ PDF الموقّع في Google Drive عند الاتصال.',
+    'page.clauseLibrary.title': 'مكتبة البنود',
+    'page.clauseLibrary.subtitle':
+      'كتل صياغة قابلة لإعادة الاستخدام للعقود واتفاقيات عدم الإفصاح لـ M5. تُركَّب في القوالب لاحقاً. هذه مكتبة صياغة — ليست توقيعاً مؤهلاً إماراتياً.',
+    'page.obligations.title': 'لوحة الالتزامات',
+    'page.obligations.subtitleLead':
+      'تتبّع المتابعة من اتفاقيات عدم الإفصاح والعقود (إعادة المواد والتجديدات والواجبات الباقية). ليست توقيعاً مؤهلاً إماراتياً. صياغة البنود في',
+    'page.obligations.clauseLibrary': 'مكتبة البنود',
+    'page.obligations.subtitleTrail': '.',
+    'page.agreementTemplate.title': 'قالب اتفاقية الخدمة',
+    'page.agreementTemplate.subtitle':
+      'صياغة اتفاقية الخدمة لكل عميل. على بطاقة عقد العميل، اتفاقية الخدمة تملؤها من العقد: الرسوم والمدة وحدود الاستخدام ورسوم الخروج المبكر وشروط حماية البيانات. اطلب من محاميك مراجعتها مرة ثم اعتمدها. الصياغة المعتمدة مقفلة؛ أي تغيير يبدأ إصداراً جديداً ليوافق عليه المحامي.',
+    'page.duplicates.title': 'التكرارات',
+    'page.duplicates.subtitle':
+      'حسابات وجهات اتصال تشترك في هاتف أو بريد أو موقع أو اسم متشابه جداً. الدمج ينقل كل ما على المكرر (الجدول الزمني وجهات الاتصال والتذاكر والعروض والفواتير والصفقات) إلى الذي تبقيه ثم يحذف المكرر.',
+    'page.duplicates.restricted': 'المدراء والمسؤولون فقط يمكنهم دمج التكرارات.',
+    'page.quoteTemplates.title': 'القوالب',
+    'page.quoteTemplates.subtitle': 'مجموعات بنود عرض أسعار قابلة لإعادة الاستخدام',
+    'page.quoteTemplates.syncSkus': 'تحميل قوالب SKU',
+    'page.quoteTemplates.syncing': 'جارٍ المزامنة…',
+    'page.quoteTemplates.new': 'قالب جديد',
+    'page.quickAdd.title': 'إضافة سريعة',
+    'page.quickAdd.restricted':
+      'الإضافة السريعة لفريق المبيعات. سجّل المكالمات على الجدول الزمني للحساب بدلاً من ذلك.',
+    'page.ctrmIssues.title': 'مشاكل CTRM',
+    'page.ctrmIssues.subtitle':
+      'مشاكل رفعها عملاء CTRM Next، مجمّعة حسب العميل. رقم تذكرة المورد وحالتها يُدخلان يدوياً. تتحول المشكلة إلى أحمر عندما لا يحصل العميل على تحديث لمدة {days} أيام عمل. سجّل واحدةً من حساب العميل (مشاكل العميل → تسجيل مشكلة).',
+    'page.wanders.title': 'CRM لـ RR Wanders',
+    'page.wanders.subtitleLead':
+      'صفقات سفر وباقات وشركاء ومغادرات وحجوزات — منفصلة عن RR Threads. العملة الأساسية:',
+    'page.wanders.tbcHint': ' (أكّد في الإعدادات قبل الإنتاج)',
+    'page.wanders.subtitleTrail': '.',
+    'page.wanders.leads': 'عملاء محتملون',
+    'page.wanders.tourOps': 'منتجات وعمليات الجولات',
+    'page.wanders.newEnquiry': 'استفسار جديد',
+    'page.ops.kicker': 'العمليات',
+    'page.catalog.title': 'الكتالوج',
+    'page.catalog.subtitle': 'كتالوجات العلامات والمنتجات عبر الأقسام',
+    'page.catalog.add': 'إضافة منتج',
+    'page.catalog.syncSkus': 'مزامنة SKU الكتالوج',
+    'page.catalog.syncing': 'جارٍ المزامنة…',
+    'page.catalog.loadServices': 'تحميل التسويق / Connect / التجارة',
+    'page.inventory.title': 'المخزون',
+    'page.inventory.subtitle':
+      'مخزون يدوي حسب SKU · المتاح = في اليد − المحجوز{low}. المزامنة تسحب SKU الكتالوج؛ ربط العرض/الكتالوج ليس تلقائياً بعد.',
+    'page.inventory.lowStock': ' · {n} مخزون منخفض',
+    'page.inventory.syncSkus': 'مزامنة SKU الكتالوج',
+    'page.domains.title': 'النطاقات',
+    'page.domains.subtitle':
+      'تتبّع كل نطاق تملكه — المسجّل والتجديدات وDNS والاستضافة. تنبيهات التجديد تظهر على لوحة التحكم قبل 90 يوماً من الانتهاء.',
+    'page.domains.add': 'إضافة نطاق',
+    'page.appErrors.title': 'أخطاء التطبيق',
+    'page.appErrors.subtitle':
+      'أخطاء يصطدم بها الناس في RR Central، مجمّعة حسب الرسالة، الأحدث أولاً. بريد الملخص اليومي يسرد يوم أمس. علّم واحداً كمحلولاً بعد معالجته.',
+    'page.appErrors.refresh': 'تحديث',
+    'page.appErrors.loading': 'جارٍ التحميل',
   },
 }
 
