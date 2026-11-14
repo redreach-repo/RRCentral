@@ -20,6 +20,11 @@ export type ExtensionRoute = {
 export type ExtensionModule = {
   manifest: ModuleManifest
   routes: ExtensionRoute[]
+  /**
+   * Optional: id of a core sidebar group (e.g. 'clients') to add this
+   * module's items to, instead of a sidebar group of its own.
+   */
+  attachTo?: string
 }
 
 export type ExtensionStrings = {

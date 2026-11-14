@@ -1,4 +1,24 @@
+import type { ModuleManifest } from '../registry'
 import type { ExtensionModule, ExtensionStrings } from './types'
+
+/**
+ * Sidebar groups: the core groups, with the items of modules that set
+ * `attachTo` appended to that group, then one group per other module.
+ * An `attachTo` naming no core group gets a group of its own.
+ */
+export function mergeExtensionNav(core: ModuleManifest[], exts: ExtensionModule[]): ModuleManifest[] {
+  const ids = new Set(core.map((m) => m.id))
+  const attached = new Map<string, ModuleManifest['items']>()
+  const own: ModuleManifest[] = []
+  for (const ext of exts) {
+    if (ext.attachTo && ids.has(ext.attachTo)) {
+      attached.set(ext.attachTo, [...(attached.get(ext.attachTo) || []), ...ext.manifest.items])
+    } else {
+      own.push(ext.manifest)
+    }
+  }
+  return [...core.map((m) => (attached.has(m.id) ? { ...m, items: [...m.items, ...attached.get(m.id)!] } : m)), ...own]
+}
 
 /** Sort by folder path so the sidebar order is stable, and refuse clashes. */
 export function collectExtensions(found: Record<string, { default: ExtensionModule }>): ExtensionModule[] {

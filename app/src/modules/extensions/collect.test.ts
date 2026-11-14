@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Box } from 'lucide-react'
-import { collectExtensions, mergeExtensionStrings } from './collect'
+import { mergeExtensionNav, collectExtensions, mergeExtensionStrings } from './collect'
 import { EXTENSION_MODULES } from './index'
 import { EXTENSION_STRINGS } from './strings'
 import { t } from '../../lib/i18n'
@@ -41,5 +41,23 @@ describe('extension slots', () => {
       }
     }
     expect(EXTENSION_STRINGS.en).toBeTypeOf('object')
+  })
+})
+
+describe('mergeExtensionNav', () => {
+  const item = (to: string) => ({ to, label: to, icon: Box })
+  const core = [
+    { id: 'clients', label: 'Clients', icon: Box, items: [item('/accounts')] },
+    { id: 'admin', label: 'Admin', icon: Box, items: [] },
+  ]
+  it('adds attached items to the core group and keeps other modules as groups', () => {
+    const merged = mergeExtensionNav(core, [
+      { manifest: { id: 'a', label: 'A', icon: Box, items: [item('/a')] }, routes: [], attachTo: 'clients' },
+      { manifest: { id: 'b', label: 'B', icon: Box, items: [item('/b')] }, routes: [] },
+      { manifest: { id: 'c', label: 'C', icon: Box, items: [item('/c')] }, routes: [], attachTo: 'nope' },
+    ])
+    expect(merged.map((m) => m.id)).toEqual(['clients', 'admin', 'b', 'c'])
+    expect(merged[0].items.map((i) => i.to)).toEqual(['/accounts', '/a'])
+    expect(core[0].items).toHaveLength(1)
   })
 })

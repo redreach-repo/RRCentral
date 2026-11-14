@@ -51,6 +51,7 @@ import { roleAtLeast } from '../lib/permissions'
 import type { UserRole } from '../lib/types'
 import { modulesEnabled, parseModuleFlags, type ModuleManifest, type ModuleNavItem } from './registry'
 import { EXTENSION_MODULES } from './extensions'
+import { mergeExtensionNav } from './extensions/collect'
 
 const CORE_MODULES: ModuleManifest[] = [
   {
@@ -203,10 +204,7 @@ const CORE_MODULES: ModuleManifest[] = [
 ]
 
 /** Core groups, then gap plan modules from modules/extensions (docs/MODULE_BUILD_PLAN.md). */
-export const APP_MODULES: ModuleManifest[] = [
-  ...CORE_MODULES,
-  ...EXTENSION_MODULES.map((ext) => ext.manifest),
-]
+export const APP_MODULES: ModuleManifest[] = mergeExtensionNav(CORE_MODULES, EXTENSION_MODULES)
 
 /** Topbar titles that differ from the short nav label (longer / more specific). */
 const PATH_TITLE_OVERRIDES: { match: (path: string) => boolean; title: string }[] = [

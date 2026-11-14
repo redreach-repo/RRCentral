@@ -12,6 +12,8 @@ const mod: ExtensionModule = {
     items: [{ to: '/ai-approvals', label: 'AI approvals', icon: Sparkles, roles: ['admin', 'manager', 'sales', 'staff'] }],
   },
   routes: [{ path: 'ai-approvals', element: <AiApprovalsPage /> }],
+  // Listed under Clients rather than as a sidebar group of its own.
+  attachTo: 'clients',
 }
 
 export default mod
