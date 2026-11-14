@@ -6,6 +6,7 @@ import { availableStock, adjustStock } from '../lib/inventory'
 import { syncSeedCatalog } from '../lib/syncCatalog'
 import type { Product } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
@@ -27,6 +28,7 @@ import { errorMessage } from '../lib/errors'
 import { parseInventoryAdjust } from '../lib/schemas/inventoryAdjust'
 
 export default function InventoryPage() {
+  const { t } = useI18n()
   const { user } = useAuth()
   const { showToast } = useToast()
   const [products, setProducts] = useState<Product[]>([])
@@ -126,12 +128,13 @@ export default function InventoryPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Operations</p>
-          <h1 className={docsStyles.title}>Inventory</h1>
+          <p className={docsStyles.kicker}>{t('page.ops.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.inventory.title')}</h1>
           <p className={docsStyles.subtitle}>
-            Manual stock by SKU · available = on hand − reserved
-            {lowCount > 0 ? ` · ${lowCount} low stock` : ''}
-            . Sync pulls catalogue SKUs; quote/catalog stock hooks are not automatic yet.
+            {t('page.inventory.subtitle').replace(
+              '{low}',
+              lowCount > 0 ? t('page.inventory.lowStock').replace('{n}', String(lowCount)) : '',
+            )}
           </p>
         </div>
         <button
@@ -141,7 +144,7 @@ export default function InventoryPage() {
           disabled={busy}
           onClick={() => void syncSkus()}
         >
-          <RefreshCw size={16} /> Sync catalogue SKUs
+          <RefreshCw size={16} /> {t('page.inventory.syncSkus')}
         </button>
       </header>
 

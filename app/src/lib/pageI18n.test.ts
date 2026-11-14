@@ -95,10 +95,28 @@ const PAGE_KEYS = [
   'page.systemCheck.subtitleLead',
   'page.systemCheck.appErrors',
   'page.systemCheck.subtitleTrail',
+  'page.ops.kicker',
+  'page.catalog.title',
+  'page.catalog.subtitle',
+  'page.catalog.add',
+  'page.catalog.syncSkus',
+  'page.catalog.syncing',
+  'page.catalog.loadServices',
+  'page.inventory.title',
+  'page.inventory.subtitle',
+  'page.inventory.lowStock',
+  'page.inventory.syncSkus',
+  'page.domains.title',
+  'page.domains.subtitle',
+  'page.domains.add',
+  'page.appErrors.title',
+  'page.appErrors.subtitle',
+  'page.appErrors.refresh',
+  'page.appErrors.loading',
 ] as const
 
 describe('page body i18n catalogs', () => {
-  it('has EN and AR entries for sales, finance, clients, and admin page chrome', () => {
+  it('has EN and AR entries for sales, finance, clients, admin, and ops page chrome', () => {
     for (const key of PAGE_KEYS) {
       expect(t('en', key)).not.toBe(key)
       expect(t('ar', key)).not.toBe(key)

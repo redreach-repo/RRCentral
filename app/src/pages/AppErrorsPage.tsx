@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { format, parseISO, subDays } from 'date-fns'
 import { Bug } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import { can } from '../lib/permissions'
@@ -23,6 +24,7 @@ const KIND_LABEL: Record<AppError['kind'], string> = {
 }
 
 export default function AppErrorsPage() {
+  const { t } = useI18n()
   const { userRole } = useAuth()
   const { showToast } = useToast()
   const [days, setDays] = useState(7)
@@ -83,12 +85,9 @@ export default function AppErrorsPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Admin</p>
-          <h1 className={docsStyles.title}>App errors</h1>
-          <p className={docsStyles.subtitle}>
-            Errors people hit in RR Central, grouped by message, newest first. The daily digest email lists the last day's.
-            Mark one as fixed once it is dealt with.
-          </p>
+          <p className={docsStyles.kicker}>{t('page.admin.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.appErrors.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.appErrors.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <select style={selectStyle} value={days} onChange={(e) => setDays(Number(e.target.value))} aria-label="Period">
@@ -104,7 +103,7 @@ export default function AppErrorsPage() {
             disabled={loading}
             onClick={() => void load()}
           >
-            {loading ? 'Loading' : 'Refresh'}
+            {loading ? t('page.appErrors.loading') : t('page.appErrors.refresh')}
           </button>
         </div>
       </header>
