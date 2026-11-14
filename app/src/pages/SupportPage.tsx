@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { LifeBuoy, Plus } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { useCompactCrm } from '../hooks/useMediaQuery'
 import resp from '../styles/crmResponsive.module.css'
@@ -42,6 +43,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 }
 
 export default function SupportPage() {
+  const { t } = useI18n()
   const { user, userRole, appUserId } = useAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
@@ -180,11 +182,9 @@ export default function SupportPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Clients</p>
-          <h1 className={docsStyles.title}>Support</h1>
-          <p className={docsStyles.subtitle}>
-            One queue for AI CRM clients and WorshipHub churches. The clock counts working hours only.
-          </p>
+          <p className={docsStyles.kicker}>{t('page.clients.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.support.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.support.subtitle')}</p>
         </div>
         {canWrite ? (
           <button
@@ -193,7 +193,7 @@ export default function SupportPage() {
             onClick={() => setModalOpen(true)}
             disabled={!writableAccounts.length}
           >
-            <Plus size={16} /> New ticket
+            <Plus size={16} /> {t('page.support.new')}
           </button>
         ) : null}
       </header>

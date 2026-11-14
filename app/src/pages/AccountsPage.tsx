@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Contact, Plus } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import StatusPill from '../components/StatusPill'
@@ -42,6 +43,7 @@ import docsStyles from '../styles/docsList.module.css'
 type TypeFilter = 'all' | AccountType
 
 export default function AccountsPage() {
+  const { t } = useI18n()
   const { user, userRole, appUserId } = useAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
@@ -208,18 +210,18 @@ export default function AccountsPage() {
   }
 
   const newLabel =
-    typeFilter === 'all' ? 'New account' : `New ${accountTypeInfo(typeFilter).label}`
+    typeFilter === 'all'
+      ? t('page.accounts.new')
+      : t('page.accounts.newTyped').replace('{type}', accountTypeInfo(typeFilter).label)
 
   return (
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Clients</p>
-          <h1 className={docsStyles.title}>Accounts</h1>
+          <p className={docsStyles.kicker}>{t('page.clients.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.accounts.title')}</h1>
           <p className={docsStyles.subtitle}>
-            {isStaff
-              ? 'The clients, churches and prospects assigned to you.'
-              : 'RR Threads, Wanders and other trading clients, plus AI CRM, WorshipHub and CTRM Next.'}
+            {isStaff ? t('page.accounts.subtitleStaff') : t('page.accounts.subtitleAll')}
           </p>
         </div>
         {canWrite ? (

@@ -63,10 +63,27 @@ const PAGE_KEYS = [
   'page.expenses.subtitle',
   'page.expenses.new',
   'page.expenses.syncMonthly',
+  'page.clients.kicker',
+  'page.accounts.title',
+  'page.accounts.subtitleStaff',
+  'page.accounts.subtitleAll',
+  'page.accounts.new',
+  'page.accounts.newTyped',
+  'page.support.title',
+  'page.support.subtitle',
+  'page.support.new',
+  'page.followups.title',
+  'page.followups.subtitleLead',
+  'page.followups.calendarSyncOn',
+  'page.followups.subtitleTrail',
+  'page.followups.calendar',
+  'page.vendors.title',
+  'page.vendors.subtitle',
+  'page.vendors.new',
 ] as const
 
 describe('page body i18n catalogs', () => {
-  it('has EN and AR entries for sales and finance page chrome', () => {
+  it('has EN and AR entries for sales, finance, and clients page chrome', () => {
     for (const key of PAGE_KEYS) {
       expect(t('en', key)).not.toBe(key)
       expect(t('ar', key)).not.toBe(key)

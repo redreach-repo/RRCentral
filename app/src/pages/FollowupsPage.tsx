@@ -11,6 +11,7 @@ import type { AppUser, CrmEntry } from '../lib/types'
 import { parseFollowupUpdateForm } from '../lib/schemas/followupUpdate'
 import { resolveOwnerEmails } from '../lib/calendarAttendees'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
@@ -55,6 +56,7 @@ function daysLabel(dateStr: string, today: Date): string {
 }
 
 export default function FollowupsPage() {
+  const { t } = useI18n()
   const { user } = useAuth()
   const { settings } = useSettings()
   const { showToast } = useToast()
@@ -460,16 +462,21 @@ export default function FollowupsPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Sales · Work</p>
-          <h1 className={docsStyles.title}>Follow-ups</h1>
+          <p className={docsStyles.kicker}>{t('page.crm.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.followups.title')}</h1>
           <p className={docsStyles.subtitle}>
-            Overdue and upcoming CRM actions
-            {getCalendarProvider(settings).isEnabled(settings) ? ` · ${getCalendarProvider(settings).label} Calendar sync on` : ''}
-            . Click Actions on a card for snooze, clear, or outreach.
+            {t('page.followups.subtitleLead')}
+            {getCalendarProvider(settings).isEnabled(settings)
+              ? t('page.followups.calendarSyncOn').replace(
+                  '{provider}',
+                  getCalendarProvider(settings).label,
+                )
+              : ''}
+            {t('page.followups.subtitleTrail')}
           </p>
         </div>
         <button type="button" className={docsStyles.newBtn} style={{ background: 'rgba(255,255,255,0.08)' }} onClick={() => setCalendarSettingsOpen(true)}>
-          <Settings size={16} /> Calendar
+          <Settings size={16} /> {t('page.followups.calendar')}
         </button>
       </header>
 

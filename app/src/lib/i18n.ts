@@ -203,6 +203,27 @@ const STRINGS: Record<Locale, Record<string, string>> = {
       'Vendor bills, supplier invoices, and receipts. Click Actions on a row to edit or delete.',
     'page.expenses.new': 'Add expense',
     'page.expenses.syncMonthly': 'Sync monthly',
+    'page.clients.kicker': 'Clients',
+    'page.accounts.title': 'Accounts',
+    'page.accounts.subtitleStaff': 'The clients, churches and prospects assigned to you.',
+    'page.accounts.subtitleAll':
+      'RR Threads, Wanders and other trading clients, plus AI CRM, WorshipHub and CTRM Next.',
+    'page.accounts.new': 'New account',
+    'page.accounts.newTyped': 'New {type}',
+    'page.support.title': 'Support',
+    'page.support.subtitle':
+      'One queue for AI CRM clients and WorshipHub churches. The clock counts working hours only.',
+    'page.support.new': 'New ticket',
+    'page.followups.title': 'Follow-ups',
+    'page.followups.subtitleLead': 'Overdue and upcoming CRM actions',
+    'page.followups.calendarSyncOn': ' · {provider} Calendar sync on',
+    'page.followups.subtitleTrail':
+      '. Click Actions on a card for snooze, clear, or outreach.',
+    'page.followups.calendar': 'Calendar',
+    'page.vendors.title': 'Vendors',
+    'page.vendors.subtitle':
+      'Register suppliers you buy from. Pick them when saving a supplier invoice — no vendor number needed.',
+    'page.vendors.new': 'Register vendor',
   },
   ar: {
     'shell.company': 'الشركة',
@@ -399,6 +420,27 @@ const STRINGS: Record<Locale, Record<string, string>> = {
       'فواتير الموردين وإيصالات المشتريات. انقر الإجراءات على صف للتعديل أو الحذف.',
     'page.expenses.new': 'إضافة مصروف',
     'page.expenses.syncMonthly': 'مزامنة شهرية',
+    'page.clients.kicker': 'العملاء',
+    'page.accounts.title': 'الحسابات',
+    'page.accounts.subtitleStaff': 'العملاء والكنائس والفرص المسندة إليك.',
+    'page.accounts.subtitleAll':
+      'عملاء RR Threads وWanders والتجارة، إضافة إلى AI CRM وWorshipHub وCTRM Next.',
+    'page.accounts.new': 'حساب جديد',
+    'page.accounts.newTyped': 'جديد: {type}',
+    'page.support.title': 'الدعم',
+    'page.support.subtitle':
+      'طابور واحد لعملاء AI CRM وكنائس WorshipHub. الساعة تحسب ساعات العمل فقط.',
+    'page.support.new': 'تذكرة جديدة',
+    'page.followups.title': 'المتابعات',
+    'page.followups.subtitleLead': 'إجراءات CRM المتأخرة والقادمة',
+    'page.followups.calendarSyncOn': ' · مزامنة تقويم {provider} مفعّلة',
+    'page.followups.subtitleTrail':
+      '. انقر الإجراءات على بطاقة للتأجيل أو المسح أو التواصل.',
+    'page.followups.calendar': 'التقويم',
+    'page.vendors.title': 'الموردون',
+    'page.vendors.subtitle':
+      'سجّل الموردين الذين تشتري منهم. اخترهم عند حفظ فاتورة مورد — بلا رقم مورد.',
+    'page.vendors.new': 'تسجيل مورد',
   },
 }
 
