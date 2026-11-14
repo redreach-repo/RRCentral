@@ -37,6 +37,7 @@ import { elapsedLabel } from '../lib/timeTracking'
 import { useRecurringDeductionsSync } from '../hooks/useRecurringDeductionsSync'
 import { usePhoneShell } from '../hooks/useMediaQuery'
 import { can, roleAtLeast } from '../lib/permissions'
+import { navItemKey, navModuleKey, navSectionKey, translateNavLabel } from '../lib/navI18n'
 import {
   APP_MODULES,
   itemMatchesPath,
@@ -252,20 +253,21 @@ export default function Layout() {
           <button
             type="button"
             className={styles.closeBtn}
-            aria-label="Close sidebar"
+            aria-label={t('shell.closeSidebar')}
             onClick={() => setSidebarOpen(false)}
           >
             <X size={18} />
           </button>
         </div>
 
-        <nav className={styles.sideNav} aria-label="Main">
+        <nav className={styles.sideNav} aria-label={t('shell.mainNav')}>
           {phoneShell && visiblePhoneShortcuts.length > 0 ? (
             <div className={styles.phoneShortcuts}>
-              <div className={styles.phoneShortcutsLabel}>Shortcuts</div>
+              <div className={styles.phoneShortcutsLabel}>{t('shell.shortcuts')}</div>
               <div className={styles.phoneShortcutsGrid}>
                 {visiblePhoneShortcuts.map((item) => {
                   const ItemIcon = item.icon
+                  const itemLabel = translateNavLabel(t, navItemKey(item.to), item.label)
                   return (
                     <NavLink
                       key={item.to}
@@ -277,7 +279,7 @@ export default function Layout() {
                       onClick={() => setSidebarOpen(false)}
                     >
                       <ItemIcon size={16} strokeWidth={1.75} />
-                      <span>{item.label}</span>
+                      <span>{itemLabel}</span>
                     </NavLink>
                   )
                 })}
@@ -288,6 +290,7 @@ export default function Layout() {
             const Icon = group.icon
             const open = expandedIds.includes(group.id)
             const groupActive = group.items.some((item) => itemMatchesPath(location.pathname, item))
+            const groupLabel = translateNavLabel(t, navModuleKey(group.id), group.label)
             const hasDue =
               group.id === 'sales' &&
               group.items.some((i) => i.to === '/follow-ups') &&
@@ -301,7 +304,7 @@ export default function Layout() {
                   onClick={() => toggleSection(group.id)}
                 >
                   <Icon size={17} strokeWidth={groupActive ? 2.1 : 1.75} />
-                  <span className={styles.sideGroupLabel}>{group.label}</span>
+                  <span className={styles.sideGroupLabel}>{groupLabel}</span>
                   {hasDue ? (
                     <span className={styles.navBadge} aria-label={`${reminders.due} due`}>
                       {reminders.due > 99 ? '99+' : reminders.due}
@@ -319,10 +322,14 @@ export default function Layout() {
                       const ItemIcon = item.icon
                       const prevSection = idx > 0 ? items[idx - 1]?.section : undefined
                       const showSection = Boolean(item.section && item.section !== prevSection)
+                      const itemLabel = translateNavLabel(t, navItemKey(item.to), item.label)
+                      const sectionLabel = item.section
+                        ? translateNavLabel(t, navSectionKey(item.section), item.section)
+                        : ''
                       return (
                         <div key={`${item.to}-${item.label}`}>
                           {showSection ? (
-                            <div className={styles.panelSectionLabel}>{item.section}</div>
+                            <div className={styles.panelSectionLabel}>{sectionLabel}</div>
                           ) : null}
                           <NavLink
                             to={item.to}
@@ -333,7 +340,7 @@ export default function Layout() {
                             onClick={() => setSidebarOpen(false)}
                           >
                             <ItemIcon size={15} strokeWidth={1.75} />
-                            <span>{item.label}</span>
+                            <span>{itemLabel}</span>
                             {item.to === '/follow-ups' && reminders.due > 0 && (
                               <span className={styles.navBadge} aria-label={`${reminders.due} due`}>
                                 {reminders.due > 99 ? '99+' : reminders.due}
@@ -356,7 +363,7 @@ export default function Layout() {
           <button
             type="button"
             className={styles.menuBtn}
-            aria-label="Open menu"
+            aria-label={t('shell.openMenu')}
             onClick={() => setSidebarOpen(true)}
           >
             <Menu size={20} />
