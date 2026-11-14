@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — EN+AR ticket detail chrome
+**Current milestone:** Continuous backlog — tenant isolation for workflow definitions
 
 ## Shipped this turn
 
-- Wired **TicketPage** loading / not-found / conversation / reply chrome through EN+AR catalogs
+- Expanded `tenant_isolation_test.sql` for **workflow_definitions** (read isolation + forged insert blocked)
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome · pipeline density · custom_field_definitions isolation
+- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome · pipeline density · ticket detail i18n
 
 ## Still open (agent queue)
 
