@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { differenceInCalendarDays, format, parseISO } from 'date-fns'
 import { Handshake, Plus } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import { useCompactCrm } from '../hooks/useMediaQuery'
@@ -55,6 +56,7 @@ const chip = (bg: string, color: string): CSSProperties => ({
 })
 
 export default function CtrmPage() {
+  const { t } = useI18n()
   const { user, userRole, appUserId } = useAuth()
   const compact = useCompactCrm()
   const { showToast } = useToast()
@@ -313,11 +315,9 @@ export default function CtrmPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Sales · Work</p>
-          <h1 className={docsStyles.title}>CTRM detail</h1>
-          <p className={docsStyles.subtitle}>
-            Fine-grained CTRM Next stages, regions, and commission. Day-to-day chasing lives on Pipeline.
-          </p>
+          <p className={docsStyles.kicker}>{t('page.crm.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.ctrmDetail.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.ctrmDetail.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <Link
@@ -325,11 +325,11 @@ export default function CtrmPage() {
             className={docsStyles.newBtn}
             style={{ textDecoration: 'none', background: 'rgba(255,255,255,0.08)' }}
           >
-            Weekly summary
+            {t('page.ctrmDetail.weeklySummary')}
           </Link>
           {canWrite ? (
             <button type="button" className={docsStyles.newBtn} onClick={() => setEditing({ deal: null })}>
-              <Plus size={16} /> New deal
+              <Plus size={16} /> {t('page.ctrmDetail.new')}
             </button>
           ) : null}
         </div>

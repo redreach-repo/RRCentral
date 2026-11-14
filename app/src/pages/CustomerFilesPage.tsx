@@ -16,6 +16,7 @@ import {
 import { db } from '../lib/db'
 import type { CrmEntry } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import StatusPill from '../components/StatusPill'
@@ -92,6 +93,7 @@ function sectionToMode(section: FolderSection): LinkDriveFileMode {
 }
 
 export default function CustomerFilesPage() {
+  const { t } = useI18n()
   const { user, isLocalMode } = useAuth()
   const { showToast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -253,12 +255,9 @@ export default function CustomerFilesPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Sales documents</p>
-          <h1 className={docsStyles.title}>Google Drive</h1>
-          <p className={docsStyles.subtitle}>
-            Every customer document lives in Google Drive. RR Central keeps the folder links — quotes,
-            invoices, delivery notes, communications, purchasing, and signed copies.
-          </p>
+          <p className={docsStyles.kicker}>{t('page.docs.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.customerFiles.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.customerFiles.subtitle')}</p>
         </div>
         {drive.connected && drive.customers_url ? (
           <a
@@ -268,7 +267,7 @@ export default function CustomerFilesPage() {
             className={docsStyles.newBtn}
             style={{ textDecoration: 'none', background: 'rgba(255,255,255,0.08)' }}
           >
-            <ExternalLink size={16} /> Open in Drive
+            <ExternalLink size={16} /> {t('page.customerFiles.openDrive')}
           </a>
         ) : null}
       </header>
