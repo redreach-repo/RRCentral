@@ -63,6 +63,12 @@ describe('visibleAppModules', () => {
     expect(sales.map((m) => m.id)).toContain('finance')
   })
 
+  it('hides clients when moduleFlags says so', () => {
+    const sales = visibleAppModules('sales', { moduleFlags: '{"clients":false}' })
+    expect(sales.map((m) => m.id)).not.toContain('clients')
+    expect(sales.map((m) => m.id)).toContain('delivery')
+  })
+
   it('soft-hides pipeline detail nav for non-admins when the setting is on', () => {
     const sales = visibleAppModules('sales', { [HIDE_PIPELINE_DETAIL_NAV_KEY]: 'yes' })
     const work = sales.find((m) => m.id === 'sales')?.items.map((i) => i.to) || []

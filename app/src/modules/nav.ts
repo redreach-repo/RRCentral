@@ -78,6 +78,8 @@ export const APP_MODULES: ModuleManifest[] = [
     id: 'clients',
     label: 'Clients',
     icon: Contact,
+    /** Soft-hide via app_settings.moduleFlags JSON, e.g. {"clients":false}. */
+    flag: 'clients',
     items: [
       { to: '/accounts', label: 'Accounts', icon: Contact, forStaff: true },
       { to: '/support', label: 'Support', icon: LifeBuoy, forStaff: true },
