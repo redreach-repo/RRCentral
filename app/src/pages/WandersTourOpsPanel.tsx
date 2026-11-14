@@ -41,6 +41,7 @@ import {
   thStyle,
 } from '../lib/uiStyles'
 import { errorMessage } from '../lib/errors'
+import { parseTourOpsLinkForm } from '../lib/schemas/tourOpsLink'
 
 type OpsTab = 'packages' | 'partners' | 'costs' | 'prices' | 'departures' | 'bookings'
 
@@ -149,34 +150,46 @@ export default function WandersTourOpsPanel({ deals }: { deals: WandersDeal[] })
   }
 
   async function linkBookingFromDeal() {
-    if (!selectedPkg || !departures[0]) {
-      showToast('Select a package with at least one departure', 'error')
-      return
-    }
     const deal = deals[0]
-    if (!deal) {
-      showToast('Create a customer lead/deal first, then link a booking', 'error')
+    const dealIdRaw = deal
+      ? window.prompt('Deal id to link (from Leads tab)', deal.id)
+      : null
+    if (dealIdRaw == null && deal) return
+    const depIdRaw =
+      selectedPkg && departures[0]
+        ? window.prompt('Departure id', departures[0].id) || departures[0].id
+        : ''
+    const paxRaw =
+      selectedPkg && departures[0] ? window.prompt('Passenger count', '2') || '2' : '0'
+    const parsed = parseTourOpsLinkForm({
+      packageId: selectedPkg?.id || '',
+      departureId: depIdRaw || '',
+      dealId: (dealIdRaw || '').trim(),
+      pax: paxRaw,
+    })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
-    const dealId = window.prompt('Deal id to link (from Leads tab)', deal.id)
-    if (!dealId) return
-    const matched = deals.find((d) => d.id === dealId)
+    const matched = deals.find((d) => d.id === parsed.data.dealId)
     if (!matched) {
       showToast('Deal not found — leads stay separate from packages', 'error')
       return
     }
-    const depId = window.prompt('Departure id', departures[0].id) || departures[0].id
-    const pax = Number(window.prompt('Passenger count', '2') || '2')
+    if (!selectedPkg) {
+      showToast('Select a package with at least one departure', 'error')
+      return
+    }
     const row: CustomerBooking = {
       id: crypto.randomUUID(),
       deal_id: matched.id,
-      package_id: selectedPkg.id,
-      departure_id: depId,
+      package_id: parsed.data.packageId,
+      departure_id: parsed.data.departureId,
       supplier_id: selectedPkg.primary_supplier_id,
       coordinator_id: selectedPkg.primary_coordinator_id,
       client_name: matched.client_name,
       lead_contact: matched.lead_contact,
-      pax_count: pax,
+      pax_count: parsed.data.pax,
       meal_tier: 'Breakfast only',
       selling_amount: 0,
       selling_currency: selectedPkg.customer_selling_currency || 'INR',
