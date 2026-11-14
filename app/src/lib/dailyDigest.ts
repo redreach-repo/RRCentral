@@ -18,6 +18,7 @@
  * and CTRM Next renewals at 90, 60 and 30 days (ctrmRenewals.ts).
  */
 import { format, isFriday, parseISO } from 'date-fns'
+import { PRODUCT } from './product'
 import { isOverdue } from './ctrm'
 import { issueDetail, needsClientUpdate, openIssues, type IssueRow } from './ctrmIssues'
 import { digestRenewals, isUrgentRenewal, renewalText } from './ctrmRenewals'
@@ -384,9 +385,12 @@ export function digestEmail(d: Digest, appUrl: string): { subject: string; body:
   const count = digestCount(d)
   const subject =
     count === 0
-      ? `RR Central digest for ${digestDateLabel(d)}: all clear`
-      : `RR Central digest for ${digestDateLabel(d)}: ${count} ${count === 1 ? 'thing needs' : 'things need'} attention`
-  const lines: string[] = [`Good morning. Here is what needs attention in RR Central today, ${digestDateLabel(d)}.`, '']
+      ? `${PRODUCT.name} digest for ${digestDateLabel(d)}: all clear`
+      : `${PRODUCT.name} digest for ${digestDateLabel(d)}: ${count} ${count === 1 ? 'thing needs' : 'things need'} attention`
+  const lines: string[] = [
+    `Good morning. Here is what needs attention in ${PRODUCT.name} today, ${digestDateLabel(d)}.`,
+    '',
+  ]
   for (const s of digestSections(d)) {
     lines.push(`${s.title} (${s.items.length})`)
     if (s.items.length === 0) lines.push(`  ${s.empty}`)
@@ -398,7 +402,9 @@ export function digestEmail(d: Digest, appUrl: string): { subject: string; body:
   }
   lines.push(`Open the dashboard: ${base}/app`)
   lines.push('')
-  lines.push('You get this because you are on the daily digest list in RR Central (Packages and rates).')
+  lines.push(
+    `You get this because you are on the daily digest list in ${PRODUCT.name} (Packages and rates).`,
+  )
   return { subject, body: lines.join('\n') }
 }
 
@@ -406,7 +412,7 @@ export function digestEmail(d: Digest, appUrl: string): { subject: string; body:
  * Values for the WhatsApp template, in order. Meta does not allow new lines
  * in template values, so WhatsApp gets the counts and the email has the detail.
  * Template body (see docs/daily-digest.md):
- *   RR Central digest for {{1}}. Tickets near or past reply time: {{2}}.
+ *   HighMast digest for {{1}}. Tickets near or past reply time: {{2}}.
  *   Renewals in the next 60 days: {{3}}. Overdue CTRM next actions: {{4}}.
  *   Clients over hours: {{5}}. Details are in your email and on the dashboard.
  */

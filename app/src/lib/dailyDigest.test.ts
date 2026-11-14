@@ -151,7 +151,7 @@ describe('digest messages', () => {
 
   it('writes a plain email with links', () => {
     const { subject, body } = digestEmail(d, 'https://example.com/RRCentral/')
-    expect(subject).toBe('RR Central digest for Thursday 22 October: 2 things need attention')
+    expect(subject).toBe('HighMast digest for Thursday 22 October: 2 things need attention')
     expect(body).toContain('Renewals in the next 60 days (1)\n  - Acme: renews in 49 days (10 Dec)\n    https://example.com/RRCentral/accounts/a1')
     expect(body).toContain('Tickets near or past their reply time (0)\n  Every open ticket is on time.')
     expect(body).toContain('Open the dashboard: https://example.com/RRCentral/app')
@@ -159,7 +159,7 @@ describe('digest messages', () => {
   })
 
   it('says all clear when there is nothing', () => {
-    expect(digestEmail(buildDigest(input()), 'https://x').subject).toBe('RR Central digest for Thursday 22 October: all clear')
+    expect(digestEmail(buildDigest(input()), 'https://x').subject).toBe('HighMast digest for Thursday 22 October: all clear')
   })
 
   it('gives WhatsApp template values without new lines', () => {

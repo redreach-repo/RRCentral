@@ -44,7 +44,7 @@ conversation.
    (`en`), with this body:
 
    ```
-   RR Central digest for {{1}}. Tickets near or past reply time: {{2}}. Renewals in the next 60 days: {{3}}. Overdue CTRM next actions: {{4}}. Clients over hours: {{5}}. Details are in your email and on the dashboard.
+   HighMast digest for {{1}}. Tickets near or past reply time: {{2}}. Renewals in the next 60 days: {{3}}. Overdue CTRM next actions: {{4}}. Clients over hours: {{5}}. Details are in your email and on the dashboard.
    ```
 
    Example values for the review: `Monday 2 November`, `2`, `1`, `3`, `0`.

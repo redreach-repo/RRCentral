@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type CSSProperties, type FormEvent, t
 import { ShieldCheck } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { errorMessage } from '../../lib/errors'
+import { PRODUCT } from '../../lib/product'
 import {
   getAssuranceLevel,
   isCodeShaped,
@@ -140,7 +141,9 @@ export default function TwoStepGate({ children }: { children: ReactNode }) {
         </h1>
         {state === 'enter_code' ? (
           <>
-            <p style={muted}>Open your authenticator app and enter the 6 digit code for RR Central.</p>
+            <p style={muted}>
+              Open your authenticator app and enter the 6 digit code for {PRODUCT.name}.
+            </p>
             {codeForm}
           </>
         ) : enrollment ? (
@@ -151,8 +154,8 @@ export default function TwoStepGate({ children }: { children: ReactNode }) {
             </p>
             <img
               src={enrollment.qrCode}
-              alt="QR code to add RR Central to your authenticator app"
-              style={{ width: 200, height: 200, background: '#fff', borderRadius: 8, padding: 8, justifySelf: 'center' }}
+              alt={`QR code to add ${PRODUCT.name} to your authenticator app`}
+              style={{ width: 200, height: 200, background: '#fff', borderRadius: 8, padding: 8, alignSelf: 'center' }}
             />
             <p style={{ ...muted, fontSize: 12 }}>
               Cannot scan? Type this key into the app instead: <code style={{ wordBreak: 'break-all' }}>{enrollment.secret}</code>
@@ -162,8 +165,9 @@ export default function TwoStepGate({ children }: { children: ReactNode }) {
         ) : (
           <>
             <p style={muted}>
-              As an {userRole === 'admin' ? 'owner' : 'admin'} you can see contracts, prices and commission, so RR Central
-              asks for a code from your phone as well as your password. It takes a minute to set up, once.
+              As an {userRole === 'admin' ? 'owner' : 'admin'} you can see contracts, prices and commission, so{' '}
+              {PRODUCT.name} asks for a code from your phone as well as your password. It takes a minute to set up,
+              once.
             </p>
             <button type="button" style={primary} disabled={busy} onClick={() => void begin()}>
               {busy ? 'Starting' : 'Set up two step sign in'}
