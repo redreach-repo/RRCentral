@@ -70,6 +70,7 @@ import { formatAED } from '../lib/money'
 import { formatRevisionReference, parseBaseReference } from '../lib/referenceNumber'
 import { allocateReference } from '../lib/numbering'
 import { parseQuotationForm } from '../lib/schemas/quotation'
+import { parseQuotationFinalizeForm } from '../lib/schemas/quotationFinalize'
 import { sortByDateDesc } from '../lib/finance'
 import { isQuotePastValidity, quoteValidUntil } from '../lib/documents'
 import { errorMessage, isUndefinedColumnError } from '../lib/errors'
@@ -759,8 +760,9 @@ export default function QuotationsPage() {
   }
 
   async function finalize(q: Quotation) {
-    if (!q.client) {
-      showToast('Client is required before finalizing', 'error')
+    const parsed = parseQuotationFinalizeForm({ client: q.client || '' })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
     setSaving(true)
