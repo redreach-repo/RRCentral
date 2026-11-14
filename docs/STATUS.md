@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod build stage blocker note
+**Current milestone:** Continuous backlog — M1 Zod legal sign + quote accept
 
 ## Shipped this turn
 
-- Zod `parseBuildBlockerNote` when marking a Delivery build stage blocked
+- Zod `parseLegalSignForm` + `parseQuoteAcceptForm` (shared rules via existing problem helpers)
 
 ## Already on main
 
