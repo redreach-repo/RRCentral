@@ -237,17 +237,18 @@ export default function SalesPipelinePage() {
         onDragEnd={() => setDragId(null)}
         data-deal={nameOf(d)}
         style={{
-          background: 'rgba(255,255,255,0.05)',
-          border: `1px solid ${isSalesDealOverdue(d, now) ? 'rgba(239,68,68,0.5)' : colors.border}`,
-          borderRadius: 10,
-          padding: 10,
+          background: 'transparent',
+          border: `1px solid ${isSalesDealOverdue(d, now) ? 'rgba(240,113,120,0.45)' : colors.border}`,
+          borderLeft: `2px solid ${isSalesDealOverdue(d, now) ? colors.danger : colors.border}`,
+          borderRadius: 8,
+          padding: 9,
           display: 'grid',
-          gap: 6,
+          gap: 5,
           cursor: editable ? 'grab' : 'default',
           opacity: dragId === d.id ? 0.5 : 1,
         }}
       >
-        <button type="button" onClick={() => setEditing({ deal: d })} style={{ all: 'unset', cursor: 'pointer', fontWeight: 600, fontSize: 14 }}>
+        <button type="button" onClick={() => setEditing({ deal: d })} style={{ all: 'unset', cursor: 'pointer', fontWeight: 600, fontSize: 13, letterSpacing: '-0.01em' }}>
           {nameOf(d)}
         </button>
         {hasQuote(d) ? (
@@ -398,8 +399,8 @@ export default function SalesPipelinePage() {
           <div
             style={
               compact
-                ? { display: 'grid', gap: 10 }
-                : { display: 'grid', gridTemplateColumns: `repeat(${SALES_STAGES.length}, minmax(210px, 1fr))`, gap: 10, minWidth: SALES_STAGES.length * 220 }
+                ? { display: 'grid', gap: 8 }
+                : { display: 'grid', gridTemplateColumns: `repeat(${SALES_STAGES.length}, minmax(190px, 1fr))`, gap: 8, minWidth: SALES_STAGES.length * 200 }
             }
           >
             {SALES_STAGES.map((s) => {
@@ -415,9 +416,9 @@ export default function SalesPipelinePage() {
                     setDragId(null)
                     if (d) void move(d, s.value)
                   }}
-                  style={{ ...cardStyle, padding: 10, minHeight: compact ? 0 : 160, display: 'flex', flexDirection: 'column', gap: 8 }}
+                  style={{ ...cardStyle, padding: 8, minHeight: compact ? 0 : 140, display: 'flex', flexDirection: 'column', gap: 6 }}
                 >
-                  <div style={{ fontSize: 12, fontWeight: 700, color: s.value === 'lost' ? colors.muted2 : colors.text }}>
+                  <div style={{ fontSize: 12, fontWeight: 650, letterSpacing: '-0.01em', color: s.value === 'lost' ? colors.muted2 : colors.text }}>
                     {s.label} <span style={{ color: colors.muted2, fontWeight: 400 }}>{inStage.length}</span>
                   </div>
                   {inStage.map((d) => dealCard(d))}

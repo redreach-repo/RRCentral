@@ -158,12 +158,12 @@ export const overlay: CSSProperties = {
 export const modal: CSSProperties = {
   background: '#141518',
   border: `1px solid ${colors.border}`,
-  borderRadius: 14,
+  borderRadius: 10,
   width: '100%',
   maxWidth: 560,
   maxHeight: '90vh',
   overflow: 'auto',
-  boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+  boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
 }
 
 export const modalLarge: CSSProperties = {
@@ -175,7 +175,7 @@ export const modalHeader: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  padding: '16px 20px',
+  padding: '14px 16px',
   borderBottom: `1px solid ${colors.border}`,
   position: 'sticky',
   top: 0,
@@ -184,10 +184,10 @@ export const modalHeader: CSSProperties = {
 }
 
 export const modalBody: CSSProperties = {
-  padding: 20,
+  padding: 16,
   display: 'flex',
   flexDirection: 'column',
-  gap: 14,
+  gap: 12,
 }
 
 export const modalFooter: CSSProperties = {
@@ -195,7 +195,7 @@ export const modalFooter: CSSProperties = {
   flexWrap: 'wrap',
   gap: 8,
   justifyContent: 'flex-end',
-  padding: '14px 20px',
+  padding: '12px 16px',
   borderTop: `1px solid ${colors.border}`,
   position: 'sticky',
   bottom: 0,

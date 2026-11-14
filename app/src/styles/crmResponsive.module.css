@@ -7,13 +7,13 @@
 }
 
 .card {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
-  padding: 14px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -25,9 +25,9 @@
 }
 
 .cardTitle {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 650;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   line-height: 1.25;
   word-break: break-word;
   background: none;
@@ -97,14 +97,9 @@
   z-index: 12;
   margin: 0 -4px 10px;
   padding: 8px 4px 6px;
-  background: linear-gradient(
-    180deg,
-    rgba(14, 16, 19, 0.97) 0%,
-    rgba(14, 16, 19, 0.94) 70%,
-    rgba(14, 16, 19, 0.88) 100%
-  );
+  background: rgba(11, 12, 14, 0.92);
   backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
 }
 
 @media (max-width: 1024px) {
@@ -129,22 +124,23 @@
 }
 
 .boardStageChip {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
   color: rgba(255, 255, 255, 0.65);
-  border-radius: 999px;
-  padding: 8px 12px;
+  border-radius: 8px;
+  padding: 7px 11px;
   font: inherit;
   font-size: 12px;
   font-weight: 650;
   cursor: pointer;
-  min-height: 40px;
+  min-height: 36px;
 }
 
 .boardStageChipActive {
-  color: #fff;
-  border-color: rgba(232, 93, 4, 0.55);
-  background: rgba(232, 93, 4, 0.18);
+  color: var(--text, #f4f5f7);
+  border-color: var(--border-strong, rgba(255, 255, 255, 0.12));
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 -2px 0 var(--accent, #e85d04);
 }
 
 .toolbarSearch {
@@ -329,23 +325,24 @@
 }
 
 .dueTile {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: 10px;
+  background: transparent;
   padding: 10px 12px;
   text-align: left;
   cursor: pointer;
   color: inherit;
   font: inherit;
   min-width: 0;
-  min-height: 64px;
+  min-height: 60px;
   transition: border-color 0.15s ease, background 0.15s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
 .dueTileActive {
-  border-color: rgba(232, 93, 4, 0.65);
-  background: rgba(232, 93, 4, 0.12);
+  border-color: var(--border-strong, rgba(255, 255, 255, 0.12));
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 2px 0 0 var(--accent, #e85d04);
 }
 
 .dueTileValue {
@@ -368,8 +365,8 @@
 
 .viewToggle {
   display: inline-flex;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -378,7 +375,7 @@
   background: transparent;
   border: none;
   color: rgba(255, 255, 255, 0.55);
-  padding: 8px 12px;
+  padding: 7px 11px;
   font: inherit;
   font-size: 12px;
   font-weight: 600;
@@ -389,8 +386,8 @@
 }
 
 .viewToggle button[aria-pressed='true'] {
-  background: rgba(232, 93, 4, 0.2);
-  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text, #f4f5f7);
 }
 
 .sheetTabs {
@@ -436,16 +433,17 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.18);
+  padding: 9px 11px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+  background: transparent;
   text-decoration: none;
   color: inherit;
 }
 
 .sheetMoneyRow:hover {
-  border-color: rgba(232, 93, 4, 0.4);
+  border-color: var(--border-strong, rgba(255, 255, 255, 0.12));
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .sheetMoneyMeta {
@@ -469,9 +467,10 @@
 }
 
 .sheetTabActive {
-  color: #fff;
-  border-color: rgba(232, 93, 4, 0.5);
-  background: rgba(232, 93, 4, 0.12);
+  color: var(--text, #f4f5f7);
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 -2px 0 var(--accent, #e85d04);
 }
 
 .sheetActions {
@@ -518,18 +517,18 @@
 
 .boardTrack {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   min-width: min-content;
   align-items: flex-start;
 }
 
 .boardCol {
-  flex: 0 0 min(300px, 85vw);
-  max-width: 320px;
-  background: rgba(0, 0, 0, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  min-height: 180px;
+  flex: 0 0 min(280px, 84vw);
+  max-width: 300px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: 10px;
+  min-height: 160px;
   display: flex;
   flex-direction: column;
 }
@@ -545,31 +544,33 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 12px 14px;
-  font-size: 13px;
-  font-weight: 700;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
   position: sticky;
   top: 0;
-  background: rgba(18, 20, 23, 0.96);
-  border-radius: 14px 14px 0 0;
+  background: rgba(11, 12, 14, 0.96);
+  border-radius: 10px 10px 0 0;
   z-index: 1;
 }
 
 .boardCount {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 650;
   color: rgba(255, 255, 255, 0.45);
-  background: rgba(255, 255, 255, 0.06);
+  background: transparent;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
   border-radius: 999px;
-  padding: 2px 8px;
+  padding: 1px 7px;
 }
 
 .boardColBody {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px;
+  gap: 6px;
+  padding: 8px;
   max-height: min(70vh, 720px);
   overflow-y: auto;
 }
@@ -582,14 +583,14 @@
 }
 
 .boardCard {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-left: 3px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  padding: 12px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-left: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: transparent;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -597,25 +598,30 @@
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
   border-radius: 8px;
   color: #fff;
   font: inherit;
   font-size: 12px;
-  padding: 6px 8px;
+  padding: 5px 8px;
 }
 
 .boardLogBtn {
-  background: rgba(232, 93, 4, 0.16);
-  border: 1px solid rgba(232, 93, 4, 0.45);
-  color: #fff;
+  background: transparent;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  color: var(--text, #f4f5f7);
   border-radius: 8px;
-  padding: 6px 10px;
+  padding: 5px 9px;
   font: inherit;
   font-size: 12px;
   font-weight: 650;
   cursor: pointer;
+}
+
+.boardLogBtn:hover {
+  border-color: var(--accent, #e85d04);
+  color: var(--accent-soft, #ff9f4a);
 }
 
 @container crm-main (min-width: 1100px) {

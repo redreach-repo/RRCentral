@@ -488,7 +488,7 @@ export default function MyDealsPage() {
   const columns = BOARD_COLUMNS.filter((c) => filters.showClosed || (c.value !== 'won' && c.value !== 'lost'))
   const board = (
     <div style={{ overflowX: 'auto', paddingBottom: 8 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns.length}, minmax(220px, 1fr))`, gap: 10, minWidth: columns.length * 230 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns.length}, minmax(200px, 1fr))`, gap: 8, minWidth: columns.length * 210 }}>
         {columns.map((c) => {
           const inColumn = shown.filter((d) => d.column === c.value)
           const sum = dealTotals(inColumn)
@@ -504,11 +504,11 @@ export default function MyDealsPage() {
                 if (deal) requestColumnMove(deal, c.value)
                 setDragKey(null)
               }}
-              style={{ ...cardStyle, padding: 10, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 120 }}
+              style={{ ...cardStyle, padding: 8, display: 'flex', flexDirection: 'column', gap: 6, minHeight: 112 }}
             >
-              <div style={{ fontSize: 12, fontWeight: 700 }}>
+              <div style={{ fontSize: 12, fontWeight: 650, letterSpacing: '-0.01em' }}>
                 {c.label} <span style={{ color: colors.muted2, fontWeight: 400 }}>{inColumn.length}</span>
-                {sum.weighted ? <div style={{ fontWeight: 400, color: colors.muted }}>{formatAED(sum.weighted)} weighted</div> : null}
+                {sum.weighted ? <div style={{ fontWeight: 400, color: colors.muted, marginTop: 2 }}>{formatAED(sum.weighted)} weighted</div> : null}
               </div>
               {inColumn.map((d) => (
                 <div
@@ -522,17 +522,18 @@ export default function MyDealsPage() {
                   onDragEnd={() => setDragKey(null)}
                   style={{
                     display: 'grid',
-                    gap: 6,
-                    padding: 10,
-                    borderRadius: 10,
+                    gap: 5,
+                    padding: 9,
+                    borderRadius: 8,
                     color: colors.text,
-                    background: 'rgba(255,255,255,0.05)',
-                    border: `1px solid ${d.overdue ? 'rgba(239,68,68,0.5)' : colors.border}`,
+                    background: 'transparent',
+                    border: `1px solid ${d.overdue ? 'rgba(240,113,120,0.45)' : colors.border}`,
+                    borderLeft: `2px solid ${d.overdue ? colors.danger : colors.border}`,
                     opacity: dragKey === d.key || busyKey === d.key ? 0.55 : 1,
                     cursor: 'grab',
                   }}
                 >
-                  <Link to={d.link} style={{ color: colors.text, fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>
+                  <Link to={d.link} style={{ color: colors.text, fontWeight: 600, fontSize: 13, textDecoration: 'none', letterSpacing: '-0.01em' }}>
                     {d.account}
                   </Link>
                   <span style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
