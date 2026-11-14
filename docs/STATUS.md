@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod invoice payment
+**Current milestone:** Continuous backlog — M1 Zod Supabase connect
 
 ## Shipped this turn
 
-- Zod `parseInvoicePaymentForm` before recording a payment on an invoice
+- Zod `parseSupabaseConnectForm` for Settings cloud credentials (API host + anon key)
 
 ## Already on main
 
