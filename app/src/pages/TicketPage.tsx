@@ -16,6 +16,7 @@ import { NO_TRADE_DATA_NOTE, isCtrmIssue } from '../lib/ctrmIssues'
 import { DELIVERY_LABELS, serviceWindow, type DeliveryStatus } from '../lib/whatsappTickets'
 import { errorMessage } from '../lib/errors'
 import { parseTicketReplyForm } from '../lib/schemas/ticketReply'
+import { parseTicketSummaryForm } from '../lib/schemas/ticketSummary'
 import { signOffFor, type AiThreadMessage } from '../lib/aiAssist'
 import { runAi } from '../lib/aiAssistStore'
 import { addTimeEntry, listTicketTime } from '../lib/deliveryStore'
@@ -233,10 +234,15 @@ export default function TicketPage() {
   }
 
   async function saveSummaryAsNote() {
-    if (!ticket || !summary.trim()) return
+    if (!ticket) return
+    const parsed = parseTicketSummaryForm({ summary })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
     setBusy(true)
     try {
-      await addTicketMessage(ticket, `Summary (AI help):\n${summary.trim()}`, true, author)
+      await addTicketMessage(ticket, `Summary (AI help):\n${parsed.data.summary}`, true, author)
       setSummary('')
       showToast('Summary saved as an internal note', 'success')
       await load()
