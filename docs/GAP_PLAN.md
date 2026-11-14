@@ -22,7 +22,7 @@ Status key: **exists** · **partial** · **missing**
 | Exact money `numeric` / no float | partial | SQL numeric exists; TS `number`+round — fix path in M7 |
 | Tenant / company / BU model | partial | M1 tables + seed + `tenant_id` retrofit; company switcher live |
 | RLS on every table | exists | M1 RESTRICTIVE tenant isolation on stamped tables |
-| Cross-tenant CI tests | partial | `tenant_isolation_test.sql` covers CRM, vendors, accounts, quotations, invoices, sales_deals, expenses, delivery_notes, payment_log, contracts, tickets, ctrm_deals, legal_documents, owned_domains, customer_documents, products, inventory_movements, quote_templates, income, follow_up_updates, supplier_commitments, saved_views, pipelines, custom_field_definitions, event_outbox + audit append-only; keep expanding stamped tables |
+| Cross-tenant CI tests | partial | `tenant_isolation_test.sql` covers CRM, vendors, accounts, quotations, invoices, sales_deals, expenses, delivery_notes, payment_log, contracts, tickets, ctrm_deals, legal_documents, owned_domains, customer_documents, products, inventory_movements, quote_templates, income, follow_up_updates, supplier_commitments, saved_views, pipelines, custom_field_definitions, workflow_definitions, event_outbox + audit append-only; keep expanding stamped tables |
 | Roles + record rules + field permissions | partial | Fixed 5 roles; field-mask API started (`fieldPermissions`); record rules later |
 | Maker-checker | missing | M7/M8 for money/payroll |
 | Customization layer (fields, pipelines, objects, workflows, templates, views, dashboards, labels, numbering) | partial | M2 layer largely in: numbering, fields, views, pipelines, workflow defs + runner (approval/notify); more step types / dashboards later |
