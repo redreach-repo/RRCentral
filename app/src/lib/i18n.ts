@@ -304,6 +304,29 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.legalSign.myCompany': 'my company',
     'page.legalSign.saving': 'Saving…',
     'page.legalSign.submit': 'Sign and submit',
+    'page.quoteAccept.loading': 'Loading your quote…',
+    'page.quoteAccept.docTitle': 'Quote',
+    'page.quoteAccept.heading': 'Quote {ref}',
+    'page.quoteAccept.forClient': 'For {client}',
+    'page.quoteAccept.dated': ', dated {date}',
+    'page.quoteAccept.validUntil': ', valid until {date}',
+    'page.quoteAccept.openPdf': 'Open the quote PDF',
+    'page.quoteAccept.acceptedThanks': 'Accepted. Thank you.',
+    'page.quoteAccept.acceptedBy': 'Accepted by {name}',
+    'page.quoteAccept.acceptedOn': ' on {when}',
+    'page.quoteAccept.acceptedNext':
+      '. The Red Reach team will be in touch with the next steps and the invoice.',
+    'page.quoteAccept.closed':
+      'This quote can no longer be accepted online. Ask Red Reach for a new one.',
+    'page.quoteAccept.acceptThis': 'Accept this quote',
+    'page.quoteAccept.instructions':
+      'Type your full name and the date. We keep your name, the date, the time and your internet address as the record of acceptance.',
+    'page.quoteAccept.fullName': 'Full name',
+    'page.quoteAccept.date': 'Date',
+    'page.quoteAccept.agree':
+      'I accept quote {ref} for {amount} on behalf of {client}.',
+    'page.quoteAccept.saving': 'Saving…',
+    'page.quoteAccept.accept': 'Accept',
     'page.support.title': 'Support',
     'page.support.subtitle':
       'One queue for AI CRM clients and WorshipHub churches. The clock counts working hours only.',
@@ -744,6 +767,29 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.legalSign.myCompany': 'شركتي',
     'page.legalSign.saving': 'جارٍ الحفظ…',
     'page.legalSign.submit': 'توقيع وإرسال',
+    'page.quoteAccept.loading': 'جارٍ تحميل عرض السعر…',
+    'page.quoteAccept.docTitle': 'عرض سعر',
+    'page.quoteAccept.heading': 'عرض سعر {ref}',
+    'page.quoteAccept.forClient': 'لـ {client}',
+    'page.quoteAccept.dated': '، بتاريخ {date}',
+    'page.quoteAccept.validUntil': '، صالح حتى {date}',
+    'page.quoteAccept.openPdf': 'فتح PDF عرض السعر',
+    'page.quoteAccept.acceptedThanks': 'تم القبول. شكراً لك.',
+    'page.quoteAccept.acceptedBy': 'قبله {name}',
+    'page.quoteAccept.acceptedOn': ' في {when}',
+    'page.quoteAccept.acceptedNext':
+      '. سيتواصل فريق Red Reach بشأن الخطوات التالية والفاتورة.',
+    'page.quoteAccept.closed':
+      'لم يعد بالإمكان قبول هذا العرض عبر الإنترنت. اطلب من Red Reach عرضاً جديداً.',
+    'page.quoteAccept.acceptThis': 'قبول هذا العرض',
+    'page.quoteAccept.instructions':
+      'اكتب اسمك الكامل والتاريخ. نحتفظ باسمك والتاريخ والوقت وعنوان الإنترنت كسجل للقبول.',
+    'page.quoteAccept.fullName': 'الاسم الكامل',
+    'page.quoteAccept.date': 'التاريخ',
+    'page.quoteAccept.agree':
+      'أقبل عرض السعر {ref} بمبلغ {amount} نيابة عن {client}.',
+    'page.quoteAccept.saving': 'جارٍ الحفظ…',
+    'page.quoteAccept.accept': 'قبول',
     'page.support.title': 'الدعم',
     'page.support.subtitle':
       'طابور واحد لعملاء AI CRM وكنائس WorshipHub. الساعة تحسب ساعات العمل فقط.',

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { useLocation } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import BrandLogo from '../components/BrandLogo'
+import { useI18n } from '../contexts/I18nContext'
 import { type AcceptView } from '../lib/quoteAccept'
 import { parseQuoteAcceptForm } from '../lib/schemas/quoteAccept'
 import { callQuoteAccept } from '../lib/quoteAcceptStore'
@@ -27,6 +28,7 @@ const money = (n: number, ccy: string) =>
  * this quote's headline and PDF.
  */
 export default function QuoteAcceptPage() {
+  const { t } = useI18n()
   const { hash } = useLocation()
   const token = decodeURIComponent(hash.replace(/^#/, ''))
   const [view, setView] = useState<AcceptView | null>(null)
@@ -51,8 +53,10 @@ export default function QuoteAcceptPage() {
   }, [load])
 
   useEffect(() => {
-    document.title = view ? `Quote ${view.reference}` : 'Quote'
-  }, [view])
+    document.title = view
+      ? t('page.quoteAccept.heading').replace('{ref}', view.reference)
+      : t('page.quoteAccept.docTitle')
+  }, [view, t])
 
   async function openPdf() {
     setBusy(true)
@@ -93,7 +97,9 @@ export default function QuoteAcceptPage() {
         <div style={column}>
           <BrandLogo height={32} />
           <section style={cardStyle}>
-            <p style={{ margin: 0, color: error ? colors.text : colors.muted }}>{loading ? 'Loading your quote…' : error}</p>
+            <p style={{ margin: 0, color: error ? colors.text : colors.muted }}>
+              {loading ? t('page.quoteAccept.loading') : error}
+            </p>
           </section>
         </div>
       </div>
@@ -109,57 +115,66 @@ export default function QuoteAcceptPage() {
         </header>
 
         <section style={cardStyle}>
-          <h1 style={{ fontSize: 24, margin: '0 0 4px' }}>Quote {view.reference}</h1>
+          <h1 style={{ fontSize: 24, margin: '0 0 4px' }}>
+            {t('page.quoteAccept.heading').replace('{ref}', view.reference)}
+          </h1>
           <p style={{ ...muted, margin: '0 0 12px' }}>
-            For {view.client}
-            {view.date ? `, dated ${day(view.date)}` : ''}
-            {view.validUntil ? `, valid until ${day(view.validUntil)}` : ''}
+            {t('page.quoteAccept.forClient').replace('{client}', view.client)}
+            {view.date ? t('page.quoteAccept.dated').replace('{date}', day(view.date)) : ''}
+            {view.validUntil
+              ? t('page.quoteAccept.validUntil').replace('{date}', day(view.validUntil))
+              : ''}
           </p>
           <p style={{ fontSize: 20, fontWeight: 700, margin: '0 0 8px' }}>{money(view.amount, view.currency)}</p>
           {view.description ? <p style={{ fontSize: 14, whiteSpace: 'pre-wrap', margin: '0 0 12px' }}>{view.description}</p> : null}
           {view.hasPdf ? (
             <button type="button" style={buttonSecondaryStyle} disabled={busy} onClick={() => void openPdf()}>
-              Open the quote PDF
+              {t('page.quoteAccept.openPdf')}
             </button>
           ) : null}
         </section>
 
         {view.state === 'accepted' ? (
           <section style={{ ...cardStyle, borderLeft: `4px solid ${colors.success}` }}>
-            <h2 style={{ fontSize: 18, margin: '0 0 6px' }}>Accepted. Thank you.</h2>
+            <h2 style={{ fontSize: 18, margin: '0 0 6px' }}>{t('page.quoteAccept.acceptedThanks')}</h2>
             <p style={{ margin: 0, fontSize: 14 }}>
-              Accepted by {view.acceptedName}
-              {view.acceptedAt ? ` on ${format(parseISO(view.acceptedAt), 'd MMM yyyy, HH:mm')}` : ''}. The Red Reach team will be in
-              touch with the next steps and the invoice.
+              {t('page.quoteAccept.acceptedBy').replace('{name}', view.acceptedName || '')}
+              {view.acceptedAt
+                ? t('page.quoteAccept.acceptedOn').replace(
+                    '{when}',
+                    format(parseISO(view.acceptedAt), 'd MMM yyyy, HH:mm'),
+                  )
+                : ''}
+              {t('page.quoteAccept.acceptedNext')}
             </p>
           </section>
         ) : view.state === 'closed' ? (
           <section style={cardStyle}>
-            <p style={{ margin: 0, fontSize: 14 }}>This quote can no longer be accepted online. Ask Red Reach for a new one.</p>
+            <p style={{ margin: 0, fontSize: 14 }}>{t('page.quoteAccept.closed')}</p>
           </section>
         ) : (
           <section style={cardStyle}>
-            <h2 style={{ fontSize: 18, margin: '0 0 6px' }}>Accept this quote</h2>
-            <p style={{ ...muted, margin: '0 0 12px' }}>
-              Type your full name and the date. We keep your name, the date, the time and your internet address as the
-              record of acceptance.
-            </p>
+            <h2 style={{ fontSize: 18, margin: '0 0 6px' }}>{t('page.quoteAccept.acceptThis')}</h2>
+            <p style={{ ...muted, margin: '0 0 12px' }}>{t('page.quoteAccept.instructions')}</p>
             <div style={{ display: 'grid', gap: 10 }}>
               <label style={labelStyle} htmlFor="accept-name">
-                Full name
+                {t('page.quoteAccept.fullName')}
               </label>
               <input id="accept-name" style={inputStyle} value={name} autoComplete="name" onChange={(e) => setName(e.target.value)} />
               <label style={labelStyle} htmlFor="accept-date">
-                Date
+                {t('page.quoteAccept.date')}
               </label>
               <input id="accept-date" type="date" style={inputStyle} value={date} onChange={(e) => setDate(e.target.value)} />
               <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 14 }}>
                 <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
-                I accept quote {view.reference} for {money(view.amount, view.currency)} on behalf of {view.client}.
+                {t('page.quoteAccept.agree')
+                  .replace('{ref}', view.reference)
+                  .replace('{amount}', money(view.amount, view.currency))
+                  .replace('{client}', view.client)}
               </label>
               {formError ? <p style={{ color: colors.danger, fontSize: 13, margin: 0 }}>{formError}</p> : null}
               <button type="button" style={buttonPrimaryStyle} disabled={busy} onClick={() => void accept()}>
-                {busy ? 'Saving…' : 'Accept'}
+                {busy ? t('page.quoteAccept.saving') : t('page.quoteAccept.accept')}
               </button>
             </div>
           </section>
