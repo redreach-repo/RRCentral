@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { useLocation } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import BrandLogo from '../components/BrandLogo'
-import { acceptProblem, type AcceptView } from '../lib/quoteAccept'
+import { type AcceptView } from '../lib/quoteAccept'
+import { parseQuoteAcceptForm } from '../lib/schemas/quoteAccept'
 import { callQuoteAccept } from '../lib/quoteAcceptStore'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle } from '../lib/uiStyles'
 
@@ -68,11 +69,19 @@ export default function QuoteAcceptPage() {
   }
 
   async function accept() {
-    const problem = acceptProblem({ name, date, agreed })
-    setFormError(problem || '')
-    if (problem) return
+    const parsed = parseQuoteAcceptForm({ name, date, agreed })
+    if (!parsed.ok) {
+      setFormError(parsed.error)
+      return
+    }
+    setFormError('')
     setBusy(true)
-    const r = await callQuoteAccept(token, { action: 'accept', name: name.trim(), date, agreed })
+    const r = await callQuoteAccept(token, {
+      action: 'accept',
+      name: parsed.data.name,
+      date: parsed.data.date,
+      agreed: true,
+    })
     setBusy(false)
     if (r.ok) setView(r.data)
     else setFormError(r.message)
