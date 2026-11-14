@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod delivery note from quote
+**Current milestone:** Continuous backlog — M1 Zod ticket AI summary
 
 ## Shipped this turn
 
-- Zod `parseDeliveryNoteFromQuoteForm` requires a quotation pick before creating a delivery note
+- Zod `parseTicketSummaryForm` before saving an AI ticket summary as an internal note
 
 ## Already on main
 
