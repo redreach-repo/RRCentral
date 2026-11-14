@@ -75,10 +75,35 @@ select cron.schedule(
 That runs at 22:30 UTC (02:30 in Dubai). To stop it:
 `select cron.unschedule('rr-hubspot-sync');`
 
+### Outbox nudge
+
+The `event-outbox` worker sets `app_settings.hubspot_sync_requested_at` when CRM /
+quote / invoice activity lands, and may POST `hubspot-sync` immediately when
+`HUBSPOT_CRON_SECRET` is set. After any finished sync (manual or schedule), the
+function clears that setting. Settings → HubSpot shows a pending nudge line
+while it is set.
+
+Optional frequent poller (only runs when a nudge is waiting):
+
+```sql
+select cron.schedule(
+  'rr-hubspot-sync-nudge',
+  '*/15 * * * *',
+  $$
+  select net.http_post(
+    url := 'https://pszjylxrpvlumldtptrr.supabase.co/functions/v1/hubspot-sync',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret', 'PASTE_THE_SAME_SECRET'),
+    body := '{"only_if_requested":true}'::jsonb
+  );
+  $$
+);
+```
+
 ## Checking it
 
-Settings → HubSpot shows the last run: what was sent, what failed and why.
-System check lists `hubspot-sync` and says when a secret is missing.
+Settings → HubSpot shows the last run: what was sent, what failed and why, and
+any pending outbox nudge. System check lists `hubspot-sync` and says when a
+secret is missing.
 
 ## Who can do what
 

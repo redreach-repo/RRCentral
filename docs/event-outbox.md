@@ -12,7 +12,7 @@ Pure classification: `app/src/lib/eventOutboxWorker.ts`. Claim RPC:
 
 | Effect | When | What it does |
 | --- | --- | --- |
-| **HubSpot nudge** | CRM / quote / invoice / deal activity | Sets `app_settings.hubspot_sync_requested_at`. If `HUBSPOT_CRON_SECRET` is set, also POSTs `hubspot-sync` once per batch. |
+| **HubSpot nudge** | CRM / quote / invoice / deal activity | Sets `app_settings.hubspot_sync_requested_at`. If `HUBSPOT_CRON_SECRET` is set, also POSTs `hubspot-sync` once per batch. `hubspot-sync` clears the setting when a run finishes; optional cron body `{ "only_if_requested": true }` polls only when a nudge is waiting. |
 | **Digest signal** | Quotes finalized, payments, follow-ups, calls, DNs | Writes `app_settings.digest_attention_signal` JSON (`{ at, events[] }`). The morning digest (`dailyDigest.parseDigestAttentionSignal`) surfaces it as “Recent CRM activity”, then clears the setting after send. |
 | **Webhook** | Every event, when configured | POSTs the event JSON to `app_settings.outbound_webhook_url`. Failures retry the outbox row. |
 
