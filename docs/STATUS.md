@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — EN+AR NDA template chrome
+**Current milestone:** Continuous backlog — EN+AR build templates chrome
 
 ## Shipped this turn
 
-- Wired **NdaTemplatePage** versions, editor labels, clause insert, and approve modal through EN+AR catalogs
+- Wired **BuildTemplatesPage** list, checklist sections, and modals through EN+AR catalogs
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR (incl. CTRM issues + obligations + clause library) · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome
+- Continuous backlog · Zod · Guide packs · Cmd+K · module flags · EN+AR (incl. NDA + agreement template) · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome
 
 ## Still open (agent queue)
 
