@@ -29,3 +29,12 @@ export function invoiceDocumentTitle(referenceNumber: string | null | undefined)
 export function invoiceKindLabel(referenceNumber: string | null | undefined): string {
   return invoiceKind(referenceNumber) === 'tax' ? 'Tax invoice' : 'Proforma invoice'
 }
+
+/**
+ * Whether the printed sheet carries the "DRAFT — reference not finalized" banner.
+ * Never on invoices: without an RR reference it is a Proforma Invoice that goes
+ * to the client as it is. Quotes and delivery notes keep it while they are drafts.
+ */
+export function printsDraftBanner(docType: string, isDraft: boolean): boolean {
+  return docType !== 'invoice' && isDraft
+}
