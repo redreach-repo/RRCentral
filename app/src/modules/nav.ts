@@ -91,6 +91,8 @@ export const APP_MODULES: ModuleManifest[] = [
     id: 'delivery',
     label: 'Delivery',
     icon: Package,
+    /** Soft-hide via app_settings.moduleFlags JSON, e.g. {"delivery":false}. */
+    flag: 'delivery',
     items: [
       { to: '/products', label: 'WorshipHub', icon: WorshipHubIcon, forStaff: true },
       { to: '/delivery-settings', label: 'Packages', icon: Package, minRole: 'manager' },

@@ -16,7 +16,7 @@ Status key: **exists** · **partial** · **missing**
 | Vite+React SPA on Supabase | exists | Keep; do not rewrite framework |
 | Trusted logic in Edge/DB not only browser | partial | Ledger/payroll/permissions must move server-side in M1+ |
 | Zod validation everywhere | partial | Login, password, app-user, account, ticket form schemas; keep expanding forms/API |
-| Module registry manifests | partial | M1 `APP_MODULES`; Layout + Cmd+K use `visibleAppModules`; Settings Module flags card (`ops`, `finance`); more module flags later |
+| Module registry manifests | partial | M1 `APP_MODULES`; Layout + Cmd+K use `visibleAppModules`; Settings Module flags card (`ops`, `finance`, `delivery`); more module flags later |
 | Domain events / `event_outbox` | partial | M1 enqueue + worker + HubSpot/digest/webhook handlers; digest + HubSpot nudge consumption live |
 | Public REST API + webhooks | missing | M11 (or earlier for partners) |
 | Exact money `numeric` / no float | partial | SQL numeric exists; TS `number`+round — fix path in M7 |
