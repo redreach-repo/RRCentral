@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod expense PDF pick
+**Current milestone:** Continuous backlog — in-app CRM guide pack
 
 ## Shipped this turn
 
-- Zod `parseExpensePdfPick` before reading a supplier invoice PDF on Expenses
+- Guide `/guide` CRM day-to-day pack (My Day, Pipeline, quotes, support, contracts vault) with EN+AR copy
 
 ## Already on main
 
@@ -13,7 +13,7 @@
 
 ## Still open (agent queue)
 
-1. More M1 Zod  
+1. More M1 Zod (open PRs)  
 2. Demo env hooks after Alfred provisions  
 
 ## Still externally blocked
