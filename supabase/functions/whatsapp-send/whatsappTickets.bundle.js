@@ -11,6 +11,23 @@ function normalizePhone(raw, countryCode = "971") {
   return digits;
 }
 
+// src/lib/product.ts
+var PRODUCT = {
+  name: "HighMast",
+  shortName: "HighMast",
+  endorsement: "by Red Reach",
+  tagline: "CRM, quoting, delivery and finance for growing teams",
+  description: "HighMast \u2014 CRM, quoting, delivery and finance by Red Reach",
+  colors: {
+    red: "#C8321A",
+    orange: "#E8872A",
+    charcoal: "#1A1A1A",
+    grey: "#6E6E6E",
+    warmGrey: "#B8B2AC",
+    paper: "#F7F4F1"
+  }
+};
+
 // src/lib/sla.ts
 var DEFAULT_WORKING_CALENDAR = {
   days: [1, 2, 3, 4, 5],
@@ -119,7 +136,7 @@ function messageText(m) {
     return str(obj(i.button_reply).title) || str(obj(i.list_reply).title) || "[Reply to a menu]";
   }
   if (type === "reaction" || type === "system" || type === "ephemeral") return null;
-  return "[A message RR Central cannot show] Open WhatsApp to see it.";
+  return `[A message ${PRODUCT.name} cannot show] Open WhatsApp to see it.`;
 }
 function parseWebhook(payload) {
   const messages = [];
