@@ -1,19 +1,19 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — pipeline density
+**Current milestone:** Continuous backlog — outbox domain handlers
 
 ## Shipped this turn
 
-- Pipeline / deal-sheet density: quieter board columns & cards, sheet tabs, My Day tiles; shared Pipeline + AI CRM detail boards tightened to match minimal chrome
+- Domain outbox handlers: HubSpot nudge (`hubspot_sync_requested_at` + optional invoke), digest attention signal, optional `outbound_webhook_url` POST — see `docs/event-outbox.md`
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide · Cmd+K · QTSP · outbox worker · a11y · minimal CRM chrome (#326)
+- Continuous backlog · Zod · Guide · Cmd+K · QTSP · outbox worker · a11y · minimal chrome · pipeline density
 
 ## Still open (agent queue)
 
-1. Domain-specific outbox handlers (digest / webhooks / HubSpot)  
+1. Morning digest reads `digest_attention_signal`  
 2. Demo env hooks after Alfred provisions  
 
 ## Still externally blocked
