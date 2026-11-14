@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — M1 Zod tour-ops booking link
+**Current milestone:** Continuous backlog — M1 Zod expense PDF pick
 
 ## Shipped this turn
 
-- Zod `parseTourOpsLinkForm` for Wanders tour-ops deal/departure/pax booking link
+- Zod `parseExpensePdfPick` before reading a supplier invoice PDF on Expenses
 
 ## Already on main
 
