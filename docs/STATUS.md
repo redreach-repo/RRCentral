@@ -1,11 +1,11 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — tenant isolation for quote templates
+**Current milestone:** Continuous backlog — delivery legal page body EN+AR
 
 ## Shipped this turn
 
-- Expanded `tenant_isolation_test.sql` for **quote_templates** (read isolation + forged insert blocked)
+- Page-body EN+AR catalogs for **NDA template**, **Clause library**, and **Obligations board** heroes
 
 ## Already on main
 

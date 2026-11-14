@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { errorMessage } from '../lib/errors'
 import {
@@ -48,6 +49,7 @@ const emptyForm = {
 type Filter = 'open' | 'done' | 'cancelled' | 'all'
 
 export default function ObligationsBoardPage() {
+  const { t } = useI18n()
   const { userRole, user } = useAuth()
   const { showToast } = useToast()
   const canEdit = can(userRole, 'delivery.contracts')
@@ -131,14 +133,13 @@ export default function ObligationsBoardPage() {
 
   return (
     <div style={pageStyle}>
-      <h1 style={pageTitleStyle}>Obligations board</h1>
+      <h1 style={pageTitleStyle}>{t('page.obligations.title')}</h1>
       <p style={pageSubtitleStyle}>
-        Track follow-through from NDAs and agreements (return materials, renewals, survivor duties). Not a UAE
-        Qualified E-Signature. Clause wording lives in the{' '}
+        {t('page.obligations.subtitleLead')}{' '}
         <Link to="/clause-library" style={{ color: colors.accent }}>
-          clause library
+          {t('page.obligations.clauseLibrary')}
         </Link>
-        .
+        {t('page.obligations.subtitleTrail')}
       </p>
 
       {missingTable ? (
