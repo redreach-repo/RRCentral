@@ -176,6 +176,14 @@ values (
   'b0000000-0000-4000-8000-000000000001'
 );
 
+insert into public.owned_domains (domain_name, registrar, notes, tenant_id)
+values (
+  'tenant-b-secret.example',
+  'Registrar B',
+  'Tenant B Secret Domain',
+  'b0000000-0000-4000-8000-000000000001'
+);
+
 insert into public.event_outbox (event_type, aggregate_type, aggregate_id, tenant_id, status)
 values (
   'finalize_quote',
@@ -256,6 +264,10 @@ select pg_temp.expect(
   'redreach admin cannot read tenant B legal_documents'
 );
 select pg_temp.expect(
+  (select count(*) from public.owned_domains where domain_name = 'tenant-b-secret.example') = 0,
+  'redreach admin cannot read tenant B owned_domains'
+);
+select pg_temp.expect(
   (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 0,
   'redreach admin cannot read tenant B event_outbox'
 );
@@ -330,6 +342,10 @@ select pg_temp.expect(
 select pg_temp.expect(
   (select count(*) from public.legal_documents where notes = 'Tenant B Secret Legal') = 1,
   'tenant B admin can read own legal_documents'
+);
+select pg_temp.expect(
+  (select count(*) from public.owned_domains where domain_name = 'tenant-b-secret.example') = 1,
+  'tenant B admin can read own owned_domains'
 );
 select pg_temp.expect(
   (select count(*) from public.event_outbox where aggregate_id = 'RR-TB-0001') = 1,
@@ -495,6 +511,22 @@ begin
     raise exception 'TENANT TEST FAILED: tenant B admin forged legal_document into redreach';
   end if;
   raise notice 'ok - tenant B cannot insert legal_document into redreach tenant_id';
+end $$;
+
+do $$
+declare
+  failed boolean := false;
+begin
+  begin
+    insert into public.owned_domains (domain_name, registrar, tenant_id)
+    values ('forged-into-a.example', 'Forged', 'a0000000-0000-4000-8000-000000000001');
+  exception when others then
+    failed := true;
+  end;
+  if not failed then
+    raise exception 'TENANT TEST FAILED: tenant B admin forged owned_domain into redreach';
+  end if;
+  raise notice 'ok - tenant B cannot insert owned_domain into redreach tenant_id';
 end $$;
 
 ------------------------------------------------------------ Append-only audit_log (authenticated cannot mutate)
