@@ -9,6 +9,31 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  a11y:
+    name: Accessibility (axe, light and dark)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      # No Supabase settings, so the app runs in local mode and never touches real data.
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:a11y
+      - name: Keep the accessibility report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-report
+          path: app/playwright-report
+          retention-days: 14
   app:
     name: Lint, typecheck, test, build
     runs-on: ubuntu-latest
