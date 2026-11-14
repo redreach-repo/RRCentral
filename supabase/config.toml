@@ -81,3 +81,9 @@ verify_jwt = false
 
 [functions.event-outbox]
 verify_jwt = false
+
+[functions.hm-public-api]
+verify_jwt = false
+
+[functions.hm-webhook-dispatch]
+verify_jwt = false

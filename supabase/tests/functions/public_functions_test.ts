@@ -39,6 +39,8 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "hubspot-sync": { kind: "cron secret or manager JWT", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret[\s\S]*rr_is_manager_or_admin/ },
   "event-outbox": { kind: "cron secret or manager JWT", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret[\s\S]*rr_is_manager_or_admin/ },
   "lead-intake": { kind: "shared secret or signed form token", pattern: /if \(!secret\)[\s\S]*=== secret[\s\S]*formTokenProblem\(/ },
+  "hm-public-api": { kind: "hashed API key with scopes", pattern: /bearerKey\(req[\s\S]*key_hash[\s\S]*keyProblem\([\s\S]*hasScope\(/ },
+  "hm-webhook-dispatch": { kind: "cron secret or manager JWT", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret[\s\S]*rr_is_manager_or_admin/ },
 }
 
 async function publicFunctions(): Promise<string[]> {
