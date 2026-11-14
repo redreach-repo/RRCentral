@@ -1,15 +1,15 @@
 # RRCRM status
 
 **Last updated:** 14 November 2026 (Asia/Dubai)  
-**Current milestone:** Continuous backlog — EN+AR client health chrome
+**Current milestone:** Continuous backlog — EN+AR module-flags Settings chrome
 
 ## Shipped this turn
 
-- Wired **ClientHealthPage** KPI bands, empty/loading, and table chrome through EN+AR catalogs
+- Wired **ModuleFlagsCard** title, copy, toggles, and toasts through EN+AR catalogs
 
 ## Already on main
 
-- Continuous backlog · Zod · Guide packs · Cmd+K · module flags (incl. overview) · EN+AR · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome
+- Continuous backlog · Zod · Guide packs · Cmd+K · module flags (incl. overview) · EN+AR (incl. client health) · QTSP · outbox · digest · HubSpot · System check · tenant CI · a11y · chrome
 
 ## Still open (agent queue)
 

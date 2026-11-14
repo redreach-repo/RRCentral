@@ -525,6 +525,29 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.admin.kicker': 'Admin',
     'page.settings.title': 'Settings',
     'page.settings.subtitle': 'Company details, data storage, and user access',
+    'page.settings.moduleFlags.title': 'Module flags',
+    'page.settings.moduleFlags.bodyLead':
+      'Soft-hide optional sidebar modules for everyone. Direct URLs keep working. Stored as',
+    'page.settings.moduleFlags.bodyMid': 'JSON in settings (for example',
+    'page.settings.moduleFlags.overview': 'Overview (Dashboard, Guide)',
+    'page.settings.moduleFlags.sales':
+      'Sales (Pipeline, My Day, Follow-ups, quotes, invoices, Drive)',
+    'page.settings.moduleFlags.ops':
+      'Operations (Wanders, Catalog, Inventory, Templates, Domains)',
+    'page.settings.moduleFlags.finance':
+      'Finance (Payments, Expenses, Vendors, Reports, MRR, Utilisation)',
+    'page.settings.moduleFlags.delivery':
+      'Delivery (WorshipHub, Packages, templates, NDA, clauses, obligations)',
+    'page.settings.moduleFlags.clients':
+      'Clients (Accounts, Support, CTRM issues, health, reports, updates)',
+    'page.settings.moduleFlags.show': 'Show in sidebar',
+    'page.settings.moduleFlags.hide': 'Hide from sidebar',
+    'page.settings.moduleFlags.save': 'Save',
+    'page.settings.moduleFlags.hiddenToast':
+      'Hidden from sidebar: {flags} (URLs still work)',
+    'page.settings.moduleFlags.shownToast':
+      'All optional modules shown in the sidebar again',
+    'page.settings.moduleFlags.saveError': 'Could not save the setting',
     'page.account.title': 'Account',
     'page.account.subtitle': 'Change the password you use to sign in.',
     'page.ctrmSummary.loading': 'Loading summary…',
@@ -1150,6 +1173,29 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.admin.kicker': 'الإدارة',
     'page.settings.title': 'الإعدادات',
     'page.settings.subtitle': 'تفاصيل الشركة وتخزين البيانات وصلاحيات المستخدمين',
+    'page.settings.moduleFlags.title': 'أعلام الوحدات',
+    'page.settings.moduleFlags.bodyLead':
+      'أخفِ وحدات الشريط الجانبي الاختيارية للجميع. الروابط المباشرة تبقى تعمل. تُحفظ كـ',
+    'page.settings.moduleFlags.bodyMid': 'JSON في الإعدادات (مثلاً',
+    'page.settings.moduleFlags.overview': 'النظرة العامة (لوحة التحكم، الدليل)',
+    'page.settings.moduleFlags.sales':
+      'المبيعات (خط الأنابيب، يومي، المتابعات، العروض، الفواتير، Drive)',
+    'page.settings.moduleFlags.ops':
+      'العمليات (Wanders، الكتالوج، المخزون، القوالب، النطاقات)',
+    'page.settings.moduleFlags.finance':
+      'المالية (المدفوعات، المصروفات، الموردون، التقارير، MRR، الاستخدام)',
+    'page.settings.moduleFlags.delivery':
+      'التسليم (WorshipHub، الحزم، القوالب، NDA، البنود، الالتزامات)',
+    'page.settings.moduleFlags.clients':
+      'العملاء (الحسابات، الدعم، مسائل CTRM، الصحة، التقارير، التحديثات)',
+    'page.settings.moduleFlags.show': 'إظهار في الشريط الجانبي',
+    'page.settings.moduleFlags.hide': 'إخفاء من الشريط الجانبي',
+    'page.settings.moduleFlags.save': 'حفظ',
+    'page.settings.moduleFlags.hiddenToast':
+      'مخفي من الشريط الجانبي: {flags} (الروابط المباشرة تبقى تعمل)',
+    'page.settings.moduleFlags.shownToast':
+      'كل الوحدات الاختيارية ظاهرة في الشريط الجانبي مجدداً',
+    'page.settings.moduleFlags.saveError': 'تعذّر حفظ الإعداد',
     'page.account.title': 'الحساب',
     'page.account.subtitle': 'غيّر كلمة المرور التي تستخدمها لتسجيل الدخول.',
     'page.ctrmSummary.loading': 'جارٍ تحميل الملخص…',

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useI18n } from '../../contexts/I18nContext'
 import { useSettings } from '../../contexts/SettingsContext'
 import { useToast } from '../../contexts/ToastContext'
 import { errorMessage } from '../../lib/errors'
@@ -24,6 +25,7 @@ type FlagState = Record<string, boolean>
 
 /** Soft-hide optional shell modules via app_settings.moduleFlags JSON. */
 export default function ModuleFlagsCard() {
+  const { t } = useI18n()
   const { settings, updateSetting } = useSettings()
   const { showToast } = useToast()
   const [enabled, setEnabled] = useState<FlagState>(() =>
@@ -53,12 +55,12 @@ export default function ModuleFlagsCard() {
       )
       showToast(
         hidden.length
-          ? `Hidden from sidebar: ${hidden.join(', ')} (URLs still work)`
-          : 'All optional modules shown in the sidebar again',
+          ? t('page.settings.moduleFlags.hiddenToast').replace('{flags}', hidden.join(', '))
+          : t('page.settings.moduleFlags.shownToast'),
         'success',
       )
     } catch (e) {
-      showToast(errorMessage(e, 'Could not save the setting'), 'error')
+      showToast(errorMessage(e, t('page.settings.moduleFlags.saveError')), 'error')
     } finally {
       setSaving(false)
     }
@@ -66,10 +68,10 @@ export default function ModuleFlagsCard() {
 
   return (
     <section id="module-flags" style={{ ...cardStyle, marginBottom: 16, scrollMarginTop: 72 }}>
-      <h2 style={sectionTitleStyle}>Module flags</h2>
+      <h2 style={sectionTitleStyle}>{t('page.settings.moduleFlags.title')}</h2>
       <p style={{ color: colors.muted, fontSize: 13, margin: '0 0 12px', lineHeight: 1.5 }}>
-        Soft-hide optional sidebar modules for everyone. Direct URLs keep working. Stored as{' '}
-        <code style={{ fontSize: 12 }}>moduleFlags</code> JSON in settings (for example{' '}
+        {t('page.settings.moduleFlags.bodyLead')}{' '}
+        <code style={{ fontSize: 12 }}>moduleFlags</code> {t('page.settings.moduleFlags.bodyMid')}{' '}
         <code style={{ fontSize: 12 }}>
           {'{"overview":false,"sales":false,"ops":false,"finance":false,"delivery":false,"clients":false}'}
         </code>
@@ -78,7 +80,7 @@ export default function ModuleFlagsCard() {
       {SETTINGS_MODULE_FLAGS.map((row) => (
         <div key={row.flag} style={fieldStyle}>
           <label style={labelStyle} htmlFor={`module-flag-${row.flag}`}>
-            {row.label}
+            {t(row.labelKey)}
           </label>
           <select
             id={`module-flag-${row.flag}`}
@@ -88,13 +90,13 @@ export default function ModuleFlagsCard() {
               setEnabled((prev) => ({ ...prev, [row.flag]: e.target.value === 'yes' }))
             }
           >
-            <option value="yes">Show in sidebar</option>
-            <option value="no">Hide from sidebar</option>
+            <option value="yes">{t('page.settings.moduleFlags.show')}</option>
+            <option value="no">{t('page.settings.moduleFlags.hide')}</option>
           </select>
         </div>
       ))}
       <button type="button" style={buttonPrimaryStyle} disabled={saving} onClick={() => void save()}>
-        Save
+        {t('page.settings.moduleFlags.save')}
       </button>
     </section>
   )

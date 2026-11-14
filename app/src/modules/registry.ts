@@ -36,30 +36,30 @@ export const REDREACH_COMPANY_ID = 'a0000000-0000-4000-8000-000000000002'
 export const MODULE_FLAGS_KEY = 'moduleFlags'
 
 /** Soft-hide toggles exposed on Settings → Module flags (must match module `flag` keys). */
-export const SETTINGS_MODULE_FLAGS: { flag: string; label: string }[] = [
+export const SETTINGS_MODULE_FLAGS: { flag: string; labelKey: string }[] = [
   {
     flag: 'overview',
-    label: 'Overview (Dashboard, Guide)',
+    labelKey: 'page.settings.moduleFlags.overview',
   },
   {
     flag: 'sales',
-    label: 'Sales (Pipeline, My Day, Follow-ups, quotes, invoices, Drive)',
+    labelKey: 'page.settings.moduleFlags.sales',
   },
   {
     flag: 'ops',
-    label: 'Operations (Wanders, Catalog, Inventory, Templates, Domains)',
+    labelKey: 'page.settings.moduleFlags.ops',
   },
   {
     flag: 'finance',
-    label: 'Finance (Payments, Expenses, Vendors, Reports, MRR, Utilisation)',
+    labelKey: 'page.settings.moduleFlags.finance',
   },
   {
     flag: 'delivery',
-    label: 'Delivery (WorshipHub, Packages, templates, NDA, clauses, obligations)',
+    labelKey: 'page.settings.moduleFlags.delivery',
   },
   {
     flag: 'clients',
-    label: 'Clients (Accounts, Support, CTRM issues, health, reports, updates)',
+    labelKey: 'page.settings.moduleFlags.clients',
   },
 ]
 
