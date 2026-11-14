@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ArrowLeft, Download } from 'lucide-react'
+import { useI18n } from '../contexts/I18nContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { getAccount, listContacts } from '../lib/accountsStore'
@@ -21,6 +22,7 @@ const bar = { appearance: 'none' as const, border: 0, borderRadius: 8, padding: 
  */
 export default function FitSheetPage() {
   const { id = '' } = useParams<{ id: string }>()
+  const { t } = useI18n()
   const { settings } = useSettings()
   const { showToast } = useToast()
   const sheetRef = useRef<HTMLDivElement>(null)
@@ -33,14 +35,14 @@ export default function FitSheetPage() {
   useEffect(() => {
     Promise.all([getAccount(id), loadFitSheet(id), listContacts(id)])
       .then(([a, s, c]) => {
-        if (!a) setError('Account not found')
-        else if (!s) setError('This account has no fit sheet yet')
+        if (!a) setError(t('page.fitSheet.notFoundAccount'))
+        else if (!s) setError(t('page.fitSheet.noSheetYet'))
         setAccount(a)
         setSheet(s)
         setContacts(c)
       })
       .catch((e) => setError(errorMessage(e, 'Could not load the fit sheet')))
-  }, [id])
+  }, [id, t])
 
   async function download() {
     if (!sheetRef.current || !account) return
@@ -60,11 +62,11 @@ export default function FitSheetPage() {
     <div style={{ minHeight: '100vh', background: '#f0f0f0', color: '#111' }}>
       <div style={{ position: 'sticky', top: 0, zIndex: 2, display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 16px', background: '#111' }}>
         <Link to={`/accounts/${id}`} style={{ ...bar, background: '#333', color: '#fff', textDecoration: 'none' }}>
-          <ArrowLeft size={16} /> Back
+          <ArrowLeft size={16} /> {t('page.fitSheet.back')}
         </Link>
         {sheet ? (
           <button type="button" style={{ ...bar, background: '#e85d04', color: '#fff' }} disabled={busy} onClick={() => void download()}>
-            <Download size={16} /> {busy ? 'Making PDF…' : 'Download PDF'}
+            <Download size={16} /> {busy ? t('page.fitSheet.makingPdf') : t('page.fitSheet.download')}
           </button>
         ) : null}
       </div>
@@ -85,11 +87,11 @@ export default function FitSheetPage() {
                   </div>
                 </div>
                 <div className={styles.docMeta}>
-                  <div className={styles.docLabel}>CTRM Next fit sheet</div>
+                  <div className={styles.docLabel}>{t('page.fitSheet.docLabel')}</div>
                   <h1>{account.name}</h1>
                   <div className={styles.metaGrid}>
                     <div>
-                      <span>Updated: </span>
+                      <span>{t('page.fitSheet.updated')} </span>
                       {format(new Date(sheet.updated_at), 'dd MMM yyyy')}
                     </div>
                   </div>
