@@ -65,7 +65,7 @@ This PR adds plug-in slots so a module PR only adds new files:
 | 11 | SaaS tenant billing | Cursor | #413 merged, #415 open |
 | 12 | AI approval queue | Claude | |
 | 13 | Industry packs | Cursor | #413 merged, #415 open |
-| – | Permission fix for the #413 tables | Claude | new migration only, no Cursor files |
+| – | Permission fix for the #413 tables | Claude | draft #419 (new migration only, no Cursor files) |
 
 **Cursor: please do not edit** `supabase/functions/_shared/functionHealth.ts`, `lib/errorReporting.ts` (Claude #418) or anything under `modules/extensions/`. **Claude will not edit** `featureSliceStores.ts`, the M6–M12 pages, `supabase/functions/public-api/`, or Cursor's migrations; fixes to Cursor's tables go in new Claude migrations only.
 
