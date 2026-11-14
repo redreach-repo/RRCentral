@@ -8,6 +8,7 @@ import { EXPENSE_CATEGORIES, parseExpenseForm } from '../lib/schemas/expense'
 import { parseExpensePdfPick } from '../lib/schemas/expensePdf'
 import type { Attachment, Expense, Quotation, Vendor } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { canViewField } from '../lib/fieldPermissions'
 import { can } from '../lib/permissions'
 import { useSettings } from '../contexts/SettingsContext'
@@ -104,6 +105,7 @@ function applyExVat(exclusive: number, rate: number): Pick<ExpenseForm, 'amount'
 }
 
 export default function ExpensesPage() {
+  const { t } = useI18n()
   const { user, userRole } = useAuth()
   const showVendorTrn = canViewField(userRole, 'vendor.trn')
   const { settings } = useSettings()
@@ -550,11 +552,9 @@ export default function ExpensesPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Finance</p>
-          <h1 className={docsStyles.title}>Expenses</h1>
-          <p className={docsStyles.subtitle}>
-            Vendor bills, supplier invoices, and receipts. Click Actions on a row to edit or delete.
-          </p>
+          <p className={docsStyles.kicker}>{t('page.finance.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.expenses.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.expenses.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
@@ -563,7 +563,7 @@ export default function ExpensesPage() {
             style={{ background: 'rgba(255,255,255,0.08)' }}
             onClick={() => void syncRecurring().then(() => load())}
           >
-            Sync monthly
+            {t('page.expenses.syncMonthly')}
           </button>
           <button
             type="button"
@@ -574,7 +574,7 @@ export default function ExpensesPage() {
             <FileUp size={16} /> Supplier invoice
           </button>
           <button type="button" className={docsStyles.newBtn} onClick={openCreate}>
-            <Plus size={16} /> Add expense
+            <Plus size={16} /> {t('page.expenses.new')}
           </button>
         </div>
       </header>

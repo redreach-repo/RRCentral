@@ -8,6 +8,7 @@ import { db } from '../lib/db'
 import { DELIVERY_NOTE_STATUSES, DELIVERY_TERMS } from '../lib/config'
 import type { Attachment, DeliveryNote, Quotation } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
+import { useI18n } from '../contexts/I18nContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
@@ -83,6 +84,7 @@ const emptyForm = (): NoteForm => ({
 type StatusTab = 'All' | 'Draft' | 'Issued' | 'Delivered'
 
 export default function DeliveryNotesPage() {
+  const { t } = useI18n()
   const { user } = useAuth()
   const { settings } = useSettings()
   const { showToast } = useToast()
@@ -324,14 +326,12 @@ export default function DeliveryNotesPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Sales documents</p>
-          <h1 className={docsStyles.title}>Delivery notes</h1>
-          <p className={docsStyles.subtitle}>
-            Goods receipts from finalized quotations. Click Actions on a row for Edit, PDF, or Delete.
-          </p>
+          <p className={docsStyles.kicker}>{t('page.docs.kicker')}</p>
+          <h1 className={docsStyles.title}>{t('page.deliveryNotes.title')}</h1>
+          <p className={docsStyles.subtitle}>{t('page.deliveryNotes.subtitle')}</p>
         </div>
         <button type="button" className={docsStyles.newBtn} onClick={() => setCreateOpen(true)}>
-          <Plus size={16} /> From quotation
+          <Plus size={16} /> {t('page.deliveryNotes.new')}
         </button>
       </header>
 
