@@ -74,6 +74,7 @@ import {
   thStyle,
 } from '../lib/uiStyles'
 import { errorMessage } from '../lib/errors'
+import { parseInvoicePaymentForm } from '../lib/schemas/invoicePayment'
 
 interface InvoiceForm {
   client: string
@@ -487,11 +488,12 @@ export default function InvoicesPage() {
       showToast('Cancelled invoices cannot take payments', 'error')
       return
     }
-    const amount = Number(payAmount)
-    if (!(amount > 0)) {
-      showToast('Enter a valid payment amount', 'error')
+    const parsed = parseInvoicePaymentForm({ amount: payAmount, method: payMethod, notes: payNotes })
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
       return
     }
+    const amount = parsed.data.amount
     setSaving(true)
     try {
       const paidSoFar = payHistory.reduce((s, p) => s + Number(p.amount || 0), 0)
@@ -505,8 +507,8 @@ export default function InvoicesPage() {
         amount,
         // Only once the "Card payments" SQL added the column; until then everything is AED.
         ...(payTarget.currency && payTarget.currency !== 'AED' ? { currency: payTarget.currency } : {}),
-        method: payMethod,
-        notes: payNotes,
+        method: parsed.data.method,
+        notes: parsed.data.notes,
         user_email: who,
         balance_after: balanceAfter,
         // The day the money was received (noon UAE time so the date never shifts).
@@ -535,7 +537,7 @@ export default function InvoicesPage() {
           date: payTarget.date,
           description: payTarget.description,
           payment_status,
-          payment_method: payMethod,
+          payment_method: parsed.data.method,
           invoice_status: payTarget.status,
         },
         { subtotal: t.subtotal || payTarget.amount / (1 + invRate), vat: t.vat, total: t.total || payTarget.amount },
