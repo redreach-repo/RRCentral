@@ -18,6 +18,8 @@ import type {
   CtrmRegion,
   CtrmStage,
 } from '../../lib/types'
+import { exportListCsv } from '../../lib/listIo'
+import { useToast } from '../../contexts/ToastContext'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -80,6 +82,7 @@ export default function DealFormModal({
   saving,
   onSave,
 }: Props) {
+  const { showToast } = useToast()
   const [v, setV] = useState<DealFormValues | null>(null)
   const [error, setError] = useState('')
   const [editorSection, setEditorSection] = useState<EditorSection>('basics')
@@ -355,7 +358,50 @@ export default function DealFormModal({
         </div>
 
         {error ? <p style={{ color: colors.danger, margin: '0 0 10px', fontSize: 13 }}>{error}</p> : null}
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            onClick={() => {
+              if (!v) return
+              exportListCsv(
+                'ctrm-deal-form.csv',
+                [
+                  'account_id',
+                  'new_company',
+                  'stage',
+                  'region',
+                  'company_type',
+                  'source',
+                  'owner_user_id',
+                  'next_action',
+                  'next_action_date',
+                  'notes',
+                  'commission_expected',
+                  'commission_received',
+                ],
+                [
+                  {
+                    account_id: v.accountId,
+                    new_company: v.newCompany,
+                    stage: v.stage,
+                    region: v.region,
+                    company_type: v.company_type,
+                    source: v.source,
+                    owner_user_id: v.owner_user_id || '',
+                    next_action: v.next_action,
+                    next_action_date: v.next_action_date || '',
+                    notes: v.notes,
+                    commission_expected: v.commission?.expected ?? '',
+                    commission_received: v.commission?.received ?? '',
+                  },
+                ],
+              )
+              showToast('CTRM deal draft CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
           <button type="button" style={buttonSecondaryStyle} onClick={onClose}>
             Cancel
           </button>
