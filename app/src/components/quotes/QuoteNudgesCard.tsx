@@ -15,6 +15,7 @@ import {
   type TemplateChannel,
 } from '../../lib/quoteNudges'
 import { contactForNudge, listTemplates, loadQuoteNudges, markFollowedUp } from '../../lib/quoteNudgesStore'
+import { exportListCsv } from '../../lib/listIo'
 import { buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
 import { buildWhatsAppUrl } from '../../lib/whatsapp'
 
@@ -81,9 +82,33 @@ export default function QuoteNudgesCard() {
 
   return (
     <section style={{ ...cardStyle, marginBottom: 16 }} aria-label="Quotes waiting for a reply">
-      <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
-        <Timer size={18} /> Quotes waiting for a reply ({rows.length})
-      </h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+          <Timer size={18} /> Quotes waiting for a reply ({rows.length})
+        </h2>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          onClick={() => {
+            exportListCsv(
+              'quote-nudges.csv',
+              ['account', 'quote_number', 'amount', 'division', 'days_waiting', 'kind', 'path'],
+              rows.map((n) => ({
+                account: n.account || '',
+                quote_number: n.quote_number,
+                amount: n.amount,
+                division: n.division || '',
+                days_waiting: n.days,
+                kind: n.kind,
+                path: n.path,
+              })),
+            )
+            showToast('Quote nudges CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
+      </div>
       <p style={{ color: colors.muted, fontSize: 12, margin: '6px 0 10px' }}>
         Sent {NUDGE_DAYS} or more days ago with no follow up since. One tap opens the follow up, ready to send.
       </p>
