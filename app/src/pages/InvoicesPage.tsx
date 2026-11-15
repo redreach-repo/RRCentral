@@ -186,6 +186,7 @@ export default function InvoicesPage() {
         : { vat_mode: 'custom', vat_percent: vatRateToPercent(rate) }
   const [statusTab, setStatusTab] = useState<'All' | 'Draft' | 'Sent' | 'Cancelled'>('All')
   const [payTab, setPayTab] = useState<'All' | 'Pending' | 'Partial' | 'Paid'>('All')
+  const [showArchived, setShowArchived] = useState(false)
   const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
   const compact = useCompactCrm()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -205,7 +206,7 @@ export default function InvoicesPage() {
       setAccounts(acc.rows)
       if (iRes.error) throw iRes.error
       const raw = ((iRes.data || []) as (Invoice & { deleted_at?: string | null })[]).filter(
-        (inv) => !inv.deleted_at,
+        (inv) => showArchived || !inv.deleted_at,
       ) as Invoice[]
       // Repair stale Paid marks on cancelled invoices (e.g. wrong Ello payment applied then cancelled)
       const stalePaid = raw.filter(
@@ -236,7 +237,7 @@ export default function InvoicesPage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast, who])
+  }, [showToast, who, showArchived])
 
   useEffect(() => {
     void load()
@@ -803,6 +804,14 @@ export default function InvoicesPage() {
             }}
           >
             Export CSV
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
           </button>
           <button type="button" className={docsStyles.newBtn} onClick={openCreate}>
             <Plus size={16} /> {t('page.invoices.new')}

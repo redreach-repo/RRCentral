@@ -207,6 +207,27 @@ export async function loadCustomFieldValues(
   return out
 }
 
+/** Map record_id → definition_id → value for list columns (capped). */
+export async function loadCustomFieldValuesForRecords(
+  objectType: string,
+  recordIds: string[],
+): Promise<Record<string, Record<string, unknown>>> {
+  const ids = [...new Set(recordIds.filter(Boolean))].slice(0, 200)
+  if (!ids.length) return {}
+  const { data, error } = await db
+    .from('custom_field_values')
+    .select('definition_id, record_id, value')
+    .eq('object_type', objectType)
+    .in('record_id', ids)
+  if (error || !data) return {}
+  const out: Record<string, Record<string, unknown>> = {}
+  for (const row of data as { definition_id: string; record_id: string; value: unknown }[]) {
+    if (!out[row.record_id]) out[row.record_id] = {}
+    out[row.record_id][row.definition_id] = row.value
+  }
+  return out
+}
+
 export async function saveCustomFieldValues(
   objectType: string,
   recordId: string,

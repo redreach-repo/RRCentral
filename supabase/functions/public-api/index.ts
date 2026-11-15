@@ -11,6 +11,7 @@
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2"
+import { isDemoEnv } from "../_shared/demoGuard.ts"
 import { withSecurityHeaders } from "../_shared/securityHeaders.ts"
 import { rateLimitAllow } from "../_shared/rateLimit.ts"
 
@@ -232,7 +233,7 @@ async function emitWebhook(
 ) {
   const { data: hooks } = await sb
     .from("webhook_endpoints")
-    .select("id, url, secret, active, event_types, delivery_failures")
+    .select("id, url, secret, active, event_types, delivery_failures, dry_run")
     .eq("tenant_id", tenantId)
     .eq("active", true)
     .limit(20)
@@ -245,10 +246,30 @@ async function emitWebhook(
   }
   const body = JSON.stringify(payload)
   const ts = Math.floor(Date.now() / 1000)
+  const demoDry = isDemoEnv()
 
   for (const hook of hooks) {
     const types = Array.isArray(hook.event_types) ? hook.event_types.map(String) : ["*"]
     if (!types.includes("*") && !types.includes(eventType)) continue
+    if (demoDry || hook.dry_run === true) {
+      await sb
+        .from("webhook_endpoints")
+        .update({
+          last_delivery_at: new Date().toISOString(),
+          last_delivery_status: demoDry ? "dry_run:demo" : "dry_run",
+          next_retry_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", hook.id)
+      await sb.from("webhook_delivery_attempts").insert({
+        tenant_id: tenantId,
+        endpoint_id: hook.id,
+        event_type: eventType,
+        attempt: 1,
+        status: demoDry ? "dry_run:demo" : "dry_run",
+      })
+      continue
+    }
     try {
       const digest = await signWebhookBody(String(hook.secret || ""), body, ts)
       const res = await fetch(String(hook.url), {

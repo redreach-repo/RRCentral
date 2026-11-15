@@ -1,7 +1,7 @@
-# Run plan — ask_ai / soft-delete / stock deepen
+# Run plan — widgets / PO numbering / custom fields / archive / webhook dry
 
 **Started:** 15 November 2026 (Asia/Dubai)  
-**Branch:** `cursor/batch-askai-softdelete-stock-d3d5` (from `main` after #446)  
+**Branch:** `cursor/batch-widgets-po-fields-d3d5` (from `main` after #447)  
 **Spec:** Master Spec v2.1  
 **Note:** M14 / live ESP / Tax / CASA / QTSP blocked.
 
@@ -9,11 +9,11 @@
 
 ## Slices
 
-- [x] Workflow ask_ai dry-log (no gateway)
-- [x] Soft-delete actions on quotes / invoices / DNs
-- [x] Record rules filter on Pipeline deals
-- [x] Warehouse stock list on Inventory
-- [x] Quotations CSV export
+- [x] Dashboard typed widget slots
+- [x] PO allocateReference + Settings prefix edit
+- [x] Custom field columns on Accounts list
+- [x] Accounts archive + show-archived on quotes/invoices
+- [x] Public API webhook demo/dry guard
 - [ ] M14 / live ESP / Tax / CASA / QTSP (Not done)
 
 ## Quality gates

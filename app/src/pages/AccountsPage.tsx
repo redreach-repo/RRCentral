@@ -22,18 +22,28 @@ import {
 } from '../lib/savedViews'
 import {
   type AccountInput,
+  type AccountRow,
   type ContactInput,
   createAccount,
   listAccounts,
   listContacts,
   listTeam,
   logAccountEvent,
+  restoreAccount,
   saveContact,
+  softDeleteAccount,
 } from '../lib/accountsStore'
+import {
+  displayFieldValue,
+  listCustomFieldDefinitions,
+  loadCustomFieldValuesForRecords,
+  type CustomFieldDefinition,
+} from '../lib/customFields'
 import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
-import type { Account, AccountContact, AccountType, AppUser } from '../lib/types'
+import type { AccountContact, AccountType, AppUser } from '../lib/types'
 import {
+  buttonSecondaryStyle,
   cardStyle,
   colors,
   selectStyle,
@@ -49,13 +59,16 @@ export default function AccountsPage() {
   const { showToast } = useToast()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [accounts, setAccounts] = useState<Account[]>([])
+  const [accounts, setAccounts] = useState<AccountRow[]>([])
   const [contacts, setContacts] = useState<AccountContact[]>([])
   const [team, setTeam] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
   const [missingTable, setMissingTable] = useState(false)
   const [search, setSearch] = useState(() => searchParams.get('q') || '')
   const [ownerFilter, setOwnerFilter] = useState(() => searchParams.get('owner') || 'all')
+  const [showArchived, setShowArchived] = useState(false)
+  const [customDefs, setCustomDefs] = useState<CustomFieldDefinition[]>([])
+  const [customValues, setCustomValues] = useState<Record<string, Record<string, unknown>>>({})
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -106,21 +119,28 @@ export default function AccountsPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [{ rows, missingTable: missing }, people, allContacts] = await Promise.all([
-        listAccounts(),
+      const [{ rows, missingTable: missing }, people, allContacts, defs] = await Promise.all([
+        listAccounts({ includeDeleted: showArchived }),
         listTeam(),
         listContacts(),
+        listCustomFieldDefinitions('account').catch(() => [] as CustomFieldDefinition[]),
       ])
       setAccounts(rows)
       setMissingTable(missing)
       setTeam(people)
       setContacts(allContacts)
+      setCustomDefs(defs.slice(0, 3))
+      const values = await loadCustomFieldValuesForRecords(
+        'account',
+        rows.map((r) => r.id),
+      ).catch(() => ({}))
+      setCustomValues(values)
     } catch (e) {
       showToast(errorMessage(e, 'Could not load accounts'), 'error')
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [showToast, showArchived])
 
   useEffect(() => {
     void load()
@@ -247,6 +267,14 @@ export default function AccountsPage() {
           >
             Export CSV
           </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
+          </button>
           {canWrite ? (
             <button
               type="button"
@@ -352,19 +380,27 @@ export default function AccountsPage() {
                   <th>Status</th>
                   <th>Main contact</th>
                   <th>Owner</th>
+                  {customDefs.map((d) => (
+                    <th key={d.id}>{d.label}</th>
+                  ))}
+                  {canWrite ? <th>Archive</th> : null}
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((a) => {
                   const contact = primaryByAccount.get(a.id)
+                  const archived = Boolean(a.deleted_at)
                   return (
                     <tr
                       key={a.id}
                       onClick={() => navigate(`/accounts/${a.id}`)}
-                      style={{ cursor: 'pointer' }}
+                      style={{ cursor: 'pointer', opacity: archived ? 0.65 : 1 }}
                     >
                       <td className={docsStyles.clientCell}>
-                        <div className={docsStyles.ref}>{a.name}</div>
+                        <div className={docsStyles.ref}>
+                          {a.name}
+                          {archived ? ' (archived)' : ''}
+                        </div>
                         <div className={docsStyles.meta}>
                           {[a.reference, a.city].filter(Boolean).join(', ')}
                         </div>
@@ -386,6 +422,34 @@ export default function AccountsPage() {
                         )}
                       </td>
                       <td>{ownerName(a.owner_user_id)}</td>
+                      {customDefs.map((d) => (
+                        <td key={d.id} className={docsStyles.meta}>
+                          {displayFieldValue(d, customValues[a.id]?.[d.id])}
+                        </td>
+                      ))}
+                      {canWrite ? (
+                        <td>
+                          <button
+                            type="button"
+                            style={buttonSecondaryStyle}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              void (async () => {
+                                try {
+                                  if (archived) await restoreAccount(a.id)
+                                  else await softDeleteAccount(a.id)
+                                  showToast(archived ? 'Account restored' : 'Account archived', 'success')
+                                  await load()
+                                } catch (err) {
+                                  showToast(errorMessage(err, 'Could not update account'), 'error')
+                                }
+                              })()
+                            }}
+                          >
+                            {archived ? 'Restore' : 'Archive'}
+                          </button>
+                        </td>
+                      ) : null}
                     </tr>
                   )
                 })}

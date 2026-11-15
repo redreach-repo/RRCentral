@@ -5,6 +5,7 @@ import { db } from './db'
 import { isMissingRelationError } from './errors'
 import { isSupabaseConfigured } from './supabaseConfig'
 import { BUILTIN_COUNTRY_PACKS, type CountryPack } from './countryPacks'
+import { allocateReference } from './numbering'
 import { nextPoNumber } from './purchasing'
 import { withoutSoftDeleted } from './softDelete'
 
@@ -117,10 +118,20 @@ export async function createPurchaseOrder(input: {
   warehouseId?: string | null
 }): Promise<PurchaseOrder> {
   const existing = await listPurchaseOrders()
-  const po_number = nextPoNumber(
-    existing.map((p) => p.po_number),
-    input.orderDate,
-  )
+  let po_number: string
+  try {
+    po_number = await allocateReference({
+      docType: 'purchase_order',
+      divisionCode: '01',
+      prefix: 'PO',
+      existingRefs: existing.map((p) => p.po_number),
+    })
+  } catch {
+    po_number = nextPoNumber(
+      existing.map((p) => p.po_number),
+      input.orderDate,
+    )
+  }
   const { data, error } = await db
     .from('purchase_orders')
     .insert({

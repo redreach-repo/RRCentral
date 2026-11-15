@@ -198,6 +198,7 @@ export default function QuotationsPage() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<StatusTab>('All')
   const [search, setSearch] = useState('')
+  const [showArchived, setShowArchived] = useState(false)
 
   const currentQuoteViewFilters = useMemo(
     () => normalizeQuotationsFilters({ q: search, status: tab }),
@@ -265,7 +266,9 @@ export default function QuotationsPage() {
 
       const validityDays = Number(settings.quoteValidityDays || 14) || 14
       let rows = sortByDateDesc(
-        ((qRes.data || []) as (Quotation & { deleted_at?: string | null })[]).filter((q) => !q.deleted_at),
+        ((qRes.data || []) as (Quotation & { deleted_at?: string | null })[]).filter(
+          (q) => showArchived || !q.deleted_at,
+        ),
       )
 
       // Backfill valid_until on finalized quotes that never got one
@@ -327,7 +330,7 @@ export default function QuotationsPage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast, settings.quoteValidityDays])
+  }, [showToast, settings.quoteValidityDays, showArchived])
 
   const companyContacts = useMemo(
     () => contactsForCompany(form.client, { clients, crm: crmRows }),
@@ -1387,6 +1390,14 @@ export default function QuotationsPage() {
             }}
           >
             Export CSV
+          </button>
+          <button
+            type="button"
+            className={qStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
           </button>
           <button type="button" className={qStyles.newBtn} onClick={() => void openCreate()}>
             <Plus size={16} /> {t('page.quotations.new')}

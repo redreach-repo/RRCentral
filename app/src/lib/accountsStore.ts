@@ -2,6 +2,7 @@ import { db } from './db'
 import { errorCode, isMissingRelationError } from './errors'
 import { ACCOUNT_REFERENCE_PREFIX, accountTypeInfo } from './accounts'
 import { allocateReference } from './numbering'
+import { withoutSoftDeleted } from './softDelete'
 import type {
   Account,
   AccountActivity,
@@ -10,6 +11,8 @@ import type {
   AccountType,
   AppUser,
 } from './types'
+
+export type AccountRow = Account & { deleted_at?: string | null }
 
 export type AccountInput = Pick<
   Account,
@@ -33,13 +36,35 @@ export type ContactInput = Pick<
 >
 
 /** Rows plus whether the accounts migration has been applied to this database. */
-export async function listAccounts(): Promise<{ rows: Account[]; missingTable: boolean }> {
+export async function listAccounts(opts?: {
+  includeDeleted?: boolean
+}): Promise<{ rows: AccountRow[]; missingTable: boolean }> {
   const { data, error } = await db.from('accounts').select('*').order('name')
   if (error) {
     if (isMissingRelationError(error)) return { rows: [], missingTable: true }
     throw error
   }
-  return { rows: (data || []) as Account[], missingTable: false }
+  const rows = (data || []) as AccountRow[]
+  return {
+    rows: opts?.includeDeleted ? rows : (withoutSoftDeleted(rows) as AccountRow[]),
+    missingTable: false,
+  }
+}
+
+export async function softDeleteAccount(id: string): Promise<void> {
+  const { error } = await db
+    .from('accounts')
+    .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function restoreAccount(id: string): Promise<void> {
+  const { error } = await db
+    .from('accounts')
+    .update({ deleted_at: null, updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
 }
 
 export async function getAccount(id: string): Promise<Account | null> {
