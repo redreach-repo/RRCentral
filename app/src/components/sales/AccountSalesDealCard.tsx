@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { lostText } from '../../lib/dealRules'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { LOST_REASONS, isLostReason, lostText } from '../../lib/dealRules'
 import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { FileSignature, Plus } from 'lucide-react'
@@ -8,12 +8,68 @@ import MakeContractModal from './MakeContractModal'
 import SalesDealFormModal, { type SalesDealFormValues } from './SalesDealFormModal'
 import { listPackages } from '../../lib/deliveryStore'
 import { errorMessage } from '../../lib/errors'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import { formatAED } from '../../lib/money'
-import { canMakeContract, hasQuote, isSalesDealOverdue, quoteFirstYear, salesStageLabel } from '../../lib/salesPipeline'
+import { parseSalesDealForm } from '../../lib/schemas/salesDeal'
+import {
+  SALES_STAGES,
+  canMakeContract,
+  hasQuote,
+  isSalesDealOverdue,
+  quoteFirstYear,
+  salesStageLabel,
+} from '../../lib/salesPipeline'
 import { listSalesDeals, makeContractFromDeal, saveSalesDealForm } from '../../lib/salesPipelineStore'
-import type { Account, AppUser, DeliveryPackage, SalesDeal } from '../../lib/types'
+import type { Account, AppUser, DeliveryPackage, SalesDeal, SalesStage } from '../../lib/types'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
+
+const EXPORT_COLUMNS = [
+  'stage',
+  'source',
+  'package',
+  'option',
+  'monthly_fee',
+  'setup_fee',
+  'next_action',
+  'next_action_date',
+  'lost_reason',
+  'notes',
+] as const
+
+const STAGE_VALUES = new Set(SALES_STAGES.map((s) => s.value))
+const STAGE_BY_LABEL = new Map(SALES_STAGES.map((s) => [s.label.toLowerCase(), s.value]))
+
+function resolveStage(raw: string): SalesStage | '' {
+  const value = raw.trim()
+  if (!value) return ''
+  if (STAGE_VALUES.has(value as SalesStage)) return value as SalesStage
+  return STAGE_BY_LABEL.get(value.toLowerCase()) || ''
+}
+
+function parseLostFromExport(raw: string): { code: string; note: string } {
+  const text = raw.trim()
+  if (!text) return { code: '', note: '' }
+  const colon = text.indexOf(': ')
+  if (colon > 0) {
+    const code = text.slice(0, colon).trim()
+    const note = text.slice(colon + 2).trim()
+    if (isLostReason(code)) return { code, note: note || code }
+  }
+  if (isLostReason(text)) return { code: text, note: text }
+  // Match a known lost reason as a prefix (export uses "code: note").
+  for (const code of LOST_REASONS) {
+    if (text === code || text.startsWith(`${code}:`)) {
+      const note = text === code ? code : text.slice(code.length).replace(/^:\s*/, '').trim()
+      return { code, note: note || code }
+    }
+  }
+  return { code: '', note: text }
+}
+
+function resolveOption(raw: string): 'A' | 'B' {
+  const v = raw.trim().toUpperCase()
+  return v === 'B' ? 'B' : 'A'
+}
 
 type Props = {
   account: Account
@@ -33,6 +89,8 @@ export default function AccountSalesDealCard({ account, team, editable, canContr
   const [editing, setEditing] = useState<SalesDeal | null | undefined>(undefined)
   const [contractFor, setContractFor] = useState<SalesDeal | null>(null)
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     try {
@@ -79,6 +137,79 @@ export default function AccountSalesDealCard({ account, team, editable, canContr
     }
   }
 
+  async function importSalesDealsCsv(file: File) {
+    if (!editable) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows)
+      const today = format(new Date(), 'yyyy-MM-dd')
+      let saved = 0
+      let skipped = 0
+      for (const row of objects) {
+        const stage = resolveStage(String(row.stage || ''))
+        // Signed deals need Make contract; skip them on import.
+        if (!stage || stage === 'signed') {
+          skipped += 1
+          continue
+        }
+        const packageName = String(row.package || '').trim()
+        const pkg = packageName
+          ? packages.find((p) => p.name.trim().toLowerCase() === packageName.toLowerCase())
+          : undefined
+        const lost = parseLostFromExport(String(row.lost_reason || ''))
+        const nextAction = String(row.next_action || '').trim()
+        const nextActionDate = String(row.next_action_date || '').trim() || (stage !== 'lost' ? today : '')
+        const values: SalesDealFormValues = {
+          accountId: account.id,
+          newCompany: '',
+          stage,
+          source: String(row.source || '').trim(),
+          owner_user_id: account.owner_user_id ?? author.appUserId,
+          next_action: nextAction,
+          next_action_date: nextActionDate || null,
+          lost_reason: lost.note,
+          lost_reason_code: lost.code,
+          notes: String(row.notes || '').trim(),
+          discovery_call_date: null,
+          package_id: pkg?.id ?? null,
+          option: resolveOption(String(row.option || '')),
+          monthly_fee: Number(String(row.monthly_fee ?? '').replace(/,/g, '')) || 0,
+          setup_fee: Number(String(row.setup_fee ?? '').replace(/,/g, '')) || 0,
+          discount_percent: 0,
+          discount_months: 0,
+          start_date: null,
+          quote_reference: '',
+        }
+        const parsed = parseSalesDealForm(values)
+        if (!parsed.ok) {
+          skipped += 1
+          continue
+        }
+        await saveSalesDealForm(parsed.data, null, [], author)
+        saved += 1
+      }
+      if (!saved && skipped) {
+        showToast('No matching sales deal rows in CSV', 'error')
+        return
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} sales deal(s)${skipNote}`, 'success')
+      await load()
+      onChanged()
+    } catch (e) {
+      showToast(errorMessage(e, 'Sales deals CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   // Only prospects, or clients that came through the pipeline, get the card.
   if (missingTable || (deals.length === 0 && account.status !== 'prospect')) return null
 
@@ -88,6 +219,26 @@ export default function AccountSalesDealCard({ account, team, editable, canContr
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Sales deal</h2>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importSalesDealsCsv(file)
+            }}
+          />
+          {editable ? (
+            <button
+              type="button"
+              style={{ ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }}
+              disabled={importing}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
+          ) : null}
           {deals.length ? (
             <button
               type="button"
@@ -95,7 +246,7 @@ export default function AccountSalesDealCard({ account, team, editable, canContr
               onClick={() => {
                 exportListCsv(
                   `sales-deals-${account.id.slice(0, 8)}.csv`,
-                  ['stage', 'source', 'package', 'option', 'monthly_fee', 'setup_fee', 'next_action', 'next_action_date', 'lost_reason', 'notes'],
+                  [...EXPORT_COLUMNS],
                   deals.map((d) => {
                     const pkg = packages.find((p) => p.id === d.package_id)
                     return {
