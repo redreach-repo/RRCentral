@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Plus } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
 import { errorMessage } from '../../lib/errors'
 import { can } from '../../lib/permissions'
 import { createRecordRule, listRecordRules, type RecordRuleRow } from '../../lib/recordRulesStore'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -40,6 +40,8 @@ export default function RecordRulesSettingsCard() {
   const [rows, setRows] = useState<RecordRuleRow[]>([])
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState({ objectType: 'deal', name: '', scope: 'owner' })
 
   const load = useCallback(async () => {
@@ -76,30 +78,94 @@ export default function RecordRulesSettingsCard() {
     }
   }
 
+  async function importRulesCsv(file: File) {
+    if (!manage) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const existing = new Set(rows.map((r) => `${r.object_type}::${r.name}`.toLowerCase()))
+      let saved = 0
+      let skipped = 0
+      for (const row of objects) {
+        const objectType = String(row.object_type || row.objectType || '').trim()
+        const name = String(row.name || '').trim()
+        const scope = String(row.scope || 'owner').trim() || 'owner'
+        if (!objectType || !name) {
+          skipped += 1
+          continue
+        }
+        const key = `${objectType}::${name}`.toLowerCase()
+        if (existing.has(key)) {
+          skipped += 1
+          continue
+        }
+        await createRecordRule({ objectType, name, scope })
+        existing.add(key)
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} record rule(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Record rules CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <section id="record-rules" style={{ ...cardStyle, marginBottom: 16, scrollMarginTop: 72 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'start' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Record rules (stub)</h2>
-        <button
-          type="button"
-          style={buttonSecondaryStyle}
-          disabled={!rows.length}
-          onClick={() => {
-            exportListCsv(
-              'record-rules.csv',
-              ['name', 'object_type', 'scope', 'active'],
-              rows.map((r) => ({
-                name: r.name,
-                object_type: r.object_type,
-                scope: r.scope,
-                active: r.active ? 'yes' : 'no',
-              })),
-            )
-            showToast('Record rules CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importRulesCsv(file)
+            }}
+          />
+          {manage ? (
+            <button
+              type="button"
+              style={buttonSecondaryStyle}
+              disabled={importing}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={!rows.length}
+            onClick={() => {
+              exportListCsv(
+                'record-rules.csv',
+                ['name', 'object_type', 'scope', 'active'],
+                rows.map((r) => ({
+                  name: r.name,
+                  object_type: r.object_type,
+                  scope: r.scope,
+                  active: r.active ? 'yes' : 'no',
+                })),
+              )
+              showToast('Record rules CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </div>
       <p style={{ color: colors.muted, fontSize: 13, margin: '12px 0 12px', lineHeight: 1.5 }}>
         Visibility scopes evaluated in the app only — RLS is not rewritten yet. Admin viewers bypass
