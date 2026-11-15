@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { LifeBuoy, Plus } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -7,6 +7,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useCompactCrm } from '../hooks/useMediaQuery'
 import resp from '../styles/crmResponsive.module.css'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import StatusPill from '../components/StatusPill'
 import SlaBadge from '../components/support/SlaBadge'
 import TicketFormModal, { type TicketFormValues } from '../components/support/TicketFormModal'
@@ -15,6 +16,7 @@ import { ACCOUNT_TYPES, accountTypeLabel, canEditAccount, visibleAccounts } from
 import { listAccounts, listContacts, listTeam } from '../lib/accountsStore'
 import { slaState } from '../lib/sla'
 import {
+  TICKET_CHANNELS,
   TICKET_PRIORITIES,
   TICKET_STATUSES,
   isOpenTicket,
@@ -30,8 +32,9 @@ import {
   type TicketRow,
 } from '../lib/supportStore'
 import { errorMessage } from '../lib/errors'
-import { exportListCsv } from '../lib/listIo'
-import type { Account, AccountContact, AppUser } from '../lib/types'
+import { TICKETS_CSV_COLUMNS } from '../lib/ticketsCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
+import type { Account, AccountContact, AppUser, TicketChannel, TicketPriority } from '../lib/types'
 import {
   buttonSecondaryStyle,
   cardStyle,
@@ -68,11 +71,38 @@ export default function SupportPage() {
   const [saving, setSaving] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
   const [now, setNow] = useState(() => new Date())
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const status = searchParams.get('status') || 'open'
   const type = searchParams.get('type') || 'all'
   const priority = searchParams.get('priority') || 'all'
   const assignee = searchParams.get('assignee') || 'all'
+  const hasUrlFilters = Boolean(
+    searchParams.get('status') ||
+      searchParams.get('type') ||
+      searchParams.get('priority') ||
+      searchParams.get('assignee'),
+  )
+  const currentViewFilters = useMemo(
+    () => ({ status, type, priority, assignee }),
+    [status, type, priority, assignee],
+  )
+  const applyViewFilters = useCallback(
+    (raw: Record<string, unknown>) => {
+      const params = new URLSearchParams()
+      const nextStatus = String(raw.status || 'open')
+      const nextType = String(raw.type || 'all')
+      const nextPriority = String(raw.priority || 'all')
+      const nextAssignee = String(raw.assignee || 'all')
+      if (nextStatus !== 'open') params.set('status', nextStatus)
+      if (nextType !== 'all') params.set('type', nextType)
+      if (nextPriority !== 'all') params.set('priority', nextPriority)
+      if (nextAssignee !== 'all') params.set('assignee', nextAssignee)
+      setSearchParams(params, { replace: true })
+    },
+    [setSearchParams],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -181,6 +211,72 @@ export default function SupportPage() {
     }
   }
 
+  async function importTicketsCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of TICKETS_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, TICKETS_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid ticket rows', 'error')
+        return
+      }
+      const byName = new Map(
+        writableAccounts.map((a) => [a.name.trim().toLowerCase(), a] as const),
+      )
+      const priorityValues = new Set(TICKET_PRIORITIES.map((p) => p.value))
+      const channelValues = new Set(TICKET_CHANNELS.map((c) => c.value))
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        const account = byName.get(row.account.toLowerCase())
+        if (!account) {
+          skipped += 1
+          continue
+        }
+        const ticketPriority = (
+          priorityValues.has(row.priority as TicketPriority) ? row.priority : 'normal'
+        ) as TicketPriority
+        const channel = (
+          channelValues.has(row.channel as TicketChannel) ? row.channel : 'email'
+        ) as TicketChannel
+        const packageId = await slaPackageFor(account.id, account.type)
+        await createTicket(
+          {
+            accountId: account.id,
+            accountType: account.type,
+            packageId,
+            contactId: null,
+            subject: row.subject,
+            details: row.details || '',
+            channel,
+            priority: ticketPriority,
+            assigneeUserId: appUserId,
+          },
+          policies,
+          calendar,
+          { appUserId, email: user?.email || '' },
+        )
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} ticket(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Ticket CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   const canWrite = userRole !== 'viewer'
   const personName = (id: string | null) => {
     if (!id) return 'Nobody yet'
@@ -197,6 +293,27 @@ export default function SupportPage() {
           <p className={docsStyles.subtitle}>{t('page.support.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importTicketsCsv(file)
+            }}
+          />
+          {canWrite ? (
+            <button
+              type="button"
+              className={docsStyles.newBtn}
+              style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+              disabled={importing || !writableAccounts.length}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
+          ) : null}
           <button
             type="button"
             className={docsStyles.newBtn}
@@ -257,6 +374,22 @@ export default function SupportPage() {
           ) : null}
         </div>
       </header>
+
+      <SavedViewsBar
+        moduleId="support"
+        filters={currentViewFilters}
+        ownerUserId={appUserId}
+        canWrite={canWrite}
+        applyDefaultOnLoad={!hasUrlFilters}
+        onApply={applyViewFilters}
+        onToast={showToast}
+        filtersEqual={(a, b) =>
+          String(a.status || 'open') === String(b.status || 'open') &&
+          String(a.type || 'all') === String(b.type || 'all') &&
+          String(a.priority || 'all') === String(b.priority || 'all') &&
+          String(a.assignee || 'all') === String(b.assignee || 'all')
+        }
+      />
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
         {[

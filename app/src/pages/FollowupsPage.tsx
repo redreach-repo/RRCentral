@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { addDays, differenceInCalendarDays, format, parseISO, startOfDay } from 'date-fns'
 import { Bell, CalendarClock, Settings } from 'lucide-react'
@@ -46,7 +46,8 @@ import {
 import docsStyles from '../styles/docsList.module.css'
 import { logActivity } from '../lib/activity'
 import { errorMessage } from '../lib/errors'
-import { exportListCsv } from '../lib/listIo'
+import { FOLLOWUPS_CSV_COLUMNS } from '../lib/followupsCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 
 function daysLabel(dateStr: string, today: Date): string {
   const d = startOfDay(parseISO(dateStr.slice(0, 10)))
@@ -78,6 +79,70 @@ export default function FollowupsPage() {
   const [emailTarget, setEmailTarget] = useState<CrmEntry | null>(null)
   const [calendarSettingsOpen, setCalendarSettingsOpen] = useState(false)
   const [ownerFilter, setOwnerFilter] = useState('All')
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
+
+  async function importFollowupsCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of FOLLOWUPS_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, FOLLOWUPS_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid follow-up rows', 'error')
+        return
+      }
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        const date = row.follow_up_date.slice(0, 10)
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          skipped += 1
+          continue
+        }
+        const { data: matches, error: findErr } = await db
+          .from('crm')
+          .select('id, company_name')
+          .ilike('company_name', row.company_name)
+          .limit(5)
+        if (findErr) throw findErr
+        const exact = (matches || []).filter(
+          (m) => String(m.company_name || '').trim().toLowerCase() === row.company_name.toLowerCase(),
+        )
+        if (exact.length !== 1) {
+          skipped += 1
+          continue
+        }
+        const patch: Record<string, unknown> = {
+          follow_up_date: date,
+          updated_by: user?.email || '',
+          updated_at: new Date().toISOString(),
+        }
+        if (row.next_action) patch.next_action = row.next_action
+        if (row.owner) patch.owner = row.owner
+        if (row.pipeline_stage) patch.pipeline_stage = row.pipeline_stage
+        if (row.quote_ref) patch.quote_ref = row.quote_ref
+        const { error: updErr } = await db.from('crm').update(patch).eq('id', exact[0].id)
+        if (updErr) throw updErr
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Updated ${saved} follow-up(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Follow-ups CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
 
   async function openFollowUpWhatsApp(entry: CrmEntry) {
     const contacts = hydrateContacts(entry)
@@ -492,6 +557,25 @@ export default function FollowupsPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importFollowupsCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}
