@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Layers } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import { useSettings } from '../contexts/SettingsContext'
@@ -11,7 +11,7 @@ import {
   retireIndustryPack,
 } from '../lib/featureSliceStores'
 import { BUILTIN_INDUSTRY_PACKS, moduleFlagsForPack, packModuleHints } from '../lib/industryPacks'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
@@ -22,6 +22,8 @@ export default function IndustryPacksPage() {
   const [rows, setRows] = useState<Array<{ pack_key: string; name: string; description: string; version: string }>>([])
   const [tenant, setTenant] = useState<Awaited<ReturnType<typeof listTenantIndustryPacks>>>([])
   const [loading, setLoading] = useState(true)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -75,6 +77,50 @@ export default function IndustryPacksPage() {
     }
   }
 
+  async function importPacksCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const known = new Set(rows.map((r) => r.pack_key))
+      let activated = 0
+      let skipped = 0
+      for (const row of objects) {
+        const packKey = String(row.pack_key || row.key || '').trim()
+        const action = String(row.action || row.status || 'activate').trim().toLowerCase()
+        if (!packKey || !known.has(packKey)) {
+          skipped += 1
+          continue
+        }
+        if (action === 'retire' || action === 'retired') {
+          await retireIndustryPack(packKey)
+          activated += 1
+          continue
+        }
+        if (statusByKey.get(packKey) === 'active') {
+          skipped += 1
+          continue
+        }
+        await activateIndustryPack(packKey)
+        activated += 1
+      }
+      await refresh()
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Processed ${activated} pack row(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Industry packs CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
@@ -86,32 +132,53 @@ export default function IndustryPacksPage() {
             Module flags).
           </p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-          disabled={!rows.length}
-          onClick={() => {
-            exportListCsv(
-              'industry-packs.csv',
-              ['pack_key', 'name', 'version', 'status', 'description', 'modules'],
-              rows.map((r) => {
-                const builtin = BUILTIN_INDUSTRY_PACKS.find((p) => p.pack_key === r.pack_key)
-                return {
-                  pack_key: r.pack_key,
-                  name: r.name,
-                  version: r.version,
-                  status: statusByKey.get(r.pack_key) || 'available',
-                  description: r.description,
-                  modules: builtin ? packModuleHints(builtin) : 'general',
-                }
-              }),
-            )
-            showToast('Industry packs CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importPacksCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!rows.length || importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!rows.length}
+            onClick={() => {
+              exportListCsv(
+                'industry-packs.csv',
+                ['pack_key', 'name', 'version', 'status', 'description', 'modules'],
+                rows.map((r) => {
+                  const builtin = BUILTIN_INDUSTRY_PACKS.find((p) => p.pack_key === r.pack_key)
+                  return {
+                    pack_key: r.pack_key,
+                    name: r.name,
+                    version: r.version,
+                    status: statusByKey.get(r.pack_key) || 'available',
+                    description: r.description,
+                    modules: builtin ? packModuleHints(builtin) : 'general',
+                  }
+                }),
+              )
+              showToast('Industry packs CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </header>
 
       {loading ? (
