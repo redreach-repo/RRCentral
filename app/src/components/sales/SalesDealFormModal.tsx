@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import Modal from '../Modal'
 import EditorSectionTabs, {
@@ -11,7 +11,8 @@ import { SALES_STAGES, quoteFirstYear, quoteFromPackage } from '../../lib/salesP
 import type { SalesDealInput } from '../../lib/salesPipelineStore'
 import { parseSalesDealForm } from '../../lib/schemas/salesDeal'
 import type { Account, AppUser, DeliveryPackage, SalesDeal, SalesStage } from '../../lib/types'
-import { exportListCsv } from '../../lib/listIo'
+import { errorMessage } from '../../lib/errors'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import { useToast } from '../../contexts/ToastContext'
 import {
   buttonPrimaryStyle,
@@ -47,7 +48,22 @@ type Props = {
 }
 
 const today = () => format(new Date(), 'yyyy-MM-dd')
-const num = (raw: string) => Number(raw.replace(/,/g, '')) || 0
+const num = (raw: string) => Number(String(raw).replace(/,/g, '')) || 0
+
+function parseSalesStage(raw: string): SalesStage | null {
+  const token = raw.trim().toLowerCase()
+  if (!token) return null
+  const byValue = SALES_STAGES.find((s) => s.value === token)
+  if (byValue) return byValue.value
+  const byLabel = SALES_STAGES.find((s) => s.label.toLowerCase() === token)
+  return byLabel?.value ?? null
+}
+
+function parseOption(raw: string): 'A' | 'B' | null {
+  const token = raw.trim().toUpperCase()
+  if (token === 'A' || token === 'B') return token
+  return null
+}
 
 export default function SalesDealFormModal({
   open,
@@ -66,6 +82,8 @@ export default function SalesDealFormModal({
   const [v, setV] = useState<SalesDealFormValues | null>(null)
   const [error, setError] = useState('')
   const [editorSection, setEditorSection] = useState<EditorSection>('basics')
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -100,6 +118,7 @@ export default function SalesDealFormModal({
   const isOpen = v.stage !== 'signed' && v.stage !== 'lost'
   const signed = Boolean(deal?.contract_id)
   const stages = SALES_STAGES.filter((s) => s.value !== 'signed' || signed)
+  const accountLocked = Boolean(deal || lockedAccountId)
 
   function pickPackage(packageId: string, option: 'A' | 'B') {
     const pkg = packages.find((p) => p.id === packageId)
@@ -118,6 +137,140 @@ export default function SalesDealFormModal({
       return
     }
     onSave({ ...v, ...parsed.data })
+  }
+
+  async function importSalesDealCsv(file: File) {
+    if (!v) return
+    setImporting(true)
+    setError('')
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      if (!objects.length) {
+        showToast('No sales deal draft rows in CSV', 'error')
+        return
+      }
+
+      const next: SalesDealFormValues = {
+        accountId: v.accountId,
+        newCompany: v.newCompany,
+        stage: v.stage,
+        source: v.source,
+        owner_user_id: v.owner_user_id,
+        next_action: v.next_action,
+        next_action_date: v.next_action_date,
+        lost_reason: v.lost_reason,
+        lost_reason_code: v.lost_reason_code,
+        notes: v.notes,
+        discovery_call_date: v.discovery_call_date,
+        package_id: v.package_id,
+        option: v.option,
+        monthly_fee: v.monthly_fee,
+        setup_fee: v.setup_fee,
+        discount_percent: v.discount_percent,
+        discount_months: v.discount_months,
+        start_date: v.start_date,
+        quote_reference: v.quote_reference,
+      }
+      let applied = 0
+      const row = objects[0]
+      const has = (key: string) => Object.prototype.hasOwnProperty.call(row, key)
+      const aiAccounts = accounts.filter((a) => a.type === 'ai_crm_client')
+
+      if (!accountLocked && has('account_id')) {
+        const accountId = String(row.account_id ?? '').trim()
+        if (!accountId || aiAccounts.some((a) => a.id === accountId)) {
+          next.accountId = accountId
+          if (accountId) next.newCompany = ''
+          applied += 1
+        }
+      }
+      if (!accountLocked && has('new_company')) {
+        next.newCompany = String(row.new_company ?? '').trim()
+        applied += 1
+      }
+      if (has('stage')) {
+        const parsedStage = parseSalesStage(String(row.stage ?? ''))
+        if (parsedStage && (parsedStage !== 'signed' || signed)) {
+          next.stage = parsedStage
+          applied += 1
+        }
+      }
+      if (has('source')) {
+        next.source = String(row.source ?? '').trim()
+        applied += 1
+      }
+      if (has('owner_user_id')) {
+        const owner = String(row.owner_user_id ?? '').trim()
+        if (!owner || team.some((u) => u.id === owner)) {
+          next.owner_user_id = owner || null
+          applied += 1
+        }
+      }
+      if (has('next_action')) {
+        next.next_action = String(row.next_action ?? '').trim()
+        applied += 1
+      }
+      if (has('next_action_date')) {
+        next.next_action_date = String(row.next_action_date ?? '').trim() || null
+        applied += 1
+      }
+      if (has('package_id')) {
+        const packageId = String(row.package_id ?? '').trim()
+        if (!packageId || packages.some((p) => p.id === packageId)) {
+          next.package_id = packageId || null
+          applied += 1
+        }
+      }
+      if (has('option')) {
+        const option = parseOption(String(row.option ?? ''))
+        if (option) {
+          next.option = option
+          applied += 1
+        }
+      }
+      if (has('monthly_fee')) {
+        next.monthly_fee = num(String(row.monthly_fee ?? ''))
+        applied += 1
+      }
+      if (has('setup_fee')) {
+        next.setup_fee = num(String(row.setup_fee ?? ''))
+        applied += 1
+      }
+      if (has('discount_percent')) {
+        next.discount_percent = num(String(row.discount_percent ?? ''))
+        applied += 1
+      }
+      if (has('discount_months')) {
+        next.discount_months = num(String(row.discount_months ?? ''))
+        applied += 1
+      }
+      if (has('start_date')) {
+        next.start_date = String(row.start_date ?? '').trim() || null
+        applied += 1
+      }
+      if (has('notes')) {
+        next.notes = String(row.notes ?? '').trim()
+        applied += 1
+      }
+
+      if (!applied) {
+        showToast('No sales deal draft fields to import in CSV', 'error')
+        return
+      }
+      setV(next)
+      showToast(`Imported ${applied} sales deal draft field(s)`, 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Sales deal draft CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
   }
 
   return (
@@ -402,9 +555,28 @@ export default function SalesDealFormModal({
 
         {error ? <p style={{ color: colors.danger, margin: '0 0 10px', fontSize: 13 }}>{error}</p> : null}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importSalesDealCsv(file)
+            }}
+          />
           <button
             type="button"
             style={buttonSecondaryStyle}
+            disabled={importing || saving}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={importing || saving}
             onClick={() => {
               if (!v) return
               exportListCsv(
@@ -451,10 +623,10 @@ export default function SalesDealFormModal({
           >
             Export CSV
           </button>
-          <button type="button" style={buttonSecondaryStyle} onClick={onClose}>
+          <button type="button" style={buttonSecondaryStyle} onClick={onClose} disabled={importing || saving}>
             Cancel
           </button>
-          <button type="submit" style={buttonPrimaryStyle} disabled={saving}>
+          <button type="submit" style={buttonPrimaryStyle} disabled={saving || importing}>
             {saving ? 'Saving…' : deal ? 'Save deal' : 'Add deal'}
           </button>
         </div>
