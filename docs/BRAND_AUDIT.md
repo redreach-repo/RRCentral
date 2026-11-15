@@ -68,7 +68,7 @@ Light / dark / system via `themeMode` + `ThemeProvider`; applied before paint. C
 
 ## Theme studio
 
-First slice shipped: `/theme-studio` edits company `brand_kits` colours + logo paths with live CSS preview (`docs/theme-studio.md`). Fonts, density, and official SVG masters remain open.
+Theme studio ships company + BU kit editing with colours, logo paths, fonts, and density (`docs/theme-studio.md`). Official SVG masters remain open (asset zip).
 
 ## Out of scope this step (per prompt)
 

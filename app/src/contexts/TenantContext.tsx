@@ -11,6 +11,8 @@ import { useAuth } from './AuthContext'
 import { db } from '../lib/db'
 import {
   applyBrandCssVars,
+  BRAND_KIT_COLUMNS,
+  coerceBrandKit,
   REDREACH_DEFAULT_BRAND,
   type BrandKit,
 } from '../lib/brandKit'
@@ -127,13 +129,11 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
         const { data: kitRows } = await db
           .from('brand_kits')
-          .select(
-            'id, tenant_id, company_id, business_unit_id, primary_color, accent_color, neutral_dark, neutral_light, logo_horizontal_path, logo_light_path, mark_square_path, legal_footer',
-          )
+          .select(BRAND_KIT_COLUMNS)
           .is('business_unit_id', null)
           .order('company_id', { ascending: true, nullsFirst: false })
 
-        const kits = (kitRows || []) as BrandKit[]
+        const kits = (kitRows || []).map((row) => coerceBrandKit(row as BrandKit))
         const companyKit = kits.find((k) => k.company_id === pick)
         const tenantKit = kits.find((k) => k.company_id == null)
         setBrandKit(companyKit || tenantKit || REDREACH_DEFAULT_BRAND)

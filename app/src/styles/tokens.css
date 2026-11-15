@@ -40,6 +40,14 @@
   --radius: 10px;
   --radius-sm: 8px;
   --space-page: clamp(20px, 2.4vw, 32px);
+
+  /* Theme studio typography / density (overridden by brand kit CSS vars). */
+  --font-body: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --font-heading: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --rr-density: 1;
+  --space-control-y: calc(9px * var(--rr-density));
+  --space-control-x: calc(14px * var(--rr-density));
+  --space-card: calc(18px * var(--rr-density));
 }
 
 [data-theme='dark'] {
