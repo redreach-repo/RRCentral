@@ -12,6 +12,7 @@ describe('GUIDE_OPS_SECTIONS', () => {
       'templates',
       'domains',
       'purchaseOrders',
+      'clientPos',
     ])
   })
 

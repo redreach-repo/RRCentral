@@ -231,6 +231,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.ops.purchaseOrders.body':
       'Order from suppliers, receive into stock when the SKU matches, and archive finished POs with soft-delete.',
     'guide.ops.purchaseOrders.link': 'Open Purchase orders',
+    'guide.ops.clientPos.title': 'Client POs',
+    'guide.ops.clientPos.body':
+      'Customer purchase orders received against quotes — receipt and match without touching supplier POs.',
+    'guide.ops.clientPos.link': 'Open Client POs',
     'guide.finance.vendors.title': 'Vendors',
     'guide.finance.vendors.body':
       'Register suppliers, keep bank details honest, and link expenses or commitments back to the right vendor.',
@@ -1263,6 +1267,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.ops.purchaseOrders.body':
       'اطلب من الموردين، استلم في المخزون عند تطابق SKU، وأرشف أوامر الشراء المنتهية بالحذف الناعم.',
     'guide.ops.purchaseOrders.link': 'فتح أوامر الشراء',
+    'guide.ops.clientPos.title': 'أوامر شراء العميل',
+    'guide.ops.clientPos.body':
+      'أوامر شراء العملاء المستلمة مقابل عروض الأسعار — استلام ومطابقة دون المساس بأوامر الموردين.',
+    'guide.ops.clientPos.link': 'فتح أوامر شراء العميل',
     'guide.finance.vendors.title': 'الموردون',
     'guide.finance.vendors.body':
       'سجّل الموردين، حافظ على بيانات البنك صادقة، واربط المصروفات أو الالتزامات بالمورد الصحيح.',
