@@ -24,7 +24,15 @@ import {
   regionLabel,
   stageLabel,
 } from '../lib/ctrm'
-import { listCommissions, listDeals, logTouch, saveDealForm, updateDeal } from '../lib/ctrmStore'
+import {
+  listCommissions,
+  listDeals,
+  logTouch,
+  restoreCtrmDeal,
+  saveDealForm,
+  softDeleteCtrmDeal,
+  updateDeal,
+} from '../lib/ctrmStore'
 import { CTRM_DEALS_CSV_COLUMNS } from '../lib/ctrmDealsCsv'
 import { canViewField } from '../lib/fieldPermissions'
 import { lostText, stageMoveProblem } from '../lib/dealRules'
@@ -73,17 +81,19 @@ export default function CtrmPage() {
   const [losing, setLosing] = useState<{ deal: CtrmDeal; reason: string; code: string } | null>(null)
   const [saving, setSaving] = useState(false)
   const [dragId, setDragId] = useState<string | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
 
   const view = searchParams.get('view') === 'table' ? 'table' : 'board'
   const region = searchParams.get('region') || 'all'
   const owner = searchParams.get('owner') || 'all'
   const showCommission = canViewField(userRole, 'ctrm.commission')
   const author = useMemo(() => ({ appUserId, email: user?.email || '' }), [appUserId, user?.email])
+  const canWrite = userRole !== 'viewer'
 
   const load = useCallback(async () => {
     try {
       const [d, { rows }, people, allContacts, comm] = await Promise.all([
-        listDeals(),
+        listDeals(undefined, { includeDeleted: showArchived }),
         listAccounts(),
         listTeam(),
         listContacts(),
@@ -99,7 +109,7 @@ export default function CtrmPage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast, showCommission])
+  }, [showToast, showCommission, showArchived])
 
   useEffect(() => {
     void load()
@@ -231,7 +241,6 @@ export default function CtrmPage() {
     }
   }
 
-  const canWrite = userRole !== 'viewer'
   const editingDeal = editing?.deal ? { ...editing.deal, stage: editing.stage ?? editing.deal.stage } : null
 
   function nextLine(d: CtrmDeal) {
@@ -283,7 +292,7 @@ export default function CtrmPage() {
         </div>
         <div style={{ fontSize: 12 }}>{nextLine(d)}</div>
         <div style={{ fontSize: 11, color: colors.muted2 }}>{personName(d.owner_user_id)}</div>
-        {editable ? (
+        {editable && !d.deleted_at ? (
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <select
               aria-label={`Move ${nameOf(d)}`}
@@ -307,6 +316,42 @@ export default function CtrmPage() {
                 Touched
               </button>
             ) : null}
+          </div>
+        ) : null}
+        {canWrite ? (
+          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+            {d.deleted_at ? (
+              <button
+                type="button"
+                style={{ ...buttonSecondaryStyle, padding: '4px 8px', fontSize: 11 }}
+                onClick={() =>
+                  void restoreCtrmDeal(d.id)
+                    .then(() => {
+                      showToast('Deal restored', 'success')
+                      return load()
+                    })
+                    .catch((err) => showToast(errorMessage(err, 'Could not restore'), 'error'))
+                }
+              >
+                Restore
+              </button>
+            ) : (
+              <button
+                type="button"
+                style={{ ...buttonSecondaryStyle, padding: '4px 8px', fontSize: 11 }}
+                onClick={() => {
+                  if (!window.confirm(`Archive ${nameOf(d)}? Use Show archived to restore later.`)) return
+                  void softDeleteCtrmDeal(d.id)
+                    .then(() => {
+                      showToast('Deal archived', 'success')
+                      return load()
+                    })
+                    .catch((err) => showToast(errorMessage(err, 'Could not archive'), 'error'))
+                }}
+              >
+                Archive
+              </button>
+            )}
           </div>
         ) : null}
       </div>
@@ -333,11 +378,19 @@ export default function CtrmPage() {
             type="button"
             className={docsStyles.newBtn}
             style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
             disabled={!filtered.length}
             onClick={() => {
               exportListCsv(
                 'ctrm-deals.csv',
-                CTRM_DEALS_CSV_COLUMNS.map((c) => c.key),
+                [...CTRM_DEALS_CSV_COLUMNS.map((c) => c.key), 'archived'],
                 filtered.map((d) => ({
                   company: nameOf(d),
                   stage: d.stage,
@@ -347,6 +400,7 @@ export default function CtrmPage() {
                   next_action: d.next_action,
                   next_action_date: d.next_action_date || '',
                   last_touch_at: d.last_touch_at,
+                  archived: d.deleted_at ? '1' : '0',
                 })),
               )
               showToast('CTRM deals CSV downloaded', 'success')

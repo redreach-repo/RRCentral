@@ -1593,6 +1593,7 @@ export interface CtrmDeal {
   created_by: string
   created_at: string
   updated_at: string
+  deleted_at?: string | null
 }
 
 export interface CtrmStageChange {
