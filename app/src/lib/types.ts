@@ -1327,6 +1327,7 @@ export interface SalesDeal {
   created_by: string
   created_at: string
   updated_at: string
+  deleted_at?: string | null
 }
 
 /** One AI request made from RR Central, logged against the account (ai_usage_log). */
