@@ -5,6 +5,7 @@ import { ShieldAlert } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { itemsFor, WATCH_KIND_LABELS, type WatchRow } from '../../lib/watchdog'
 import { listOpenWatchItems } from '../../lib/watchdogStore'
+import { exportListCsv } from '../../lib/listIo'
 import { buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
 
 /**
@@ -36,9 +37,33 @@ export default function WatchdogCard() {
         <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
           <ShieldAlert size={18} /> Watchdog ({shown.length})
         </h2>
-        <button type="button" style={buttonSecondaryStyle} onClick={() => setMineOnly((m) => !m)}>
-          {mineOnly ? 'Show everyone’s' : 'Show mine only'}
-        </button>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={!shown.length}
+            onClick={() => {
+              exportListCsv(
+                'watchdog-items.csv',
+                ['title', 'kind', 'severity', 'reason', 'owner', 'first_seen_at', 'link'],
+                shown.map((r) => ({
+                  title: r.title,
+                  kind: WATCH_KIND_LABELS[r.kind] ?? r.kind,
+                  severity: r.severity,
+                  reason: r.reason,
+                  owner: r.owner_label || '',
+                  first_seen_at: r.first_seen_at || '',
+                  link: r.link || '',
+                })),
+              )
+            }}
+          >
+            Export CSV
+          </button>
+          <button type="button" style={buttonSecondaryStyle} onClick={() => setMineOnly((m) => !m)}>
+            {mineOnly ? 'Show everyone’s' : 'Show mine only'}
+          </button>
+        </div>
       </div>
       <p style={{ color: colors.muted, fontSize: 12, margin: '6px 0 10px' }}>
         Checked every morning at 07:30. An item clears itself the morning after its cause is fixed.
