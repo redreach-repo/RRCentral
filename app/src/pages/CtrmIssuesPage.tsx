@@ -1,15 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
+import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
+import SavedViewsBar from '../components/SavedViewsBar'
+import { useSupportConfig } from '../components/support/useSupportConfig'
 import { listAccounts, listTeam } from '../lib/accountsStore'
 import { CLIENT_UPDATE_DAYS, groupIssuesByClient, isCtrmIssue, needsClientUpdate, vendorStatusLabel } from '../lib/ctrmIssues'
 import { CTRM_ISSUES_CSV_COLUMNS } from '../lib/ctrmIssuesCsv'
 import { errorMessage } from '../lib/errors'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import { TICKET_STATUSES, isOpenTicket, optionLabel } from '../lib/support'
-import { listTickets } from '../lib/supportStore'
+import { createTicket, listTickets, slaPackageFor } from '../lib/supportStore'
 import type { Account, AppUser, Ticket } from '../lib/types'
 import { buttonSecondaryStyle, cardStyle, colors, pageStyle, pageSubtitleStyle, pageTitleStyle, sectionTitleStyle } from '../lib/uiStyles'
 
@@ -23,20 +26,26 @@ const muted = { color: colors.muted, fontSize: 13 }
  */
 export default function CtrmIssuesPage() {
   const { t } = useI18n()
+  const { appUserId, user } = useAuth()
   const { showToast } = useToast()
+  const { calendar, policies } = useSupportConfig()
   const [tickets, setTickets] = useState<Ticket[] | null>(null)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [team, setTeam] = useState<AppUser[]>([])
   const [showAll, setShowAll] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
+  const issuesViewFilters = useMemo(() => ({ show_all: showAll ? '1' : '0' }), [showAll])
+
+  async function load() {
+    const [list, a, u] = await Promise.all([listTickets(), listAccounts(), listTeam()])
+    setTickets(list.filter(isCtrmIssue))
+    setAccounts(a.rows)
+    setTeam(u)
+  }
 
   useEffect(() => {
-    Promise.all([listTickets(), listAccounts(), listTeam()])
-      .then(([list, a, u]) => {
-        setTickets(list.filter(isCtrmIssue))
-        setAccounts(a.rows)
-        setTeam(u)
-      })
-      .catch((e) => showToast(errorMessage(e, 'Could not load the issues'), 'error'))
+    load().catch((e) => showToast(errorMessage(e, 'Could not load the issues'), 'error'))
   }, [showToast])
 
   const now = useMemo(() => new Date(), [])
@@ -78,18 +87,102 @@ export default function CtrmIssuesPage() {
     [groups, team],
   )
 
+  async function importIssuesCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of CTRM_ISSUES_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, CTRM_ISSUES_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid CTRM issue rows', 'error')
+        return
+      }
+      const byName = new Map(accounts.map((a) => [a.name.trim().toLowerCase(), a] as const))
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        const account = byName.get((row.client || '').toLowerCase())
+        if (!account) {
+          skipped += 1
+          continue
+        }
+        const packageId = await slaPackageFor(account.id, account.type)
+        await createTicket(
+          {
+            accountId: account.id,
+            accountType: account.type,
+            packageId,
+            contactId: null,
+            subject: row.subject,
+            details: '',
+            channel: 'ctrm_next',
+            priority: 'normal',
+            assigneeUserId: appUserId,
+          },
+          policies,
+          calendar,
+          { appUserId, email: user?.email || '' },
+        )
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} CTRM issue(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'CTRM issues CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <div style={pageStyle}>
       <h1 style={pageTitleStyle}>{t('page.ctrmIssues.title')}</h1>
       <p style={pageSubtitleStyle}>
         {t('page.ctrmIssues.subtitle').replace('{days}', String(CLIENT_UPDATE_DAYS))}
       </p>
+      <SavedViewsBar
+        moduleId="ctrm_issues"
+        filters={issuesViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => setShowAll(String(f.show_all || '0') === '1')}
+        onToast={showToast}
+        filtersEqual={(a, b) => String(a.show_all || '0') === String(b.show_all || '0')}
+      />
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '12px 0 16px' }}>
         <button type="button" style={tab(!showAll)} onClick={() => setShowAll(false)}>
           {t('page.ctrmIssues.open').replace('{n}', String(openCount))}
         </button>
         <button type="button" style={tab(showAll)} onClick={() => setShowAll(true)}>
           {t('page.ctrmIssues.all')}
+        </button>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".csv,text/csv"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) void importIssuesCsv(file)
+          }}
+        />
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={importing}
+          onClick={() => importInputRef.current?.click()}
+        >
+          {importing ? 'Importing…' : 'Import CSV'}
         </button>
         <button
           type="button"
