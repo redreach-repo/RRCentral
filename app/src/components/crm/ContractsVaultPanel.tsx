@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Copy, ExternalLink, FileSignature, Plus, Send } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -13,9 +13,15 @@ import {
   listLegalDocuments,
   listSignLinks,
   revokeLegalSignLink,
+  updateLegalDocumentMeta,
   voidLegalDocument,
 } from '../../lib/legalDocumentStore'
-import { LEGAL_SIGN_STATE_LABELS, legalDocLabel, legalSignLinkState } from '../../lib/legalDocuments'
+import {
+  LEGAL_SIGN_STATE_LABELS,
+  legalDocLabel,
+  legalSignLinkState,
+  type LegalDocType,
+} from '../../lib/legalDocuments'
 import { buildNda, ndaFooter, templateInUse } from '../../lib/nda'
 import { blobToBase64, ndaPdf } from '../../lib/ndaPdf'
 import { listNdaTemplates } from '../../lib/ndaTemplateStore'
@@ -27,7 +33,7 @@ import {
   setObligationStatus,
 } from '../../lib/obligationBoardStore'
 import { parseObligationForm } from '../../lib/schemas/obligation'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows, type ColumnMap } from '../../lib/listIo'
 import { btn, btnGhost, btnPrimary, colors, input } from '../../lib/pageStyles'
 import type {
   ContractObligation,
@@ -38,9 +44,42 @@ import type {
   NdaTemplate,
 } from '../../lib/types'
 
+const CONTRACTS_VAULT_CSV_COLUMNS: ColumnMap[] = [
+  { key: 'title', label: 'title' },
+  { key: 'doc_type', label: 'doc_type' },
+  { key: 'status', label: 'status' },
+  { key: 'party_name', label: 'party_name', required: true },
+  { key: 'party_email', label: 'party_email' },
+  { key: 'created_at', label: 'created_at' },
+  { key: 'sent_at', label: 'sent_at' },
+  { key: 'signed_at', label: 'signed_at' },
+  { key: 'drive_url', label: 'drive_url' },
+]
+
+const CONTRACTS_VAULT_CSV_HEADERS = CONTRACTS_VAULT_CSV_COLUMNS.map((c) => c.key)
+
+const DOC_TYPES: LegalDocType[] = ['nda', 'service_agreement', 'other']
+
 function appBaseUrl(): string {
   const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
   return `${window.location.origin}${base}`
+}
+
+function vaultMatchKey(title: string, partyName: string, partyEmail: string): string {
+  const party = (partyEmail || partyName).trim().toLowerCase()
+  return `${title.trim().toLowerCase()}|${party}`
+}
+
+function parseDocType(raw: string): LegalDocType {
+  const v = raw.trim().toLowerCase().replace(/\s+/g, '_')
+  if ((DOC_TYPES as string[]).includes(v)) return v as LegalDocType
+  if (v === 'service' || v === 'agreement' || v === 'service-agreement') return 'service_agreement'
+  return 'nda'
+}
+
+function wantsVoid(status: string): boolean {
+  const v = status.trim().toLowerCase()
+  return v === 'void' || v === 'voided' || v === 'cancelled' || v === 'canceled'
 }
 
 export default function ContractsVaultPanel({
@@ -65,6 +104,8 @@ export default function ContractsVaultPanel({
   const [missingObligations, setMissingObligations] = useState(false)
   const [newDuty, setNewDuty] = useState('')
   const [newDue, setNewDue] = useState('')
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const approved = useMemo(() => templateInUse(templates), [templates])
   const openDuties = useMemo(() => filterOpenObligations(obligations), [obligations])
@@ -128,6 +169,124 @@ export default function ContractsVaultPanel({
       showToast(errorMessage(e, 'Could not create the NDA.'), 'error')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function importContractsCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of CONTRACTS_VAULT_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, CONTRACTS_VAULT_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid contract rows', 'error')
+        return
+      }
+
+      const working = [...rows]
+      const byKey = new Map<string, LegalDocument>()
+      for (const doc of working) {
+        byKey.set(vaultMatchKey(doc.title, doc.party_name, doc.party_email), doc)
+      }
+
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        const partyName = row.party_name.trim()
+        const partyEmail = (row.party_email || '').trim()
+        const title = (row.title || '').trim() || 'Non-disclosure agreement'
+        const docType = parseDocType(row.doc_type || 'nda')
+        const driveUrl = (row.drive_url || '').trim()
+        const key = vaultMatchKey(title, partyName, partyEmail)
+        const existing = byKey.get(key)
+
+        if (existing) {
+          if (existing.status === 'signed') {
+            skipped += 1
+            continue
+          }
+          if (wantsVoid(row.status || '')) {
+            if (existing.status === 'void') {
+              skipped += 1
+              continue
+            }
+            await voidLegalDocument(existing.id)
+            byKey.set(key, { ...existing, status: 'void' })
+            saved += 1
+            continue
+          }
+          if (existing.status === 'void') {
+            skipped += 1
+            continue
+          }
+          await updateLegalDocumentMeta(existing.id, {
+            title,
+            docType,
+            partyName,
+            partyEmail,
+            driveUrl,
+          })
+          byKey.set(key, {
+            ...existing,
+            title,
+            doc_type: docType,
+            party_name: partyName,
+            party_email: partyEmail,
+            drive_url: driveUrl,
+          })
+          saved += 1
+          continue
+        }
+
+        if (wantsVoid(row.status || '')) {
+          skipped += 1
+          continue
+        }
+
+        const created = await createLegalDocument({
+          companyName: entry.company_name,
+          crmId: entry.id,
+          docType,
+          title,
+          partyName,
+          partyEmail,
+          partyCompany: entry.company_name,
+          templateId: approved?.id || null,
+          templateVersion: approved?.version ?? null,
+          createdBy: user?.email || '',
+        })
+        if (driveUrl) {
+          await updateLegalDocumentMeta(created.id, { driveUrl })
+          created.drive_url = driveUrl
+        }
+        byKey.set(key, created)
+        working.push(created)
+        saved += 1
+      }
+
+      if (!saved && skipped) {
+        showToast('No matching contract rows to import in CSV', 'error')
+        return
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} contract row(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Contracts CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
     }
   }
 
@@ -211,6 +370,24 @@ export default function ContractsVaultPanel({
             placeholder="optional"
           />
         </label>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".csv,text/csv"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) void importContractsCsv(file)
+          }}
+        />
+        <button
+          type="button"
+          style={btn}
+          disabled={importing || busy}
+          onClick={() => importInputRef.current?.click()}
+        >
+          {importing ? 'Importing…' : 'Import CSV'}
+        </button>
         <button
           type="button"
           style={btn}
@@ -218,17 +395,7 @@ export default function ContractsVaultPanel({
           onClick={() => {
             exportListCsv(
               `contracts-${entry.company_name || 'vault'}.csv`,
-              [
-                'title',
-                'doc_type',
-                'status',
-                'party_name',
-                'party_email',
-                'created_at',
-                'sent_at',
-                'signed_at',
-                'drive_url',
-              ],
+              CONTRACTS_VAULT_CSV_HEADERS,
               rows.map((d) => ({
                 title: d.title,
                 doc_type: d.doc_type,
