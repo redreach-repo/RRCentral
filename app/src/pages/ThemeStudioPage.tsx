@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Palette } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import { useTenant } from '../contexts/TenantContext'
@@ -9,12 +9,22 @@ import {
   applyBrandCssVars,
   brandAssetUrl,
   brandKitToDraft,
+  BRAND_DENSITY_OPTIONS,
+  BRAND_FONT_OPTIONS,
   BRAND_PRESETS,
+  coerceBrandKit,
   contrastRatio,
+  fontStack,
   REDREACH_DEFAULT_BRAND,
+  type BrandKit,
   type BrandKitDraft,
 } from '../lib/brandKit'
-import { saveCompanyBrandKit } from '../lib/brandKitStore'
+import {
+  listBrandKitsForCompany,
+  listCompanyBusinessUnits,
+  saveBrandKit,
+  type BusinessUnitRow,
+} from '../lib/brandKitStore'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -22,31 +32,97 @@ import {
   colors,
   inputStyle,
   labelStyle,
+  selectStyle,
 } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
-/** §5.3 first slice: edit company brand kit colours + logo paths with live preview. */
+const COMPANY_SCOPE = '__company__'
+
+/** §5.3 deepen: company + BU kits, fonts, density, live preview. */
 export default function ThemeStudioPage() {
   const { showToast } = useToast()
   const { isLocalMode } = useAuth()
   const { tenantId, activeCompany, brandKit, setBrandKit } = useTenant()
+  const [scopeId, setScopeId] = useState(COMPANY_SCOPE)
+  const [units, setUnits] = useState<BusinessUnitRow[]>([])
+  const [kits, setKits] = useState<BrandKit[]>([])
+  const [editingKit, setEditingKit] = useState<BrandKit>(brandKit)
   const [draft, setDraft] = useState<BrandKitDraft>(() => brandKitToDraft(brandKit))
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    setDraft(brandKitToDraft(brandKit))
-  }, [brandKit])
+  const loadScoped = useCallback(async () => {
+    if (!activeCompany?.id || isLocalMode) {
+      setUnits([])
+      setKits([])
+      setEditingKit(brandKit)
+      setDraft(brandKitToDraft(brandKit))
+      setScopeId(COMPANY_SCOPE)
+      return
+    }
+    try {
+      const [buRows, kitRows] = await Promise.all([
+        listCompanyBusinessUnits(activeCompany.id),
+        listBrandKitsForCompany(activeCompany.id),
+      ])
+      setUnits(buRows)
+      setKits(kitRows)
+      const companyKit =
+        kitRows.find((k) => k.business_unit_id == null) ||
+        (brandKit.company_id === activeCompany.id ? brandKit : REDREACH_DEFAULT_BRAND)
+      setEditingKit(companyKit)
+      setDraft(brandKitToDraft(companyKit))
+      setScopeId(COMPANY_SCOPE)
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not load business units'), 'error')
+    }
+  }, [activeCompany?.id, brandKit, isLocalMode, showToast])
 
-  // Live preview while editing (reverts if user navigates away without save via TenantContext reload on remount).
+  useEffect(() => {
+    void loadScoped()
+  }, [loadScoped])
+
+  function onScopeChange(next: string) {
+    setScopeId(next)
+    if (next === COMPANY_SCOPE) {
+      const companyKit =
+        kits.find((k) => k.business_unit_id == null) ||
+        (brandKit.company_id === activeCompany?.id ? brandKit : REDREACH_DEFAULT_BRAND)
+      setEditingKit(companyKit)
+      setDraft(brandKitToDraft(companyKit))
+      return
+    }
+    const existing = kits.find((k) => k.business_unit_id === next)
+    if (existing) {
+      setEditingKit(existing)
+      setDraft(brandKitToDraft(existing))
+      return
+    }
+    const base = kits.find((k) => k.business_unit_id == null) || brandKit
+    const blank = coerceBrandKit({
+      ...base,
+      id: undefined,
+      business_unit_id: next,
+      company_id: activeCompany?.id || base.company_id,
+    })
+    setEditingKit(blank)
+    setDraft(brandKitToDraft(blank))
+  }
+
+  // Live preview while editing.
   useEffect(() => {
     applyBrandCssVars({
-      ...brandKit,
-      primary_color: draft.primary_color || brandKit.primary_color,
-      accent_color: draft.accent_color || brandKit.accent_color,
-      neutral_dark: draft.neutral_dark || brandKit.neutral_dark,
-      neutral_light: draft.neutral_light || brandKit.neutral_light,
+      ...editingKit,
+      primary_color: draft.primary_color || editingKit.primary_color,
+      accent_color: draft.accent_color || editingKit.accent_color,
+      neutral_dark: draft.neutral_dark || editingKit.neutral_dark,
+      neutral_light: draft.neutral_light || editingKit.neutral_light,
+      fonts: {
+        heading: draft.heading_font,
+        body: draft.body_font,
+        density: draft.density,
+      },
     })
-  }, [draft, brandKit])
+  }, [draft, editingKit])
 
   const primaryOnLight = useMemo(
     () => contrastRatio(draft.primary_color || '#000', draft.neutral_light || '#fff'),
@@ -64,7 +140,14 @@ export default function ThemeStudioPage() {
   function applyPreset(key: string) {
     const preset = BRAND_PRESETS.find((p) => p.key === key)
     if (!preset) return
-    setDraft((d) => ({ ...d, ...preset.kit }))
+    const { fonts, ...colorsOnly } = preset.kit
+    setDraft((d) => ({
+      ...d,
+      ...colorsOnly,
+      heading_font: fonts?.heading || d.heading_font,
+      body_font: fonts?.body || d.body_font,
+      density: fonts?.density || d.density,
+    }))
   }
 
   function resetDefaults() {
@@ -76,30 +159,38 @@ export default function ThemeStudioPage() {
       showToast('No active company to save a brand kit for', 'error')
       return
     }
+    const buId = scopeId === COMPANY_SCOPE ? null : scopeId
     if (isLocalMode) {
-      const local = {
-        ...brandKit,
-        ...draft,
+      const local = coerceBrandKit({
+        ...editingKit,
+        ...draftToLocal(draft),
         tenant_id: tenantId,
         company_id: activeCompany.id,
-        logo_horizontal_path: draft.logo_horizontal_path || null,
-        logo_light_path: draft.logo_light_path || null,
-        mark_square_path: draft.mark_square_path || null,
-      }
-      setBrandKit(local)
-      showToast('Brand kit applied locally (not persisted)', 'success')
+        business_unit_id: buId,
+      })
+      setEditingKit(local)
+      if (!buId) setBrandKit(local)
+      showToast(buId ? 'BU kit applied locally (not persisted)' : 'Brand kit applied locally (not persisted)', 'success')
       return
     }
     setSaving(true)
     try {
-      const saved = await saveCompanyBrandKit({
+      const saved = await saveBrandKit({
         tenantId,
         companyId: activeCompany.id,
+        businessUnitId: buId,
         draft,
-        existingId: brandKit.company_id === activeCompany.id ? brandKit.id : null,
+        existingId: editingKit.id || null,
       })
-      setBrandKit(saved)
-      showToast('Brand kit saved', 'success')
+      setEditingKit(saved)
+      setKits((prev) => {
+        const others = prev.filter((k) =>
+          buId ? k.business_unit_id !== buId : k.business_unit_id != null,
+        )
+        return [...others, saved]
+      })
+      if (!buId) setBrandKit(saved)
+      showToast(buId ? 'Business unit kit saved' : 'Company brand kit saved', 'success')
     } catch (e) {
       showToast(errorMessage(e, 'Could not save brand kit'), 'error')
     } finally {
@@ -115,18 +206,40 @@ export default function ThemeStudioPage() {
     )
   }
 
+  const scopeLabel =
+    scopeId === COMPANY_SCOPE
+      ? activeCompany.name
+      : units.find((u) => u.id === scopeId)?.name || 'Business unit'
+
   return (
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Theme studio · §5.3 slice</p>
+          <p className={docsStyles.kicker}>Theme studio · §5.3</p>
           <h1 className={docsStyles.title}>Brand kit</h1>
           <p className={docsStyles.subtitle}>
-            Colours and logo paths for <strong>{activeCompany.name}</strong>. Fonts and full layout studio stay later.
-            Official SVG masters still wait on the asset zip.
+            Colours, fonts, density, and logo paths for <strong>{scopeLabel}</strong>. Official SVG masters still wait
+            on the asset zip.
           </p>
         </div>
       </header>
+
+      <div style={{ marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'end' }}>
+        <label style={labelStyle}>
+          Scope
+          <select style={selectStyle} value={scopeId} onChange={(e) => onScopeChange(e.target.value)}>
+            <option value={COMPANY_SCOPE}>Company · {activeCompany.name}</option>
+            {units.map((u) => (
+              <option key={u.id} value={u.id}>
+                BU · {u.code} {u.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {isLocalMode ? (
+          <span style={{ fontSize: 12, color: colors.muted }}>Local mode — BU list unavailable from DB</span>
+        ) : null}
+      </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
         {BRAND_PRESETS.map((p) => (
@@ -176,6 +289,50 @@ export default function ThemeStudioPage() {
             </label>
           ))}
 
+          <strong style={{ marginTop: 8 }}>Typography & density</strong>
+          <label style={labelStyle}>
+            Heading font
+            <select
+              style={selectStyle}
+              value={draft.heading_font}
+              onChange={(e) => patch('heading_font', e.target.value as BrandKitDraft['heading_font'])}
+            >
+              {BRAND_FONT_OPTIONS.map((f) => (
+                <option key={f.key} value={f.key}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={labelStyle}>
+            Body font
+            <select
+              style={selectStyle}
+              value={draft.body_font}
+              onChange={(e) => patch('body_font', e.target.value as BrandKitDraft['body_font'])}
+            >
+              {BRAND_FONT_OPTIONS.map((f) => (
+                <option key={f.key} value={f.key}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={labelStyle}>
+            UI density
+            <select
+              style={selectStyle}
+              value={draft.density}
+              onChange={(e) => patch('density', e.target.value as BrandKitDraft['density'])}
+            >
+              {BRAND_DENSITY_OPTIONS.map((d) => (
+                <option key={d.key} value={d.key}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <strong style={{ marginTop: 8 }}>Assets</strong>
           <label style={labelStyle}>
             Logo (horizontal path or URL)
@@ -200,7 +357,7 @@ export default function ThemeStudioPage() {
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button type="submit" style={buttonPrimaryStyle} disabled={saving}>
-              {saving ? 'Saving…' : 'Save brand kit'}
+              {saving ? 'Saving…' : scopeId === COMPANY_SCOPE ? 'Save company kit' : 'Save BU kit'}
             </button>
           </div>
           <p style={{ margin: 0, fontSize: 12, color: colors.muted }}>
@@ -217,18 +374,29 @@ export default function ThemeStudioPage() {
               border: `1px solid ${colors.border}`,
               background: draft.neutral_light,
               color: draft.neutral_dark,
+              fontFamily: fontStack(draft.body_font),
+              padding: `calc(12px * var(--rr-density, 1))`,
             }}
           >
-            <div style={{ background: draft.primary_color, color: draft.neutral_light, padding: '14px 16px', fontWeight: 600 }}>
-              {activeCompany.name}
+            <div
+              style={{
+                background: draft.primary_color,
+                color: draft.neutral_light,
+                padding: `calc(14px * var(--rr-density, 1)) calc(16px * var(--rr-density, 1))`,
+                fontWeight: 600,
+                fontFamily: fontStack(draft.heading_font),
+              }}
+            >
+              {scopeLabel}
             </div>
-            <div style={{ padding: 16, display: 'grid', gap: 10 }}>
+            <div style={{ padding: `calc(16px * var(--rr-density, 1))`, display: 'grid', gap: `calc(10px * var(--rr-density, 1))` }}>
               <img
-                src={brandAssetUrl(draft.logo_horizontal_path || brandKit.logo_horizontal_path)}
+                src={brandAssetUrl(draft.logo_horizontal_path || editingKit.logo_horizontal_path)}
                 alt=""
                 style={{ maxHeight: 40, maxWidth: '100%', objectFit: 'contain' }}
               />
-              <p style={{ margin: 0, fontSize: 14 }}>Sample body text on neutral light.</p>
+              <h3 style={{ margin: 0, fontFamily: fontStack(draft.heading_font), fontSize: 18 }}>Heading sample</h3>
+              <p style={{ margin: 0, fontSize: 14 }}>Sample body text on neutral light · density {draft.density}.</p>
               <button
                 type="button"
                 style={{
@@ -236,6 +404,7 @@ export default function ThemeStudioPage() {
                   background: draft.accent_color,
                   borderColor: draft.accent_color,
                   justifySelf: 'start',
+                  padding: `var(--space-control-y, 9px) var(--space-control-x, 14px)`,
                 }}
               >
                 Accent action
@@ -247,4 +416,22 @@ export default function ThemeStudioPage() {
       </div>
     </div>
   )
+}
+
+function draftToLocal(draft: BrandKitDraft) {
+  return {
+    primary_color: draft.primary_color,
+    accent_color: draft.accent_color,
+    neutral_dark: draft.neutral_dark,
+    neutral_light: draft.neutral_light,
+    logo_horizontal_path: draft.logo_horizontal_path || null,
+    logo_light_path: draft.logo_light_path || null,
+    mark_square_path: draft.mark_square_path || null,
+    legal_footer: draft.legal_footer,
+    fonts: {
+      heading: draft.heading_font,
+      body: draft.body_font,
+      density: draft.density,
+    },
+  }
 }

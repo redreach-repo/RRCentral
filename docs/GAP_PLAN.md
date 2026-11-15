@@ -31,7 +31,7 @@ Status key: **exists** · **partial** · **missing**
 | Company switcher | partial | M1 top-bar switcher; multi-company ops still thin |
 | EN+AR RTL | partial | M1 `I18nContext` + dir; guide + shell/nav + sales/finance/clients/admin/ops/delivery list chrome (Dashboard → Domains through Wanders, Settings/Account, CTRM weekly summary, ticket + account detail, CTRM fit sheet, quote/invoice/DN viewer, legal e-sign + quote-accept + client portal + monthly client report + Wanders tour-ops + monthly reports + weekly updates queue + client health + module-flags Settings card + CTRM issues + obligations board + clause library + NDA template + build templates + agreement template + domains + app errors + Settings section chrome); more page bodies later |
 | PWA installable | partial | Icons + maskable safe-zone from brand mark; theme `#C8321A`; still missing division logos |
-| Brand kits per tenant/company/BU | partial | M1 `brand_kits` + Theme studio company editor; missing Boost/Care/Trading assets + BU UI |
+| Brand kits per tenant/company/BU | partial | M1 `brand_kits` + Theme studio company/BU editor (fonts + density); missing Boost/Care/Trading SVG assets + active-BU chrome switch |
 | In-app guide `/guide` | partial | CRM + billing + delivery + ops + finance + admin packs live (`GUIDE_PACKS`); more packs / AR polish later |
 
 ---

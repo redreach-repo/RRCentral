@@ -46,7 +46,7 @@ export const cardStyle: CSSProperties = {
   background: colors.card,
   border: `1px solid ${colors.border}`,
   borderRadius: 10,
-  padding: 18,
+  padding: 'var(--space-card, 18px)',
 }
 
 export const pageTitleStyle: CSSProperties = {
