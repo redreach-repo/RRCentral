@@ -73,3 +73,24 @@ if [[ $pipelines_rc -ne 0 ]] || grep -q "PIPELINES TEST FAILED\|ERROR:" /tmp/pip
   exit 1
 fi
 echo "Pipelines tests passed"
+
+# Gap plan modules (docs/MODULE_BUILD_PLAN.md): every tests/modules/*_test.sql
+# runs here, so a module PR adds its own file and never edits this script.
+# A file fails on any ERROR or a NOTICE containing "TEST FAILED".
+shopt -s nullglob
+for t in tests/modules/*_test.sql; do
+  name="$(basename "$t" .sql)"
+  echo "Running module test $name…"
+  set +e
+  "${PSQL[@]}" -d "$DB" -f "$t" > "/tmp/${name}_out.txt" 2>&1
+  rc=$?
+  set -e
+  sed -n "s/.*NOTICE:  //p" "/tmp/${name}_out.txt" || true
+  if [[ $rc -ne 0 ]] || grep -q "TEST FAILED\|ERROR:" "/tmp/${name}_out.txt"; then
+    echo "Module test $name failed — full output:" >&2
+    cat "/tmp/${name}_out.txt" >&2
+    exit 1
+  fi
+  echo "Module test $name passed"
+done
+shopt -u nullglob

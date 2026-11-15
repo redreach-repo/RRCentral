@@ -3,8 +3,8 @@ import { HIDE_PIPELINE_DETAIL_NAV_KEY } from '../lib/pipelineDetailNav'
 import { APP_MODULES, moduleIdForPath, titleForPath, visibleAppModules } from './nav'
 
 describe('APP_MODULES', () => {
-  it('lists the shell sections in order', () => {
-    expect(APP_MODULES.map((m) => m.id)).toEqual([
+  it('lists the core shell sections in order (gap plan extension groups follow)', () => {
+    expect(APP_MODULES.slice(0, 12).map((m) => m.id)).toEqual([
       'overview',
       'sales',
       'clients',
