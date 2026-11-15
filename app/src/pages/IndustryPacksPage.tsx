@@ -11,6 +11,7 @@ import {
   retireIndustryPack,
 } from '../lib/featureSliceStores'
 import { BUILTIN_INDUSTRY_PACKS, moduleFlagsForPack, packModuleHints } from '../lib/industryPacks'
+import { exportListCsv } from '../lib/listIo'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
@@ -85,6 +86,32 @@ export default function IndustryPacksPage() {
             Module flags).
           </p>
         </div>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+          disabled={!rows.length}
+          onClick={() => {
+            exportListCsv(
+              'industry-packs.csv',
+              ['pack_key', 'name', 'version', 'status', 'description', 'modules'],
+              rows.map((r) => {
+                const builtin = BUILTIN_INDUSTRY_PACKS.find((p) => p.pack_key === r.pack_key)
+                return {
+                  pack_key: r.pack_key,
+                  name: r.name,
+                  version: r.version,
+                  status: statusByKey.get(r.pack_key) || 'available',
+                  description: r.description,
+                  modules: builtin ? packModuleHints(builtin) : 'general',
+                }
+              }),
+            )
+            showToast('Industry packs CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
       </header>
 
       {loading ? (
