@@ -21,6 +21,7 @@ import {
   type PipelineOutcome,
   type PipelineStage,
 } from '../../lib/pipelines'
+import { exportListCsv } from '../../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -177,12 +178,37 @@ export default function PipelinesSettingsCard() {
     <div id="pipelines" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.settings.section.pipelines')}</h2>
-        {manage && selected ? (
-          <button type="button" style={buttonPrimaryStyle} onClick={openCreate}>
-            <Plus size={16} style={{ marginRight: 6 }} />
-            Add stage
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={!stages.length}
+            onClick={() => {
+              exportListCsv(
+                `pipeline-${selected?.pipeline_key || 'stages'}-stages.csv`,
+                ['pipeline_key', 'stage_key', 'label', 'color', 'outcome', 'sort_order', 'active'],
+                stages.map((s) => ({
+                  pipeline_key: selected?.pipeline_key || '',
+                  stage_key: s.stage_key,
+                  label: s.label,
+                  color: s.color || '',
+                  outcome: s.outcome,
+                  sort_order: s.sort_order,
+                  active: s.active ? 'yes' : 'no',
+                })),
+              )
+              showToast('Pipeline stages CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
           </button>
-        ) : null}
+          {manage && selected ? (
+            <button type="button" style={buttonPrimaryStyle} onClick={openCreate}>
+              <Plus size={16} style={{ marginRight: 6 }} />
+              Add stage
+            </button>
+          ) : null}
+        </div>
       </div>
       <p style={{ margin: '8px 0 14px', fontSize: 13, color: colors.muted, lineHeight: 1.45 }}>
         Tenant-defined stages with colour and outcome. CRM company stages are free text, so new CRM

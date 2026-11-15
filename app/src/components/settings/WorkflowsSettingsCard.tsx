@@ -21,6 +21,7 @@ import {
   type WorkflowTriggerType,
 } from '../../lib/workflows'
 import { startWorkflowRun } from '../../lib/workflowRunner'
+import { exportListCsv } from '../../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -205,12 +206,35 @@ export default function WorkflowsSettingsCard() {
     <div id="workflows" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.settings.section.workflows')}</h2>
-        {manage ? (
-          <button type="button" style={buttonPrimaryStyle} onClick={openCreate}>
-            <Plus size={16} style={{ marginRight: 6 }} />
-            Add approval chain
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={!rows.length}
+            onClick={() => {
+              exportListCsv(
+                'workflows.csv',
+                ['name', 'workflow_key', 'trigger_type', 'description', 'active'],
+                rows.map((r) => ({
+                  name: r.name,
+                  workflow_key: r.workflow_key,
+                  trigger_type: r.trigger_type,
+                  description: r.description || '',
+                  active: r.active ? 'yes' : 'no',
+                })),
+              )
+              showToast('Workflows CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
           </button>
-        ) : null}
+          {manage ? (
+            <button type="button" style={buttonPrimaryStyle} onClick={openCreate}>
+              <Plus size={16} style={{ marginRight: 6 }} />
+              Add approval chain
+            </button>
+          ) : null}
+        </div>
       </div>
       <p style={{ margin: '8px 0 14px', fontSize: 13, color: colors.muted, lineHeight: 1.45 }}>
         Define triggers and steps (approval → notify). Dry-run starts a workflow run without outbound

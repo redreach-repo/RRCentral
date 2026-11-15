@@ -11,8 +11,10 @@ import {
   serializeModuleFlags,
   withModuleFlag,
 } from '../../modules/registry'
+import { exportListCsv } from '../../lib/listIo'
 import {
   buttonPrimaryStyle,
+  buttonSecondaryStyle,
   cardStyle,
   colors,
   fieldStyle,
@@ -68,8 +70,28 @@ export default function ModuleFlagsCard() {
 
   return (
     <section id="module-flags" style={{ ...cardStyle, marginBottom: 16, scrollMarginTop: 72 }}>
-      <h2 style={sectionTitleStyle}>{t('page.settings.moduleFlags.title')}</h2>
-      <p style={{ color: colors.muted, fontSize: 13, margin: '0 0 12px', lineHeight: 1.5 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'start' }}>
+        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.settings.moduleFlags.title')}</h2>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          onClick={() => {
+            exportListCsv(
+              'module-flags.csv',
+              ['flag', 'label', 'enabled'],
+              SETTINGS_MODULE_FLAGS.map((row) => ({
+                flag: row.flag,
+                label: t(row.labelKey),
+                enabled: enabled[row.flag] !== false ? 'yes' : 'no',
+              })),
+            )
+            showToast('Module flags CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
+      </div>
+      <p style={{ color: colors.muted, fontSize: 13, margin: '12px 0 12px', lineHeight: 1.5 }}>
         {t('page.settings.moduleFlags.bodyLead')}{' '}
         <code style={{ fontSize: 12 }}>moduleFlags</code> {t('page.settings.moduleFlags.bodyMid')}{' '}
         <code style={{ fontSize: 12 }}>
