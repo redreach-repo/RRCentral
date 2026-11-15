@@ -898,6 +898,10 @@ export interface AccountContact {
   phone: string
   whatsapp: string
   is_primary: boolean
+  /** M10 marketing consent; optional until migration is applied. */
+  marketing_opt_in?: boolean
+  marketing_opt_in_at?: string | null
+  marketing_opt_in_source?: string
   created_at: string
 }
 

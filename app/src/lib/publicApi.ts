@@ -5,8 +5,10 @@
 
 export const PUBLIC_API_READ_SCOPES = [
   'read:accounts',
+  'read:contacts',
   'read:invoices',
   'read:quotations',
+  'read:tickets',
 ] as const
 
 export const PUBLIC_API_WRITE_SCOPES = [
@@ -21,8 +23,10 @@ export type PublicApiWriteScope = (typeof PUBLIC_API_WRITE_SCOPES)[number]
 /** Default scopes for newly minted keys — reads only; writes are opt-in. */
 export const DEFAULT_API_KEY_SCOPES: string[] = [
   'read:accounts',
+  'read:contacts',
   'read:invoices',
   'read:quotations',
+  'read:tickets',
 ]
 
 export const ACCOUNT_TYPES = ['ai_crm_client', 'worship_church', 'ctrm_prospect'] as const

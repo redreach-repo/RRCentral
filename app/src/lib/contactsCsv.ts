@@ -9,4 +9,5 @@ export const CONTACT_CSV_COLUMNS: ColumnMap[] = [
   { key: 'phone', label: 'phone' },
   { key: 'whatsapp', label: 'whatsapp' },
   { key: 'is_primary', label: 'is_primary' },
+  { key: 'marketing_opt_in', label: 'marketing_opt_in' },
 ]

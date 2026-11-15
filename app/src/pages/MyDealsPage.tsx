@@ -56,6 +56,7 @@ import {
   thStyle,
 } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
+import { exportListCsv } from '../lib/listIo'
 
 const VIEW_KEY = 'rr.myDeals.view'
 
@@ -612,6 +613,50 @@ export default function MyDealsPage() {
             ) : null}
           </p>
         </div>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+          disabled={!shown.length}
+          onClick={() => {
+            exportListCsv(
+              'pipeline-deals.csv',
+              [
+                'pipeline',
+                'account',
+                'deal',
+                'stage',
+                'value',
+                'weighted',
+                'next_action',
+                'next_action_date',
+                'days_in_stage',
+                'owner',
+                'source',
+                'division',
+                'quote_ref',
+              ],
+              shown.map((d) => ({
+                pipeline: d.pipeline,
+                account: d.account,
+                deal: d.deal,
+                stage: d.stageLabel || d.stage,
+                value: d.value ?? '',
+                weighted: d.weighted ?? '',
+                next_action: d.next_action || '',
+                next_action_date: d.next_action_date || '',
+                days_in_stage: d.days_in_stage,
+                owner: d.owner_label || '',
+                source: d.source || '',
+                division: d.division || '',
+                quote_ref: d.quote_ref || '',
+              })),
+            )
+            showToast('Pipeline CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
       </header>
 
       {filterBar}

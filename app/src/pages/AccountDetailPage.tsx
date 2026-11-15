@@ -426,6 +426,9 @@ export default function AccountDetailPage() {
       let saved = 0
       for (const row of ok) {
         const primaryRaw = String(row.is_primary || '').toLowerCase()
+        const optRaw = String(row.marketing_opt_in || '').toLowerCase()
+        const marketing_opt_in =
+          optRaw === 'true' || optRaw === '1' || optRaw === 'yes'
         await saveContact(account.id, {
           name: row.name,
           role: row.role || '',
@@ -433,6 +436,9 @@ export default function AccountDetailPage() {
           phone: row.phone || '',
           whatsapp: row.whatsapp || '',
           is_primary: primaryRaw === 'true' || primaryRaw === '1' || primaryRaw === 'yes',
+          marketing_opt_in,
+          marketing_opt_in_at: marketing_opt_in ? new Date().toISOString() : null,
+          marketing_opt_in_source: marketing_opt_in ? 'csv_import' : '',
         })
         saved += 1
       }
@@ -654,7 +660,15 @@ export default function AccountDetailPage() {
               onClick={() => {
                 exportListCsv(
                   `contacts-${account?.reference || account?.id || 'account'}.csv`,
-                  ['name', 'role', 'email', 'phone', 'whatsapp', 'is_primary'],
+                  [
+                    'name',
+                    'role',
+                    'email',
+                    'phone',
+                    'whatsapp',
+                    'is_primary',
+                    'marketing_opt_in',
+                  ],
                   sortedContacts.map((c) => ({
                     name: c.name,
                     role: c.role || '',
@@ -662,6 +676,7 @@ export default function AccountDetailPage() {
                     phone: c.phone || '',
                     whatsapp: c.whatsapp || '',
                     is_primary: c.is_primary ? 'true' : 'false',
+                    marketing_opt_in: c.marketing_opt_in ? 'true' : 'false',
                   })),
                 )
                 showToast('Contacts CSV downloaded', 'success')
