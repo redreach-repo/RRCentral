@@ -4,7 +4,9 @@ import { addDays, format, parseISO, startOfDay } from 'date-fns'
 import { CalendarClock, ExternalLink, Loader2, Plus, RefreshCw, Settings } from 'lucide-react'
 import type { AppUser, CrmEntry } from '../lib/types'
 import { useSettings } from '../contexts/SettingsContext'
+import { useToast } from '../contexts/ToastContext'
 import { db } from '../lib/db'
+import { exportListCsv } from '../lib/listIo'
 import { hydrateContacts, primaryContact } from '../lib/contacts'
 import { getCalendarProvider } from '../lib/mailCalendar'
 import { enrichCalendarEvents, type CalendarEventRow } from '../lib/zohoCalendarMatch'
@@ -55,6 +57,7 @@ function kindBadge(kind: ScheduleKind): { label: string; color: string } {
 export default function ZohoCalendarPanel({ crmEntries }: Props) {
   const navigate = useNavigate()
   const { settings } = useSettings()
+  const { showToast } = useToast()
   const compact = useCompactCrm()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -252,6 +255,35 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
             onClick={() => setSettingsOpen(true)}
           >
             <Settings size={14} /> {compact ? 'Settings' : 'Calendar settings'}
+          </button>
+          <button
+            type="button"
+            style={{
+              ...buttonSecondaryStyle,
+              minHeight: compact ? 40 : undefined,
+              padding: compact ? '8px 12px' : buttonSecondaryStyle.padding,
+            }}
+            disabled={visible.length === 0}
+            onClick={() => {
+              exportListCsv(
+                'schedule.csv',
+                ['when', 'kind', 'title', 'detail', 'owner', 'crm', 'quote_ref', 'attendees', 'overdue'],
+                visible.map((r) => ({
+                  when: formatWhen(r),
+                  kind: r.kind,
+                  title: r.title,
+                  detail: r.detail,
+                  owner: r.owner,
+                  crm: r.crmName,
+                  quote_ref: r.quoteRef,
+                  attendees: r.attendees,
+                  overdue: r.overdue ? 'yes' : 'no',
+                })),
+              )
+              showToast('Schedule CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
           </button>
           <Link
             to="/follow-ups"
