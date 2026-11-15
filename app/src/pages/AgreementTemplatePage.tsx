@@ -28,6 +28,8 @@ import {
   listAgreementTemplates,
   saveAgreementDraft,
 } from '../lib/agreementStore'
+import { AGREEMENT_TEMPLATES_CSV_COLUMNS } from '../lib/legalTemplatesCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
 import { parseAgreementApproveForm, parseAgreementDraftForm } from '../lib/schemas/agreementTemplate'
@@ -64,7 +66,9 @@ export default function AgreementTemplatePage() {
   const [busy, setBusy] = useState(false)
   const [approving, setApproving] = useState<{ by: string; on: string; note: string } | null>(null)
   const [clauses, setClauses] = useState<ContractClause[]>([])
+  const [importing, setImporting] = useState(false)
   const textRef = useRef<HTMLTextAreaElement>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const statusLabel = (status: AgreementTemplate['status']) => {
     if (status === 'draft') return t('page.agreementTemplate.statusDraft')
@@ -161,11 +165,105 @@ export default function AgreementTemplatePage() {
 
   const author = user?.email ?? ''
 
+  async function importAgreementCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of AGREEMENT_TEMPLATES_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, AGREEMENT_TEMPLATES_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid agreement template rows', 'error')
+        return
+      }
+      let saved = 0
+      let skipped = errors.length
+      let lastId = ''
+      const existing = [...templates]
+      for (const row of ok) {
+        lastId = await saveAgreementDraft({ title: row.title, body: row.body }, author, existing)
+        const nextVersion = Math.max(0, ...existing.map((x) => x.version)) + 1
+        existing.push({
+          id: lastId,
+          version: nextVersion,
+          title: row.title,
+          body: row.body,
+          status: 'draft',
+          approved_by: '',
+          approved_at: null,
+          approval_note: '',
+          created_by: author,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} agreement draft(s)${skipNote}`, 'success')
+      await load(lastId || undefined)
+    } catch (e) {
+      showToast(errorMessage(e, 'Agreement CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <div style={pageStyle}>
-      <div>
-        <h1 style={pageTitleStyle}>{t('page.agreementTemplate.title')}</h1>
-        <p style={pageSubtitleStyle}>{t('page.agreementTemplate.subtitle')}</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <div>
+          <h1 style={pageTitleStyle}>{t('page.agreementTemplate.title')}</h1>
+          <p style={pageSubtitleStyle}>{t('page.agreementTemplate.subtitle')}</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importAgreementCsv(file)
+            }}
+          />
+          {canEdit && !missingTable ? (
+            <button
+              type="button"
+              style={smallBtn}
+              disabled={importing || busy}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            style={smallBtn}
+            disabled={!templates.length}
+            onClick={() => {
+              exportListCsv(
+                'agreement-templates.csv',
+                AGREEMENT_TEMPLATES_CSV_COLUMNS.map((c) => c.key),
+                templates.map((row) => ({
+                  title: row.title,
+                  body: row.body,
+                  status: row.status,
+                  version: row.version,
+                })),
+              )
+              showToast('Agreement templates CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </div>
 
       {missingTable ? (
