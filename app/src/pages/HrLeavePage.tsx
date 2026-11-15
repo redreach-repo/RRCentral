@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { CalendarDays } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import { errorMessage } from '../lib/errors'
 import { listHrEmployees, type HrEmployee } from '../lib/featureSliceStores'
 import { LEAVE_TYPES, leaveDaysInclusive, type LeaveType } from '../lib/hrLeave'
@@ -26,6 +28,7 @@ import docsStyles from '../styles/docsList.module.css'
 
 /** M6: leave requests (manager+). */
 export default function HrLeavePage() {
+  const { appUserId } = useAuth()
   const { showToast } = useToast()
   const [people, setPeople] = useState<HrEmployee[]>([])
   const [rows, setRows] = useState<HrLeaveRequest[]>([])
@@ -38,6 +41,7 @@ export default function HrLeavePage() {
   const [loading, setLoading] = useState(true)
   const [importing, setImporting] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
+  const leaveViewFilters = useMemo(() => ({ status: filter }), [filter])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -258,6 +262,17 @@ export default function HrLeavePage() {
               Submit
             </button>
           </form>
+
+          <SavedViewsBar
+            moduleId="hr_leave"
+            filters={leaveViewFilters}
+            ownerUserId={appUserId}
+            canWrite
+            applyDefaultOnLoad={false}
+            onApply={(f) => setFilter(String(f.status || 'pending'))}
+            onToast={showToast}
+            filtersEqual={(a, b) => String(a.status || 'pending') === String(b.status || 'pending')}
+          />
 
           <section style={cardStyle}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
