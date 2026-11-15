@@ -11,6 +11,7 @@ import {
   Bug,
   Building2,
   CalendarClock,
+  CalendarDays,
   ClipboardList,
   Contact,
   CopyCheck,
@@ -141,6 +142,7 @@ const CORE_MODULES: ModuleManifest[] = [
       { to: '/payments', label: 'Payments', icon: Banknote },
       { to: '/expenses', label: 'Expenses', icon: Wallet },
       { to: '/vendors', label: 'Vendors', icon: Building2 },
+      { to: '/ledger', label: 'Ledger', icon: BookOpen, minRole: 'manager' },
       { to: '/reports', label: 'Reports', icon: BarChart3 },
       { to: '/mrr', label: 'MRR', icon: TrendingUp, minRole: 'manager' },
       { to: '/insights', label: 'Utilisation', icon: Gauge, minRole: 'manager' },
@@ -152,7 +154,10 @@ const CORE_MODULES: ModuleManifest[] = [
     label: 'HR',
     icon: Users,
     flag: 'hr',
-    items: [{ to: '/hr/people', label: 'People', icon: Users, minRole: 'manager' }],
+    items: [
+      { to: '/hr/people', label: 'People', icon: Users, minRole: 'manager' },
+      { to: '/hr/leave', label: 'Leave', icon: CalendarDays, minRole: 'manager' },
+    ],
   },
   {
     id: 'payroll',

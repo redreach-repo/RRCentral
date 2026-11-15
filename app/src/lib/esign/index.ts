@@ -2,6 +2,8 @@ import {
   ESIGN_LEVEL_LABELS,
   QTSP_PROVIDER_OPTIONS,
   QTSP_PROVIDER_SETTING,
+  REQUIRED_ESIGN_LEVEL,
+  type EsignDocType,
   type EsignLevel,
   type QtspProvider,
   type QtspSignRequest,
@@ -13,6 +15,8 @@ export {
   ESIGN_LEVEL_LABELS,
   QTSP_PROVIDER_OPTIONS,
   QTSP_PROVIDER_SETTING,
+  REQUIRED_ESIGN_LEVEL,
+  type EsignDocType,
   type EsignLevel,
   type QtspProvider,
   type QtspProviderId,
@@ -25,6 +29,25 @@ const PROVIDERS: QtspProvider[] = [stubQtspProvider]
 /** Today's `/sign` canvas path — never AdES/QES. */
 export function currentCanvasEsignLevel(): EsignLevel {
   return 'assent_capture'
+}
+
+/** Level counsel would require for a doc type once QTSP exists. */
+export function requiredEsignLevelForDocType(docType: EsignDocType): EsignLevel {
+  return REQUIRED_ESIGN_LEVEL[docType] ?? 'assent_capture'
+}
+
+/**
+ * What the product may honestly offer right now for a doc type.
+ * Without a configured QTSP, always canvas assent — even if the matrix asks for AdES/QES.
+ */
+export function availableEsignLevelForDocType(
+  docType: EsignDocType,
+  settings: Record<string, string>,
+): EsignLevel {
+  const required = requiredEsignLevelForDocType(docType)
+  if (required === 'assent_capture') return 'assent_capture'
+  if (!qtspReady(settings)) return 'assent_capture'
+  return required
 }
 
 export function esignLevelLabel(level: EsignLevel): string {

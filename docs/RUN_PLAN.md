@@ -1,81 +1,43 @@
-# Run plan — Batch M0 through M3a
+# Run plan — Batch M4 through M7
 
 **Started:** 15 November 2026 (Asia/Dubai)  
-**Branch:** `cursor/batch-m0-m3a-d3d5`  
-**Spec:** Master Spec v2.1 (`MASTER_SPEC.md`)
-
-Execute top to bottom. Tick when quality gates pass. Do not wait for approval between items.
+**Branch:** `cursor/batch-m4-m7-d3d5`  
+**Spec:** Master Spec v2.1 (`MASTER_SPEC.md`)  
+**Prior batch:** M0–M3a merged (#436)
 
 ---
 
-## M0 — Audit and plan
+## M4 — Mail and calendar
 
-- [x] Condensed `MASTER_SPEC.md` in repo (authority + Accept when)
-- [x] `docs/SPEC_POINTER.md` points at v2.1
-- [x] Refresh `docs/AUDIT.md` executive summary for multi-tenant reality
-- [x] Refresh `docs/GAP_PLAN.md` (demo isolation status honest)
-- [x] `docs/DECISIONS.md` + `docs/QUESTIONS.md`
-- [x] Brand / PRODUCT constant audit already on main (`docs/BRAND_AUDIT.md`)
-- [x] RLS: every public table has RLS (re-assert in AUDIT)
-- [ ] External: Boost/Care/Trading SVG masters (blocked — zip)
-- [ ] External: Sentry project keys if Alfred wants paid observability now (optional)
+- [x] Zoho + Gmail Phase A + M365 Phase A/B already on main
+- [x] IMAP remains unavailable in Settings (explicit stub + resolve tests)
+- [ ] Gmail Phase B inbox — blocked on CASA (Not done)
+- [ ] IMAP live adapter — deferred until a real non-API mailbox need (Not done)
 
-## M1 — Platform core (verify + fill)
+## M5 — Contracts and e-sign
 
-- [x] `tenants` / `companies` / `business_units` / `brand_kits` + seed Red Reach
-- [x] `tenant_id` stamp + RESTRICTIVE RLS on core tables
-- [x] Cross-tenant CI (`tenant_isolation_test.sql`)
-- [x] Roles + permissions (`permissions.ts`)
-- [x] Module registry / flags + company switcher + I18n EN+AR skeleton
-- [x] Event outbox claim/worker path
-- [x] PRODUCT constant + HighMast colours
-- [x] Theme light/dark token pairs
-- [x] PWA after sign-in follows brand kit (partial §5.6)
-- [ ] Per-host manifests + `tenant_app_identities` (deferred M11 — Not done)
-- [ ] MFA passkeys / SSO (deferred — Not done)
-- [ ] Field-level encryption fully wired for all sensitive columns (partial — Not done remainder)
+- [x] NDA /sign, clauses, obligations, QTSP stub already on main
+- [x] Doc-type → required e-sign level matrix (honest labels; canvas stays assent)
+- [ ] TDRA-licensed QTSP vendor — Alfred / paid (Not done)
 
-## M2 — Customization layer (verify + fill)
+## M6 — HR core
 
-- [x] Custom field definitions + values
-- [x] Pipelines + stages
-- [x] Saved views
-- [x] Numbering sequences
-- [x] Workflow definitions + runner (approval/notify)
-- [x] Industry pack catalog + activate → moduleFlags
-- [x] CRM/quote custom field + saved view seeds
-- [ ] Dashboard builder UI (deferred later packs — Not done)
-- [ ] Full terminology override UI (partial labels only — Not done)
+- [x] People directory + FLE + gratuity draft already on main
+- [x] Leave requests table + RLS + People-adjacent Leave page
+- [ ] Full attendance / org chart / contracts HR pack — later (Not done)
 
-## M3 — CRM unify (verify + fill)
+## M7 — Accounting core
 
-- [x] Pipeline board `/deals` unions crm / sales / ctrm
-- [x] Write façade (`myDealsStore`)
-- [x] Soft-retire / hide detail nav setting
-- [x] Read model `pipeline_deals_v`
-- [x] Account link coverage plan
-- [x] Document non-destructive consolidate plan (`docs/M3_CRM_UNIFY.md`)
-- [x] Regression: quote accept + myDeals unit tests green
-- [ ] Destructive schema merge (explicitly deferred — Not done)
+- [x] Maker-checker / Approvals already on main
+- [x] Chart of accounts + journals + balanced post + immutable posted rows
+- [x] Ledger page under Finance (manager+)
+- [x] Seed default CoA (UAE SME starter — Unverified for tax mapping)
+- [ ] Auto-post from invoices/expenses — later deepen (Not done)
+- [ ] Full VAT return engine — M7+ / COMPLIANCE (Not done)
 
-## M3a — Demo isolation (code-side closeout)
+## Quality gates
 
-- [x] `VITE_APP_ENV=demo` detection + DEMO banner
-- [x] Browser fetch guard
-- [x] Build refuses demo→live Supabase URL
-- [x] Edge `APP_ENV=demo` outbound guard + tests
-- [x] `demo_seed.sql` with safety gates + fictional data
-- [x] Expand seed: sales deal story + contacts + Falcon Bay brand kit
-- [x] Guided tour checklist (demo build only)
-- [x] Demo role switcher (UI override, demo build only)
-- [x] Presenter reset SQL (`demo_reset.sql`)
-- [x] Docs: `M3A_DEMO.md`, `modules/demo-isolation.md`, STATUS Not done for Alfred
-- [ ] Alfred: provision demo Supabase + `DEMO_*` secrets (blocked — Not done)
-- [ ] Demo Pages deploy workflow (blocked until project exists — Not done)
-- [ ] Self-serve rate limits / expiry / name blocklist (open §19 — Not done)
-
-## Quality gates (batch)
-
-- [x] `npm run typecheck` in `app/`
-- [x] Unit tests: full suite **1311** passed (242 files)
-- [x] Lint (`oxlint` — existing warnings only, no new errors)
+- [x] typecheck
+- [x] lint (existing warnings only)
+- [x] vitest (ledger, leave, esign, mailCalendar)
+- [x] SQL module tests: `accounting_ledger_test` + `hr_leave_test` (+ full `run.sh`)

@@ -52,9 +52,9 @@ Status key: **exists** · **partial** · **missing**
 | 6.2 CRM and sales | partial | Strong ops CRM; three pipelines; Pipeline-first soft-retire (M3 slice 4); schema merge later (ask) |
 | 6.3 Email and calendar | partial | Zoho + Gmail Phase A + M365 Phase A/B (incl. inbox); Gmail inbox still CASA-gated; IMAP deferred |
 | 6.4 Contracts and e-sign | partial | NDA `/sign` + clauses + obligations board + spawn-on-sign; QTSP → M5 later |
-| 6.5 HR | partial | M6 first slice: `hr_employees` + People page |
+| 6.5 HR | partial | People + leave requests; attendance/org chart later |
 | 6.6 Payroll | partial | M8 first slice: payroll runs + WPS/gratuity draft helpers (not legal advice) |
-| 6.7 Accounting (ledger) | partial | Invoices/payments/expenses/reports; **no** journals/CoA/immutability → M7 |
+| 6.7 Accounting (ledger) | partial | CoA + journals + post/immutability shipped; auto-post from invoices + VAT return later |
 | 6.8 Inventory and purchasing | partial | Catalog/inventory thin; DN as delivery doc → M9 |
 | 6.9 Delivery (projects/support) | partial | AI CRM delivery + tickets strong; generalize projects → M3/M9 continuity |
 | 6.10 Marketing | partial | M10 first slice: `marketing_campaigns` + Campaigns page |
