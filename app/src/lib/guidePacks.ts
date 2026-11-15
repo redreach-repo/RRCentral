@@ -8,6 +8,7 @@ import { GUIDE_CRM_SECTIONS, type GuideCrmSection } from './guideCrm'
 import { GUIDE_DELIVERY_SECTIONS } from './guideDelivery'
 import { GUIDE_FINANCE_SECTIONS } from './guideFinance'
 import { GUIDE_HR_SECTIONS } from './guideHr'
+import { GUIDE_MARKETING_SECTIONS } from './guideMarketing'
 import { GUIDE_OPS_SECTIONS } from './guideOps'
 
 export type GuideSection = GuideCrmSection
@@ -38,6 +39,11 @@ export const GUIDE_PACKS: GuidePack[] = [
     id: 'ops',
     titleKey: 'guide.pack.ops',
     sections: GUIDE_OPS_SECTIONS,
+  },
+  {
+    id: 'marketing',
+    titleKey: 'guide.pack.marketing',
+    sections: GUIDE_MARKETING_SECTIONS,
   },
   {
     id: 'finance',

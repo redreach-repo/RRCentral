@@ -36,6 +36,7 @@ describe('GUIDE_PACKS', () => {
       'billing',
       'delivery',
       'ops',
+      'marketing',
       'finance',
       'hr',
       'admin',
