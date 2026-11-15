@@ -1,3 +1,4 @@
+import { generatePayrollLinesServer, updatePayrollLineServer } from './payroll/payrollServer'
 /**
  * Supabase stores for M6–M12 feature slices.
  * Missing-table errors surface as empty lists so local mode stays usable.
@@ -309,6 +310,8 @@ export async function listPayrollLines(runId: string): Promise<PayrollLine[]> {
 }
 
 export async function generatePayrollLinesFromHr(runId: string): Promise<number> {
+  const serverCount = await generatePayrollLinesServer(runId)
+  if (serverCount !== null) return serverCount
   const people = await listHrEmployees('active')
   if (!people.length) return 0
   const rows = people.map((p) => {
@@ -341,6 +344,7 @@ export async function updatePayrollLine(
   id: string,
   patch: Partial<{ basic_aed: number; allowances_aed: number; deductions_aed: number }>,
 ): Promise<void> {
+  if (await updatePayrollLineServer(id, patch)) return
   const { data: existing, error: readErr } = await db
     .from('payroll_lines')
     .select('*, hr_employees(iban, labour_card_no, bank_routing_code)')

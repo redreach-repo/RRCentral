@@ -1,3 +1,7 @@
+import {
+  add, decimalToString, decMul, lineMoney, maxZero, min, money, moneyOrZero, multiply, percentOf, pow10, roundAmount, roundToScale, sub, toDecimalOrZero,
+  toNumber, zero, type Money,
+} from './money/index'
 import { VAT_RATE } from './config'
 import { db } from './db'
 import { isUndefinedColumnError } from './errors'
@@ -33,11 +37,9 @@ export function newDraftLine(partial?: Partial<DraftLineItem>): DraftLineItem {
   }
 }
 
-export function calcLine(qty: number, unitPrice: number, vatRate = VAT_RATE) {
-  const amount = round2(Number(qty || 0) * Number(unitPrice || 0))
-  const vat_amount = round2(amount * vatRate)
-  const line_total = round2(amount + vat_amount)
-  return { amount, vat_amount, line_total, vat_rate: vatRate }
+export function calcLine(qty: number, unitPrice: number, vatRate = VAT_RATE, currency = 'AED') {
+  const l = lineMoney(toDecimalOrZero(qty), toDecimalOrZero(unitPrice), toDecimalOrZero(vatRate), currency)
+  return { amount: toNumber(l.amount), vat_amount: toNumber(l.vat), line_total: toNumber(l.total), vat_rate: vatRate }
 }
 
 export type DiscountOpts = {
@@ -107,58 +109,65 @@ export function applyDiscount(
   subtotal: number,
   opts?: DiscountOpts,
 ): { discount: number; taxable: number } {
-  const base = round2(Math.max(0, Number(subtotal) || 0))
-  const pct = Math.min(100, Math.max(0, Number(opts?.discountPercent) || 0))
-  const fixed = Math.max(0, Number(opts?.discountAmount) || 0)
-  const fromPct = round2((base * pct) / 100)
-  const discount = round2(Math.min(base, fromPct + fixed))
-  return { discount, taxable: round2(Math.max(0, base - discount)) }
+  const r = applyDiscountMoney(moneyOrZero(subtotal, 'AED'), opts)
+  return { discount: toNumber(r.discount), taxable: toNumber(r.taxable) }
 }
 
-export function calcTotals(items: DraftLineItem[], vatRate = VAT_RATE, discount?: DiscountOpts) {
-  let subtotal = 0
-  let cost = 0
-  for (const item of items) {
-    const qty = item.sizes ? sumSizes(item.sizes) : Number(item.qty) || 0
-    const c = calcLine(qty, item.unit_price, vatRate)
-    subtotal += c.amount
-    cost += round2(qty * (Number(item.unit_cost) || 0))
+/** Exact discount: percent of the subtotal (rounded), plus a fixed amount, never more than the subtotal. */
+export function applyDiscountMoney(subtotal: Money, opts?: DiscountOpts): { discount: Money; taxable: Money } {
+  const base = maxZero(subtotal)
+  const pctDec = toDecimalOrZero(opts?.discountPercent)
+  const pct = pctDec.coef < 0n ? 0 : pctDec.coef > 100n * pow10(pctDec.scale) ? 100 : pctDec
+  const fixed = maxZero(moneyOrZero(opts?.discountAmount, base.currency))
+  const fromPct = multiply(base, decMul(pct, '0.01'))
+  const discount = min(base, add(fromPct, fixed))
+  return { discount, taxable: maxZero(sub(base, discount)) }
+}
+
+export function calcTotals(items: DraftLineItem[], vatRate = VAT_RATE, discount?: DiscountOpts, currency = 'AED') {
+  const t = calcTotalsMoney(items, vatRate, discount, currency)
+  return {
+    subtotal: toNumber(t.subtotal),
+    discount: toNumber(t.discount),
+    taxable: toNumber(t.taxable),
+    vat: toNumber(t.vat),
+    total: toNumber(t.total),
+    cost: toNumber(t.cost),
+    profit: toNumber(t.profit),
+    marginPct: t.marginPct,
   }
-  subtotal = round2(subtotal)
-  cost = round2(cost)
-  if (discount?.offsetVat && vatRate > 0) {
-    const vat = round2(subtotal * vatRate)
-    const profit = round2(subtotal - cost)
-    const marginPct = subtotal > 0 ? round2((profit / subtotal) * 100) : 0
+}
+
+/** Document totals in exact money. Line amounts are rounded per line, then summed (no drift). */
+export function calcTotalsMoney(items: DraftLineItem[], vatRate: number | string = VAT_RATE, discount?: DiscountOpts, currency = 'AED') {
+  const rate = toDecimalOrZero(vatRate)
+  let subtotal = zero(currency)
+  let cost = zero(currency)
+  for (const item of items) {
+    const qty = item.sizes ? sumSizes(item.sizes) : item.qty
+    subtotal = add(subtotal, lineMoney(toDecimalOrZero(qty), toDecimalOrZero(item.unit_price), rate, currency).amount)
+    cost = add(cost, money(decMul(toDecimalOrZero(qty), toDecimalOrZero(item.unit_cost)), currency))
+  }
+  if (discount?.offsetVat && rate.coef > 0n) {
+    const vat = multiply(subtotal, rate)
+    const profit = sub(subtotal, cost)
     return {
-      subtotal,
-      discount: vat,
-      taxable: subtotal,
-      vat,
-      total: subtotal,
-      cost,
-      profit,
-      marginPct,
+      subtotal, discount: vat, taxable: subtotal, vat, total: subtotal, cost, profit,
+      marginPct: subtotal.minor > 0n ? percentOf(profit, subtotal) : 0,
     }
   }
-  const { discount: discountValue, taxable } = applyDiscount(subtotal, discount)
-  const vat = round2(taxable * vatRate)
-  const profit = round2(taxable - cost)
-  const marginPct = taxable > 0 ? round2((profit / taxable) * 100) : 0
+  const { discount: discountValue, taxable } = applyDiscountMoney(subtotal, discount)
+  const vat = multiply(taxable, rate)
+  const profit = sub(taxable, cost)
   return {
-    subtotal,
-    discount: discountValue,
-    taxable,
-    vat,
-    total: round2(taxable + vat),
-    cost,
-    profit,
-    marginPct,
+    subtotal, discount: discountValue, taxable, vat, total: add(taxable, vat), cost, profit,
+    marginPct: taxable.minor > 0n ? percentOf(profit, taxable) : 0,
   }
 }
 
+/** Exact 2-place rounding (half away from zero, same as Postgres round()). */
 export function round2(n: number): number {
-  return Math.round((Number(n) || 0) * 100) / 100
+  return roundAmount(n, 'AED')
 }
 
 export function formatMoney(n: number, currency = 'AED'): string {
@@ -280,12 +289,12 @@ export function savedVatRate(rows: Pick<LineItem, 'vat_rate'>[], fallback = VAT_
 export function vatPercentToRate(percent: string | number, fallback = VAT_RATE): number {
   const n = Number(percent)
   if (String(percent).trim() === '' || !Number.isFinite(n) || n < 0 || n >= 100) return fallback
-  return Math.round(n * 1000) / 100000
+  return Number(decimalToString({ coef: roundToScale(String(percent).trim(), 3), scale: 5 }))
 }
 
 /** 0.05 → "5" (trailing zeros trimmed). */
 export function vatRateToPercent(rate: number): string {
-  return String(Math.round(rate * 100000) / 1000)
+  return String(Number(decimalToString({ coef: roundToScale(toDecimalOrZero(rate), 5), scale: 3 })))
 }
 
 export function toDraftItems(rows: LineItem[]): DraftLineItem[] {

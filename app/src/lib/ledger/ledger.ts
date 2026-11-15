@@ -1,3 +1,4 @@
+import { roundAmount, sumAmounts } from '../money/index'
 /** M7 double-entry helpers (pure). CoA tax mapping stays Unverified. */
 
 export type GlAccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense'
@@ -17,8 +18,7 @@ export type JournalBalance = {
 }
 
 export function money2(n: number): number {
-  if (!Number.isFinite(n)) return 0
-  return Math.round(n * 100) / 100
+  return roundAmount(n, 'AED')
 }
 
 export function normalizeLine(line: JournalLineInput): JournalLineInput | null {
@@ -42,8 +42,8 @@ export function journalBalance(lines: JournalLineInput[]): JournalBalance {
   for (const raw of lines) {
     const line = normalizeLine(raw)
     if (!line) continue
-    debitTotal = money2(debitTotal + line.debit)
-    creditTotal = money2(creditTotal + line.credit)
+    debitTotal = sumAmounts([debitTotal, line.debit])
+    creditTotal = sumAmounts([creditTotal, line.credit])
     lineCount += 1
   }
   return {

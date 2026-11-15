@@ -1,18 +1,15 @@
+/** Legacy AED helpers. Exact: they delegate to the shared money module (lib/money/). */
+import { formatMoney, lineMoney, money, roundAmount, toNumber } from './money/index'
+
 export function round2(n: number): number {
-  return Math.round((Number(n) || 0) * 100) / 100
+  return roundAmount(n, 'AED')
 }
 
 export function formatAED(n: number): string {
-  const amount = round2(n)
-  return `AED ${amount.toLocaleString('en-AE', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
+  return formatMoney(money(round2(n), 'AED'))
 }
 
 export function calcLine(qty: number, unitPrice: number, vatRate = 0.05) {
-  const amount = round2(Number(qty || 0) * Number(unitPrice || 0))
-  const vat_amount = round2(amount * Number(vatRate || 0))
-  const line_total = round2(amount + vat_amount)
-  return { amount, vat_amount, line_total }
+  const l = lineMoney(Number(qty) || 0, Number(unitPrice) || 0, Number(vatRate) || 0, 'AED')
+  return { amount: toNumber(l.amount), vat_amount: toNumber(l.vat), line_total: toNumber(l.total) }
 }

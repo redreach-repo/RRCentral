@@ -46,3 +46,59 @@ export async function fieldEncryptionReady(): Promise<boolean> {
   if (error) return false
   return data === true
 }
+
+export type RevealField = 'hr.basic_salary' | 'hr.iban' | 'hr.emirates_id' | 'hr.passport_no' | 'hr.national_id' | 'wanders.passport_number' | 'payroll.line'
+export type RevealResult = { value: string | null; masked: boolean; outcome: 'revealed' | 'denied' | 'rate_limited' }
+
+/** Ask the database for one plain value. Permission, rate limit and audit entry happen there. */
+export async function revealField(field: RevealField, rowId: string, reason = ''): Promise<RevealResult> {
+  const { data, error } = await db.rpc('rr_fle_reveal', { p_field: field, p_row_id: rowId, p_reason: reason })
+  if (error) throw error
+  const row = (Array.isArray(data) ? data[0] : data) as RevealResult | undefined
+  if (!row) throw new Error('Record not found')
+  return row
+}
+
+export type HrMasked = {
+  employee_id: string
+  basic_salary: string
+  iban: string
+  emirates_id: string
+  passport_no: string
+  national_id: string
+  national_id_type: string
+  encrypted: boolean
+}
+
+/** Masked values only (safe to show anyone in the tenant). null when the A1 migration is not applied yet. */
+export async function getHrMasked(employeeId: string): Promise<HrMasked | null> {
+  const { data, error } = await db.rpc('rr_hr_masked', { p_employee: employeeId })
+  if (error) {
+    const code = String((error as { code?: string }).code || '')
+    if (code === 'PGRST202' || code === '42883') return null
+    throw error
+  }
+  return ((Array.isArray(data) ? data[0] : data) as HrMasked | undefined) ?? null
+}
+
+/** Save an ID number. It is encrypted in the database and never stored in plain text. */
+export async function setHrIdentity(
+  employeeId: string,
+  kind: 'emirates_id' | 'passport_no' | 'national_id',
+  value: string,
+  nationalIdType?: 'aadhaar' | 'pan' | 'sin' | 'other' | '',
+): Promise<void> {
+  const { error } = await db.rpc('rr_hr_set_identity', {
+    p_employee: employeeId,
+    p_kind: kind,
+    p_value: value,
+    p_national_id_type: nationalIdType ?? null,
+  })
+  if (error) throw error
+}
+
+/** Same as rr_fle_mask(…, 'id'): last four characters only. */
+export function maskId(value: string): string {
+  const s = value.replace(/[\s-]/g, '')
+  return s ? `•••• ${s.slice(-4)}` : s
+}

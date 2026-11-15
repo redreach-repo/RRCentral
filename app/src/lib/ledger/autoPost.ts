@@ -1,3 +1,4 @@
+import { roundAmount, sumAmounts } from '../money/index'
 /**
  * M13: map a finalized invoice into draft GL lines (Unverified CoA mapping).
  * Never marks journals posted — human / maker-checker only.
@@ -41,7 +42,7 @@ export type ExpenseAutoPostInput = {
 export function invoiceToDraftLines(input: InvoiceAutoPostInput): AutoPostLine[] {
   const ex = round2(input.exclusiveAed)
   const vat = round2(input.vatAed)
-  const inc = round2(input.inclusiveAed || ex + vat)
+  const inc = round2(input.inclusiveAed || sumAmounts([ex, vat]))
   if (inc <= 0) return []
   const lines: AutoPostLine[] = [
     {
@@ -80,7 +81,7 @@ export function autoPostSourceId(invoiceId: string): string {
 export function expenseToDraftLines(input: ExpenseAutoPostInput): AutoPostLine[] {
   const ex = round2(input.exclusiveAed)
   const vat = round2(input.vatAed)
-  const inc = round2(input.inclusiveAed || ex + vat)
+  const inc = round2(input.inclusiveAed || sumAmounts([ex, vat]))
   if (inc <= 0) return []
   const lines: AutoPostLine[] = [
     {
@@ -116,11 +117,10 @@ export function expenseAutoPostSourceId(expenseId: string): string {
 }
 
 function round2(n: number): number {
-  return Math.round((Number(n) || 0) * 100) / 100
+  return roundAmount(n, 'AED')
 }
 
+/** Exact: debits equal credits to the fil. */
 export function linesBalance(lines: AutoPostLine[]): boolean {
-  const d = lines.reduce((s, l) => s + l.debit, 0)
-  const c = lines.reduce((s, l) => s + l.credit, 0)
-  return Math.abs(round2(d) - round2(c)) < 0.005
+  return sumAmounts(lines.map((l) => l.debit)) === sumAmounts(lines.map((l) => l.credit))
 }
