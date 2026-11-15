@@ -15,6 +15,7 @@ import {
 import { listSessions, markFollowUpDone, saveSession } from '../../lib/ctrmSessionsStore'
 import { errorMessage } from '../../lib/errors'
 import { parseSettingsList } from '../../lib/fitSheet'
+import { exportListCsv } from '../../lib/listIo'
 import { parseCtrmSessionForm } from '../../lib/schemas/ctrmSession'
 import type { Account, CtrmSession, CtrmSessionKind } from '../../lib/types'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, fieldStyle, inputStyle, labelStyle, sectionTitleStyle, selectStyle } from '../../lib/uiStyles'
@@ -127,11 +128,39 @@ export default function SessionsCard({ account, editable, author }: { account: A
     <section style={{ ...cardStyle, marginTop: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Sessions</h2>
-        {editable && !editing ? (
-          <button type="button" style={smallBtn} onClick={() => setEditing({ session: null, draft: blank() })}>
-            <Plus size={14} /> Log a session
-          </button>
-        ) : null}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {rows && rows.length ? (
+            <button
+              type="button"
+              style={smallBtn}
+              onClick={() => {
+                exportListCsv(
+                  `ctrm-sessions-${account.id.slice(0, 8)}.csv`,
+                  ['kind', 'session_date', 'attendees', 'topics_covered', 'topics_left', 'follow_up_due', 'follow_up_done', 'recording_url', 'notes'],
+                  rows.map((s) => ({
+                    kind: sessionKindLabel(s.kind),
+                    session_date: s.session_date || '',
+                    attendees: s.attendees || '',
+                    topics_covered: (s.topics_covered || []).join('; '),
+                    topics_left: (s.topics_left || []).join('; '),
+                    follow_up_due: s.follow_up_due || '',
+                    follow_up_done: s.follow_up_done ? 'yes' : 'no',
+                    recording_url: s.recording_url || '',
+                    notes: s.notes || '',
+                  })),
+                )
+                showToast('Sessions CSV downloaded', 'success')
+              }}
+            >
+              Export CSV
+            </button>
+          ) : null}
+          {editable && !editing ? (
+            <button type="button" style={smallBtn} onClick={() => setEditing({ session: null, draft: blank() })}>
+              <Plus size={14} /> Log a session
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {rows && rows.length ? (
