@@ -22,6 +22,7 @@ import {
   createPlanningScenario,
   deactivatePlanningScenario,
   listPlanningScenarios,
+  reactivatePlanningScenario,
   type PlanningScenario,
 } from '../lib/planningScenariosStore'
 import { PLANNING_GOALS_CSV_COLUMNS, PLANNING_SCENARIOS_CSV_COLUMNS } from '../lib/planningCsv'
@@ -54,6 +55,7 @@ export default function PlanningGoalsPage() {
   const [scenarioName, setScenarioName] = useState('')
   const [scenarioAssumptions, setScenarioAssumptions] = useState('{"revenue_uplift_pct":0}')
   const [statusFilter, setStatusFilter] = useState('active')
+  const [showInactiveScenarios, setShowInactiveScenarios] = useState(false)
   const [loading, setLoading] = useState(true)
   const [importingGoals, setImportingGoals] = useState(false)
   const [importingScenarios, setImportingScenarios] = useState(false)
@@ -72,7 +74,7 @@ export default function PlanningGoalsPage() {
         listPlanningGoals(),
         db.from('invoices').select('amount, status, date, created_at').limit(500),
         db.from('sales_deals').select('created_at').limit(500),
-        listPlanningScenarios().catch(() => [] as PlanningScenario[]),
+        listPlanningScenarios({ includeInactive: showInactiveScenarios }).catch(() => [] as PlanningScenario[]),
       ])
       setRows(goals)
       setInvoices((inv.data || []) as typeof invoices)
@@ -83,7 +85,7 @@ export default function PlanningGoalsPage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [showToast, showInactiveScenarios])
 
   useEffect(() => {
     void load()
@@ -359,9 +361,19 @@ export default function PlanningGoalsPage() {
           </form>
 
           <section style={cardStyle}>
-            <h2 style={{ marginTop: 0, fontSize: 16 }}>Scenarios (stub)</h2>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+              <h2 style={{ margin: 0, fontSize: 16, flex: 1 }}>Scenarios (stub)</h2>
+              <button
+                type="button"
+                style={buttonSecondaryStyle}
+                onClick={() => setShowInactiveScenarios((v) => !v)}
+              >
+                {showInactiveScenarios ? 'Hide inactive' : 'Show inactive'}
+              </button>
+            </div>
             <p style={{ margin: '0 0 10px', fontSize: 12, color: colors.muted }}>
-              Named what-if rows with assumptions JSON. Forecasting engine later.
+              Named what-if rows with assumptions JSON. Forecasting engine later. Deactivate archives a scenario
+              without deleting it.
             </p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
               <input
@@ -408,7 +420,9 @@ export default function PlanningGoalsPage() {
               </button>
             </div>
             {scenarios.length === 0 ? (
-              <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>No scenarios yet.</p>
+              <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>
+                {showInactiveScenarios ? 'No scenarios yet.' : 'No active scenarios. Use Show inactive to restore archived ones.'}
+              </p>
             ) : (
               <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
                 {scenarios.map((s) => (
@@ -422,29 +436,50 @@ export default function PlanningGoalsPage() {
                       alignItems: 'flex-start',
                       borderTop: `1px solid ${colors.border}`,
                       paddingTop: 6,
+                      opacity: s.active ? 1 : 0.7,
                     }}
                   >
                     <div>
                       <strong>{s.name}</strong>
+                      {!s.active ? (
+                        <span style={{ color: colors.muted, fontWeight: 400, fontSize: 12 }}> · inactive</span>
+                      ) : null}
                       {s.description ? ` · ${s.description}` : ''}
                       <div style={{ color: colors.muted, fontSize: 12, fontFamily: 'monospace' }}>
                         {JSON.stringify(s.assumptions_json ?? {})}
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      style={{ ...buttonSecondaryStyle, padding: '2px 8px', fontSize: 12 }}
-                      onClick={() => {
-                        void deactivatePlanningScenario(s.id)
-                          .then(() => {
-                            showToast('Scenario deactivated', 'success')
-                            return load()
-                          })
-                          .catch((err) => showToast(errorMessage(err, 'Could not deactivate'), 'error'))
-                      }}
-                    >
-                      Deactivate
-                    </button>
+                    {s.active ? (
+                      <button
+                        type="button"
+                        style={{ ...buttonSecondaryStyle, padding: '2px 8px', fontSize: 12 }}
+                        onClick={() => {
+                          void deactivatePlanningScenario(s.id)
+                            .then(() => {
+                              showToast('Scenario deactivated', 'success')
+                              return load()
+                            })
+                            .catch((err) => showToast(errorMessage(err, 'Could not deactivate'), 'error'))
+                        }}
+                      >
+                        Deactivate
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        style={{ ...buttonSecondaryStyle, padding: '2px 8px', fontSize: 12 }}
+                        onClick={() => {
+                          void reactivatePlanningScenario(s.id)
+                            .then(() => {
+                              showToast('Scenario restored', 'success')
+                              return load()
+                            })
+                            .catch((err) => showToast(errorMessage(err, 'Could not restore'), 'error'))
+                        }}
+                      >
+                        Restore
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
