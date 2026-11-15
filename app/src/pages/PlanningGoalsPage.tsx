@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Target } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import { errorMessage } from '../lib/errors'
 import { db } from '../lib/db'
 import {
@@ -37,6 +39,7 @@ import docsStyles from '../styles/docsList.module.css'
 
 /** §6.12 planning goals + scenario stubs. */
 export default function PlanningGoalsPage() {
+  const { appUserId } = useAuth()
   const { showToast } = useToast()
   const [rows, setRows] = useState<PlanningGoal[]>([])
   const [scenarios, setScenarios] = useState<PlanningScenario[]>([])
@@ -50,11 +53,17 @@ export default function PlanningGoalsPage() {
   const [period, setPeriod] = useState(currentPeriodYyyyMm())
   const [scenarioName, setScenarioName] = useState('')
   const [scenarioAssumptions, setScenarioAssumptions] = useState('{"revenue_uplift_pct":0}')
+  const [statusFilter, setStatusFilter] = useState('active')
   const [loading, setLoading] = useState(true)
   const [importingGoals, setImportingGoals] = useState(false)
   const [importingScenarios, setImportingScenarios] = useState(false)
   const goalsImportRef = useRef<HTMLInputElement>(null)
   const scenariosImportRef = useRef<HTMLInputElement>(null)
+  const goalsViewFilters = useMemo(() => ({ status: statusFilter }), [statusFilter])
+  const visibleGoals = useMemo(
+    () => (statusFilter === 'all' ? rows : rows.filter((r) => r.status === statusFilter)),
+    [rows, statusFilter],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -295,6 +304,17 @@ export default function PlanningGoalsPage() {
         </div>
       </header>
 
+      <SavedViewsBar
+        moduleId="planning_goals"
+        filters={goalsViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => setStatusFilter(String(f.status || 'active'))}
+        onToast={showToast}
+        filtersEqual={(a, b) => String(a.status || 'active') === String(b.status || 'active')}
+      />
+
       {loading ? (
         <p>Loading…</p>
       ) : (
@@ -432,12 +452,24 @@ export default function PlanningGoalsPage() {
           </section>
 
           <section style={cardStyle}>
-            <h2 style={{ marginTop: 0, fontSize: 16 }}>Goals</h2>
-            {rows.length === 0 ? (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+              <h2 style={{ margin: 0, fontSize: 16, flex: 1 }}>Goals</h2>
+              <select
+                style={selectStyle}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                aria-label="Goal status filter"
+              >
+                <option value="active">Active</option>
+                <option value="achieved">Achieved</option>
+                <option value="all">All</option>
+              </select>
+            </div>
+            {visibleGoals.length === 0 ? (
               <EmptyState title="No goals yet" subtitle="Add a period target above." />
             ) : (
               <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}>
-                {rows.map((r) => {
+                {visibleGoals.map((r) => {
                   const metric = GOAL_METRICS.find((m) => m.key === r.metric_key)?.label || r.metric_key
                   const actual = actualForGoalMetric(r.metric_key, r.period_yyyy_mm, { invoices, deals })
                   const pct = goalProgressPct(actual, r.target_value)
