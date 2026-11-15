@@ -62,6 +62,26 @@ export async function activateCountryPack(packKey: string): Promise<void> {
   if (sErr && !isMissingRelationError(sErr)) throw sErr
 }
 
+export async function retireCountryPack(packKey: string): Promise<void> {
+  const { data: pack, error: pErr } = await db.from('country_packs').select('id').eq('pack_key', packKey).maybeSingle()
+  if (pErr) throw pErr
+  if (!pack) throw new Error('Country pack not found — apply the country_packs migration')
+  const { data: existing } = await db
+    .from('tenant_country_packs')
+    .select('id, status')
+    .eq('pack_id', pack.id)
+    .maybeSingle()
+  if (!existing) throw new Error('Pack is not activated for this tenant')
+  if (existing.status === 'retired') throw new Error('Pack already retired')
+  const { error } = await db.from('tenant_country_packs').update({ status: 'retired' }).eq('id', existing.id)
+  if (error) throw error
+  const { data: setting } = await db.from('app_settings').select('value').eq('key', 'countryPack').maybeSingle()
+  if (setting?.value === packKey) {
+    const { error: sErr } = await db.from('app_settings').upsert({ key: 'countryPack', value: '' }, { onConflict: 'key' })
+    if (sErr && !isMissingRelationError(sErr)) throw sErr
+  }
+}
+
 export type PurchaseOrder = {
   id: string
   po_number: string
