@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { format } from 'date-fns'
+import { format, parse } from 'date-fns'
 import { CloudUpload, ExternalLink, FolderOpen, Loader2, Mail, Plug, RefreshCw } from 'lucide-react'
 import type { CrmEntry } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { getMailProvider, type MailMessage } from '../lib/mailCalendar'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { attachCrmMatches, type InboxRow } from '../lib/zohoInboxMatch'
 import { useDriveStatus } from '../hooks/useDriveStatus'
 import { archiveSetupHint, scanAndFileCrmEmails } from '../lib/zohoEmailArchive'
@@ -33,6 +33,85 @@ type Props = {
 type Mailbox = 'inbox' | 'sent'
 type Filter = 'all' | 'crm' | 'unread'
 
+const MAIL_CSV_COLUMNS = [
+  'mailbox',
+  'subject',
+  'from',
+  'to',
+  'sender',
+  'status',
+  'received',
+  'has_attachment',
+  'crm_company',
+  'matched_email',
+  'summary',
+] as const
+
+const RECEIVED_FMT = 'yyyy-MM-dd HH:mm'
+
+function mailMatchKey(subject: string, from: string, to: string, received: string): string {
+  return `${subject.trim().toLowerCase()}|${from.trim().toLowerCase()}|${to.trim().toLowerCase()}|${received.trim()}`
+}
+
+function formatReceived(ts: number): string {
+  if (!ts) return ''
+  try {
+    return format(new Date(ts), RECEIVED_FMT)
+  } catch {
+    return ''
+  }
+}
+
+function parseReceived(raw: string): number {
+  const v = raw.trim()
+  if (!v) return 0
+  try {
+    const d = parse(v, RECEIVED_FMT, new Date())
+    if (!Number.isNaN(d.getTime())) return d.getTime()
+  } catch {
+    /* fall through */
+  }
+  const n = Date.parse(v)
+  return Number.isNaN(n) ? 0 : n
+}
+
+function parseMailStatus(raw: string): 'read' | 'unread' {
+  return raw.trim().toLowerCase() === 'unread' ? 'unread' : 'read'
+}
+
+function resolveCrmFromCsv(
+  company: string,
+  matchedEmail: string,
+  entries: CrmEntry[],
+): InboxRow['crm'] {
+  const email = matchedEmail.trim().toLowerCase()
+  const name = company.trim().toLowerCase()
+  if (name) {
+    const byName = entries.find((e) => (e.company_name || '').toLowerCase() === name)
+    if (byName) {
+      return {
+        crmId: byName.id,
+        companyName: byName.company_name,
+        matchedEmail: matchedEmail.trim(),
+      }
+    }
+  }
+  if (email) {
+    const byEmail = entries.find((e) => (e.email_phone || '').toLowerCase().includes(email))
+    if (byEmail) {
+      return {
+        crmId: byEmail.id,
+        companyName: byEmail.company_name,
+        matchedEmail: matchedEmail.trim(),
+      }
+    }
+  }
+  if (company.trim()) {
+    return { crmId: '', companyName: company.trim(), matchedEmail: matchedEmail.trim() }
+  }
+  return null
+}
+
 export default function ZohoInboxPanel({ crmEntries }: Props) {
   const { settings } = useSettings()
   const { user } = useAuth()
@@ -40,11 +119,15 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
   const compact = useCompactCrm()
   const [loading, setLoading] = useState(false)
   const [filing, setFiling] = useState(false)
+  const [importing, setImporting] = useState(false)
   const [error, setError] = useState('')
   const [rows, setRows] = useState<InboxRow[]>([])
   const [mailbox, setMailbox] = useState<Mailbox>('inbox')
   const [filter, setFilter] = useState<Filter>('all')
   const [lastScan, setLastScan] = useState('')
+  const [csvFiltered, setCsvFiltered] = useState(false)
+  const [importedRows, setImportedRows] = useState<InboxRow[] | null>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const mail = getMailProvider(settings)
   const enabled = mail.isEnabled(settings)
@@ -52,6 +135,8 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
   const driveOn = useDriveStatus().status.connected
 
   const load = useCallback(async () => {
+    setCsvFiltered(false)
+    setImportedRows(null)
     if (!enabled) return
     setLoading(true)
     setError('')
@@ -110,14 +195,107 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
     }
   }
 
-  const visible = rows.filter((r) => {
+  const boardRows = csvFiltered && importedRows ? importedRows : rows
+
+  const visible = boardRows.filter((r) => {
     if (filter === 'crm') return Boolean(r.crm)
     if (filter === 'unread') return r.status === 'unread'
     return true
   })
 
-  const crmHits = rows.filter((r) => r.crm).length
-  const unread = rows.filter((r) => r.status === 'unread').length
+  const crmHits = boardRows.filter((r) => r.crm).length
+  const unread = boardRows.filter((r) => r.status === 'unread').length
+
+  async function importMailCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const byKey = new Map(
+        rows.map(
+          (r) =>
+            [
+              mailMatchKey(
+                r.subject,
+                r.fromAddress,
+                r.toAddress || '',
+                formatReceived(r.receivedTime),
+              ),
+              r,
+            ] as const,
+        ),
+      )
+      const next: InboxRow[] = []
+      const seen = new Set<string>()
+      let matched = 0
+      let softLoaded = 0
+      let skipped = 0
+
+      objects.forEach((row, idx) => {
+        const subject = String(row.subject || '').trim()
+        const from = String(row.from || '').trim()
+        const to = String(row.to || '').trim()
+        const received = String(row.received || '').trim()
+        if (!subject && !from && !to) {
+          skipped += 1
+          return
+        }
+        const key = mailMatchKey(subject, from, to, received)
+        if (seen.has(key)) {
+          skipped += 1
+          return
+        }
+        seen.add(key)
+        const existing = byKey.get(key)
+        if (existing) {
+          next.push(existing)
+          matched += 1
+          return
+        }
+        const crmCompany = String(row.crm_company || '').trim()
+        const matchedEmail = String(row.matched_email || '').trim()
+        next.push({
+          messageId: `import-${idx}`,
+          subject: subject || '—',
+          fromAddress: from,
+          toAddress: to || undefined,
+          sender: String(row.sender || '').trim() || from,
+          summary: String(row.summary || '').trim(),
+          receivedTime: parseReceived(received),
+          status: parseMailStatus(String(row.status || '')),
+          hasAttachment:
+            String(row.has_attachment || '')
+              .trim()
+              .toLowerCase() === 'yes',
+          folderId: '',
+          crm: resolveCrmFromCsv(crmCompany, matchedEmail, crmEntries),
+        })
+        softLoaded += 1
+      })
+
+      if (!next.length) {
+        showToast('No matching mail rows in CSV', 'error')
+        return
+      }
+      setImportedRows(next)
+      setCsvFiltered(true)
+      const parts = [matched ? `${matched} matched` : '', softLoaded ? `${softLoaded} soft-loaded` : '']
+        .filter(Boolean)
+        .join(', ')
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${next.length} mail row(s) (${parts})${skipNote}`, 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Mail CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
 
   if (!configured) {
     return (
@@ -171,7 +349,7 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
             Zoho mail
           </h2>
           <p style={{ color: colors.muted2, fontSize: 12, margin: '4px 0 0' }}>
-            {rows.length
+            {boardRows.length
               ? `${mailbox === 'sent' ? 'Sent' : `${unread} unread`} · ${crmHits} matched to CRM`
               : mailbox === 'sent'
                 ? 'Mail you sent from Zoho / CRM'
@@ -192,6 +370,24 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
             {loading ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />}
             Refresh
           </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importMailCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={importing || loading}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
           <button
             type="button"
             style={buttonSecondaryStyle}
@@ -199,19 +395,7 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
             onClick={() => {
               exportListCsv(
                 `zoho-mail-${mailbox}.csv`,
-                [
-                  'mailbox',
-                  'subject',
-                  'from',
-                  'to',
-                  'sender',
-                  'status',
-                  'received',
-                  'has_attachment',
-                  'crm_company',
-                  'matched_email',
-                  'summary',
-                ],
+                [...MAIL_CSV_COLUMNS],
                 visible.map((m) => ({
                   mailbox,
                   subject: m.subject,
@@ -219,9 +403,7 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
                   to: m.toAddress || '',
                   sender: m.sender,
                   status: m.status,
-                  received: m.receivedTime
-                    ? format(new Date(m.receivedTime), 'yyyy-MM-dd HH:mm')
-                    : '',
+                  received: formatReceived(m.receivedTime),
                   has_attachment: m.hasAttachment ? 'yes' : 'no',
                   crm_company: m.crm?.companyName || '',
                   matched_email: m.crm?.matchedEmail || '',
@@ -266,6 +448,13 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
         ) : null}
       </p>
 
+      {csvFiltered ? (
+        <p style={{ color: colors.muted, fontSize: 13, margin: '0 0 12px', lineHeight: 1.45 }}>
+          Showing {boardRows.length} mail row{boardRows.length === 1 ? '' : 's'} from CSV (session only —
+          Refresh clears).
+        </p>
+      ) : null}
+
       <div className={resp.chipRow} style={{ marginBottom: 8 }}>
         {(
           [
@@ -297,7 +486,7 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
       <div className={resp.chipRow}>
         {(
           [
-            ['all', `All (${rows.length})`],
+            ['all', `All (${boardRows.length})`],
             ['crm', `CRM matches (${crmHits})`],
             ...(mailbox === 'inbox' ? ([['unread', `Unread (${unread})`]] as const) : []),
           ] as const
@@ -345,7 +534,7 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
             <Plug size={14} /> Settings → Zoho
           </Link>
         </div>
-      ) : loading && !rows.length ? (
+      ) : loading && !boardRows.length ? (
         <div style={{ color: colors.muted, fontSize: 13, padding: '20px 0' }}>
           <Loader2 size={16} style={{ verticalAlign: 'middle', marginRight: 8 }} /> Loading mail…
         </div>
