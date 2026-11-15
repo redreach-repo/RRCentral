@@ -90,3 +90,6 @@ verify_jwt = false
 
 [functions.public-api]
 verify_jwt = false
+
+[functions.webhook-retry]
+verify_jwt = false

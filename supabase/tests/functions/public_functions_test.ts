@@ -42,6 +42,7 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "event-outbox": { kind: "cron secret or manager JWT", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret[\s\S]*rr_is_manager_or_admin/ },
   "lead-intake": { kind: "shared secret or signed form token", pattern: /if \(!secret\)[\s\S]*=== secret[\s\S]*formTokenProblem\(/ },
   "public-api": { kind: "hashed api key (x-api-key)", pattern: /x-api-key[\s\S]*apiKey\.startsWith\("hm_"\)[\s\S]*key_hash !== hash/ },
+  "webhook-retry": { kind: "cron secret", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret/ },
 }
 
 async function publicFunctions(): Promise<string[]> {

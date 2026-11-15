@@ -34,6 +34,8 @@ export const SYSTEM_FUNCTIONS: SystemFunction[] = [
   { name: 'contract-invoices', feature: 'Contract invoices each morning', liveTest: '10' },
   { name: 'watchdog', feature: 'Daily watchdog list', liveTest: '11' },
   { name: 'event-outbox', feature: 'Domain event outbox worker', liveTest: '33' },
+  { name: 'public-api', feature: 'Partner REST API (API keys)', liveTest: '—' },
+  { name: 'webhook-retry', feature: 'Partner webhook retry worker', liveTest: '—' },
   { name: 'payment-reminder', feature: 'One tap payment reminders', liveTest: '12' },
   { name: 'lead-intake', feature: 'Website and WhatsApp leads', liveTest: '15' },
   { name: 'quote-accept', feature: 'Quote accept links', liveTest: '16' },

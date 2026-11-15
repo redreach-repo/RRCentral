@@ -129,6 +129,7 @@ No database migrations. Documentation and `brand-assets/` only.
 **What**
 - `webhook_endpoints.delivery_failures` / `next_retry_at`
 - `webhook_delivery_attempts` audit table (admin RLS)
+- Consumed by Edge `webhook-retry` (cron secret)
 
 **Rollback**
 - Drop attempts table; drop new columns on `webhook_endpoints`.

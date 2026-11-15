@@ -12,7 +12,7 @@
 | SaaS tenant billing | §6.13 / M11 | Plan catalog, trial/activate/cancel, seat usage; Stripe Checkout + portal (`docs/saas-billing.md`) |
 | Industry packs | §3 / M12 | Catalog + tenant activate/retire (`tenant_industry_packs`) |
 | Maker-checker | §3 / M7 | Approvals queue, self-approve block, payroll auto-wire ≥ AED 5k |
-| Public REST + webhooks | §3 / M11 | Keys + HMAC webhooks with retries; Edge `/v1/me` `/v1/accounts` `/v1/invoices` `/v1/quotations` (cursor) |
+| Public REST + webhooks | §3 / M11 | Keys + HMAC webhooks; reads + `POST/PATCH /v1/accounts`; Edge `webhook-retry` worker |
 
 Module flags (default **hidden** until Settings): `hr`, `payroll`, `marketing`, `saasBilling`, `industryPacks`. Approvals and API live under Admin.
 
@@ -27,5 +27,5 @@ Module flags (default **hidden** until Settings): `hr`, `payroll`, `marketing`, 
 
 - Bank-certified WPS/SIF file format + legal counsel sign-off (draft deepen shipped; see `docs/COMPLIANCE_NOTES.md` § WPS)
 - Real marketing send providers
-- Public API write surface + background webhook retry worker
+- Invoice/quotation write endpoints
 - Stripe Tax registration for live UAE/GCC SaaS charges

@@ -16,6 +16,7 @@ import {
   type ApiKeyRow,
   type WebhookEndpoint,
 } from '../lib/featureSliceStores'
+import { DEFAULT_API_KEY_SCOPES } from '../lib/publicApi'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
@@ -26,6 +27,7 @@ export default function PublicApiPage() {
   const [keys, setKeys] = useState<ApiKeyRow[]>([])
   const [hooks, setHooks] = useState<WebhookEndpoint[]>([])
   const [keyName, setKeyName] = useState('Partner read')
+  const [allowWriteAccounts, setAllowWriteAccounts] = useState(false)
   const [hookUrl, setHookUrl] = useState('')
   const [plaintext, setPlaintext] = useState('')
   const [loading, setLoading] = useState(true)
@@ -50,7 +52,10 @@ export default function PublicApiPage() {
   async function onCreateKey(e: React.FormEvent) {
     e.preventDefault()
     try {
-      const created = await createApiKey(keyName, appUserId)
+      const scopes = allowWriteAccounts
+        ? [...DEFAULT_API_KEY_SCOPES, 'write:accounts']
+        : [...DEFAULT_API_KEY_SCOPES]
+      const created = await createApiKey(keyName, appUserId, scopes)
       setPlaintext(created.plaintext)
       showToast('API key created — copy it now', 'success')
       await load()
@@ -112,8 +117,8 @@ export default function PublicApiPage() {
           <p className={docsStyles.kicker}>Public API</p>
           <h1 className={docsStyles.title}>API and webhooks</h1>
           <p className={docsStyles.subtitle}>
-            Hashed API keys (`x-api-key`) and partner webhooks. Edge routes: `/v1/me`, `/v1/accounts`, `/v1/invoices`,
-            `/v1/quotations` (cursor pagination). Webhook tests use HMAC signatures with retries.
+            Hashed API keys (`x-api-key`) and partner webhooks. Reads: `/v1/accounts|invoices|quotations`. Writes:
+            `POST/PATCH /v1/accounts` with `write:accounts`. Failed deliveries are retried by Edge `webhook-retry`.
             {publicApiConfigured() ? '' : ' Supabase is not configured in this environment.'}
           </p>
         </div>
@@ -123,6 +128,14 @@ export default function PublicApiPage() {
         <label style={labelStyle}>
           Key name
           <input style={inputStyle} value={keyName} onChange={(e) => setKeyName(e.target.value)} required />
+        </label>
+        <label style={{ ...labelStyle, display: 'flex', gap: 8, alignItems: 'center', flexDirection: 'row' }}>
+          <input
+            type="checkbox"
+            checked={allowWriteAccounts}
+            onChange={(e) => setAllowWriteAccounts(e.target.checked)}
+          />
+          Allow account writes (`write:accounts`)
         </label>
         <button type="submit" style={buttonPrimaryStyle}>
           Create API key
@@ -164,6 +177,7 @@ export default function PublicApiPage() {
                 <strong>{k.name}</strong>
                 <div style={{ color: colors.muted, fontSize: 13, marginTop: 4 }}>
                   {k.key_prefix}… {k.revoked_at ? '· revoked' : '· active'}
+                  {Array.isArray(k.scopes) ? ` · ${(k.scopes as string[]).join(', ')}` : ''}
                   {k.last_used_at ? ` · last used ${new Date(k.last_used_at).toLocaleString()}` : ''}
                 </div>
               </div>

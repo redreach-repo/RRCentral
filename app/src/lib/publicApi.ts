@@ -9,17 +9,109 @@ export const PUBLIC_API_READ_SCOPES = [
   'read:quotations',
 ] as const
 
-export type PublicApiReadScope = (typeof PUBLIC_API_READ_SCOPES)[number]
+export const PUBLIC_API_WRITE_SCOPES = ['write:accounts'] as const
 
+export type PublicApiReadScope = (typeof PUBLIC_API_READ_SCOPES)[number]
+export type PublicApiWriteScope = (typeof PUBLIC_API_WRITE_SCOPES)[number]
+
+/** Default scopes for newly minted keys — reads only; writes are opt-in. */
 export const DEFAULT_API_KEY_SCOPES: string[] = [
   'read:accounts',
   'read:invoices',
   'read:quotations',
 ]
 
+export const ACCOUNT_TYPES = ['ai_crm_client', 'worship_church', 'ctrm_prospect'] as const
+export type AccountType = (typeof ACCOUNT_TYPES)[number]
+
+export type AccountWriteInput = {
+  name?: string
+  type?: string
+  reference?: string
+  status?: string
+  industry?: string
+  country?: string
+  city?: string
+  website?: string
+  notes?: string
+  source?: string
+}
+
+export type AccountWritePatch = {
+  name: string
+  type: AccountType
+  reference: string
+  status: string
+  industry: string
+  country: string
+  city: string
+  website: string
+  notes: string
+  source: string
+}
+
 export function hasApiScope(scopes: string[], need: string): boolean {
   if (scopes.includes('*')) return true
   return scopes.includes(need)
+}
+
+function trimStr(value: unknown, max = 500): string {
+  return String(value ?? '')
+    .trim()
+    .slice(0, max)
+}
+
+/**
+ * Validate POST/PATCH account body.
+ * `partial` allows omitting name/type (PATCH); create requires name.
+ */
+export function parseAccountWrite(
+  raw: unknown,
+  opts: { partial: boolean },
+): { ok: true; patch: Partial<AccountWritePatch> } | { ok: false; error: string } {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, error: 'body_must_be_object' }
+  }
+  const body = raw as AccountWriteInput
+  const patch: Partial<AccountWritePatch> = {}
+
+  if (body.name !== undefined || !opts.partial) {
+    const name = trimStr(body.name, 200)
+    if (!name) return { ok: false, error: 'name_required' }
+    patch.name = name
+  }
+  if (body.type !== undefined || !opts.partial) {
+    const type = trimStr(body.type || 'ai_crm_client', 40)
+    if (!ACCOUNT_TYPES.includes(type as AccountType)) {
+      return { ok: false, error: 'invalid_type' }
+    }
+    patch.type = type as AccountType
+  }
+  if (body.reference !== undefined) patch.reference = trimStr(body.reference, 80)
+  if (body.status !== undefined) patch.status = trimStr(body.status, 40) || 'active'
+  if (body.industry !== undefined) patch.industry = trimStr(body.industry, 120)
+  if (body.country !== undefined) patch.country = trimStr(body.country, 80)
+  if (body.city !== undefined) patch.city = trimStr(body.city, 80)
+  if (body.website !== undefined) patch.website = trimStr(body.website, 200)
+  if (body.notes !== undefined) patch.notes = trimStr(body.notes, 2000)
+  if (body.source !== undefined) patch.source = trimStr(body.source, 80)
+
+  if (opts.partial && Object.keys(patch).length === 0) {
+    return { ok: false, error: 'empty_patch' }
+  }
+  return { ok: true, patch }
+}
+
+/** Endpoints due for a background retry pass. */
+export function webhookDueForRetry(
+  row: { active?: boolean; next_retry_at?: string | null; delivery_failures?: number },
+  nowMs: number = Date.now(),
+): boolean {
+  if (row.active === false) return false
+  if (!row.next_retry_at) return false
+  const t = Date.parse(row.next_retry_at)
+  if (Number.isNaN(t)) return false
+  return t <= nowMs
 }
 
 export type CursorPage = {
