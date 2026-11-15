@@ -4,6 +4,7 @@ import { format, parseISO } from 'date-fns'
 import { Users } from 'lucide-react'
 import { findCrmForAccount } from '../../lib/crmAccountLink'
 import { errorMessage } from '../../lib/errors'
+import { exportListCsv } from '../../lib/listIo'
 import type { Account, CrmEntry } from '../../lib/types'
 import {
   buttonSecondaryStyle,
@@ -78,12 +79,36 @@ export default function AccountCrmCard({ account }: { account: Account }) {
     <section style={{ ...cardStyle, marginTop: 16 }} aria-label="CRM deal">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>CRM deal</h2>
-        <Link
-          to={`/crm?edit=${encodeURIComponent(crm.id)}`}
-          style={{ ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12, textDecoration: 'none' }}
-        >
-          <Users size={14} /> Open in CRM
-        </Link>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            style={{ ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }}
+            onClick={() => {
+              exportListCsv(
+                `account-crm-${account.id.slice(0, 8)}.csv`,
+                ['company_name', 'pipeline_stage', 'owner', 'follow_up_date', 'next_action', 'notes'],
+                [
+                  {
+                    company_name: crm.company_name || account.name,
+                    pipeline_stage: crm.pipeline_stage || '',
+                    owner: crm.owner || '',
+                    follow_up_date: crm.follow_up_date || '',
+                    next_action: crm.next_action || '',
+                    notes: crm.notes || '',
+                  },
+                ],
+              )
+            }}
+          >
+            Export CSV
+          </button>
+          <Link
+            to={`/crm?edit=${encodeURIComponent(crm.id)}`}
+            style={{ ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12, textDecoration: 'none' }}
+          >
+            <Users size={14} /> Open in CRM
+          </Link>
+        </div>
       </div>
       <p style={{ margin: '10px 0 0', fontSize: 13, color: colors.text }}>
         {[crm.pipeline_stage || 'Lead', crm.owner?.trim() || 'Unassigned', follow ? `Follow-up ${follow}` : null, crm.next_action?.trim() || null]
