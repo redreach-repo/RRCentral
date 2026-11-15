@@ -164,6 +164,7 @@ export interface CompanyDocument {
   storage_provider: string
   uploaded_by: string
   uploaded_at: string
+  deleted_at?: string | null
 }
 
 export interface FollowUpUpdate {
