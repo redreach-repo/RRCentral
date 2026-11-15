@@ -5,7 +5,8 @@ import { Inbox } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { canSeeLeads, newLeads, type NewLead } from '../../lib/leadIntake'
 import { listRecentLeads } from '../../lib/leadIntakeStore'
-import { cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
+import { exportListCsv } from '../../lib/listIo'
+import { buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
 
 /** Leads from the website, WhatsApp and the landing page in the last 7 days. */
 export default function NewLeadsCard() {
@@ -29,9 +30,29 @@ export default function NewLeadsCard() {
 
   return (
     <section style={{ ...cardStyle, marginBottom: 16 }} aria-label="New leads">
-      <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
-        <Inbox size={18} /> New leads ({rows.length})
-      </h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+          <Inbox size={18} /> New leads ({rows.length})
+        </h2>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          onClick={() => {
+            exportListCsv(
+              'new-leads.csv',
+              ['name', 'detail', 'created_at', 'link'],
+              rows.map((r) => ({
+                name: r.name,
+                detail: r.detail,
+                created_at: r.created_at,
+                link: r.link,
+              })),
+            )
+          }}
+        >
+          Export CSV
+        </button>
+      </div>
       <p style={{ color: colors.muted, fontSize: 12, margin: '6px 0 10px' }}>
         From the website, WhatsApp and the AI CRM landing page in the last 7 days.
       </p>
