@@ -255,3 +255,13 @@ No database migrations. Documentation and `brand-assets/` only.
 **Tests**
 - `dsr_retention_test.sql`, `rate_limit_test.sql`
 
+
+
+## Post-M13 deepen — `20261302120000` … `20261302130000`
+
+**What**
+- PO `landed_cost_aed` + `landed_unit_cost`; receive allocates freight into product unit_cost
+- Project `retention_pct`, `billed_to_date_aed`, `wip_aed` + `rr_project_refresh_wip`
+
+**Tests**
+- Extended `purchase_orders_test.sql`, `project_accounting_test.sql`

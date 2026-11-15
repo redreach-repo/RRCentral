@@ -68,6 +68,7 @@ export type PurchaseOrder = {
   order_date: string
   currency: string
   notes: string
+  landed_cost_aed: number
 }
 
 export type PurchaseOrderLine = {
@@ -79,20 +80,24 @@ export type PurchaseOrderLine = {
   qty_ordered: number
   qty_received: number
   unit_cost: number
+  landed_unit_cost: number
 }
 
 export async function listPurchaseOrders(): Promise<PurchaseOrder[]> {
   if (!isSupabaseConfigured()) return []
   const { data, error } = await db
     .from('purchase_orders')
-    .select('id, po_number, vendor_name, status, order_date, currency, notes')
+    .select('id, po_number, vendor_name, status, order_date, currency, notes, landed_cost_aed')
     .order('order_date', { ascending: false })
     .limit(100)
   if (error) {
     if (isMissingRelationError(error)) return []
     throw error
   }
-  return (data || []) as PurchaseOrder[]
+  return (data || []).map((r: PurchaseOrder) => ({
+    ...r,
+    landed_cost_aed: Number(r.landed_cost_aed) || 0,
+  }))
 }
 
 export async function createPurchaseOrder(input: {
@@ -102,6 +107,7 @@ export async function createPurchaseOrder(input: {
   description: string
   qty: number
   unitCost: number
+  landedCostAed?: number
 }): Promise<PurchaseOrder> {
   const existing = await listPurchaseOrders()
   const po_number = nextPoNumber(
@@ -116,8 +122,9 @@ export async function createPurchaseOrder(input: {
       order_date: input.orderDate,
       status: 'ordered',
       notes: '',
+      landed_cost_aed: Number(input.landedCostAed) || 0,
     })
-    .select('id, po_number, vendor_name, status, order_date, currency, notes')
+    .select('id, po_number, vendor_name, status, order_date, currency, notes, landed_cost_aed')
     .single()
   if (error) throw error
   const { error: lErr } = await db.from('purchase_order_lines').insert({
@@ -130,17 +137,28 @@ export async function createPurchaseOrder(input: {
     unit_cost: input.unitCost,
   })
   if (lErr) throw lErr
-  return data as PurchaseOrder
+  return { ...data, landed_cost_aed: Number(data.landed_cost_aed) || 0 } as PurchaseOrder
 }
 
 export async function listPoLines(poId: string): Promise<PurchaseOrderLine[]> {
   const { data, error } = await db
     .from('purchase_order_lines')
-    .select('id, purchase_order_id, line_no, sku, description, qty_ordered, qty_received, unit_cost')
+    .select('id, purchase_order_id, line_no, sku, description, qty_ordered, qty_received, unit_cost, landed_unit_cost')
     .eq('purchase_order_id', poId)
     .order('line_no')
   if (error) throw error
-  return (data || []) as PurchaseOrderLine[]
+  return (data || []).map((r: PurchaseOrderLine) => ({
+    ...r,
+    landed_unit_cost: Number(r.landed_unit_cost) || 0,
+  }))
+}
+
+export async function updatePoLandedCost(poId: string, landedCostAed: number): Promise<void> {
+  const { error } = await db
+    .from('purchase_orders')
+    .update({ landed_cost_aed: Number(landedCostAed) || 0, updated_at: new Date().toISOString() })
+    .eq('id', poId)
+  if (error) throw error
 }
 
 export async function receivePoLine(lineId: string, qty: number, userEmail: string): Promise<void> {
@@ -160,6 +178,9 @@ export type DeliveryProject = {
   account_id: string | null
   budget_aed: number | null
   notes: string
+  retention_pct: number
+  billed_to_date_aed: number
+  wip_aed: number
 }
 
 export type ProjectCostLine = {
@@ -175,26 +196,56 @@ export async function listDeliveryProjects(): Promise<DeliveryProject[]> {
   if (!isSupabaseConfigured()) return []
   const { data, error } = await db
     .from('delivery_projects')
-    .select('id, code, name, status, account_id, budget_aed, notes')
+    .select('id, code, name, status, account_id, budget_aed, notes, retention_pct, billed_to_date_aed, wip_aed')
     .order('created_at', { ascending: false })
   if (error) {
     if (isMissingRelationError(error)) return []
     throw error
   }
-  return (data || []) as DeliveryProject[]
+  return (data || []).map((r: DeliveryProject) => ({
+    ...r,
+    retention_pct: Number(r.retention_pct) || 0,
+    billed_to_date_aed: Number(r.billed_to_date_aed) || 0,
+    wip_aed: Number(r.wip_aed) || 0,
+  }))
 }
 
 export async function createDeliveryProject(input: {
   code: string
   name: string
   budgetAed?: number | null
+  retentionPct?: number
 }): Promise<void> {
   const { error } = await db.from('delivery_projects').insert({
     code: input.code.trim(),
     name: input.name.trim(),
     status: 'active',
     budget_aed: input.budgetAed ?? null,
+    retention_pct: Number(input.retentionPct) || 0,
   })
+  if (error) throw error
+}
+
+export async function updateProjectBilling(input: {
+  projectId: string
+  billedToDateAed: number
+  retentionPct: number
+}): Promise<void> {
+  const { error } = await db
+    .from('delivery_projects')
+    .update({
+      billed_to_date_aed: Number(input.billedToDateAed) || 0,
+      retention_pct: Number(input.retentionPct) || 0,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', input.projectId)
+  if (error) throw error
+  const { error: wErr } = await db.rpc('rr_project_refresh_wip', { p_project: input.projectId })
+  if (wErr && !isMissingRelationError(wErr)) throw wErr
+}
+
+export async function refreshProjectWip(projectId: string): Promise<void> {
+  const { error } = await db.rpc('rr_project_refresh_wip', { p_project: projectId })
   if (error) throw error
 }
 

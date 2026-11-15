@@ -26,6 +26,7 @@ import {
 import docsStyles from '../styles/docsList.module.css'
 import { errorMessage } from '../lib/errors'
 import { parseInventoryAdjust } from '../lib/schemas/inventoryAdjust'
+import { exportListCsv } from '../lib/listIo'
 
 export default function InventoryPage() {
   const { t } = useI18n()
@@ -137,15 +138,40 @@ export default function InventoryPage() {
             )}
           </p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          style={{ background: 'rgba(255,255,255,0.08)' }}
-          disabled={busy}
-          onClick={() => void syncSkus()}
-        >
-          <RefreshCw size={16} /> {t('page.inventory.syncSkus')}
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!products.length}
+            onClick={() => {
+              exportListCsv(
+                'inventory.csv',
+                ['sku', 'name', 'division_code', 'stock_on_hand', 'stock_reserved', 'reorder_level'],
+                products.map((p) => ({
+                  sku: p.sku,
+                  name: p.name,
+                  division_code: p.division_code,
+                  stock_on_hand: p.stock_on_hand,
+                  stock_reserved: p.stock_reserved,
+                  reorder_level: p.reorder_level,
+                })),
+              )
+              showToast('Inventory CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'rgba(255,255,255,0.08)' }}
+            disabled={busy}
+            onClick={() => void syncSkus()}
+          >
+            <RefreshCw size={16} /> {t('page.inventory.syncSkus')}
+          </button>
+        </div>
       </header>
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>

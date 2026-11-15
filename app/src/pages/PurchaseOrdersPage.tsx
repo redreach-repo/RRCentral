@@ -10,9 +10,11 @@ import {
   listPoLines,
   listPurchaseOrders,
   receivePoLine,
+  updatePoLandedCost,
   type PurchaseOrder,
   type PurchaseOrderLine,
 } from '../lib/opsSliceStores'
+import { exportListCsv } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -35,6 +37,7 @@ export default function PurchaseOrdersPage() {
   const [desc, setDesc] = useState('')
   const [qty, setQty] = useState('1')
   const [cost, setCost] = useState('0')
+  const [landed, setLanded] = useState('0')
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -70,8 +73,32 @@ export default function PurchaseOrdersPage() {
             <Truck size={22} style={{ verticalAlign: 'middle', marginRight: 8 }} />
             Purchase orders
           </h1>
-          <p className={docsStyles.subtitle}>Order from suppliers and receive into inventory when the SKU matches.</p>
+          <p className={docsStyles.subtitle}>
+            Order from suppliers and receive into inventory when the SKU matches. Landed cost (freight/duty) allocates into unit cost on receive (Unverified).
+          </p>
         </div>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+          disabled={!rows.length}
+          onClick={() => {
+            exportListCsv(
+              'purchase-orders.csv',
+              ['po_number', 'vendor_name', 'status', 'order_date', 'landed_cost_aed'],
+              rows.map((r) => ({
+                po_number: r.po_number,
+                vendor_name: r.vendor_name,
+                status: r.status,
+                order_date: r.order_date,
+                landed_cost_aed: r.landed_cost_aed,
+              })),
+            )
+            showToast('PO CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
       </header>
 
       {loading ? (
@@ -89,12 +116,14 @@ export default function PurchaseOrdersPage() {
                 description: desc,
                 qty: Number(qty),
                 unitCost: Number(cost),
+                landedCostAed: Number(landed) || 0,
               })
                 .then(() => {
                   showToast('PO created', 'success')
                   setVendor('')
                   setSku('')
                   setDesc('')
+                  setLanded('0')
                   return load()
                 })
                 .catch((err) => showToast(errorMessage(err, 'Create failed'), 'error'))
@@ -122,6 +151,10 @@ export default function PurchaseOrdersPage() {
                 Unit cost
                 <input style={inputStyle} type="number" min={0} step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} />
               </label>
+              <label style={labelStyle}>
+                Landed cost (AED)
+                <input style={inputStyle} type="number" min={0} step="0.01" value={landed} onChange={(e) => setLanded(e.target.value)} />
+              </label>
             </div>
             <button type="submit" style={{ ...buttonPrimaryStyle, marginTop: 10 }}>
               Create
@@ -145,13 +178,37 @@ export default function PurchaseOrdersPage() {
             )}
             {selected ? (
               <div style={{ marginTop: 12 }}>
-                <h3 style={{ fontSize: 14 }}>{selected.po_number}</h3>
+                <h3 style={{ fontSize: 14 }}>
+                  {selected.po_number} · landed {Number(selected.landed_cost_aed || 0).toFixed(2)} AED
+                </h3>
+                <label style={{ ...labelStyle, maxWidth: 220, marginBottom: 8 }}>
+                  Update landed cost
+                  <input
+                    style={inputStyle}
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    defaultValue={selected.landed_cost_aed}
+                    onBlur={(e) => {
+                      const v = Number(e.target.value) || 0
+                      void updatePoLandedCost(selected.id, v)
+                        .then(async () => {
+                          showToast('Landed cost saved', 'success')
+                          await load()
+                          const next = (await listPurchaseOrders()).find((p) => p.id === selected.id)
+                          if (next) await openPo(next)
+                        })
+                        .catch((err) => showToast(errorMessage(err, 'Landed cost failed'), 'error'))
+                    }}
+                  />
+                </label>
                 {lines.map((l) => {
                   const rem = poReceiveRemaining(l.qty_ordered, l.qty_received)
                   return (
                     <div key={l.id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
                       <span style={{ fontSize: 13 }}>
                         {l.sku || '—'} {l.description} · ordered {l.qty_ordered} · received {l.qty_received}
+                        {l.landed_unit_cost ? ` · landed unit ${Number(l.landed_unit_cost).toFixed(2)}` : ''}
                       </span>
                       {rem > 0 && selected.status !== 'canceled' ? (
                         <button

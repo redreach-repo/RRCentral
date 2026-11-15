@@ -24,6 +24,7 @@ import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import { formatAED } from '../lib/money'
+import { buildVatReturnBoxes } from '../lib/vatReturn/vatReturnStub'
 import { BASE_CURRENCY, formatMoneyAmount } from '../lib/currency'
 import { buildCurrencyReport, cashReceivedByCurrency } from '../lib/currencyReports'
 import {
@@ -1058,6 +1059,33 @@ export default function ReportsPage() {
             </div>
             <div style={{ fontSize: 13, color: colors.muted, paddingBottom: 8 }}>
               VAT rate {(vatRate * 100).toFixed(0)}% · Not-awarded quotes excluded from income
+            </div>
+          </div>
+
+          <div style={cardStyle}>
+            <h2 style={{ margin: '0 0 8px', fontSize: 16 }}>VAT return boxes (stub)</h2>
+            <p style={{ margin: '0 0 12px', fontSize: 13, color: colors.muted }}>
+              Draft / Unverified — not for FTA filing. Export CSV also writes <code>vat-return-stub-…</code>.
+            </p>
+            <div style={tableWrapStyle}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Box</th>
+                    <th style={thStyle}>Label</th>
+                    <th style={thStyle}>Amount AED</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {buildVatReturnBoxes(vatReport.totals).map((b) => (
+                    <tr key={b.box}>
+                      <td style={tdStyle}>{b.box}</td>
+                      <td style={tdStyle}>{b.label}</td>
+                      <td style={tdStyle}>{formatAED(b.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
 

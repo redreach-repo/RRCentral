@@ -25,6 +25,7 @@ import {
   listExpensesForVendor,
 } from '../lib/supplierInvoiceStore'
 import { listVendors } from '../lib/vendors'
+import { exportListCsv } from '../lib/listIo'
 import {
   buttonDangerStyle,
   buttonPrimaryStyle,
@@ -276,14 +277,38 @@ export default function VendorsPage() {
           <h1 className={docsStyles.title}>{t('page.vendors.title')}</h1>
           <p className={docsStyles.subtitle}>{t('page.vendors.subtitle')}</p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          onClick={openCreate}
-          disabled={missingTable}
-        >
-          <Plus size={16} /> {t('page.vendors.new')}
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!filtered.length}
+            onClick={() => {
+              exportListCsv(
+                'vendors.csv',
+                ['company_name', 'primary_contact', 'email', 'mobile', 'trn'],
+                filtered.map((v) => ({
+                  company_name: v.company_name,
+                  primary_contact: v.primary_contact || '',
+                  email: v.email || '',
+                  mobile: v.mobile || '',
+                  trn: v.trn || '',
+                })),
+              )
+              showToast('Vendors CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            onClick={openCreate}
+            disabled={missingTable}
+          >
+            <Plus size={16} /> {t('page.vendors.new')}
+          </button>
+        </div>
       </header>
 
       {missingTable ? (
