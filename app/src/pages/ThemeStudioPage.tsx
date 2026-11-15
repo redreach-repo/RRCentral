@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Palette } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import { useTenant } from '../contexts/TenantContext'
@@ -15,6 +15,7 @@ import {
   coerceBrandKit,
   contrastRatio,
   fontStack,
+  normalizeBrandFonts,
   REDREACH_DEFAULT_BRAND,
   type BrandKit,
   type BrandKitDraft,
@@ -25,7 +26,7 @@ import {
   saveBrandKit,
   type BusinessUnitRow,
 } from '../lib/brandKitStore'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows, type ColumnMap } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -39,6 +40,92 @@ import docsStyles from '../styles/docsList.module.css'
 
 const COMPANY_SCOPE = '__company__'
 
+/** Match Theme Studio export headers (scope, colours, fonts, assets). */
+const BRAND_KITS_CSV_COLUMNS: ColumnMap[] = [
+  { key: 'scope', label: 'scope' },
+  { key: 'business_unit', label: 'business_unit' },
+  { key: 'primary_color', label: 'primary_color', required: true },
+  { key: 'accent_color', label: 'accent_color', required: true },
+  { key: 'neutral_dark', label: 'neutral_dark', required: true },
+  { key: 'neutral_light', label: 'neutral_light', required: true },
+  { key: 'heading_font', label: 'heading_font' },
+  { key: 'body_font', label: 'body_font' },
+  { key: 'density', label: 'density' },
+  { key: 'logo_horizontal_path', label: 'logo_horizontal_path' },
+  { key: 'logo_light_path', label: 'logo_light_path' },
+  { key: 'mark_square_path', label: 'mark_square_path' },
+  { key: 'legal_footer', label: 'legal_footer' },
+]
+
+/** Resolve company (null) vs BU id; undefined when BU cannot be matched. */
+function resolveBrandKitBuId(
+  scope: string,
+  businessUnit: string,
+  units: BusinessUnitRow[],
+): string | null | undefined {
+  const scopeRaw = scope.trim()
+  const nameRaw = businessUnit.trim()
+  const scopeLower = scopeRaw.toLowerCase()
+
+  if (!scopeRaw || scopeLower === 'company') {
+    if (nameRaw) {
+      const byName = units.find(
+        (u) =>
+          u.name.toLowerCase() === nameRaw.toLowerCase() ||
+          u.code.toLowerCase() === nameRaw.toLowerCase(),
+      )
+      if (byName) return byName.id
+    }
+    return null
+  }
+
+  const codeFromScope = scopeRaw.match(/^BU:(.+)$/i)?.[1]?.trim()
+  if (codeFromScope) {
+    const byCode = units.find((u) => u.code.toLowerCase() === codeFromScope.toLowerCase())
+    if (byCode) return byCode.id
+    if (nameRaw) {
+      const byName = units.find((u) => u.name.toLowerCase() === nameRaw.toLowerCase())
+      if (byName) return byName.id
+    }
+    return undefined
+  }
+
+  const byCode = units.find((u) => u.code.toLowerCase() === scopeLower)
+  if (byCode) return byCode.id
+  const byScopeName = units.find((u) => u.name.toLowerCase() === scopeLower)
+  if (byScopeName) return byScopeName.id
+  if (nameRaw) {
+    const byName = units.find(
+      (u) =>
+        u.name.toLowerCase() === nameRaw.toLowerCase() ||
+        u.code.toLowerCase() === nameRaw.toLowerCase(),
+    )
+    if (byName) return byName.id
+  }
+  return undefined
+}
+
+function rowToBrandKitDraft(row: Record<string, string>): BrandKitDraft {
+  const fonts = normalizeBrandFonts({
+    heading: row.heading_font,
+    body: row.body_font,
+    density: row.density,
+  })
+  return {
+    primary_color: row.primary_color,
+    accent_color: row.accent_color,
+    neutral_dark: row.neutral_dark,
+    neutral_light: row.neutral_light,
+    logo_horizontal_path: row.logo_horizontal_path || '',
+    logo_light_path: row.logo_light_path || '',
+    mark_square_path: row.mark_square_path || '',
+    legal_footer: row.legal_footer || '',
+    heading_font: fonts.heading,
+    body_font: fonts.body,
+    density: fonts.density,
+  }
+}
+
 /** §5.3 deepen: company + BU kits, fonts, density, live preview. */
 export default function ThemeStudioPage() {
   const { showToast } = useToast()
@@ -50,6 +137,8 @@ export default function ThemeStudioPage() {
   const [editingKit, setEditingKit] = useState<BrandKit>(brandKit)
   const [draft, setDraft] = useState<BrandKitDraft>(() => brandKitToDraft(brandKit))
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const loadScoped = useCallback(async () => {
     if (!activeCompany?.id || isLocalMode) {
@@ -199,6 +288,103 @@ export default function ThemeStudioPage() {
     }
   }
 
+  async function importBrandKitsCsv(file: File) {
+    if (!tenantId || !activeCompany?.id) {
+      showToast('No active company to import brand kits for', 'error')
+      return
+    }
+    if (isLocalMode) {
+      showToast('CSV import requires cloud mode', 'error')
+      return
+    }
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of BRAND_KITS_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, BRAND_KITS_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid brand kit rows', 'error')
+        return
+      }
+
+      const [buRows, kitRows] = await Promise.all([
+        listCompanyBusinessUnits(activeCompany.id),
+        listBrandKitsForCompany(activeCompany.id),
+      ])
+      setUnits(buRows)
+
+      let savedCount = 0
+      let skipped = errors.length
+      let nextKits = [...kitRows]
+      let companySaved: BrandKit | null = null
+
+      for (const row of ok) {
+        const buId = resolveBrandKitBuId(row.scope || '', row.business_unit || '', buRows)
+        if (buId === undefined) {
+          skipped += 1
+          continue
+        }
+        const draftRow = rowToBrandKitDraft(row)
+        const existing = nextKits.find((k) =>
+          buId ? k.business_unit_id === buId : k.business_unit_id == null,
+        )
+        try {
+          const saved = await saveBrandKit({
+            tenantId,
+            companyId: activeCompany.id,
+            businessUnitId: buId,
+            draft: draftRow,
+            existingId: existing?.id || null,
+          })
+          nextKits = nextKits.filter((k) =>
+            buId ? k.business_unit_id !== buId : k.business_unit_id != null,
+          )
+          nextKits.push(saved)
+          if (!buId) companySaved = saved
+          savedCount += 1
+        } catch {
+          skipped += 1
+        }
+      }
+
+      setKits(nextKits)
+      if (companySaved) {
+        setBrandKit(companySaved)
+        if (scopeId === COMPANY_SCOPE) {
+          setEditingKit(companySaved)
+          setDraft(brandKitToDraft(companySaved))
+        }
+      } else if (scopeId !== COMPANY_SCOPE) {
+        const current = nextKits.find((k) => k.business_unit_id === scopeId)
+        if (current) {
+          setEditingKit(current)
+          setDraft(brandKitToDraft(current))
+        }
+      } else {
+        const companyKit = nextKits.find((k) => k.business_unit_id == null)
+        if (companyKit) {
+          setEditingKit(companyKit)
+          setDraft(brandKitToDraft(companyKit))
+        }
+      }
+
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${savedCount} brand kit(s)${skipNote}`, 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Brand kits CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   if (!activeCompany) {
     return (
       <div className={docsStyles.page}>
@@ -223,55 +409,62 @@ export default function ThemeStudioPage() {
             on the asset zip.
           </p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-          disabled={!kits.length && !editingKit}
-          onClick={() => {
-            const rows = (kits.length ? kits : [editingKit]).map((k) => {
-              const fonts = k.fonts || { heading: '', body: '', density: '' }
-              const bu = k.business_unit_id ? units.find((u) => u.id === k.business_unit_id) : null
-              return {
-                scope: bu ? `BU:${bu.code}` : 'company',
-                business_unit: bu?.name || '',
-                primary_color: k.primary_color,
-                accent_color: k.accent_color,
-                neutral_dark: k.neutral_dark,
-                neutral_light: k.neutral_light,
-                heading_font: fonts.heading || '',
-                body_font: fonts.body || '',
-                density: fonts.density || '',
-                logo_horizontal_path: k.logo_horizontal_path || '',
-                logo_light_path: k.logo_light_path || '',
-                mark_square_path: k.mark_square_path || '',
-                legal_footer: k.legal_footer || '',
-              }
-            })
-            exportListCsv(
-              'brand-kits.csv',
-              [
-                'scope',
-                'business_unit',
-                'primary_color',
-                'accent_color',
-                'neutral_dark',
-                'neutral_light',
-                'heading_font',
-                'body_font',
-                'density',
-                'logo_horizontal_path',
-                'logo_light_path',
-                'mark_square_path',
-                'legal_footer',
-              ],
-              rows,
-            )
-            showToast('Brand kits CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importBrandKitsCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing || isLocalMode || !activeCompany}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!kits.length && !editingKit}
+            onClick={() => {
+              const rows = (kits.length ? kits : [editingKit]).map((k) => {
+                const fonts = k.fonts || { heading: '', body: '', density: '' }
+                const bu = k.business_unit_id ? units.find((u) => u.id === k.business_unit_id) : null
+                return {
+                  scope: bu ? `BU:${bu.code}` : 'company',
+                  business_unit: bu?.name || '',
+                  primary_color: k.primary_color,
+                  accent_color: k.accent_color,
+                  neutral_dark: k.neutral_dark,
+                  neutral_light: k.neutral_light,
+                  heading_font: fonts.heading || '',
+                  body_font: fonts.body || '',
+                  density: fonts.density || '',
+                  logo_horizontal_path: k.logo_horizontal_path || '',
+                  logo_light_path: k.logo_light_path || '',
+                  mark_square_path: k.mark_square_path || '',
+                  legal_footer: k.legal_footer || '',
+                }
+              })
+              exportListCsv(
+                'brand-kits.csv',
+                BRAND_KITS_CSV_COLUMNS.map((c) => c.key),
+                rows,
+              )
+              showToast('Brand kits CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </header>
 
       <div style={{ marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'end' }}>
