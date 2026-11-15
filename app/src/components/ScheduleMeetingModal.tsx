@@ -14,7 +14,9 @@ import {
   labelStyle,
 } from '../lib/uiStyles'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import { parseScheduleMeetingForm } from '../lib/schemas/scheduleMeeting'
+import { useToast } from '../contexts/ToastContext'
 
 type Props = {
   open: boolean
@@ -35,6 +37,7 @@ export default function ScheduleMeetingModal({
   defaultCrmId = '',
   onCreated,
 }: Props) {
+  const { showToast } = useToast()
   const [title, setTitle] = useState('')
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [time, setTime] = useState('10:00')
@@ -217,7 +220,33 @@ export default function ScheduleMeetingModal({
       {error ? (
         <p style={{ color: colors.danger, fontSize: 13, margin: '0 0 12px' }}>{error}</p>
       ) : null}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={saving}
+          onClick={() => {
+            const crm = crmEntries.find((c) => c.id === crmId)
+            exportListCsv(
+              'schedule-meeting.csv',
+              ['field', 'value'],
+              [
+                { field: 'title', value: title },
+                { field: 'date', value: date },
+                { field: 'time', value: time },
+                { field: 'duration_minutes', value: duration },
+                { field: 'location', value: location },
+                { field: 'notes', value: notes },
+                { field: 'crm_company', value: crm?.company_name || '' },
+                { field: 'crm_id', value: crmId },
+                ...selectedTeam.map((email, i) => ({ field: `invitee_${i + 1}`, value: email })),
+              ],
+            )
+            showToast('Meeting draft CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
         <button type="button" style={buttonSecondaryStyle} onClick={onClose} disabled={saving}>
           Cancel
         </button>
