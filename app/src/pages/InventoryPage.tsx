@@ -55,7 +55,9 @@ export default function InventoryPage() {
         listWarehouses().catch(() => [] as Warehouse[]),
       ])
       if (error) throw error
-      setProducts((data || []) as Product[])
+      setProducts(
+        ((data || []) as (Product & { deleted_at?: string | null })[]).filter((p) => !p.deleted_at),
+      )
       setWarehouses(wh)
       setWarehouseId((prev) => prev || defaultWarehouse(wh)?.id || '')
     } catch (e) {

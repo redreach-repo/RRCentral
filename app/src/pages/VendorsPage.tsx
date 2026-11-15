@@ -253,11 +253,21 @@ export default function VendorsPage() {
     if (!deleteTarget) return
     setSaving(true)
     try {
-      const { error } = await db
+      let { error } = await db
         .from('vendors')
-        .update({ active: false, updated_at: new Date().toISOString() })
+        .update({
+          active: false,
+          deleted_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', deleteTarget.id)
-      if (error) throw error
+      if (error) {
+        const retry = await db
+          .from('vendors')
+          .update({ active: false, updated_at: new Date().toISOString() })
+          .eq('id', deleteTarget.id)
+        if (retry.error) throw retry.error
+      }
       await logActivity('archive_vendor', 'vendor', deleteTarget.company_name, '', user?.email || '')
       showToast('Vendor archived', 'success')
       setDeleteTarget(null)

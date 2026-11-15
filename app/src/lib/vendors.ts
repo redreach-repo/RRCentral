@@ -22,7 +22,9 @@ export async function listVendors(): Promise<Vendor[]> {
     if (isMissingRelationError(error)) return []
     throw error
   }
-  return ((data || []) as Vendor[]).filter((v) => v.active !== false)
+  return ((data || []) as Vendor[]).filter(
+    (v) => v.active !== false && !(v as Vendor & { deleted_at?: string | null }).deleted_at,
+  )
 }
 
 export async function findVendorByName(companyName: string): Promise<Vendor | null> {

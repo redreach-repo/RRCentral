@@ -11,6 +11,9 @@ import GuidePage from './pages/GuidePage'
 import AboutProductPage from './pages/AboutProductPage'
 import HrPeoplePage from './pages/HrPeoplePage'
 import HrLeavePage from './pages/HrLeavePage'
+import HrAttendancePage from './pages/HrAttendancePage'
+import ConstructionSitesPage from './pages/ConstructionSitesPage'
+import PlanningGoalsPage from './pages/PlanningGoalsPage'
 import LedgerPage from './pages/LedgerPage'
 import PayrollPage from './pages/PayrollPage'
 import MarketingPage from './pages/MarketingPage'
@@ -169,6 +172,7 @@ export default function App() {
               <Route path="about-product" element={<AboutProductPage />} />
               <Route path="hr/people" element={<HrPeoplePage />} />
               <Route path="hr/leave" element={<HrLeavePage />} />
+              <Route path="hr/attendance" element={<HrAttendancePage />} />
               <Route path="ledger" element={<LedgerPage />} />
               <Route path="payroll" element={<PayrollPage />} />
               <Route path="marketing" element={<MarketingPage />} />
@@ -177,7 +181,9 @@ export default function App() {
               <Route path="country-packs" element={<CountryPacksPage />} />
               <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
               <Route path="projects" element={<ProjectsPage />} />
+              <Route path="construction-sites" element={<ConstructionSitesPage />} />
               <Route path="client-pos" element={<ClientPosPage />} />
+              <Route path="planning-goals" element={<PlanningGoalsPage />} />
               <Route path="approvals" element={<ApprovalsPage />} />
               <Route path="public-api" element={<PublicApiPage />} />
               <Route path="theme-studio" element={<ThemeStudioPage />} />
