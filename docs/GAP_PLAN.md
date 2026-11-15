@@ -24,7 +24,7 @@ Status key: **exists** · **partial** · **missing**
 | RLS on every table | exists | M1 RESTRICTIVE tenant isolation on stamped tables |
 | Cross-tenant CI tests | partial | `tenant_isolation_test.sql` covers CRM, vendors, accounts, quotations, invoices, sales_deals, expenses, delivery_notes, payment_log, contracts, tickets, ctrm_deals, legal_documents, owned_domains, customer_documents, products, inventory_movements, quote_templates, income, follow_up_updates, supplier_commitments, saved_views, pipelines, pipeline_stages, custom_field_definitions, custom_field_values, numbering_sequences, brand_kits, business_units, workflow_definitions, workflow_runs, event_outbox + audit append-only; keep expanding stamped tables |
 | Roles + record rules + field permissions | partial | Fixed 5 roles; field-mask API started (`fieldPermissions`); record rules later |
-| Maker-checker | partial | M7: Approvals queue; payroll + large expenses wired; supplier payments / refunds next |
+| Maker-checker | partial | M7: Approvals queue; payroll, expenses, refunds, supplier commitments ≥ AED 5k wired |
 | Customization layer (fields, pipelines, objects, workflows, templates, views, dashboards, labels, numbering) | partial | M2 layer largely in: numbering, fields, views, pipelines, workflow defs + runner (approval/notify); more step types / dashboards later |
 | Industry packs | partial | M12: catalog + activate enables moduleFlags; deeper object templates later |
 | Shell: Inbox/Sales/… areas, Cmd+K, AI button | partial | Accordion nav exists; restructure shell in M1 |

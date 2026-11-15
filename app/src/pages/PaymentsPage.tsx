@@ -46,6 +46,11 @@ import {
 import docsStyles from '../styles/docsList.module.css'
 import { PAYMENT_METHODS } from '../lib/config'
 import { errorMessage } from '../lib/errors'
+import { ensureMoneyApproval } from '../lib/featureSliceStores'
+import {
+  DEFAULT_APPROVAL_THRESHOLD_AED,
+  moneyActionRowStatus,
+} from '../lib/makerChecker'
 import {
   parseCustomerPaymentForm,
   parseCustomerRefundForm,
@@ -96,7 +101,7 @@ const emptyPay = (q?: Quotation | null): PayForm => ({
 
 export default function PaymentsPage() {
   const { t } = useI18n()
-  const { user } = useAuth()
+  const { user, appUserId } = useAuth()
   const { showToast } = useToast()
   const [quotes, setQuotes] = useState<Quotation[]>([])
   const [payments, setPayments] = useState<CustomerPayment[]>([])
@@ -244,7 +249,27 @@ export default function PaymentsPage() {
     try {
       const rate = Number(refundPayment.fx_rate) || 1
       const base = toBaseAmount(parsed.data.amount_refunded, rate)
+      const refundId = crypto.randomUUID()
+      let gate: { proceed: boolean; needsApproval: boolean; reason?: string } = {
+        proceed: true,
+        needsApproval: false,
+      }
+      if (base >= DEFAULT_APPROVAL_THRESHOLD_AED) {
+        gate = await ensureMoneyApproval({
+          objectType: 'customer_refund',
+          objectId: refundId,
+          action: 'refund',
+          amountAed: base,
+          requestedBy: appUserId || user?.email || null,
+        })
+      }
+      const status = moneyActionRowStatus({
+        proceed: gate.proceed,
+        needsApproval: gate.needsApproval,
+        approvedStatus: 'Refunded',
+      })
       await saveCustomerRefund({
+        id: refundId,
         payment_id: refundPayment.id,
         booking_id: selected.id,
         quote_ref: selected.reference_number || selected.quote_id,
@@ -261,13 +286,18 @@ export default function PaymentsPage() {
         base_amount: base,
         fx_gain_loss: 0,
         reason: parsed.data.reason,
-        approved_by: user?.email || '',
-        approved_at: new Date().toISOString(),
-        status: 'Refunded',
+        approved_by: gate.proceed ? user?.email || '' : '',
+        approved_at: gate.proceed ? new Date().toISOString() : null,
+        status,
         notes: '',
         created_by: user?.email || '',
       })
-      showToast('Refund recorded', 'success')
+      showToast(
+        gate.proceed
+          ? 'Refund recorded'
+          : `Refund submitted for maker-checker (≥ AED ${DEFAULT_APPROVAL_THRESHOLD_AED})`,
+        'success',
+      )
       setRefundOpen(false)
       setRefundPayment(null)
       await loadLedger(selected.id)
@@ -288,6 +318,21 @@ export default function PaymentsPage() {
     setSaving(true)
     try {
       const s = parsed.data
+      const commitmentId = crypto.randomUUID()
+      const base = toBaseAmount(s.amount, Number(s.fx_rate) || 1)
+      let gate: { proceed: boolean; needsApproval: boolean; reason?: string } = {
+        proceed: true,
+        needsApproval: false,
+      }
+      if (base >= DEFAULT_APPROVAL_THRESHOLD_AED) {
+        gate = await ensureMoneyApproval({
+          objectType: 'supplier_commitment',
+          objectId: commitmentId,
+          action: 'supplier_pay',
+          amountAed: base,
+          requestedBy: appUserId || user?.email || null,
+        })
+      }
       await approveFxRate({
         from: s.currency,
         rate: s.fx_rate,
@@ -295,7 +340,13 @@ export default function PaymentsPage() {
         approvedBy: user?.email || '',
         notes: `Supplier ${s.supplier_name} · ${selected.reference_number || selected.quote_id}`,
       })
+      const status = moneyActionRowStatus({
+        proceed: gate.proceed,
+        needsApproval: gate.needsApproval,
+        approvedStatus: 'Open',
+      })
       await saveSupplierCommitment({
+        id: commitmentId,
         booking_id: selected.id,
         quote_ref: selected.reference_number || selected.quote_id,
         supplier_name: s.supplier_name,
@@ -304,11 +355,17 @@ export default function PaymentsPage() {
         currency: s.currency,
         fx_rate: s.fx_rate,
         fx_rate_date: s.fx_rate_date,
-        status: 'Open',
+        base_amount: base,
+        status,
         due_date: s.due_date || null,
         notes: s.notes,
       })
-      showToast('Supplier commitment saved (original currency preserved)', 'success')
+      showToast(
+        gate.proceed
+          ? 'Supplier commitment saved (original currency preserved)'
+          : `Supplier commitment submitted for maker-checker (≥ AED ${DEFAULT_APPROVAL_THRESHOLD_AED})`,
+        'success',
+      )
       setSupplierOpen(false)
       await loadLedger(selected.id)
     } catch (e) {

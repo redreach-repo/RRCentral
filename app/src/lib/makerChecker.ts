@@ -6,6 +6,20 @@ export type ApprovalDecision = 'approve' | 'reject' | 'cancel'
 
 export const DEFAULT_APPROVAL_THRESHOLD_AED = 5000
 
+/** Object types that keep a Pending Approval row until checker decides. */
+export const MONEY_ACTION_PENDING_STATUS = 'Pending Approval'
+
+export function moneyActionRowStatus(input: {
+  proceed: boolean
+  needsApproval: boolean
+  approvedStatus: string
+  pendingStatus?: string
+}): string {
+  if (input.proceed) return input.approvedStatus
+  if (input.needsApproval) return input.pendingStatus ?? MONEY_ACTION_PENDING_STATUS
+  return input.approvedStatus
+}
+
 export function nextApprovalStatus(
   current: ApprovalStatus,
   decision: ApprovalDecision,
