@@ -14,6 +14,7 @@ import SimpleRowActions from '../components/SimpleRowActions'
 import { db, currentAuthMode } from '../lib/db'
 import type { AppUser, CompanyDocument, CompanyDocumentCategory, UserRole } from '../lib/types'
 import TwoStepCard from '../components/security/TwoStepCard'
+import PasskeyStubCard from '../components/security/PasskeyStubCard'
 import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { useSettings } from '../contexts/SettingsContext'
@@ -623,6 +624,7 @@ export default function SettingsPage() {
         <h1 style={pageTitleStyle}>{t('page.account.title')}</h1>
         <p style={pageSubtitleStyle}>{t('page.account.subtitle')}</p>
         <TwoStepCard />
+        <PasskeyStubCard />
         <div style={cardStyle}>
           <h2 style={sectionTitleStyle}>{t('page.settings.section.myPassword')}</h2>
           <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
@@ -1562,6 +1564,7 @@ export default function SettingsPage() {
 
       <div id="two-step" style={{ scrollMarginTop: 72 }}>
         <TwoStepCard />
+        <PasskeyStubCard />
       </div>
 
       <div style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }} id="account">

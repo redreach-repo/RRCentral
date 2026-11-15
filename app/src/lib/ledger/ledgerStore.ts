@@ -81,6 +81,8 @@ export async function createDraftJournal(input: {
   entryDate: string
   memo: string
   lines: JournalLineInput[]
+  sourceType?: string
+  sourceId?: string
 }): Promise<GlJournal> {
   const lines = input.lines.map(normalizeLine).filter((l): l is NonNullable<typeof l> => Boolean(l))
   const bal = journalBalance(lines)
@@ -99,7 +101,8 @@ export async function createDraftJournal(input: {
       entry_date: input.entryDate,
       memo: input.memo.trim(),
       status: 'draft',
-      source_type: 'manual',
+      source_type: input.sourceType || 'manual',
+      source_id: input.sourceId || '',
     })
     .select('id, journal_number, entry_date, memo, status, source_type, source_id, posted_at')
     .single()
@@ -116,6 +119,42 @@ export async function createDraftJournal(input: {
   const { error: lErr } = await db.from('gl_journal_lines').insert(rows)
   if (lErr) throw lErr
   return header as GlJournal
+}
+
+/** M13: create draft journal from invoice totals using starter CoA codes (Unverified). */
+export async function createInvoiceAutoPostDraft(input: {
+  invoiceId: string
+  invoiceNumber: string
+  entryDate: string
+  exclusiveAed: number
+  vatAed: number
+  inclusiveAed: number
+}): Promise<GlJournal | null> {
+  const { autoPostMemo, autoPostSourceId, invoiceToDraftLines, linesBalance } = await import('./autoPost')
+  const draftLines = invoiceToDraftLines(input)
+  if (!draftLines.length || !linesBalance(draftLines)) return null
+
+  const accounts = await listGlAccounts()
+  const map = new Map(accounts.map((a) => [a.code, a.id]))
+  const resolved = draftLines.map((l) => {
+    const accountId = map.get(l.code)
+    if (!accountId) return null
+    return { accountId, memo: l.memo, debit: l.debit, credit: l.credit }
+  })
+  if (resolved.some((r) => !r)) return null
+  try {
+    return await createDraftJournal({
+      entryDate: input.entryDate,
+      memo: autoPostMemo(input),
+      lines: resolved as JournalLineInput[],
+      sourceType: 'invoice',
+      sourceId: autoPostSourceId(input.invoiceId),
+    })
+  } catch (e) {
+    // Unique source key → already drafted
+    if (String((e as { code?: string })?.code || '').includes('23505')) return null
+    throw e
+  }
 }
 
 export async function postJournal(journalId: string, lines: JournalLineInput[]): Promise<GlJournal> {

@@ -210,6 +210,7 @@ const CORE_MODULES: ModuleManifest[] = [
       { to: '/approvals', label: 'Approvals', icon: ShieldCheck, minRole: 'manager' },
       { to: '/public-api', label: 'API and webhooks', icon: KeyRound, minRole: 'admin' },
       { to: '/audit-log', label: 'Audit log', icon: ShieldCheck, minRole: 'admin' },
+      { to: '/dsr', label: 'Data requests', icon: ShieldCheck, minRole: 'admin' },
       { to: '/app-errors', label: 'App errors', icon: Bug, minRole: 'admin' },
       { to: '/system-check', label: 'System check', icon: Activity, minRole: 'admin' },
     ],

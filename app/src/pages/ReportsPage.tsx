@@ -570,6 +570,11 @@ export default function ReportsPage() {
         ...expenseRows,
       ].join('\n')
       downloadCsv(`vat-report-${qLabel}.csv`, body)
+      // M13: also offer FTA-shaped stub (Unverified — not for filing).
+      void import('../lib/vatReturn/vatReturnStub').then(({ buildVatReturnBoxes, vatReturnCsv }) => {
+        const boxes = buildVatReturnBoxes(vatReport.totals)
+        downloadCsv(`vat-return-stub-${qLabel}.csv`, vatReturnCsv(qLabel, boxes))
+      })
     }
     showToast('CSV downloaded', 'success')
   }

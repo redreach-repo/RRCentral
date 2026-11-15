@@ -74,8 +74,8 @@ Status key: **exists** · **partial** · **missing**
 | AI human approval queue | partial | M10: queue + account Suggest button; Alfred SQL/Edge deploy still needed |
 | Field-level encryption (salary, IBAN, tokens) | missing | M1 for tokens; M6/M8 for HR fields |
 | Append-only audit | partial | `audit_log` exists; CI asserts authenticated cannot INSERT/UPDATE/DELETE (REVOKE); prune stays security definer |
-| Sentry / structured logs | missing | M0/M1 add |
-| Soft delete / retention tooling | partial | Soft patterns vary; DSR tooling missing |
+| Sentry / structured logs | partial | Built behind DSN (off until Alfred); App errors + structured Edge logs |
+| Soft delete / retention tooling | partial | M13: DSR log + prune wrapper + contact anonymize; broader soft-delete later |
 | Demo isolation + outbound block | partial | Browser + Edge guards + seed; demo cloud project + deploy workflow still Alfred |
 
 ---
@@ -87,8 +87,8 @@ Status key: **exists** · **partial** · **missing**
 | UAE VAT codes / TRN / e-invoice ready model | partial | VAT on docs; no CoA tax engine → M7 + COMPLIANCE_NOTES |
 | WPS / gratuity | partial | M8 draft CSV + SIF + export audit; **verify law + bank** before live use |
 | Client PO tracker | partial | M9a table + UI; invoice auto-match later |
-| Arabic bilingual PDFs | missing | M1/M7 |
-| Import/export every list | partial | Some CSV; not universal → M1 framework |
+| Arabic bilingual PDFs | partial | Bilingual document toggle shipped; native review later |
+| Import/export every list | partial | M13 `listIo` CSV framework + Accounts export; more lists later |
 | Keep RR Central workflows | exists | Must not break §B.3 during M1–M3 |
 
 ---
