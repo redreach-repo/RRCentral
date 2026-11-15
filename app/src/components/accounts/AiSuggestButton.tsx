@@ -9,6 +9,7 @@ import {
   requestAiProposals,
 } from '../../lib/aiApprovals/aiApprovalsStore'
 import { errorMessage } from '../../lib/errors'
+import { exportListCsv } from '../../lib/listIo'
 import { isSupabaseConfigured } from '../../lib/supabaseConfig'
 import type { Account } from '../../lib/types'
 import {
@@ -148,9 +149,35 @@ export default function AiSuggestButton({
 
         {pending.length > 0 ? (
           <div style={{ marginTop: 16 }}>
-            <p style={{ margin: '0 0 8px', fontSize: 12, color: colors.muted, fontWeight: 600 }}>
-              Waiting on this account ({pending.length})
-            </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+              <p style={{ margin: 0, fontSize: 12, color: colors.muted, fontWeight: 600 }}>
+                Waiting on this account ({pending.length})
+              </p>
+              <button
+                type="button"
+                style={buttonSecondaryStyle}
+                onClick={() => {
+                  exportListCsv(
+                    `ai-suggestions-${account.reference || account.id}.csv`,
+                    ['summary', 'action', 'detail', 'rationale', 'model', 'cost_usd', 'proposed_by', 'created_at', 'status'],
+                    pending.map((p) => ({
+                      summary: p.summary || describeProposal(p.action, p.payload)[0] || '',
+                      action: p.action,
+                      detail: describeProposal(p.action, p.payload).join(' | '),
+                      rationale: p.rationale || '',
+                      model: p.model || '',
+                      cost_usd: p.cost_usd,
+                      proposed_by: p.proposed_by_email || '',
+                      created_at: p.created_at || '',
+                      status: p.status,
+                    })),
+                  )
+                  showToast('AI suggestions CSV downloaded', 'success')
+                }}
+              >
+                Export CSV
+              </button>
+            </div>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
               {pending.map((p) => (
                 <li
