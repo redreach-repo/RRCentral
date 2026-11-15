@@ -64,6 +64,10 @@ export type NoNextStepRow = {
   link: string
   owner_user_id: string | null
   owner_label: string
+  /** Current next action text (may be empty when that is what is missing). */
+  next_action: string
+  /** Current next-action date (CRM follow_up_date / deal next_action_date). */
+  next_action_date: string | null
 }
 
 export type NoNextStepInput = {
@@ -105,6 +109,8 @@ export function noNextStep(input: NoNextStepInput): NoNextStepRow[] {
       link: `/crm?edit=${c.id}`,
       owner_user_id: login?.id ?? null,
       owner_label: login ? login.name : String(c.owner || ''),
+      next_action: String(c.next_action || '').trim(),
+      next_action_date: c.follow_up_date,
     })
   }
   const deal = (pipeline: 'sales' | 'ctrm', d: NoNextStepInput['salesDeals'][number] | NoNextStepInput['ctrmDeals'][number]) => {
@@ -120,6 +126,8 @@ export function noNextStep(input: NoNextStepInput): NoNextStepRow[] {
       link: `/accounts/${d.account_id}`,
       owner_user_id: d.owner_user_id && userName.has(d.owner_user_id) ? d.owner_user_id : null,
       owner_label: (d.owner_user_id && userName.get(d.owner_user_id)) || '',
+      next_action: String(d.next_action || '').trim(),
+      next_action_date: d.next_action_date,
     })
   }
   for (const d of input.salesDeals) deal('sales', d)
