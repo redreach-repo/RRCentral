@@ -46,7 +46,7 @@ import {
   restoreCompanyDocument,
   saveCompanyDocument,
 } from '../lib/companyDocs'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { can, ROLE_DESCRIPTIONS, ROLE_LABELS, USER_ROLES } from '../lib/permissions'
 import {
   listNumberingSequences,
@@ -233,6 +233,7 @@ export default function SettingsPage() {
   const [deleteUser, setDeleteUser] = useState<AppUser | null>(null)
   const [busy, setBusy] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [importingCompanyCsv, setImportingCompanyCsv] = useState(false)
   const [backingUp, setBackingUp] = useState(false)
   const [testingZoho, setTestingZoho] = useState(false)
   const [newPassword, setNewPassword] = useState('')
@@ -273,6 +274,7 @@ export default function SettingsPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const backupRef = useRef<HTMLInputElement>(null)
   const cloudBackupRef = useRef<HTMLInputElement>(null)
+  const companyDocsCsvRef = useRef<HTMLInputElement>(null)
   const runtimeCfg = getSupabaseRuntimeConfig()
   const [supabaseUrl, setSupabaseUrl] = useState(
     runtimeCfg.source === 'runtime'
@@ -419,6 +421,113 @@ export default function SettingsPage() {
       showToast(errorMessage(e, 'Save failed'), 'error')
     } finally {
       setBusy(false)
+    }
+  }
+
+  function resolveCompanyDocCategory(raw: string): CompanyDocumentCategory {
+    const v = raw.trim()
+    if (!v) return 'other'
+    const byId = COMPANY_DOC_CATEGORIES.find((c) => c.id === v)
+    if (byId) return byId.id
+    const byLabel = COMPANY_DOC_CATEGORIES.find((c) => c.label.toLowerCase() === v.toLowerCase())
+    return byLabel?.id ?? 'other'
+  }
+
+  function parseYesNo(raw: string): boolean | null {
+    const v = raw.trim().toLowerCase()
+    if (!v) return null
+    if (v === 'yes' || v === 'true' || v === '1' || v === 'y') return true
+    if (v === 'no' || v === 'false' || v === '0' || v === 'n') return false
+    return null
+  }
+
+  async function importCompanyDocsCsv(file: File) {
+    if (companyDocsMissing) {
+      showToast('Create the company_documents table before importing', 'error')
+      return
+    }
+    setImportingCompanyCsv(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows)
+      const byUrl = new Map(
+        companyDocs
+          .filter((d) => d.drive_url)
+          .map((d) => [d.drive_url.trim().toLowerCase(), d] as const),
+      )
+      const byTitleCat = new Map(
+        companyDocs.map(
+          (d) => [`${d.category}::${(d.title || '').trim().toLowerCase()}`, d] as const,
+        ),
+      )
+      let created = 0
+      let updated = 0
+      let skipped = 0
+
+      for (const row of objects) {
+        const driveUrl = String(row.drive_url || '').trim()
+        const title = String(row.title || '').trim()
+        const category = resolveCompanyDocCategory(String(row.category || ''))
+        const archived = parseYesNo(String(row.archived || ''))
+        if (!driveUrl) {
+          skipped += 1
+          continue
+        }
+        // Archived export rows are skipped on import (restore stays manual).
+        if (archived === true) {
+          skipped += 1
+          continue
+        }
+        const fileName = String(row.file_name || '').trim()
+        const notes = String(row.notes || '').trim()
+        const expiresOn = String(row.expires_on || '').trim().slice(0, 10) || null
+        const existing =
+          byUrl.get(driveUrl.toLowerCase()) ||
+          (title ? byTitleCat.get(`${category}::${title.toLowerCase()}`) : undefined)
+        try {
+          const saved = await saveCompanyDocument(
+            {
+              category,
+              title: title || companyDocCategoryLabel(category),
+              file_name: fileName,
+              drive_url: driveUrl,
+              notes,
+              expires_on: expiresOn,
+              uploaded_by: user?.email || '',
+            },
+            existing?.id,
+          )
+          byUrl.set(driveUrl.toLowerCase(), saved)
+          byTitleCat.set(`${saved.category}::${(saved.title || '').trim().toLowerCase()}`, saved)
+          if (existing) updated += 1
+          else created += 1
+        } catch {
+          skipped += 1
+        }
+      }
+
+      const applied = created + updated
+      if (!applied) {
+        showToast(skipped ? 'No company document rows to import' : 'CSV has no data rows', 'error')
+        return
+      }
+      const parts = [
+        created ? `${created} added` : '',
+        updated ? `${updated} updated` : '',
+      ].filter(Boolean)
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Company documents CSV: ${parts.join(', ')}${skipNote}`, 'success')
+      await loadCompanyDocs()
+    } catch (e) {
+      showToast(errorMessage(e, 'Company documents CSV import failed'), 'error')
+    } finally {
+      setImportingCompanyCsv(false)
+      if (companyDocsCsvRef.current) companyDocsCsvRef.current.value = ''
     }
   }
 
@@ -1092,10 +1201,28 @@ export default function SettingsPage() {
             >
               {showArchivedCompanyDocs ? 'Hide archived' : 'Show archived'}
             </button>
+            <input
+              ref={companyDocsCsvRef}
+              type="file"
+              accept=".csv,text/csv"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) void importCompanyDocsCsv(file)
+              }}
+            />
             <button
               type="button"
               style={buttonSecondaryStyle}
-              disabled={!companyDocs.length}
+              disabled={importingCompanyCsv || companyDocsMissing || busy}
+              onClick={() => companyDocsCsvRef.current?.click()}
+            >
+              <Upload size={16} /> {importingCompanyCsv ? 'Importing…' : 'Import CSV'}
+            </button>
+            <button
+              type="button"
+              style={buttonSecondaryStyle}
+              disabled={!companyDocs.length || importingCompanyCsv}
               onClick={() => {
                 exportListCsv(
                   'company-documents.csv',
@@ -1115,7 +1242,7 @@ export default function SettingsPage() {
             >
               <Download size={16} /> Export CSV
             </button>
-            <button type="button" style={buttonPrimaryStyle} onClick={openCompanyDocCreate}>
+            <button type="button" style={buttonPrimaryStyle} onClick={openCompanyDocCreate} disabled={importingCompanyCsv}>
               <Plus size={16} /> Add document
             </button>
           </div>
