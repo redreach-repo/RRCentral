@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import { Plane, Plus, Shield } from 'lucide-react'
@@ -40,7 +40,8 @@ import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
 import SavedViewsBar from '../components/SavedViewsBar'
 import StatusPill from '../components/StatusPill'
-import { exportListCsv } from '../lib/listIo'
+import { WANDERS_CSV_COLUMNS } from '../lib/wandersCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -79,6 +80,8 @@ export default function WandersPage() {
   const [tab, setTab] = useState<Tab>('trip')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const [paxOpen, setPaxOpen] = useState(false)
   const [paxForm, setPaxForm] = useState<WandersPassenger | null>(null)
   const [stageFilter, setStageFilter] = useState('All')
@@ -223,6 +226,71 @@ export default function WandersPage() {
     showToast(`Applied package ${pkg.code} (internal catalogue)`, 'success')
   }
 
+  async function importWandersCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of WANDERS_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, WANDERS_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid Wanders deal rows', 'error')
+        return
+      }
+      let saved = 0
+      for (const row of ok) {
+        const deal = emptyWandersDeal({
+          client_name: row.client_name,
+          sales_stage: row.sales_stage || 'New enquiry',
+          booking_status: row.booking_status || 'Deposit pending',
+          destination_country: row.destination_country || '',
+          departure_date: row.departure_date || null,
+          return_date: row.return_date || null,
+          lead_contact: row.lead_contact || '',
+          email: row.email || '',
+          mobile: row.mobile || '',
+          budget_amount: Number(row.budget_amount) || 0,
+          budget_currency: row.budget_currency || baseCurrency,
+          sales_owner: user?.email || '',
+          operations_owner: user?.email || '',
+          deposit_percent: Number(settings.wandersDepositPercent) || 50,
+          hold_business_days: Number(settings.wandersHoldBusinessDays) || 3,
+          terms_version: settings.wandersTermsVersion || 'WAN-TERMS-2026-07-DRAFT',
+          booking_currency: baseCurrency,
+          quote_currency: baseCurrency,
+          terms_text: buildWandersTermsText({
+            depositPercent: Number(settings.wandersDepositPercent) || 50,
+            holdBusinessDays: Number(settings.wandersHoldBusinessDays) || 3,
+            balanceDaysBefore: settings.wandersBalanceDaysBefore || '30-45',
+            version: settings.wandersTermsVersion,
+            governingLaw: settings.wandersGoverningLaw,
+            disputeJurisdiction: settings.wandersDisputeJurisdiction,
+          }),
+        })
+        await saveWandersDeal(deal, user?.email || '')
+        saved += 1
+      }
+      const skipNote = errors.length ? ` · ${errors.length} row(s) skipped` : ''
+      showToast(`Imported ${saved} Wanders deal(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Wanders CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   function openNewPassenger() {
     if (!form) return
     setPaxForm({
@@ -287,6 +355,25 @@ export default function WandersPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importWandersCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}
@@ -295,19 +382,7 @@ export default function WandersPage() {
             onClick={() => {
               exportListCsv(
                 'wanders-deals.csv',
-                [
-                  'client_name',
-                  'sales_stage',
-                  'booking_status',
-                  'destination_country',
-                  'departure_date',
-                  'return_date',
-                  'lead_contact',
-                  'email',
-                  'mobile',
-                  'budget_amount',
-                  'budget_currency',
-                ],
+                WANDERS_CSV_COLUMNS.map((c) => c.key),
                 deals.map((d) => ({
                   client_name: d.client_name,
                   sales_stage: d.sales_stage,
