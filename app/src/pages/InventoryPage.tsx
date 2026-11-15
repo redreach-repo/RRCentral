@@ -10,6 +10,7 @@ import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -37,7 +38,7 @@ import { defaultWarehouse, warehouseLabel, type Warehouse } from '../lib/warehou
 
 export default function InventoryPage() {
   const { t } = useI18n()
-  const { user } = useAuth()
+  const { user, appUserId } = useAuth()
   const { showToast } = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
@@ -55,6 +56,15 @@ export default function InventoryPage() {
   const [importing, setImporting] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
   const [showArchived, setShowArchived] = useState(false)
+  const inventoryViewFilters = useMemo(
+    () => ({
+      stock: filter,
+      q: search,
+      archived: showArchived ? '1' : '0',
+      warehouse: warehouseId,
+    }),
+    [filter, search, showArchived, warehouseId],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -293,6 +303,28 @@ export default function InventoryPage() {
           </button>
         </div>
       </header>
+
+      <SavedViewsBar
+        moduleId="inventory"
+        filters={inventoryViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => {
+          const stock = String(f.stock || 'all')
+          if (stock === 'all' || stock === 'low' || stock === 'reserved') setFilter(stock)
+          setSearch(String(f.q || ''))
+          setShowArchived(String(f.archived || '0') === '1')
+          setWarehouseId(String(f.warehouse || ''))
+        }}
+        onToast={showToast}
+        filtersEqual={(a, b) =>
+          String(a.stock || 'all') === String(b.stock || 'all') &&
+          String(a.q || '') === String(b.q || '') &&
+          String(a.archived || '0') === String(b.archived || '0') &&
+          String(a.warehouse || '') === String(b.warehouse || '')
+        }
+      />
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
         <select
