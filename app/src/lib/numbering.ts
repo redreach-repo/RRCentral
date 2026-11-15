@@ -7,6 +7,7 @@ export type NumberingDocType =
   | 'delivery_note'
   | 'account'
   | 'expense'
+  | 'purchase_order'
   | 'other'
 
 export type NumberingSequence = {
@@ -24,6 +25,8 @@ function defaultPrefix(docType: NumberingDocType, prefix?: string): string {
   if (prefix && prefix.trim()) return prefix.trim().toUpperCase()
   if (docType === 'delivery_note') return 'DN'
   if (docType === 'account') return 'AC'
+  if (docType === 'expense') return 'EX'
+  if (docType === 'purchase_order') return 'PO'
   return 'RR'
 }
 

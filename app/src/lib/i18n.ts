@@ -105,7 +105,20 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.pack.delivery': 'Delivery and care',
     'guide.pack.ops': 'Operations',
     'guide.pack.finance': 'Finance and insight',
+    'guide.pack.hr': 'People and HR',
     'guide.pack.admin': 'Admin and platform',
+    'guide.hr.people.title': 'People',
+    'guide.hr.people.body':
+      'Employee directory, managers, and org links for leave and attendance.',
+    'guide.hr.people.link': 'Open People',
+    'guide.hr.leave.title': 'Leave',
+    'guide.hr.leave.body':
+      'Leave balances and requests. Formats that touch WPS need Alfred / counsel before live payroll.',
+    'guide.hr.leave.link': 'Open Leave',
+    'guide.hr.attendance.title': 'Attendance',
+    'guide.hr.attendance.body':
+      'Daily attendance rows for the HR stub — not a live biometric feed.',
+    'guide.hr.attendance.link': 'Open Attendance',
     'guide.crm.myday.title': 'My Day',
     'guide.crm.myday.body':
       'Start here each morning. Log touches, set the next action and follow-up date, and mark Won or Lost with a reason.',
@@ -1100,7 +1113,20 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.pack.delivery': 'التسليم والرعاية',
     'guide.pack.ops': 'العمليات',
     'guide.pack.finance': 'المالية والرؤية',
+    'guide.pack.hr': 'الأفراد والموارد البشرية',
     'guide.pack.admin': 'الإدارة والمنصة',
+    'guide.hr.people.title': 'الأفراد',
+    'guide.hr.people.body':
+      'دليل الموظفين والمدراء وروابط المؤسسة للإجازات والحضور.',
+    'guide.hr.people.link': 'فتح الأفراد',
+    'guide.hr.leave.title': 'الإجازات',
+    'guide.hr.leave.body':
+      'أرصدة وطلبات الإجازة. الصيغ التي تمس WPS تحتاج مراجعة ألفرد/المستشار قبل الرواتب الحية.',
+    'guide.hr.leave.link': 'فتح الإجازات',
+    'guide.hr.attendance.title': 'الحضور',
+    'guide.hr.attendance.body':
+      'صفوف حضور يومية لنموذج الموارد البشرية — ليست تغذية بيومترية حية.',
+    'guide.hr.attendance.link': 'فتح الحضور',
     'guide.crm.myday.title': 'يومي',
     'guide.crm.myday.body':
       'ابدأ من هنا كل صباح. سجّل التواصل، حدّد الخطوة التالية وتاريخ المتابعة، وعلّم ربح أو خسارة مع السبب.',

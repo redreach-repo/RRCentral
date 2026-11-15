@@ -204,7 +204,9 @@ export default function InvoicesPage() {
       ])
       setAccounts(acc.rows)
       if (iRes.error) throw iRes.error
-      const raw = (iRes.data || []) as Invoice[]
+      const raw = ((iRes.data || []) as (Invoice & { deleted_at?: string | null })[]).filter(
+        (inv) => !inv.deleted_at,
+      ) as Invoice[]
       // Repair stale Paid marks on cancelled invoices (e.g. wrong Ello payment applied then cancelled)
       const stalePaid = raw.filter(
         (inv) => isCancelledInvoice(inv) && String(inv.payment_status || '').toLowerCase() === 'paid',

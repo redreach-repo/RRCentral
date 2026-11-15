@@ -6,6 +6,7 @@ import { isMissingRelationError } from './errors'
 import { isSupabaseConfigured } from './supabaseConfig'
 import { BUILTIN_COUNTRY_PACKS, type CountryPack } from './countryPacks'
 import { nextPoNumber } from './purchasing'
+import { withoutSoftDeleted } from './softDelete'
 
 export async function listCountryPacks(): Promise<CountryPack[]> {
   if (!isSupabaseConfigured()) return BUILTIN_COUNTRY_PACKS
@@ -88,18 +89,21 @@ export async function listPurchaseOrders(): Promise<PurchaseOrder[]> {
   if (!isSupabaseConfigured()) return []
   const { data, error } = await db
     .from('purchase_orders')
-    .select('id, po_number, vendor_name, status, order_date, currency, notes, landed_cost_aed, warehouse_id')
+    .select(
+      'id, po_number, vendor_name, status, order_date, currency, notes, landed_cost_aed, warehouse_id, deleted_at',
+    )
     .order('order_date', { ascending: false })
     .limit(100)
   if (error) {
     if (isMissingRelationError(error)) return []
     throw error
   }
-  return (data || []).map((r: PurchaseOrder) => ({
+  const mapped = (data || []).map((r: PurchaseOrder & { deleted_at?: string | null }) => ({
     ...r,
     landed_cost_aed: Number(r.landed_cost_aed) || 0,
     warehouse_id: r.warehouse_id || null,
   }))
+  return withoutSoftDeleted(mapped) as PurchaseOrder[]
 }
 
 export async function createPurchaseOrder(input: {

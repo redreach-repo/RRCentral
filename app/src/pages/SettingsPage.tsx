@@ -8,6 +8,7 @@ import ModuleFlagsCard from '../components/settings/ModuleFlagsCard'
 import PipelineDetailNavCard from '../components/settings/PipelineDetailNavCard'
 import PipelinesSettingsCard from '../components/settings/PipelinesSettingsCard'
 import WorkflowRunsCard from '../components/settings/WorkflowRunsCard'
+import RecordRulesSettingsCard from '../components/settings/RecordRulesSettingsCard'
 import WorkflowsSettingsCard from '../components/settings/WorkflowsSettingsCard'
 import { Download, HardDrive, Plus, Trash2, Upload, Plug } from 'lucide-react'
 import SimpleRowActions from '../components/SimpleRowActions'
@@ -1291,6 +1292,7 @@ export default function SettingsPage() {
       <ModuleFlagsCard />
       <WorkflowsSettingsCard />
       <WorkflowRunsCard />
+      <RecordRulesSettingsCard />
 
       {renderSection(
         t('page.settings.section.divisionFormats'),
