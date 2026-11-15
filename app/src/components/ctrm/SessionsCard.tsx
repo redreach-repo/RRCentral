@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { ExternalLink, Plus } from 'lucide-react'
 import { useSettings } from '../../contexts/SettingsContext'
@@ -15,7 +15,7 @@ import {
 import { listSessions, markFollowUpDone, saveSession } from '../../lib/ctrmSessionsStore'
 import { errorMessage } from '../../lib/errors'
 import { parseSettingsList } from '../../lib/fitSheet'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import { parseCtrmSessionForm } from '../../lib/schemas/ctrmSession'
 import type { Account, CtrmSession, CtrmSessionKind } from '../../lib/types'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, fieldStyle, inputStyle, labelStyle, sectionTitleStyle, selectStyle } from '../../lib/uiStyles'
@@ -46,6 +46,8 @@ export default function SessionsCard({ account, editable, author }: { account: A
   const [rows, setRows] = useState<CtrmSession[] | null>(null)
   const [editing, setEditing] = useState<{ session: CtrmSession | null; draft: SessionDraft } | null>(null)
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     try {
@@ -83,6 +85,62 @@ export default function SessionsCard({ account, editable, author }: { account: A
       await load()
     } catch (e) {
       showToast(errorMessage(e, 'Could not save that'), 'error')
+    }
+  }
+
+  async function importSessionsCsv(file: File) {
+    if (!editable) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const splitTopics = (raw: string) =>
+        raw
+          .split(';')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      let saved = 0
+      let skipped = 0
+      for (const row of objects) {
+        const kindRaw = String(row.kind || '').trim()
+        const kindMatch = SESSION_KINDS.find(
+          (k) => k.value === kindRaw || k.label.toLowerCase() === kindRaw.toLowerCase(),
+        )
+        if (!kindMatch) {
+          skipped += 1
+          continue
+        }
+        const followRaw = String(row.follow_up_due ?? '').trim()
+        const parsed = parseCtrmSessionForm({
+          kind: kindMatch.value,
+          session_date: String(row.session_date || '').trim(),
+          attendees: String(row.attendees || ''),
+          topics_covered: splitTopics(String(row.topics_covered || '')),
+          topics_left: splitTopics(String(row.topics_left || '')),
+          recording_url: String(row.recording_url || ''),
+          follow_up_due: followRaw || null,
+          notes: String(row.notes || ''),
+        })
+        if (!parsed.ok) {
+          skipped += 1
+          continue
+        }
+        await saveSession(account.id, parsed.data, null, author)
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} session(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Sessions CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
     }
   }
 
@@ -129,6 +187,23 @@ export default function SessionsCard({ account, editable, author }: { account: A
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Sessions</h2>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {editable ? (
+            <>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) void importSessionsCsv(file)
+                }}
+              />
+              <button type="button" style={smallBtn} disabled={importing} onClick={() => importInputRef.current?.click()}>
+                {importing ? 'Importing…' : 'Import CSV'}
+              </button>
+            </>
+          ) : null}
           {rows && rows.length ? (
             <button
               type="button"
