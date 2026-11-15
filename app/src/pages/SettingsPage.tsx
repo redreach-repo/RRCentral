@@ -49,6 +49,7 @@ import { can, ROLE_DESCRIPTIONS, ROLE_LABELS, USER_ROLES } from '../lib/permissi
 import {
   listNumberingSequences,
   previewNextReference,
+  updateNumberingSequence,
   type NumberingSequence,
 } from '../lib/numbering'
 import {
@@ -1166,9 +1167,9 @@ export default function SettingsPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr>
-                  {['Type', 'Division', 'Prefix', 'Year', 'Last', 'Next'].map((h) => (
+                  {['Type', 'Division', 'Prefix', 'Year', 'Last', 'Next', ''].map((h) => (
                     <th
-                      key={h}
+                      key={h || 'actions'}
                       style={{
                         textAlign: 'left',
                         padding: '8px 10px',
@@ -1208,6 +1209,27 @@ export default function SettingsPage() {
                       }}
                     >
                       {previewNextReference(row)}
+                    </td>
+                    <td style={{ padding: '8px 10px', borderBottom: `1px solid ${colors.border}` }}>
+                      {can(userRole, 'settings.manage') &&
+                      (row.doc_type === 'purchase_order' || row.doc_type === 'expense') ? (
+                        <button
+                          type="button"
+                          style={buttonSecondaryStyle}
+                          onClick={() => {
+                            const next = window.prompt('Prefix (2–8 chars)', row.prefix)
+                            if (next == null) return
+                            void updateNumberingSequence(row.id, { prefix: next })
+                              .then(() => {
+                                showToast('Prefix updated', 'success')
+                                return loadNumbering()
+                              })
+                              .catch((e) => showToast(errorMessage(e, 'Could not update prefix'), 'error'))
+                          }}
+                        >
+                          Edit prefix
+                        </button>
+                      ) : null}
                     </td>
                   </tr>
                 ))}

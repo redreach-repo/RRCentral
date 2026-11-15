@@ -76,3 +76,22 @@ export function previewNextReference(seq: NumberingSequence): string {
   const pad = Math.max(2, Math.min(6, Number(seq.pad) || 3))
   return `${seq.prefix}-${seq.division_code}-${seq.year_yy}${String(next).padStart(pad, '0')}`
 }
+
+/** Admin edit of prefix / pad for a numbering sequence (does not rewrite history). */
+export async function updateNumberingSequence(
+  id: string,
+  patch: { prefix?: string; pad?: number },
+): Promise<void> {
+  const row: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (patch.prefix != null) {
+    const p = String(patch.prefix).trim().toUpperCase().slice(0, 8)
+    if (!p) throw new Error('Prefix is required')
+    row.prefix = p
+  }
+  if (patch.pad != null) {
+    const pad = Math.max(2, Math.min(6, Number(patch.pad) || 3))
+    row.pad = pad
+  }
+  const { error } = await db.from('numbering_sequences').update(row).eq('id', id)
+  if (error) throw error
+}
