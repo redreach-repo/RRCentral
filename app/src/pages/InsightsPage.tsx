@@ -23,6 +23,7 @@ import {
 import { canViewField } from '../lib/fieldPermissions'
 import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import { parseInsightsCapacityForm } from '../lib/schemas/insightsCapacity'
 import { formatAED } from '../lib/money'
 import type { Account, Contract, DeliveryPackage, TimeEntry, UsageRecord } from '../lib/types'
@@ -144,6 +145,58 @@ export default function InsightsPage() {
           <h1 className={docsStyles.title}>{t('page.insights.title')}</h1>
           <p className={docsStyles.subtitle}>{t('page.insights.subtitle')}</p>
         </div>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+          disabled={!use}
+          onClick={() => {
+            if (!use) return
+            exportListCsv(
+              'insights.csv',
+              [
+                'section',
+                'month',
+                'hours',
+                'percent',
+                'client',
+                'direction',
+                'change_points',
+                'margin_aed',
+                'margin_percent',
+              ],
+              [
+                ...use.months.map((m) => ({
+                  section: 'utilisation',
+                  month: m.month,
+                  hours: m.hours,
+                  percent: m.percent,
+                  client: '',
+                  direction: '',
+                  change_points: '',
+                  margin_aed: '',
+                  margin_percent: '',
+                })),
+                ...trends.flatMap((tr) =>
+                  tr.months.map((m) => ({
+                    section: 'profit_trend',
+                    month: m.month,
+                    hours: m.hours,
+                    percent: '',
+                    client: tr.name,
+                    direction: tr.direction,
+                    change_points: tr.changePoints ?? '',
+                    margin_aed: m.marginAed,
+                    margin_percent: m.marginPercent,
+                  })),
+                ),
+              ],
+            )
+            showToast('Insights CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
       </header>
 
       {!use ? (
