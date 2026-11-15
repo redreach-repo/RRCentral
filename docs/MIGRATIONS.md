@@ -228,6 +228,23 @@ No database migrations. Documentation and `brand-assets/` only.
 - `drop table if exists public.payroll_exports;`
 
 
+## M10–M12 deepen — `20261230200000` … `20261230240000`
+
+**What**
+- Marketing consent columns + `marketing_segments` / `marketing_campaign_recipients`
+- `ai_knowledge_docs` + `rr_ai_search_docs` (FTS)
+- Fireflies webhook maps/events
+- `business_type_packs` + `workspace_provision_requests`
+- `tenant_app_identities`
+- Industry pack `manifest.templates` seeds (eng/construction/trading)
+
+**Edge**
+- `hm-ai-gateway`, `fireflies-webhook`, `hm-provision-workspace` (`verify_jwt = false` + in-function guards)
+
+**Tests**
+- `supabase/tests/modules/marketing_test.sql`, `ai_retrieval_test.sql`, `app_identity_test.sql`, `industry_packs_templates_test.sql`
+
+
 ## M13 — `20261301120000` … `20261301140000`
 
 **What**
@@ -237,3 +254,4 @@ No database migrations. Documentation and `brand-assets/` only.
 
 **Tests**
 - `dsr_retention_test.sql`, `rate_limit_test.sql`
+

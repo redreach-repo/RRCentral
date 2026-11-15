@@ -5,6 +5,8 @@ import {
   appNameProblem,
   buildTenantWebManifest,
   clampAppShortName,
+  fullAppHost,
+  hostSlugProblem,
   identityFromBrandKit,
   tenantManifestId,
 } from './tenantAppIdentity'
@@ -58,5 +60,15 @@ describe('identityFromBrandKit', () => {
 describe('tenantManifestId', () => {
   it('differs by company so installs do not collide', () => {
     expect(tenantManifestId('t1', 'a')).not.toBe(tenantManifestId('t1', 'b'))
+  })
+})
+
+describe('hostSlugProblem', () => {
+  it('validates slug format and reserved names', () => {
+    expect(hostSlugProblem('')).toBe('host_slug_required')
+    expect(hostSlugProblem('Al Noor')).toBe('host_slug_invalid')
+    expect(hostSlugProblem('admin')).toBe('host_slug_reserved')
+    expect(hostSlugProblem('alnoor')).toBeNull()
+    expect(fullAppHost('alnoor')).toBe('alnoor.highmast.app')
   })
 })

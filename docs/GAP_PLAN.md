@@ -31,13 +31,13 @@ Status key: **exists** · **partial** · **missing**
 | Shell: Inbox/Sales/… areas, Cmd+K, AI button | partial | Accordion nav exists; restructure shell in M1 |
 | Company switcher | partial | M1 top-bar switcher; multi-company ops still thin |
 | EN+AR RTL | partial | M1 `I18nContext` + dir; guide + shell/nav + sales/finance/clients/admin/ops/delivery list chrome (Dashboard → Domains through Wanders, Settings/Account, CTRM weekly summary, ticket + account detail, CTRM fit sheet, quote/invoice/DN viewer, legal e-sign + quote-accept + client portal + monthly client report + Wanders tour-ops + monthly reports + weekly updates queue + client health + module-flags Settings card + CTRM issues + obligations board + clause library + NDA template + build templates + agreement template + domains + app errors + Settings section chrome); more page bodies later |
-| PWA / app identity §5.6 | partial | After sign-in manifest follows company brand; still need per-host manifests, `tenant_app_identities`, install guides |
+| PWA / app identity §5.6 | partial | After sign-in manifest + `tenant_app_identities` table; still need per-host served manifests / DNS |
 | Native apps §5.7 / M14 | missing | v6 only — spike later; do not start without Alfred |
 | Brand kits per tenant/company/BU | partial | M1 `brand_kits` + Theme studio + top-bar BU chrome switch; missing Boost/Care/Trading SVG assets |
 | In-app guide `/guide` | partial | CRM + billing + delivery + ops + finance + admin packs live (`GUIDE_PACKS`); more packs / AR polish later |
-| Sign-up + provisioner §6.13.1–2 | missing | M11: workspace setup form + idempotent provisioner + business-type → pack table |
-| Engineering pack §11.3 | partial | Builtin pack key + module flags; shared foundation M12a not built |
-| Construction pack §11.4 | partial | Builtin pack key + module flags; workforce/site objects M12b not built |
+| Sign-up + provisioner §6.13.1–2 | partial | M11: `/workspace-setup` + `business_type_packs` + idempotent Edge scaffold; auth user create later |
+| Engineering pack §11.3 | partial | Templates on activate (fields/pipelines); shared foundation M12a later |
+| Construction pack §11.4 | partial | Templates on activate; workforce/site objects M12b later |
 | Trading pack §11.2 light | partial | `trading_import` starter exists; landed cost / credit limits later |
 | Languages §5.5 (v3) | partial | EN+AR only; all new strings must stay key-based for v3 |
 | Country packs §12 | partial | AE/IN/CA catalog + activate shipped (Unverified); residency §19 |
@@ -57,7 +57,7 @@ Status key: **exists** · **partial** · **missing**
 | 6.7 Accounting (ledger) | partial | CoA + journals + post/immutability shipped; auto-post from invoices + VAT return later |
 | 6.8 Inventory and purchasing | partial | M9: POs + receive→stock; landed cost / multi-warehouse later |
 | 6.9 Delivery (projects/support) | partial | M9b: `delivery_projects` + cost lines; WIP/retention later |
-| 6.10 Marketing | partial | M10 first slice: `marketing_campaigns` + Campaigns page |
+| 6.10 Marketing | partial | M10: campaigns + consent + segments + recipients (no live ESP) |
 | 6.11 Documents and knowledge | partial | Drive + customer_documents; not full DMS → expand with M5/M11 |
 | 6.12 Planning and reports | partial | Reports/MRR/insights; no goals/scenarios builder → M12-ish / planning |
 | 6.13 Tenant billing | partial | M11: `tenant_subscriptions` + plan catalog + Stripe Checkout/portal (`saas-checkout`); Tax registration later |
@@ -70,8 +70,8 @@ Status key: **exists** · **partial** · **missing**
 | Requirement | Status | Step |
 |-------------|--------|------|
 | Mail providers (Zoho→Gmail→M365→IMAP) | partial | Zoho + Gmail Phase A + M365 Phase A/B; Gmail Phase B later; IMAP deferred |
-| AI gateway + tools-as-user + pgvector | partial | `ai-assist` Edge; no gateway/retrieval/action queue → M10 (light from M4) |
-| AI human approval queue | partial | M10: queue + account Suggest button; Alfred SQL/Edge deploy still needed |
+| AI gateway + tools-as-user + pgvector | partial | `hm-ai-gateway` + FTS knowledge docs; pgvector / tools-as-user later |
+| AI human approval queue | partial | Queue + account Suggest button; Alfred SQL/Edge deploy still needed |
 | Field-level encryption (salary, IBAN, tokens) | missing | M1 for tokens; M6/M8 for HR fields |
 | Append-only audit | partial | `audit_log` exists; CI asserts authenticated cannot INSERT/UPDATE/DELETE (REVOKE); prune stays security definer |
 | Sentry / structured logs | partial | Built behind DSN (off until Alfred); App errors + structured Edge logs |

@@ -13,10 +13,14 @@ After sign-in, `TenantContext` builds a per-tenant Web App Manifest from the act
 
 Helpers: `app/src/lib/tenantAppIdentity.ts`.
 
-## Not yet (needs M11 provisioner / Alfred)
+## Shipped in M11 deepen
 
-- Server-generated manifest **per tenant host** (`alnoor.highmast.app`)
-- `tenant_app_identities` table and workspace address uniqueness
+- Table `tenant_app_identities` (host_slug unique, admin write, tenant RLS)
+- Helpers: `hostSlugProblem`, `fullAppHost` in `tenantAppIdentity.ts`
+
+## Not yet (Alfred / hosting)
+
+- Server-generated manifest **served** per tenant host (`alnoor.highmast.app`)
 - Install guides with tenant-coloured screenshots
 - iPhone reinstall notice when the app name changes
 - Initials tile generator when no logo is uploaded

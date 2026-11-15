@@ -9,28 +9,33 @@ import {
   updateMarketingCampaign,
   type MarketingCampaign,
 } from '../lib/featureSliceStores'
+import { createMarketingSegment, listMarketingSegments, type MarketingSegment } from '../lib/m10m12Stores'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle, selectStyle } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
 const CHANNELS = ['email', 'social', 'ads', 'event', 'other'] as const
 const STATUSES = ['draft', 'scheduled', 'active', 'paused', 'done'] as const
 
-/** M10: campaigns with status, budget, and schedule. */
+/** M10: campaigns with status, budget, schedule, and consent-aware segments. */
 export default function MarketingPage() {
   const { showToast } = useToast()
   const [rows, setRows] = useState<MarketingCampaign[]>([])
+  const [segments, setSegments] = useState<MarketingSegment[]>([])
   const [filter, setFilter] = useState('all')
   const [name, setName] = useState('')
   const [channel, setChannel] = useState('email')
   const [budget, setBudget] = useState('')
   const [startsOn, setStartsOn] = useState('')
   const [endsOn, setEndsOn] = useState('')
+  const [segmentName, setSegmentName] = useState('')
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await listMarketingCampaigns(filter))
+      const [campaigns, segs] = await Promise.all([listMarketingCampaigns(filter), listMarketingSegments()])
+      setRows(campaigns)
+      setSegments(segs)
     } catch (e) {
       showToast(errorMessage(e, 'Could not load campaigns'), 'error')
     } finally {
@@ -73,13 +78,30 @@ export default function MarketingPage() {
     }
   }
 
+  async function onAddSegment(e: React.FormEvent) {
+    e.preventDefault()
+    try {
+      await createMarketingSegment({
+        name: segmentName,
+        filter: { opt_in_only: true, channel: 'email' },
+      })
+      setSegmentName('')
+      showToast('Segment created (opt-in only)', 'success')
+      await load()
+    } catch (err) {
+      showToast(errorMessage(err, 'Could not create segment'), 'error')
+    }
+  }
+
   return (
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
           <p className={docsStyles.kicker}>Marketing</p>
           <h1 className={docsStyles.title}>Campaigns</h1>
-          <p className={docsStyles.subtitle}>Plan and track campaigns by channel. Send automation stays out of scope.</p>
+          <p className={docsStyles.subtitle}>
+            Plan campaigns and opt-in segments. Live ESP send is out of scope; recipients respect marketing consent.
+          </p>
         </div>
       </header>
 
@@ -129,6 +151,30 @@ export default function MarketingPage() {
         <button type="submit" style={buttonPrimaryStyle}>
           New campaign
         </button>
+      </form>
+
+      <form onSubmit={(e) => void onAddSegment(e)} style={{ ...cardStyle, marginBottom: 16, display: 'grid', gap: 10, maxWidth: 560 }}>
+        <strong style={{ fontSize: 14 }}>Segments</strong>
+        <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
+          Default filter is opt-in contacts with email. {segments.length} segment(s) saved.
+        </p>
+        <label style={labelStyle}>
+          Segment name
+          <input style={inputStyle} value={segmentName} onChange={(e) => setSegmentName(e.target.value)} required />
+        </label>
+        <button type="submit" style={buttonSecondaryStyle}>
+          New opt-in segment
+        </button>
+        {segments.length > 0 ? (
+          <ul style={{ margin: 0, paddingLeft: 18, color: colors.muted, fontSize: 13 }}>
+            {segments.map((s) => (
+              <li key={s.id}>
+                {s.name}
+                {s.filter_json?.opt_in_only ? ' · opt-in' : ''}
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </form>
 
       {loading ? (

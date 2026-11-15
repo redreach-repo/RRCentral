@@ -43,6 +43,9 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "lead-intake": { kind: "shared secret or signed form token", pattern: /if \(!secret\)[\s\S]*=== secret[\s\S]*formTokenProblem\(/ },
   "public-api": { kind: "hashed api key (x-api-key)", pattern: /x-api-key[\s\S]*apiKey\.startsWith\("hm_"\)[\s\S]*key_hash !== hash/ },
   "webhook-retry": { kind: "cron secret", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret/ },
+  "hm-ai-gateway": { kind: "signed in staff JWT", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_staff/ },
+  "fireflies-webhook": { kind: "shared secret", pattern: /FIREFLIES_WEBHOOK_SECRET[\s\S]*x-fireflies-secret[\s\S]*provided !== expected/ },
+  "hm-provision-workspace": { kind: "provision secret or admin JWT", pattern: /WORKSPACE_PROVISION_SECRET[\s\S]*x-provision-secret[\s\S]*rr_is_admin/ },
 }
 
 async function publicFunctions(): Promise<string[]> {

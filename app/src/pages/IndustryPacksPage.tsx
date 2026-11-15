@@ -53,7 +53,11 @@ export default function IndustryPacksPage() {
       const result = await activateIndustryPack(packKey)
       await refresh()
       const flags = result.enabledFlags.length ? ` · enabled: ${result.enabledFlags.join(', ')}` : ''
-      showToast(`Pack activated${flags}`, 'success')
+      const tpl =
+        result.fieldsCreated || result.pipelinesCreated
+          ? ` · templates +${result.fieldsCreated} fields / +${result.pipelinesCreated} pipelines`
+          : ''
+      showToast(`Pack activated${flags}${tpl}`, 'success')
       await load()
     } catch (e) {
       showToast(errorMessage(e, 'Could not activate pack'), 'error')
