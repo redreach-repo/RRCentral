@@ -26,6 +26,8 @@ import {
   listNdaTemplates,
   saveNdaDraft,
 } from '../lib/ndaTemplateStore'
+import { NDA_TEMPLATES_CSV_COLUMNS } from '../lib/legalTemplatesCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import { btn, btnGhost, btnPrimary, colors, input } from '../lib/pageStyles'
 import { pageStyle, pageSubtitleStyle, pageTitleStyle } from '../lib/uiStyles'
 import type { ContractClause, NdaTemplate } from '../lib/types'
@@ -62,7 +64,9 @@ export default function NdaTemplatePage() {
   const [busy, setBusy] = useState(false)
   const [approving, setApproving] = useState<{ by: string; on: string; note: string } | null>(null)
   const [clauses, setClauses] = useState<ContractClause[]>([])
+  const [importing, setImporting] = useState(false)
   const textRef = useRef<HTMLTextAreaElement>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(
     async (select?: string) => {
@@ -139,11 +143,109 @@ export default function NdaTemplatePage() {
     insertAtCursor(formatClauseForTemplate(clause))
   }
 
+  async function importNdaCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of NDA_TEMPLATES_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, NDA_TEMPLATES_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid NDA template rows', 'error')
+        return
+      }
+      let saved = 0
+      let skipped = errors.length
+      let lastId = ''
+      const existing = [...templates]
+      for (const row of ok) {
+        lastId = await saveNdaDraft(
+          { title: row.title, body: row.body },
+          user?.email || '',
+          existing,
+        )
+        const nextVersion = Math.max(0, ...existing.map((x) => x.version)) + 1
+        existing.push({
+          id: lastId,
+          version: nextVersion,
+          title: row.title,
+          body: row.body,
+          status: 'draft',
+          approved_by: '',
+          approved_at: null,
+          approval_note: '',
+          created_by: user?.email || '',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} NDA draft(s)${skipNote}`, 'success')
+      await load(lastId || undefined)
+    } catch (e) {
+      showToast(errorMessage(e, 'NDA CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <div style={pageStyle}>
-      <div>
-        <h1 style={pageTitleStyle}>{t('page.ndaTemplate.title')}</h1>
-        <p style={pageSubtitleStyle}>{t('page.ndaTemplate.subtitle')}</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <div>
+          <h1 style={pageTitleStyle}>{t('page.ndaTemplate.title')}</h1>
+          <p style={pageSubtitleStyle}>{t('page.ndaTemplate.subtitle')}</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importNdaCsv(file)
+            }}
+          />
+          {canEdit && !missingTable ? (
+            <button
+              type="button"
+              style={btnGhost}
+              disabled={importing || busy}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            style={btnGhost}
+            disabled={!templates.length}
+            onClick={() => {
+              exportListCsv(
+                'nda-templates.csv',
+                NDA_TEMPLATES_CSV_COLUMNS.map((c) => c.key),
+                templates.map((row) => ({
+                  title: row.title,
+                  body: row.body,
+                  status: row.status,
+                  version: row.version,
+                })),
+              )
+              showToast('NDA templates CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </div>
 
       {missingTable ? (
