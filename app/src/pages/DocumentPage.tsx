@@ -19,14 +19,33 @@ import {
   type QuoteColumnId,
 } from '../lib/divisionQuoteFormats'
 import { CONNECT_PARTNER } from '../lib/seedDivisionCatalogues'
-import { loadLineItems, applyDiscount, calcTotals, toDraftItems, quoteOffsetsVat, savedVatRate, vatRateToPercent } from '../lib/lineItems'
-import { getDeliveryNote, loadDeliveryNoteLineItems } from '../lib/deliveryNoteStore'
+import {
+  loadLineItems,
+  applyDiscount,
+  calcTotals,
+  toDraftItems,
+  quoteOffsetsVat,
+  savedVatRate,
+  vatRateToPercent,
+  saveLineItems,
+} from '../lib/lineItems'
+import {
+  getDeliveryNote,
+  loadDeliveryNoteLineItems,
+  saveDeliveryNoteLineItems,
+} from '../lib/deliveryNoteStore'
+import { isTempDocumentRef } from '../lib/documentRefs'
+import {
+  DOCUMENT_LINES_CSV_COLUMNS,
+  DOCUMENT_LINES_CSV_HEADERS,
+  documentLineRowToDraft,
+} from '../lib/documentLinesCsv'
 import {
   deleteSignedDeliveryNoteAttachment,
   loadSignedDeliveryNoteAttachments,
 } from '../lib/signedDeliveryNotes'
 import { errorMessage } from '../lib/errors'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import { PRODUCT } from '../lib/product'
 import { buildWhatsAppUrl } from '../lib/whatsapp'
 import { resolveLogoUrl } from '../lib/brand'
@@ -118,6 +137,8 @@ export default function DocumentPage() {
   const [linkMode, setLinkMode] = useState<'signed' | 'communication' | null>(null)
   const [savePrompt, setSavePrompt] = useState<'email' | 'whatsapp' | null>(null)
   const [acceptOpen, setAcceptOpen] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -301,6 +322,25 @@ export default function DocumentPage() {
         ? deliveryNote.status === 'Draft'
         : invoice?.status === 'Draft'),
   )
+  /** Import CSV only when the document is still a draft / temp (proforma) reference. */
+  const canImportLines = useMemo(() => {
+    if (docType === 'quote' && quote) {
+      return (
+        quote.status === 'Draft' ||
+        !String(quote.reference_number || '').trim() ||
+        isTempDocumentRef(quote.reference_number)
+      )
+    }
+    if (docType === 'delivery-note' && deliveryNote) {
+      return (
+        deliveryNote.status === 'Draft' || isTempDocumentRef(deliveryNote.reference_number)
+      )
+    }
+    if (docType === 'invoice' && invoice) {
+      return invoice.status === 'Draft' || isTempDocumentRef(invoice.reference_number)
+    }
+    return false
+  }, [docType, quote, deliveryNote, invoice])
   const division =
     DIVISIONS.find((d) => d.code === docDivisionCode)?.brand ||
     quote?.vertical ||
@@ -389,6 +429,103 @@ export default function DocumentPage() {
       offsetVat: false,
     }
   }, [items, doc, docType, effectiveVatRate, isWandersQuote, wandersVatEnabled, settings])
+
+  async function importLinesCsv(file: File) {
+    if (!canImportLines) {
+      showToast('Line import is only available on draft documents', 'error')
+      return
+    }
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of DOCUMENT_LINES_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, DOCUMENT_LINES_CSV_COLUMNS)
+      if (!ok.length) {
+        showToast(errors[0] || 'No valid line item rows', 'error')
+        return
+      }
+      const drafts = ok.map(documentLineRowToDraft)
+      if (!drafts.length) {
+        showToast('No valid line item rows', 'error')
+        return
+      }
+
+      const offsetVat = quoteOffsetsVat(quote, settings)
+      const discountOpts = {
+        discountPercent: offsetVat ? 0 : Number(quote?.discount_percent) || 0,
+        discountAmount: offsetVat ? 0 : Number(quote?.discount_amount) || 0,
+        offsetVat,
+      }
+      const lineVat =
+        docType === 'delivery-note'
+          ? 0
+          : isWandersQuote && !wandersVatEnabled
+            ? 0
+            : effectiveVatRate
+      const totals = calcTotals(drafts, lineVat, discountOpts)
+      const who = user?.email || ''
+
+      if (docType === 'quote' && quote) {
+        const ref = quote.quote_id
+        if (!ref) {
+          showToast('Quotation has no draft id for line items', 'error')
+          return
+        }
+        await saveLineItems('Quote', ref, drafts, lineVat)
+        const { error } = await db
+          .from('quotations')
+          .update({
+            amount: totals.total,
+            updated_by: who,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', quote.id)
+        if (error) throw error
+      } else if (docType === 'invoice' && invoice) {
+        const ref = String(invoice.reference_number || '').trim()
+        if (!ref) {
+          showToast('Invoice has no reference for line items', 'error')
+          return
+        }
+        await saveLineItems('Invoice', ref, drafts, lineVat)
+        const { error } = await db
+          .from('invoices')
+          .update({
+            amount: totals.total,
+            updated_by: who,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', invoice.id)
+        if (error) throw error
+      } else if (docType === 'delivery-note' && deliveryNote) {
+        const ref = String(deliveryNote.reference_number || '').trim()
+        if (!ref) {
+          showToast('Delivery note has no reference for line items', 'error')
+          return
+        }
+        await saveDeliveryNoteLineItems(ref, drafts)
+      } else {
+        showToast('Document not loaded', 'error')
+        return
+      }
+
+      const skipNote = errors.length ? ` · ${errors.length} row(s) skipped` : ''
+      showToast(`Imported ${drafts.length} line item(s) into draft${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Line item CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
 
   async function downloadPdf() {
     if (!sheetRef.current) return
@@ -1264,6 +1401,24 @@ export default function DocumentPage() {
           <input type="checkbox" checked={bilingual} onChange={(e) => setBilingual(e.target.checked)} />
           {t('page.document.bilingual')}
         </label>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".csv,text/csv"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) void importLinesCsv(file)
+          }}
+        />
+        {canImportLines ? (
+          <ToolbarBtn
+            onClick={() => importInputRef.current?.click()}
+            disabled={importing || loading}
+          >
+            <FileUp size={14} /> {importing ? 'Importing…' : 'Import CSV'}
+          </ToolbarBtn>
+        ) : null}
         <ToolbarBtn
           onClick={() => {
             if (!items.length) {
@@ -1276,19 +1431,7 @@ export default function DocumentPage() {
               id
             exportListCsv(
               `${docType}-${String(ref).replace(/\s+/g, '-')}-lines.csv`,
-              [
-                'line_no',
-                'description',
-                'sku',
-                'qty',
-                'unit_price',
-                'unit_cost',
-                'vat_rate',
-                'amount',
-                'vat_amount',
-                'line_total',
-                'remarks',
-              ],
+              DOCUMENT_LINES_CSV_HEADERS,
               items.map((it) => ({
                 line_no: it.line_no,
                 description: it.description,
