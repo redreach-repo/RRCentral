@@ -7,6 +7,7 @@ import EditorSectionTabs, {
 import { useToast } from '../../contexts/ToastContext'
 import { ACCOUNT_TYPES, accountStatusLabel, accountTypeInfo } from '../../lib/accounts'
 import type { AccountInput, ContactInput } from '../../lib/accountsStore'
+import { exportListCsv } from '../../lib/listIo'
 import { parseAccountForm } from '../../lib/schemas/account'
 import type { Account, AccountType, AppUser } from '../../lib/types'
 import {
@@ -273,7 +274,52 @@ export default function AccountFormModal({
       </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={saving}
+          onClick={() => {
+            exportListCsv(
+              `account-form-${(form.name || account?.reference || 'draft').replace(/\s+/g, '-').toLowerCase()}.csv`,
+              [
+                'type',
+                'name',
+                'industry',
+                'country',
+                'city',
+                'website',
+                'status',
+                'owner_user_id',
+                'source',
+                'notes',
+                'contact_name',
+                'contact_email',
+                'contact_phone',
+              ],
+              [
+                {
+                  type: form.type,
+                  name: form.name,
+                  industry: form.industry,
+                  country: form.country,
+                  city: form.city,
+                  website: form.website,
+                  status: form.status,
+                  owner_user_id: form.owner_user_id || '',
+                  source: form.source,
+                  notes: form.notes,
+                  contact_name: form.contactName,
+                  contact_email: form.contactEmail,
+                  contact_phone: form.contactPhone,
+                },
+              ],
+            )
+            showToast('Account form CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
         <button type="button" style={buttonSecondaryStyle} onClick={onClose} disabled={saving}>
           Cancel
         </button>
