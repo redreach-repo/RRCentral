@@ -65,7 +65,7 @@ This PR adds plug-in slots so a module PR only adds new files:
 | 11 | SaaS tenant billing | Cursor | #413 merged, #415 open |
 | 12 | AI approval queue | Claude | |
 | 13 | Industry packs | Cursor | #413 merged, #415 open |
-| – | Permission fix for the #413 tables | Claude | new migration only, no Cursor files |
+| – | Permission fix for the #413 tables | Claude | draft #419 (new migration only, no Cursor files) |
 
 **Cursor: please do not edit** `supabase/functions/_shared/functionHealth.ts`, `lib/errorReporting.ts` (Claude #418) or anything under `modules/extensions/`. **Claude will not edit** `featureSliceStores.ts`, the M6–M12 pages, `supabase/functions/public-api/`, or Cursor's migrations; fixes to Cursor's tables go in new Claude migrations only.
 
@@ -160,14 +160,15 @@ The criteria below were written before the re-split; for modules now owned by Cu
 |---|--------|-------|--------|----|
 | 1 | Maker-checker | Cursor | first slice merged, deepening | #413, #415 |
 | 2 | Public REST API + webhooks | Cursor | first slice merged, deepening | #413, #415 |
-| 3 | Sentry / structured logs | Claude | draft PR open | #418 |
-| 4 | Demo isolation | Claude | in progress | |
-| 5 | Field-level encryption | Claude | not started | |
+| 3 | Sentry / structured logs | Claude | built and tested, draft PR (needs a Sentry DSN to send anything) | #418 |
+| 4 | Demo isolation | Claude | built and tested, draft PR (needs a separate demo Supabase project to use) | #420 |
+| 5 | Field-level encryption | Claude | built and tested, draft PR (needs a Vault key; Cursor's HR pages still read plain columns) | #421 (after #419) |
 | 6 | HR | Cursor | first slice merged, deepening | #413, #415 |
 | 7 | Payroll | Cursor | first slice merged, deepening | #413, #415 |
 | 8 | WPS / gratuity | Cursor | planning-only calc merged, deepening | #413, #415 |
-| 9 | Arabic bilingual PDFs | Claude | not started | |
+| 9 | Arabic bilingual PDFs | Claude | built and tested, draft PR (Arabic wording needs a native speaker check) | #423 |
 | 10 | Marketing | Cursor | first slice merged, deepening | #413, #415 |
 | 11 | SaaS tenant billing | Cursor | first slice merged, deepening | #413, #415 |
-| 12 | AI approval queue | Claude | not started | |
+| 12 | AI approval queue | Claude | built and tested, draft PR (never called against the real Claude API) | #422 |
 | 13 | Industry packs | Cursor | first slice merged, deepening | #413, #415 |
+| + | Permission fix for #413 tables | Claude | built and tested, draft PR; run before Cursor's M6–M12 SQL goes live | #419 |
