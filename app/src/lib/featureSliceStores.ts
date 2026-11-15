@@ -36,6 +36,8 @@ export type HrEmployee = {
   basic_salary_aed: number | null
   allowances_aed: number
   iban: string
+  labour_card_no: string
+  bank_routing_code: string
   notes: string
 }
 
@@ -57,7 +59,10 @@ export type PayrollLine = {
   net_aed: number
   gratuity_accrual_aed: number
   wps_ready: boolean
-  hr_employees?: Pick<HrEmployee, 'employee_code' | 'full_name' | 'iban'> | null
+  hr_employees?: Pick<
+    HrEmployee,
+    'employee_code' | 'full_name' | 'iban' | 'labour_card_no' | 'bank_routing_code'
+  > | null
 }
 
 export type MarketingCampaign = {
@@ -159,6 +164,8 @@ function normalizeHr(row: Record<string, unknown>): HrEmployee {
     basic_salary_aed: row.basic_salary_aed == null ? null : Number(row.basic_salary_aed),
     allowances_aed: Number(row.allowances_aed || 0),
     iban: String(row.iban || ''),
+    labour_card_no: String(row.labour_card_no || ''),
+    bank_routing_code: String(row.bank_routing_code || ''),
     notes: String(row.notes || ''),
   }
 }
@@ -172,6 +179,8 @@ export async function createHrEmployee(input: {
   basic_salary_aed?: number | null
   allowances_aed?: number
   iban?: string
+  labour_card_no?: string
+  bank_routing_code?: string
   start_date?: string | null
   employment_status?: string
 }): Promise<void> {
@@ -185,6 +194,8 @@ export async function createHrEmployee(input: {
     basic_salary_aed: input.basic_salary_aed ?? null,
     allowances_aed: input.allowances_aed ?? 0,
     iban: (input.iban || '').trim(),
+    labour_card_no: (input.labour_card_no || '').trim(),
+    bank_routing_code: (input.bank_routing_code || '').trim(),
     start_date: input.start_date || null,
     employment_status: input.employment_status || 'active',
   })
@@ -203,6 +214,8 @@ export async function updateHrEmployee(
     basic_salary_aed: number | null
     allowances_aed: number
     iban: string
+    labour_card_no: string
+    bank_routing_code: string
     start_date: string | null
     notes: string
   }>,
@@ -244,7 +257,7 @@ export async function listPayrollLines(runId: string): Promise<PayrollLine[]> {
   return emptyOnMissing(async () => {
     const { data, error } = await db
       .from('payroll_lines')
-      .select('*, hr_employees(employee_code, full_name, iban)')
+      .select('*, hr_employees(employee_code, full_name, iban, labour_card_no, bank_routing_code)')
       .eq('run_id', runId)
       .order('created_at')
     if (error) throw error
@@ -273,7 +286,7 @@ export async function generatePayrollLinesFromHr(runId: string): Promise<number>
       deductions_aed: deductions,
       net_aed: net,
       gratuity_accrual_aed: gratuity,
-      wps_ready: Boolean(p.iban && net > 0),
+      wps_ready: Boolean(p.iban && p.labour_card_no && p.bank_routing_code && net > 0),
     }
   })
   const { error } = await db.from('payroll_lines').upsert(rows, { onConflict: 'run_id,employee_id' })
@@ -285,12 +298,18 @@ export async function updatePayrollLine(
   id: string,
   patch: Partial<{ basic_aed: number; allowances_aed: number; deductions_aed: number }>,
 ): Promise<void> {
-  const { data: existing, error: readErr } = await db.from('payroll_lines').select('*').eq('id', id).single()
+  const { data: existing, error: readErr } = await db
+    .from('payroll_lines')
+    .select('*, hr_employees(iban, labour_card_no, bank_routing_code)')
+    .eq('id', id)
+    .single()
   if (readErr) throw readErr
   const basic = patch.basic_aed ?? Number(existing.basic_aed)
   const allowances = patch.allowances_aed ?? Number(existing.allowances_aed)
   const deductions = patch.deductions_aed ?? Number(existing.deductions_aed)
   const net = payrollNetAed(basic, allowances, deductions)
+  const emp = (existing as PayrollLine).hr_employees
+  const wpsReady = Boolean(emp?.iban && emp?.labour_card_no && emp?.bank_routing_code && net > 0)
   const { error } = await db
     .from('payroll_lines')
     .update({
@@ -298,7 +317,7 @@ export async function updatePayrollLine(
       allowances_aed: allowances,
       deductions_aed: deductions,
       net_aed: net,
-      wps_ready: net > 0,
+      wps_ready: wpsReady,
     })
     .eq('id', id)
   if (error) throw error

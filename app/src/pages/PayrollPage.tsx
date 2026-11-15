@@ -14,11 +14,19 @@ import {
   type PayrollLine,
   type PayrollRun,
 } from '../lib/featureSliceStores'
-import { buildWpsCsvDraft } from '../lib/wpsGratuity'
+import {
+  buildWpsCsvDraft,
+  buildWpsSifDraft,
+  periodBoundsFromYyyyMm,
+  wpsFileReadiness,
+  type WpsLine,
+} from '../lib/wpsGratuity'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
-/** M8: payroll runs, lines from HR, WPS draft export, maker-checker submit. */
+const EMPLOYER_KEY = 'highmast.wpsEmployerId'
+
+/** M8: payroll runs, lines from HR, WPS/SIF draft export, maker-checker submit. */
 export default function PayrollPage() {
   const { appUserId } = useAuth()
   const { showToast } = useToast()
@@ -26,6 +34,13 @@ export default function PayrollPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [lines, setLines] = useState<PayrollLine[]>([])
   const [period, setPeriod] = useState(() => new Date().toISOString().slice(0, 7))
+  const [employerId, setEmployerId] = useState(() => {
+    try {
+      return localStorage.getItem(EMPLOYER_KEY) || ''
+    } catch {
+      return ''
+    }
+  })
   const [loading, setLoading] = useState(true)
   const [linesLoading, setLinesLoading] = useState(false)
 
@@ -115,17 +130,23 @@ export default function PayrollPage() {
     }
   }
 
-  function downloadWps() {
+  function toWpsLines(): WpsLine[] {
+    return lines.map((l) => ({
+      employeeCode: l.hr_employees?.employee_code || l.employee_id.slice(0, 8),
+      employeeName: l.hr_employees?.full_name || 'Employee',
+      iban: l.hr_employees?.iban || '',
+      labourCardNo: l.hr_employees?.labour_card_no || '',
+      routingCode: l.hr_employees?.bank_routing_code || '',
+      amountAed: Number(l.net_aed || 0),
+      fixedIncomeAed: Number(l.basic_aed || 0) + Number(l.allowances_aed || 0),
+      variableIncomeAed: 0,
+    }))
+  }
+
+  function downloadWpsCsv() {
     const selected = rows.find((r) => r.id === selectedId)
-    const csv = buildWpsCsvDraft(
-      lines.map((l) => ({
-        employeeCode: l.hr_employees?.employee_code || l.employee_id.slice(0, 8),
-        employeeName: l.hr_employees?.full_name || 'Employee',
-        iban: l.hr_employees?.iban || '',
-        amountAed: Number(l.net_aed || 0),
-      })),
-      `${selected?.period_yyyy_mm || period}-28`,
-    )
+    const bounds = periodBoundsFromYyyyMm(selected?.period_yyyy_mm || period)
+    const csv = buildWpsCsvDraft(toWpsLines(), bounds.payEndIso)
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -135,9 +156,41 @@ export default function PayrollPage() {
     URL.revokeObjectURL(url)
   }
 
+  function downloadWpsSif() {
+    const selected = rows.find((r) => r.id === selectedId)
+    const periodKey = selected?.period_yyyy_mm || period
+    const bounds = periodBoundsFromYyyyMm(periodKey)
+    const wpsLines = toWpsLines()
+    const employer = { employerUniqueId: employerId, bankLabel: 'DRAFT' }
+    const check = wpsFileReadiness(employer, wpsLines)
+    if (!employerId.trim()) {
+      showToast('Enter employer MoL / establishment ID before SIF export', 'error')
+      return
+    }
+    try {
+      localStorage.setItem(EMPLOYER_KEY, employerId.trim())
+    } catch {
+      /* ignore */
+    }
+    if (!check.ready) {
+      showToast(`SIF draft has ${check.issues.length} issue(s) — file still downloads as DRAFT`, 'info')
+    }
+    const body = buildWpsSifDraft(employer, bounds, wpsLines)
+    const blob = new Blob([body], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `wps-sif-DRAFT-${periodKey}.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const selected = rows.find((r) => r.id === selectedId) || null
   const totalNet = lines.reduce((s, l) => s + Number(l.net_aed || 0), 0)
   const totalGratuity = lines.reduce((s, l) => s + Number(l.gratuity_accrual_aed || 0), 0)
+  const readiness = selected
+    ? wpsFileReadiness({ employerUniqueId: employerId }, toWpsLines())
+    : null
 
   return (
     <div className={docsStyles.page}>
@@ -146,7 +199,8 @@ export default function PayrollPage() {
           <p className={docsStyles.kicker}>Payroll</p>
           <h1 className={docsStyles.title}>Payroll runs</h1>
           <p className={docsStyles.subtitle}>
-            Generate lines from HR, export WPS drafts, and route large runs through Approvals. Not legal advice.
+            Generate lines from HR, export WPS CSV / SIF drafts, and route large runs through Approvals. SIF is a draft
+            scaffold — not bank-certified and not legal advice.
           </p>
         </div>
       </header>
@@ -158,6 +212,15 @@ export default function PayrollPage() {
         <label style={labelStyle}>
           Period (YYYY-MM)
           <input style={inputStyle} value={period} onChange={(e) => setPeriod(e.target.value)} required pattern="\d{4}-\d{2}" />
+        </label>
+        <label style={labelStyle}>
+          Employer MoL / establishment ID
+          <input
+            style={inputStyle}
+            value={employerId}
+            onChange={(e) => setEmployerId(e.target.value)}
+            placeholder="digits only"
+          />
         </label>
         <button type="submit" style={buttonPrimaryStyle}>
           Create draft run
@@ -219,11 +282,24 @@ export default function PayrollPage() {
                   Mark paid
                 </button>
               ) : null}
-              <button type="button" style={buttonSecondaryStyle} onClick={downloadWps} disabled={!lines.length}>
+              <button type="button" style={buttonSecondaryStyle} onClick={downloadWpsCsv} disabled={!lines.length}>
                 Download WPS CSV
+              </button>
+              <button type="button" style={buttonSecondaryStyle} onClick={downloadWpsSif} disabled={!lines.length}>
+                Download SIF draft
               </button>
             </div>
           </div>
+
+          {readiness && lines.length ? (
+            <p style={{ margin: 0, fontSize: 12, color: readiness.ready ? colors.muted : colors.warn }}>
+              {readiness.ready
+                ? 'SIF draft readiness: all required fields present (still not bank-certified).'
+                : `SIF draft issues (${readiness.issues.length}): ${readiness.issues.slice(0, 3).join(' · ')}${
+                    readiness.issues.length > 3 ? '…' : ''
+                  }`}
+            </p>
+          ) : null}
 
           {linesLoading ? (
             <p style={{ color: colors.muted, margin: 0 }}>Loading lines…</p>

@@ -77,7 +77,7 @@ Status key: **exists** · **partial** · **missing**
 | Requirement | Status | Step |
 |-------------|--------|------|
 | UAE VAT codes / TRN / e-invoice ready model | partial | VAT on docs; no CoA tax engine → M7 + COMPLIANCE_NOTES |
-| WPS / gratuity | partial | M8 draft CSV + accrual helper shipped; **verify law** before live use |
+| WPS / gratuity | partial | M8 draft CSV + SIF-like SCR/EDR + validators shipped; **verify law + bank** before live use |
 | Arabic bilingual PDFs | missing | M1/M7 |
 | Import/export every list | partial | Some CSV; not universal → M1 framework |
 | Keep RR Central workflows | exists | Must not break §B.3 during M1–M3 |

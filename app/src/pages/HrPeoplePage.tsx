@@ -41,6 +41,8 @@ export default function HrPeoplePage() {
   const [salary, setSalary] = useState('')
   const [allowances, setAllowances] = useState('')
   const [iban, setIban] = useState('')
+  const [labourCard, setLabourCard] = useState('')
+  const [routing, setRouting] = useState('')
   const [startDate, setStartDate] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -69,6 +71,8 @@ export default function HrPeoplePage() {
     setSalary('')
     setAllowances('')
     setIban('')
+    setLabourCard('')
+    setRouting('')
     setStartDate('')
   }
 
@@ -82,6 +86,8 @@ export default function HrPeoplePage() {
     setSalary(r.basic_salary_aed != null ? String(r.basic_salary_aed) : '')
     setAllowances(String(r.allowances_aed || ''))
     setIban(r.iban || '')
+    setLabourCard(r.labour_card_no || '')
+    setRouting(r.bank_routing_code || '')
     setStartDate(r.start_date || '')
   }
 
@@ -97,6 +103,8 @@ export default function HrPeoplePage() {
       basic_salary_aed: salary ? Number(salary) : null,
       allowances_aed: allowances ? Number(allowances) : 0,
       iban,
+      labour_card_no: labourCard,
+      bank_routing_code: routing,
       start_date: startDate || null,
     }
     try {
@@ -202,6 +210,14 @@ export default function HrPeoplePage() {
             IBAN (WPS draft)
             <input style={inputStyle} value={iban} onChange={(e) => setIban(e.target.value)} placeholder="AE…" />
           </label>
+          <label style={labelStyle}>
+            Labour / MoL number
+            <input style={inputStyle} value={labourCard} onChange={(e) => setLabourCard(e.target.value)} />
+          </label>
+          <label style={labelStyle}>
+            Bank routing (9 digits)
+            <input style={inputStyle} value={routing} onChange={(e) => setRouting(e.target.value)} />
+          </label>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button type="submit" style={buttonPrimaryStyle}>
@@ -242,6 +258,8 @@ export default function HrPeoplePage() {
                       Basic AED {Number(r.basic_salary_aed || 0).toFixed(2)} · Allowances AED{' '}
                       {Number(r.allowances_aed || 0).toFixed(2)}
                       {r.iban ? ` · ${r.iban}` : ' · no IBAN'}
+                      {r.labour_card_no ? ` · MoL ${r.labour_card_no}` : ''}
+                      {r.bank_routing_code ? ` · routing ${r.bank_routing_code}` : ''}
                     </div>
                     <div style={{ color: colors.muted2, fontSize: 12, marginTop: 4 }}>
                       Draft gratuity ({years}y): AED {gratuity.toFixed(2)}
