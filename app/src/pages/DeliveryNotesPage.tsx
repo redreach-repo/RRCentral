@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { Link2, Paperclip, Plus, Truck } from 'lucide-react'
@@ -29,6 +29,7 @@ import {
 } from '../lib/deliveryNotes'
 import {
   deleteDeliveryNote,
+  insertDeliveryNote,
   listDeliveryNotes,
   loadDeliveryNoteLineItems,
   restoreDeliveryNote,
@@ -36,12 +37,13 @@ import {
   updateDeliveryNote,
   type DeliveryNoteRow,
 } from '../lib/deliveryNoteStore'
+import { DELIVERY_NOTES_CSV_COLUMNS } from '../lib/deliveryNotesCsv'
 import {
   deleteSignedDeliveryNoteAttachment,
   loadSignedDeliveryNoteAttachments,
 } from '../lib/signedDeliveryNotes'
 import { errorMessage } from '../lib/errors'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import { parseDeliveryNoteForm } from '../lib/schemas/deliveryNote'
 import { parseDeliveryNoteFromQuoteForm } from '../lib/schemas/deliveryNoteFromQuote'
 import { type DraftLineItem } from '../lib/lineItems'
@@ -101,6 +103,8 @@ export default function DeliveryNotesPage() {
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState<StatusTab>('All')
   const [showArchived, setShowArchived] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
@@ -155,6 +159,71 @@ export default function DeliveryNotesPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  async function importDeliveryNotesCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of DELIVERY_NOTES_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, DELIVERY_NOTES_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid delivery note rows', 'error')
+        return
+      }
+      let saved = 0
+      const now = new Date().toISOString()
+      for (const row of ok) {
+        const status = (DELIVERY_NOTE_STATUSES as readonly string[]).includes(row.status)
+          ? row.status
+          : 'Draft'
+        const quote =
+          quotes.find(
+            (q) =>
+              q.reference_number === row.quote_ref ||
+              q.quote_id === row.quote_ref ||
+              q.id === row.quote_ref,
+          ) || null
+        await insertDeliveryNote({
+          id: crypto.randomUUID(),
+          client: row.client,
+          vertical: quote?.vertical || '',
+          division_code: quote?.division_code || '01',
+          reference_number: '',
+          date: format(new Date(), 'yyyy-MM-dd'),
+          delivery_date: row.delivery_date || null,
+          description: '',
+          quote_ref: row.quote_ref || quote?.reference_number || '',
+          quote_id: quote?.quote_id || quote?.id || '',
+          status,
+          delivery_terms: quote?.delivery_terms || DELIVERY_TERMS[0] || '',
+          ship_to: row.ship_to || '',
+          notes: row.notes || '',
+          received_by: '',
+          vehicle_notes: '',
+          created_by: who,
+          updated_by: who,
+          created_at: now,
+          updated_at: now,
+        })
+        saved += 1
+      }
+      const skipNote = errors.length ? ` · ${errors.length} row(s) skipped` : ''
+      showToast(`Imported ${saved} delivery note draft(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Delivery note CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
 
   useEffect(() => {
     if (loading) return
@@ -342,6 +411,25 @@ export default function DeliveryNotesPage() {
           <p className={docsStyles.subtitle}>{t('page.deliveryNotes.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importDeliveryNotesCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}
@@ -350,7 +438,7 @@ export default function DeliveryNotesPage() {
             onClick={() => {
               exportListCsv(
                 'delivery-notes.csv',
-                ['reference_number', 'client', 'quote_ref', 'status', 'delivery_date', 'ship_to'],
+                ['reference_number', 'client', 'quote_ref', 'status', 'delivery_date', 'ship_to', 'notes'],
                 notes.map((n) => ({
                   reference_number: n.reference_number,
                   client: n.client,
@@ -358,6 +446,7 @@ export default function DeliveryNotesPage() {
                   status: n.status,
                   delivery_date: n.delivery_date || '',
                   ship_to: n.ship_to,
+                  notes: n.notes || '',
                 })),
               )
               showToast('Delivery notes CSV downloaded', 'success')

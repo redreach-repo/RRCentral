@@ -19,6 +19,12 @@ import EditorSectionTabs, {
   type EditorSection,
 } from '../components/EditorSectionTabs'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
+import {
+  expensesFiltersEqual,
+  normalizeExpensesFilters,
+  type ExpensesViewFilters,
+} from '../lib/savedViews'
 import { formatAED } from '../lib/money'
 import { logActivity } from '../lib/activity'
 import { expenseChargesVat, expenseVatParts } from '../lib/finance'
@@ -763,6 +769,22 @@ export default function ExpensesPage() {
           </button>
         </div>
       </header>
+
+      <SavedViewsBar
+        moduleId="expenses"
+        filters={normalizeExpensesFilters({ from, to })}
+        ownerUserId={appUserId}
+        canWrite={userRole !== 'viewer'}
+        onApply={(filters) => {
+          const next = filters as ExpensesViewFilters
+          setFrom(typeof next.from === 'string' ? next.from : '')
+          setTo(typeof next.to === 'string' ? next.to : '')
+        }}
+        onToast={showToast}
+        filtersEqual={(a, b) =>
+          expensesFiltersEqual(a as ExpensesViewFilters, b as ExpensesViewFilters)
+        }
+      />
 
       <div className={docsStyles.controls}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>

@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { useSettings } from '../contexts/SettingsContext'
+import CustomFieldsCard from '../components/CustomFieldsCard'
 import EmptyState from '../components/EmptyState'
 import SlaBadge from '../components/support/SlaBadge'
 import { accountTypeLabel, canEditAccount } from '../lib/accounts'
@@ -467,6 +468,17 @@ export default function TicketPage() {
           </div>
         )}
       </section>
+
+      {ticket.id ? (
+        <section style={{ marginBottom: 16 }}>
+          <CustomFieldsCard
+            objectType="ticket"
+            recordId={ticket.id}
+            editable={Boolean(editable) && userRole !== 'viewer'}
+            onToast={showToast}
+          />
+        </section>
+      ) : null}
 
       {editable ? (
         <section style={cardStyle}>
