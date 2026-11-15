@@ -183,6 +183,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.delivery.obligations.body':
       'Track NDA and contract obligations after sign so renewals and follow-ups do not slip.',
     'guide.delivery.obligations.link': 'Open obligations',
+    'guide.delivery.support.title': 'Support',
+    'guide.delivery.support.body':
+      'Client support tickets and reply threads. Archive soft-deletes keep history for restore.',
+    'guide.delivery.support.link': 'Open Support',
     'guide.admin.settings.title': 'Settings',
     'guide.admin.settings.body':
       'Company, bank, users, and integrations live here. Prefer Settings over editing env files on a running tenant.',
@@ -1219,6 +1223,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.delivery.obligations.body':
       'تابع التزامات NDA والعقود بعد التوقيع حتى لا تفوت التجديدات والمتابعات.',
     'guide.delivery.obligations.link': 'فتح الالتزامات',
+    'guide.delivery.support.title': 'الدعم',
+    'guide.delivery.support.body':
+      'تذاكر دعم العملاء وسلاسل الرد. الأرشفة بالحذف الناعم تبقي السجل للاستعادة.',
+    'guide.delivery.support.link': 'فتح الدعم',
     'guide.admin.settings.title': 'الإعدادات',
     'guide.admin.settings.body':
       'الشركة والبنك والمستخدمون والتكاملات هنا. فضّل الإعدادات على تعديل ملفات البيئة على مستأجر يعمل.',

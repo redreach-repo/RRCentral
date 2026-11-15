@@ -40,4 +40,11 @@ export const GUIDE_DELIVERY_SECTIONS: GuideDeliverySection[] = [
     to: '/obligations',
     linkKey: 'guide.delivery.obligations.link',
   },
+  {
+    id: 'support',
+    titleKey: 'guide.delivery.support.title',
+    bodyKey: 'guide.delivery.support.body',
+    to: '/support',
+    linkKey: 'guide.delivery.support.link',
+  },
 ]

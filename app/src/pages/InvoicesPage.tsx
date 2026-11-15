@@ -19,6 +19,12 @@ import { accountTypeLabel } from '../lib/accounts'
 import { listAccounts } from '../lib/accountsStore'
 import { resolveCreditWarnForClient } from '../lib/creditSoftWarn'
 import { exportListCsv } from '../lib/listIo'
+import {
+  displayFieldValue,
+  listCustomFieldDefinitions,
+  loadCustomFieldValuesForRecords,
+  type CustomFieldDefinition,
+} from '../lib/customFields'
 import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { can, roleAtLeast } from '../lib/permissions'
@@ -187,6 +193,10 @@ export default function InvoicesPage() {
   const [statusTab, setStatusTab] = useState<'All' | 'Draft' | 'Sent' | 'Cancelled'>('All')
   const [payTab, setPayTab] = useState<'All' | 'Pending' | 'Partial' | 'Paid'>('All')
   const [showArchived, setShowArchived] = useState(false)
+  const [customDefs, setCustomDefs] = useState<CustomFieldDefinition[]>([])
+  const [customValues, setCustomValues] = useState<
+    Record<string, Record<string, unknown>>
+  >({})
   const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
   const compact = useCompactCrm()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -232,6 +242,15 @@ export default function InvoicesPage() {
         : raw
       setInvoices(sortByDateDesc(invoicesFixed))
       setClients((cRes.data || []) as Client[])
+      const defs = await listCustomFieldDefinitions('invoice').catch(
+        () => [] as CustomFieldDefinition[],
+      )
+      setCustomDefs(defs.slice(0, 3))
+      const values = await loadCustomFieldValuesForRecords(
+        'invoice',
+        invoicesFixed.map((r) => r.id),
+      ).catch(() => ({}))
+      setCustomValues(values)
     } catch (e) {
       showToast(errorMessage(e, 'Failed to load invoices'), 'error')
     } finally {
@@ -802,15 +821,29 @@ export default function InvoicesPage() {
             onClick={() => {
               exportListCsv(
                 'invoices.csv',
-                ['reference_number', 'client', 'status', 'payment_status', 'amount', 'date'],
-                invoices.map((inv) => ({
-                  reference_number: inv.reference_number,
-                  client: inv.client,
-                  status: inv.status,
-                  payment_status: inv.payment_status,
-                  amount: inv.amount,
-                  date: inv.date || '',
-                })),
+                [
+                  'reference_number',
+                  'client',
+                  'status',
+                  'payment_status',
+                  'amount',
+                  'date',
+                  ...customDefs.map((d) => d.field_key || d.id),
+                ],
+                invoices.map((inv) => {
+                  const row: Record<string, unknown> = {
+                    reference_number: inv.reference_number,
+                    client: inv.client,
+                    status: inv.status,
+                    payment_status: inv.payment_status,
+                    amount: inv.amount,
+                    date: inv.date || '',
+                  }
+                  for (const d of customDefs) {
+                    row[d.field_key || d.id] = displayFieldValue(d, customValues[inv.id]?.[d.id])
+                  }
+                  return row
+                }),
               )
               showToast('Invoices CSV downloaded', 'success')
             }}
@@ -911,6 +944,9 @@ export default function InvoicesPage() {
                   <th className={docsStyles.colAmount}>Amount</th>
                   <th className={docsStyles.colStatus}>Status</th>
                   <th className={docsStyles.colStatus}>Payment</th>
+                  {customDefs.map((d) => (
+                    <th key={d.id}>{d.label || d.field_key}</th>
+                  ))}
                   <th className={docsStyles.colActions} style={{ textAlign: 'right' }}>
                     Actions
                   </th>
@@ -941,6 +977,11 @@ export default function InvoicesPage() {
                     <td className={docsStyles.colStatus}>
                       <StatusPill status={effectiveInvoicePaymentStatus(inv)} />
                     </td>
+                    {customDefs.map((d) => (
+                      <td key={d.id}>
+                        {displayFieldValue(d, customValues[inv.id]?.[d.id])}
+                      </td>
+                    ))}
                     <td className={`${docsStyles.colActions} ${docsStyles.actionsCell}`}>
                       {renderInvoiceActions(inv)}
                     </td>

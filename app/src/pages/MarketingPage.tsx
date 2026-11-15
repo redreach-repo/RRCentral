@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Megaphone } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
@@ -15,7 +15,8 @@ import {
   listMarketingSegments,
   type MarketingSegment,
 } from '../lib/m10m12Stores'
-import { exportListCsv } from '../lib/listIo'
+import { MARKETING_CSV_COLUMNS } from '../lib/marketingCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle, selectStyle } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
@@ -35,6 +36,8 @@ export default function MarketingPage() {
   const [endsOn, setEndsOn] = useState('')
   const [segmentName, setSegmentName] = useState('')
   const [loading, setLoading] = useState(true)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -52,6 +55,54 @@ export default function MarketingPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+
+  async function importCampaignsCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of MARKETING_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, MARKETING_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid campaign rows', 'error')
+        return
+      }
+      let saved = 0
+      for (const row of ok) {
+        const channel = CHANNELS.includes(row.channel as (typeof CHANNELS)[number])
+          ? row.channel
+          : 'email'
+        await createMarketingCampaign({
+          name: row.name,
+          channel,
+          budget_aed: row.budget_aed ? Number(row.budget_aed) : null,
+          starts_on: row.starts_on || null,
+          ends_on: row.ends_on || null,
+          notes: row.notes || '',
+        })
+        saved += 1
+      }
+      const skipNote = errors.length ? ` · ${errors.length} row(s) skipped` : ''
+      showToast(`Imported ${saved} campaign(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Campaign CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
 
   async function onAdd(e: React.FormEvent) {
     e.preventDefault()
@@ -109,6 +160,26 @@ export default function MarketingPage() {
             Plan campaigns and opt-in segments. Live ESP send is out of scope; use Dry-run to mark queued recipients locally.
           </p>
         </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".csv,text/csv"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) void importCampaignsCsv(file)
+          }}
+        />
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+          disabled={importing}
+          onClick={() => importInputRef.current?.click()}
+        >
+          {importing ? 'Importing…' : 'Import CSV'}
+        </button>
         <button
           type="button"
           className={docsStyles.newBtn}
@@ -133,6 +204,7 @@ export default function MarketingPage() {
         >
           Export CSV
         </button>
+        </div>
       </header>
 
       <div style={{ marginBottom: 12 }}>

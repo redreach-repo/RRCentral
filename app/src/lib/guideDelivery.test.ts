@@ -4,13 +4,14 @@ import { GUIDE_PACKS } from './guidePacks'
 import { t } from './i18n'
 
 describe('GUIDE_DELIVERY_SECTIONS', () => {
-  it('covers the five delivery paths', () => {
+  it('covers the six delivery paths', () => {
     expect(GUIDE_DELIVERY_SECTIONS.map((s) => s.id)).toEqual([
       'accounts',
       'health',
       'reports',
       'updates',
       'obligations',
+      'support',
     ])
   })
 
