@@ -9,7 +9,7 @@
 | Payroll | §6.6 / M8 | Runs, generate lines from active HR, WPS CSV from lines, submit/approve/paid |
 | WPS / gratuity | §11 / M8 | `wpsGratuity.ts` (years-of-service, daily wage, net, CSV) |
 | Marketing | §6.10 / M10 | Campaigns with budget/dates + activate/pause/done |
-| SaaS tenant billing | §6.13 / M11 | Plan catalog, trial/activate/cancel, seat usage vs HR headcount |
+| SaaS tenant billing | §6.13 / M11 | Plan catalog, trial/activate/cancel, seat usage; Stripe Checkout + portal (`docs/saas-billing.md`) |
 | Industry packs | §3 / M12 | Catalog + tenant activate/retire (`tenant_industry_packs`) |
 | Maker-checker | §3 / M7 | Approvals queue, self-approve block, payroll auto-wire ≥ AED 5k |
 | Public REST + webhooks | §3 / M11 | Key revoke, webhook test fire, Edge `public-api` `/v1/me` + `/v1/accounts` |
@@ -23,7 +23,7 @@ Module flags (default **hidden** until Settings): `hr`, `payroll`, `marketing`, 
 
 ## Still later (not claimed done)
 
-- Stripe Checkout for HighMast SaaS plans
 - Bank-certified WPS/SIF file format + legal counsel sign-off
 - Real marketing send providers
 - Full public API write surface + signed webhook retries
+- Stripe Tax registration for live UAE/GCC SaaS charges

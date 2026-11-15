@@ -1,25 +1,24 @@
 # HighMast / RR Central status
 
 **Last updated:** 15 November 2026 (Asia/Dubai)  
-**Current milestone:** M6–M12 feature slices deepened (demo left alone)
+**Current milestone:** HighMast SaaS Checkout (M11)
 
 ## Shipped this turn
 
-- Deepened all 8 feature tracks into usable end-to-end slices (HR edit/status, payroll lines + WPS + approvals wire, marketing lifecycle, SaaS activate/cancel + seats, pack activate/retire, maker-checker self-approve block, public API routes + webhook test)
-- Migration `20261217140000_feature_slices_deepen.sql`
-- See `docs/FEATURE_SLICES_M6_M12.md`
+- Stripe Checkout + Customer Portal for HighMast tenant plans (`saas-checkout`, `saas-billing-webhook`)
+- SaaS billing page: Subscribe with Stripe / Manage in Stripe; local trial/activate kept for demos
+- See `docs/saas-billing.md`
 
 ## Already on main
 
-- First slices (#413) · Continuous backlog · HighMast brand/chrome · platform tenancy · EN+AR · Zod · guides
+- M6–M12 deepened slices (#415) · Arabic PDFs · AI approvals · encryption · demo · observability · brand/chrome
 
 ## Still open (agent queue)
 
-1. Stripe SaaS Checkout for HighMast plans  
-2. Bank-certified WPS + counsel review  
-3. Theme studio (§5.3) later  
-4. Official SVG masters when zip lands  
-5. Demo / M3a after Alfred  
+1. Bank-certified WPS + counsel review  
+2. Theme studio (§5.3) later  
+3. Official SVG masters when zip lands  
+4. Demo / M3a after Alfred  
 
 ## Still externally blocked
 

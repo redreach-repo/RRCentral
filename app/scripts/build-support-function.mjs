@@ -57,6 +57,8 @@ const bundles = [
   { entry: 'src/lib/invoicePayLink.ts', out: '../supabase/functions/stripe-invoice-webhook/invoicePayLink.bundle.js' },
   { entry: 'src/lib/clientReports.ts', out: '../supabase/functions/client-reports/clientReports.bundle.js' },
   { entry: 'src/lib/weeklyUpdates.ts', out: '../supabase/functions/client-updates/weeklyUpdates.bundle.js' },
+  { entry: 'src/lib/saasCheckout.ts', out: '../supabase/functions/saas-checkout/saasCheckout.bundle.js' },
+  { entry: 'src/lib/saasCheckout.ts', out: '../supabase/functions/saas-billing-webhook/saasCheckout.bundle.js' },
 ]
 
 let stale = false

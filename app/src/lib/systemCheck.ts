@@ -40,6 +40,8 @@ export const SYSTEM_FUNCTIONS: SystemFunction[] = [
   { name: 'fireflies-fetch', feature: 'Fireflies calls on the timeline', liveTest: '18' },
   { name: 'invoice-pay-link', feature: 'Card payment links on invoices', liveTest: '19' },
   { name: 'stripe-invoice-webhook', feature: 'Card payments mark invoices paid', liveTest: '19' },
+  { name: 'saas-checkout', feature: 'HighMast SaaS Checkout and billing portal', liveTest: '19' },
+  { name: 'saas-billing-webhook', feature: 'HighMast SaaS subscription sync from Stripe', liveTest: '19' },
   { name: 'client-reports', feature: 'Monthly client reports to approve', liveTest: '22' },
   { name: 'client-updates', feature: 'Weekly CTRM Next client updates to approve', liveTest: '30' },
 ]
