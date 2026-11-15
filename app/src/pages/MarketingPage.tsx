@@ -15,6 +15,7 @@ import {
   listMarketingSegments,
   type MarketingSegment,
 } from '../lib/m10m12Stores'
+import { exportListCsv } from '../lib/listIo'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle, selectStyle } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
@@ -108,6 +109,30 @@ export default function MarketingPage() {
             Plan campaigns and opt-in segments. Live ESP send is out of scope; use Dry-run to mark queued recipients locally.
           </p>
         </div>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+          disabled={!rows.length}
+          onClick={() => {
+            exportListCsv(
+              'marketing-campaigns.csv',
+              ['name', 'channel', 'status', 'starts_on', 'ends_on', 'budget_aed', 'notes'],
+              rows.map((r) => ({
+                name: r.name,
+                channel: r.channel,
+                status: r.status,
+                starts_on: r.starts_on || '',
+                ends_on: r.ends_on || '',
+                budget_aed: r.budget_aed ?? '',
+                notes: r.notes,
+              })),
+            )
+            showToast('Campaigns CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
       </header>
 
       <div style={{ marginBottom: 12 }}>

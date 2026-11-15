@@ -15,4 +15,18 @@ describe('numbering', () => {
     }
     expect(previewNextReference(seq)).toBe('RR-01-26015')
   })
+
+  it('respects pad width in the preview', () => {
+    const seq: NumberingSequence = {
+      id: '2',
+      doc_type: 'purchase_order',
+      division_code: '01',
+      prefix: 'PO',
+      year_yy: '26',
+      last_seq: 7,
+      pad: 4,
+      active: true,
+    }
+    expect(previewNextReference(seq)).toBe('PO-01-260008')
+  })
 })

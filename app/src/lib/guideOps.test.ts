@@ -4,13 +4,14 @@ import { GUIDE_PACKS } from './guidePacks'
 import { t } from './i18n'
 
 describe('GUIDE_OPS_SECTIONS', () => {
-  it('covers the five operations paths', () => {
+  it('covers the operations paths including purchase orders', () => {
     expect(GUIDE_OPS_SECTIONS.map((s) => s.id)).toEqual([
       'wanders',
       'catalog',
       'inventory',
       'templates',
       'domains',
+      'purchaseOrders',
     ])
   })
 

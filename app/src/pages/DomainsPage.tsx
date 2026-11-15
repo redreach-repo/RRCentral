@@ -19,6 +19,7 @@ import {
   domainStatusLabel,
   listOwnedDomainsResult,
 } from '../lib/domains'
+import { exportListCsv } from '../lib/listIo'
 import { parseDomainForm } from '../lib/schemas/domain'
 import {
   buttonDangerStyle,
@@ -267,14 +268,48 @@ export default function DomainsPage() {
           <h1 className={docsStyles.title}>{t('page.domains.title')}</h1>
           <p className={docsStyles.subtitle}>{t('page.domains.subtitle')}</p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          onClick={openCreate}
-          disabled={missingTable}
-        >
-          <Plus size={16} /> {t('page.domains.add')}
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!domains.length}
+            onClick={() => {
+              exportListCsv(
+                'domains.csv',
+                [
+                  'domain_name',
+                  'registrar',
+                  'status',
+                  'expires_on',
+                  'auto_renew',
+                  'cost_aed',
+                  'billing_cycle',
+                ],
+                domains.map((d) => ({
+                  domain_name: d.domain_name,
+                  registrar: d.registrar,
+                  status: d.status,
+                  expires_on: d.expires_on || '',
+                  auto_renew: d.auto_renew ? 'yes' : 'no',
+                  cost_aed: d.cost_aed,
+                  billing_cycle: d.billing_cycle,
+                })),
+              )
+              showToast('Domains CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            onClick={openCreate}
+            disabled={missingTable}
+          >
+            <Plus size={16} /> {t('page.domains.add')}
+          </button>
+        </div>
       </header>
 
       {missingTable ? (

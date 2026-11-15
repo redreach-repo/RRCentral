@@ -40,6 +40,7 @@ import {
   loadSignedDeliveryNoteAttachments,
 } from '../lib/signedDeliveryNotes'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import { parseDeliveryNoteForm } from '../lib/schemas/deliveryNote'
 import { parseDeliveryNoteFromQuoteForm } from '../lib/schemas/deliveryNoteFromQuote'
 import { type DraftLineItem } from '../lib/lineItems'
@@ -330,9 +331,34 @@ export default function DeliveryNotesPage() {
           <h1 className={docsStyles.title}>{t('page.deliveryNotes.title')}</h1>
           <p className={docsStyles.subtitle}>{t('page.deliveryNotes.subtitle')}</p>
         </div>
-        <button type="button" className={docsStyles.newBtn} onClick={() => setCreateOpen(true)}>
-          <Plus size={16} /> {t('page.deliveryNotes.new')}
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!notes.length}
+            onClick={() => {
+              exportListCsv(
+                'delivery-notes.csv',
+                ['reference_number', 'client', 'quote_ref', 'status', 'delivery_date', 'ship_to'],
+                notes.map((n) => ({
+                  reference_number: n.reference_number,
+                  client: n.client,
+                  quote_ref: n.quote_ref,
+                  status: n.status,
+                  delivery_date: n.delivery_date || '',
+                  ship_to: n.ship_to,
+                })),
+              )
+              showToast('Delivery notes CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+          <button type="button" className={docsStyles.newBtn} onClick={() => setCreateOpen(true)}>
+            <Plus size={16} /> {t('page.deliveryNotes.new')}
+          </button>
+        </div>
       </header>
 
       <div className={docsStyles.controls}>

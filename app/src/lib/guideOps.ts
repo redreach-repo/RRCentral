@@ -40,4 +40,11 @@ export const GUIDE_OPS_SECTIONS: GuideOpsSection[] = [
     to: '/domains',
     linkKey: 'guide.ops.domains.link',
   },
+  {
+    id: 'purchaseOrders',
+    titleKey: 'guide.ops.purchaseOrders.title',
+    bodyKey: 'guide.ops.purchaseOrders.body',
+    to: '/purchase-orders',
+    linkKey: 'guide.ops.purchaseOrders.link',
+  },
 ]

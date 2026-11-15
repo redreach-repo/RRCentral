@@ -199,6 +199,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.admin.appErrors.body':
       'Browser and function failures saved for triage. Clear resolved rows after you fix the cause.',
     'guide.admin.appErrors.link': 'Open App errors',
+    'guide.admin.dsr.title': 'Data subject requests',
+    'guide.admin.dsr.body':
+      'Log access, erasure, and export requests, then run retention prune when aged logs should go. Export the list as CSV for counsel.',
+    'guide.admin.dsr.link': 'Open Data requests',
     'guide.ops.wanders.title': 'Wanders',
     'guide.ops.wanders.body':
       'Travel leads, packages, partners, departures and bookings for RR Wanders — kept separate from RR Threads deals.',
@@ -219,6 +223,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.ops.domains.body':
       'Owned domains, registrar notes, and renewals so client sites do not expire quietly.',
     'guide.ops.domains.link': 'Open Domains',
+    'guide.ops.purchaseOrders.title': 'Purchase orders',
+    'guide.ops.purchaseOrders.body':
+      'Order from suppliers, receive into stock when the SKU matches, and archive finished POs with soft-delete.',
+    'guide.ops.purchaseOrders.link': 'Open Purchase orders',
     'guide.finance.vendors.title': 'Vendors',
     'guide.finance.vendors.body':
       'Register suppliers, keep bank details honest, and link expenses or commitments back to the right vendor.',
@@ -1207,6 +1215,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.admin.appErrors.body':
       'إخفاقات المتصفح والدوال محفوظة للفرز. امسح الصفوف المحلولة بعد إصلاح السبب.',
     'guide.admin.appErrors.link': 'فتح أخطاء التطبيق',
+    'guide.admin.dsr.title': 'طلبات أصحاب البيانات',
+    'guide.admin.dsr.body':
+      'سجّل طلبات الوصول والمسح والتصدير، ثم شغّل تقليم الاحتفاظ عندما يحين وقت حذف السجلات القديمة. صدّر القائمة كـ CSV للمستشار.',
+    'guide.admin.dsr.link': 'فتح طلبات البيانات',
     'guide.ops.wanders.title': 'Wanders',
     'guide.ops.wanders.body':
       'عملاء محتملون وباقات وشركاء ومغادرات وحجوزات لـ RR Wanders — منفصلة عن صفقات RR Threads.',
@@ -1227,6 +1239,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.ops.domains.body':
       'النطاقات المملوكة وملاحظات المسجّل والتجديدات حتى لا تنتهي مواقع العملاء بهدوء.',
     'guide.ops.domains.link': 'فتح النطاقات',
+    'guide.ops.purchaseOrders.title': 'أوامر الشراء',
+    'guide.ops.purchaseOrders.body':
+      'اطلب من الموردين، استلم في المخزون عند تطابق SKU، وأرشف أوامر الشراء المنتهية بالحذف الناعم.',
+    'guide.ops.purchaseOrders.link': 'فتح أوامر الشراء',
     'guide.finance.vendors.title': 'الموردون',
     'guide.finance.vendors.body':
       'سجّل الموردين، حافظ على بيانات البنك صادقة، واربط المصروفات أو الالتزامات بالمورد الصحيح.',
