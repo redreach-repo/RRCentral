@@ -197,9 +197,6 @@ export default function WebsiteInquiriesPanel({
   }
 
   if (!loaded) return null
-  if (!rows.length && !importing) {
-    // Still show a slim bar so Import CSV remains reachable when the queue is empty.
-  }
 
   return (
     <section
