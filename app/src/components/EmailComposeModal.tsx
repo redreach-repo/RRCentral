@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Mail } from 'lucide-react'
 import type { CrmContact } from '../lib/types'
 import { contactEmails, primaryContact } from '../lib/contacts'
@@ -16,8 +16,18 @@ import {
   colors,
 } from '../lib/uiStyles'
 import { errorMessage } from '../lib/errors'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { parseEmailComposeForm } from '../lib/schemas/emailCompose'
+
+const EMAIL_COMPOSE_CSV_COLUMNS = [
+  'kind',
+  'name',
+  'email',
+  'company',
+  'to',
+  'subject',
+  'body',
+] as const
 
 type Props = {
   open: boolean
@@ -48,6 +58,8 @@ export default function EmailComposeModal({
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -59,6 +71,70 @@ export default function EmailComposeModal({
         `Dear ${p?.name || 'team'},\n\nI hope you are well.\n\nBest regards,\n${settings.companyName || 'Red Reach Middle East FZE'}`,
     )
   }, [open, contacts, emails, defaultSubject, defaultBody, companyName, settings.companyName])
+
+  async function importComposeCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows)
+      if (!objects.length) {
+        showToast('No email compose rows in CSV', 'error')
+        return
+      }
+
+      const draftRow =
+        objects.find((r) => String(r.kind || '').trim().toLowerCase() === 'draft') ||
+        objects.find(
+          (r) =>
+            String(r.to || '').trim() ||
+            String(r.subject || '').trim() ||
+            String(r.body || '').trim(),
+        ) ||
+        null
+
+      if (!draftRow) {
+        showToast('CSV had no matching email draft fields', 'error')
+        return
+      }
+
+      const nextTo = String(draftRow.to || draftRow.email || '').trim()
+      const nextSubject = String(draftRow.subject ?? '').trim()
+      const nextBody = String(draftRow.body ?? '')
+      let applied = 0
+
+      if (nextTo) {
+        setTo(nextTo)
+        applied += 1
+      }
+      if (draftRow.subject != null && String(draftRow.subject) !== '') {
+        setSubject(nextSubject)
+        applied += 1
+      } else if (draftRow.subject != null) {
+        setSubject('')
+        applied += 1
+      }
+      if (draftRow.body != null) {
+        setBody(nextBody)
+        applied += 1
+      }
+
+      if (!applied) {
+        showToast('CSV had no matching email draft fields', 'error')
+        return
+      }
+      showToast('Email compose draft imported', 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Email compose CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
 
   async function handleSend() {
     const parsed = parseEmailComposeForm({ to, subject, body })
@@ -138,10 +214,28 @@ export default function EmailComposeModal({
         />
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".csv,text/csv"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) void importComposeCsv(file)
+          }}
+        />
         <button
           type="button"
           style={buttonSecondaryStyle}
-          disabled={sending}
+          disabled={sending || importing}
+          onClick={() => importInputRef.current?.click()}
+        >
+          {importing ? 'Importing…' : 'Import CSV'}
+        </button>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={sending || importing}
           onClick={() => {
             const contactRows = contacts
               .filter((c) => c.email)
@@ -153,7 +247,7 @@ export default function EmailComposeModal({
               }))
             exportListCsv(
               `email-compose-${companyName.replace(/\s+/g, '-').toLowerCase() || 'draft'}.csv`,
-              ['kind', 'name', 'email', 'company', 'to', 'subject', 'body'],
+              [...EMAIL_COMPOSE_CSV_COLUMNS],
               [
                 ...contactRows,
                 {
@@ -172,15 +266,25 @@ export default function EmailComposeModal({
         >
           Export CSV
         </button>
-        <button type="button" style={buttonSecondaryStyle} onClick={onClose} disabled={sending}>
+        <button type="button" style={buttonSecondaryStyle} onClick={onClose} disabled={sending || importing}>
           Cancel
         </button>
         {zohoEnabled ? (
-          <button type="button" style={buttonSecondaryStyle} onClick={handleMailtoFallback} disabled={sending}>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            onClick={handleMailtoFallback}
+            disabled={sending || importing}
+          >
             Open mailto…
           </button>
         ) : null}
-        <button type="button" style={buttonPrimaryStyle} onClick={() => void handleSend()} disabled={sending}>
+        <button
+          type="button"
+          style={buttonPrimaryStyle}
+          onClick={() => void handleSend()}
+          disabled={sending || importing}
+        >
           <Mail size={14} />
           {sending ? 'Sending…' : zohoEnabled ? 'Send via Zoho' : 'Open mail app'}
         </button>
