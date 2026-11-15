@@ -5,6 +5,7 @@ import { HEALTH_BAND_COLORS, HEALTH_BAND_LABELS, REPORT_CALL_LABELS, reportCallM
 import { listReportCalls, loadClientHealth, saveReportCall, type HealthRow } from '../../lib/clientHealthStore'
 import { monthKey } from '../../lib/delivery'
 import { errorMessage } from '../../lib/errors'
+import { exportListCsv } from '../../lib/listIo'
 import type { Account, ReportCall } from '../../lib/types'
 import { buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
 
@@ -49,9 +50,37 @@ export default function ClientHealthCard({ account, editable, author }: { accoun
 
   return (
     <section style={cardStyle} aria-label="Client health">
-      <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <HeartPulse size={16} style={{ color }} /> Health
-      </h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+          <HeartPulse size={16} style={{ color }} /> Health
+        </h2>
+        <button
+          type="button"
+          style={smallBtn}
+          onClick={() => {
+            exportListCsv(
+              `client-health-${account.id.slice(0, 8)}.csv`,
+              ['metric', 'value', 'note'],
+              [
+                { metric: 'score', value: health.score, note: HEALTH_BAND_LABELS[health.band] },
+                { metric: 'churn_warning', value: health.churnWarning ? 'yes' : 'no', note: health.flags.join('; ') },
+                ...health.parts.map((p) => ({ metric: p.label, value: `${p.points}/25`, note: p.note })),
+                ...reportCallMonths().map((m) => {
+                  const rec = calls.find((c) => monthKey(c.month) === m.key)
+                  return {
+                    metric: `report_call_${m.key}`,
+                    value: rec ? REPORT_CALL_LABELS[rec.status] : 'not_recorded',
+                    note: m.label,
+                  }
+                }),
+              ],
+            )
+            showToast('Client health CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
+      </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
         <span style={{ fontSize: 30, fontWeight: 700, color }}>{health.score}</span>
         <span style={{ color: colors.muted, fontSize: 13 }}>out of 100, {HEALTH_BAND_LABELS[health.band].toLowerCase()}</span>
