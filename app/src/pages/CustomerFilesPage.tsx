@@ -32,6 +32,7 @@ import {
   deleteCustomerDocument,
   filterFolderItems,
   loadCustomerFolder,
+  restoreCustomerDocument,
   relatedRefOptionsForSection,
   suggestedDriveFolderName,
   updateCrmDriveFolderUrl,
@@ -115,7 +116,11 @@ export default function CustomerFilesPage() {
   const [savingFolder, setSavingFolder] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [addSection, setAddSection] = useState<FolderSection>(CUSTOMER_FOLDER_SECTIONS[0])
-  const filesViewFilters = useMemo(() => ({ q: search }), [search])
+  const [showArchivedDocs, setShowArchivedDocs] = useState(false)
+  const filesViewFilters = useMemo(
+    () => ({ q: search, archived: showArchivedDocs ? '1' : '0' }),
+    [search, showArchivedDocs],
+  )
 
   function openUpload(section: FolderSection) {
     setAddSection(section)
@@ -181,7 +186,7 @@ export default function CustomerFilesPage() {
       }
       setLoadingFolder(true)
       try {
-        const next = await loadCustomerFolder(name)
+        const next = await loadCustomerFolder(name, { includeDeletedDocs: showArchivedDocs })
         setFolder(next)
         setDriveFolderUrl(next.crm?.drive_folder_url || '')
         setMissingTable(Boolean(next.missingDocumentsTable))
@@ -197,7 +202,7 @@ export default function CustomerFilesPage() {
         setLoadingFolder(false)
       }
     },
-    [searchParams, setSearchParams, showToast],
+    [searchParams, setSearchParams, showToast, showArchivedDocs],
   )
 
   useEffect(() => {
@@ -210,6 +215,11 @@ export default function CustomerFilesPage() {
     if (fromUrl === selected) return
     void openCompany(fromUrl)
   }, [searchParams, selected, openCompany])
+
+  useEffect(() => {
+    if (!selected) return
+    void openCompany(selected)
+  }, [showArchivedDocs]) // eslint-disable-line react-hooks/exhaustive-deps -- reload folder when archive filter flips
 
   const filteredCompanies = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -247,11 +257,16 @@ export default function CustomerFilesPage() {
   async function removeDriveFile(item: CustomerFolderItem) {
     if (!item.documentId) return
     try {
-      await deleteCustomerDocument(item.documentId)
-      showToast('Link removed (file stays on Google Drive)', 'success')
+      if (item.archived) {
+        await restoreCustomerDocument(item.documentId)
+        showToast('Link restored', 'success')
+      } else {
+        await deleteCustomerDocument(item.documentId)
+        showToast('Link archived (file stays on Google Drive). Use Show archived to restore.', 'success')
+      }
       if (selected) await openCompany(selected)
     } catch (e) {
-      showToast(errorMessage(e, 'Could not remove link'), 'error')
+      showToast(errorMessage(e, item.archived ? 'Could not restore link' : 'Could not remove link'), 'error')
     }
   }
 
@@ -305,9 +320,14 @@ export default function CustomerFilesPage() {
         ownerUserId={appUserId}
         canWrite
         applyDefaultOnLoad={false}
-        onApply={(f) => setSearch(String(f.q || ''))}
+        onApply={(f) => {
+          setSearch(String(f.q || ''))
+          setShowArchivedDocs(String(f.archived || '0') === '1')
+        }}
         onToast={showToast}
-        filtersEqual={(a, b) => String(a.q || '') === String(b.q || '')}
+        filtersEqual={(a, b) =>
+          String(a.q || '') === String(b.q || '') && String(a.archived || '0') === String(b.archived || '0')
+        }
       />
 
       {isLocalMode ? (
@@ -483,6 +503,13 @@ export default function CustomerFilesPage() {
                     </p>
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    <button
+                      type="button"
+                      style={buttonSecondaryStyle}
+                      onClick={() => setShowArchivedDocs((v) => !v)}
+                    >
+                      {showArchivedDocs ? 'Hide archived links' : 'Show archived links'}
+                    </button>
                     {driveFolderUrl ? (
                       <a
                         href={driveFolderUrl}
@@ -697,11 +724,11 @@ export default function CustomerFilesPage() {
                               {item.documentId ? (
                                 <button
                                   type="button"
-                                  style={buttonDangerStyle}
-                                  title="Remove link only"
+                                  style={item.archived ? buttonSecondaryStyle : buttonDangerStyle}
+                                  title={item.archived ? 'Restore link' : 'Archive link only'}
                                   onClick={() => void removeDriveFile(item)}
                                 >
-                                  <Trash2 size={14} /> Unlink
+                                  <Trash2 size={14} /> {item.archived ? 'Restore' : 'Unlink'}
                                 </button>
                               ) : null}
                             </div>
