@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { FileSignature, Plus, Target } from 'lucide-react'
@@ -15,11 +15,12 @@ import { useCompactCrm } from '../hooks/useMediaQuery'
 import { canEditAccount, visibleAccounts } from '../lib/accounts'
 import { listAccounts, listTeam } from '../lib/accountsStore'
 import { listPackages } from '../lib/deliveryStore'
-import { lostText, stageMoveProblem } from '../lib/dealRules'
+import { LOST_REASONS, isLostReason, lostText, stageMoveProblem } from '../lib/dealRules'
 import { errorMessage } from '../lib/errors'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { formatAED } from '../lib/money'
 import { can } from '../lib/permissions'
+import { parseSalesDealForm } from '../lib/schemas/salesDeal'
 import {
   SALES_STAGES,
   canMakeContract,
@@ -62,6 +63,40 @@ const chip = (bg: string, color: string): CSSProperties => ({
   whiteSpace: 'nowrap',
 })
 
+const STAGE_VALUES = new Set(SALES_STAGES.map((s) => s.value))
+const STAGE_BY_LABEL = new Map(SALES_STAGES.map((s) => [s.label.toLowerCase(), s.value]))
+
+function resolveStage(raw: string): SalesStage | '' {
+  const value = raw.trim()
+  if (!value) return ''
+  if (STAGE_VALUES.has(value as SalesStage)) return value as SalesStage
+  return STAGE_BY_LABEL.get(value.toLowerCase()) || ''
+}
+
+function parseLostFromExport(raw: string): { code: string; note: string } {
+  const text = raw.trim()
+  if (!text) return { code: '', note: '' }
+  const colon = text.indexOf(': ')
+  if (colon > 0) {
+    const code = text.slice(0, colon).trim()
+    const note = text.slice(colon + 2).trim()
+    if (isLostReason(code)) return { code, note: note || code }
+  }
+  if (isLostReason(text)) return { code: text, note: text }
+  for (const code of LOST_REASONS) {
+    if (text === code || text.startsWith(`${code}:`)) {
+      const note = text === code ? code : text.slice(code.length).replace(/^:\s*/, '').trim()
+      return { code, note: note || code }
+    }
+  }
+  return { code: '', note: text }
+}
+
+function isArchivedFlag(raw: string): boolean {
+  const v = raw.trim().toLowerCase()
+  return v === '1' || v === 'yes' || v === 'true' || v === 'y'
+}
+
 /** The pre-sale pipeline for AI CRM prospects: lead, discovery call, quote sent, signed. */
 export default function SalesPipelinePage() {
   const { t } = useI18n()
@@ -83,6 +118,8 @@ export default function SalesPipelinePage() {
   const [stageFilter, setStageFilter] = useState<SalesStage | 'all'>('all')
   const [overdueOnly, setOverdueOnly] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const author = useMemo(() => ({ appUserId, email: user?.email || '' }), [appUserId, user?.email])
   const canWrite = userRole !== 'viewer'
@@ -259,6 +296,107 @@ export default function SalesPipelinePage() {
     }
   }
 
+  async function importSalesDealsCsv(file: File) {
+    if (!canWrite || missingTable) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows)
+      const byName = new Map(editableClients.map((a) => [a.name.trim().toLowerCase(), a] as const))
+      const ownerByLabel = new Map(
+        team.flatMap((u) => {
+          const entries: [string, string][] = []
+          if (u.name?.trim()) entries.push([u.name.trim().toLowerCase(), u.id])
+          if (u.email?.trim()) entries.push([u.email.trim().toLowerCase(), u.id])
+          return entries
+        }),
+      )
+      const today = format(new Date(), 'yyyy-MM-dd')
+      const knownRefs = accounts.map((a) => a.reference)
+      let saved = 0
+      let skipped = 0
+      for (const row of objects) {
+        if (isArchivedFlag(String(row.archived || ''))) {
+          skipped += 1
+          continue
+        }
+        const company = String(row.company || '').trim()
+        if (!company) {
+          skipped += 1
+          continue
+        }
+        const stage = resolveStage(String(row.stage || ''))
+        // Signed deals need Make contract; skip them on import.
+        if (!stage || stage === 'signed') {
+          skipped += 1
+          continue
+        }
+        const account = byName.get(company.toLowerCase())
+        const packageName = String(row.package || '').trim()
+        const pkg = packageName
+          ? packages.find((p) => p.name.trim().toLowerCase() === packageName.toLowerCase())
+          : undefined
+        const lost = parseLostFromExport(String(row.lost_reason || ''))
+        if (stage === 'lost' && !lost.code) {
+          skipped += 1
+          continue
+        }
+        const ownerRaw = String(row.owner || '').trim().toLowerCase()
+        const ownerId =
+          (ownerRaw && ownerRaw !== 'nobody yet' ? ownerByLabel.get(ownerRaw) : null) ??
+          account?.owner_user_id ??
+          author.appUserId
+        const nextAction = String(row.next_action || '').trim()
+        const nextActionDate = String(row.next_action_date || '').trim() || (stage !== 'lost' ? today : '')
+        const values: SalesDealFormValues = {
+          accountId: account?.id ?? '',
+          newCompany: account ? '' : company,
+          stage,
+          source: String(row.source || '').trim(),
+          owner_user_id: ownerId,
+          next_action: nextAction,
+          next_action_date: nextActionDate || null,
+          lost_reason: lost.note,
+          lost_reason_code: lost.code,
+          notes: String(row.notes || '').trim(),
+          discovery_call_date: null,
+          package_id: pkg?.id ?? null,
+          option: 'A',
+          monthly_fee: Number(String(row.monthly_fee ?? '').replace(/,/g, '')) || 0,
+          setup_fee: Number(String(row.setup_fee ?? '').replace(/,/g, '')) || 0,
+          discount_percent: 0,
+          discount_months: 0,
+          start_date: null,
+          quote_reference: '',
+        }
+        const parsed = parseSalesDealForm(values)
+        if (!parsed.ok) {
+          skipped += 1
+          continue
+        }
+        await saveSalesDealForm(parsed.data, null, knownRefs, author)
+        saved += 1
+      }
+      if (!saved && skipped) {
+        showToast('No matching sales deal rows in CSV', 'error')
+        return
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} sales deal(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Sales deals CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   const editingDeal = editing?.deal ?? null
 
   function nextLine(d: SalesDeal) {
@@ -405,6 +543,27 @@ export default function SalesPipelinePage() {
           >
             {showArchived ? 'Hide archived' : 'Show archived'}
           </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importSalesDealsCsv(file)
+            }}
+          />
+          {canWrite && !missingTable ? (
+            <button
+              type="button"
+              className={docsStyles.newBtn}
+              style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+              disabled={importing}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
+          ) : null}
           <button
             type="button"
             className={docsStyles.newBtn}
