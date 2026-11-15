@@ -276,3 +276,23 @@ No database migrations. Documentation and `brand-assets/` only.
 
 **Tests**
 - Extended industry/project tests; `trading_credit_limits_test.sql`
+
+## A1 — `20261320120000_a1_money_server_payroll_ledger.sql`, `20261320130000_a1_field_encryption_reveal.sql`
+
+**What**
+- Money helpers `rr_currency_decimals`, `rr_money_round`; payroll functions and net-recompute trigger; journals posted only through `rr_gl_post_journal`.
+- `payroll_lines` amount columns widen `numeric(14,2)` → `numeric(18,3)` (no value changes).
+- Encrypted columns: `hr_employees.emirates_id_enc|passport_no_enc|national_id_enc` (+ `national_id_type`), `wanders_passengers.passport_number_enc`, `payroll_lines.pay_enc`, `app_settings.value_enc`; `fle_access_log.reason|actor_user_id`; wider outcome check.
+- Functions: `rr_hr_masked`, `rr_fle_reveal`, `rr_hr_set_identity`, `rr_app_secret` (service role), `rr_fle_backfill`, `rr_fle_backfill_reverse`; audit redaction for HR, payroll and passenger fields.
+
+**Apply (Alfred, via the SQL copy page; never from a laptop CLI)**
+1. Only after the HR/payroll permission question (#419) is settled. Apply on a development project first.
+2. Run both files in order. They are safe to re-run.
+3. If the Vault key `hm_fle_key_v1` exists: dry run `select * from rr_fle_backfill('hr');` (and `'wanders'`, `'payroll'`, `'settings'`), check the counts, then run each with `false`.
+4. Do not set `fle.enforce.*` until the pages and Edge Functions listed in `docs/REMAINING.md` read through the new functions.
+
+**Rollback**
+- Plain values: `select * from rr_fle_backfill_reverse('hr', false);` (also `'wanders'`, `'settings'`) after setting the matching `fle.enforce.*` to `false`.
+- The new columns and functions can stay; nothing reads them unless called. Retiring them later would be a separate, approved drop.
+
+**Tests:** `supabase/tests/modules/a1_money_server_test.sql`, `supabase/tests/modules/a1_field_encryption_reveal_test.sql` (local Postgres 16 with a Vault stub; not run on Supabase).

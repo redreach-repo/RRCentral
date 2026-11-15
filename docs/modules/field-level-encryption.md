@@ -5,6 +5,8 @@ Stubbed / unverified: tested on local Postgres 16 with a stand-in for Supabase V
 
 # Field-level encryption
 
+> **A1 update (2026-11-15):** ID numbers, passenger passports, payroll amounts and token settings are covered too; values are masked by default and revealed only through `rr_fle_reveal()` (permission, rate limit, audit). See `docs/MIGRATIONS.md` (A1) and `docs/DECISIONS.md` D11–D13.
+
 ## How it works
 - AES-256 (`pgp_sym_encrypt` from pgcrypto, in the `extensions` schema as Supabase ships it).
 - The key lives in **Supabase Vault** as a secret named `hm_fle_key_v1` (later `_v2`, …). It is never in a table, the repo, the browser or this chat.

@@ -51,3 +51,34 @@ Autonomous picks for open Master Spec §19 items during batch **M0–M3a**. Each
 - **What:** `hr_leave_requests` + manager approve path only; no attendance clock or org chart yet.
 - **Why:** Highest-value HR deepen that reuses `hr_employees` without inventing labour-law attendance rules.
 - **Change later:** Attendance / contracts HR pack after counsel input.
+
+## D9 — Money is bigint minor units, rounded half away from zero (A1)
+
+- **What:** `app/src/lib/money` holds amounts as `bigint` minor units with ISO 4217 decimals; rounding defaults to half away from zero. Legacy `number` helpers delegate to it. No decimal library added.
+- **Why:** Matches Postgres `round(numeric, n)`, so browser and database agree; no new dependency. The old float rounding was wrong on half-fil cases (1.005 → 1.00); the new result (1.01) is what the database already computes.
+- **Spec note:** the condensed `MASTER_SPEC.md` has no sections 3.5, 6.7 or 10.3; A1 followed the prompt text and GAP_PLAN rows instead.
+- **Change later:** pass `'half-even'` per call if an accountant asks for banker's rounding on a report.
+
+## D10 — Trusted payroll and ledger logic lives in the database, with a browser fallback (A1)
+
+- **What:** Payroll lines are generated, updated and totalled by security-definer functions; a trigger recomputes net on every save; journals can only become `posted` inside `rr_gl_post_journal`. The browser calls the RPCs and only falls back to its old maths when the function is missing (migration not yet applied).
+- **Why:** Keep what works: live runs main without A1 SQL; the fallback avoids breaking payroll before Alfred applies it.
+- **Gratuity as-of date:** kept as "today" (same as before) for the regression; a period-end as-of date is a later choice for Alfred.
+- **HR / payroll permissions:** #413's SQL lets sales read and write HR and payroll tables; the fix #419 was closed unmerged. A1 functions check manager/admin themselves, but direct table access is still open on main. Do not apply `20261217120000` to live until A2 decides record and field rules.
+
+## D11 — Keys stay in Supabase Vault; envelope via OpenPGP session keys (A1)
+
+- **What:** Keep the Vault secret `hm_fle_key_v<N>` (no external KMS: no new paid service). Each value is encrypted with its own random session key (`sess-key=1`), wrapped by the key derived from the Vault secret.
+- **Why:** Keys never sit in table rows; rotation already works by version.
+- **Change later:** move the key-encryption key to a cloud KMS if a customer contract needs it.
+
+## D12 — Masked by default; reveal needs manager/admin, 20 per 10 minutes, always logged (A1)
+
+- **What:** `rr_hr_masked` returns masks only. `rr_fle_reveal` returns plain text for manager/admin (HR, payroll, passenger fields) or admin (anything else), counts against `fle.reveal_limit_per_10min` (default 20), and writes `fle_access_log` with outcome and reason for every attempt, including denied ones.
+- **Why:** Safest default until A2 brings per-field permissions.
+- **Kept:** `rr_hr_sensitive` (from the earlier module) is unchanged so nothing that calls it breaks.
+
+## D13 — ID numbers have no plain column; other fields blank only when enforced (A1)
+
+- **What:** Emirates ID, passport and national ID (Aadhaar / PAN / SIN / other) on employees are written only through `rr_hr_set_identity` and stored encrypted. Existing plain fields (salary, IBAN, passenger passports, token settings) get encrypted copies; blanking the plain copy is opt-in per area (`fle.enforce.hr|wanders|settings`).
+- **Why:** Additive only, and live pages still read the plain columns. Bank routing codes and labour card numbers are not encrypted (routing codes identify a bank, not a person; labour card numbers were not in the A1 list).

@@ -15,12 +15,12 @@ Status key: **exists** · **partial** · **missing**
 | Requirement | Status | Migration / next step |
 |-------------|--------|------------------------|
 | Vite+React SPA on Supabase | exists | Keep; do not rewrite framework |
-| Trusted logic in Edge/DB not only browser | partial | Ledger/payroll/permissions must move server-side in M1+ |
+| Trusted logic in Edge/DB not only browser | partial | A1: payroll maths and journal posting enforced in the database; permissions are A2 |
 | Zod validation everywhere | partial | Login, password, app-user, account, ticket form schemas; keep expanding forms/API |
 | Module registry manifests | partial | M1 `APP_MODULES`; Layout + Cmd+K use `visibleAppModules`; Settings Module flags card (`overview`, `sales`, `ops`, `finance`, `delivery`, `clients`); Admin stays always on; more polish later |
 | Domain events / `event_outbox` | partial | M1 enqueue + worker + HubSpot/digest/webhook handlers; digest + HubSpot nudge consumption live |
 | Public REST API + webhooks | partial | M11: reads/writes + lines + invoice/quote finalize + HMAC webhooks + `webhook-retry` |
-| Exact money `numeric` / no float | partial | SQL numeric exists; TS `number`+round — fix path in M7 |
+| Exact money `numeric` / no float | partial | A1: shared `lib/money` (bigint minor units, per-currency rounding) on invoices, quotes, ledger, payroll; float guard test; other files on a shrink-only baseline |
 | Tenant / company / BU model | partial | M1 tables + seed + `tenant_id` retrofit; company switcher live |
 | RLS on every table | exists | M1 RESTRICTIVE tenant isolation on stamped tables |
 | Cross-tenant CI tests | partial | `tenant_isolation_test.sql` covers CRM, vendors, accounts, quotations, invoices, sales_deals, expenses, delivery_notes, payment_log, contracts, tickets, ctrm_deals, legal_documents, owned_domains, customer_documents, products, inventory_movements, quote_templates, income, follow_up_updates, supplier_commitments, saved_views, pipelines, pipeline_stages, custom_field_definitions, custom_field_values, numbering_sequences, brand_kits, business_units, workflow_definitions, workflow_runs, event_outbox + audit append-only; keep expanding stamped tables |
@@ -72,7 +72,7 @@ Status key: **exists** · **partial** · **missing**
 | Mail providers (Zoho→Gmail→M365→IMAP) | partial | Zoho + Gmail Phase A + M365 Phase A/B; Gmail Phase B later; IMAP deferred |
 | AI gateway + tools-as-user + pgvector | partial | `hm-ai-gateway` + FTS knowledge docs; pgvector / tools-as-user later |
 | AI human approval queue | partial | Queue + account Suggest button; Alfred SQL/Edge deploy still needed |
-| Field-level encryption (salary, IBAN, tokens) | missing | M1 for tokens; M6/M8 for HR fields |
+| Field-level encryption (salary, IBAN, tokens) | partial | A1: salary, IBAN, ID numbers, passports, pay lines, token settings encrypted; masked by default; logged, rate-limited reveal. Enforcement switches off until pages/Edge Functions move |
 | Append-only audit | partial | `audit_log` exists; CI asserts authenticated cannot INSERT/UPDATE/DELETE (REVOKE); prune stays security definer |
 | Sentry / structured logs | partial | Built behind DSN (off until Alfred); App errors + structured Edge logs |
 | Soft delete / retention tooling | partial | M13: DSR + accounts/contacts/vendors/products/expenses/tickets/POs soft-delete; AccountDetail archive/restore |
