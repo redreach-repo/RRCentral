@@ -83,6 +83,7 @@ const CORE_MODULES: ModuleManifest[] = [
       { to: '/quotations', label: 'Quotations', icon: FileText, section: 'Documents' },
       { to: '/invoices', label: 'Invoices', icon: Receipt, section: 'Documents' },
       { to: '/delivery-notes', label: 'Delivery notes', icon: Truck, section: 'Documents' },
+      { to: '/client-pos', label: 'Client POs', icon: ClipboardList, section: 'Documents' },
       { to: '/customer-files', label: 'Google Drive', icon: FolderOpen, section: 'Documents' },
     ],
   },
@@ -127,6 +128,8 @@ const CORE_MODULES: ModuleManifest[] = [
       { to: '/app/wanders', label: 'Wanders', icon: Plane },
       { to: '/catalog', label: 'Catalog', icon: Package },
       { to: '/inventory', label: 'Inventory', icon: Boxes },
+      { to: '/purchase-orders', label: 'Purchase orders', icon: Truck },
+      { to: '/projects', label: 'Projects', icon: Briefcase, minRole: 'manager' },
       { to: '/templates', label: 'Templates', icon: LayoutTemplate },
       { to: '/domains', label: 'Domains', icon: Globe },
     ],
@@ -180,7 +183,10 @@ const CORE_MODULES: ModuleManifest[] = [
     label: 'Industry packs',
     icon: Layers,
     flag: 'industryPacks',
-    items: [{ to: '/industry-packs', label: 'Packs', icon: Layers, minRole: 'admin' }],
+    items: [
+      { to: '/industry-packs', label: 'Packs', icon: Layers, minRole: 'admin' },
+      { to: '/country-packs', label: 'Country packs', icon: Globe, minRole: 'admin' },
+    ],
   },
   {
     id: 'admin',
