@@ -17,6 +17,7 @@ import CtrmIssueBox from '../components/support/CtrmIssueBox'
 import { NO_TRADE_DATA_NOTE, isCtrmIssue } from '../lib/ctrmIssues'
 import { DELIVERY_LABELS, serviceWindow, type DeliveryStatus } from '../lib/whatsappTickets'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import { parseTicketReplyForm } from '../lib/schemas/ticketReply'
 import { parseTicketSummaryForm } from '../lib/schemas/ticketSummary'
 import { signOffFor, type AiThreadMessage } from '../lib/aiAssist'
@@ -399,18 +400,43 @@ export default function TicketPage() {
       <section style={{ ...cardStyle, marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
           <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.ticket.conversation')}</h2>
-          {editable && account && messages.length ? (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button type="button" style={aiButton} disabled={Boolean(aiBusy)} onClick={() => void aiSummary()}>
-                <Sparkles size={13} />{' '}
-                {aiBusy === 'summary' ? t('page.ticket.summarising') : t('page.ticket.summarise')}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {messages.length ? (
+              <button
+                type="button"
+                style={aiButton}
+                onClick={() => {
+                  exportListCsv(
+                    `ticket-${(ticket?.subject || id).replace(/\s+/g, '-').slice(0, 40).toLowerCase() || id}-messages.csv`,
+                    ['created_at', 'author', 'author_kind', 'internal_note', 'body', 'delivery_status'],
+                    messages.map((m) => ({
+                      created_at: m.created_at,
+                      author: m.author_label,
+                      author_kind: m.author_kind,
+                      internal_note: m.is_internal_note ? 'yes' : 'no',
+                      body: m.body || '',
+                      delivery_status: m.delivery_status || '',
+                    })),
+                  )
+                  showToast('Ticket messages CSV downloaded', 'success')
+                }}
+              >
+                Export CSV
               </button>
-              <button type="button" style={aiButton} disabled={Boolean(aiBusy)} onClick={() => void aiReply()}>
-                <Sparkles size={13} />{' '}
-                {aiBusy === 'reply' ? t('page.ticket.drafting') : t('page.ticket.draftReply')}
-              </button>
-            </div>
-          ) : null}
+            ) : null}
+            {editable && account && messages.length ? (
+              <>
+                <button type="button" style={aiButton} disabled={Boolean(aiBusy)} onClick={() => void aiSummary()}>
+                  <Sparkles size={13} />{' '}
+                  {aiBusy === 'summary' ? t('page.ticket.summarising') : t('page.ticket.summarise')}
+                </button>
+                <button type="button" style={aiButton} disabled={Boolean(aiBusy)} onClick={() => void aiReply()}>
+                  <Sparkles size={13} />{' '}
+                  {aiBusy === 'reply' ? t('page.ticket.drafting') : t('page.ticket.draftReply')}
+                </button>
+              </>
+            ) : null}
+          </div>
         </div>
         {summary ? (
           <div
