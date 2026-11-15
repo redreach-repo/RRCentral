@@ -6,7 +6,9 @@ import { db } from '../lib/db'
 import { errorMessage } from '../lib/errors'
 import {
   clientPoIsOpen,
+  clientPoRemaining,
   clientPoStatusAfterMatch,
+  clientPoStatusAfterReceipt,
   clientPoSummary,
   suggestClientPoInvoiceMatch,
 } from '../lib/clientPurchaseOrders'
@@ -14,6 +16,7 @@ import {
   createClientPurchaseOrder,
   linkClientPoInvoice,
   listClientPurchaseOrders,
+  recordClientPoReceipt,
   setClientPoStatus,
   type ClientPurchaseOrder,
 } from '../lib/opsSliceStores'
@@ -226,6 +229,10 @@ export default function ClientPosPage() {
                         {r.invoice_id ? (
                           <div style={{ color: colors.muted, fontSize: 12 }}>Linked invoice id {r.invoice_id}</div>
                         ) : null}
+                        <div style={{ color: colors.muted, fontSize: 12 }}>
+                          Received {Number(r.received_amount || 0).toFixed(2)} · remaining{' '}
+                          {clientPoRemaining(Number(r.amount), Number(r.received_amount || 0)).toFixed(2)}
+                        </div>
                         {suggestion && !r.invoice_id ? (
                           <div style={{ color: colors.muted, fontSize: 12 }}>
                             Suggest {suggestion.reference} · {suggestion.reason}
@@ -236,6 +243,26 @@ export default function ClientPosPage() {
                         {clientPoIsOpen(r.status) && !r.invoice_id ? (
                           <button type="button" style={buttonSecondaryStyle} onClick={() => void matchInvoice(r)}>
                             Soft-match invoice
+                          </button>
+                        ) : null}
+                        {clientPoIsOpen(r.status) ? (
+                          <button
+                            type="button"
+                            style={buttonSecondaryStyle}
+                            onClick={() => {
+                              const add = window.prompt('Received amount to add (AED)', '0')
+                              if (add == null) return
+                              const next = Number(r.received_amount || 0) + (Number(add) || 0)
+                              const status = clientPoStatusAfterReceipt(Number(r.amount), next)
+                              void recordClientPoReceipt(r.id, next, status)
+                                .then(() => {
+                                  showToast(`Receipt recorded → ${status}`, 'success')
+                                  return load()
+                                })
+                                .catch((err) => showToast(errorMessage(err, 'Receipt failed'), 'error'))
+                            }}
+                          >
+                            Record receipt
                           </button>
                         ) : null}
                         {r.status === 'open' || r.status === 'partial' ? (

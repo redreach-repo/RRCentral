@@ -1,19 +1,19 @@
-# Run plan — M12b / M13 leftover stubs
+# Run plan — M2 / M12a deepen
 
 **Started:** 15 November 2026 (Asia/Dubai)  
-**Branch:** `cursor/batch-m12b-m13-stubs-d3d5` (from `main`)  
+**Branch:** `cursor/batch-m2-m12a-deepen-d3d5` (from `main`)  
 **Spec:** Master Spec v2.1  
-**Note:** M14 native blocked. No live ESP / Tax / CASA / QTSP.
+**Note:** M14 native blocked.
 
 ---
 
 ## Slices
 
-- [x] HR attendance day stub
-- [x] Client PO → invoice soft auto-match
-- [x] Construction sites + workforce stub
-- [x] Planning goals stub
-- [x] Soft-delete broaden (vendors / products) + more listIo CSV
+- [x] Workflow `update_field` + `create_record` steps
+- [x] Engineering document register + claims stubs
+- [x] Soft-delete expenses/tickets + invoices CSV
+- [x] Planning goal actuals + client PO received_amount
+- [x] Per-warehouse stock stub
 - [ ] M14 / live ESP / Tax / CASA / QTSP (Not done)
 
 ## Quality gates

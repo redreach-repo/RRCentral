@@ -16,6 +16,19 @@ export type WorkflowRunStatus =
   | 'failed'
   | 'cancelled'
 
+export type WorkflowFieldUpdate = {
+  field_key: string
+  value: string
+  object_type?: string
+  record_id?: string
+}
+
+export type WorkflowCreatedRecord = {
+  object_type: string
+  label: string
+  temp_id: string
+}
+
 export type WorkflowRunContext = {
   object_type?: string
   record_id?: string
@@ -24,6 +37,8 @@ export type WorkflowRunContext = {
   stage_key?: string
   actor_email?: string
   notifications?: string[]
+  field_updates?: WorkflowFieldUpdate[]
+  created_records?: WorkflowCreatedRecord[]
   step_log?: WorkflowStepLogEntry[]
   [key: string]: unknown
 }
@@ -137,7 +152,69 @@ export function processSteps(
       continue
     }
 
-    // Unsupported step types are skipped (recorded) so packs can grow later.
+    if (step.type === 'update_field') {
+      const field_key = String(step.config.field_key || '').trim()
+      const value = String(step.config.value ?? '')
+      if (!field_key) {
+        ctx = appendLog(ctx, {
+          index: i,
+          type: step.type,
+          name: step.name,
+          status: 'failed',
+          detail: 'Missing field_key',
+        })
+        return {
+          status: 'failed',
+          current_step: i,
+          context: ctx,
+          error_message: 'update_field requires field_key',
+        }
+      }
+      const update: WorkflowFieldUpdate = {
+        field_key,
+        value,
+        object_type: String(step.config.object_type || ctx.object_type || ''),
+        record_id: String(step.config.record_id || ctx.record_id || ''),
+      }
+      ctx = {
+        ...ctx,
+        field_updates: [...(ctx.field_updates || []), update],
+      }
+      ctx = appendLog(ctx, {
+        index: i,
+        type: step.type,
+        name: step.name,
+        status: 'done',
+        detail: `${field_key}=${value}`,
+      })
+      i += 1
+      continue
+    }
+
+    if (step.type === 'create_record') {
+      const object_type = String(step.config.object_type || 'note').trim() || 'note'
+      const label = String(step.config.label || step.name || 'Workflow record')
+      const created: WorkflowCreatedRecord = {
+        object_type,
+        label,
+        temp_id: `wf_${Date.now()}_${i}`,
+      }
+      ctx = {
+        ...ctx,
+        created_records: [...(ctx.created_records || []), created],
+      }
+      ctx = appendLog(ctx, {
+        index: i,
+        type: step.type,
+        name: step.name,
+        status: 'done',
+        detail: `${object_type}: ${label}`,
+      })
+      i += 1
+      continue
+    }
+
+    // webhook / ask_ai remain skipped until outbound/AI gates land.
     ctx = appendLog(ctx, {
       index: i,
       type: step.type,

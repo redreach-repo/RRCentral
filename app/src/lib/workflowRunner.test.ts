@@ -4,7 +4,12 @@ import {
   processSteps,
   roleCanApprove,
 } from './workflowRunner'
-import { buildApprovalStep, buildNotifyStep } from './workflows'
+import {
+  buildApprovalStep,
+  buildCreateRecordStep,
+  buildNotifyStep,
+  buildUpdateFieldStep,
+} from './workflows'
 
 describe('workflowRunner helpers', () => {
   it('matches stage_enter triggers', () => {
@@ -61,5 +66,19 @@ describe('workflowRunner helpers', () => {
     )
     expect(result.status).toBe('completed')
     expect(result.context.step_log?.[0]?.status).toBe('skipped')
+  })
+
+  it('applies update_field and create_record into context', () => {
+    const result = processSteps(
+      [
+        buildUpdateFieldStep({ fieldKey: 'status', value: 'Won' }),
+        buildCreateRecordStep({ objectType: 'task', label: 'Follow up' }),
+      ],
+      0,
+      { object_type: 'deal', record_id: 'd1', notifications: [], step_log: [] },
+    )
+    expect(result.status).toBe('completed')
+    expect(result.context.field_updates?.[0]).toMatchObject({ field_key: 'status', value: 'Won' })
+    expect(result.context.created_records?.[0]).toMatchObject({ object_type: 'task', label: 'Follow up' })
   })
 })

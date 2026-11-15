@@ -3,7 +3,9 @@ import { Target } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import { errorMessage } from '../lib/errors'
+import { db } from '../lib/db'
 import {
+  actualForGoalMetric,
   currentPeriodYyyyMm,
   GOAL_METRICS,
   goalProgressPct,
@@ -30,6 +32,10 @@ import docsStyles from '../styles/docsList.module.css'
 export default function PlanningGoalsPage() {
   const { showToast } = useToast()
   const [rows, setRows] = useState<PlanningGoal[]>([])
+  const [invoices, setInvoices] = useState<
+    { amount?: number; status?: string; date?: string | null; created_at?: string | null }[]
+  >([])
+  const [deals, setDeals] = useState<{ created_at?: string | null }[]>([])
   const [name, setName] = useState('')
   const [metricKey, setMetricKey] = useState('revenue_aed')
   const [target, setTarget] = useState('')
@@ -39,7 +45,14 @@ export default function PlanningGoalsPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await listPlanningGoals())
+      const [goals, inv, sd] = await Promise.all([
+        listPlanningGoals(),
+        db.from('invoices').select('amount, status, date, created_at').limit(500),
+        db.from('sales_deals').select('created_at').limit(500),
+      ])
+      setRows(goals)
+      setInvoices((inv.data || []) as typeof invoices)
+      setDeals((sd.data || []) as typeof deals)
     } catch (e) {
       showToast(errorMessage(e, 'Could not load goals'), 'error')
     } finally {
@@ -157,15 +170,15 @@ export default function PlanningGoalsPage() {
               <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}>
                 {rows.map((r) => {
                   const metric = GOAL_METRICS.find((m) => m.key === r.metric_key)?.label || r.metric_key
-                  // Actuals are wired later — progress shows 0 until reporting hooks land.
-                  const pct = goalProgressPct(0, r.target_value)
+                  const actual = actualForGoalMetric(r.metric_key, r.period_yyyy_mm, { invoices, deals })
+                  const pct = goalProgressPct(actual, r.target_value)
                   return (
                     <li key={r.id} style={{ borderTop: `1px solid ${colors.border}`, paddingTop: 8 }}>
                       <div style={{ fontSize: 13 }}>
                         <strong>{r.name}</strong> · {metric} · target {r.target_value} · {r.period_yyyy_mm} ·{' '}
                         {r.status}
                         <div style={{ color: colors.muted, fontSize: 12 }}>
-                          Actual tracking stub · progress {pct}%
+                          Actual {actual} · progress {pct}% (Unverified)
                         </div>
                       </div>
                       {r.status === 'active' ? (
