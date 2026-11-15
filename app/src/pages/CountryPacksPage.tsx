@@ -3,6 +3,7 @@ import { Globe2 } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import { errorMessage } from '../lib/errors'
 import { isCountryPackVerified, type CountryPack } from '../lib/countryPacks'
+import { exportListCsv } from '../lib/listIo'
 import { activateCountryPack, listCountryPacks } from '../lib/opsSliceStores'
 import { buttonPrimaryStyle, cardStyle, colors } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
@@ -42,6 +43,31 @@ export default function CountryPacksPage() {
             them off.
           </p>
         </div>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+          disabled={!packs.length}
+          onClick={() => {
+            exportListCsv(
+              'country-packs.csv',
+              ['pack_key', 'name', 'country_code', 'currency', 'tax_id_label', 'leave_types', 'verified', 'description'],
+              packs.map((p) => ({
+                pack_key: p.pack_key,
+                name: p.name,
+                country_code: p.country_code,
+                currency: p.currency,
+                tax_id_label: p.rules.taxIdLabel || '',
+                leave_types: (p.rules.leaveTypes || []).join('; '),
+                verified: isCountryPackVerified(p) ? 'yes' : 'no',
+                description: p.description,
+              })),
+            )
+            showToast('Country packs CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
       </header>
       {loading ? (
         <p>Loading…</p>
