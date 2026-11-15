@@ -54,4 +54,11 @@ export const GUIDE_ADMIN_SECTIONS: GuideAdminSection[] = [
     to: '/dsr',
     linkKey: 'guide.admin.dsr.link',
   },
+  {
+    id: 'publicApi',
+    titleKey: 'guide.admin.publicApi.title',
+    bodyKey: 'guide.admin.publicApi.body',
+    to: '/public-api',
+    linkKey: 'guide.admin.publicApi.link',
+  },
 ]

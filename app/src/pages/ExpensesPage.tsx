@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { FileUp, Paperclip, Plus, Wallet } from 'lucide-react'
 import ExpenseRowActions from '../components/expenses/ExpenseRowActions'
@@ -36,7 +36,8 @@ import {
   syncQuoteSupplierCostFromExpense,
 } from '../lib/supplierInvoiceStore'
 import { ensureVendor, listVendors } from '../lib/vendors'
-import { exportListCsv } from '../lib/listIo'
+import { EXPENSES_CSV_COLUMNS } from '../lib/expensesCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import { isUndefinedColumnError, errorMessage } from '../lib/errors'
 import { ensureMoneyApproval } from '../lib/featureSliceStores'
 import { DEFAULT_APPROVAL_THRESHOLD_AED, moneyActionRowStatus } from '../lib/makerChecker'
@@ -121,6 +122,8 @@ export default function ExpensesPage() {
   const [vendorSuggest, setVendorSuggest] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showArchived, setShowArchived] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [open, setOpen] = useState(false)
@@ -177,6 +180,68 @@ export default function ExpensesPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  async function importExpensesCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of EXPENSES_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, EXPENSES_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid expense rows', 'error')
+        return
+      }
+      const who = user?.email || ''
+      let saved = 0
+      for (const row of ok) {
+        const amount = round2(Number(row.amount) || 0)
+        if (!(amount > 0)) continue
+        const category = (CATEGORIES as readonly string[]).includes(row.category)
+          ? row.category
+          : CATEGORIES[0]
+        const payment_method = (PAYMENT_METHODS as readonly string[]).includes(row.payment_method)
+          ? row.payment_method
+          : PAYMENT_METHODS[0]
+        const parts = applyVatInclusive(amount, vatRate)
+        const payload = {
+          date: row.date || null,
+          vendor: row.vendor,
+          category,
+          amount: parts.amount,
+          amount_ex_vat: parts.amount_ex_vat,
+          vat_amount: parts.vat_amount,
+          payment_method,
+          notes: row.notes || '',
+          quote_ref: row.quote_ref || '',
+          references_text: row.quote_ref || '',
+          created_by: who,
+          updated_at: new Date().toISOString(),
+        }
+        const { error } = await db.from('expenses').insert({ ...payload, id: crypto.randomUUID() })
+        if (error && isUndefinedColumnError(error)) {
+          const { amount_ex_vat: _a, vat_amount: _v, quote_ref: _q, ...legacy } = payload
+          const retry = await db.from('expenses').insert({ ...legacy, id: crypto.randomUUID() })
+          if (retry.error) throw retry.error
+        } else if (error) throw error
+        saved += 1
+      }
+      const skipNote = errors.length ? ` · ${errors.length} row(s) skipped` : ''
+      showToast(`Imported ${saved} expense(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Expense CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
 
   const filtered = useMemo(() => {
     return expenses.filter((e) => {
@@ -626,6 +691,25 @@ export default function ExpensesPage() {
           <p className={docsStyles.subtitle}>{t('page.expenses.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importExpensesCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing || userRole === 'viewer'}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}
@@ -634,7 +718,7 @@ export default function ExpensesPage() {
             onClick={() => {
               exportListCsv(
                 'expenses.csv',
-                ['date', 'vendor', 'category', 'amount', 'payment_method', 'notes'],
+                ['date', 'vendor', 'category', 'amount', 'payment_method', 'notes', 'quote_ref'],
                 filtered.map((e) => ({
                   date: e.date || '',
                   vendor: e.vendor || '',
@@ -642,6 +726,7 @@ export default function ExpensesPage() {
                   amount: e.amount,
                   payment_method: e.payment_method || '',
                   notes: e.notes || '',
+                  quote_ref: e.quote_ref || '',
                 })),
               )
               showToast('Expenses CSV downloaded', 'success')
