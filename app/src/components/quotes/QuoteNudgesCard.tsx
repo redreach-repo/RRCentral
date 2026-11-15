@@ -121,7 +121,7 @@ export default function QuoteNudgesCard() {
         return
       }
       const objects = csvRowsToObjects(headers, csvRows)
-      const remaining = [...currentRows]
+      const remaining = [...(rows ?? [])]
       let done = 0
       let skipped = 0
       for (const row of objects) {
