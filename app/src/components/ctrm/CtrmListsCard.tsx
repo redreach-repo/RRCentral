@@ -5,7 +5,17 @@ import { useToast } from '../../contexts/ToastContext'
 import { errorMessage } from '../../lib/errors'
 import { CTRM_LISTS } from '../../lib/ctrmLists'
 import { parseSettingsList } from '../../lib/fitSheet'
-import { buttonPrimaryStyle, cardStyle, colors, fieldStyle, inputStyle, labelStyle, sectionTitleStyle } from '../../lib/uiStyles'
+import { exportListCsv } from '../../lib/listIo'
+import {
+  buttonPrimaryStyle,
+  buttonSecondaryStyle,
+  cardStyle,
+  colors,
+  fieldStyle,
+  inputStyle,
+  labelStyle,
+  sectionTitleStyle,
+} from '../../lib/uiStyles'
 
 /** Settings card for the CTRM Next pick lists, one item per line. */
 export default function CtrmListsCard() {
@@ -33,8 +43,26 @@ export default function CtrmListsCard() {
 
   return (
     <div style={{ ...cardStyle, marginBottom: 20 }}>
-      <h2 style={sectionTitleStyle}>{t('page.settings.section.ctrmLists')}</h2>
-      <p style={{ color: colors.muted, fontSize: 13, marginTop: 0 }}>One item per line. Leave a list empty to go back to the standard one.</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'start' }}>
+        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.settings.section.ctrmLists')}</h2>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          onClick={() => {
+            const rows: Array<{ list_key: string; list_label: string; item: string }> = []
+            for (const l of CTRM_LISTS) {
+              for (const item of parseSettingsList(draft[l.key], l.fallback)) {
+                rows.push({ list_key: l.key, list_label: l.label, item })
+              }
+            }
+            exportListCsv('ctrm-lists.csv', ['list_key', 'list_label', 'item'], rows)
+            showToast('CTRM lists CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
+      </div>
+      <p style={{ color: colors.muted, fontSize: 13, marginTop: 12 }}>One item per line. Leave a list empty to go back to the standard one.</p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
         {CTRM_LISTS.map((l) => (
           <div key={l.key} style={fieldStyle}>
