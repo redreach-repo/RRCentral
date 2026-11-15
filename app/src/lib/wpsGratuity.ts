@@ -1,3 +1,4 @@
+import { add, divide, maxZero, moneyOrZero, multiply, sub, sum, toDecimalString, toNumber } from './money/index'
 /**
  * UAE WPS / end-of-service gratuity helpers — planning drafts only.
  * Not legal advice. Not a bank-certified SIF. Counsel must review before
@@ -27,9 +28,9 @@ export function draftGratuityAccrualAed(input: GratuityInput): number {
   if (years > 5) days += (years - 5) * 30
   // Draft resignation taper (not legal advice): some readings reduce early years.
   if (input.reason === 'resignation' && years < 5) {
-    days = Math.round(days * 0.5)
+    days = Math.trunc((days + 1) / 2) // half the days, odd counts round up (integer maths, no float)
   }
-  return Math.round(days * daily * 100) / 100
+  return toNumber(multiply(moneyOrZero(daily, 'AED'), days))
 }
 
 /** Floor years between hire date and as-of (defaults to today). */
@@ -45,7 +46,7 @@ export function yearsOfServiceFromStart(startDateIso: string | null | undefined,
 /** Common planning shortcut: basic monthly salary / 30. */
 export function dailyWageFromBasicMonthly(basicSalaryAed: number | null | undefined): number {
   const basic = Math.max(0, Number(basicSalaryAed) || 0)
-  return Math.round((basic / 30) * 100) / 100
+  return toNumber(divide(moneyOrZero(basic, 'AED'), 30))
 }
 
 export type WpsLine = {
@@ -72,7 +73,7 @@ export function buildWpsCsvDraft(lines: WpsLine[], valueDateIso: string): string
       csv(l.labourCardNo || ''),
       csv(l.routingCode || ''),
       csv(l.iban),
-      (Math.round((Number(l.amountAed) || 0) * 100) / 100).toFixed(2),
+      toDecimalString(moneyOrZero(l.amountAed, 'AED')),
       csv(valueDateIso.slice(0, 10)),
     ].join(','),
   )
@@ -107,8 +108,8 @@ export function buildWpsSifDraft(
   const created = createdAtIso.slice(0, 10).replace(/-/g, '')
   const daysDefault = period.daysInPeriod ?? daysInclusive(payStart, payEnd)
   const edr = lines.map((l) => {
-    const fixed = Math.round((Number(l.fixedIncomeAed ?? l.amountAed) || 0) * 100) / 100
-    const variable = Math.round((Number(l.variableIncomeAed) || 0) * 100) / 100
+    const fixed = moneyOrZero(l.fixedIncomeAed ?? l.amountAed, 'AED')
+    const variable = moneyOrZero(l.variableIncomeAed, 'AED')
     const days = l.daysInPeriod ?? daysDefault
     return [
       'EDR',
@@ -118,19 +119,19 @@ export function buildWpsSifDraft(
       payStart.replace(/-/g, ''),
       payEnd.replace(/-/g, ''),
       String(days),
-      fixed.toFixed(2),
-      variable.toFixed(2),
+      toDecimalString(fixed),
+      toDecimalString(variable),
       '0', // days on leave for unpaid leave — draft stub
       csv(l.employeeName),
     ].join(',')
   })
-  const total = lines.reduce((s, l) => s + (Number(l.amountAed) || 0), 0)
+  const total = sum(lines.map((l) => moneyOrZero(l.amountAed, 'AED')), 'AED')
   const scr = [
     'SCR',
     digitsOnly(employer.employerUniqueId),
     created,
     String(lines.length),
-    (Math.round(total * 100) / 100).toFixed(2),
+    toDecimalString(total),
     'AED',
     csv(employer.bankLabel || 'DRAFT'),
   ].join(',')
@@ -198,8 +199,8 @@ export function wpsFileReadiness(employer: SifDraftEmployer, lines: WpsLine[]): 
 
 /** Net pay: basic + allowances − deductions (never negative). */
 export function payrollNetAed(basic: number, allowances: number, deductions: number): number {
-  const net = (Number(basic) || 0) + (Number(allowances) || 0) - (Number(deductions) || 0)
-  return Math.round(Math.max(0, net) * 100) / 100
+  const c = 'AED'
+  return toNumber(maxZero(sub(add(moneyOrZero(basic, c), moneyOrZero(allowances, c)), moneyOrZero(deductions, c))))
 }
 
 /** Inclusive calendar days between two YYYY-MM-DD dates. */

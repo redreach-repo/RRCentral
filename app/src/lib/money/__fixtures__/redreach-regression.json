@@ -1,0 +1,448 @@
+{
+  "note": "Synthetic examples shaped like Red Reach invoices and payroll runs. Expected values were produced by the pre-A1 float formulas on main; the exact money module must reproduce them. No production data.",
+  "invoices": [
+    {
+      "ref": "retainer-monthly",
+      "items": [
+        {
+          "qty": 1,
+          "unit_price": 4535,
+          "unit_cost": 0
+        }
+      ],
+      "vatRate": 0.05,
+      "expected": {
+        "subtotal": 4535,
+        "discount": 0,
+        "taxable": 4535,
+        "vat": 226.75,
+        "total": 4761.75,
+        "cost": 0,
+        "profit": 4535,
+        "marginPct": 100
+      }
+    },
+    {
+      "ref": "software-setup-plus-hours",
+      "items": [
+        {
+          "qty": 1,
+          "unit_price": 12500,
+          "unit_cost": 3000
+        },
+        {
+          "qty": 37.5,
+          "unit_price": 285,
+          "unit_cost": 110
+        }
+      ],
+      "vatRate": 0.05,
+      "expected": {
+        "subtotal": 23187.5,
+        "discount": 0,
+        "taxable": 23187.5,
+        "vat": 1159.38,
+        "total": 24346.88,
+        "cost": 7125,
+        "profit": 16062.5,
+        "marginPct": 69.27
+      }
+    },
+    {
+      "ref": "merch-order",
+      "items": [
+        {
+          "qty": 120,
+          "unit_price": 18.75,
+          "unit_cost": 9.4
+        },
+        {
+          "qty": 45,
+          "unit_price": 32.99,
+          "unit_cost": 14.2
+        },
+        {
+          "qty": 3,
+          "unit_price": 0.33,
+          "unit_cost": 0
+        }
+      ],
+      "vatRate": 0.05,
+      "expected": {
+        "subtotal": 3735.54,
+        "discount": 0,
+        "taxable": 3735.54,
+        "vat": 186.78,
+        "total": 3922.32,
+        "cost": 1767,
+        "profit": 1968.54,
+        "marginPct": 52.7
+      }
+    },
+    {
+      "ref": "discounted-quote",
+      "items": [
+        {
+          "qty": 2,
+          "unit_price": 9999.99,
+          "unit_cost": 4000
+        }
+      ],
+      "discount": {
+        "discountPercent": 7.5,
+        "discountAmount": 150
+      },
+      "vatRate": 0.05,
+      "expected": {
+        "subtotal": 19999.98,
+        "discount": 1650,
+        "taxable": 18349.98,
+        "vat": 917.5,
+        "total": 19267.48,
+        "cost": 8000,
+        "profit": 10349.98,
+        "marginPct": 56.4
+      }
+    },
+    {
+      "ref": "ctrm-licences",
+      "items": [
+        {
+          "qty": 14,
+          "unit_price": 1650,
+          "unit_cost": 1155
+        },
+        {
+          "qty": 1,
+          "unit_price": 2200.5,
+          "unit_cost": 0
+        }
+      ],
+      "vatRate": 0.05,
+      "expected": {
+        "subtotal": 25300.5,
+        "discount": 0,
+        "taxable": 25300.5,
+        "vat": 1265.03,
+        "total": 26565.53,
+        "cost": 16170,
+        "profit": 9130.5,
+        "marginPct": 36.09
+      }
+    },
+    {
+      "ref": "small-lines",
+      "items": [
+        {
+          "qty": 1,
+          "unit_price": 0.1,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 2,
+          "unit_price": 0.2,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 3,
+          "unit_price": 0.30000000000000004,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 4,
+          "unit_price": 0.4,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 5,
+          "unit_price": 0.5,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 6,
+          "unit_price": 0.6000000000000001,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 7,
+          "unit_price": 0.7000000000000001,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 1,
+          "unit_price": 0.8,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 2,
+          "unit_price": 0.9,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 3,
+          "unit_price": 1,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 4,
+          "unit_price": 1.1,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 5,
+          "unit_price": 1.2000000000000002,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 6,
+          "unit_price": 1.3,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 7,
+          "unit_price": 1.4000000000000001,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 1,
+          "unit_price": 1.5,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 2,
+          "unit_price": 1.6,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 3,
+          "unit_price": 1.7000000000000002,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 4,
+          "unit_price": 1.8,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 5,
+          "unit_price": 1.9000000000000001,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 6,
+          "unit_price": 2,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 7,
+          "unit_price": 2.1,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 1,
+          "unit_price": 2.2,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 2,
+          "unit_price": 2.3000000000000003,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 3,
+          "unit_price": 2.4000000000000004,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 4,
+          "unit_price": 2.5,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 5,
+          "unit_price": 2.6,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 6,
+          "unit_price": 2.7,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 7,
+          "unit_price": 2.8000000000000003,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 1,
+          "unit_price": 2.9000000000000004,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 2,
+          "unit_price": 3,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 3,
+          "unit_price": 3.1,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 4,
+          "unit_price": 3.2,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 5,
+          "unit_price": 3.3000000000000003,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 6,
+          "unit_price": 3.4000000000000004,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 7,
+          "unit_price": 3.5,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 1,
+          "unit_price": 3.6,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 2,
+          "unit_price": 3.7,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 3,
+          "unit_price": 3.8000000000000003,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 4,
+          "unit_price": 3.9000000000000004,
+          "unit_cost": 0.05
+        },
+        {
+          "qty": 5,
+          "unit_price": 4,
+          "unit_cost": 0.05
+        }
+      ],
+      "vatRate": 0.05,
+      "expected": {
+        "subtotal": 324,
+        "discount": 0,
+        "taxable": 324,
+        "vat": 16.2,
+        "total": 340.2,
+        "cost": 7.75,
+        "profit": 316.25,
+        "marginPct": 97.61
+      }
+    },
+    {
+      "ref": "church-review",
+      "items": [
+        {
+          "qty": 1,
+          "unit_price": 750,
+          "unit_cost": 0
+        },
+        {
+          "qty": 6,
+          "unit_price": 125.25,
+          "unit_cost": 40
+        }
+      ],
+      "vatRate": 0.05,
+      "expected": {
+        "subtotal": 1501.5,
+        "discount": 0,
+        "taxable": 1501.5,
+        "vat": 75.08,
+        "total": 1576.58,
+        "cost": 240,
+        "profit": 1261.5,
+        "marginPct": 84.02
+      }
+    }
+  ],
+  "payroll": [
+    {
+      "ref": "run-2026-10",
+      "lines": [
+        {
+          "basic": 18500.5,
+          "allowances": 2500,
+          "deductions": 0,
+          "years": 3,
+          "net": 21000.5,
+          "gratuity": 38850.84
+        },
+        {
+          "basic": 9200,
+          "allowances": 1200,
+          "deductions": 350.75,
+          "years": 1,
+          "net": 10049.25,
+          "gratuity": 6440.07
+        },
+        {
+          "basic": 4100,
+          "allowances": 600,
+          "deductions": 0,
+          "years": 7,
+          "net": 4700,
+          "gratuity": 22550.55
+        },
+        {
+          "basic": 26750,
+          "allowances": 0,
+          "deductions": 1200,
+          "years": 12,
+          "net": 25550,
+          "gratuity": 280876.05
+        }
+      ],
+      "totalNet": 61299.75,
+      "totalGratuity": 348717.51
+    },
+    {
+      "ref": "run-2026-11",
+      "lines": [
+        {
+          "basic": 18500.5,
+          "allowances": 2500,
+          "deductions": 125.5,
+          "years": 3,
+          "net": 20875,
+          "gratuity": 38850.84
+        },
+        {
+          "basic": 9200,
+          "allowances": 1200,
+          "deductions": 0,
+          "years": 1,
+          "net": 10400,
+          "gratuity": 6440.07
+        },
+        {
+          "basic": 3333.33,
+          "allowances": 333.33,
+          "deductions": 33.33,
+          "years": 0,
+          "net": 3633.33,
+          "gratuity": 0
+        }
+      ],
+      "totalNet": 34908.33,
+      "totalGratuity": 45290.91
+    }
+  ]
+}

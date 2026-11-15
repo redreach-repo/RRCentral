@@ -1,3 +1,4 @@
+import { decMul, divide, money, moneyOrZero, roundAmount, sub, sumAmounts, toDecimalOrZero, toNumber } from './money/index'
 /** Multi-currency helpers. Threads default display currency remains AED.
  * RR Wanders base/reporting currency is configurable (settings.wandersBaseCurrency)
  * and may be TBC until the owner confirms — do not invent a jurisdiction currency.
@@ -43,7 +44,7 @@ export function toBaseAmount(amount: number, rate: number): number {
   const a = Number(amount) || 0
   const r = Number(rate) || 0
   if (r <= 0) return 0
-  return roundMoney(a * r)
+  return toNumber(money(decMul(toDecimalOrZero(a), toDecimalOrZero(r)), BASE_CURRENCY))
 }
 
 /** Convert base → foreign using the same rate definition. */
@@ -51,11 +52,12 @@ export function fromBaseAmount(baseAmount: number, rate: number): number {
   const a = Number(baseAmount) || 0
   const r = Number(rate) || 0
   if (r <= 0) return 0
-  return roundMoney(a / r)
+  return toNumber(divide(moneyOrZero(a, BASE_CURRENCY), toDecimalOrZero(r)))
 }
 
+/** Exact 2-place rounding via the shared money module. */
 export function roundMoney(n: number): number {
-  return Math.round((Number(n) || 0) * 100) / 100
+  return roundAmount(n, 'AED')
 }
 
 export function formatMoneyAmount(amount: number, currency: string): string {
@@ -79,7 +81,7 @@ export function sumByCurrency(rows: MoneyAmount[]): Record<string, number> {
   const out: Record<string, number> = {}
   for (const row of rows) {
     const c = (row.currency || BASE_CURRENCY).toUpperCase()
-    out[c] = roundMoney((out[c] || 0) + (Number(row.amount) || 0))
+    out[c] = sumAmounts([out[c] || 0, row.amount], 'AED')
   }
   return out
 }
@@ -89,10 +91,9 @@ export function netReceived(opts: {
   processingFee?: number
   conversionFee?: number
 }): number {
-  return roundMoney(
-    (Number(opts.amountReceived) || 0) -
-      (Number(opts.processingFee) || 0) -
-      (Number(opts.conversionFee) || 0),
+  const c = BASE_CURRENCY
+  return toNumber(
+    sub(sub(moneyOrZero(opts.amountReceived, c), moneyOrZero(opts.processingFee, c)), moneyOrZero(opts.conversionFee, c)),
   )
 }
 
@@ -103,7 +104,7 @@ export function netReceived(opts: {
  * Positive = gain for RR Wanders.
  */
 export function exchangeGainLoss(expectedBase: number, actualBase: number): number {
-  return roundMoney((Number(actualBase) || 0) - (Number(expectedBase) || 0))
+  return toNumber(sub(moneyOrZero(actualBase, BASE_CURRENCY), moneyOrZero(expectedBase, BASE_CURRENCY)))
 }
 
 export function isKnownCurrency(code: string): boolean {
