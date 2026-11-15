@@ -114,7 +114,8 @@ export default function FollowupsPage() {
           .limit(5)
         if (findErr) throw findErr
         const exact = (matches || []).filter(
-          (m) => String(m.company_name || '').trim().toLowerCase() === row.company_name.toLowerCase(),
+          (m: { id: string; company_name: string | null }) =>
+            String(m.company_name || '').trim().toLowerCase() === row.company_name.toLowerCase(),
         )
         if (exact.length !== 1) {
           skipped += 1
