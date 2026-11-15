@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
@@ -7,9 +7,16 @@ import { listAccounts } from '../lib/accountsStore'
 import { loadClientHealth } from '../lib/clientHealthStore'
 import { listContracts } from '../lib/deliveryStore'
 import { errorMessage } from '../lib/errors'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { formatAED } from '../lib/money'
-import { PIPELINE_WEIGHTS, mrrByAccount, mrrForecast, mrrHistory } from '../lib/mrr'
+import {
+  PIPELINE_WEIGHTS,
+  mrrByAccount,
+  mrrForecast,
+  mrrHistory,
+  type ForecastMonth,
+  type MrrMonth,
+} from '../lib/mrr'
 import { canViewField } from '../lib/fieldPermissions'
 import { salesStageLabel } from '../lib/salesPipeline'
 import { listSalesDeals } from '../lib/salesPipelineStore'
@@ -31,7 +38,42 @@ const num: CSSProperties = { ...tdStyle, textAlign: 'right', whiteSpace: 'nowrap
 const numTh: CSSProperties = { ...thStyle, textAlign: 'right' }
 const aed = (n: number) => (n ? formatAED(n) : '-')
 
+const MRR_CSV_HEADERS = [
+  'section',
+  'month',
+  'label',
+  'mrr',
+  'clients',
+  'added',
+  'expansion',
+  'contraction',
+  'lost',
+  'pipeline',
+  'contracted',
+  'forecast',
+  'renewals_due',
+] as const
+
 type Data = { accounts: Account[]; contracts: Contract[]; deals: SalesDeal[]; atRisk: Set<string> }
+type MrrView = {
+  history: MrrMonth[]
+  forecast: ForecastMonth[]
+  now: MrrMonth
+  atRiskMrr: number
+  name: (id: string) => string
+}
+
+function numOr(raw: string, fallback = 0): number {
+  const n = Number(String(raw || '').trim())
+  return Number.isFinite(n) ? n : fallback
+}
+
+function normalizeMonth(raw: string): string {
+  const value = raw.trim()
+  if (/^\d{4}-\d{2}$/.test(value)) return `${value}-01`
+  if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10)
+  return value
+}
 
 export default function MrrPage() {
   const { t } = useI18n()
@@ -39,22 +81,28 @@ export default function MrrPage() {
   const { showToast } = useToast()
   const allowed = canViewField(userRole, 'delivery.profitability')
   const [data, setData] = useState<Data | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [csvFiltered, setCsvFiltered] = useState(false)
+  const [importedView, setImportedView] = useState<MrrView | null>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!allowed) return
     Promise.all([listAccounts(), listContracts(), listSalesDeals(), loadClientHealth().catch(() => [])])
-      .then(([a, c, d, h]) =>
+      .then(([a, c, d, h]) => {
         setData({
           accounts: a.rows,
           contracts: c,
           deals: d.rows,
           atRisk: new Set(h.filter((r) => r.health.churnWarning).map((r) => r.account.id)),
-        }),
-      )
+        })
+        setCsvFiltered(false)
+        setImportedView(null)
+      })
       .catch((e) => showToast(errorMessage(e, 'Could not load MRR'), 'error'))
   }, [allowed, showToast])
 
-  const view = useMemo(() => {
+  const liveView = useMemo(() => {
     if (!data) return null
     const history = mrrHistory(data.contracts, 12)
     const forecast = mrrForecast(data.contracts, data.deals, 3)
@@ -62,8 +110,126 @@ export default function MrrPage() {
     const byAccount = mrrByAccount(data.contracts, monthKey(new Date()))
     const atRiskMrr = [...byAccount].filter(([id]) => data.atRisk.has(id)).reduce((s, [, v]) => s + v, 0)
     const name = (id: string) => data.accounts.find((a) => a.id === id)?.name ?? 'Unknown client'
-    return { history, forecast, now, atRiskMrr, name }
+    return { history, forecast, now, atRiskMrr, name } satisfies MrrView
   }, [data])
+
+  const view = csvFiltered && importedView ? importedView : liveView
+
+  async function importMrrCsv(file: File) {
+    if (!liveView) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const historyByMonth = new Map(liveView.history.map((m) => [m.month.slice(0, 7), m] as const))
+      const forecastByMonth = new Map(liveView.forecast.map((f) => [f.month.slice(0, 7), f] as const))
+      const nextHistory: MrrMonth[] = []
+      const nextForecast: ForecastMonth[] = []
+      const seenH = new Set<string>()
+      const seenF = new Set<string>()
+      let matched = 0
+      let softLoaded = 0
+      let skipped = 0
+
+      for (const row of objects) {
+        const section = String(row.section || '').trim().toLowerCase()
+        const month = normalizeMonth(String(row.month || ''))
+        const monthKey7 = month.slice(0, 7)
+        if (!monthKey7 || !/^\d{4}-\d{2}$/.test(monthKey7)) {
+          skipped += 1
+          continue
+        }
+        const label = String(row.label || '').trim() || monthKey7
+        if (section === 'forecast' || (!section && String(row.forecast || row.pipeline || row.contracted || '').trim())) {
+          if (seenF.has(monthKey7)) {
+            skipped += 1
+            continue
+          }
+          seenF.add(monthKey7)
+          const existing = forecastByMonth.get(monthKey7)
+          if (existing) {
+            nextForecast.push(existing)
+            matched += 1
+            continue
+          }
+          const contracted = numOr(row.contracted)
+          const pipeline = numOr(row.pipeline)
+          const total = numOr(row.forecast, contracted + pipeline)
+          nextForecast.push({
+            month: `${monthKey7}-01`,
+            label,
+            contracted,
+            pipeline,
+            total,
+            renewalsDue: numOr(row.renewals_due),
+          })
+          softLoaded += 1
+          continue
+        }
+
+        if (seenH.has(monthKey7)) {
+          skipped += 1
+          continue
+        }
+        seenH.add(monthKey7)
+        const existing = historyByMonth.get(monthKey7)
+        if (existing) {
+          nextHistory.push(existing)
+          matched += 1
+          continue
+        }
+        nextHistory.push({
+          month: `${monthKey7}-01`,
+          label,
+          mrr: numOr(row.mrr),
+          clients: numOr(row.clients),
+          added: numOr(row.added),
+          expansion: numOr(row.expansion),
+          contraction: numOr(row.contraction),
+          lost: numOr(row.lost),
+          newClients: [],
+          lostClients: [],
+        })
+        softLoaded += 1
+      }
+
+      if (!nextHistory.length && !nextForecast.length) {
+        showToast('No matching MRR rows in CSV', 'error')
+        return
+      }
+
+      const history = nextHistory.length
+        ? [...nextHistory].sort((a, b) => a.month.localeCompare(b.month))
+        : liveView.history
+      const forecast = nextForecast.length
+        ? [...nextForecast].sort((a, b) => a.month.localeCompare(b.month))
+        : liveView.forecast
+      const now = history[history.length - 1] || liveView.now
+      setImportedView({
+        history,
+        forecast,
+        now,
+        atRiskMrr: liveView.atRiskMrr,
+        name: liveView.name,
+      })
+      setCsvFiltered(true)
+      const parts = [matched ? `${matched} matched` : '', softLoaded ? `${softLoaded} soft-loaded` : '']
+        .filter(Boolean)
+        .join(', ')
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${history.length + forecast.length} MRR row(s) (${parts})${skipNote}`, 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'MRR CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
 
   if (!allowed) {
     return (
@@ -95,55 +261,95 @@ export default function MrrPage() {
           <h1 className={docsStyles.title}>{t('page.mrr.title')}</h1>
           <p className={docsStyles.subtitle}>{t('page.mrr.subtitle')}</p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-          disabled={!view}
-          onClick={() => {
-            if (!view) return
-            exportListCsv(
-              'mrr-history.csv',
-              ['section', 'month', 'label', 'mrr', 'clients', 'added', 'expansion', 'contraction', 'lost', 'pipeline', 'contracted', 'forecast', 'renewals_due'],
-              [
-                ...view.history.map((m) => ({
-                  section: 'history',
-                  month: m.month,
-                  label: m.label,
-                  mrr: m.mrr,
-                  clients: m.clients,
-                  added: m.added,
-                  expansion: m.expansion,
-                  contraction: m.contraction,
-                  lost: m.lost,
-                  pipeline: '',
-                  contracted: '',
-                  forecast: '',
-                  renewals_due: '',
-                })),
-                ...view.forecast.map((f) => ({
-                  section: 'forecast',
-                  month: f.month,
-                  label: f.label,
-                  mrr: '',
-                  clients: '',
-                  added: '',
-                  expansion: '',
-                  contraction: '',
-                  lost: '',
-                  pipeline: f.pipeline,
-                  contracted: f.contracted,
-                  forecast: f.total,
-                  renewals_due: f.renewalsDue,
-                })),
-              ],
-            )
-            showToast('MRR CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importMrrCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing || !liveView}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!view}
+            onClick={() => {
+              if (!view) return
+              exportListCsv(
+                'mrr-history.csv',
+                [...MRR_CSV_HEADERS],
+                [
+                  ...view.history.map((m) => ({
+                    section: 'history',
+                    month: m.month,
+                    label: m.label,
+                    mrr: m.mrr,
+                    clients: m.clients,
+                    added: m.added,
+                    expansion: m.expansion,
+                    contraction: m.contraction,
+                    lost: m.lost,
+                    pipeline: '',
+                    contracted: '',
+                    forecast: '',
+                    renewals_due: '',
+                  })),
+                  ...view.forecast.map((f) => ({
+                    section: 'forecast',
+                    month: f.month,
+                    label: f.label,
+                    mrr: '',
+                    clients: '',
+                    added: '',
+                    expansion: '',
+                    contraction: '',
+                    lost: '',
+                    pipeline: f.pipeline,
+                    contracted: f.contracted,
+                    forecast: f.total,
+                    renewals_due: f.renewalsDue,
+                  })),
+                ],
+              )
+              showToast('MRR CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+          {csvFiltered ? (
+            <button
+              type="button"
+              className={docsStyles.newBtn}
+              style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+              onClick={() => {
+                setCsvFiltered(false)
+                setImportedView(null)
+              }}
+            >
+              Clear CSV filter
+            </button>
+          ) : null}
+        </div>
       </header>
+
+      {csvFiltered ? (
+        <p style={{ color: colors.muted, fontSize: 13, margin: '0 0 12px', lineHeight: 1.45 }}>
+          Showing MRR from CSV (session only — Clear CSV filter resets).
+        </p>
+      ) : null}
 
       {!view ? (
         <p style={{ color: colors.muted }}>Loading…</p>
