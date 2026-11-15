@@ -1,31 +1,16 @@
-# Run plan — inventory / listIo / contracts / HR + post-#451 leftovers
+# Run plan — domains inactive / catalog import / guide ops
 
 **Started:** 15 November 2026 (Asia/Dubai)  
-**Branch:** `cursor/batch-listio-inventory-hr-d3d5` (merged main after #451)  
+**Branch:** `cursor/batch-domains-catalog-ops-d3d5` (from `main` after #452)  
 **Spec:** Master Spec v2.1  
-**Note:** M14 / live ESP / Tax / CASA / QTSP blocked.
-
----
 
 ## Slices
 
-- [x] Inventory show-archived + restore
-- [x] Vendors listIo CSV import pilot
-- [x] Contracts vault CSV export
-- [x] Guide HR deepen (payroll cross-link)
-- [x] Accounts listIo Import CSV pilot
-- [x] Quotes / Invoices restore polish
-- [x] Workflow dry-run UI
-- [x] HR attendance date/person filter
-- [ ] M14 / live ESP / Tax / CASA / QTSP (Not done)
-
-## Merged from #451 (main)
-
-- [x] Expenses / vendors / catalog archive
-- [x] CSV: ledger, payroll, HR leave, app errors
-- [x] Guide finance deepen
-- [x] Contacts soft-archive + PO restore + Settings prefix
+- [x] Domains show inactive + restore (active flag)
+- [x] Catalog listIo CSV import
+- [x] Guide ops deepen (client POs)
+- [ ] M14 blocked
 
 ## Quality gates
 
-- [x] typecheck / vitest (guideHr, vendorsCsv, accountsCsv, listIo)
+- [x] typecheck / vitest (catalogCsv, guideOps)
