@@ -11,6 +11,8 @@ import { SALES_STAGES, quoteFirstYear, quoteFromPackage } from '../../lib/salesP
 import type { SalesDealInput } from '../../lib/salesPipelineStore'
 import { parseSalesDealForm } from '../../lib/schemas/salesDeal'
 import type { Account, AppUser, DeliveryPackage, SalesDeal, SalesStage } from '../../lib/types'
+import { exportListCsv } from '../../lib/listIo'
+import { useToast } from '../../contexts/ToastContext'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -60,6 +62,7 @@ export default function SalesDealFormModal({
   saving,
   onSave,
 }: Props) {
+  const { showToast } = useToast()
   const [v, setV] = useState<SalesDealFormValues | null>(null)
   const [error, setError] = useState('')
   const [editorSection, setEditorSection] = useState<EditorSection>('basics')
@@ -398,7 +401,56 @@ export default function SalesDealFormModal({
         </div>
 
         {error ? <p style={{ color: colors.danger, margin: '0 0 10px', fontSize: 13 }}>{error}</p> : null}
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            onClick={() => {
+              if (!v) return
+              exportListCsv(
+                'sales-deal-form.csv',
+                [
+                  'account_id',
+                  'new_company',
+                  'stage',
+                  'source',
+                  'owner_user_id',
+                  'next_action',
+                  'next_action_date',
+                  'package_id',
+                  'option',
+                  'monthly_fee',
+                  'setup_fee',
+                  'discount_percent',
+                  'discount_months',
+                  'start_date',
+                  'notes',
+                ],
+                [
+                  {
+                    account_id: v.accountId,
+                    new_company: v.newCompany,
+                    stage: v.stage,
+                    source: v.source,
+                    owner_user_id: v.owner_user_id || '',
+                    next_action: v.next_action,
+                    next_action_date: v.next_action_date || '',
+                    package_id: v.package_id || '',
+                    option: v.option,
+                    monthly_fee: v.monthly_fee,
+                    setup_fee: v.setup_fee,
+                    discount_percent: v.discount_percent,
+                    discount_months: v.discount_months,
+                    start_date: v.start_date || '',
+                    notes: v.notes,
+                  },
+                ],
+              )
+              showToast('Sales deal draft CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
           <button type="button" style={buttonSecondaryStyle} onClick={onClose}>
             Cancel
           </button>
