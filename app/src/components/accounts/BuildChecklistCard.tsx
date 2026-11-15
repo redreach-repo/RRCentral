@@ -14,6 +14,7 @@ import {
 } from '../../lib/buildTemplatesStore'
 import { errorMessage } from '../../lib/errors'
 import { isGoLive } from '../../lib/goLive'
+import { exportListCsv } from '../../lib/listIo'
 import { parseBuildTaskForm } from '../../lib/schemas/buildTask'
 import { hoursLabel } from '../../lib/timeTracking'
 import type { BuildStageKey, BuildTask, BuildTemplate, DeliveryPackage, Requirement } from '../../lib/types'
@@ -138,11 +139,37 @@ export default function BuildChecklistCard({
     <section style={cardStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Build checklist</h2>
-        {buildTasks.length ? (
-          <span style={{ fontSize: 12, color: colors.muted }}>
-            {progress.done} of {progress.total} done, about {hoursLabel(progress.estHoursLeft)} left
-          </span>
-        ) : null}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {buildTasks.length ? (
+            <>
+              <span style={{ fontSize: 12, color: colors.muted }}>
+                {progress.done} of {progress.total} done, about {hoursLabel(progress.estHoursLeft)} left
+              </span>
+              <button
+                type="button"
+                style={smallBtn}
+                onClick={() => {
+                  exportListCsv(
+                    `build-checklist-${accountId.slice(0, 8)}.csv`,
+                    ['stage', 'title', 'detail', 'est_hours', 'done', 'done_at', 'done_by', 'sort'],
+                    buildTasks.map((t) => ({
+                      stage: t.stage,
+                      title: t.title,
+                      detail: t.detail || '',
+                      est_hours: t.est_hours,
+                      done: t.done ? 'yes' : 'no',
+                      done_at: t.done_at || '',
+                      done_by: t.done_by || '',
+                      sort: t.sort,
+                    })),
+                  )
+                }}
+              >
+                Export CSV
+              </button>
+            </>
+          ) : null}
+        </div>
       </div>
 
       <p style={{ ...mutedNote, marginTop: 8, color: overTarget ? colors.warn : colors.muted }}>
