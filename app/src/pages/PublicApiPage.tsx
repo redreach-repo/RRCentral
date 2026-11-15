@@ -17,6 +17,7 @@ import {
   type WebhookEndpoint,
 } from '../lib/featureSliceStores'
 import { DEFAULT_API_KEY_SCOPES } from '../lib/publicApi'
+import { exportListCsv } from '../lib/listIo'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
@@ -128,6 +129,59 @@ export default function PublicApiPage() {
             {publicApiConfigured() ? '' : ' Supabase is not configured in this environment.'}
           </p>
         </div>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={loading || (keys.length === 0 && hooks.length === 0)}
+          onClick={() => {
+            const keyRows = keys.map((k) => ({
+              kind: 'api_key',
+              name: k.name,
+              key_prefix: k.key_prefix,
+              scopes: Array.isArray(k.scopes) ? (k.scopes as string[]).join('|') : String(k.scopes ?? ''),
+              url: '',
+              active: k.revoked_at ? 'no' : 'yes',
+              revoked_at: k.revoked_at || '',
+              last_used_at: k.last_used_at || '',
+              last_delivery_status: '',
+              last_delivery_at: '',
+              created_at: k.created_at,
+            }))
+            const hookRows = hooks.map((h) => ({
+              kind: 'webhook',
+              name: '',
+              key_prefix: '',
+              scopes: Array.isArray(h.event_types) ? (h.event_types as string[]).join('|') : String(h.event_types ?? ''),
+              url: h.url,
+              active: h.active ? 'yes' : 'no',
+              revoked_at: '',
+              last_used_at: '',
+              last_delivery_status: h.last_delivery_status || '',
+              last_delivery_at: h.last_delivery_at || '',
+              created_at: '',
+            }))
+            exportListCsv(
+              'public-api.csv',
+              [
+                'kind',
+                'name',
+                'key_prefix',
+                'scopes',
+                'url',
+                'active',
+                'revoked_at',
+                'last_used_at',
+                'last_delivery_status',
+                'last_delivery_at',
+                'created_at',
+              ],
+              [...keyRows, ...hookRows],
+            )
+            showToast('Public API CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
       </header>
 
       <form onSubmit={(e) => void onCreateKey(e)} style={{ ...cardStyle, marginBottom: 16, display: 'grid', gap: 10, maxWidth: 520 }}>
