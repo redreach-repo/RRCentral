@@ -1,5 +1,9 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useAuth } from '../../../contexts/AuthContext'
 import { useI18n } from '../../../contexts/I18nContext'
+import { useToast } from '../../../contexts/ToastContext'
+import SavedViewsBar from '../../../components/SavedViewsBar'
+import { exportListCsv } from '../../../lib/listIo'
 import { isSupabaseConfigured } from '../../../lib/supabaseConfig'
 import {
   ACCOUNT_FIELDS,
@@ -42,6 +46,8 @@ const row: CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap', alignIte
 
 export default function AiApprovalsPage() {
   const { t } = useI18n()
+  const { appUserId } = useAuth()
+  const { showToast } = useToast()
   const localMode = !isSupabaseConfigured()
   const [filter, setFilter] = useState<AiProposalStatus | 'all'>('pending')
   const [rows, setRows] = useState<AiProposal[]>([])
@@ -52,6 +58,7 @@ export default function AiApprovalsPage() {
   const [editing, setEditing] = useState<string>('')
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [note, setNote] = useState('')
+  const aiqViewFilters = useMemo(() => ({ status: filter }), [filter])
 
   const load = useCallback(async () => {
     if (localMode) return
@@ -100,10 +107,51 @@ export default function AiApprovalsPage() {
 
   return (
     <div style={{ ...pageStyle, display: 'grid', gap: 16 }}>
-      <div>
-        <h1 style={pageTitleStyle}>{t('aiq.title')}</h1>
-        <p style={pageSubtitleStyle}>{t('aiq.subtitle')}</p>
+      <div style={{ ...row, justifyContent: 'space-between' }}>
+        <div>
+          <h1 style={pageTitleStyle}>{t('aiq.title')}</h1>
+          <p style={pageSubtitleStyle}>{t('aiq.subtitle')}</p>
+        </div>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={!rows.length}
+          onClick={() => {
+            exportListCsv(
+              'ai-proposals.csv',
+              ['account', 'action', 'status', 'summary', 'prompt', 'proposed_by', 'created_at', 'decided_by', 'error'],
+              rows.map((p) => ({
+                account: p.accounts?.name || p.account_id,
+                action: p.action,
+                status: p.status,
+                summary: p.summary || '',
+                prompt: p.prompt || '',
+                proposed_by: p.proposed_by_email || '',
+                created_at: p.created_at,
+                decided_by: p.decided_by_email || '',
+                error: p.error || '',
+              })),
+            )
+            showToast('AI proposals CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
       </div>
+
+      <SavedViewsBar
+        moduleId="ai_approvals"
+        filters={aiqViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => {
+          const next = String(f.status || 'pending') as AiProposalStatus | 'all'
+          setFilter(FILTERS.includes(next) ? next : 'pending')
+        }}
+        onToast={showToast}
+        filtersEqual={(a, b) => String(a.status || 'pending') === String(b.status || 'pending')}
+      />
 
       <AskPanel onDone={() => void load()} />
 
