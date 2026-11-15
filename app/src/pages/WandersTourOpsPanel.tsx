@@ -42,6 +42,7 @@ import {
   thStyle,
 } from '../lib/uiStyles'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import { parseTourOpsLinkForm } from '../lib/schemas/tourOpsLink'
 
 type OpsTab = 'packages' | 'partners' | 'costs' | 'prices' | 'departures' | 'bookings'
@@ -248,7 +249,7 @@ export default function WandersTourOpsPanel({ deals }: { deals: WandersDeal[] })
         </select>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center' }}>
         {(
           [
             ['packages', t('page.wandersOps.tabPackages')],
@@ -272,6 +273,107 @@ export default function WandersTourOpsPanel({ deals }: { deals: WandersDeal[] })
             {label}
           </button>
         ))}
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          onClick={() => {
+            if (tab === 'packages') {
+              exportListCsv(
+                'wanders-packages.csv',
+                ['code', 'name', 'destination', 'destination_country', 'nights', 'days', 'product_type', 'supplier_currency', 'summary'],
+                packages.map((p) => ({
+                  code: p.code,
+                  name: p.name,
+                  destination: p.destination,
+                  destination_country: p.destination_country,
+                  nights: p.nights,
+                  days: p.days,
+                  product_type: p.product_type,
+                  supplier_currency: p.supplier_currency,
+                  summary: p.summary,
+                })),
+              )
+            } else if (tab === 'partners') {
+              exportListCsv(
+                'wanders-partners.csv',
+                ['name', 'partner_type', 'country', 'destination', 'status', 'contact_name', 'contact_email', 'contact_phone', 'active'],
+                partners.map((p) => ({
+                  name: p.name,
+                  partner_type: p.partner_type,
+                  country: p.country,
+                  destination: p.destination,
+                  status: p.status,
+                  contact_name: p.contact_name,
+                  contact_email: p.contact_email,
+                  contact_phone: p.contact_phone,
+                  active: p.active ? 'yes' : 'no',
+                })),
+              )
+            } else if (tab === 'costs') {
+              exportListCsv(
+                'wanders-costs.csv',
+                ['category', 'description', 'meal_tier', 'amount', 'currency', 'per_person', 'notes'],
+                components.map((c) => ({
+                  category: c.category,
+                  description: c.description,
+                  meal_tier: c.meal_tier,
+                  amount: c.amount,
+                  currency: c.currency,
+                  per_person: c.per_person ? 'yes' : 'no',
+                  notes: c.notes,
+                })),
+              )
+            } else if (tab === 'prices') {
+              exportListCsv(
+                'wanders-prices.csv',
+                ['label', 'meal_tier', 'selling_amount', 'selling_currency', 'cost_amount', 'cost_currency', 'margin_pct', 'status'],
+                prices.map((p) => ({
+                  label: p.label,
+                  meal_tier: p.meal_tier,
+                  selling_amount: p.selling_amount,
+                  selling_currency: p.selling_currency,
+                  cost_amount: p.cost_amount,
+                  cost_currency: p.cost_currency,
+                  margin_pct: p.margin_pct,
+                  status: p.status,
+                })),
+              )
+            } else if (tab === 'departures') {
+              exportListCsv(
+                'wanders-departures.csv',
+                ['label', 'departure_date', 'return_date', 'capacity', 'booked_pax', 'status', 'min_group_met', 'booking_deadline'],
+                departures.map((d) => ({
+                  label: d.label,
+                  departure_date: d.departure_date || '',
+                  return_date: d.return_date || '',
+                  capacity: d.capacity,
+                  booked_pax: d.booked_pax,
+                  status: d.status,
+                  min_group_met: d.min_group_met ? 'yes' : 'no',
+                  booking_deadline: d.booking_deadline || '',
+                })),
+              )
+            } else {
+              exportListCsv(
+                'wanders-bookings.csv',
+                ['client_name', 'lead_contact', 'pax_count', 'meal_tier', 'selling_amount', 'selling_currency', 'deposit_status', 'payment_status'],
+                bookings.map((b) => ({
+                  client_name: b.client_name,
+                  lead_contact: b.lead_contact,
+                  pax_count: b.pax_count,
+                  meal_tier: b.meal_tier,
+                  selling_amount: b.selling_amount,
+                  selling_currency: b.selling_currency,
+                  deposit_status: b.deposit_status,
+                  payment_status: b.payment_status,
+                })),
+              )
+            }
+            showToast('Tour ops CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
       </div>
 
       {tab === 'packages' && selectedPkg ? (
