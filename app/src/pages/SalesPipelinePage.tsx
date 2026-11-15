@@ -7,6 +7,7 @@ import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import Modal from '../components/Modal'
+import SavedViewsBar from '../components/SavedViewsBar'
 import LostReasonFields from '../components/deals/LostReasonFields'
 import MakeContractModal from '../components/sales/MakeContractModal'
 import SalesDealFormModal, { type SalesDealFormValues } from '../components/sales/SalesDealFormModal'
@@ -16,6 +17,7 @@ import { listAccounts, listTeam } from '../lib/accountsStore'
 import { listPackages } from '../lib/deliveryStore'
 import { lostText, stageMoveProblem } from '../lib/dealRules'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import { formatAED } from '../lib/money'
 import { can } from '../lib/permissions'
 import {
@@ -35,6 +37,7 @@ import {
   buttonSecondaryStyle,
   cardStyle,
   colors,
+  inputStyle,
   sectionTitleStyle,
   selectStyle,
 } from '../lib/uiStyles'
@@ -68,10 +71,21 @@ export default function SalesPipelinePage() {
   const [contractFor, setContractFor] = useState<SalesDeal | null>(null)
   const [saving, setSaving] = useState(false)
   const [dragId, setDragId] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [stageFilter, setStageFilter] = useState<SalesStage | 'all'>('all')
+  const [overdueOnly, setOverdueOnly] = useState(false)
 
   const author = useMemo(() => ({ appUserId, email: user?.email || '' }), [appUserId, user?.email])
   const canWrite = userRole !== 'viewer'
   const canContract = can(userRole, 'delivery.contracts')
+  const salesViewFilters = useMemo(
+    () => ({
+      q: search,
+      stage: stageFilter,
+      overdue: overdueOnly ? '1' : '0',
+    }),
+    [search, stageFilter, overdueOnly],
+  )
 
   const load = useCallback(async () => {
     try {
@@ -101,13 +115,29 @@ export default function SalesPipelinePage() {
     [mineAccounts, userRole, appUserId],
   )
   // RLS already limits staff in the cloud; this keeps local mode the same.
-  const visibleDeals = useMemo(() => {
+  const scopedDeals = useMemo(() => {
     const ids = new Set(mineAccounts.map((a) => a.id))
     return deals.filter((d) => ids.has(d.account_id))
   }, [deals, mineAccounts])
-  const totals = pipelineTotals(visibleDeals)
   const now = new Date()
-  const overdue = visibleDeals
+  const visibleDeals = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return scopedDeals.filter((d) => {
+      if (stageFilter !== 'all' && d.stage !== stageFilter) return false
+      if (overdueOnly && !isSalesDealOverdue(d, now)) return false
+      if (!q) return true
+      const name = (accountById.get(d.account_id)?.name || '').toLowerCase()
+      return (
+        name.includes(q) ||
+        (d.next_action || '').toLowerCase().includes(q) ||
+        (d.owner_user_id ? (teamById.get(d.owner_user_id)?.name || teamById.get(d.owner_user_id)?.email || '') : '')
+          .toLowerCase()
+          .includes(q)
+      )
+    })
+  }, [scopedDeals, stageFilter, overdueOnly, search, accountById, teamById, now])
+  const totals = pipelineTotals(visibleDeals)
+  const overdue = scopedDeals
     .filter((d) => isSalesDealOverdue(d, now))
     .sort((a, b) => String(a.next_action_date).localeCompare(String(b.next_action_date)))
 
@@ -315,12 +345,97 @@ export default function SalesPipelinePage() {
           <h1 className={docsStyles.title}>{t('page.salesDetail.title')}</h1>
           <p className={docsStyles.subtitle}>{t('page.salesDetail.subtitle')}</p>
         </div>
-        {canWrite && !missingTable ? (
-          <button type="button" className={docsStyles.newBtn} onClick={() => setEditing({ deal: null })}>
-            <Plus size={16} /> {t('page.salesDetail.new')}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!visibleDeals.length}
+            onClick={() => {
+              exportListCsv(
+                'sales-pipeline-deals.csv',
+                [
+                  'company',
+                  'stage',
+                  'owner',
+                  'next_action',
+                  'next_action_date',
+                  'monthly_fee',
+                  'setup_fee',
+                  'package',
+                  'overdue',
+                ],
+                visibleDeals.map((d) => ({
+                  company: nameOf(d),
+                  stage: d.stage,
+                  owner: personName(d.owner_user_id),
+                  next_action: d.next_action || '',
+                  next_action_date: d.next_action_date || '',
+                  monthly_fee: d.monthly_fee ?? '',
+                  setup_fee: d.setup_fee ?? '',
+                  package: d.package_id ? packageById.get(d.package_id)?.name || d.package_id : '',
+                  overdue: isSalesDealOverdue(d, now) ? 'yes' : 'no',
+                })),
+              )
+              showToast('Sales deals CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
           </button>
-        ) : null}
+          {canWrite && !missingTable ? (
+            <button type="button" className={docsStyles.newBtn} onClick={() => setEditing({ deal: null })}>
+              <Plus size={16} /> {t('page.salesDetail.new')}
+            </button>
+          ) : null}
+        </div>
       </header>
+
+      <SavedViewsBar
+        moduleId="sales_pipeline"
+        filters={salesViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => {
+          setSearch(String(f.q || ''))
+          const stage = String(f.stage || 'all')
+          setStageFilter(
+            stage === 'all' || SALES_STAGES.some((s) => s.value === stage) ? (stage as SalesStage | 'all') : 'all',
+          )
+          setOverdueOnly(String(f.overdue || '0') === '1')
+        }}
+        onToast={showToast}
+        filtersEqual={(a, b) =>
+          String(a.q || '') === String(b.q || '') &&
+          String(a.stage || 'all') === String(b.stage || 'all') &&
+          String(a.overdue || '0') === String(b.overdue || '0')
+        }
+      />
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center' }}>
+        <input
+          style={{ ...inputStyle, maxWidth: 260 }}
+          placeholder="Search company, action, owner…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <select
+          style={{ ...selectStyle, maxWidth: 180 }}
+          value={stageFilter}
+          onChange={(e) => setStageFilter(e.target.value as SalesStage | 'all')}
+        >
+          <option value="all">All stages</option>
+          {SALES_STAGES.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: colors.muted }}>
+          <input type="checkbox" checked={overdueOnly} onChange={(e) => setOverdueOnly(e.target.checked)} />
+          Overdue only
+        </label>
+      </div>
 
       <div
         role="status"
@@ -378,13 +493,19 @@ export default function SalesPipelinePage() {
 
       {loading ? (
         <div style={{ ...cardStyle, color: colors.muted }}>Loading the pipeline…</div>
-      ) : missingTable ? null : visibleDeals.length === 0 ? (
+      ) : missingTable ? null : scopedDeals.length === 0 ? (
         <EmptyState
           icon={<Target size={22} />}
           title="No sales deals yet"
           subtitle="Add the first AI CRM prospect, with the next thing to do and when."
           actionLabel={canWrite ? 'Add a deal' : undefined}
           onAction={() => setEditing({ deal: null })}
+        />
+      ) : visibleDeals.length === 0 ? (
+        <EmptyState
+          icon={<Target size={22} />}
+          title="No deals match"
+          subtitle="Clear search or stage filters to see the board again."
         />
       ) : (
         <div style={compact ? undefined : { overflowX: 'auto', paddingBottom: 8 }}>
