@@ -29,6 +29,7 @@ import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import StatusPill from '../components/StatusPill'
 import {
   buttonPrimaryStyle,
@@ -117,6 +118,10 @@ export default function PaymentsPage() {
   const [importing, setImporting] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
+  const paymentsViewFilters = useMemo(
+    () => ({ archived: showArchived ? '1' : '0' }),
+    [showArchived],
+  )
   const [payOpen, setPayOpen] = useState(false)
   const [refundOpen, setRefundOpen] = useState(false)
   const [supplierOpen, setSupplierOpen] = useState(false)
@@ -635,6 +640,17 @@ export default function PaymentsPage() {
           </button>
         </div>
       </header>
+
+      <SavedViewsBar
+        moduleId="payments"
+        filters={paymentsViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => setShowArchived(String(f.archived || '0') === '1')}
+        onToast={showToast}
+        filtersEqual={(a, b) => String(a.archived || '0') === String(b.archived || '0')}
+      />
 
       <div style={{ ...cardStyle, marginBottom: 16 }}>
         <label style={labelStyle}>Booking / quotation</label>
