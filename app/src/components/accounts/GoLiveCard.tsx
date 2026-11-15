@@ -14,6 +14,7 @@ import {
 } from '../../lib/buildTemplatesStore'
 import { errorMessage } from '../../lib/errors'
 import { GO_LIVE_OWNERS, goLiveProgress, goLiveSteps, isOverdue, ownerLabel } from '../../lib/goLive'
+import { exportListCsv } from '../../lib/listIo'
 import { parseGoLiveStepForm } from '../../lib/schemas/goLiveStep'
 import type { AppUser, BuildStageKey, BuildTask, GoLiveOwner } from '../../lib/types'
 import { buttonSecondaryStyle, cardStyle, colors, inputStyle, sectionTitleStyle, selectStyle } from '../../lib/uiStyles'
@@ -98,13 +99,39 @@ export default function GoLiveCard({
     <section style={cardStyle} aria-label="Go live checklist">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Go live checklist</h2>
-        {steps.length ? (
-          <span style={{ fontSize: 12, color: progress.overdue ? colors.warn : colors.muted }}>
-            {progress.live ? 'Live' : `${progress.done} of ${progress.total} done`}
-            {progress.overdue ? `, ${progress.overdue} overdue` : ''}
-            {progress.goLiveDate && !progress.live ? `. Go live ${day(progress.goLiveDate)}` : ''}
-          </span>
-        ) : null}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {steps.length ? (
+            <>
+              <span style={{ fontSize: 12, color: progress.overdue ? colors.warn : colors.muted }}>
+                {progress.live ? 'Live' : `${progress.done} of ${progress.total} done`}
+                {progress.overdue ? `, ${progress.overdue} overdue` : ''}
+                {progress.goLiveDate && !progress.live ? `. Go live ${day(progress.goLiveDate)}` : ''}
+              </span>
+              <button
+                type="button"
+                style={smallBtn}
+                onClick={() => {
+                  exportListCsv(
+                    `go-live-${accountId.slice(0, 8)}.csv`,
+                    ['stage', 'title', 'owner', 'due_date', 'due_days', 'done', 'done_at', 'done_by'],
+                    steps.map((t) => ({
+                      stage: t.stage,
+                      title: t.title,
+                      owner: ownerLabel(t.owner || 'red_reach'),
+                      due_date: t.due_date || '',
+                      due_days: t.due_days ?? '',
+                      done: t.done ? 'yes' : 'no',
+                      done_at: t.done_at || '',
+                      done_by: t.done_by || '',
+                    })),
+                  )
+                }}
+              >
+                Export CSV
+              </button>
+            </>
+          ) : null}
+        </div>
       </div>
 
       {steps.length ? (
