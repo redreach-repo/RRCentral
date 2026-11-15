@@ -167,6 +167,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.billing.digest.body':
       'On Packages and rates, add who gets the morning email or WhatsApp of what needs attention (tickets, renewals, outbox activity).',
     'guide.billing.digest.link': 'Open Packages and rates',
+    'guide.billing.ledger.title': 'Ledger',
+    'guide.billing.ledger.body':
+      'General ledger stub for rehearsal postings. Live VAT/tax packs stay blocked until counsel clears the rules.',
+    'guide.billing.ledger.link': 'Open Ledger',
     'guide.delivery.accounts.title': 'Accounts',
     'guide.delivery.accounts.body':
       'Open the account record for contracts, build stages, time, and Drive files once a deal is live.',
@@ -195,6 +199,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.admin.settings.body':
       'Company, bank, users, and integrations live here. Prefer Settings over editing env files on a running tenant.',
     'guide.admin.settings.link': 'Open Settings',
+    'guide.admin.workflows.title': 'Workflows',
+    'guide.admin.workflows.body':
+      'Approval chains and dry-run runs under Settings. Webhook and ask_ai steps stay local until live gateways are cleared.',
+    'guide.admin.workflows.link': 'Open Workflows',
     'guide.admin.moduleFlags.title': 'Module flags',
     'guide.admin.moduleFlags.body':
       'Soft-hide Overview, Sales, Operations, Finance, Delivery, or Clients from the sidebar for everyone. Direct URLs still work.',
@@ -215,6 +223,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.admin.dsr.body':
       'Log access, erasure, and export requests, then run retention prune when aged logs should go. Export the list as CSV for counsel.',
     'guide.admin.dsr.link': 'Open Data requests',
+    'guide.admin.publicApi.title': 'Public API',
+    'guide.admin.publicApi.body':
+      'Mint API keys with read or write scopes, register webhook endpoints, and test deliveries. Partners use x-api-key; cron retries use the webhook-retry function.',
+    'guide.admin.publicApi.link': 'Open Public API',
     'guide.ops.wanders.title': 'Wanders',
     'guide.ops.wanders.body':
       'Travel leads, packages, partners, departures and bookings for RR Wanders — kept separate from RR Threads deals.',
@@ -1211,6 +1223,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.billing.digest.body':
       'في الحزم والأسعار، أضف من يتلقى بريد أو واتساب الصباح بما يحتاج انتباهاً (التذاكر والتجديدات ونشاط الصندوق).',
     'guide.billing.digest.link': 'فتح الحزم والأسعار',
+    'guide.billing.ledger.title': 'دفتر الأستاذ',
+    'guide.billing.ledger.body':
+      'نموذج دفتر أستاذ للترحيلات التجريبية. حزم الضريبة الحية تبقى موقوفة حتى يوافق المستشار على القواعد.',
+    'guide.billing.ledger.link': 'فتح دفتر الأستاذ',
     'guide.delivery.accounts.title': 'الحسابات',
     'guide.delivery.accounts.body':
       'افتح سجل الحساب للعقود ومراحل البناء والوقت وملفات Drive بعد أن تصبح الصفقة حية.',
@@ -1239,6 +1255,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.admin.settings.body':
       'الشركة والبنك والمستخدمون والتكاملات هنا. فضّل الإعدادات على تعديل ملفات البيئة على مستأجر يعمل.',
     'guide.admin.settings.link': 'فتح الإعدادات',
+    'guide.admin.workflows.title': 'سير العمل',
+    'guide.admin.workflows.body':
+      'سلاسل الموافقة وتشغيلات التجربة تحت الإعدادات. خطوات webhook و ask_ai تبقى محلية حتى تُفتح البوابات الحية.',
+    'guide.admin.workflows.link': 'فتح سير العمل',
     'guide.admin.moduleFlags.title': 'أعلام الوحدات',
     'guide.admin.moduleFlags.body':
       'أخفِ النظرة العامة أو المبيعات أو العمليات أو المالية أو التسليم أو العملاء من الشريط الجانبي للجميع. الروابط المباشرة تبقى تعمل.',
@@ -1259,6 +1279,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.admin.dsr.body':
       'سجّل طلبات الوصول والمسح والتصدير، ثم شغّل تقليم الاحتفاظ عندما يحين وقت حذف السجلات القديمة. صدّر القائمة كـ CSV للمستشار.',
     'guide.admin.dsr.link': 'فتح طلبات البيانات',
+    'guide.admin.publicApi.title': 'واجهة برمجة عامة',
+    'guide.admin.publicApi.body':
+      'أنشئ مفاتيح API بصلاحيات قراءة أو كتابة، سجّل نقاط webhook، واختبر التسليم. الشركاء يستخدمون x-api-key؛ وإعادة المحاولة تتم عبر دالة webhook-retry.',
+    'guide.admin.publicApi.link': 'فتح الواجهة العامة',
     'guide.ops.wanders.title': 'Wanders',
     'guide.ops.wanders.body':
       'عملاء محتملون وباقات وشركاء ومغادرات وحجوزات لـ RR Wanders — منفصلة عن صفقات RR Threads.',

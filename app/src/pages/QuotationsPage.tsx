@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, Fragment } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { FilePlus2, Plus, Trash2 } from 'lucide-react'
@@ -75,7 +75,8 @@ import { parseQuotationFinalizeForm } from '../lib/schemas/quotationFinalize'
 import { sortByDateDesc } from '../lib/finance'
 import { isQuotePastValidity, quoteValidUntil } from '../lib/documents'
 import { errorMessage, isUndefinedColumnError } from '../lib/errors'
-import { exportListCsv } from '../lib/listIo'
+import { QUOTATIONS_CSV_COLUMNS } from '../lib/quotationsCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import {
   displayFieldValue,
   listCustomFieldDefinitions,
@@ -209,6 +210,8 @@ export default function QuotationsPage() {
   const [tab, setTab] = useState<StatusTab>('All')
   const [search, setSearch] = useState('')
   const [showArchived, setShowArchived] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const currentQuoteViewFilters = useMemo(
     () => normalizeQuotationsFilters({ q: search, status: tab }),
@@ -380,6 +383,72 @@ export default function QuotationsPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  async function importQuotationsCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of QUOTATIONS_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, QUOTATIONS_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid quotation rows', 'error')
+        return
+      }
+      let saved = 0
+      for (const row of ok) {
+        const quoteId = makeQuoteId()
+        const amount = Math.max(0, Number(row.amount) || 0)
+        const status = (QUOTE_STATUSES as readonly string[]).includes(row.status)
+          ? row.status
+          : 'Draft'
+        const insertRow = {
+          id: crypto.randomUUID(),
+          client: row.client,
+          vertical: divisionBrand('01'),
+          division_code: '01',
+          description: row.description || '',
+          notes: row.notes || '',
+          date: row.date || format(new Date(), 'yyyy-MM-dd'),
+          valid_until: row.valid_until || null,
+          amount,
+          status: status === 'Draft' ? 'Draft' : status,
+          reference_number: '',
+          base_reference: '',
+          revision: 0,
+          quote_id: quoteId,
+          created_by: who,
+          updated_by: who,
+          updated_at: new Date().toISOString(),
+          ...quotationCurrencyDefaults(),
+        }
+        const { error } = await db.from('quotations').insert(insertRow)
+        if (error && isUndefinedColumnError(error)) {
+          const {
+            valid_until: _v,
+            ...legacy
+          } = insertRow
+          const retry = await db.from('quotations').insert(legacy)
+          if (retry.error) throw retry.error
+        } else if (error) throw error
+        saved += 1
+      }
+      const skipNote = errors.length ? ` · ${errors.length} row(s) skipped` : ''
+      showToast(`Imported ${saved} quotation draft(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Quotation CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
 
   useEffect(() => {
     const ref = searchParams.get('ref') || searchParams.get('quote')
@@ -1399,6 +1468,25 @@ export default function QuotationsPage() {
           <p className={qStyles.subtitle}>{t('page.quotations.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importQuotationsCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={qStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing || userRole === 'viewer'}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
           <button
             type="button"
             className={qStyles.newBtn}
@@ -1414,6 +1502,8 @@ export default function QuotationsPage() {
                   'amount',
                   'date',
                   'valid_until',
+                  'description',
+                  'notes',
                   ...customDefs.map((d) => d.field_key || d.id),
                 ],
                 quotes.map((q) => {
@@ -1424,6 +1514,8 @@ export default function QuotationsPage() {
                     amount: q.amount,
                     date: q.date || '',
                     valid_until: q.valid_until || '',
+                    description: q.description || '',
+                    notes: q.notes || '',
                   }
                   for (const d of customDefs) {
                     row[d.field_key || d.id] = displayFieldValue(d, customValues[q.id]?.[d.id])

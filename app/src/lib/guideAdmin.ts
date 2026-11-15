@@ -13,6 +13,13 @@ export const GUIDE_ADMIN_SECTIONS: GuideAdminSection[] = [
     linkKey: 'guide.admin.settings.link',
   },
   {
+    id: 'workflows',
+    titleKey: 'guide.admin.workflows.title',
+    bodyKey: 'guide.admin.workflows.body',
+    to: '/settings#workflows',
+    linkKey: 'guide.admin.workflows.link',
+  },
+  {
     id: 'moduleFlags',
     titleKey: 'guide.admin.moduleFlags.title',
     bodyKey: 'guide.admin.moduleFlags.body',
@@ -46,5 +53,12 @@ export const GUIDE_ADMIN_SECTIONS: GuideAdminSection[] = [
     bodyKey: 'guide.admin.dsr.body',
     to: '/dsr',
     linkKey: 'guide.admin.dsr.link',
+  },
+  {
+    id: 'publicApi',
+    titleKey: 'guide.admin.publicApi.title',
+    bodyKey: 'guide.admin.publicApi.body',
+    to: '/public-api',
+    linkKey: 'guide.admin.publicApi.link',
   },
 ]

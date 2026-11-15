@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Package, Plus, RefreshCw } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS } from '../lib/config'
@@ -26,7 +26,8 @@ import {
 import docsStyles from '../styles/docsList.module.css'
 import { errorMessage } from '../lib/errors'
 import { parseInventoryAdjust } from '../lib/schemas/inventoryAdjust'
-import { exportListCsv } from '../lib/listIo'
+import { INVENTORY_ADJUST_CSV_COLUMNS } from '../lib/inventoryCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import { createWarehouse, listWarehouses } from '../lib/warehouseStore'
 import {
   listWarehouseStock,
@@ -51,6 +52,8 @@ export default function InventoryPage() {
   const [delta, setDelta] = useState('0')
   const [reason, setReason] = useState('manual_adjust')
   const [busy, setBusy] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const [showArchived, setShowArchived] = useState(false)
 
   const load = useCallback(async () => {
@@ -165,6 +168,56 @@ export default function InventoryPage() {
 
   const brand = (code: string) => DIVISIONS.find((d) => d.code === code)?.brand || code
 
+  async function importAdjustCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of INVENTORY_ADJUST_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, INVENTORY_ADJUST_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid adjust rows', 'error')
+        return
+      }
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        const qtyDelta = Number(row.qty_delta)
+        if (!Number.isFinite(qtyDelta) || qtyDelta === 0) {
+          skipped += 1
+          continue
+        }
+        const updated = await adjustStock({
+          sku: row.sku,
+          qtyDelta,
+          reason: row.reason || 'csv_adjust',
+          reference: row.reference || 'csv',
+          userEmail: user?.email || '',
+          warehouseId: warehouseId || null,
+        })
+        if (!updated) {
+          skipped += 1
+          continue
+        }
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Adjusted ${saved} SKU(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Inventory CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
@@ -179,6 +232,25 @@ export default function InventoryPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importAdjustCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing || busy}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import adjusts'}
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}

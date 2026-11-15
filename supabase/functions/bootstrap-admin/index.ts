@@ -4,6 +4,7 @@
 // Prefer manage-auth-user (admin JWT) or the Supabase Auth dashboard for day-to-day use.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
+import { withErrorLog } from "../_shared/functionHealth.ts"
 
 const ADMIN_EMAIL = "info@redreach.ae"
 const ADMIN_NAME = "Red Reach"
@@ -72,7 +73,7 @@ async function findAuthUserId(
   }
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve(withErrorLog("bootstrap-admin", async (req: Request) => {
   const cors = corsHeadersFor(req)
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors })
   if (req.method !== "POST") return json(405, { error: "POST only" }, cors)
@@ -142,4 +143,4 @@ Deno.serve(async (req: Request) => {
   } catch (e) {
     return json(500, { error: e instanceof Error ? e.message : "Server error" }, cors)
   }
-})
+}))

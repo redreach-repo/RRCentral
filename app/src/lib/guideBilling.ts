@@ -40,4 +40,11 @@ export const GUIDE_BILLING_SECTIONS: GuideBillingSection[] = [
     to: '/delivery-settings',
     linkKey: 'guide.billing.digest.link',
   },
+  {
+    id: 'ledger',
+    titleKey: 'guide.billing.ledger.title',
+    bodyKey: 'guide.billing.ledger.body',
+    to: '/ledger',
+    linkKey: 'guide.billing.ledger.link',
+  },
 ]

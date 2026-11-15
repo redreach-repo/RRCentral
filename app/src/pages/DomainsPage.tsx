@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { ExternalLink, Globe, Plus } from 'lucide-react'
 import { db } from '../lib/db'
@@ -18,9 +18,11 @@ import {
   DOMAIN_STATUSES,
   domainStatusLabel,
   listOwnedDomainsResult,
+  normalizeDomainName,
   restoreOwnedDomain,
 } from '../lib/domains'
-import { exportListCsv } from '../lib/listIo'
+import { DOMAINS_CSV_COLUMNS } from '../lib/domainsCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import { parseDomainForm } from '../lib/schemas/domain'
 import {
   buttonDangerStyle,
@@ -97,6 +99,8 @@ export default function DomainsPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showInactive, setShowInactive] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<OwnedDomain | null>(null)
   const [form, setForm] = useState<DomainForm>(emptyForm())
@@ -123,6 +127,87 @@ export default function DomainsPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  async function importDomainsCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of DOMAINS_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, DOMAINS_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid domain rows', 'error')
+        return
+      }
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        const domain_name = normalizeDomainName(row.domain_name)
+        if (!domain_name) {
+          skipped += 1
+          continue
+        }
+        const duplicate = domains.some(
+          (d) => normalizeDomainName(d.domain_name) === domain_name,
+        )
+        if (duplicate) {
+          skipped += 1
+          continue
+        }
+        const status = (DOMAIN_STATUSES as readonly string[]).includes(row.status)
+          ? (row.status as OwnedDomainStatus)
+          : 'active'
+        const billing = DOMAIN_BILLING_CYCLES.some((c) => c.value === row.billing_cycle)
+          ? (row.billing_cycle as OwnedDomainBillingCycle)
+          : ''
+        const autoRenew = /^(1|true|yes|y)$/i.test(row.auto_renew)
+        const { error } = await db.from('owned_domains').insert({
+          id: crypto.randomUUID(),
+          domain_name,
+          registrar: row.registrar || '',
+          registrar_account: '',
+          status,
+          registered_on: null,
+          expires_on: row.expires_on || null,
+          auto_renew: autoRenew,
+          dns_provider: '',
+          nameservers: '',
+          hosting_provider: '',
+          website_url: '',
+          managed_by: '',
+          cost_aed: row.cost_aed ? Number(row.cost_aed) : null,
+          billing_cycle: billing,
+          notes: row.notes || '',
+          active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        if (error) throw error
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} domain(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      if (isMissingRelationError(e)) {
+        showToast(
+          'Domains table is missing. Run supabase/migrations/20261008120000_owned_domains.sql in Supabase first.',
+          'error',
+        )
+      } else {
+        showToast(errorMessage(e, 'Domain CSV import failed'), 'error')
+      }
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
 
   const renewalAlerts = useMemo(() => domainRenewalAlerts(domains, 90), [domains])
 
@@ -288,6 +373,25 @@ export default function DomainsPage() {
           >
             {showInactive ? 'Hide inactive' : 'Show inactive'}
           </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importDomainsCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing || missingTable}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}
@@ -304,6 +408,7 @@ export default function DomainsPage() {
                   'auto_renew',
                   'cost_aed',
                   'billing_cycle',
+                  'notes',
                 ],
                 domains.map((d) => ({
                   domain_name: d.domain_name,
@@ -313,6 +418,7 @@ export default function DomainsPage() {
                   auto_renew: d.auto_renew ? 'yes' : 'no',
                   cost_aed: d.cost_aed,
                   billing_cycle: d.billing_cycle,
+                  notes: d.notes || '',
                 })),
               )
               showToast('Domains CSV downloaded', 'success')

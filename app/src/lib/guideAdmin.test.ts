@@ -4,14 +4,16 @@ import { GUIDE_PACKS } from './guidePacks'
 import { t } from './i18n'
 
 describe('GUIDE_ADMIN_SECTIONS', () => {
-  it('covers the admin paths including DSR', () => {
+  it('covers the admin paths including DSR and public API', () => {
     expect(GUIDE_ADMIN_SECTIONS.map((s) => s.id)).toEqual([
       'settings',
+      'workflows',
       'moduleFlags',
       'systemCheck',
       'audit',
       'appErrors',
       'dsr',
+      'publicApi',
     ])
   })
 

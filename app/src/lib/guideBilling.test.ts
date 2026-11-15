@@ -1,21 +1,32 @@
 import { describe, expect, it } from 'vitest'
 import { GUIDE_BILLING_SECTIONS } from './guideBilling'
 import { GUIDE_PACKS } from './guidePacks'
+import { t } from './i18n'
 
 describe('GUIDE_BILLING_SECTIONS', () => {
-  it('covers the five billing paths', () => {
+  it('covers the six billing paths', () => {
     expect(GUIDE_BILLING_SECTIONS.map((s) => s.id)).toEqual([
       'invoices',
       'payments',
       'deliveryNotes',
       'expenses',
       'digest',
+      'ledger',
     ])
   })
 
   it('routes into the app', () => {
     for (const s of GUIDE_BILLING_SECTIONS) {
       expect(s.to.startsWith('/')).toBe(true)
+    }
+  })
+
+  it('has EN and AR catalog copy for every section', () => {
+    for (const s of GUIDE_BILLING_SECTIONS) {
+      for (const key of [s.titleKey, s.bodyKey, s.linkKey]) {
+        expect(t('en', key)).not.toBe(key)
+        expect(t('ar', key)).not.toBe(key)
+      }
     }
   })
 })
