@@ -99,6 +99,34 @@ export async function queueCampaignRecipients(input: {
   return { queued, skipped }
 }
 
+/** Local dry-run: mark queued recipients as dry_run_sent — never calls an ESP. */
+export async function dryRunCampaignSend(campaignId: string): Promise<{ sent: number; skipped: number }> {
+  const { dryRunEligible, dryRunResultStatus, summarizeDryRun } = await import('./marketingDryRun')
+  const { data, error } = await db
+    .from('marketing_campaign_recipients')
+    .select('id, status, account_contacts(email)')
+    .eq('campaign_id', campaignId)
+  if (error) throw error
+  type RecipientJoin = { id: string; status: string; account_contacts?: { email?: string } | null }
+  const rows = ((data || []) as RecipientJoin[]).map((r) => ({
+    id: r.id,
+    status: r.status,
+    email: r.account_contacts?.email || '',
+  }))
+  const summary = summarizeDryRun(rows)
+  const eligibleIds = rows
+    .filter((r: { status: string; email: string }) => dryRunEligible(r.status) && String(r.email).includes('@'))
+    .map((r: { id: string }) => r.id)
+  if (eligibleIds.length) {
+    const { error: uErr } = await db
+      .from('marketing_campaign_recipients')
+      .update({ status: dryRunResultStatus(), skip_reason: 'dry_run_local' })
+      .in('id', eligibleIds)
+    if (uErr) throw uErr
+  }
+  return summary
+}
+
 export async function listAiKnowledgeDocs(): Promise<Array<{ id: string; title: string; body: string; source: string }>> {
   if (!isSupabaseConfigured()) return []
   const { data, error } = await db

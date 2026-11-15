@@ -63,6 +63,13 @@ export const BUILTIN_INDUSTRY_PACKS: IndustryPack[] = [
     manifest: { modules: ['sales', 'delivery'], objects: ['deal'] },
   },
   {
+    pack_key: 'logistics',
+    name: 'Logistics',
+    description: 'Lanes, carriers, and delivery windows (starter templates).',
+    version: '0.1.0',
+    manifest: { modules: ['sales', 'ops', 'delivery'], objects: ['deal', 'product'] },
+  },
+  {
     pack_key: 'engineering',
     name: 'Engineering',
     description: 'Master Spec §11.3 starter: projects, claims, document registers (full pack later).',

@@ -47,6 +47,10 @@ function saasCheckoutProblem(body) {
   }
   return null;
 }
+function stripeTaxStubEnabled(env = {}) {
+  const v = String(env.STRIPE_TAX_STUB || env.VITE_STRIPE_TAX_STUB || "").toLowerCase();
+  return v === "1" || v === "true" || v === "yes";
+}
 function buildSaasCheckoutParams(input) {
   const params = {
     mode: "subscription",
@@ -80,6 +84,9 @@ function buildSaasCheckoutParams(input) {
       }
     ]
   };
+  if (input.enableTaxStub) {
+    params.automatic_tax = { enabled: true };
+  }
   if (input.stripeCustomerId) params.customer = input.stripeCustomerId;
   return params;
 }
@@ -159,5 +166,6 @@ export {
   randomIntegrationSuffix,
   saasApplyFromCheckoutSession,
   saasApplyFromSubscription,
-  saasCheckoutProblem
+  saasCheckoutProblem,
+  stripeTaxStubEnabled
 };

@@ -5,13 +5,17 @@ import EmptyState from '../components/EmptyState'
 import { errorMessage } from '../lib/errors'
 import { computeWipAed, projectCostTotal, projectHealth } from '../lib/projectAccounting'
 import {
+  addProjectBillingSchedule,
   addProjectCost,
   createDeliveryProject,
   listDeliveryProjects,
+  listProjectBillingSchedules,
   listProjectCosts,
+  markProjectMilestoneBilled,
   refreshProjectWip,
   updateProjectBilling,
   type DeliveryProject,
+  type ProjectBillingSchedule,
   type ProjectCostLine,
 } from '../lib/opsSliceStores'
 import { exportListCsv } from '../lib/listIo'
@@ -24,6 +28,7 @@ export default function ProjectsPage() {
   const [rows, setRows] = useState<DeliveryProject[]>([])
   const [selected, setSelected] = useState<DeliveryProject | null>(null)
   const [costs, setCosts] = useState<ProjectCostLine[]>([])
+  const [schedules, setSchedules] = useState<ProjectBillingSchedule[]>([])
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [budget, setBudget] = useState('')
@@ -32,6 +37,9 @@ export default function ProjectsPage() {
   const [category, setCategory] = useState('labour')
   const [desc, setDesc] = useState('')
   const [amount, setAmount] = useState('')
+  const [mileLabel, setMileLabel] = useState('')
+  const [milePct, setMilePct] = useState('25')
+  const [mileAmount, setMileAmount] = useState('')
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -52,7 +60,9 @@ export default function ProjectsPage() {
   async function openProject(p: DeliveryProject) {
     setSelected(p)
     try {
-      setCosts(await listProjectCosts(p.id))
+      const [c, s] = await Promise.all([listProjectCosts(p.id), listProjectBillingSchedules(p.id)])
+      setCosts(c)
+      setSchedules(s)
     } catch (e) {
       showToast(errorMessage(e, 'Could not load costs'), 'error')
     }
@@ -258,6 +268,59 @@ export default function ProjectsPage() {
                   {costs.map((c) => (
                     <li key={c.id}>
                       {c.cost_date} · {c.category} · {c.description} · {Number(c.amount_aed).toFixed(2)}
+                    </li>
+                  ))}
+                </ul>
+                <h4 style={{ fontSize: 13, marginTop: 16 }}>Billing schedule</h4>
+                <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '2fr 1fr 1fr auto', marginTop: 8 }}>
+                  <input style={inputStyle} placeholder="Milestone" value={mileLabel} onChange={(e) => setMileLabel(e.target.value)} />
+                  <input style={inputStyle} type="number" placeholder="%" value={milePct} onChange={(e) => setMilePct(e.target.value)} />
+                  <input style={inputStyle} type="number" placeholder="AED" value={mileAmount} onChange={(e) => setMileAmount(e.target.value)} />
+                  <button
+                    type="button"
+                    style={buttonPrimaryStyle}
+                    onClick={() => {
+                      void addProjectBillingSchedule({
+                        projectId: selected.id,
+                        label: mileLabel,
+                        pct: Number(milePct) || 0,
+                        amountAed: Number(mileAmount) || 0,
+                      })
+                        .then(async () => {
+                          showToast('Milestone added', 'success')
+                          setMileLabel('')
+                          await openProject(selected)
+                        })
+                        .catch((err) => showToast(errorMessage(err, 'Milestone failed'), 'error'))
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
+                <ul style={{ marginTop: 10, paddingLeft: 18, fontSize: 13, color: colors.muted }}>
+                  {schedules.map((s) => (
+                    <li key={s.id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span>
+                        {s.milestone_label} · {s.pct}% · {Number(s.amount_aed).toFixed(2)} · {s.status}
+                      </span>
+                      {s.status === 'planned' ? (
+                        <button
+                          type="button"
+                          style={buttonSecondaryStyle}
+                          onClick={() => {
+                            void markProjectMilestoneBilled(s.id)
+                              .then(async () => {
+                                showToast('Milestone billed', 'success')
+                                await load()
+                                const next = (await listDeliveryProjects()).find((p) => p.id === selected.id)
+                                if (next) await openProject(next)
+                              })
+                              .catch((err) => showToast(errorMessage(err, 'Mark billed failed'), 'error'))
+                          }}
+                        >
+                          Mark billed
+                        </button>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

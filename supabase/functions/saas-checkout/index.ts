@@ -14,6 +14,7 @@ import {
   planByKey,
   randomIntegrationSuffix,
   saasCheckoutProblem,
+  stripeTaxStubEnabled,
 } from "./saasCheckout.bundle.js"
 import { withErrorLog } from "../_shared/functionHealth.ts"
 
@@ -118,6 +119,7 @@ Deno.serve(withErrorLog("saas-checkout", async (req) => {
     successUrl: String(body.success_url),
     cancelUrl: String(body.cancel_url),
     stripeCustomerId: subRow?.stripe_customer_id || null,
+    enableTaxStub: stripeTaxStubEnabled(Deno.env.toObject()),
   })
 
   try {
