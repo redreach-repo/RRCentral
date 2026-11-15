@@ -5,9 +5,11 @@ import { SUPPORT_SETTING_KEYS, calendarFromSettings, workingDayHours } from '../
 import { parseSupportPoliciesForm, parseSupportWeekForm } from '../../lib/schemas/supportSettings'
 import { listPolicies, savePolicy } from '../../lib/supportStore'
 import { errorMessage } from '../../lib/errors'
+import { exportListCsv } from '../../lib/listIo'
 import type { SlaPolicy } from '../../lib/types'
 import {
   buttonPrimaryStyle,
+  buttonSecondaryStyle,
   cardStyle,
   colors,
   fieldStyle,
@@ -115,8 +117,34 @@ export default function SupportSettingsCard({ canPolicies, canWeek }: { canPolic
 
   return (
     <section style={{ ...cardStyle, marginBottom: 16 }}>
-      <h2 style={sectionTitleStyle}>Support response times</h2>
-      <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.55 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Support response times</h2>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={!policies.length}
+          onClick={() => {
+            exportListCsv(
+              'support-sla-policies.csv',
+              ['label', 'applies_to', 'package_id', 'account_type', 'first_response_hours', 'working_days', 'opens', 'closes'],
+              policies.map((p) => ({
+                label: p.label,
+                applies_to: p.applies_to,
+                package_id: p.package_id || '',
+                account_type: p.account_type || '',
+                first_response_hours: hours[p.id] ?? p.first_response_hours,
+                working_days: days.map((d) => WEEKDAYS.find((w) => w.iso === d)?.label || d).join(' '),
+                opens: start,
+                closes: end,
+              })),
+            )
+            showToast('Support SLA CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
+      </div>
+      <p style={{ color: colors.muted, fontSize: 13, marginTop: 8, lineHeight: 1.55 }}>
         Working hours to the first reply. A working day is {dayHours} hours, so 1 working day is {dayHours} and 2 are{' '}
         {dayHours * 2}. Changes apply to tickets opened after you save.
       </p>
