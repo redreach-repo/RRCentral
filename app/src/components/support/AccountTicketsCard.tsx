@@ -1,16 +1,39 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { useToast } from '../../contexts/ToastContext'
 import SlaBadge from './SlaBadge'
 import TicketFormModal, { type TicketFormValues } from './TicketFormModal'
 import { useSupportConfig } from './useSupportConfig'
-import { TICKET_STATUSES, isOpenTicket, optionLabel, sortQueue } from '../../lib/support'
+import {
+  TICKET_CHANNELS,
+  TICKET_PRIORITIES,
+  TICKET_STATUSES,
+  isOpenTicket,
+  optionLabel,
+  sortQueue,
+} from '../../lib/support'
 import { createTicket, listTickets, slaPackageFor } from '../../lib/supportStore'
 import { errorMessage } from '../../lib/errors'
-import { exportListCsv } from '../../lib/listIo'
-import type { Account, AccountContact, AppUser, Ticket } from '../../lib/types'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
+import type { Account, AccountContact, AppUser, Ticket, TicketChannel, TicketPriority } from '../../lib/types'
 import { buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
+
+const EXPORT_COLUMNS = [
+  'subject',
+  'status',
+  'priority',
+  'channel',
+  'requester_email',
+  'sla_hours',
+  'sla_due_at',
+  'first_response_at',
+  'resolved_at',
+  'created_at',
+] as const
+
+const PRIORITY_VALUES = new Set(TICKET_PRIORITIES.map((p) => p.value))
+const CHANNEL_VALUES = new Set(TICKET_CHANNELS.map((c) => c.value))
 
 type Props = {
   account: Account
@@ -29,6 +52,8 @@ export default function AccountTicketsCard({ account, contacts, team, editable, 
   const [showAll, setShowAll] = useState(false)
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     try {
@@ -41,6 +66,9 @@ export default function AccountTicketsCard({ account, contacts, team, editable, 
   useEffect(() => {
     void load()
   }, [load])
+
+  const isCtrm = account.type === 'ctrm_prospect'
+  const defaultChannel: TicketChannel = isCtrm ? 'ctrm_next' : 'email'
 
   async function handleCreate(values: TicketFormValues) {
     if (!values.subject) {
@@ -60,7 +88,59 @@ export default function AccountTicketsCard({ account, contacts, team, editable, 
     }
   }
 
-  const isCtrm = account.type === 'ctrm_prospect'
+  async function importTicketsCsv(file: File) {
+    if (!editable) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows)
+      const packageId = await slaPackageFor(account.id, account.type)
+      let saved = 0
+      let skipped = 0
+      for (const row of objects) {
+        const subject = String(row.subject || '').trim()
+        if (!subject) {
+          skipped += 1
+          continue
+        }
+        const priorityRaw = String(row.priority || '').trim() as TicketPriority
+        const channelRaw = String(row.channel || '').trim() as TicketChannel
+        const priority = (PRIORITY_VALUES.has(priorityRaw) ? priorityRaw : 'normal') as TicketPriority
+        const channel = (CHANNEL_VALUES.has(channelRaw) ? channelRaw : defaultChannel) as TicketChannel
+        await createTicket(
+          {
+            accountId: account.id,
+            accountType: account.type,
+            packageId,
+            contactId: null,
+            subject,
+            details: '',
+            channel,
+            priority,
+            assigneeUserId: author.appUserId,
+          },
+          policies,
+          calendar,
+          author,
+        )
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} ticket(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Ticket CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   const openCount = tickets.filter(isOpenTicket).length
   const shown = sortQueue(showAll ? tickets : tickets.filter(isOpenTicket)).slice(0, showAll ? 50 : 8)
 
@@ -71,6 +151,26 @@ export default function AccountTicketsCard({ account, contacts, team, editable, 
           {isCtrm ? 'Client issues' : 'Support tickets'} {openCount ? <span style={{ color: colors.muted, fontWeight: 400 }}>({openCount} open)</span> : null}
         </h2>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importTicketsCsv(file)
+            }}
+          />
+          {editable ? (
+            <button
+              type="button"
+              style={{ ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }}
+              disabled={importing}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
+          ) : null}
           {tickets.length ? (
             <button
               type="button"
@@ -78,7 +178,7 @@ export default function AccountTicketsCard({ account, contacts, team, editable, 
               onClick={() => {
                 exportListCsv(
                   `account-tickets-${account.id.slice(0, 8)}.csv`,
-                  ['subject', 'status', 'priority', 'channel', 'requester_email', 'sla_hours', 'sla_due_at', 'first_response_at', 'resolved_at', 'created_at'],
+                  [...EXPORT_COLUMNS],
                   tickets.map((t) => ({
                     subject: t.subject || '',
                     status: t.status,
@@ -157,7 +257,7 @@ export default function AccountTicketsCard({ account, contacts, team, editable, 
         team={team}
         lockedAccountId={account.id}
         defaultAssigneeId={author.appUserId}
-        defaultChannel={isCtrm ? 'ctrm_next' : 'email'}
+        defaultChannel={defaultChannel}
         saving={saving}
         onSave={(v) => void handleCreate(v)}
       />
