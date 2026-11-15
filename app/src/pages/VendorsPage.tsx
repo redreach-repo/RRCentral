@@ -24,7 +24,7 @@ import {
   listExpenseAttachmentsForIds,
   listExpensesForVendor,
 } from '../lib/supplierInvoiceStore'
-import { listVendors } from '../lib/vendors'
+import { listVendors, restoreVendor, type VendorRow } from '../lib/vendors'
 import { exportListCsv } from '../lib/listIo'
 import {
   buttonDangerStyle,
@@ -79,7 +79,8 @@ export default function VendorsPage() {
   const { showToast } = useToast()
   const showTrn = canViewField(userRole, 'vendor.trn')
   const editTrn = canEditField(userRole, 'vendor.trn')
-  const [vendors, setVendors] = useState<Vendor[]>([])
+  const [vendors, setVendors] = useState<VendorRow[]>([])
+  const [showArchived, setShowArchived] = useState(false)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const vendorViewFilters = useMemo(() => {
@@ -101,7 +102,7 @@ export default function VendorsPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const rows = await listVendors()
+      const rows = await listVendors({ includeDeleted: showArchived })
       setVendors(rows)
       setMissingTable(false)
     } catch (e) {
@@ -114,7 +115,7 @@ export default function VendorsPage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [showToast, showArchived])
 
   useEffect(() => {
     void load()
@@ -251,29 +252,35 @@ export default function VendorsPage() {
 
   async function confirmDelete() {
     if (!deleteTarget) return
+    const archived = Boolean((deleteTarget as VendorRow).deleted_at)
     setSaving(true)
     try {
-      let { error } = await db
-        .from('vendors')
-        .update({
-          active: false,
-          deleted_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', deleteTarget.id)
-      if (error) {
-        const retry = await db
+      if (archived) {
+        await restoreVendor(deleteTarget.id)
+        showToast('Vendor restored', 'success')
+      } else {
+        let { error } = await db
           .from('vendors')
-          .update({ active: false, updated_at: new Date().toISOString() })
+          .update({
+            active: false,
+            deleted_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
           .eq('id', deleteTarget.id)
-        if (retry.error) throw retry.error
+        if (error) {
+          const retry = await db
+            .from('vendors')
+            .update({ active: false, updated_at: new Date().toISOString() })
+            .eq('id', deleteTarget.id)
+          if (retry.error) throw retry.error
+        }
+        await logActivity('archive_vendor', 'vendor', deleteTarget.company_name, '', user?.email || '')
+        showToast('Vendor archived', 'success')
       }
-      await logActivity('archive_vendor', 'vendor', deleteTarget.company_name, '', user?.email || '')
-      showToast('Vendor archived', 'success')
       setDeleteTarget(null)
       await load()
     } catch (e) {
-      showToast(errorMessage(e, 'Delete failed'), 'error')
+      showToast(errorMessage(e, 'Archive failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -309,6 +316,14 @@ export default function VendorsPage() {
             }}
           >
             Export CSV
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
           </button>
           <button
             type="button"
@@ -631,17 +646,38 @@ export default function VendorsPage() {
         </div>
       </Modal>
 
-      <Modal open={!!deleteTarget} title="Archive vendor?" onClose={() => setDeleteTarget(null)} width={400}>
+      <Modal
+        open={!!deleteTarget}
+        title={(deleteTarget as VendorRow | null)?.deleted_at ? 'Restore vendor?' : 'Archive vendor?'}
+        onClose={() => setDeleteTarget(null)}
+        width={400}
+      >
         <p style={{ color: colors.muted, fontSize: 14 }}>
-          Archive <strong style={{ color: colors.text }}>{deleteTarget?.company_name}</strong>? Past
-          expenses keep the company name.
+          {(deleteTarget as VendorRow | null)?.deleted_at ? (
+            <>
+              Restore <strong style={{ color: colors.text }}>{deleteTarget?.company_name}</strong> to the
+              active vendors list.
+            </>
+          ) : (
+            <>
+              Archive <strong style={{ color: colors.text }}>{deleteTarget?.company_name}</strong>? Past
+              expenses keep the company name. Use Show archived to restore later.
+            </>
+          )}
         </p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setDeleteTarget(null)}>
             Cancel
           </button>
-          <button type="button" style={buttonDangerStyle} disabled={saving} onClick={() => void confirmDelete()}>
-            Archive
+          <button
+            type="button"
+            style={
+              (deleteTarget as VendorRow | null)?.deleted_at ? buttonSecondaryStyle : buttonDangerStyle
+            }
+            disabled={saving}
+            onClick={() => void confirmDelete()}
+          >
+            {(deleteTarget as VendorRow | null)?.deleted_at ? 'Restore' : 'Archive'}
           </button>
         </div>
       </Modal>

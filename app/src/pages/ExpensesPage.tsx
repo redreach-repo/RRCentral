@@ -120,6 +120,7 @@ export default function ExpensesPage() {
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [vendorSuggest, setVendorSuggest] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [showArchived, setShowArchived] = useState(false)
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [open, setOpen] = useState(false)
@@ -162,9 +163,8 @@ export default function ExpensesPage() {
         listVendors().catch(() => [] as Vendor[]),
       ])
       if (expRes.error) throw expRes.error
-      setExpenses(
-        ((expRes.data || []) as (Expense & { deleted_at?: string | null })[]).filter((e) => !e.deleted_at),
-      )
+      const raw = (expRes.data || []) as (Expense & { deleted_at?: string | null })[]
+      setExpenses(showArchived ? raw : raw.filter((e) => !e.deleted_at))
       if (!quoteRes.error) setQuotes((quoteRes.data || []) as Quotation[])
       setVendors(vendorRows)
     } catch (e) {
@@ -172,7 +172,7 @@ export default function ExpensesPage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast, syncRecurring])
+  }, [showToast, syncRecurring, showArchived])
 
   useEffect(() => {
     void load()
@@ -578,33 +578,35 @@ export default function ExpensesPage() {
   async function confirmDelete() {
     if (!deleteTarget) return
     if (!can(userRole, 'expense.delete')) {
-      showToast('Only admins can delete expenses', 'error')
+      showToast('Only admins can archive expenses', 'error')
       return
     }
+    const archived = Boolean((deleteTarget as Expense & { deleted_at?: string | null }).deleted_at)
     setSaving(true)
     try {
-      const { data: atts } = await db
-        .from('attachments')
-        .select('id')
-        .eq('entity_type', 'expense')
-        .eq('entity_ref', deleteTarget.id)
-      for (const a of (atts || []) as { id: string }[]) {
-        await db.from('attachments').delete().eq('id', a.id)
+      if (archived) {
+        const { error } = await db
+          .from('expenses')
+          .update({ deleted_at: null })
+          .eq('id', deleteTarget.id)
+        if (error) throw error
+        showToast('Expense restored', 'success')
+      } else {
+        let { error } = await db
+          .from('expenses')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', deleteTarget.id)
+        if (error) {
+          const hard = await db.from('expenses').delete().eq('id', deleteTarget.id)
+          if (hard.error) throw hard.error
+        }
+        await logActivity('delete_expense', 'expense', deleteTarget.vendor, '', user?.email || '')
+        showToast('Expense archived', 'success')
       }
-      let { error } = await db
-        .from('expenses')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('id', deleteTarget.id)
-      if (error) {
-        const hard = await db.from('expenses').delete().eq('id', deleteTarget.id)
-        if (hard.error) throw hard.error
-      }
-      await logActivity('delete_expense', 'expense', deleteTarget.vendor, '', user?.email || '')
-      showToast('Expense deleted', 'success')
       setDeleteTarget(null)
       await load()
     } catch (e) {
-      showToast(errorMessage(e, 'Delete failed'), 'error')
+      showToast(errorMessage(e, 'Archive failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -646,6 +648,14 @@ export default function ExpensesPage() {
             }}
           >
             Export CSV
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
           </button>
           <button
             type="button"
@@ -1133,16 +1143,45 @@ export default function ExpensesPage() {
         </div>
       </Modal>
 
-      <Modal open={!!deleteTarget} title="Delete expense?" onClose={() => setDeleteTarget(null)} width={400}>
+      <Modal
+        open={!!deleteTarget}
+        title={
+          (deleteTarget as (Expense & { deleted_at?: string | null }) | null)?.deleted_at
+            ? 'Restore expense?'
+            : 'Archive expense?'
+        }
+        onClose={() => setDeleteTarget(null)}
+        width={400}
+      >
         <p style={{ color: colors.muted, fontSize: 14 }}>
-          Delete expense for <strong style={{ color: colors.text }}>{deleteTarget?.vendor}</strong>?
+          {(deleteTarget as (Expense & { deleted_at?: string | null }) | null)?.deleted_at ? (
+            <>
+              Restore expense for <strong style={{ color: colors.text }}>{deleteTarget?.vendor}</strong>?
+            </>
+          ) : (
+            <>
+              Archive expense for <strong style={{ color: colors.text }}>{deleteTarget?.vendor}</strong>?
+              Use Show archived to restore later.
+            </>
+          )}
         </p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setDeleteTarget(null)}>
             Cancel
           </button>
-          <button type="button" style={buttonDangerStyle} disabled={saving} onClick={() => void confirmDelete()}>
-            Delete
+          <button
+            type="button"
+            style={
+              (deleteTarget as (Expense & { deleted_at?: string | null }) | null)?.deleted_at
+                ? buttonSecondaryStyle
+                : buttonDangerStyle
+            }
+            disabled={saving}
+            onClick={() => void confirmDelete()}
+          >
+            {(deleteTarget as (Expense & { deleted_at?: string | null }) | null)?.deleted_at
+              ? 'Restore'
+              : 'Archive'}
           </button>
         </div>
       </Modal>

@@ -2,22 +2,20 @@
 
 **Last updated:** 15 November 2026 (Asia/Dubai)  
 **Spec:** Master Specification **v2.1**  
-**Batch:** numbering pad / CSV / DSR / guide deepen (`docs/RUN_PLAN.md`)  
-**Branch:** `cursor/batch-numbering-csv-dsr-d3d5`
+**Batch:** soft-archive / finance CSV / guide finance (`docs/RUN_PLAN.md`)  
+**Branch:** `cursor/batch-soft-delete-csv-guides-d3d5`
 
 ## Milestone verdict
 
 | Slice | Result |
 |-------|--------|
-| Settings numbering pad edit | **Pass** |
-| CSV: DN / domains / marketing / payments / follow-ups | **Pass** |
-| DSR / retention polish | **Pass** |
-| Guide pack deepen (DSR + POs) | **Pass** |
-| Support + DN soft-archive / Approvals CSV | **Pass** |
+| Expenses / Vendors / Catalog show-archived + restore | **Pass** |
+| CSV: ledger / payroll / HR leave / app errors | **Pass** |
+| Guide finance deepen (ledger / approvals / payroll) | **Pass** |
 | M14 / live ESP / Tax / CASA / QTSP | **Not done** |
 
 ## Test results
 
 - Typecheck / lint: pass  
 - Vitest: **1380** passed / 273 files  
-- SQL: no new migrations this batch (prior `run.sh` green on #449)
+- SQL: no new migrations this batch
