@@ -11,6 +11,7 @@ import { downloadBlob, elementToPdfBlob } from '../lib/documents'
 import { errorMessage } from '../lib/errors'
 import { CTRM_NEXT_PUBLIC, fitSheetRows } from '../lib/fitSheet'
 import { loadFitSheet } from '../lib/fitSheetStore'
+import { exportListCsv } from '../lib/listIo'
 import type { Account, AccountContact, CtrmFitSheet } from '../lib/types'
 import styles from './DocumentPage.module.css'
 
@@ -65,9 +66,30 @@ export default function FitSheetPage() {
           <ArrowLeft size={16} /> {t('page.fitSheet.back')}
         </Link>
         {sheet ? (
-          <button type="button" style={{ ...bar, background: 'var(--primary)', color: 'var(--on-primary)' }} disabled={busy} onClick={() => void download()}>
-            <Download size={16} /> {busy ? t('page.fitSheet.makingPdf') : t('page.fitSheet.download')}
-          </button>
+          <>
+            <button
+              type="button"
+              style={{ ...bar, background: '#333', color: '#fff' }}
+              onClick={() => {
+                const dmLabel = contacts.find((c) => c.id === sheet.decision_maker_id)
+                const rows = fitSheetRows(
+                  sheet,
+                  dmLabel ? [dmLabel.name, dmLabel.role].filter(Boolean).join(', ') : '',
+                )
+                exportListCsv(
+                  `fit-sheet-${(account?.name || id).replace(/\s+/g, '-').toLowerCase()}.csv`,
+                  ['field', 'value'],
+                  rows.map((r) => ({ field: r.label, value: r.value })),
+                )
+                showToast('Fit sheet CSV downloaded', 'success')
+              }}
+            >
+              <Download size={16} /> Export CSV
+            </button>
+            <button type="button" style={{ ...bar, background: 'var(--primary)', color: 'var(--on-primary)' }} disabled={busy} onClick={() => void download()}>
+              <Download size={16} /> {busy ? t('page.fitSheet.makingPdf') : t('page.fitSheet.download')}
+            </button>
+          </>
         ) : null}
       </div>
       {error ? <p style={{ color: '#b91c1c', padding: 24 }}>{error}</p> : null}
