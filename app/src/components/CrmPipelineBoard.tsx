@@ -3,8 +3,45 @@ import { PIPELINE_STAGES } from '../lib/config'
 import type { CrmEntry } from '../lib/types'
 import { followUpBucket } from '../lib/crmWorkQueue'
 import { contactDisplay, hydrateContacts, primaryContact } from '../lib/contacts'
+import { exportListCsv } from '../lib/listIo'
 import { colors } from '../lib/pageStyles'
+import { buttonSecondaryStyle } from '../lib/uiStyles'
 import resp from '../styles/crmResponsive.module.css'
+
+function exportBoardCsv(entries: CrmEntry[]) {
+  exportListCsv(
+    'crm-pipeline-board.csv',
+    [
+      'company_name',
+      'pipeline_stage',
+      'owner',
+      'follow_up_date',
+      'next_action',
+      'contact',
+      'phone',
+      'email',
+      'quote_ref',
+      'follow_up_bucket',
+    ],
+    entries.map((row) => {
+      const contacts = hydrateContacts(row)
+      const display = contactDisplay(contacts)
+      const p = primaryContact(contacts)
+      return {
+        company_name: row.company_name,
+        pipeline_stage: row.pipeline_stage || 'Lead',
+        owner: row.owner || '',
+        follow_up_date: row.follow_up_date || '',
+        next_action: row.next_action || '',
+        contact: display.label,
+        phone: p?.phone || '',
+        email: p?.email || '',
+        quote_ref: row.quote_ref || '',
+        follow_up_bucket: followUpBucket(row.follow_up_date),
+      }
+    }),
+  )
+}
 
 type Props = {
   entries: CrmEntry[]
@@ -108,6 +145,16 @@ export default function CrmPipelineBoard({
     const rows = byStage(stageFocus)
     return (
       <div className={resp.boardCompact}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={entries.length === 0}
+            onClick={() => exportBoardCsv(entries)}
+          >
+            Export CSV
+          </button>
+        </div>
         <div className={resp.chipScroll} role="tablist" aria-label="Pipeline stage">
           {stages.map((s) => (
             <button
@@ -174,6 +221,16 @@ export default function CrmPipelineBoard({
 
   return (
     <div className={resp.board}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={entries.length === 0}
+          onClick={() => exportBoardCsv(entries)}
+        >
+          Export CSV
+        </button>
+      </div>
       <div className={resp.boardTrack}>
         {openStages.map((s) => column(s))}
         {closedStages.map((s) => column(s, true))}
