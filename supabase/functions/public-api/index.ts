@@ -12,6 +12,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2"
 import { isDemoEnv } from "../_shared/demoGuard.ts"
+import { withErrorLog } from "../_shared/functionHealth.ts"
 import { withSecurityHeaders } from "../_shared/securityHeaders.ts"
 import { rateLimitAllow } from "../_shared/rateLimit.ts"
 
@@ -316,7 +317,7 @@ async function emitWebhook(
   }
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withErrorLog("public-api", async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors })
 
   const url = new URL(req.url)
@@ -813,4 +814,4 @@ Deno.serve(async (req) => {
   }
 
   return json({ error: "not_found", path }, 404)
-})
+}))

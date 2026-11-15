@@ -14,7 +14,7 @@ Findings from official sources go here **before** shipping tax, payroll, e-sign,
 | Microsoft 365 Graph mail/calendar assessment | **concluded** | See § M365 below | 13 Nov 2026 | Phase A+B **implemented** (`Mail.Send` + `Mail.Read` + `Calendars.ReadWrite` via `m365-mail-calendar`). Prefer delegated over application permissions. |
 | IMAP / other mail hosts assessment | **concluded** | See § IMAP below | 13 Nov 2026 | Prefer Gmail API / Microsoft Graph over IMAP. Gmail IMAP needs restricted `mail.google.com`; M365 IMAP basic auth is dead. Generic IMAP deferred until a real non-Gmail/M365 customer need. |
 | Data residency (UAE hosting options) | not started | — | — | Decide before first external customer / M13 |
-| VAT return CSV stub / GL invoice auto-post | **Unverified** | Product draft helpers only | 15 Nov 2026 | Not for FTA filing; journals stay draft until human post. |
+| VAT return CSV stub / GL invoice auto-post | **Unverified** | Product draft helpers only | 15 Nov 2026 | Not for FTA filing; journals stay draft until human post. Extra stub boxes (zero-rated / exempt / adjustments) + optional GL peek are informational only — still not a return engine. |
 | Country pack tax/payroll rules (AE/IN/CA) | **Unverified** | See § Country packs below | 15 Nov 2026 | Starter labels/hints only. **Not** tax, GST, CPP/EI, PF/ESI, or WPS advice. Counsel must verify before production reliance. |
 
 Do not rely on model memory for legal or tax rules.

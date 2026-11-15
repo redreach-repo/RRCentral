@@ -69,6 +69,11 @@ POST /functions/v1/webhook-retry
 Header: x-cron-secret: <secret>
 ```
 
+## Ops / demo
+
+- Handler wrapped with `withErrorLog("public-api", …)` (error log + `installDemoGuard`)
+- Demo env still dry-runs webhook emit via `isDemoEnv()`
+
 ## Not in this slice
 
 - Line-item writes / finalize / PDF generation via API

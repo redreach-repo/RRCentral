@@ -184,6 +184,14 @@ export async function updatePoLandedCost(poId: string, landedCostAed: number): P
   if (error) throw error
 }
 
+export async function softDeletePurchaseOrder(poId: string): Promise<void> {
+  const { error } = await db
+    .from('purchase_orders')
+    .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', poId)
+  if (error) throw error
+}
+
 export async function receivePoLine(lineId: string, qty: number, userEmail: string): Promise<void> {
   const { error } = await db.rpc('rr_po_receive_line', {
     p_line: lineId,

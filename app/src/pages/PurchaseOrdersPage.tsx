@@ -10,6 +10,7 @@ import {
   listPoLines,
   listPurchaseOrders,
   receivePoLine,
+  softDeletePurchaseOrder,
   updatePoLandedCost,
   type PurchaseOrder,
   type PurchaseOrderLine,
@@ -196,12 +197,28 @@ export default function PurchaseOrdersPage() {
             ) : (
               <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
                 {rows.map((po) => (
-                  <li key={po.id}>
+                  <li key={po.id} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                     <button type="button" style={buttonSecondaryStyle} onClick={() => void openPo(po)}>
                       {po.po_number} · {po.vendor_name} · {po.status}
                       {po.warehouse_id
                         ? ` · ${warehouses.find((w) => w.id === po.warehouse_id)?.code || 'WH'}`
                         : ''}
+                    </button>
+                    <button
+                      type="button"
+                      style={buttonSecondaryStyle}
+                      onClick={() => {
+                        if (!window.confirm(`Archive ${po.po_number}?`)) return
+                        void softDeletePurchaseOrder(po.id)
+                          .then(() => {
+                            showToast('PO archived', 'success')
+                            if (selected?.id === po.id) setSelected(null)
+                            return load()
+                          })
+                          .catch((err) => showToast(errorMessage(err, 'Archive failed'), 'error'))
+                      }}
+                    >
+                      Archive
                     </button>
                   </li>
                 ))}

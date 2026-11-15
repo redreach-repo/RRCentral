@@ -114,6 +114,13 @@ import {
 } from '../lib/pageStyles'
 import docsStyles from '../styles/docsList.module.css'
 import { errorMessage } from '../lib/errors'
+import {
+  displayFieldValue,
+  listCustomFieldDefinitions,
+  loadCustomFieldValuesForRecords,
+  type CustomFieldDefinition,
+} from '../lib/customFields'
+import { exportListCsv } from '../lib/listIo'
 import QuoteNudgesCard from '../components/quotes/QuoteNudgesCard'
 import SessionFollowUpsCard from '../components/ctrm/SessionFollowUpsCard'
 import ContractsVaultPanel from '../components/crm/ContractsVaultPanel'
@@ -196,6 +203,8 @@ export default function CrmPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [entries, setEntries] = useState<CrmEntry[]>([])
   const [owners, setOwners] = useState<AppUser[]>([])
+  const [customDefs, setCustomDefs] = useState<CustomFieldDefinition[]>([])
+  const [customValues, setCustomValues] = useState<Record<string, Record<string, unknown>>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -301,24 +310,30 @@ export default function CrmPage() {
     setLoading(true)
     setError('')
     try {
-      const [crmRes, usersRes] = await Promise.all([
+      const [crmRes, usersRes, defs] = await Promise.all([
         db.from('crm').select('*').order('updated_at', { ascending: false }),
         db.from('app_users').select('*').eq('active', true).order('name'),
+        listCustomFieldDefinitions('crm').catch(() => [] as CustomFieldDefinition[]),
       ])
       if (crmRes.error) throw crmRes.error
       if (usersRes.error) throw usersRes.error
-      setEntries(
-        ((crmRes.data || []) as CrmEntry[]).map((row) => ({
-          ...row,
-          pipeline_stage: row.pipeline_stage || 'Lead',
-          company_owner: row.company_owner || '',
-          address: row.address || '',
-          website: row.website || '',
-          trn: row.trn || '',
-          outcome_reason: row.outcome_reason || '',
-        })),
-      )
+      const rows = ((crmRes.data || []) as CrmEntry[]).map((row) => ({
+        ...row,
+        pipeline_stage: row.pipeline_stage || 'Lead',
+        company_owner: row.company_owner || '',
+        address: row.address || '',
+        website: row.website || '',
+        trn: row.trn || '',
+        outcome_reason: row.outcome_reason || '',
+      }))
+      setEntries(rows)
       setOwners((usersRes.data || []) as AppUser[])
+      setCustomDefs(defs.slice(0, 3))
+      const values = await loadCustomFieldValuesForRecords(
+        'crm',
+        rows.map((r) => r.id),
+      ).catch(() => ({}))
+      setCustomValues(values)
     } catch (e) {
       setError(errorMessage(e, 'Failed to load CRM'))
     } finally {
@@ -1180,14 +1195,56 @@ export default function CrmPage() {
             )}
           </p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          style={{ minHeight: compact ? 44 : undefined }}
-          onClick={openCreate}
-        >
-          <Plus size={16} /> {t('page.crm.addCompany')}
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{
+              background: 'transparent',
+              color: 'inherit',
+              border: '1px solid var(--border)',
+              minHeight: compact ? 44 : undefined,
+            }}
+            disabled={!entries.length}
+            onClick={() => {
+              exportListCsv(
+                'crm.csv',
+                [
+                  'company_name',
+                  'pipeline_stage',
+                  'company_owner',
+                  'follow_up_date',
+                  'next_action',
+                  ...customDefs.map((d) => d.field_key),
+                ],
+                entries.map((e) => {
+                  const row: Record<string, unknown> = {
+                    company_name: e.company_name,
+                    pipeline_stage: e.pipeline_stage,
+                    company_owner: e.company_owner,
+                    follow_up_date: e.follow_up_date || '',
+                    next_action: e.next_action || '',
+                  }
+                  for (const d of customDefs) {
+                    row[d.field_key] = displayFieldValue(d, customValues[e.id]?.[d.id])
+                  }
+                  return row
+                }),
+              )
+              showToast('CRM CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ minHeight: compact ? 44 : undefined }}
+            onClick={openCreate}
+          >
+            <Plus size={16} /> {t('page.crm.addCompany')}
+          </button>
+        </div>
       </header>
 
       <WebsiteInquiriesPanel
@@ -1558,6 +1615,11 @@ export default function CrmPage() {
                 <th style={th}>Next action</th>
                 <th style={th}>Sales owner</th>
                 <th style={th}>Quote</th>
+                {customDefs.map((d) => (
+                  <th key={d.id} style={th}>
+                    {d.label}
+                  </th>
+                ))}
                 <th style={th}></th>
               </tr>
             </thead>
@@ -1662,6 +1724,11 @@ export default function CrmPage() {
                         '—'
                       )}
                     </td>
+                    {customDefs.map((d) => (
+                      <td key={d.id} style={td}>
+                        {displayFieldValue(d, customValues[row.id]?.[d.id])}
+                      </td>
+                    ))}
                     <td style={{ ...td, whiteSpace: 'nowrap' }}>{renderCrmRowActions(row)}</td>
                   </tr>
                 )
