@@ -5,6 +5,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { renewalInfo, renewalText } from '../../lib/ctrmRenewals'
 import { listTerms, saveTerms, type TermsDraft } from '../../lib/ctrmTermsStore'
 import { errorMessage } from '../../lib/errors'
+import { exportListCsv } from '../../lib/listIo'
 import { parseCtrmTermsForm } from '../../lib/schemas/ctrmTerms'
 import { roleAtLeast } from '../../lib/permissions'
 import type { Account, CtrmClientTerms } from '../../lib/types'
@@ -67,24 +68,52 @@ export default function CtrmTermsCard({ account, editable, author }: { account: 
 
   return (
     <section style={{ ...cardStyle, marginTop: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Contract and renewal</h2>
-        {canEdit && loaded && !draft ? (
-          <button
-            type="button"
-            style={smallBtn}
-            onClick={() =>
-              setDraft({
-                contract_start: terms?.contract_start ?? null,
-                renewal_date: terms?.renewal_date ?? null,
-                notice_days: terms?.notice_days ?? 0,
-                notice: String(terms?.notice_days ?? ''),
-              })
-            }
-          >
-            {terms ? 'Edit' : 'Add dates'}
-          </button>
-        ) : null}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {terms && loaded && !draft ? (
+            <button
+              type="button"
+              style={smallBtn}
+              onClick={() => {
+                exportListCsv(
+                  `ctrm-terms-${account.id.slice(0, 8)}.csv`,
+                  ['contract_start', 'renewal_date', 'notice_days', 'stage', 'days_to_renewal', 'notice_by', 'summary'],
+                  [
+                    {
+                      contract_start: terms.contract_start || '',
+                      renewal_date: terms.renewal_date || '',
+                      notice_days: terms.notice_days,
+                      stage: info?.stage || '',
+                      days_to_renewal: info?.days ?? '',
+                      notice_by: info?.noticeBy || '',
+                      summary: info?.stage ? renewalText(info) : '',
+                    },
+                  ],
+                )
+                showToast('CTRM terms CSV downloaded', 'success')
+              }}
+            >
+              Export CSV
+            </button>
+          ) : null}
+          {canEdit && loaded && !draft ? (
+            <button
+              type="button"
+              style={smallBtn}
+              onClick={() =>
+                setDraft({
+                  contract_start: terms?.contract_start ?? null,
+                  renewal_date: terms?.renewal_date ?? null,
+                  notice_days: terms?.notice_days ?? 0,
+                  notice: String(terms?.notice_days ?? ''),
+                })
+              }
+            >
+              {terms ? 'Edit' : 'Add dates'}
+            </button>
+          ) : null}
+        </div>
       </div>
       {!loaded ? <p style={muted}>Loading…</p> : null}
       {loaded && !draft ? (
