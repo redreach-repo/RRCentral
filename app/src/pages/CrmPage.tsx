@@ -1492,6 +1492,7 @@ export default function CrmPage() {
           stages={crmStages}
           onOpen={openEdit}
           onMoveStage={(row, stage) => void quickPatch(row, { pipeline_stage: stage })}
+          onImported={() => void load()}
           renderActions={(row) => renderCrmRowActions(row, { flush: true })}
         />
       ) : compact ? (
