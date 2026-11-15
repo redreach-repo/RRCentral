@@ -3,8 +3,9 @@ import { format, parseISO } from 'date-fns'
 import { RefreshCw } from 'lucide-react'
 import { useToast } from '../../contexts/ToastContext'
 import { SOURCE_STATUS_LABEL, listImportRuns, runUsageImport } from '../../lib/usageImportStore'
+import { exportListCsv } from '../../lib/listIo'
 import type { UsageImportRun } from '../../lib/types'
-import { buttonPrimaryStyle, cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
+import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
 
 /** Status of the daily WhatsApp and AI usage import, with an Import now button. */
 export default function UsageImportCard() {
@@ -47,8 +48,35 @@ export default function UsageImportCard() {
 
   return (
     <section style={{ ...cardStyle, marginBottom: 16 }}>
-      <h2 style={sectionTitleStyle}>Usage import</h2>
-      <p style={{ color: colors.muted, fontSize: 13, margin: '0 0 12px', lineHeight: 1.5 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Usage import</h2>
+        {runs.length ? (
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            onClick={() => {
+              exportListCsv(
+                'usage-import-runs.csv',
+                ['started_at', 'finished_at', 'trigger', 'requested_by', 'whatsapp_status', 'ai_status', 'rows_written', 'message'],
+                runs.map((r) => ({
+                  started_at: r.started_at || '',
+                  finished_at: r.finished_at || '',
+                  trigger: r.trigger,
+                  requested_by: r.requested_by || '',
+                  whatsapp_status: SOURCE_STATUS_LABEL[r.whatsapp_status] ?? r.whatsapp_status,
+                  ai_status: SOURCE_STATUS_LABEL[r.ai_status] ?? r.ai_status,
+                  rows_written: r.rows_written,
+                  message: r.message || '',
+                })),
+              )
+              showToast('Usage import runs CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        ) : null}
+      </div>
+      <p style={{ color: colors.muted, fontSize: 13, margin: '8px 0 12px', lineHeight: 1.5 }}>
         Pulls each client&apos;s WhatsApp message counts from Meta and AI spend from Anthropic, for this month (and last
         month during the first 3 days). Link each client to its WhatsApp number and AI workspace on the client page,
         under Usage. Months typed in by hand are left alone. Lead credits stay manual.
