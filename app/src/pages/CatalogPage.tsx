@@ -78,7 +78,10 @@ export default function CatalogPage() {
   const [form, setForm] = useState<ProductForm>(emptyForm())
   const [saving, setSaving] = useState(false)
   const [syncing, setSyncing] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<(Product & { deleted_at?: string | null }) | null>(
+    null,
+  )
+  const [showArchived, setShowArchived] = useState(false)
   const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -86,15 +89,14 @@ export default function CatalogPage() {
     try {
       const { data, error } = await db.from('products').select('*').order('name')
       if (error) throw error
-      setProducts(
-        ((data || []) as (Product & { deleted_at?: string | null })[]).filter((p) => !p.deleted_at),
-      )
+      const raw = (data || []) as (Product & { deleted_at?: string | null })[]
+      setProducts(showArchived ? raw : raw.filter((p) => !p.deleted_at))
     } catch (e) {
       showToast(errorMessage(e, 'Failed to load catalog'), 'error')
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [showToast, showArchived])
 
   useEffect(() => {
     void load()
@@ -184,21 +186,31 @@ export default function CatalogPage() {
 
   async function confirmDelete() {
     if (!deleteTarget) return
+    const archived = Boolean(deleteTarget.deleted_at)
     setSaving(true)
     try {
-      let { error } = await db
-        .from('products')
-        .update({ deleted_at: new Date().toISOString(), active: false })
-        .eq('id', deleteTarget.id)
-      if (error) {
-        const hard = await db.from('products').delete().eq('id', deleteTarget.id)
-        if (hard.error) throw hard.error
+      if (archived) {
+        const { error } = await db
+          .from('products')
+          .update({ deleted_at: null, active: true, updated_at: new Date().toISOString() })
+          .eq('id', deleteTarget.id)
+        if (error) throw error
+        showToast('Product restored', 'success')
+      } else {
+        let { error } = await db
+          .from('products')
+          .update({ deleted_at: new Date().toISOString(), active: false })
+          .eq('id', deleteTarget.id)
+        if (error) {
+          const hard = await db.from('products').delete().eq('id', deleteTarget.id)
+          if (hard.error) throw hard.error
+        }
+        showToast('Product archived', 'success')
       }
-      showToast('Product archived', 'success')
       setDeleteTarget(null)
       await load()
     } catch (e) {
-      showToast(errorMessage(e, 'Delete failed'), 'error')
+      showToast(errorMessage(e, 'Archive failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -275,6 +287,14 @@ export default function CatalogPage() {
             }}
           >
             <Download size={16} /> Export CSV
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
           </button>
           <button
             type="button"
@@ -556,13 +576,37 @@ export default function CatalogPage() {
         </div>
       </Modal>
 
-      <Modal open={!!deleteTarget} title="Delete product?" onClose={() => setDeleteTarget(null)} width={400}>
+      <Modal
+        open={!!deleteTarget}
+        title={deleteTarget?.deleted_at ? 'Restore product?' : 'Archive product?'}
+        onClose={() => setDeleteTarget(null)}
+        width={400}
+      >
         <p style={{ color: colors.muted, fontSize: 14 }}>
-          Delete <strong style={{ color: colors.text }}>{deleteTarget?.name}</strong>?
+          {deleteTarget?.deleted_at ? (
+            <>
+              Restore <strong style={{ color: colors.text }}>{deleteTarget?.name}</strong> to the active
+              catalog.
+            </>
+          ) : (
+            <>
+              Archive <strong style={{ color: colors.text }}>{deleteTarget?.name}</strong>? Use Show
+              archived to restore later.
+            </>
+          )}
         </p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-          <button type="button" style={buttonSecondaryStyle} onClick={() => setDeleteTarget(null)}>Cancel</button>
-          <button type="button" style={buttonDangerStyle} disabled={saving} onClick={() => void confirmDelete()}>Delete</button>
+          <button type="button" style={buttonSecondaryStyle} onClick={() => setDeleteTarget(null)}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            style={deleteTarget?.deleted_at ? buttonSecondaryStyle : buttonDangerStyle}
+            disabled={saving}
+            onClick={() => void confirmDelete()}
+          >
+            {deleteTarget?.deleted_at ? 'Restore' : 'Archive'}
+          </button>
         </div>
       </Modal>
     </div>

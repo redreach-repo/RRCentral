@@ -14,6 +14,7 @@ import {
   type GlJournal,
   type GlJournalLine,
 } from '../lib/ledger/ledgerStore'
+import { exportListCsv } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -114,6 +115,28 @@ export default function LedgerPage() {
             accountant before filing.
           </p>
         </div>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+          disabled={!journals.length}
+          onClick={() => {
+            exportListCsv(
+              'gl-journals.csv',
+              ['journal_number', 'entry_date', 'memo', 'status', 'posted_at'],
+              journals.map((j) => ({
+                journal_number: j.journal_number,
+                entry_date: j.entry_date,
+                memo: j.memo,
+                status: j.status,
+                posted_at: j.posted_at || '',
+              })),
+            )
+            showToast('Journals CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
       </header>
 
       {loading ? (

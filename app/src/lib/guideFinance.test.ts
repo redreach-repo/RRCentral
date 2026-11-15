@@ -4,13 +4,16 @@ import { GUIDE_PACKS } from './guidePacks'
 import { t } from './i18n'
 
 describe('GUIDE_FINANCE_SECTIONS', () => {
-  it('covers the five finance paths beyond billing', () => {
+  it('covers finance paths including ledger, approvals, payroll', () => {
     expect(GUIDE_FINANCE_SECTIONS.map((s) => s.id)).toEqual([
       'vendors',
       'reports',
       'mrr',
       'insights',
       'duplicates',
+      'ledger',
+      'approvals',
+      'payroll',
     ])
   })
 

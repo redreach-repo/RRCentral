@@ -11,6 +11,7 @@ import {
   listHrLeaveRequests,
   type HrLeaveRequest,
 } from '../lib/hrLeaveStore'
+import { exportListCsv } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -88,6 +89,30 @@ export default function HrLeavePage() {
           </h1>
           <p className={docsStyles.subtitle}>Request and approve annual, sick, unpaid or other leave.</p>
         </div>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+          disabled={!rows.length}
+          onClick={() => {
+            exportListCsv(
+              'hr-leave.csv',
+              ['employee', 'leave_type', 'starts_on', 'ends_on', 'days', 'status', 'reason'],
+              rows.map((r) => ({
+                employee: r.hr_employees?.full_name || r.employee_id,
+                leave_type: r.leave_type,
+                starts_on: r.starts_on,
+                ends_on: r.ends_on,
+                days: r.days,
+                status: r.status,
+                reason: r.reason,
+              })),
+            )
+            showToast('Leave CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
       </header>
 
       {loading ? (

@@ -16,15 +16,29 @@ export type VendorInput = {
   active?: boolean
 }
 
-export async function listVendors(): Promise<Vendor[]> {
+export type VendorRow = Vendor & { deleted_at?: string | null }
+
+export async function listVendors(opts?: { includeDeleted?: boolean }): Promise<VendorRow[]> {
   const { data, error } = await db.from('vendors').select('*').order('company_name')
   if (error) {
     if (isMissingRelationError(error)) return []
     throw error
   }
-  return ((data || []) as Vendor[]).filter(
-    (v) => v.active !== false && !(v as Vendor & { deleted_at?: string | null }).deleted_at,
-  )
+  const rows = (data || []) as VendorRow[]
+  if (opts?.includeDeleted) return rows
+  return rows.filter((v) => v.active !== false && !v.deleted_at)
+}
+
+export async function restoreVendor(id: string): Promise<void> {
+  const { error } = await db
+    .from('vendors')
+    .update({
+      active: true,
+      deleted_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+  if (error) throw error
 }
 
 export async function findVendorByName(companyName: string): Promise<Vendor | null> {

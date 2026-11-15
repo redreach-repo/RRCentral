@@ -9,6 +9,7 @@ import { can } from '../lib/permissions'
 import { errorMessage, isMissingRelationError } from '../lib/errors'
 import { clearAppErrors, errorKey, groupErrors, listAppErrors, type AppError } from '../lib/errorReporting'
 import { isAuditAvailable } from '../lib/auditLog'
+import { exportListCsv } from '../lib/listIo'
 import {
   buttonSecondaryStyle,
   cardStyle,
@@ -105,6 +106,29 @@ export default function AppErrorsPage() {
             <option value={30}>{t('page.appErrors.last30d')}</option>
             <option value={90}>{t('page.appErrors.last90d')}</option>
           </select>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!errors.length}
+            onClick={() => {
+              exportListCsv(
+                'app-errors.csv',
+                ['created_at', 'kind', 'message', 'page', 'user_email', 'release'],
+                errors.map((e) => ({
+                  created_at: e.created_at,
+                  kind: e.kind,
+                  message: e.message,
+                  page: e.page,
+                  user_email: e.user_email,
+                  release: e.release,
+                })),
+              )
+              showToast('App errors CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}

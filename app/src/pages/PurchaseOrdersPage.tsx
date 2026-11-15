@@ -10,10 +10,12 @@ import {
   listPoLines,
   listPurchaseOrders,
   receivePoLine,
+  restorePurchaseOrder,
   softDeletePurchaseOrder,
   updatePoLandedCost,
   type PurchaseOrder,
   type PurchaseOrderLine,
+  type PurchaseOrderRow,
 } from '../lib/opsSliceStores'
 import { exportListCsv } from '../lib/listIo'
 import { listWarehouses } from '../lib/warehouseStore'
@@ -33,7 +35,7 @@ import docsStyles from '../styles/docsList.module.css'
 export default function PurchaseOrdersPage() {
   const { user } = useAuth()
   const { showToast } = useToast()
-  const [rows, setRows] = useState<PurchaseOrder[]>([])
+  const [rows, setRows] = useState<PurchaseOrderRow[]>([])
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [warehouseId, setWarehouseId] = useState('')
   const [selected, setSelected] = useState<PurchaseOrder | null>(null)
@@ -45,12 +47,13 @@ export default function PurchaseOrdersPage() {
   const [cost, setCost] = useState('0')
   const [landed, setLanded] = useState('0')
   const [loading, setLoading] = useState(true)
+  const [showArchived, setShowArchived] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const [pos, wh] = await Promise.all([
-        listPurchaseOrders(),
+        listPurchaseOrders({ includeDeleted: showArchived }),
         listWarehouses().catch(() => [] as Warehouse[]),
       ])
       setRows(pos)
@@ -61,7 +64,7 @@ export default function PurchaseOrdersPage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [showToast, showArchived])
 
   useEffect(() => {
     void load()
@@ -89,28 +92,38 @@ export default function PurchaseOrdersPage() {
             Order from suppliers and receive into inventory when the SKU matches. Landed cost (freight/duty) allocates into unit cost on receive (Unverified).
           </p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-          disabled={!rows.length}
-          onClick={() => {
-            exportListCsv(
-              'purchase-orders.csv',
-              ['po_number', 'vendor_name', 'status', 'order_date', 'landed_cost_aed'],
-              rows.map((r) => ({
-                po_number: r.po_number,
-                vendor_name: r.vendor_name,
-                status: r.status,
-                order_date: r.order_date,
-                landed_cost_aed: r.landed_cost_aed,
-              })),
-            )
-            showToast('PO CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!rows.length}
+            onClick={() => {
+              exportListCsv(
+                'purchase-orders.csv',
+                ['po_number', 'vendor_name', 'status', 'order_date', 'landed_cost_aed'],
+                rows.map((r) => ({
+                  po_number: r.po_number,
+                  vendor_name: r.vendor_name,
+                  status: r.status,
+                  order_date: r.order_date,
+                  landed_cost_aed: r.landed_cost_aed,
+                })),
+              )
+              showToast('PO CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
+          </button>
+        </div>
       </header>
 
       {loading ? (
@@ -196,32 +209,42 @@ export default function PurchaseOrdersPage() {
               <EmptyState title="No purchase orders" subtitle="Create one above. Apply the purchase_orders migration if empty after create." />
             ) : (
               <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
-                {rows.map((po) => (
+                {rows.map((po) => {
+                  const archived = Boolean(po.deleted_at)
+                  return (
                   <li key={po.id} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                     <button type="button" style={buttonSecondaryStyle} onClick={() => void openPo(po)}>
                       {po.po_number} · {po.vendor_name} · {po.status}
                       {po.warehouse_id
                         ? ` · ${warehouses.find((w) => w.id === po.warehouse_id)?.code || 'WH'}`
                         : ''}
+                      {archived ? ' · archived' : ''}
                     </button>
                     <button
                       type="button"
                       style={buttonSecondaryStyle}
                       onClick={() => {
-                        if (!window.confirm(`Archive ${po.po_number}?`)) return
-                        void softDeletePurchaseOrder(po.id)
+                        if (
+                          !window.confirm(
+                            archived ? `Restore ${po.po_number}?` : `Archive ${po.po_number}?`,
+                          )
+                        ) {
+                          return
+                        }
+                        void (archived ? restorePurchaseOrder(po.id) : softDeletePurchaseOrder(po.id))
                           .then(() => {
-                            showToast('PO archived', 'success')
+                            showToast(archived ? 'PO restored' : 'PO archived', 'success')
                             if (selected?.id === po.id) setSelected(null)
                             return load()
                           })
                           .catch((err) => showToast(errorMessage(err, 'Archive failed'), 'error'))
                       }}
                     >
-                      Archive
+                      {archived ? 'Restore' : 'Archive'}
                     </button>
                   </li>
-                ))}
+                  )
+                })}
               </ul>
             )}
             {selected ? (
