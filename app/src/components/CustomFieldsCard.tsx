@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import {
   CUSTOM_FIELD_OBJECTS,
   displayFieldValue,
@@ -9,7 +9,7 @@ import {
   type CustomFieldDefinition,
 } from '../lib/customFields'
 import { errorMessage } from '../lib/errors'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -55,6 +55,8 @@ export default function CustomFieldsCard({
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -118,11 +120,89 @@ export default function CustomFieldsCard({
     }
   }
 
+  function coerceImportValue(def: CustomFieldDefinition, raw: string): unknown {
+    const v = raw.trim()
+    if (def.field_type === 'boolean') {
+      const lower = v.toLowerCase()
+      return lower === 'yes' || lower === 'true' || lower === '1'
+    }
+    if (def.field_type === 'number') {
+      if (!v) return null
+      const n = Number(v)
+      return Number.isFinite(n) ? n : v
+    }
+    if (def.field_type === 'multiselect') {
+      if (!v) return []
+      return v.split(/[|;,]/).map((s) => s.trim()).filter(Boolean)
+    }
+    return v || null
+  }
+
+  async function importValuesCsv(file: File) {
+    if (!editable) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        onToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows)
+      const byKey = new Map(defs.map((d) => [d.field_key, d]))
+      const next = { ...draft }
+      let applied = 0
+      let skipped = 0
+      for (const row of objects) {
+        const key = String(row.key || row.field_key || '').trim()
+        const def = byKey.get(key)
+        if (!def) {
+          skipped += 1
+          continue
+        }
+        next[def.id] = coerceImportValue(def, String(row.value ?? ''))
+        applied += 1
+      }
+      setDraft(next)
+      setEditing(true)
+      await saveCustomFieldValues(objectType, recordId, defs, next)
+      setValues({ ...next })
+      setEditing(false)
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      onToast(`Imported ${applied} custom field value(s)${skipNote}`, 'success')
+    } catch (e) {
+      onToast(errorMessage(e, 'Custom fields CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <section style={wrapStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0, fontSize: framed ? undefined : 14 }}>{title}</h2>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importValuesCsv(file)
+            }}
+          />
+          {editable ? (
+            <button
+              type="button"
+              style={buttonSecondaryStyle}
+              disabled={importing}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
+          ) : null}
           <button
             type="button"
             style={buttonSecondaryStyle}
