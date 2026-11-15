@@ -1,6 +1,6 @@
 # AI approval queue
 
-Status: **built and tested in CI-equivalent local runs; not live.** Draft PR, not merged, SQL not applied, no secret set, never called against the real Anthropic API.
+Status: **built.** Account detail **Suggest with AI** is wired. SQL / Edge deploy / first live Anthropic call still need Alfred (see Setup).
 
 ## What it does
 
@@ -44,6 +44,6 @@ No delete, no email, no money, no owner/stage/amount changes. Adding an action m
 ## Not done / unverified
 
 - Never run against the real Claude API (no key in the build session). The structured output schema follows the same pattern as ai-assist, which works live, but the first real call is the real test.
-- Not wired into other screens yet (e.g. a "Suggest with AI" button on the account page). The queue page has its own account picker.
+- Account detail has **Suggest with AI** (`AiSuggestButton`) which opens the same propose flow and lists pending rows for that account; approve still happens on `/ai-approvals`.
 - No bulk approve, no expiry of old pending proposals.
 - Accessibility check (axe) covers the page only once CI's a11y job visits `/ai-approvals`; it has not been added to that job.

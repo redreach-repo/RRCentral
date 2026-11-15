@@ -63,7 +63,7 @@ Status key: **exists** · **partial** · **missing**
 |-------------|--------|------|
 | Mail providers (Zoho→Gmail→M365→IMAP) | partial | Zoho + Gmail Phase A + M365 Phase A/B; Gmail Phase B later; IMAP deferred |
 | AI gateway + tools-as-user + pgvector | partial | `ai-assist` Edge; no gateway/retrieval/action queue → M10 (light from M4) |
-| AI human approval queue | missing | M10 |
+| AI human approval queue | partial | M10: queue + account Suggest button; Alfred SQL/Edge deploy still needed |
 | Field-level encryption (salary, IBAN, tokens) | missing | M1 for tokens; M6/M8 for HR fields |
 | Append-only audit | partial | `audit_log` exists; CI asserts authenticated cannot INSERT/UPDATE/DELETE (REVOKE); prune stays security definer |
 | Sentry / structured logs | missing | M0/M1 add |
