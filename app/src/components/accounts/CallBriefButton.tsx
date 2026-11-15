@@ -7,6 +7,7 @@ import { runAi } from '../../lib/aiAssistStore'
 import { briefFacts, briefNote, type Brief } from '../../lib/callBrief'
 import { loadBrief } from '../../lib/callBriefStore'
 import { errorMessage } from '../../lib/errors'
+import { exportListCsv } from '../../lib/listIo'
 import { formatAED } from '../../lib/money'
 import type { Account } from '../../lib/types'
 import { buttonPrimaryStyle, buttonSecondaryStyle, colors } from '../../lib/uiStyles'
@@ -173,16 +174,63 @@ export default function CallBriefButton({
             {aiNote ? <p style={{ ...muted, fontSize: 12 }}>{aiNote}</p> : null}
             <p style={{ ...muted, fontSize: 12, marginTop: 8 }}>Suggested by AI from the facts above. Check them before you use them.</p>
 
-            {editable ? (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
-                <button type="button" style={buttonSecondaryStyle} disabled={aiBusy} onClick={() => void ask(brief)}>
-                  <Sparkles size={14} /> Other questions
-                </button>
-                <button type="button" style={buttonPrimaryStyle} disabled={saving || aiBusy} onClick={() => void save()}>
-                  {saving ? 'Saving…' : 'Save as a note'}
-                </button>
-              </div>
-            ) : null}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
+              <button
+                type="button"
+                style={buttonSecondaryStyle}
+                onClick={() => {
+                  const rows: { section: string; detail: string }[] = []
+                  if (brief.lastContact) {
+                    rows.push({
+                      section: 'last_contact',
+                      detail: `${brief.lastContact.kind}, ${brief.lastContact.when}, ${brief.lastContact.by || ''}: ${brief.lastContact.summary}`,
+                    })
+                  }
+                  for (const t of brief.openTickets) {
+                    rows.push({
+                      section: 'ticket',
+                      detail: `${t.subject}: ${t.status}, opened ${t.opened}${t.late ? ', reply overdue' : ''}`,
+                    })
+                  }
+                  for (const i of brief.openInvoices) {
+                    rows.push({
+                      section: 'invoice',
+                      detail: `${i.reference}: ${i.balance}${i.due ? `, due ${i.due}` : ''}${i.daysLate ? `, ${i.daysLate} days late` : ''}`,
+                    })
+                  }
+                  for (const d of brief.deals) {
+                    rows.push({
+                      section: 'deal',
+                      detail: `${d.pipeline}: ${d.stage}${d.nextAction ? `. Next: ${d.nextAction}` : ''}${d.nextDate ? ` (${d.nextDate})` : ''}`,
+                    })
+                  }
+                  for (const o of brief.overdue) {
+                    rows.push({ section: 'overdue', detail: o })
+                  }
+                  for (const q of questions) {
+                    rows.push({ section: 'question', detail: q })
+                  }
+                  exportListCsv(
+                    `call-brief-${account.reference || account.id}.csv`,
+                    ['section', 'detail'],
+                    rows,
+                  )
+                  showToast('Call brief CSV downloaded', 'success')
+                }}
+              >
+                Export CSV
+              </button>
+              {editable ? (
+                <>
+                  <button type="button" style={buttonSecondaryStyle} disabled={aiBusy} onClick={() => void ask(brief)}>
+                    <Sparkles size={14} /> Other questions
+                  </button>
+                  <button type="button" style={buttonPrimaryStyle} disabled={saving || aiBusy} onClick={() => void save()}>
+                    {saving ? 'Saving…' : 'Save as a note'}
+                  </button>
+                </>
+              ) : null}
+            </div>
           </div>
         )}
       </Modal>
