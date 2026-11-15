@@ -1,5 +1,5 @@
 /**
- * UAE WPS / end-of-service gratuity helpers — first slice only.
+ * UAE WPS / end-of-service gratuity helpers — planning drafts only.
  * Not legal advice. Figures must be checked against current UAE labour law
  * before any live payroll run.
  */
@@ -24,6 +24,22 @@ export function draftGratuityAccrualAed(input: GratuityInput): number {
   return Math.round(days * daily * 100) / 100
 }
 
+/** Floor years between hire date and as-of (defaults to today). */
+export function yearsOfServiceFromStart(startDateIso: string | null | undefined, asOfIso?: string): number {
+  if (!startDateIso) return 0
+  const start = new Date(startDateIso.slice(0, 10) + 'T00:00:00Z')
+  const asOf = new Date((asOfIso || new Date().toISOString()).slice(0, 10) + 'T00:00:00Z')
+  if (Number.isNaN(start.getTime()) || Number.isNaN(asOf.getTime()) || asOf < start) return 0
+  const ms = asOf.getTime() - start.getTime()
+  return Math.floor(ms / (365.25 * 24 * 60 * 60 * 1000))
+}
+
+/** Common planning shortcut: basic monthly salary / 30. */
+export function dailyWageFromBasicMonthly(basicSalaryAed: number | null | undefined): number {
+  const basic = Math.max(0, Number(basicSalaryAed) || 0)
+  return Math.round((basic / 30) * 100) / 100
+}
+
 export type WpsLine = {
   employeeCode: string
   employeeName: string
@@ -44,6 +60,12 @@ export function buildWpsCsvDraft(lines: WpsLine[], valueDateIso: string): string
     ].join(','),
   )
   return [header, ...rows].join('\n')
+}
+
+/** Net pay: basic + allowances − deductions (never negative). */
+export function payrollNetAed(basic: number, allowances: number, deductions: number): number {
+  const net = (Number(basic) || 0) + (Number(allowances) || 0) - (Number(deductions) || 0)
+  return Math.round(Math.max(0, net) * 100) / 100
 }
 
 function csv(value: string): string {
