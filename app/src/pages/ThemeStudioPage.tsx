@@ -25,6 +25,7 @@ import {
   saveBrandKit,
   type BusinessUnitRow,
 } from '../lib/brandKitStore'
+import { exportListCsv } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -222,6 +223,55 @@ export default function ThemeStudioPage() {
             on the asset zip.
           </p>
         </div>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+          disabled={!kits.length && !editingKit}
+          onClick={() => {
+            const rows = (kits.length ? kits : [editingKit]).map((k) => {
+              const fonts = k.fonts || { heading: '', body: '', density: '' }
+              const bu = k.business_unit_id ? units.find((u) => u.id === k.business_unit_id) : null
+              return {
+                scope: bu ? `BU:${bu.code}` : 'company',
+                business_unit: bu?.name || '',
+                primary_color: k.primary_color,
+                accent_color: k.accent_color,
+                neutral_dark: k.neutral_dark,
+                neutral_light: k.neutral_light,
+                heading_font: fonts.heading || '',
+                body_font: fonts.body || '',
+                density: fonts.density || '',
+                logo_horizontal_path: k.logo_horizontal_path || '',
+                logo_light_path: k.logo_light_path || '',
+                mark_square_path: k.mark_square_path || '',
+                legal_footer: k.legal_footer || '',
+              }
+            })
+            exportListCsv(
+              'brand-kits.csv',
+              [
+                'scope',
+                'business_unit',
+                'primary_color',
+                'accent_color',
+                'neutral_dark',
+                'neutral_light',
+                'heading_font',
+                'body_font',
+                'density',
+                'logo_horizontal_path',
+                'logo_light_path',
+                'mark_square_path',
+                'legal_footer',
+              ],
+              rows,
+            )
+            showToast('Brand kits CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
       </header>
 
       <div style={{ marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'end' }}>
