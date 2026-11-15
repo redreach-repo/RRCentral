@@ -7,6 +7,7 @@ import { useDriveStatus } from '../hooks/useDriveStatus'
 import { errorMessage } from '../lib/errors'
 import { fileQuotesAndInvoicesToDrive, type FileDocsSummary } from '../lib/fileDocsToDrive'
 import { disconnectDrive, startDriveConnect } from '../lib/googleDrive'
+import { exportListCsv } from '../lib/listIo'
 import { PRODUCT } from '../lib/product'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../lib/uiStyles'
 
@@ -97,8 +98,55 @@ export default function GoogleDriveCard() {
 
   return (
     <div style={{ ...cardStyle, marginBottom: 20 }}>
-      <h2 style={sectionTitleStyle}>{t('page.settings.section.googleDrive')}</h2>
-      <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.settings.section.googleDrive')}</h2>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={loading}
+          onClick={() => {
+            exportListCsv(
+              'google-drive-status.csv',
+              ['field', 'value'],
+              [
+                { field: 'configured', value: status.configured ? 'yes' : 'no' },
+                { field: 'connected', value: status.connected ? 'yes' : 'no' },
+                { field: 'account_email', value: status.account_email || '' },
+                { field: 'root_url', value: status.root_url || '' },
+                { field: 'customers_url', value: status.customers_url || '' },
+                { field: 'company_url', value: status.company_url || '' },
+                { field: 'redirect_uri', value: status.redirect_uri || '' },
+                ...(lastRun
+                  ? [
+                      { field: 'last_run_scanned', value: String(lastRun.scanned) },
+                      { field: 'last_run_filed', value: String(lastRun.filed) },
+                      { field: 'last_run_skipped', value: String(lastRun.skipped) },
+                      { field: 'last_run_errors', value: String(lastRun.errors) },
+                    ]
+                  : []),
+              ],
+            )
+            if (lastRun?.results.length) {
+              exportListCsv(
+                'google-drive-last-filing.csv',
+                ['kind', 'ref', 'company', 'status', 'detail', 'drive_url'],
+                lastRun.results.map((r) => ({
+                  kind: r.kind,
+                  ref: r.ref || '',
+                  company: r.company || '',
+                  status: r.status,
+                  detail: r.detail || '',
+                  drive_url: r.driveUrl || '',
+                })),
+              )
+            }
+            showToast('Google Drive CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
+      </div>
+      <p style={{ color: colors.muted, fontSize: 13, marginTop: 8, lineHeight: 1.5 }}>
         All documents live in Google Drive; {PRODUCT.name} only keeps the share links. Once connected, {PRODUCT.name}{' '}
         makes a folder per client under <strong>RR Central / Customers</strong>, files matched emails and portal uploads
         there, and <strong>Save to Drive</strong> on quotes, invoices and delivery notes uploads the PDF. Company papers
