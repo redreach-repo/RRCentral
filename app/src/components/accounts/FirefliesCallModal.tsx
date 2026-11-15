@@ -4,7 +4,9 @@ import { errorMessage } from '../../lib/errors'
 import type { FirefliesMeeting } from '../../lib/fireflies'
 import { fetchFirefliesMeeting, meetingWhen, saveMeetingActivity } from '../../lib/firefliesStore'
 import { parseFirefliesMeetingInput } from '../../lib/schemas/firefliesMeeting'
+import { exportListCsv } from '../../lib/listIo'
 import { buttonPrimaryStyle, buttonSecondaryStyle, colors, inputStyle, labelStyle } from '../../lib/uiStyles'
+import { useToast } from '../../contexts/ToastContext'
 
 /**
  * Paste a Fireflies meeting link or ID, check what came back, and keep it as
@@ -25,6 +27,7 @@ export default function FirefliesCallModal({
   onClose: () => void
   onSaved: (meeting: FirefliesMeeting) => void
 }) {
+  const { showToast } = useToast()
   const [input, setInput] = useState('')
   const [meeting, setMeeting] = useState<FirefliesMeeting | null>(null)
   const [busy, setBusy] = useState(false)
@@ -115,7 +118,49 @@ export default function FirefliesCallModal({
               ? 'After adding it, AI help reads it for requirements; you tick the ones to keep.'
               : 'It is added to the timeline as a Meeting.'}
           </p>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              style={buttonSecondaryStyle}
+              onClick={() => {
+                if (!meeting) return
+                const actionRows = meeting.actionItems.map((item, i) => ({
+                  kind: 'action_item',
+                  index: i + 1,
+                  title: meeting.title,
+                  date: meeting.date,
+                  minutes: meeting.minutes,
+                  participants: meeting.participants.join('|'),
+                  overview: meeting.overview,
+                  action_item: item,
+                  url: meeting.url,
+                }))
+                const rows =
+                  actionRows.length > 0
+                    ? actionRows
+                    : [
+                        {
+                          kind: 'meeting',
+                          index: '',
+                          title: meeting.title,
+                          date: meeting.date,
+                          minutes: meeting.minutes,
+                          participants: meeting.participants.join('|'),
+                          overview: meeting.overview,
+                          action_item: '',
+                          url: meeting.url,
+                        },
+                      ]
+                exportListCsv(
+                  `fireflies-${meeting.id}.csv`,
+                  ['kind', 'index', 'title', 'date', 'minutes', 'participants', 'overview', 'action_item', 'url'],
+                  rows,
+                )
+                showToast('Fireflies meeting CSV downloaded', 'success')
+              }}
+            >
+              Export CSV
+            </button>
             <button type="button" style={buttonSecondaryStyle} onClick={() => setMeeting(null)}>
               Back
             </button>
