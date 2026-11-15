@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpen } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
@@ -10,11 +10,13 @@ import {
   listGlJournals,
   listJournalLines,
   postJournal,
+  upsertGlAccountByCode,
   type GlAccount,
   type GlJournal,
   type GlJournalLine,
 } from '../lib/ledger/ledgerStore'
-import { exportListCsv } from '../lib/listIo'
+import { LEDGER_COA_CSV_COLUMNS } from '../lib/ledgerCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -40,6 +42,8 @@ export default function LedgerPage() {
     { accountId: '', debit: 0, credit: 0 },
   ])
   const [loading, setLoading] = useState(true)
+  const [importingCoa, setImportingCoa] = useState(false)
+  const coaImportRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -101,6 +105,53 @@ export default function LedgerPage() {
     }
   }
 
+  async function importCoaCsv(file: File) {
+    setImportingCoa(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of LEDGER_COA_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, LEDGER_COA_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid CoA rows', 'error')
+        return
+      }
+      let created = 0
+      let updated = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        try {
+          const result = await upsertGlAccountByCode({
+            code: row.code,
+            name: row.name,
+            accountType: row.account_type,
+            isPostable: row.is_postable,
+            isActive: row.is_active,
+            notes: row.notes,
+          })
+          if (result === 'created') created += 1
+          else updated += 1
+        } catch {
+          skipped += 1
+        }
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`CoA import: ${created} created, ${updated} updated${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'CoA CSV import failed'), 'error')
+    } finally {
+      setImportingCoa(false)
+      if (coaImportRef.current) coaImportRef.current.value = ''
+    }
+  }
+
   return (
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
@@ -116,6 +167,25 @@ export default function LedgerPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={coaImportRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importCoaCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importingCoa}
+            onClick={() => coaImportRef.current?.click()}
+          >
+            {importingCoa ? 'Importing…' : 'Import CoA CSV'}
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}

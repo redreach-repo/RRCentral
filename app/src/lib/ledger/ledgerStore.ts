@@ -1,7 +1,14 @@
 import { db } from '../db'
 import { isMissingRelationError } from '../errors'
 import { isSupabaseConfigured } from '../supabaseConfig'
-import { canPostJournal, journalBalance, nextJournalNumber, normalizeLine, type JournalLineInput } from './ledger'
+import {
+  canPostJournal,
+  journalBalance,
+  nextJournalNumber,
+  normalizeLine,
+  type GlAccountType,
+  type JournalLineInput,
+} from './ledger'
 
 export type GlAccount = {
   id: string
@@ -47,6 +54,71 @@ export async function listGlAccounts(): Promise<GlAccount[]> {
     throw error
   }
   return (data || []) as GlAccount[]
+}
+
+const ACCOUNT_TYPES = new Set<GlAccountType>(['asset', 'liability', 'equity', 'revenue', 'expense'])
+
+function parseBool(raw: string, fallback: boolean): boolean {
+  const v = raw.trim().toLowerCase()
+  if (!v) return fallback
+  if (['1', 'true', 'yes', 'y'].includes(v)) return true
+  if (['0', 'false', 'no', 'n'].includes(v)) return false
+  return fallback
+}
+
+/** Insert or update a CoA row by code (tenant-scoped unique). */
+export async function upsertGlAccountByCode(input: {
+  code: string
+  name: string
+  accountType: string
+  isPostable?: string
+  isActive?: string
+  notes?: string
+}): Promise<'created' | 'updated'> {
+  const code = input.code.trim()
+  const name = input.name.trim()
+  if (!code || !name) throw new Error('Account code and name are required')
+  const accountType = input.accountType.trim().toLowerCase() as GlAccountType
+  if (!ACCOUNT_TYPES.has(accountType)) {
+    throw new Error(`Invalid account_type "${input.accountType}"`)
+  }
+  const is_postable = parseBool(input.isPostable || '', true)
+  const is_active = parseBool(input.isActive || '', true)
+  const notes = (input.notes || '').trim()
+
+  const { data: existing, error: findErr } = await db
+    .from('gl_accounts')
+    .select('id')
+    .eq('code', code)
+    .maybeSingle()
+  if (findErr) throw findErr
+
+  if (existing?.id) {
+    const { error } = await db
+      .from('gl_accounts')
+      .update({
+        name,
+        account_type: accountType,
+        is_postable,
+        is_active,
+        notes,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existing.id)
+    if (error) throw error
+    return 'updated'
+  }
+
+  const { error } = await db.from('gl_accounts').insert({
+    code,
+    name,
+    account_type: accountType,
+    is_postable,
+    is_active,
+    notes,
+  })
+  if (error) throw error
+  return 'created'
 }
 
 export async function listGlJournals(): Promise<GlJournal[]> {
