@@ -1,22 +1,22 @@
 # HighMast / RR Central status
 
 **Last updated:** 15 November 2026 (Asia/Dubai)  
-**Current milestone:** Public API account writes + webhook retry worker
+**Current milestone:** Industry pack flag wiring + expense maker-checker
 
 ## Shipped this turn
 
-- `POST/PATCH /v1/accounts` (`write:accounts`); Edge `webhook-retry` drains `next_retry_at` (`docs/modules/public-api.md`)
+- Pack activate enables shell `moduleFlags` from manifest; large expenses (≥ AED 5k) open maker-checker requests
 
 ## Already on main
 
-- Public API deepen (#429) · Active-BU chrome (#428) · Theme studio deepen (#427) · WPS SIF draft (#426)
+- Public API writes (#430) · Public API deepen (#429) · Active-BU chrome (#428) · Theme studio deepen (#427)
 
 ## Still open (agent queue)
 
 1. Bank-certified WPS + counsel review (format deepen shipped; counsel still blocked)  
 2. Official SVG masters when zip lands  
 3. Demo / M3a after Alfred  
-4. Industry packs activation wiring / maker-checker pay-flow wires  
+4. More pay-flow wires (supplier payments / refunds)  
 
 ## Still externally blocked
 

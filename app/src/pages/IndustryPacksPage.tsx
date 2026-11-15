@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Layers } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
+import { useSettings } from '../contexts/SettingsContext'
 import EmptyState from '../components/EmptyState'
 import { errorMessage } from '../lib/errors'
 import {
@@ -9,13 +10,14 @@ import {
   listTenantIndustryPacks,
   retireIndustryPack,
 } from '../lib/featureSliceStores'
-import { BUILTIN_INDUSTRY_PACKS, packModuleHints } from '../lib/industryPacks'
+import { BUILTIN_INDUSTRY_PACKS, moduleFlagsForPack, packModuleHints } from '../lib/industryPacks'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
-/** M12: industry pack catalog with tenant activate / retire. */
+/** M12: industry pack catalog with tenant activate / retire + module flag wiring. */
 export default function IndustryPacksPage() {
   const { showToast } = useToast()
+  const { refresh } = useSettings()
   const [rows, setRows] = useState<Array<{ pack_key: string; name: string; description: string; version: string }>>([])
   const [tenant, setTenant] = useState<Awaited<ReturnType<typeof listTenantIndustryPacks>>>([])
   const [loading, setLoading] = useState(true)
@@ -48,8 +50,10 @@ export default function IndustryPacksPage() {
 
   async function onActivate(packKey: string) {
     try {
-      await activateIndustryPack(packKey)
-      showToast('Pack activated', 'success')
+      const result = await activateIndustryPack(packKey)
+      await refresh()
+      const flags = result.enabledFlags.length ? ` · enabled: ${result.enabledFlags.join(', ')}` : ''
+      showToast(`Pack activated${flags}`, 'success')
       await load()
     } catch (e) {
       showToast(errorMessage(e, 'Could not activate pack'), 'error')
@@ -72,7 +76,10 @@ export default function IndustryPacksPage() {
         <div>
           <p className={docsStyles.kicker}>Industry packs</p>
           <h1 className={docsStyles.title}>Packs</h1>
-          <p className={docsStyles.subtitle}>Activate vertical starters for this tenant. Manifest modules are hints for nav flags.</p>
+          <p className={docsStyles.subtitle}>
+            Activate vertical starters for this tenant. Activation enables matching shell module flags (Settings →
+            Module flags).
+          </p>
         </div>
       </header>
 
@@ -94,7 +101,12 @@ export default function IndustryPacksPage() {
                     <span style={{ marginLeft: 8, color: colors.muted, fontSize: 12 }}>v{r.version}</span>
                     <span style={{ marginLeft: 8, color: colors.muted, fontSize: 12 }}>· {status}</span>
                     <p style={{ margin: '8px 0 0', color: colors.muted, fontSize: 14 }}>{r.description}</p>
-                    <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted2 }}>Modules: {hint}</p>
+                    <p style={{ margin: '6px 0 0', fontSize: 12, color: colors.muted2 }}>
+                      Modules: {hint}
+                      {builtin
+                        ? ` · flags: ${moduleFlagsForPack(builtin).join(', ') || 'none'}`
+                        : ''}
+                    </p>
                   </div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'start' }}>
                     {status !== 'active' ? (

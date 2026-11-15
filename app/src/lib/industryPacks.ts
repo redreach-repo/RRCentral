@@ -1,5 +1,7 @@
 /** Industry pack catalog helpers (M12). */
 
+import { withModuleFlag } from '../modules/registry'
+
 export type IndustryPackManifest = {
   modules?: string[]
   locale?: string
@@ -15,6 +17,21 @@ export type IndustryPack = {
 }
 
 export type TenantPackStatus = 'available' | 'active' | 'retired'
+
+/** Map pack manifest module ids → Settings moduleFlags keys. */
+export const PACK_MODULE_TO_FLAG: Record<string, string> = {
+  sales: 'sales',
+  finance: 'finance',
+  clients: 'clients',
+  delivery: 'delivery',
+  ops: 'ops',
+  hr: 'hr',
+  payroll: 'payroll',
+  marketing: 'marketing',
+  overview: 'overview',
+  saasBilling: 'saasBilling',
+  industryPacks: 'industryPacks',
+}
 
 export const BUILTIN_INDUSTRY_PACKS: IndustryPack[] = [
   {
@@ -50,6 +67,33 @@ export const BUILTIN_INDUSTRY_PACKS: IndustryPack[] = [
 export function packModuleHints(pack: IndustryPack): string {
   const mods = pack.manifest.modules || []
   return mods.length ? mods.join(', ') : 'general'
+}
+
+/** Module flag keys a pack wants enabled (unknown modules skipped). */
+export function moduleFlagsForPack(pack: Pick<IndustryPack, 'manifest'>): string[] {
+  const mods = pack.manifest?.modules || []
+  const out: string[] = []
+  for (const m of mods) {
+    const flag = PACK_MODULE_TO_FLAG[m] || PACK_MODULE_TO_FLAG[String(m).toLowerCase()]
+    if (flag && !out.includes(flag)) out.push(flag)
+  }
+  return out
+}
+
+/**
+ * Enable pack modules in a flags map (false = hidden). Enabling deletes the
+ * false entry so the module shows in the shell again.
+ */
+export function applyPackFlagsToMap(
+  flags: Record<string, boolean>,
+  pack: Pick<IndustryPack, 'manifest'>,
+): { flags: Record<string, boolean>; enabled: string[] } {
+  const enabled = moduleFlagsForPack(pack)
+  let next = { ...flags }
+  for (const flag of enabled) {
+    next = withModuleFlag(next, flag, true)
+  }
+  return { flags: next, enabled }
 }
 
 export function nextTenantPackStatus(
