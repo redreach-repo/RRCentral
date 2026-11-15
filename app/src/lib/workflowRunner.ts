@@ -36,6 +36,13 @@ export type WorkflowWebhookDryLog = {
   dry_run: true
 }
 
+export type WorkflowAskAiDryLog = {
+  prompt: string
+  object_type: string
+  record_id: string
+  dry_run: true
+}
+
 export type WorkflowRunContext = {
   object_type?: string
   record_id?: string
@@ -47,6 +54,7 @@ export type WorkflowRunContext = {
   field_updates?: WorkflowFieldUpdate[]
   created_records?: WorkflowCreatedRecord[]
   webhook_dry_logs?: WorkflowWebhookDryLog[]
+  ask_ai_dry_logs?: WorkflowAskAiDryLog[]
   step_log?: WorkflowStepLogEntry[]
   [key: string]: unknown
 }
@@ -264,7 +272,44 @@ export function processSteps(
       continue
     }
 
-    // ask_ai remains skipped until AI gateway gates land.
+    if (step.type === 'ask_ai') {
+      const prompt = String(step.config.prompt || step.config.instruction || step.name || '').trim()
+      if (!prompt) {
+        ctx = appendLog(ctx, {
+          index: i,
+          type: step.type,
+          name: step.name,
+          status: 'failed',
+          detail: 'Missing ask_ai prompt',
+        })
+        return {
+          status: 'failed',
+          current_step: i,
+          context: ctx,
+          error_message: 'ask_ai requires prompt',
+        }
+      }
+      const entry: WorkflowAskAiDryLog = {
+        prompt,
+        object_type: String(ctx.object_type || ''),
+        record_id: String(ctx.record_id || ''),
+        dry_run: true,
+      }
+      ctx = {
+        ...ctx,
+        ask_ai_dry_logs: [...(ctx.ask_ai_dry_logs || []), entry],
+      }
+      ctx = appendLog(ctx, {
+        index: i,
+        type: step.type,
+        name: step.name,
+        status: 'done',
+        detail: 'Dry-run ask_ai (no gateway call)',
+      })
+      i += 1
+      continue
+    }
+
     ctx = appendLog(ctx, {
       index: i,
       type: step.type,

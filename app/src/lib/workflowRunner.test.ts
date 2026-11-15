@@ -69,14 +69,24 @@ describe('workflowRunner helpers', () => {
     expect(result.context.step_log?.[0]?.status).toBe('done')
   })
 
-  it('skips ask_ai', () => {
+  it('dry-logs ask_ai without gateway', () => {
     const result = processSteps(
-      [{ type: 'ask_ai', name: 'Ask', config: {} }],
+      [{ type: 'ask_ai', name: 'Ask', config: { prompt: 'Summarise this deal' } }],
+      0,
+      { notifications: [], step_log: [], object_type: 'deal', record_id: 'd1' },
+    )
+    expect(result.status).toBe('completed')
+    expect(result.context.ask_ai_dry_logs?.[0]?.prompt).toMatch(/Summarise/)
+    expect(result.context.step_log?.[0]?.status).toBe('done')
+  })
+
+  it('fails ask_ai without prompt', () => {
+    const result = processSteps(
+      [{ type: 'ask_ai', name: '', config: {} }],
       0,
       { notifications: [], step_log: [] },
     )
-    expect(result.status).toBe('completed')
-    expect(result.context.step_log?.[0]?.status).toBe('skipped')
+    expect(result.status).toBe('failed')
   })
 
   it('applies update_field and create_record into context', () => {

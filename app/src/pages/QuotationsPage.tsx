@@ -75,6 +75,7 @@ import { parseQuotationFinalizeForm } from '../lib/schemas/quotationFinalize'
 import { sortByDateDesc } from '../lib/finance'
 import { isQuotePastValidity, quoteValidUntil } from '../lib/documents'
 import { errorMessage, isUndefinedColumnError } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import { resolveCreditWarnForClient } from '../lib/creditSoftWarn'
 import { createDeliveryNoteFromQuote, matchQuoteForDeliveryNote } from '../lib/deliveryNotes'
 import { resolveDealRef } from '../lib/dealQuotes'
@@ -1074,8 +1075,14 @@ export default function QuotationsPage() {
     setSaving(true)
     try {
       await deleteLineItems('Quote', [deleteTarget.quote_id])
-      const { error } = await db.from('quotations').delete().eq('id', deleteTarget.id)
-      if (error) throw error
+      let { error } = await db
+        .from('quotations')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', deleteTarget.id)
+      if (error) {
+        const hard = await db.from('quotations').delete().eq('id', deleteTarget.id)
+        if (hard.error) throw hard.error
+      }
       await logActivity('delete_quote', 'quotation', deleteTarget.quote_id, deleteTarget.client, who)
       showToast('Quotation deleted', 'success')
       setDeleteTarget(null)
@@ -1357,9 +1364,34 @@ export default function QuotationsPage() {
           <h1 className={qStyles.title}>{t('page.quotations.title')}</h1>
           <p className={qStyles.subtitle}>{t('page.quotations.subtitle')}</p>
         </div>
-        <button type="button" className={qStyles.newBtn} onClick={() => void openCreate()}>
-          <Plus size={16} /> {t('page.quotations.new')}
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={qStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!quotes.length}
+            onClick={() => {
+              exportListCsv(
+                'quotations.csv',
+                ['reference_number', 'client', 'status', 'amount', 'date', 'valid_until'],
+                quotes.map((q) => ({
+                  reference_number: q.reference_number || '',
+                  client: q.client,
+                  status: q.status,
+                  amount: q.amount,
+                  date: q.date || '',
+                  valid_until: q.valid_until || '',
+                })),
+              )
+              showToast('Quotations CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+          <button type="button" className={qStyles.newBtn} onClick={() => void openCreate()}>
+            <Plus size={16} /> {t('page.quotations.new')}
+          </button>
+        </div>
       </header>
 
       <SavedViewsBar
