@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -11,7 +11,8 @@ import {
   type ApprovalRequest,
 } from '../lib/featureSliceStores'
 import { DEFAULT_APPROVAL_THRESHOLD_AED } from '../lib/makerChecker'
-import { exportListCsv } from '../lib/listIo'
+import { APPROVALS_CSV_COLUMNS } from '../lib/approvalsCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle, selectStyle } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
@@ -24,6 +25,8 @@ export default function ApprovalsPage() {
   const [amount, setAmount] = useState(String(DEFAULT_APPROVAL_THRESHOLD_AED + 1000))
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(true)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -67,6 +70,47 @@ export default function ApprovalsPage() {
     }
   }
 
+  async function importApprovalsCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, csvRows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of APPROVALS_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, APPROVALS_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid approval rows', 'error')
+        return
+      }
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        const amountAed = row.amount_aed ? Number(row.amount_aed) : null
+        await requestApproval({
+          objectType: row.object_type,
+          objectId: row.object_id,
+          action: row.action,
+          amountAed: amountAed != null && Number.isFinite(amountAed) ? amountAed : null,
+          requestedBy: appUserId,
+        })
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} approval request(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Approvals CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
@@ -79,46 +123,67 @@ export default function ApprovalsPage() {
             automatically. Maker cannot approve their own request.
           </p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-          disabled={!rows.length}
-          onClick={() => {
-            exportListCsv(
-              'approvals.csv',
-              [
-                'status',
-                'object_type',
-                'object_id',
-                'action',
-                'amount_aed',
-                'summary',
-                'requested_by',
-                'decided_by',
-                'decision_note',
-                'created_at',
-                'decided_at',
-              ],
-              rows.map((r) => ({
-                status: r.status,
-                object_type: r.object_type,
-                object_id: r.object_id,
-                action: r.action,
-                amount_aed: r.amount_aed ?? '',
-                summary: r.summary,
-                requested_by: r.requested_by || '',
-                decided_by: r.decided_by || '',
-                decision_note: r.decision_note,
-                created_at: r.created_at,
-                decided_at: r.decided_at || '',
-              })),
-            )
-            showToast('Approvals CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) void importApprovalsCsv(f)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!rows.length}
+            onClick={() => {
+              exportListCsv(
+                'approvals.csv',
+                [
+                  'status',
+                  'object_type',
+                  'object_id',
+                  'action',
+                  'amount_aed',
+                  'summary',
+                  'requested_by',
+                  'decided_by',
+                  'decision_note',
+                  'created_at',
+                  'decided_at',
+                ],
+                rows.map((r) => ({
+                  status: r.status,
+                  object_type: r.object_type,
+                  object_id: r.object_id,
+                  action: r.action,
+                  amount_aed: r.amount_aed ?? '',
+                  summary: r.summary,
+                  requested_by: r.requested_by || '',
+                  decided_by: r.decided_by || '',
+                  decision_note: r.decision_note,
+                  created_at: r.created_at,
+                  decided_at: r.decided_at || '',
+                })),
+              )
+              showToast('Approvals CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </header>
 
       <div style={{ ...cardStyle, marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'end' }}>

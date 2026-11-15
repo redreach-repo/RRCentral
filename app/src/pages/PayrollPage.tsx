@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Wallet } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -22,7 +22,8 @@ import {
   type WpsLine,
 } from '../lib/wpsGratuity'
 import { logPayrollExport } from '../lib/opsSliceStores'
-import { exportListCsv } from '../lib/listIo'
+import { PAYROLL_CSV_COLUMNS } from '../lib/payrollCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
@@ -45,6 +46,8 @@ export default function PayrollPage() {
   })
   const [loading, setLoading] = useState(true)
   const [linesLoading, setLinesLoading] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -91,6 +94,47 @@ export default function PayrollPage() {
       await load()
     } catch (err) {
       showToast(errorMessage(err, 'Could not create run'), 'error')
+    }
+  }
+
+  async function importPayrollCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, csvRows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of PAYROLL_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, PAYROLL_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid payroll rows', 'error')
+        return
+      }
+      const existing = new Set(rows.map((r) => r.period_yyyy_mm))
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        const periodKey = row.period_yyyy_mm.slice(0, 7)
+        if (!/^\d{4}-\d{2}$/.test(periodKey) || existing.has(periodKey)) {
+          skipped += 1
+          continue
+        }
+        await createPayrollRun(periodKey, appUserId)
+        existing.add(periodKey)
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} payroll run(s)${skipNote}`, 'success')
+      await load()
+    } catch (err) {
+      showToast(errorMessage(err, 'Payroll CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
     }
   }
 
@@ -226,27 +270,48 @@ export default function PayrollPage() {
             scaffold — not bank-certified and not legal advice.
           </p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-          disabled={!rows.length}
-          onClick={() => {
-            exportListCsv(
-              'payroll-runs.csv',
-              ['period_yyyy_mm', 'status', 'currency', 'notes'],
-              rows.map((r) => ({
-                period_yyyy_mm: r.period_yyyy_mm,
-                status: r.status,
-                currency: r.currency,
-                notes: r.notes,
-              })),
-            )
-            showToast('Payroll runs CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) void importPayrollCsv(f)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!rows.length}
+            onClick={() => {
+              exportListCsv(
+                'payroll-runs.csv',
+                ['period_yyyy_mm', 'status', 'currency', 'notes'],
+                rows.map((r) => ({
+                  period_yyyy_mm: r.period_yyyy_mm,
+                  status: r.status,
+                  currency: r.currency,
+                  notes: r.notes,
+                })),
+              )
+              showToast('Payroll runs CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </header>
 
       <form
