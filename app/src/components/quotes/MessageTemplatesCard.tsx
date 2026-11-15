@@ -15,6 +15,7 @@ import {
 } from '../../lib/quoteNudges'
 import { deleteTemplate, listTemplates, saveTemplate, type TemplateInput } from '../../lib/quoteNudgesStore'
 import { parseMessageTemplateForm } from '../../lib/schemas/messageTemplate'
+import { exportListCsv } from '../../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -103,8 +104,33 @@ export default function MessageTemplatesCard() {
 
   return (
     <section style={{ ...cardStyle, marginBottom: 16 }}>
-      <h2 style={sectionTitleStyle}>Follow up templates</h2>
-      <p style={{ color: colors.muted, fontSize: 13, margin: '0 0 12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'start' }}>
+        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Follow up templates</h2>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={!rows.length}
+          onClick={() => {
+            exportListCsv(
+              'message-templates.csv',
+              ['name', 'division_code', 'channel', 'purpose', 'subject', 'body', 'active'],
+              rows.map((r) => ({
+                name: r.name,
+                division_code: r.division_code,
+                channel: r.channel,
+                purpose: r.purpose,
+                subject: r.subject || '',
+                body: r.body || '',
+                active: r.active ? 'yes' : 'no',
+              })),
+            )
+            showToast('Message templates CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
+      </div>
+      <p style={{ color: colors.muted, fontSize: 13, margin: '12px 0 12px' }}>
         Used by "Quotes waiting for a reply" in My Day. A division's own template wins, then one for every division,
         then the built in wording. Merge fields: {MERGE_FIELDS.map((f) => `{{${f.key}}}`).join(', ')}.
       </p>
