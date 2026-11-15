@@ -8,6 +8,7 @@ import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import SimpleRowActions from '../components/SimpleRowActions'
 import { logActivity } from '../lib/activity'
 import { errorMessage, isMissingRelationError } from '../lib/errors'
@@ -93,12 +94,16 @@ function formatDate(value: string | null | undefined): string {
 
 export default function DomainsPage() {
   const { t } = useI18n()
-  const { user } = useAuth()
+  const { user, appUserId } = useAuth()
   const { showToast } = useToast()
   const [domains, setDomains] = useState<OwnedDomain[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showInactive, setShowInactive] = useState(false)
+  const domainsViewFilters = useMemo(
+    () => ({ q: search, inactive: showInactive ? '1' : '0' }),
+    [search, showInactive],
+  )
   const [importing, setImporting] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(false)
@@ -468,6 +473,23 @@ export default function DomainsPage() {
           </ul>
         </div>
       ) : null}
+
+      <SavedViewsBar
+        moduleId="domains"
+        filters={domainsViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => {
+          setSearch(String(f.q || ''))
+          setShowInactive(String(f.inactive || '0') === '1')
+        }}
+        onToast={showToast}
+        filtersEqual={(a, b) =>
+          String(a.q || '') === String(b.q || '') &&
+          String(a.inactive || '0') === String(b.inactive || '0')
+        }
+      />
 
       <div style={{ marginBottom: 16 }}>
         <input

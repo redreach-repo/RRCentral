@@ -16,6 +16,7 @@ import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import EmailComposeModal from '../components/EmailComposeModal'
 import CalendarSettingsModal from '../components/CalendarSettingsModal'
 import { hydrateContacts, primaryContact } from '../lib/contacts'
@@ -60,7 +61,7 @@ function daysLabel(dateStr: string, today: Date): string {
 
 export default function FollowupsPage() {
   const { t } = useI18n()
-  const { user } = useAuth()
+  const { user, appUserId } = useAuth()
   const { settings } = useSettings()
   const { showToast } = useToast()
   const compact = useCompactCrm()
@@ -81,6 +82,7 @@ export default function FollowupsPage() {
   const [ownerFilter, setOwnerFilter] = useState('All')
   const [importing, setImporting] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
+  const followupsViewFilters = useMemo(() => ({ owner: ownerFilter }), [ownerFilter])
 
   async function importFollowupsCsv(file: File) {
     setImporting(true)
@@ -624,6 +626,17 @@ export default function FollowupsPage() {
       {error ? (
         <div style={{ ...cardStyle, color: colors.danger, marginBottom: 16 }}>{error}</div>
       ) : null}
+
+      <SavedViewsBar
+        moduleId="followups"
+        filters={followupsViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => setOwnerFilter(String(f.owner || 'All'))}
+        onToast={showToast}
+        filtersEqual={(a, b) => String(a.owner || 'All') === String(b.owner || 'All')}
+      />
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
         <label style={{ ...labelStyle, margin: 0 }}>

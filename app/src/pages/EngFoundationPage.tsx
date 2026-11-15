@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { DraftingCompass } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import { errorMessage } from '../lib/errors'
 import { engClaimLabel, engDocLabel } from '../lib/engFoundation'
+import { ENG_FOUNDATION_CSV_COLUMNS } from '../lib/engFoundationCsv'
 import {
   createEngClaim,
   createEngDocument,
@@ -12,7 +13,7 @@ import {
   type EngClaim,
   type EngDocument,
 } from '../lib/engFoundationStore'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
   cardStyle,
@@ -34,6 +35,8 @@ export default function EngFoundationPage() {
   const [claimTitle, setClaimTitle] = useState('')
   const [claimAmount, setClaimAmount] = useState('')
   const [loading, setLoading] = useState(true)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -84,6 +87,56 @@ export default function EngFoundationPage() {
     }
   }
 
+  async function importEngCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, csvRows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of ENG_FOUNDATION_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, ENG_FOUNDATION_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid engineering rows', 'error')
+        return
+      }
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        const kind = row.kind.toLowerCase()
+        if (kind === 'claim') {
+          await createEngClaim({
+            claimNo: row.number || '',
+            title: row.title,
+            amountAed: Number(row.amount_aed) || 0,
+          })
+          saved += 1
+        } else if (kind === 'document' || kind === 'doc') {
+          await createEngDocument({
+            docNo: row.number || '',
+            title: row.title,
+            discipline: row.discipline || '',
+          })
+          saved += 1
+        } else {
+          skipped += 1
+        }
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} engineering row(s)${skipNote}`, 'success')
+      await load()
+    } catch (err) {
+      showToast(errorMessage(err, 'Engineering CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
@@ -97,37 +150,60 @@ export default function EngFoundationPage() {
             Starter document register and claims log for the engineering pack. Not contractual advice.
           </p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-          disabled={!docs.length && !claims.length}
-          onClick={() => {
-            exportListCsv(
-              'eng-register.csv',
-              ['kind', 'number', 'title', 'status', 'amount_aed'],
-              [
-                ...docs.map((d) => ({
-                  kind: 'document',
-                  number: d.doc_no,
-                  title: d.title,
-                  status: d.status,
-                  amount_aed: '',
-                })),
-                ...claims.map((c) => ({
-                  kind: 'claim',
-                  number: c.claim_no,
-                  title: c.title,
-                  status: c.status,
-                  amount_aed: c.amount_aed,
-                })),
-              ],
-            )
-            showToast('Engineering CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) void importEngCsv(f)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!docs.length && !claims.length}
+            onClick={() => {
+              exportListCsv(
+                'eng-register.csv',
+                ['kind', 'number', 'title', 'discipline', 'status', 'amount_aed'],
+                [
+                  ...docs.map((d) => ({
+                    kind: 'document',
+                    number: d.doc_no,
+                    title: d.title,
+                    discipline: d.discipline,
+                    status: d.status,
+                    amount_aed: '',
+                  })),
+                  ...claims.map((c) => ({
+                    kind: 'claim',
+                    number: c.claim_no,
+                    title: c.title,
+                    discipline: '',
+                    status: c.status,
+                    amount_aed: c.amount_aed,
+                  })),
+                ],
+              )
+              showToast('Engineering CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </header>
 
       {loading ? (

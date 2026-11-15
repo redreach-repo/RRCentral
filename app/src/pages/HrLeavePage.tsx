@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { CalendarDays } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import { errorMessage } from '../lib/errors'
 import { listHrEmployees, type HrEmployee } from '../lib/featureSliceStores'
 import { LEAVE_TYPES, leaveDaysInclusive, type LeaveType } from '../lib/hrLeave'
+import { HR_LEAVE_CSV_COLUMNS } from '../lib/hrLeaveCsv'
 import {
   createHrLeaveRequest,
   decideHrLeave,
   listHrLeaveRequests,
   type HrLeaveRequest,
 } from '../lib/hrLeaveStore'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -35,6 +36,8 @@ export default function HrLeavePage() {
   const [endsOn, setEndsOn] = useState('')
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(true)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -76,6 +79,59 @@ export default function HrLeavePage() {
     }
   }
 
+  async function importLeaveCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, csvRows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of HR_LEAVE_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, HR_LEAVE_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid leave rows', 'error')
+        return
+      }
+      const byCode = new Map(
+        people
+          .filter((p) => p.employee_code)
+          .map((p) => [p.employee_code.toLowerCase(), p] as const),
+      )
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        const emp = byCode.get(row.employee_code.toLowerCase())
+        if (!emp) {
+          skipped += 1
+          continue
+        }
+        const lt = (LEAVE_TYPES as readonly string[]).includes(row.leave_type)
+          ? (row.leave_type as LeaveType)
+          : 'annual'
+        await createHrLeaveRequest({
+          employeeId: emp.id,
+          leaveType: lt,
+          startsOn: row.starts_on,
+          endsOn: row.ends_on,
+          reason: row.reason || '',
+        })
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} leave request(s)${skipNote}`, 'success')
+      await load()
+    } catch (err) {
+      showToast(errorMessage(err, 'Leave CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   const daysPreview = startsOn && endsOn ? leaveDaysInclusive(startsOn, endsOn) : 0
 
   return (
@@ -89,30 +145,52 @@ export default function HrLeavePage() {
           </h1>
           <p className={docsStyles.subtitle}>Request and approve annual, sick, unpaid or other leave.</p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-          disabled={!rows.length}
-          onClick={() => {
-            exportListCsv(
-              'hr-leave.csv',
-              ['employee', 'leave_type', 'starts_on', 'ends_on', 'days', 'status', 'reason'],
-              rows.map((r) => ({
-                employee: r.hr_employees?.full_name || r.employee_id,
-                leave_type: r.leave_type,
-                starts_on: r.starts_on,
-                ends_on: r.ends_on,
-                days: r.days,
-                status: r.status,
-                reason: r.reason,
-              })),
-            )
-            showToast('Leave CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) void importLeaveCsv(f)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing || people.length === 0}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!rows.length}
+            onClick={() => {
+              exportListCsv(
+                'hr-leave.csv',
+                ['employee_code', 'employee', 'leave_type', 'starts_on', 'ends_on', 'days', 'status', 'reason'],
+                rows.map((r) => ({
+                  employee_code: r.hr_employees?.employee_code || '',
+                  employee: r.hr_employees?.full_name || r.employee_id,
+                  leave_type: r.leave_type,
+                  starts_on: r.starts_on,
+                  ends_on: r.ends_on,
+                  days: r.days,
+                  status: r.status,
+                  reason: r.reason,
+                })),
+              )
+              showToast('Leave CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </header>
 
       {loading ? (

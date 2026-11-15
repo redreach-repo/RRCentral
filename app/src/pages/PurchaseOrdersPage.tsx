@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Truck } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import { errorMessage } from '../lib/errors'
 import { poReceiveRemaining } from '../lib/purchasing'
 import {
@@ -34,7 +35,7 @@ import docsStyles from '../styles/docsList.module.css'
 
 /** M9: supplier purchase orders + receive into stock. */
 export default function PurchaseOrdersPage() {
-  const { user } = useAuth()
+  const { user, appUserId } = useAuth()
   const { showToast } = useToast()
   const [rows, setRows] = useState<PurchaseOrderRow[]>([])
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
@@ -51,6 +52,10 @@ export default function PurchaseOrdersPage() {
   const [showArchived, setShowArchived] = useState(false)
   const [importing, setImporting] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
+  const poViewFilters = useMemo(
+    () => ({ archived: showArchived ? '1' : '0' }),
+    [showArchived],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -189,6 +194,17 @@ export default function PurchaseOrdersPage() {
           </button>
         </div>
       </header>
+
+      <SavedViewsBar
+        moduleId="purchase_orders"
+        filters={poViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => setShowArchived(String(f.archived || '0') === '1')}
+        onToast={showToast}
+        filtersEqual={(a, b) => String(a.archived || '0') === String(b.archived || '0')}
+      />
 
       {loading ? (
         <p>Loading…</p>
