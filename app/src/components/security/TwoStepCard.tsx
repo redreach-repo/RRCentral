@@ -6,6 +6,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { can } from '../../lib/permissions'
 import { errorMessage } from '../../lib/errors'
 import { TWO_STEP_ROLES, removeAuthenticator, teamTwoStep, type TeamTwoStep } from '../../lib/twoStep'
+import { exportListCsv } from '../../lib/listIo'
 import { buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
 import type { UserRole } from '../../lib/types'
 
@@ -43,10 +44,33 @@ export default function TwoStepCard() {
 
   return (
     <div style={{ ...cardStyle, marginBottom: 20 }}>
-      <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <ShieldCheck size={18} /> {t('page.settings.section.twoStep')}
-      </h2>
-      <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'start' }}>
+        <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+          <ShieldCheck size={18} /> {t('page.settings.section.twoStep')}
+        </h2>
+        {team ? (
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            onClick={() => {
+              const rows = team.filter((row) => row.active && TWO_STEP_ROLES.includes(row.role as UserRole))
+              exportListCsv(
+                'team-two-step.csv',
+                ['email', 'role', 'has_two_step'],
+                rows.map((row) => ({
+                  email: row.email,
+                  role: row.role,
+                  has_two_step: row.has_two_step ? 'yes' : 'no',
+                })),
+              )
+              showToast('Two-step CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        ) : null}
+      </div>
+      <p style={{ color: colors.muted, fontSize: 13, marginTop: 12, lineHeight: 1.5 }}>
         {required
           ? 'Your role needs a code from an authenticator app at each sign in. New phone? Remove the old authenticator here, then sign in again to set up the new one.'
           : 'Required for admins and managers. Your role signs in with a password only.'}
@@ -59,13 +83,13 @@ export default function TwoStepCard() {
       {team ? (
         <ul style={{ listStyle: 'none', padding: 0, margin: '14px 0 0', fontSize: 13 }}>
           {team
-            .filter((t) => t.active && TWO_STEP_ROLES.includes(t.role as UserRole))
-            .map((t) => (
-              <li key={t.email} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            .filter((row) => row.active && TWO_STEP_ROLES.includes(row.role as UserRole))
+            .map((row) => (
+              <li key={row.email} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                 <span>
-                  {t.email} <span style={{ color: colors.muted2 }}>({t.role})</span>
+                  {row.email} <span style={{ color: colors.muted2 }}>({row.role})</span>
                 </span>
-                <span style={{ color: t.has_two_step ? colors.success : colors.warn }}>{t.has_two_step ? 'Set up' : 'Not yet'}</span>
+                <span style={{ color: row.has_two_step ? colors.success : colors.warn }}>{row.has_two_step ? 'Set up' : 'Not yet'}</span>
               </li>
             ))}
         </ul>
