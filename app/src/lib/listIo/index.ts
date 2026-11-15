@@ -6,6 +6,7 @@ export {
   validateMappedRows,
   type ColumnMap,
 } from './csv'
+export { columnMapsToZod, parseListIoRow, parseListIoRows } from './schema'
 import { downloadCsv } from '../uiStyles'
 import { rowsToCsv } from './csv'
 

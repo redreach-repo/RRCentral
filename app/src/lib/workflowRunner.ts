@@ -29,6 +29,13 @@ export type WorkflowCreatedRecord = {
   temp_id: string
 }
 
+export type WorkflowWebhookDryLog = {
+  url: string
+  method: string
+  payload: Record<string, unknown>
+  dry_run: true
+}
+
 export type WorkflowRunContext = {
   object_type?: string
   record_id?: string
@@ -39,6 +46,7 @@ export type WorkflowRunContext = {
   notifications?: string[]
   field_updates?: WorkflowFieldUpdate[]
   created_records?: WorkflowCreatedRecord[]
+  webhook_dry_logs?: WorkflowWebhookDryLog[]
   step_log?: WorkflowStepLogEntry[]
   [key: string]: unknown
 }
@@ -214,7 +222,49 @@ export function processSteps(
       continue
     }
 
-    // webhook / ask_ai remain skipped until outbound/AI gates land.
+    if (step.type === 'webhook') {
+      const url = String(step.config.url || '').trim()
+      const method = String(step.config.method || 'POST').toUpperCase()
+      const payload =
+        step.config.payload && typeof step.config.payload === 'object' && !Array.isArray(step.config.payload)
+          ? (step.config.payload as Record<string, unknown>)
+          : {
+              object_type: ctx.object_type || '',
+              record_id: ctx.record_id || '',
+              step: step.name,
+            }
+      if (!url) {
+        ctx = appendLog(ctx, {
+          index: i,
+          type: step.type,
+          name: step.name,
+          status: 'failed',
+          detail: 'Missing webhook url',
+        })
+        return {
+          status: 'failed',
+          current_step: i,
+          context: ctx,
+          error_message: 'webhook requires url',
+        }
+      }
+      const entry: WorkflowWebhookDryLog = { url, method, payload, dry_run: true }
+      ctx = {
+        ...ctx,
+        webhook_dry_logs: [...(ctx.webhook_dry_logs || []), entry],
+      }
+      ctx = appendLog(ctx, {
+        index: i,
+        type: step.type,
+        name: step.name,
+        status: 'done',
+        detail: `Dry-run ${method} ${url} (no outbound)`,
+      })
+      i += 1
+      continue
+    }
+
+    // ask_ai remains skipped until AI gateway gates land.
     ctx = appendLog(ctx, {
       index: i,
       type: step.type,

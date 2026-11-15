@@ -263,7 +263,9 @@ export default function QuotationsPage() {
       setVendors(vendorRows)
 
       const validityDays = Number(settings.quoteValidityDays || 14) || 14
-      let rows = sortByDateDesc((qRes.data || []) as Quotation[])
+      let rows = sortByDateDesc(
+        ((qRes.data || []) as (Quotation & { deleted_at?: string | null })[]).filter((q) => !q.deleted_at),
+      )
 
       // Backfill valid_until on finalized quotes that never got one
       const needValidUntil = rows.filter(

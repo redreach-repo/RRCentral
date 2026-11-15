@@ -58,9 +58,20 @@ describe('workflowRunner helpers', () => {
     expect(done.context.notifications).toContain('Won deal approved')
   })
 
-  it('skips unsupported step types', () => {
+  it('dry-logs webhook without outbound', () => {
     const result = processSteps(
-      [{ type: 'webhook', name: 'Ping', config: {} }],
+      [{ type: 'webhook', name: 'Ping', config: { url: 'https://example.test/hook' } }],
+      0,
+      { notifications: [], step_log: [] },
+    )
+    expect(result.status).toBe('completed')
+    expect(result.context.webhook_dry_logs?.[0]?.url).toContain('example.test')
+    expect(result.context.step_log?.[0]?.status).toBe('done')
+  })
+
+  it('skips ask_ai', () => {
+    const result = processSteps(
+      [{ type: 'ask_ai', name: 'Ask', config: {} }],
       0,
       { notifications: [], step_log: [] },
     )

@@ -6,6 +6,7 @@ import {
   toPersistedLineItemRows,
   type DraftLineItem,
 } from './lineItems'
+import { withoutSoftDeleted } from './softDelete'
 import type { DeliveryNote, LineItem } from './types'
 
 export const DELIVERY_NOTES_STORE_KEY = 'delivery_notes_store'
@@ -71,8 +72,14 @@ export async function listDeliveryNotes(): Promise<DeliveryNote[]> {
       .order('created_at', { ascending: false })
     if (!error) {
       tableMissing = false
-      const byId = new Map(((data || []) as DeliveryNote[]).map((n) => [n.id, n]))
-      for (const note of blob.notes) {
+      const byId = new Map(
+        withoutSoftDeleted((data || []) as (DeliveryNote & { deleted_at?: string | null })[]).map(
+          (n) => [n.id, n],
+        ),
+      )
+      for (const note of withoutSoftDeleted(
+        blob.notes as (DeliveryNote & { deleted_at?: string | null })[],
+      )) {
         if (!byId.has(note.id)) byId.set(note.id, note)
       }
       return sortNotes([...byId.values()])
