@@ -65,16 +65,21 @@ export function domainStatusLabel(status: string): string {
   }
 }
 
-export async function listOwnedDomains(): Promise<OwnedDomain[]> {
+export async function listOwnedDomains(opts?: {
+  includeInactive?: boolean
+}): Promise<OwnedDomain[]> {
   const { data, error } = await db.from('owned_domains').select('*').order('domain_name')
   if (error) {
     if (isMissingRelationError(error)) return []
     throw error
   }
-  return ((data || []) as OwnedDomain[]).filter((d) => d.active !== false)
+  const rows = (data || []) as OwnedDomain[]
+  return opts?.includeInactive ? rows : rows.filter((d) => d.active !== false)
 }
 
-export async function listOwnedDomainsResult(): Promise<{
+export async function listOwnedDomainsResult(opts?: {
+  includeInactive?: boolean
+}): Promise<{
   rows: OwnedDomain[]
   missingTable: boolean
 }> {
@@ -83,8 +88,18 @@ export async function listOwnedDomainsResult(): Promise<{
     if (isMissingRelationError(error)) return { rows: [], missingTable: true }
     throw error
   }
+  const rows = (data || []) as OwnedDomain[]
   return {
-    rows: ((data || []) as OwnedDomain[]).filter((d) => d.active !== false),
+    rows: opts?.includeInactive ? rows : rows.filter((d) => d.active !== false),
     missingTable: false,
   }
 }
+
+export async function restoreOwnedDomain(id: string): Promise<void> {
+  const { error } = await db
+    .from('owned_domains')
+    .update({ active: true, updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+

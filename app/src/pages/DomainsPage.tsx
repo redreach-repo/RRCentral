@@ -18,6 +18,7 @@ import {
   DOMAIN_STATUSES,
   domainStatusLabel,
   listOwnedDomainsResult,
+  restoreOwnedDomain,
 } from '../lib/domains'
 import { exportListCsv } from '../lib/listIo'
 import { parseDomainForm } from '../lib/schemas/domain'
@@ -95,6 +96,7 @@ export default function DomainsPage() {
   const [domains, setDomains] = useState<OwnedDomain[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [showInactive, setShowInactive] = useState(false)
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<OwnedDomain | null>(null)
   const [form, setForm] = useState<DomainForm>(emptyForm())
@@ -106,7 +108,9 @@ export default function DomainsPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const { rows, missingTable: missing } = await listOwnedDomainsResult()
+      const { rows, missingTable: missing } = await listOwnedDomainsResult({
+        includeInactive: showInactive,
+      })
       setDomains(rows)
       setMissingTable(missing)
     } catch (e) {
@@ -114,7 +118,7 @@ export default function DomainsPage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [showToast, showInactive])
 
   useEffect(() => {
     void load()
@@ -242,19 +246,26 @@ export default function DomainsPage() {
 
   async function confirmDelete() {
     if (!deleteTarget) return
+    const inactive = deleteTarget.active === false
     setSaving(true)
     try {
-      const { error } = await db
-        .from('owned_domains')
-        .update({ active: false, updated_at: new Date().toISOString() })
-        .eq('id', deleteTarget.id)
-      if (error) throw error
-      await logActivity('archive_domain', 'owned_domain', deleteTarget.domain_name, '', user?.email || '')
-      showToast('Domain archived', 'success')
+      if (inactive) {
+        await restoreOwnedDomain(deleteTarget.id)
+        await logActivity('restore_domain', 'owned_domain', deleteTarget.domain_name, '', user?.email || '')
+        showToast('Domain restored', 'success')
+      } else {
+        const { error } = await db
+          .from('owned_domains')
+          .update({ active: false, updated_at: new Date().toISOString() })
+          .eq('id', deleteTarget.id)
+        if (error) throw error
+        await logActivity('archive_domain', 'owned_domain', deleteTarget.domain_name, '', user?.email || '')
+        showToast('Domain archived', 'success')
+      }
       setDeleteTarget(null)
       await load()
     } catch (e) {
-      showToast(errorMessage(e, 'Delete failed'), 'error')
+      showToast(errorMessage(e, inactive ? 'Restore failed' : 'Archive failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -269,6 +280,14 @@ export default function DomainsPage() {
           <p className={docsStyles.subtitle}>{t('page.domains.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => setShowInactive((v) => !v)}
+          >
+            {showInactive ? 'Hide inactive' : 'Show inactive'}
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}
@@ -642,14 +661,23 @@ export default function DomainsPage() {
 
       <Modal
         open={!!deleteTarget}
-        title={t('page.domains.archiveTitle')}
+        title={deleteTarget?.active === false ? 'Restore domain?' : t('page.domains.archiveTitle')}
         onClose={() => setDeleteTarget(null)}
         width={420}
       >
         <p style={{ color: colors.muted, lineHeight: 1.5 }}>
-          {t('page.domains.archiveBodyLead')}
-          <strong style={{ color: colors.text }}>{deleteTarget?.domain_name}</strong>
-          {t('page.domains.archiveBodyTrail')}
+          {deleteTarget?.active === false ? (
+            <>
+              Restore <strong style={{ color: colors.text }}>{deleteTarget?.domain_name}</strong> to
+              the active list.
+            </>
+          ) : (
+            <>
+              {t('page.domains.archiveBodyLead')}
+              <strong style={{ color: colors.text }}>{deleteTarget?.domain_name}</strong>
+              {t('page.domains.archiveBodyTrail')} Use Show inactive to restore later.
+            </>
+          )}
         </p>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setDeleteTarget(null)}>
@@ -657,11 +685,17 @@ export default function DomainsPage() {
           </button>
           <button
             type="button"
-            style={buttonDangerStyle}
+            style={deleteTarget?.active === false ? buttonSecondaryStyle : buttonDangerStyle}
             onClick={() => void confirmDelete()}
             disabled={saving}
           >
-            {saving ? t('page.domains.archiving') : t('page.domains.archive')}
+            {deleteTarget?.active === false
+              ? saving
+                ? 'Restoring…'
+                : 'Restore'
+              : saving
+                ? t('page.domains.archiving')
+                : t('page.domains.archive')}
           </button>
         </div>
       </Modal>

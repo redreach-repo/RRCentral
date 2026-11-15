@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Download, ExternalLink, FileText, Package, Plus, RefreshCw } from 'lucide-react'
 import { db } from '../lib/db'
 import { DIVISIONS, FABRIC_OPTIONS } from '../lib/config'
@@ -32,7 +32,8 @@ import {
 import docsStyles from '../styles/docsList.module.css'
 import { errorMessage } from '../lib/errors'
 import { parseCatalogProductForm } from '../lib/schemas/catalogProduct'
-import { exportListCsv } from '../lib/listIo'
+import { CATALOG_CSV_COLUMNS } from '../lib/catalogCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 
 type ProductForm = {
   sku: string
@@ -82,6 +83,8 @@ export default function CatalogPage() {
     null,
   )
   const [showArchived, setShowArchived] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -141,6 +144,73 @@ export default function CatalogPage() {
       track_sizes: !!p.track_sizes,
     })
     setOpen(true)
+  }
+
+
+  async function importCatalogCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of CATALOG_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, CATALOG_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid catalog rows', 'error')
+        return
+      }
+      let saved = 0
+      const now = new Date().toISOString()
+      for (const row of ok) {
+        const activeRaw = String(row.active || 'true').toLowerCase()
+        const payload = {
+          sku: row.sku,
+          name: row.name,
+          division_code: row.division_code || '01',
+          unit_price: Number(row.unit_price) || 0,
+          unit_cost: Number(row.unit_cost) || 0,
+          stock_on_hand: Number(row.stock_on_hand) || 0,
+          active: !(activeRaw === 'false' || activeRaw === '0' || activeRaw === 'no'),
+          updated_at: now,
+        }
+        const existing = products.find((p) => p.sku === row.sku)
+        if (existing) {
+          const { error } = await db.from('products').update(payload).eq('id', existing.id)
+          if (error) throw error
+        } else {
+          const { error } = await db.from('products').insert({
+            ...payload,
+            id: crypto.randomUUID(),
+            moq: 50,
+            fabric: '',
+            unit: 'pcs',
+            notes: '',
+            stock_reserved: 0,
+            reorder_level: 20,
+            track_sizes: false,
+          })
+          if (error) throw error
+        }
+        saved += 1
+      }
+      const skipNote = errors.length ? ` · ${errors.length} row(s) skipped` : ''
+      showToast(`Imported ${saved} product(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Catalog CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
   }
 
   async function save() {
@@ -264,6 +334,25 @@ export default function CatalogPage() {
           <p className={docsStyles.subtitle}>{t('page.catalog.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importCatalogCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}

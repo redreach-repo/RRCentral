@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import FirefliesCallModal from '../components/accounts/FirefliesCallModal'
@@ -60,6 +60,8 @@ import { canViewField } from '../lib/fieldPermissions'
 import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
 import { parseAccountContactForm, parseAccountNoteForm } from '../lib/schemas/accountContact'
+import { CONTACT_CSV_COLUMNS } from '../lib/contactsCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import { formatAED } from '../lib/money'
 import type {
   Account,
@@ -172,6 +174,8 @@ export default function AccountDetailPage() {
   // Bumped when Make contract adds a contract, so the delivery panel reloads.
   const [deliveryKey, setDeliveryKey] = useState(0)
   const [contacts, setContacts] = useState<ContactRow[]>([])
+  const [importingContacts, setImportingContacts] = useState(false)
+  const contactImportRef = useRef<HTMLInputElement>(null)
   const [showArchivedContacts, setShowArchivedContacts] = useState(false)
   const [timeline, setTimeline] = useState<AccountActivity[]>([])
   const [team, setTeam] = useState<AppUser[]>([])
@@ -396,6 +400,53 @@ export default function AccountDetailPage() {
     )
   }
 
+
+  async function importContactsCsv(file: File) {
+    if (!account || !editable) return
+    setImportingContacts(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of CONTACT_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, CONTACT_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid contact rows', 'error')
+        return
+      }
+      let saved = 0
+      for (const row of ok) {
+        const primaryRaw = String(row.is_primary || '').toLowerCase()
+        await saveContact(account.id, {
+          name: row.name,
+          role: row.role || '',
+          email: row.email || '',
+          phone: row.phone || '',
+          whatsapp: row.whatsapp || '',
+          is_primary: primaryRaw === 'true' || primaryRaw === '1' || primaryRaw === 'yes',
+        })
+        saved += 1
+      }
+      const skipNote = errors.length ? ` · ${errors.length} row(s) skipped` : ''
+      showToast(`Imported ${saved} contact(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Contact CSV import failed'), 'error')
+    } finally {
+      setImportingContacts(false)
+      if (contactImportRef.current) contactImportRef.current.value = ''
+    }
+  }
+
   const sortedContacts = sortContacts(contacts) as ContactRow[]
   const items = sortTimeline(timeline)
 
@@ -586,6 +637,48 @@ export default function AccountDetailPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.accountDetail.contacts')}</h2>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <input
+              ref={contactImportRef}
+              type="file"
+              accept=".csv,text/csv"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) void importContactsCsv(file)
+              }}
+            />
+            <button
+              type="button"
+              style={smallBtn}
+              disabled={!sortedContacts.length}
+              onClick={() => {
+                exportListCsv(
+                  `contacts-${account?.reference || account?.id || 'account'}.csv`,
+                  ['name', 'role', 'email', 'phone', 'whatsapp', 'is_primary'],
+                  sortedContacts.map((c) => ({
+                    name: c.name,
+                    role: c.role || '',
+                    email: c.email || '',
+                    phone: c.phone || '',
+                    whatsapp: c.whatsapp || '',
+                    is_primary: c.is_primary ? 'true' : 'false',
+                  })),
+                )
+                showToast('Contacts CSV downloaded', 'success')
+              }}
+            >
+              Export CSV
+            </button>
+            {editable ? (
+              <button
+                type="button"
+                style={smallBtn}
+                disabled={importingContacts}
+                onClick={() => contactImportRef.current?.click()}
+              >
+                {importingContacts ? 'Importing…' : 'Import CSV'}
+              </button>
+            ) : null}
             <button
               type="button"
               style={smallBtn}

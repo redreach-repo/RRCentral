@@ -47,4 +47,11 @@ export const GUIDE_OPS_SECTIONS: GuideOpsSection[] = [
     to: '/purchase-orders',
     linkKey: 'guide.ops.purchaseOrders.link',
   },
+  {
+    id: 'clientPos',
+    titleKey: 'guide.ops.clientPos.title',
+    bodyKey: 'guide.ops.clientPos.body',
+    to: '/client-pos',
+    linkKey: 'guide.ops.clientPos.link',
+  },
 ]
