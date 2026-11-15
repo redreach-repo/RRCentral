@@ -16,6 +16,7 @@ import {
   colors,
 } from '../lib/uiStyles'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import { parseEmailComposeForm } from '../lib/schemas/emailCompose'
 
 type Props = {
@@ -137,6 +138,40 @@ export default function EmailComposeModal({
         />
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={sending}
+          onClick={() => {
+            const contactRows = contacts
+              .filter((c) => c.email)
+              .map((c) => ({
+                kind: 'contact',
+                name: c.name || '',
+                email: c.email || '',
+                company: companyName,
+              }))
+            exportListCsv(
+              `email-compose-${companyName.replace(/\s+/g, '-').toLowerCase() || 'draft'}.csv`,
+              ['kind', 'name', 'email', 'company', 'to', 'subject', 'body'],
+              [
+                ...contactRows,
+                {
+                  kind: 'draft',
+                  name: '',
+                  email: '',
+                  company: companyName,
+                  to,
+                  subject,
+                  body,
+                },
+              ],
+            )
+            showToast('Email compose CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
         <button type="button" style={buttonSecondaryStyle} onClick={onClose} disabled={sending}>
           Cancel
         </button>
