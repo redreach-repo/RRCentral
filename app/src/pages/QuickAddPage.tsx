@@ -18,6 +18,7 @@ import {
 } from '../lib/quickAdd'
 import { loadQuickData, logQuickCall, saveQuickLead, type QuickData } from '../lib/quickAddStore'
 import { parseQuickLeadForm } from '../lib/schemas/quickLead'
+import { exportListCsv } from '../lib/listIo'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle, pageStyle, pageTitleStyle, selectStyle } from '../lib/uiStyles'
 
 const big: CSSProperties = { ...inputStyle, fontSize: 22, padding: '12px 14px', letterSpacing: 1 }
@@ -171,8 +172,42 @@ export default function QuickAddPage() {
         <section style={{ ...cardStyle, marginTop: 12 }}>
           {matches.length ? (
             <>
-              <div style={{ fontSize: 13, color: colors.muted, marginBottom: 8 }}>
-                {matches.length === 1 ? 'Known number' : `${matches.length} matches, pick one`}
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 13, color: colors.muted }}>
+                  {matches.length === 1 ? 'Known number' : `${matches.length} matches, pick one`}
+                </div>
+                <button
+                  type="button"
+                  style={buttonSecondaryStyle}
+                  onClick={() => {
+                    exportListCsv(
+                      `quick-add-matches-${cleanPhoneInput(phone) || 'phone'}.csv`,
+                      ['kind', 'name', 'phone', 'account_or_company', 'account_type_or_stage', 'id'],
+                      matches.map((m) =>
+                        m.kind === 'contact'
+                          ? {
+                              kind: 'contact',
+                              name: m.name,
+                              phone: m.phone,
+                              account_or_company: m.accountName,
+                              account_type_or_stage: m.accountType,
+                              id: m.id,
+                            }
+                          : {
+                              kind: 'crm',
+                              name: m.name,
+                              phone: m.phone,
+                              account_or_company: m.company,
+                              account_type_or_stage: m.stage,
+                              id: m.id,
+                            },
+                      ),
+                    )
+                    showToast('Quick-add matches CSV downloaded', 'success')
+                  }}
+                >
+                  Export CSV
+                </button>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {matches.map((m) => (
