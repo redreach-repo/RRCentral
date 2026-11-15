@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { format, parseISO } from 'date-fns'
 import { CalendarClock, Plus, Trash2 } from 'lucide-react'
 import { useToast } from '../../contexts/ToastContext'
@@ -15,10 +15,52 @@ import {
 } from '../../lib/buildTemplatesStore'
 import { errorMessage } from '../../lib/errors'
 import { GO_LIVE_OWNERS, goLiveProgress, goLiveSteps, isOverdue, ownerLabel } from '../../lib/goLive'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import { parseGoLiveStepForm } from '../../lib/schemas/goLiveStep'
 import type { AppUser, BuildStageKey, BuildTask, GoLiveOwner } from '../../lib/types'
 import { buttonSecondaryStyle, cardStyle, colors, inputStyle, sectionTitleStyle, selectStyle } from '../../lib/uiStyles'
+
+const GO_LIVE_CSV_COLUMNS = [
+  'stage',
+  'title',
+  'owner',
+  'due_date',
+  'due_days',
+  'done',
+  'done_at',
+  'done_by',
+  'archived',
+] as const
+
+const STAGE_VALUES = new Set(BUILD_STAGES.map((s) => s.value))
+const STAGE_BY_LABEL = new Map(BUILD_STAGES.map((s) => [s.label.toLowerCase(), s.value]))
+
+function stepMatchKey(stage: string, title: string): string {
+  return `${stage}|${title.trim().toLowerCase()}`
+}
+
+function parseDoneFlag(raw: string): boolean {
+  const v = raw.trim().toLowerCase()
+  if (!v) return false
+  return !(v === 'no' || v === 'false' || v === '0' || v === 'off' || v === 'n')
+}
+
+function resolveStage(raw: string): BuildStageKey | '' {
+  const value = raw.trim()
+  if (!value) return ''
+  if (STAGE_VALUES.has(value as BuildStageKey)) return value as BuildStageKey
+  return (STAGE_BY_LABEL.get(value.toLowerCase()) as BuildStageKey | undefined) || ''
+}
+
+function resolveOwner(raw: string): GoLiveOwner {
+  const v = raw.trim().toLowerCase()
+  if (!v) return 'red_reach'
+  if (v === 'client' || v === 'you') return 'client'
+  const byLabel = GO_LIVE_OWNERS.find((o) => o.label.toLowerCase() === v || o.portalLabel.toLowerCase() === v)
+  if (byLabel) return byLabel.value
+  if (v === 'red_reach' || v === 'red reach') return 'red_reach'
+  return 'red_reach'
+}
 
 const smallBtn: CSSProperties = { ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }
 const muted: CSSProperties = { color: colors.muted, fontSize: 13, margin: 0, lineHeight: 1.5 }
@@ -48,6 +90,8 @@ export default function GoLiveCard({
   const [tasks, setTasks] = useState<BuildTask[]>([])
   const [signed, setSigned] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const [showArchived, setShowArchived] = useState(false)
   const [form, setForm] = useState({ stage: 'live' as BuildStageKey, title: '', owner: 'red_reach' as GoLiveOwner, due: '' })
   const today = format(new Date(), 'yyyy-MM-dd')
@@ -99,6 +143,100 @@ export default function GoLiveCard({
     }, 'Could not add the step')
   }
 
+  async function importGoLiveCsv(file: File) {
+    if (!canEdit) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const byKey = new Map(steps.map((t) => [stepMatchKey(t.stage, t.title), t] as const))
+      const seen = new Set(byKey.keys())
+      let working: Pick<BuildTask, 'sort'>[] = [...tasks]
+      let added = 0
+      let updated = 0
+      let skipped = 0
+      const pendingDone: Array<{ key: string; done: boolean; by: string }> = []
+
+      for (const row of objects) {
+        const title = String(row.title || '').trim()
+        const stage = resolveStage(String(row.stage || '')) || 'live'
+        if (!title) {
+          skipped += 1
+          continue
+        }
+        const owner = resolveOwner(String(row.owner || ''))
+        const dueRaw = String(row.due_date || '').trim()
+        const due_date = /^\d{4}-\d{2}-\d{2}$/.test(dueRaw) ? dueRaw : null
+        const done = parseDoneFlag(String(row.done ?? ''))
+        const doneBy = String(row.done_by || '').trim() || authorEmail
+        const key = stepMatchKey(stage, title)
+        const existing = byKey.get(key)
+        if (existing) {
+          const nextOwner = owner
+          const ownerChanged = (existing.owner || 'red_reach') !== nextOwner
+          const dueChanged = (existing.due_date || null) !== due_date
+          if (ownerChanged || dueChanged) {
+            await updateGoLiveStep(existing.id, {
+              owner: nextOwner,
+              owner_user_id: nextOwner === 'client' ? null : existing.owner_user_id,
+              due_date,
+            })
+            updated += 1
+          }
+          if (Boolean(existing.done) !== done) {
+            await setBuildTaskDone(existing.id, done, done ? doneBy : '')
+            updated += 1
+          }
+          continue
+        }
+        if (seen.has(key)) {
+          skipped += 1
+          continue
+        }
+        await addGoLiveStep(accountId, { stage, title, owner, due_date }, working)
+        const nextSort = working.reduce((max, t) => Math.max(max, t.sort), 0) + 1
+        working = [...working, { sort: nextSort }]
+        seen.add(key)
+        added += 1
+        if (done) pendingDone.push({ key, done: true, by: doneBy })
+      }
+
+      if (pendingDone.length) {
+        const fresh = goLiveSteps(await listBuildTasks(accountId, { includeDeleted: showArchived }))
+        const freshByKey = new Map(fresh.map((t) => [stepMatchKey(t.stage, t.title), t] as const))
+        for (const item of pendingDone) {
+          const task = freshByKey.get(item.key)
+          if (task && Boolean(task.done) !== item.done) {
+            await setBuildTaskDone(task.id, item.done, item.done ? item.by : '')
+            updated += 1
+          }
+        }
+      }
+
+      if (!added && !updated && skipped) {
+        showToast('No matching go-live rows in CSV', 'error')
+        return
+      }
+      const parts = [added ? `${added} added` : '', updated ? `${updated} updated` : ''].filter(Boolean)
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(
+        parts.length ? `Imported go-live checklist (${parts.join(', ')})${skipNote}` : `No go-live changes${skipNote}`,
+        'success',
+      )
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Go-live CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   if (!steps.length && !canEdit) return null
 
   return (
@@ -112,36 +250,59 @@ export default function GoLiveCard({
             </button>
           ) : null}
           {steps.length ? (
+            <span style={{ fontSize: 12, color: progress.overdue ? colors.warn : colors.muted }}>
+              {progress.live ? 'Live' : `${progress.done} of ${progress.total} done`}
+              {progress.overdue ? `, ${progress.overdue} overdue` : ''}
+              {progress.goLiveDate && !progress.live ? `. Go live ${day(progress.goLiveDate)}` : ''}
+            </span>
+          ) : null}
+          {canEdit ? (
             <>
-              <span style={{ fontSize: 12, color: progress.overdue ? colors.warn : colors.muted }}>
-                {progress.live ? 'Live' : `${progress.done} of ${progress.total} done`}
-                {progress.overdue ? `, ${progress.overdue} overdue` : ''}
-                {progress.goLiveDate && !progress.live ? `. Go live ${day(progress.goLiveDate)}` : ''}
-              </span>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) void importGoLiveCsv(file)
+                }}
+              />
               <button
                 type="button"
                 style={smallBtn}
-                onClick={() => {
-                  exportListCsv(
-                    `go-live-${accountId.slice(0, 8)}.csv`,
-                    ['stage', 'title', 'owner', 'due_date', 'due_days', 'done', 'done_at', 'done_by', 'archived'],
-                    steps.map((t) => ({
-                      stage: t.stage,
-                      title: t.title,
-                      owner: ownerLabel(t.owner || 'red_reach'),
-                      due_date: t.due_date || '',
-                      due_days: t.due_days ?? '',
-                      done: t.done ? 'yes' : 'no',
-                      done_at: t.done_at || '',
-                      done_by: t.done_by || '',
-                      archived: t.deleted_at ? 'yes' : 'no',
-                    })),
-                  )
-                }}
+                disabled={importing || busy}
+                onClick={() => importInputRef.current?.click()}
               >
-                Export CSV
+                {importing ? 'Importing…' : 'Import CSV'}
               </button>
             </>
+          ) : null}
+          {steps.length ? (
+            <button
+              type="button"
+              style={smallBtn}
+              onClick={() => {
+                exportListCsv(
+                  `go-live-${accountId.slice(0, 8)}.csv`,
+                  [...GO_LIVE_CSV_COLUMNS],
+                  steps.map((t) => ({
+                    stage: t.stage,
+                    title: t.title,
+                    owner: ownerLabel(t.owner || 'red_reach'),
+                    due_date: t.due_date || '',
+                    due_days: t.due_days ?? '',
+                    done: t.done ? 'yes' : 'no',
+                    done_at: t.done_at || '',
+                    done_by: t.done_by || '',
+                    archived: t.deleted_at ? 'yes' : 'no',
+                  })),
+                )
+                showToast('Go-live checklist CSV downloaded', 'success')
+              }}
+            >
+              Export CSV
+            </button>
           ) : null}
         </div>
       </div>
