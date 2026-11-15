@@ -27,6 +27,7 @@ export const CUSTOM_FIELD_OBJECTS: { value: string; label: string }[] = [
   { value: 'account', label: 'Account' },
   { value: 'crm', label: 'CRM lead' },
   { value: 'quotation', label: 'Quotation' },
+  { value: 'ticket', label: 'Support ticket' },
 ]
 
 export type CustomFieldDefinition = {

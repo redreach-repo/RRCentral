@@ -106,6 +106,22 @@ export function quotationsFiltersEqual(
   return (a.q || '') === (b.q || '') && (a.status || 'All') === (b.status || 'All')
 }
 
+export type ExpensesViewFilters = {
+  from?: string
+  to?: string
+}
+
+export function normalizeExpensesFilters(input: { from: string; to: string }): ExpensesViewFilters {
+  const out: ExpensesViewFilters = {}
+  if (input.from.trim()) out.from = input.from.trim()
+  if (input.to.trim()) out.to = input.to.trim()
+  return out
+}
+
+export function expensesFiltersEqual(a: ExpensesViewFilters, b: ExpensesViewFilters): boolean {
+  return (a.from || '') === (b.from || '') && (a.to || '') === (b.to || '')
+}
+
 export async function listSavedViews(moduleId: string): Promise<SavedView[]> {
   const { data, error } = await db
     .from('saved_views')
