@@ -1,7 +1,9 @@
 # Spec pointer
 
-The product authority is **RRCRM Master Specification Version 1.1** (13 November 2026), owned by Alfred S. Varghese.
+The product authority is **HighMast Master Specification Version 2.1** (15 November 2026), owned by Alfred S. Varghese.
+
+Product name: **HighMast** (by Red Reach). RR Central / RRCRM remain only as names for the existing app in audit and migration notes.
 
 Cursor must follow section 0 rules: audit → gap plan → milestones; keep what works; ask before destructive or paid changes; never commit secrets; verify compliance sources into `COMPLIANCE_NOTES.md`.
 
-Working name: RRCRM (RR Central). Final product name is an open decision (§19).
+Version roadmap (spec §5.7): **v1** web + per-tenant installable PWA · **v3** multi-language · **v6** native apps (six platforms). Do not invent content for undefined versions.

@@ -1,8 +1,9 @@
-# RRCRM gap plan (M0)
+# HighMast gap plan (M0)
 
-**Date:** 13 November 2026 (Asia/Dubai)  
-**Against:** Master Specification v1.1  
+**Date:** 15 November 2026 (Asia/Dubai)  
+**Against:** Master Specification **v2.1**  
 **Audit:** `docs/AUDIT.md`  
+**Pointer:** `docs/SPEC_POINTER.md`  
 **Rule:** Keep what works. Add structures, migrate, then retire old paths. Ask before destructive migrations, auth/hosting changes, or new paid services.
 
 Status key: **exists** · **partial** · **missing**
@@ -30,9 +31,16 @@ Status key: **exists** · **partial** · **missing**
 | Shell: Inbox/Sales/… areas, Cmd+K, AI button | partial | Accordion nav exists; restructure shell in M1 |
 | Company switcher | partial | M1 top-bar switcher; multi-company ops still thin |
 | EN+AR RTL | partial | M1 `I18nContext` + dir; guide + shell/nav + sales/finance/clients/admin/ops/delivery list chrome (Dashboard → Domains through Wanders, Settings/Account, CTRM weekly summary, ticket + account detail, CTRM fit sheet, quote/invoice/DN viewer, legal e-sign + quote-accept + client portal + monthly client report + Wanders tour-ops + monthly reports + weekly updates queue + client health + module-flags Settings card + CTRM issues + obligations board + clause library + NDA template + build templates + agreement template + domains + app errors + Settings section chrome); more page bodies later |
-| PWA installable | partial | Icons + maskable safe-zone from brand mark; theme `#C8321A`; still missing division logos |
+| PWA / app identity §5.6 | partial | After sign-in manifest follows company brand; still need per-host manifests, `tenant_app_identities`, install guides |
+| Native apps §5.7 / M14 | missing | v6 only — spike later; do not start without Alfred |
 | Brand kits per tenant/company/BU | partial | M1 `brand_kits` + Theme studio + top-bar BU chrome switch; missing Boost/Care/Trading SVG assets |
 | In-app guide `/guide` | partial | CRM + billing + delivery + ops + finance + admin packs live (`GUIDE_PACKS`); more packs / AR polish later |
+| Sign-up + provisioner §6.13.1–2 | missing | M11: workspace setup form + idempotent provisioner + business-type → pack table |
+| Engineering pack §11.3 | partial | Builtin pack key + module flags; shared foundation M12a not built |
+| Construction pack §11.4 | partial | Builtin pack key + module flags; workforce/site objects M12b not built |
+| Trading pack §11.2 light | partial | `trading_import` starter exists; landed cost / credit limits later |
+| Languages §5.5 (v3) | partial | EN+AR only; all new strings must stay key-based for v3 |
+| Country packs §12 | partial | UAE helpers exist; India/Canada packs M8a; residency §19 |
 
 ---
 
@@ -116,7 +124,7 @@ WorshipHub admin, Tee Tribe shop, RR Wanders tour ops, CTRM commission tables �
 | **M2** | Depends on M1 |
 | **M3** | Dual/triple CRM merge; keep briefing — see `docs/M3_CRM_UNIFY.md` |
 | **M3a** | Separate Supabase project for demo (ask Alfred before provisioning) |
-| **M4+** | As spec |
+| **M4+** | As spec (M11 includes §6.13 form + §5.6 host manifests; M12a/b Eng/Construction; M14 native v6) |
 
 ---
 
@@ -125,8 +133,10 @@ WorshipHub admin, Tee Tribe shop, RR Wanders tour ops, CTRM commission tables �
 1. Confirm job runner remains **pg_cron + Edge** for now (recommended).  
 2. Confirm when to provision a **second Supabase project** for demo (M3a).  
 3. Confirm data residency preference timing (before first external customer).  
-4. Provide Boost / Care / Trading logos + SVGs + light variants when available.
+4. Provide Boost / Care / Trading logos + SVGs + light variants when available.  
+5. Confirm workspace address domain for §5.6 (open decision §19.1 / §19.14).  
+6. Confirm native build approach only after a short spike (§19.29) — not before M14.
 
 ---
 
-*End of GAP_PLAN.md — M0*
+*End of GAP_PLAN.md — against Master Spec v2.1*
