@@ -6,6 +6,7 @@ import { listAccounts, listTeam } from '../../lib/accountsStore'
 import { listDeals as listCtrmDeals } from '../../lib/ctrmStore'
 import { db } from '../../lib/db'
 import { noNextStep, type NoNextStepRow } from '../../lib/dealRules'
+import { exportListCsv } from '../../lib/listIo'
 import { can } from '../../lib/permissions'
 import { listSalesDeals } from '../../lib/salesPipelineStore'
 import type { CrmEntry } from '../../lib/types'
@@ -69,9 +70,32 @@ export default function NoNextStepCard() {
         <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
           <Signpost size={18} /> No next step ({shown.length})
         </h2>
-        <button type="button" style={buttonSecondaryStyle} onClick={() => setMineOnly((m) => !m)}>
-          {mineOnly ? 'Show everyone’s' : 'Show mine only'}
-        </button>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={!shown.length}
+            onClick={() => {
+              exportListCsv(
+                'no-next-step.csv',
+                ['name', 'pipeline', 'stage', 'missing', 'owner', 'link'],
+                shown.map((r) => ({
+                  name: r.name,
+                  pipeline: PIPELINE[r.pipeline],
+                  stage: r.stage,
+                  missing: r.missing,
+                  owner: r.owner_label || '',
+                  link: r.link,
+                })),
+              )
+            }}
+          >
+            Export CSV
+          </button>
+          <button type="button" style={buttonSecondaryStyle} onClick={() => setMineOnly((m) => !m)}>
+            {mineOnly ? 'Show everyone’s' : 'Show mine only'}
+          </button>
+        </div>
       </div>
       <p style={{ color: colors.muted, fontSize: 12, margin: '6px 0 10px' }}>
         Open deals with no next action or no date for it. Open one and add what happens next.
