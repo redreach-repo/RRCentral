@@ -5,8 +5,10 @@ import { Download, ShieldCheck } from 'lucide-react'
 import { db } from '../lib/db'
 import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
+import { useToast } from '../contexts/ToastContext'
 import { can } from '../lib/permissions'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import {
   AUDIT_FOCUS,
   AUDIT_TABLE_LABELS,
@@ -95,7 +97,8 @@ async function lookupClients(
 
 export default function AuditLogPage() {
   const { t } = useI18n()
-  const { userRole } = useAuth()
+  const { userRole, appUserId } = useAuth()
+  const { showToast } = useToast()
   const [params, setParams] = useSearchParams()
   const focus = (params.get('focus') || '') as AuditFocus | ''
   const accountId = params.get('account') || ''
@@ -109,6 +112,10 @@ export default function AuditLogPage() {
   const [operation, setOperation] = useState<AuditEntry['operation'] | ''>('')
   const [actor, setActor] = useState('')
   const [expanded, setExpanded] = useState<number | null>(null)
+  const auditViewFilters = useMemo(
+    () => ({ focus: focus || 'all', since, operation: operation || 'all', table: table || 'all' }),
+    [focus, since, operation, table],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -199,6 +206,35 @@ export default function AuditLogPage() {
           <p className={docsStyles.subtitle}>{t('page.audit.subtitle')}</p>
         </div>
       </header>
+
+      <SavedViewsBar
+        moduleId="audit_log"
+        filters={auditViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => {
+          const nextFocus = String(f.focus || 'all')
+          setParam('focus', nextFocus === 'all' ? '' : nextFocus)
+          const nextSince = String(f.since || '30')
+          if (SINCE_OPTIONS.some((o) => o.value === nextSince)) setSince(nextSince)
+          const nextOp = String(f.operation || 'all')
+          setOperation(
+            nextOp === 'INSERT' || nextOp === 'UPDATE' || nextOp === 'DELETE'
+              ? nextOp
+              : '',
+          )
+          const nextTable = String(f.table || 'all')
+          setTable(nextTable === 'all' ? '' : nextTable)
+        }}
+        onToast={showToast}
+        filtersEqual={(a, b) =>
+          String(a.focus || 'all') === String(b.focus || 'all') &&
+          String(a.since || '30') === String(b.since || '30') &&
+          String(a.operation || 'all') === String(b.operation || 'all') &&
+          String(a.table || 'all') === String(b.table || 'all')
+        }
+      />
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         {(['', 'contracts', 'prices', 'commission'] as const).map((f) => (
