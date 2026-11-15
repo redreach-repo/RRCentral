@@ -51,6 +51,7 @@ export default function InventoryPage() {
   const [delta, setDelta] = useState('0')
   const [reason, setReason] = useState('manual_adjust')
   const [busy, setBusy] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -61,9 +62,8 @@ export default function InventoryPage() {
         listWarehouseStock().catch(() => [] as WarehouseStockListRow[]),
       ])
       if (error) throw error
-      setProducts(
-        ((data || []) as (Product & { deleted_at?: string | null })[]).filter((p) => !p.deleted_at),
-      )
+      const raw = (data || []) as (Product & { deleted_at?: string | null })[]
+      setProducts(showArchived ? raw : raw.filter((p) => !p.deleted_at))
       setWarehouses(wh)
       setStockRows(stock)
       setWarehouseId((prev) => prev || defaultWarehouse(wh)?.id || '')
@@ -72,14 +72,16 @@ export default function InventoryPage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [showToast, showArchived])
 
   useEffect(() => {
     void load()
   }, [load])
 
   const rows = useMemo(() => {
-    let list = products.filter((p) => p.active !== false)
+    let list = showArchived
+      ? products
+      : products.filter((p) => p.active !== false)
     if (filter === 'low') {
       list = list.filter((p) => availableStock(p) <= Number(p.reorder_level || 0))
     } else if (filter === 'reserved') {
@@ -94,7 +96,7 @@ export default function InventoryPage() {
       )
     }
     return list
-  }, [products, filter, search])
+  }, [products, filter, search, showArchived])
 
   const lowCount = products.filter(
     (p) => p.active !== false && availableStock(p) <= Number(p.reorder_level || 0),
@@ -108,6 +110,23 @@ export default function InventoryPage() {
       await load()
     } catch (e) {
       showToast(errorMessage(e, 'Sync failed'), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function restoreProduct(p: Product & { deleted_at?: string | null }) {
+    setBusy(true)
+    try {
+      const { error } = await db
+        .from('products')
+        .update({ deleted_at: null, active: true, updated_at: new Date().toISOString() })
+        .eq('id', p.id)
+      if (error) throw error
+      showToast(`Restored ${p.sku}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Restore failed'), 'error')
     } finally {
       setBusy(false)
     }
@@ -182,6 +201,14 @@ export default function InventoryPage() {
             }}
           >
             Export CSV
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
           </button>
           <button
             type="button"
@@ -324,13 +351,17 @@ export default function InventoryPage() {
               </thead>
               <tbody>
                 {rows.map((p) => {
+                  const archived = Boolean((p as Product & { deleted_at?: string | null }).deleted_at)
                   const avail = availableStock(p)
                   const low = avail <= Number(p.reorder_level || 0)
                   return (
-                    <tr key={p.id}>
+                    <tr key={p.id} style={archived ? { opacity: 0.65 } : undefined}>
                       <td style={{ ...tdStyle, fontWeight: 600 }}>{p.sku || '—'}</td>
                       <td style={tdStyle}>
                         {p.name}
+                        {archived ? (
+                          <span style={{ marginLeft: 6, fontSize: 11, color: colors.muted2 }}>archived</span>
+                        ) : null}
                         {p.track_sizes ? (
                           <span style={{ marginLeft: 6, fontSize: 11, color: colors.muted2 }}>sizes</span>
                         ) : null}
@@ -350,17 +381,28 @@ export default function InventoryPage() {
                       </td>
                       <td style={tdStyle}>{Number(p.reorder_level || 0)}</td>
                       <td style={tdStyle}>
-                        <button
-                          type="button"
-                          style={buttonSecondaryStyle}
-                          onClick={() => {
-                            setAdjustTarget(p)
-                            setDelta('0')
-                            setReason('manual_adjust')
-                          }}
-                        >
-                          <Plus size={14} /> Adjust
-                        </button>
+                        {archived ? (
+                          <button
+                            type="button"
+                            style={buttonSecondaryStyle}
+                            disabled={busy}
+                            onClick={() => void restoreProduct(p)}
+                          >
+                            Restore
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            style={buttonSecondaryStyle}
+                            onClick={() => {
+                              setAdjustTarget(p)
+                              setDelta('0')
+                              setReason('manual_adjust')
+                            }}
+                          >
+                            <Plus size={14} /> Adjust
+                          </button>
+                        )}
                       </td>
                     </tr>
                   )

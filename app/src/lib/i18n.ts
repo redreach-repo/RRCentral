@@ -119,6 +119,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.hr.attendance.body':
       'Daily attendance rows for the HR stub — not a live biometric feed.',
     'guide.hr.attendance.link': 'Open Attendance',
+    'guide.hr.payroll.title': 'Payroll',
+    'guide.hr.payroll.body':
+      'Payroll run stubs for rehearsal only. Live WPS / bank files stay blocked until Alfred and counsel clear the formats.',
+    'guide.hr.payroll.link': 'Open Payroll',
     'guide.crm.myday.title': 'My Day',
     'guide.crm.myday.body':
       'Start here each morning. Log touches, set the next action and follow-up date, and mark Won or Lost with a reason.',
@@ -1135,6 +1139,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.hr.attendance.body':
       'صفوف حضور يومية لنموذج الموارد البشرية — ليست تغذية بيومترية حية.',
     'guide.hr.attendance.link': 'فتح الحضور',
+    'guide.hr.payroll.title': 'الرواتب',
+    'guide.hr.payroll.body':
+      'تشغيلات رواتب تجريبية فقط. ملفات WPS / البنك الحية تبقى موقوفة حتى يوافق ألفرد والمستشار على الصيغ.',
+    'guide.hr.payroll.link': 'فتح الرواتب',
     'guide.crm.myday.title': 'يومي',
     'guide.crm.myday.body':
       'ابدأ من هنا كل صباح. سجّل التواصل، حدّد الخطوة التالية وتاريخ المتابعة، وعلّم ربح أو خسارة مع السبب.',
