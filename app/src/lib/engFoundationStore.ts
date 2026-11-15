@@ -1,6 +1,7 @@
 import { db } from './db'
 import { isMissingRelationError } from './errors'
 import { isSupabaseConfigured } from './supabaseConfig'
+import { withoutSoftDeleted } from './softDelete'
 
 export type EngDocument = {
   id: string
@@ -10,6 +11,7 @@ export type EngDocument = {
   revision: string
   status: string
   notes: string
+  deleted_at?: string | null
 }
 
 export type EngClaim = {
@@ -19,20 +21,24 @@ export type EngClaim = {
   amount_aed: number
   status: string
   notes: string
+  deleted_at?: string | null
 }
 
-export async function listEngDocuments(): Promise<EngDocument[]> {
+export async function listEngDocuments(opts?: {
+  includeDeleted?: boolean
+}): Promise<EngDocument[]> {
   if (!isSupabaseConfigured()) return []
   const { data, error } = await db
     .from('eng_document_registers')
-    .select('id, doc_no, title, discipline, revision, status, notes')
+    .select('id, doc_no, title, discipline, revision, status, notes, deleted_at')
     .order('created_at', { ascending: false })
     .limit(100)
   if (error) {
     if (isMissingRelationError(error)) return []
     throw error
   }
-  return (data || []) as EngDocument[]
+  const rows = (data || []) as EngDocument[]
+  return opts?.includeDeleted ? rows : withoutSoftDeleted(rows)
 }
 
 export async function createEngDocument(input: {
@@ -51,18 +57,40 @@ export async function createEngDocument(input: {
   if (error) throw error
 }
 
-export async function listEngClaims(): Promise<EngClaim[]> {
+export async function softDeleteEngDocument(id: string): Promise<void> {
+  const { error } = await db
+    .from('eng_document_registers')
+    .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function restoreEngDocument(id: string): Promise<void> {
+  const { error } = await db
+    .from('eng_document_registers')
+    .update({ deleted_at: null, updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function listEngClaims(opts?: {
+  includeDeleted?: boolean
+}): Promise<EngClaim[]> {
   if (!isSupabaseConfigured()) return []
   const { data, error } = await db
     .from('eng_claims')
-    .select('id, claim_no, title, amount_aed, status, notes')
+    .select('id, claim_no, title, amount_aed, status, notes, deleted_at')
     .order('created_at', { ascending: false })
     .limit(100)
   if (error) {
     if (isMissingRelationError(error)) return []
     throw error
   }
-  return (data || []).map((r: EngClaim) => ({ ...r, amount_aed: Number(r.amount_aed) || 0 }))
+  const rows = (data || []).map((r: EngClaim) => ({
+    ...r,
+    amount_aed: Number(r.amount_aed) || 0,
+  }))
+  return opts?.includeDeleted ? rows : withoutSoftDeleted(rows)
 }
 
 export async function createEngClaim(input: {
@@ -76,5 +104,21 @@ export async function createEngClaim(input: {
     amount_aed: Number(input.amountAed) || 0,
     status: 'draft',
   })
+  if (error) throw error
+}
+
+export async function softDeleteEngClaim(id: string): Promise<void> {
+  const { error } = await db
+    .from('eng_claims')
+    .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function restoreEngClaim(id: string): Promise<void> {
+  const { error } = await db
+    .from('eng_claims')
+    .update({ deleted_at: null, updated_at: new Date().toISOString() })
+    .eq('id', id)
   if (error) throw error
 }
