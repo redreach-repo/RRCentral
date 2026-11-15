@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { getMailProvider, type MailMessage } from '../lib/mailCalendar'
+import { exportListCsv } from '../lib/listIo'
 import { attachCrmMatches, type InboxRow } from '../lib/zohoInboxMatch'
 import { useDriveStatus } from '../hooks/useDriveStatus'
 import { archiveSetupHint, scanAndFileCrmEmails } from '../lib/zohoEmailArchive'
@@ -190,6 +191,47 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
           <button type="button" style={buttonSecondaryStyle} disabled={loading} onClick={() => void load()}>
             {loading ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />}
             Refresh
+          </button>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={visible.length === 0}
+            onClick={() => {
+              exportListCsv(
+                `zoho-mail-${mailbox}.csv`,
+                [
+                  'mailbox',
+                  'subject',
+                  'from',
+                  'to',
+                  'sender',
+                  'status',
+                  'received',
+                  'has_attachment',
+                  'crm_company',
+                  'matched_email',
+                  'summary',
+                ],
+                visible.map((m) => ({
+                  mailbox,
+                  subject: m.subject,
+                  from: m.fromAddress,
+                  to: m.toAddress || '',
+                  sender: m.sender,
+                  status: m.status,
+                  received: m.receivedTime
+                    ? format(new Date(m.receivedTime), 'yyyy-MM-dd HH:mm')
+                    : '',
+                  has_attachment: m.hasAttachment ? 'yes' : 'no',
+                  crm_company: m.crm?.companyName || '',
+                  matched_email: m.crm?.matchedEmail || '',
+                  summary: m.summary,
+                })),
+              )
+              showToast('Mail CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
           </button>
           <button
             type="button"
