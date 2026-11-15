@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { useI18n } from '../../../contexts/I18nContext'
@@ -9,9 +9,10 @@ import {
   defaultStubWidgets,
   parseDashboardLayout,
   type DashboardWidget,
+  type DashboardWidgetType,
 } from '../../../lib/dashboardWidgets'
 import { errorMessage, isMissingRelationError } from '../../../lib/errors'
-import { exportListCsv } from '../../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../../lib/listIo'
 import { isSupabaseConfigured } from '../../../lib/supabaseConfig'
 import {
   buttonPrimaryStyle,
@@ -25,11 +26,47 @@ import {
 } from '../../../lib/uiStyles'
 import SetupNotice from '../_shared/SetupNotice'
 
+const DASHBOARD_CSV_HEADERS = ['name', 'active', 'widget_count', 'widget_types'] as const
+
+const WIDGET_TYPES = new Set<DashboardWidgetType>(['kpi_count', 'saved_view_link', 'static_note'])
+
 type DashboardRow = {
   id: string
   name: string
   layout_json: unknown
   active: boolean
+}
+
+function parseActiveFlag(raw: string): boolean {
+  const v = raw.trim().toLowerCase()
+  if (!v) return true
+  return !['0', 'false', 'no', 'n', 'off'].includes(v)
+}
+
+function widgetId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
+  return `w_${Math.random().toString(36).slice(2, 10)}`
+}
+
+/** Rebuild stub widgets from export's semicolon-separated types column. */
+function widgetsFromTypes(raw: string): DashboardWidget[] {
+  const parts = raw
+    .split(/[;|,]/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+  const widgets: DashboardWidget[] = []
+  for (const part of parts) {
+    const type = part as DashboardWidgetType
+    if (!WIDGET_TYPES.has(type)) continue
+    if (type === 'kpi_count') {
+      widgets.push({ id: widgetId(), type, title: 'KPI', value: 0 })
+    } else if (type === 'saved_view_link') {
+      widgets.push({ id: widgetId(), type, title: 'Saved view', href: '/deals' })
+    } else {
+      widgets.push({ id: widgetId(), type, title: 'Note', body: 'Imported stub widget.' })
+    }
+  }
+  return widgets
 }
 
 function WidgetCard({ w }: { w: DashboardWidget }) {
@@ -70,6 +107,8 @@ export default function DashboardsPage() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [missing, setMissing] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -149,6 +188,99 @@ export default function DashboardsPage() {
     }
   }
 
+  async function importDashboardsCsv(file: File) {
+    if (!isSupabaseConfigured() || missing) {
+      showToast('Dashboards store is not available', 'error')
+      return
+    }
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const { data: existingRaw, error: existingError } = await db
+        .from('custom_dashboards')
+        .select('id, name, layout_json, active')
+      if (existingError) {
+        if (isMissingRelationError(existingError)) {
+          showToast('custom_dashboards table is missing', 'error')
+          return
+        }
+        throw existingError
+      }
+      const byName = new Map(
+        ((existingRaw || []) as DashboardRow[]).map(
+          (r) => [r.name.trim().toLowerCase(), r] as const,
+        ),
+      )
+      let saved = 0
+      let skipped = 0
+      for (const row of objects) {
+        const name = String(row.name || '').trim()
+        if (!name) {
+          skipped += 1
+          continue
+        }
+        const active = parseActiveFlag(String(row.active ?? 'yes'))
+        const fromTypes = widgetsFromTypes(String(row.widget_types || ''))
+        const existing = byName.get(name.toLowerCase())
+        if (existing) {
+          const existingWidgets = parseDashboardLayout(existing.layout_json).widgets
+          const layout_json =
+            existingWidgets.length > 0
+              ? existing.layout_json
+              : { widgets: fromTypes.length ? fromTypes : defaultStubWidgets() }
+          const { error } = await db
+            .from('custom_dashboards')
+            .update({
+              name,
+              active,
+              layout_json,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existing.id)
+          if (error) throw error
+          byName.set(name.toLowerCase(), {
+            ...existing,
+            name,
+            active,
+            layout_json,
+          })
+        } else {
+          const layout_json = {
+            widgets: fromTypes.length ? fromTypes : defaultStubWidgets(),
+          }
+          const { data: inserted, error } = await db
+            .from('custom_dashboards')
+            .insert({ name, layout_json, active })
+            .select('id, name, layout_json, active')
+            .single()
+          if (error) throw error
+          if (inserted) {
+            byName.set(name.toLowerCase(), inserted as DashboardRow)
+          }
+        }
+        saved += 1
+      }
+      if (!saved) {
+        showToast('No matching dashboard rows in CSV', 'error')
+        return
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} dashboard(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Dashboards CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <div style={pageStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'start' }}>
@@ -156,29 +288,49 @@ export default function DashboardsPage() {
           <h1 style={pageTitleStyle}>{t('page.dashboards.title')}</h1>
           <p style={pageSubtitleStyle}>{t('page.dashboards.subtitle')}</p>
         </div>
-        <button
-          type="button"
-          style={buttonSecondaryStyle}
-          disabled={!rows.length}
-          onClick={() => {
-            exportListCsv(
-              'custom-dashboards.csv',
-              ['name', 'active', 'widget_count', 'widget_types'],
-              rows.map((r) => {
-                const widgets = parseDashboardLayout(r.layout_json).widgets
-                return {
-                  name: r.name,
-                  active: r.active ? 'yes' : 'no',
-                  widget_count: widgets.length,
-                  widget_types: widgets.map((w) => w.type).join('; '),
-                }
-              }),
-            )
-            showToast('Dashboards CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importDashboardsCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={importing || missing || !isSupabaseConfigured()}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={!rows.length}
+            onClick={() => {
+              exportListCsv(
+                'custom-dashboards.csv',
+                [...DASHBOARD_CSV_HEADERS],
+                rows.map((r) => {
+                  const widgets = parseDashboardLayout(r.layout_json).widgets
+                  return {
+                    name: r.name,
+                    active: r.active ? 'yes' : 'no',
+                    widget_count: widgets.length,
+                    widget_types: widgets.map((w) => w.type).join('; '),
+                  }
+                }),
+              )
+              showToast('Dashboards CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </div>
       <SetupNotice
         localMode={!isSupabaseConfigured()}
