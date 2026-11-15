@@ -2,6 +2,7 @@ import { db } from './db'
 import { isMissingRelationError, isUndefinedColumnError } from './errors'
 import type { IntakeRow } from './leadIntake'
 import { getSupabaseRuntimeConfig, isSupabaseConfigured } from './supabaseConfig'
+import { submitWebsiteInquiry, type WebsiteInquiryInput } from './websiteLeads'
 
 const COLUMNS = 'id, name, email, phone, source, channel, status, pipeline, account_id, crm_id, deal_id, matched, created_at'
 
@@ -20,6 +21,46 @@ export async function listRecentLeads(since: Date): Promise<IntakeRow[]> {
   }
   return (data || []) as IntakeRow[]
 }
+
+const INTAKE_STATUSES = new Set(['new', 'converted', 'closed'])
+
+/** Create a website inquiry (and CRM lead in local mode) via the public submit helper. */
+export async function createLeadFromImport(input: WebsiteInquiryInput) {
+  return submitWebsiteInquiry(input)
+}
+
+/** Patch an existing website inquiry. Returns false when the row is missing or the table is not ready. */
+export async function updateLeadInquiry(
+  id: string,
+  patch: {
+    name?: string
+    email?: string
+    phone?: string
+    source?: string
+    channel?: string
+    status?: string
+  },
+): Promise<boolean> {
+  const next: Record<string, string> = {}
+  if (patch.name != null) next.name = patch.name
+  if (patch.email != null) next.email = patch.email
+  if (patch.phone != null) next.phone = patch.phone
+  if (patch.source != null) next.source = patch.source
+  if (patch.channel != null) next.channel = patch.channel
+  if (patch.status != null) {
+    const status = patch.status.trim().toLowerCase()
+    if (!INTAKE_STATUSES.has(status)) return false
+    next.status = status
+  }
+  if (!Object.keys(next).length) return true
+  const { error } = await db.from('website_inquiries').update(next).eq('id', id)
+  if (error) {
+    if (isMissingRelationError(error) || isUndefinedColumnError(error)) return false
+    throw error
+  }
+  return true
+}
+
 
 function functionUrl(query = ''): string | null {
   const cfg = getSupabaseRuntimeConfig()
