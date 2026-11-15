@@ -76,6 +76,12 @@ import { sortByDateDesc } from '../lib/finance'
 import { isQuotePastValidity, quoteValidUntil } from '../lib/documents'
 import { errorMessage, isUndefinedColumnError } from '../lib/errors'
 import { exportListCsv } from '../lib/listIo'
+import {
+  displayFieldValue,
+  listCustomFieldDefinitions,
+  loadCustomFieldValuesForRecords,
+  type CustomFieldDefinition,
+} from '../lib/customFields'
 import { resolveCreditWarnForClient } from '../lib/creditSoftWarn'
 import { createDeliveryNoteFromQuote, matchQuoteForDeliveryNote } from '../lib/deliveryNotes'
 import { resolveDealRef } from '../lib/dealQuotes'
@@ -191,6 +197,10 @@ export default function QuotationsPage() {
   const canDeleteQuote = can(userRole, 'quote.deleteAny')
 
   const [quotes, setQuotes] = useState<Quotation[]>([])
+  const [customDefs, setCustomDefs] = useState<CustomFieldDefinition[]>([])
+  const [customValues, setCustomValues] = useState<
+    Record<string, Record<string, unknown>>
+  >({})
   const [clients, setClients] = useState<Client[]>([])
   const [crmRows, setCrmRows] = useState<CrmEntry[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -325,6 +335,15 @@ export default function QuotationsPage() {
       }
 
       setQuotes(rows)
+      const defs = await listCustomFieldDefinitions('quotation').catch(
+        () => [] as CustomFieldDefinition[],
+      )
+      setCustomDefs(defs.slice(0, 3))
+      const values = await loadCustomFieldValuesForRecords(
+        'quotation',
+        rows.map((r) => r.id),
+      ).catch(() => ({}))
+      setCustomValues(values)
     } catch (e) {
       showToast(errorMessage(e, 'Failed to load quotations'), 'error')
     } finally {
@@ -1388,15 +1407,29 @@ export default function QuotationsPage() {
             onClick={() => {
               exportListCsv(
                 'quotations.csv',
-                ['reference_number', 'client', 'status', 'amount', 'date', 'valid_until'],
-                quotes.map((q) => ({
-                  reference_number: q.reference_number || '',
-                  client: q.client,
-                  status: q.status,
-                  amount: q.amount,
-                  date: q.date || '',
-                  valid_until: q.valid_until || '',
-                })),
+                [
+                  'reference_number',
+                  'client',
+                  'status',
+                  'amount',
+                  'date',
+                  'valid_until',
+                  ...customDefs.map((d) => d.field_key || d.id),
+                ],
+                quotes.map((q) => {
+                  const row: Record<string, unknown> = {
+                    reference_number: q.reference_number || '',
+                    client: q.client,
+                    status: q.status,
+                    amount: q.amount,
+                    date: q.date || '',
+                    valid_until: q.valid_until || '',
+                  }
+                  for (const d of customDefs) {
+                    row[d.field_key || d.id] = displayFieldValue(d, customValues[q.id]?.[d.id])
+                  }
+                  return row
+                }),
               )
               showToast('Quotations CSV downloaded', 'success')
             }}
@@ -1477,6 +1510,9 @@ export default function QuotationsPage() {
                   <th className={qStyles.colDate}>Date</th>
                   <th className={qStyles.colAmount}>Amount</th>
                   <th className={qStyles.colStatus}>Status</th>
+                  {customDefs.map((d) => (
+                    <th key={d.id}>{d.label || d.field_key}</th>
+                  ))}
                   <th className={qStyles.colActions} style={{ textAlign: 'right' }}>
                     Actions
                   </th>
