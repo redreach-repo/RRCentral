@@ -249,11 +249,11 @@ export default function ConstructionSitesPage() {
 
           <section style={cardStyle}>
             <h2 style={{ marginTop: 0, fontSize: 16 }}>Sites</h2>
-            {sites.length === 0 ? (
+            {visibleSites.length === 0 ? (
               <EmptyState title="No sites" subtitle="Create a site above. Apply construction_sites migration if empty." />
             ) : (
               <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
-                {sites.map((s) => (
+                {visibleSites.map((s) => (
                   <li key={s.id}>
                     <button type="button" style={buttonSecondaryStyle} onClick={() => void openSite(s)}>
                       {siteLabel(s.code, s.name)} · {s.status}
