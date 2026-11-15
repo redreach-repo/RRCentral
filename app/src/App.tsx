@@ -16,6 +16,7 @@ import SaasBillingPage from './pages/SaasBillingPage'
 import IndustryPacksPage from './pages/IndustryPacksPage'
 import ApprovalsPage from './pages/ApprovalsPage'
 import PublicApiPage from './pages/PublicApiPage'
+import ThemeStudioPage from './pages/ThemeStudioPage'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
@@ -164,6 +165,7 @@ export default function App() {
               <Route path="industry-packs" element={<IndustryPacksPage />} />
               <Route path="approvals" element={<ApprovalsPage />} />
               <Route path="public-api" element={<PublicApiPage />} />
+              <Route path="theme-studio" element={<ThemeStudioPage />} />
               <Route path="accounts" element={<AccountsPage />} />
               <Route path="accounts/:id" element={<AccountDetailPage />} />
               <Route path="delivery-settings" element={<DeliverySettingsPage />} />

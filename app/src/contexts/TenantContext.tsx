@@ -32,6 +32,8 @@ type TenantValue = {
   activeCompany: TenantCompany | null
   setActiveCompanyId: (id: string) => void
   brandKit: BrandKit
+  /** Apply a kit immediately (Theme Studio save / preview). */
+  setBrandKit: (kit: BrandKit) => void
   loading: boolean
 }
 
@@ -178,6 +180,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       activeCompany,
       setActiveCompanyId,
       brandKit,
+      setBrandKit,
       loading,
     }),
     [tenantId, companies, activeCompany, setActiveCompanyId, brandKit, loading],

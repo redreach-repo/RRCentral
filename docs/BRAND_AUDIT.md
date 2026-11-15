@@ -66,9 +66,12 @@ Light / dark / system via `themeMode` + `ThemeProvider`; applied before paint. C
 - Pipeline stage colours may rely on hue alone
 - Live React mounts (full Layout/DocumentPage) still optional next step beyond chrome fixtures
 
+## Theme studio
+
+First slice shipped: `/theme-studio` edits company `brand_kits` colours + logo paths with live CSS preview (`docs/theme-studio.md`). Fonts, density, and official SVG masters remain open.
+
 ## Out of scope this step (per prompt)
 
-- Full theme studio (§5.3)
 - Renaming repo, tables, Edge Functions, `/RRCentral` routes
 - Deleting features / touching real data
 - Paid QTSP / demo env
