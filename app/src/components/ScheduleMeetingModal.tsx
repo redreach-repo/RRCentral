@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import Modal from './Modal'
 import type { AppUser, CrmEntry } from '../lib/types'
@@ -14,7 +14,7 @@ import {
   labelStyle,
 } from '../lib/uiStyles'
 import { errorMessage } from '../lib/errors'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { parseScheduleMeetingForm } from '../lib/schemas/scheduleMeeting'
 import { useToast } from '../contexts/ToastContext'
 
@@ -47,7 +47,9 @@ export default function ScheduleMeetingModal({
   const [crmId, setCrmId] = useState(defaultCrmId)
   const [selectedTeam, setSelectedTeam] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
   const [error, setError] = useState('')
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const activeTeam = useMemo(
     () => team.filter((u) => u.active !== false && u.email),
@@ -63,6 +65,99 @@ export default function ScheduleMeetingModal({
     setSelectedTeam((prev) =>
       prev.includes(email) ? prev.filter((e) => e !== email) : [...prev, email],
     )
+  }
+
+  async function importMeetingCsv(file: File) {
+    setImporting(true)
+    setError('')
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      if (!objects.length) {
+        showToast('No meeting draft rows in CSV', 'error')
+        return
+      }
+
+      let applied = 0
+      const invitees: string[] = []
+      const activeEmails = new Set(
+        team.filter((u) => u.active !== false && u.email).map((u) => u.email.toLowerCase()),
+      )
+
+      for (const row of objects) {
+        const field = String(row.field || row.key || '').trim().toLowerCase()
+        const value = String(row.value ?? '').trim()
+        if (!field) continue
+        if (field === 'title') {
+          setTitle(value)
+          applied += 1
+        } else if (field === 'date') {
+          setDate(value)
+          applied += 1
+        } else if (field === 'time') {
+          setTime(value)
+          applied += 1
+        } else if (field === 'duration_minutes' || field === 'duration') {
+          setDuration(value)
+          applied += 1
+        } else if (field === 'location') {
+          setLocation(value)
+          applied += 1
+        } else if (field === 'notes') {
+          setNotes(value)
+          applied += 1
+        } else if (field === 'crm_id') {
+          if (!value || crmEntries.some((c) => c.id === value)) {
+            setCrmId(value)
+            applied += 1
+          }
+        } else if (field === 'crm_company') {
+          if (!value) {
+            setCrmId('')
+            applied += 1
+          } else {
+            const match = crmEntries.find(
+              (c) => c.company_name.toLowerCase() === value.toLowerCase(),
+            )
+            if (match) {
+              setCrmId(match.id)
+              applied += 1
+            }
+          }
+        } else if (field.startsWith('invitee')) {
+          if (value && activeEmails.has(value.toLowerCase())) {
+            invitees.push(
+              team.find((u) => u.email.toLowerCase() === value.toLowerCase())?.email || value,
+            )
+            applied += 1
+          } else if (value) {
+            invitees.push(value)
+            applied += 1
+          }
+        }
+      }
+
+      if (invitees.length) {
+        const unique = [...new Set(invitees)]
+        setSelectedTeam(unique)
+      }
+
+      if (!applied) {
+        showToast('No meeting draft fields to import in CSV', 'error')
+        return
+      }
+      showToast(`Imported ${applied} meeting draft field(s)`, 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Meeting draft CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
   }
 
   async function save() {
@@ -221,10 +316,28 @@ export default function ScheduleMeetingModal({
         <p style={{ color: colors.danger, fontSize: 13, margin: '0 0 12px' }}>{error}</p>
       ) : null}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".csv,text/csv"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) void importMeetingCsv(file)
+          }}
+        />
         <button
           type="button"
           style={buttonSecondaryStyle}
-          disabled={saving}
+          disabled={saving || importing}
+          onClick={() => importInputRef.current?.click()}
+        >
+          {importing ? 'Importing…' : 'Import CSV'}
+        </button>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={saving || importing}
           onClick={() => {
             const crm = crmEntries.find((c) => c.id === crmId)
             exportListCsv(
@@ -247,10 +360,15 @@ export default function ScheduleMeetingModal({
         >
           Export CSV
         </button>
-        <button type="button" style={buttonSecondaryStyle} onClick={onClose} disabled={saving}>
+        <button type="button" style={buttonSecondaryStyle} onClick={onClose} disabled={saving || importing}>
           Cancel
         </button>
-        <button type="button" style={buttonPrimaryStyle} onClick={() => void save()} disabled={saving}>
+        <button
+          type="button"
+          style={buttonPrimaryStyle}
+          onClick={() => void save()}
+          disabled={saving || importing}
+        >
           {saving ? 'Scheduling…' : 'Schedule & invite'}
         </button>
       </div>
