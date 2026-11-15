@@ -1,12 +1,10 @@
 /**
- * Public API (M11 writes slice).
+ * Public API (M11 document writes).
  * GET  /public-api                 → health
  * GET  /public-api/v1/me           → key metadata (x-api-key)
- * GET  /public-api/v1/accounts     → list (read:accounts)
- * POST /public-api/v1/accounts     → create (write:accounts)
- * PATCH /public-api/v1/accounts/:id → update (write:accounts)
- * GET  /public-api/v1/invoices     → list (read:invoices)
- * GET  /public-api/v1/quotations   → list (read:quotations)
+ * GET/POST /v1/accounts · PATCH /v1/accounts/:id
+ * GET/POST /v1/invoices · PATCH /v1/invoices/:id
+ * GET/POST /v1/quotations · PATCH /v1/quotations/:id
  *
  * List routes support ?limit=1..100&cursor=<last-id>.
  * Deploy with verify_jwt = false; auth is via hashed api_keys (x-api-key).
@@ -22,6 +20,10 @@ const cors = {
 
 const ACCOUNT_TYPES = new Set(["ai_crm_client", "worship_church", "ctrm_prospect"])
 const ACCOUNT_COLUMNS = "id, name, type, status, reference, industry, country, city, website, source, notes, created_at, updated_at"
+const INVOICE_COLUMNS =
+  "id, client, reference_number, status, payment_status, amount, date, currency, description, notes, created_at, updated_at"
+const QUOTATION_COLUMNS =
+  "id, client, reference_number, status, amount, date, currency, deal_ref, description, notes, created_at"
 
 type ApiKeyRow = {
   id: string
@@ -109,6 +111,104 @@ function parseAccountWrite(
   return { ok: true, patch }
 }
 
+function parseMoneyAmount(value: unknown): number | null {
+  if (value === undefined || value === null || value === "") return null
+  const n = typeof value === "number" ? value : Number(String(value).trim())
+  if (!Number.isFinite(n) || n < 0) return null
+  return Math.round(n * 100) / 100
+}
+
+function parseOptionalDate(
+  value: unknown,
+): { ok: true; date: string | null } | { ok: false; error: string } {
+  if (value === undefined || value === null || value === "") return { ok: true, date: null }
+  const date = trimStr(value, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: "invalid_date" }
+  return { ok: true, date }
+}
+
+function parseInvoiceWrite(
+  raw: unknown,
+  partial: boolean,
+): { ok: true; patch: Record<string, unknown> } | { ok: false; error: string } {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { ok: false, error: "body_must_be_object" }
+  }
+  const body = raw as Record<string, unknown>
+  const patch: Record<string, unknown> = {}
+
+  if (body.client !== undefined || !partial) {
+    const client = trimStr(body.client, 200)
+    if (!client) return { ok: false, error: "client_required" }
+    patch.client = client
+  }
+  if (body.reference_number !== undefined) patch.reference_number = trimStr(body.reference_number, 80)
+  if (body.status !== undefined || !partial) {
+    patch.status = trimStr(body.status || "Draft", 40) || "Draft"
+  }
+  if (body.payment_status !== undefined || !partial) {
+    patch.payment_status = trimStr(body.payment_status || "Unpaid", 40) || "Unpaid"
+  }
+  if (body.amount !== undefined || !partial) {
+    const amount = parseMoneyAmount(body.amount !== undefined ? body.amount : 0)
+    if (amount == null) return { ok: false, error: "invalid_amount" }
+    patch.amount = amount
+  }
+  if (body.currency !== undefined || !partial) {
+    patch.currency = trimStr(body.currency || "AED", 8).toUpperCase() || "AED"
+  }
+  if (body.date !== undefined) {
+    const d = parseOptionalDate(body.date)
+    if (!d.ok) return d
+    patch.date = d.date
+  }
+  if (body.description !== undefined) patch.description = trimStr(body.description, 2000)
+  if (body.notes !== undefined) patch.notes = trimStr(body.notes, 2000)
+
+  if (partial && Object.keys(patch).length === 0) return { ok: false, error: "empty_patch" }
+  return { ok: true, patch }
+}
+
+function parseQuotationWrite(
+  raw: unknown,
+  partial: boolean,
+): { ok: true; patch: Record<string, unknown> } | { ok: false; error: string } {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { ok: false, error: "body_must_be_object" }
+  }
+  const body = raw as Record<string, unknown>
+  const patch: Record<string, unknown> = {}
+
+  if (body.client !== undefined || !partial) {
+    const client = trimStr(body.client, 200)
+    if (!client) return { ok: false, error: "client_required" }
+    patch.client = client
+  }
+  if (body.reference_number !== undefined) patch.reference_number = trimStr(body.reference_number, 80)
+  if (body.status !== undefined || !partial) {
+    patch.status = trimStr(body.status || "Draft", 40) || "Draft"
+  }
+  if (body.amount !== undefined || !partial) {
+    const amount = parseMoneyAmount(body.amount !== undefined ? body.amount : 0)
+    if (amount == null) return { ok: false, error: "invalid_amount" }
+    patch.amount = amount
+  }
+  if (body.currency !== undefined || !partial) {
+    patch.currency = trimStr(body.currency || "AED", 8).toUpperCase() || "AED"
+  }
+  if (body.date !== undefined) {
+    const d = parseOptionalDate(body.date)
+    if (!d.ok) return d
+    patch.date = d.date
+  }
+  if (body.description !== undefined) patch.description = trimStr(body.description, 2000)
+  if (body.notes !== undefined) patch.notes = trimStr(body.notes, 2000)
+  if (body.deal_ref !== undefined) patch.deal_ref = trimStr(body.deal_ref, 80)
+
+  if (partial && Object.keys(patch).length === 0) return { ok: false, error: "empty_patch" }
+  return { ok: true, patch }
+}
+
 async function signWebhookBody(secret: string, body: string, timestampSec: number): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
@@ -122,11 +222,11 @@ async function signWebhookBody(secret: string, body: string, timestampSec: numbe
 }
 
 /** Best-effort fan-out to active tenant webhooks (does not block the API response path long). */
-async function emitAccountWebhook(
+async function emitWebhook(
   sb: SupabaseClient,
   tenantId: string,
   eventType: string,
-  account: Record<string, unknown>,
+  data: Record<string, unknown>,
 ) {
   const { data: hooks } = await sb
     .from("webhook_endpoints")
@@ -139,7 +239,7 @@ async function emitAccountWebhook(
   const payload = {
     type: eventType,
     sent_at: new Date().toISOString(),
-    data: account,
+    data,
   }
   const body = JSON.stringify(payload)
   const ts = Math.floor(Date.now() / 1000)
@@ -204,7 +304,7 @@ Deno.serve(async (req) => {
       ok: true,
       product: "HighMast",
       api: "public-api",
-      version: "0.4.0",
+      version: "0.5.0",
       routes: [
         "GET /",
         "GET /v1/me",
@@ -212,7 +312,11 @@ Deno.serve(async (req) => {
         "POST /v1/accounts",
         "PATCH /v1/accounts/:id",
         "GET /v1/invoices",
+        "POST /v1/invoices",
+        "PATCH /v1/invoices/:id",
         "GET /v1/quotations",
+        "POST /v1/quotations",
+        "PATCH /v1/quotations/:id",
       ],
     })
   }
@@ -312,7 +416,7 @@ Deno.serve(async (req) => {
     if (error) return json({ error: "insert_failed", detail: error.message }, 500)
     const account = data as Record<string, unknown>
     try {
-      await emitAccountWebhook(sb, key.tenant_id, "account.created", account)
+      await emitWebhook(sb, key.tenant_id, "account.created", account)
     } catch {
       /* partner notify best-effort */
     }
@@ -344,7 +448,7 @@ Deno.serve(async (req) => {
     if (!data) return json({ error: "not_found" }, 404)
     const account = data as Record<string, unknown>
     try {
-      await emitAccountWebhook(sb, key.tenant_id, "account.updated", account)
+      await emitWebhook(sb, key.tenant_id, "account.updated", account)
     } catch {
       /* partner notify best-effort */
     }
@@ -359,12 +463,172 @@ Deno.serve(async (req) => {
     )
   }
 
+  if (req.method === "POST" && path === "/v1/invoices") {
+    if (!hasScope(scopes, "write:invoices")) {
+      return json({ error: "forbidden_scope", need: "write:invoices" }, 403)
+    }
+    let raw: unknown
+    try {
+      raw = await req.json()
+    } catch {
+      return json({ error: "invalid_json" }, 400)
+    }
+    const parsed = parseInvoiceWrite(raw, false)
+    if (!parsed.ok) return json({ error: parsed.error }, 400)
+    const now = new Date().toISOString()
+    const actor = `api_key:${key.key_prefix}`
+    const row = {
+      ...parsed.patch,
+      tenant_id: key.tenant_id,
+      vertical: "API",
+      payment_terms: "",
+      delivery_terms: "",
+      moq: "",
+      description: String(parsed.patch.description || ""),
+      notes: String(parsed.patch.notes || ""),
+      reference_number: String(parsed.patch.reference_number || ""),
+      created_by: actor,
+      updated_by: actor,
+      created_at: now,
+      updated_at: now,
+    }
+    const { data, error } = await sb.from("invoices").insert(row).select(INVOICE_COLUMNS).single()
+    if (error) return json({ error: "insert_failed", detail: error.message }, 500)
+    const invoice = data as Record<string, unknown>
+    try {
+      await emitWebhook(sb, key.tenant_id, "invoice.created", invoice)
+    } catch {
+      /* partner notify best-effort */
+    }
+    return json({ data: invoice }, 201)
+  }
+
+  const invoicePatchMatch = path.match(/^\/v1\/invoices\/([0-9a-f-]{36})$/i)
+  if (req.method === "PATCH" && invoicePatchMatch) {
+    if (!hasScope(scopes, "write:invoices")) {
+      return json({ error: "forbidden_scope", need: "write:invoices" }, 403)
+    }
+    const invoiceId = invoicePatchMatch[1]
+    let raw: unknown
+    try {
+      raw = await req.json()
+    } catch {
+      return json({ error: "invalid_json" }, 400)
+    }
+    const parsed = parseInvoiceWrite(raw, true)
+    if (!parsed.ok) return json({ error: parsed.error }, 400)
+    const { data, error } = await sb
+      .from("invoices")
+      .update({
+        ...parsed.patch,
+        updated_by: `api_key:${key.key_prefix}`,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", invoiceId)
+      .eq("tenant_id", key.tenant_id)
+      .select(INVOICE_COLUMNS)
+      .maybeSingle()
+    if (error) return json({ error: "update_failed", detail: error.message }, 500)
+    if (!data) return json({ error: "not_found" }, 404)
+    const invoice = data as Record<string, unknown>
+    try {
+      await emitWebhook(sb, key.tenant_id, "invoice.updated", invoice)
+    } catch {
+      /* partner notify best-effort */
+    }
+    return json({ data: invoice })
+  }
+
   if (req.method === "GET" && path === "/v1/quotations") {
     return await listResource(
       "read:quotations",
       "quotations",
       "id, client, reference_number, status, amount, date, currency, deal_ref, created_at",
     )
+  }
+
+  if (req.method === "POST" && path === "/v1/quotations") {
+    if (!hasScope(scopes, "write:quotations")) {
+      return json({ error: "forbidden_scope", need: "write:quotations" }, 403)
+    }
+    let raw: unknown
+    try {
+      raw = await req.json()
+    } catch {
+      return json({ error: "invalid_json" }, 400)
+    }
+    const parsed = parseQuotationWrite(raw, false)
+    if (!parsed.ok) return json({ error: parsed.error }, 400)
+    const now = new Date().toISOString()
+    const actor = `api_key:${key.key_prefix}`
+    const quoteId = crypto.randomUUID()
+    const row = {
+      ...parsed.patch,
+      id: quoteId,
+      quote_id: quoteId,
+      tenant_id: key.tenant_id,
+      vertical: "API",
+      division_code: "00",
+      base_reference: String(parsed.patch.reference_number || ""),
+      revision: 0,
+      payment_terms: "",
+      delivery_terms: "",
+      moq: "",
+      outcome_reason: "",
+      description: String(parsed.patch.description || ""),
+      notes: String(parsed.patch.notes || ""),
+      reference_number: String(parsed.patch.reference_number || ""),
+      deal_ref: String(parsed.patch.deal_ref || ""),
+      created_by: actor,
+      updated_by: actor,
+      created_at: now,
+      updated_at: now,
+    }
+    const { data, error } = await sb.from("quotations").insert(row).select(QUOTATION_COLUMNS).single()
+    if (error) return json({ error: "insert_failed", detail: error.message }, 500)
+    const quotation = data as Record<string, unknown>
+    try {
+      await emitWebhook(sb, key.tenant_id, "quotation.created", quotation)
+    } catch {
+      /* partner notify best-effort */
+    }
+    return json({ data: quotation }, 201)
+  }
+
+  const quotationPatchMatch = path.match(/^\/v1\/quotations\/([0-9a-f-]{36})$/i)
+  if (req.method === "PATCH" && quotationPatchMatch) {
+    if (!hasScope(scopes, "write:quotations")) {
+      return json({ error: "forbidden_scope", need: "write:quotations" }, 403)
+    }
+    const quotationId = quotationPatchMatch[1]
+    let raw: unknown
+    try {
+      raw = await req.json()
+    } catch {
+      return json({ error: "invalid_json" }, 400)
+    }
+    const parsed = parseQuotationWrite(raw, true)
+    if (!parsed.ok) return json({ error: parsed.error }, 400)
+    const { data, error } = await sb
+      .from("quotations")
+      .update({
+        ...parsed.patch,
+        updated_by: `api_key:${key.key_prefix}`,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", quotationId)
+      .eq("tenant_id", key.tenant_id)
+      .select(QUOTATION_COLUMNS)
+      .maybeSingle()
+    if (error) return json({ error: "update_failed", detail: error.message }, 500)
+    if (!data) return json({ error: "not_found" }, 404)
+    const quotation = data as Record<string, unknown>
+    try {
+      await emitWebhook(sb, key.tenant_id, "quotation.updated", quotation)
+    } catch {
+      /* partner notify best-effort */
+    }
+    return json({ data: quotation })
   }
 
   return json({ error: "not_found", path }, 404)

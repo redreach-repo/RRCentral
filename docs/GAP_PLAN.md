@@ -18,7 +18,7 @@ Status key: **exists** · **partial** · **missing**
 | Zod validation everywhere | partial | Login, password, app-user, account, ticket form schemas; keep expanding forms/API |
 | Module registry manifests | partial | M1 `APP_MODULES`; Layout + Cmd+K use `visibleAppModules`; Settings Module flags card (`overview`, `sales`, `ops`, `finance`, `delivery`, `clients`); Admin stays always on; more polish later |
 | Domain events / `event_outbox` | partial | M1 enqueue + worker + HubSpot/digest/webhook handlers; digest + HubSpot nudge consumption live |
-| Public REST API + webhooks | partial | M11: reads + account writes + HMAC webhooks + `webhook-retry` worker; invoice/quote writes later |
+| Public REST API + webhooks | partial | M11: reads + account/invoice/quotation writes + HMAC webhooks + `webhook-retry`; line items / finalize later |
 | Exact money `numeric` / no float | partial | SQL numeric exists; TS `number`+round — fix path in M7 |
 | Tenant / company / BU model | partial | M1 tables + seed + `tenant_id` retrofit; company switcher live |
 | RLS on every table | exists | M1 RESTRICTIVE tenant isolation on stamped tables |

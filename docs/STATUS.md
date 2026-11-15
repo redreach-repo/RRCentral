@@ -1,15 +1,15 @@
 # HighMast / RR Central status
 
 **Last updated:** 15 November 2026 (Asia/Dubai)  
-**Current milestone:** Maker-checker refunds + supplier commitments
+**Current milestone:** Public API invoice + quotation writes
 
 ## Shipped this turn
 
-- Refunds and supplier commitments ≥ AED 5k save as Pending Approval and finalize on checker decide
+- `POST/PATCH /v1/invoices` + `/v1/quotations` (`write:invoices` / `write:quotations`) with webhooks
 
 ## Already on main
 
-- Packs + expense maker-checker (#431) · Public API writes (#430) · Public API deepen (#429)
+- Maker-checker refunds (#432) · Packs + expense maker-checker (#431) · Public API account writes (#430)
 
 ## Still open (agent queue)
 
