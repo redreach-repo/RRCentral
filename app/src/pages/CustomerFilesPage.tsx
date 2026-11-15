@@ -19,7 +19,9 @@ import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import StatusPill from '../components/StatusPill'
+import { exportListCsv } from '../lib/listIo'
 import LinkDriveFileModal, { type LinkDriveFileMode } from '../components/LinkDriveFileModal'
 import { logActivity } from '../lib/activity'
 import { errorMessage, isMissingRelationError } from '../lib/errors'
@@ -95,7 +97,7 @@ function sectionToMode(section: FolderSection): LinkDriveFileMode {
 
 export default function CustomerFilesPage() {
   const { t } = useI18n()
-  const { user, isLocalMode } = useAuth()
+  const { user, isLocalMode, appUserId } = useAuth()
   const { showToast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const compact = useCompactCrm()
@@ -113,6 +115,7 @@ export default function CustomerFilesPage() {
   const [savingFolder, setSavingFolder] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [addSection, setAddSection] = useState<FolderSection>(CUSTOMER_FOLDER_SECTIONS[0])
+  const filesViewFilters = useMemo(() => ({ q: search }), [search])
 
   function openUpload(section: FolderSection) {
     setAddSection(section)
@@ -260,18 +263,52 @@ export default function CustomerFilesPage() {
           <h1 className={docsStyles.title}>{t('page.customerFiles.title')}</h1>
           <p className={docsStyles.subtitle}>{t('page.customerFiles.subtitle')}</p>
         </div>
-        {drive.connected && drive.customers_url ? (
-          <a
-            href={drive.customers_url}
-            target="_blank"
-            rel="noreferrer"
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
             className={docsStyles.newBtn}
-            style={{ textDecoration: 'none', background: 'rgba(255,255,255,0.08)' }}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!companies.length}
+            onClick={() => {
+              exportListCsv(
+                'customer-files-companies.csv',
+                ['company_name', 'primary_contact', 'owner', 'drive_folder_url'],
+                companies.map((c) => ({
+                  company_name: c.company_name,
+                  primary_contact: c.primary_contact || '',
+                  owner: c.owner || '',
+                  drive_folder_url: c.drive_folder_url || '',
+                })),
+              )
+              showToast('Customer companies CSV downloaded', 'success')
+            }}
           >
-            <ExternalLink size={16} /> {t('page.customerFiles.openDrive')}
-          </a>
-        ) : null}
+            Export CSV
+          </button>
+          {drive.connected && drive.customers_url ? (
+            <a
+              href={drive.customers_url}
+              target="_blank"
+              rel="noreferrer"
+              className={docsStyles.newBtn}
+              style={{ textDecoration: 'none', background: 'rgba(255,255,255,0.08)' }}
+            >
+              <ExternalLink size={16} /> {t('page.customerFiles.openDrive')}
+            </a>
+          ) : null}
+        </div>
       </header>
+
+      <SavedViewsBar
+        moduleId="customer_files"
+        filters={filesViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => setSearch(String(f.q || ''))}
+        onToast={showToast}
+        filtersEqual={(a, b) => String(a.q || '') === String(b.q || '')}
+      />
 
       {isLocalMode ? (
         <div style={{ ...cardStyle, marginBottom: 16, borderColor: colors.warn }}>
