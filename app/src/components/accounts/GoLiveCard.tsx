@@ -8,6 +8,7 @@ import {
   deleteBuildTask,
   listBuildTasks,
   refreshGoLiveDates,
+  restoreBuildTask,
   setBuildTaskDone,
   signedDateForAccount,
   updateGoLiveStep,
@@ -47,26 +48,31 @@ export default function GoLiveCard({
   const [tasks, setTasks] = useState<BuildTask[]>([])
   const [signed, setSigned] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
   const [form, setForm] = useState({ stage: 'live' as BuildStageKey, title: '', owner: 'red_reach' as GoLiveOwner, due: '' })
   const today = format(new Date(), 'yyyy-MM-dd')
 
   const load = useCallback(async () => {
     try {
-      const [t, s] = await Promise.all([listBuildTasks(accountId), signedDateForAccount(accountId)])
+      const [t, s] = await Promise.all([
+        listBuildTasks(accountId, { includeDeleted: showArchived }),
+        signedDateForAccount(accountId),
+      ])
       setTasks(t)
       setSigned(s)
     } catch (e) {
       showToast(errorMessage(e, 'Could not load the go live checklist'), 'error')
     }
-  }, [accountId, showToast])
+  }, [accountId, showToast, showArchived])
 
   useEffect(() => {
     void load()
   }, [load, reloadKey])
 
+  const activeTasks = useMemo(() => tasks.filter((t) => !t.deleted_at), [tasks])
   const steps = useMemo(() => goLiveSteps(tasks), [tasks])
-  const progress = goLiveProgress(tasks, today)
-  const undated = steps.filter((t) => !t.done && !t.due_date && t.due_days != null).length
+  const progress = goLiveProgress(activeTasks, today)
+  const undated = activeTasks.filter((t) => !t.done && !t.due_date && t.due_days != null).length
 
   async function run(job: () => Promise<unknown>, failure: string) {
     setBusy(true)
@@ -100,6 +106,11 @@ export default function GoLiveCard({
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Go live checklist</h2>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {canEdit ? (
+            <button type="button" style={smallBtn} onClick={() => setShowArchived((v) => !v)}>
+              {showArchived ? 'Hide archived' : 'Show archived'}
+            </button>
+          ) : null}
           {steps.length ? (
             <>
               <span style={{ fontSize: 12, color: progress.overdue ? colors.warn : colors.muted }}>
@@ -113,7 +124,7 @@ export default function GoLiveCard({
                 onClick={() => {
                   exportListCsv(
                     `go-live-${accountId.slice(0, 8)}.csv`,
-                    ['stage', 'title', 'owner', 'due_date', 'due_days', 'done', 'done_at', 'done_by'],
+                    ['stage', 'title', 'owner', 'due_date', 'due_days', 'done', 'done_at', 'done_by', 'archived'],
                     steps.map((t) => ({
                       stage: t.stage,
                       title: t.title,
@@ -123,6 +134,7 @@ export default function GoLiveCard({
                       done: t.done ? 'yes' : 'no',
                       done_at: t.done_at || '',
                       done_by: t.done_by || '',
+                      archived: t.deleted_at ? 'yes' : 'no',
                     })),
                   )
                 }}
@@ -225,15 +237,38 @@ export default function GoLiveCard({
                       disabled={busy}
                       onChange={(e) => void run(() => updateGoLiveStep(t.id, { due_date: e.target.value || null }), 'Could not change the date')}
                     />
-                    <button
-                      type="button"
-                      style={{ ...smallBtn, padding: '4px 8px', color: colors.danger }}
-                      aria-label={`Delete ${t.title}`}
-                      disabled={busy}
-                      onClick={() => window.confirm(`Delete "${t.title}"?`) && void run(() => deleteBuildTask(t.id), 'Could not delete the step')}
-                    >
-                      <Trash2 size={12} /> Remove
-                    </button>
+                    {t.deleted_at ? (
+                      <button
+                        type="button"
+                        style={{ ...smallBtn, padding: '4px 8px' }}
+                        aria-label={`Restore ${t.title}`}
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            await restoreBuildTask(t.id)
+                            showToast('Step restored', 'success')
+                          }, 'Could not restore the step')
+                        }
+                      >
+                        Restore
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        style={{ ...smallBtn, padding: '4px 8px', color: colors.danger }}
+                        aria-label={`Archive ${t.title}`}
+                        disabled={busy}
+                        onClick={() =>
+                          window.confirm(`Archive "${t.title}"? Use Show archived to restore later.`) &&
+                          void run(async () => {
+                            await deleteBuildTask(t.id)
+                            showToast('Step archived', 'success')
+                          }, 'Could not archive the step')
+                        }
+                      >
+                        <Trash2 size={12} /> Archive
+                      </button>
+                    )}
                   </span>
                 ) : null}
               </li>
