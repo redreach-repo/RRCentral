@@ -1,3 +1,5 @@
+import { demoTargetProblem } from './demo-target.mjs'
+
 /**
  * Fail the production build if VITE_SUPABASE_ANON_KEY is a service_role JWT.
  * That key bypasses RLS and must never ship in the GitHub Pages bundle.
@@ -13,6 +15,13 @@ function jwtRole(token) {
   } catch {
     return null
   }
+}
+
+// Demo isolation: a demo build must never target the live project.
+const demoProblem = demoTargetProblem(process.env, process.env.LIVE_SUPABASE_URL || '')
+if (demoProblem) {
+  console.error(`[assert-client-supabase-key] ${demoProblem} Refusing to build.`)
+  process.exit(1)
 }
 
 const key = String(process.env.VITE_SUPABASE_ANON_KEY || '').trim()
