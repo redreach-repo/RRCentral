@@ -29,6 +29,9 @@ import { errorMessage } from '../lib/errors'
 import { PRODUCT } from '../lib/product'
 import { buildWhatsAppUrl } from '../lib/whatsapp'
 import { resolveLogoUrl } from '../lib/brand'
+import Bi from '../components/documents/Bi'
+import { BilingualContext } from '../components/documents/bilingualContext'
+import { readBilingualPreference, saveBilingualPreference } from '../lib/bilingualDocs/arabicLabels'
 import {
   displayDocumentReference,
   invoiceDocumentTitle,
@@ -94,6 +97,12 @@ export default function DocumentPage() {
   const [pdfBusy, setPdfBusy] = useState(false)
   /** Compress blank vertical space so PDFs prefer one A4; else uniform 2-page split. */
   const [pageLayout, setPageLayoutState] = useState<PdfPageLayout>(readPdfPageLayout)
+  // Arabic bilingual PDFs: fixed labels print in English and Arabic (docs/modules/arabic-bilingual-pdfs.md).
+  const [bilingual, setBilingualState] = useState<boolean>(readBilingualPreference)
+  const setBilingual = (on: boolean) => {
+    setBilingualState(on)
+    saveBilingualPreference(on)
+  }
   const fitToPage = pageLayout === 'fit'
   const setPageLayout = (layout: PdfPageLayout) => {
     setPageLayoutState(layout)
@@ -677,7 +686,7 @@ export default function DocumentPage() {
             {settings.trn ? (
               <>
                 <br />
-                TRN: {settings.trn}
+                <Bi en="TRN" />: {settings.trn}
               </>
             ) : null}
           </div>
@@ -688,40 +697,40 @@ export default function DocumentPage() {
           ) : null}
         </div>
         <div className={styles.docMeta}>
-          <div className={styles.docLabel}>{title}</div>
+          <div className={styles.docLabel}><Bi en={title} /></div>
           {isProformaInvoice ? null : <h1>{displayRef}</h1>}
           <div className={styles.metaGrid}>
             <div>
-              <span style={{ color: '#555' }}>Date: </span>
+              <span style={{ color: '#555' }}><Bi en="Date" />: </span>
               {doc.date ? format(new Date(doc.date), 'dd MMM yyyy') : '—'}
             </div>
             {docType === 'quote' && validUntil ? (
               <div>
-                <span style={{ color: '#555' }}>Valid until: </span>
+                <span style={{ color: '#555' }}><Bi en="Valid until" />: </span>
                 {format(new Date(validUntil), 'dd MMM yyyy')}
               </div>
             ) : null}
             {isDeliveryNote && deliveryNote?.quote_ref ? (
               <div>
-                <span style={{ color: '#555' }}>Quotation: </span>
+                <span style={{ color: '#555' }}><Bi en="Quotation" />: </span>
                 {deliveryNote.quote_ref}
               </div>
             ) : null}
             {isDeliveryNote && deliveryNote?.delivery_date ? (
               <div>
-                <span style={{ color: '#555' }}>Delivery: </span>
+                <span style={{ color: '#555' }}><Bi en="Delivery" />: </span>
                 {format(new Date(deliveryNote.delivery_date), 'dd MMM yyyy')}
               </div>
             ) : null}
             {'payment_status' in doc && (
               <div>
-                <span style={{ color: '#555' }}>Payment: </span>
+                <span style={{ color: '#555' }}><Bi en="Payment" />: </span>
                 {doc.payment_status}
               </div>
             )}
             {'status' in doc && (
               <div>
-                <span style={{ color: '#555' }}>Status: </span>
+                <span style={{ color: '#555' }}><Bi en="Status" />: </span>
                 {doc.status}
               </div>
             )}
@@ -751,7 +760,7 @@ export default function DocumentPage() {
               color: '#555',
             }}
           >
-            {isDeliveryNote ? 'Deliver to' : quoteFormat.sectionHeadings.billTo}
+            <Bi en={isDeliveryNote ? 'Deliver to' : quoteFormat.sectionHeadings.billTo} />
           </h3>
           <p style={{ margin: 0, lineHeight: 1.5, fontSize: 14 }}>
             <strong>{billTo.companyName || doc.client}</strong>
@@ -785,7 +794,7 @@ export default function DocumentPage() {
               color: '#555',
             }}
           >
-            {isDeliveryNote ? 'Against quotation' : quoteFormat.sectionHeadings.scope}
+            <Bi en={isDeliveryNote ? 'Against quotation' : quoteFormat.sectionHeadings.scope} />
           </h3>
           <p style={{ margin: 0, lineHeight: 1.5, fontSize: 14 }}>{doc.description || '—'}</p>
           {isDeliveryNote && deliveryNote?.quote_ref ? (
@@ -823,7 +832,7 @@ export default function DocumentPage() {
           color: '#555',
         }}
       >
-        {isDeliveryNote ? 'Goods delivered' : quoteFormat.sectionHeadings.lines}
+        <Bi en={isDeliveryNote ? 'Goods delivered' : quoteFormat.sectionHeadings.lines} />
       </h3>
 
       <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8, fontSize: 13.5 }}>
@@ -845,7 +854,7 @@ export default function DocumentPage() {
                   color: '#555',
                 }}
               >
-                {columnLabel(h)}
+                <Bi en={columnLabel(h)} stack />
               </th>
             ))}
           </tr>
@@ -857,7 +866,7 @@ export default function DocumentPage() {
                 colSpan={lineColumns.length}
                 style={{ padding: 12, color: '#555' }}
               >
-                No line items
+                <Bi en="No line items" />
               </td>
             </tr>
           ) : (
@@ -898,20 +907,20 @@ export default function DocumentPage() {
               fontSize: 16,
             }}
           >
-            <span>Total qty</span>
+            <span><Bi en="Total qty" /></span>
             <span>{deliveryNoteTotalQty(items)}</span>
           </div>
         </div>
       ) : (
       <div style={{ width: 280, margin: '18px 0 0 auto', fontSize: 14 }}>
         <div style={totalRow}>
-          <span>Subtotal</span>
+          <span><Bi en="Subtotal" /></span>
           <span>{money(summary.subtotal)}</span>
         </div>
         {summary.offsetVat ? (
           <>
             <div style={totalRow}>
-              <span>VAT ({vatRateToPercent(effectiveVatRate)}%)</span>
+              <span><Bi en={`VAT (${vatRateToPercent(effectiveVatRate)}%)`} /></span>
               <span>{money(summary.vat)}</span>
             </div>
             {summary.discount > 0 ? (
@@ -926,7 +935,7 @@ export default function DocumentPage() {
             {summary.discount > 0 ? (
               <div style={totalRow}>
                 <span>
-                  Discount
+                  <Bi en="Discount" />
                   {docType === 'quote' && Number((doc as Quotation).discount_percent) > 0
                     ? ` (${Number((doc as Quotation).discount_percent)}%)`
                     : ''}
@@ -940,7 +949,7 @@ export default function DocumentPage() {
               </div>
             ) : null}
             <div style={totalRow}>
-              <span>VAT ({vatRateToPercent(effectiveVatRate)}%)</span>
+              <span><Bi en={`VAT (${vatRateToPercent(effectiveVatRate)}%)`} /></span>
               <span>{money(summary.vat)}</span>
             </div>
           </>
@@ -955,7 +964,7 @@ export default function DocumentPage() {
             fontSize: 16,
           }}
         >
-          <span>Total ({docType === 'quote' ? docCurrency : 'AED'})</span>
+          <span><Bi en={`Total (${docType === 'quote' ? docCurrency : 'AED'})`} /></span>
           <span>{money(summary.total)}</span>
         </div>
       </div>
@@ -967,12 +976,12 @@ export default function DocumentPage() {
     <>
       <div style={{ marginTop: 28, fontSize: 12.5, lineHeight: 1.55, color: '#333' }}>
         <h3 style={{ margin: '0 0 8px', fontSize: 13, color: '#c1121f' }}>
-          {isDeliveryNote ? 'Delivery' : quoteFormat.sectionHeadings.commercial}
+          <Bi en={isDeliveryNote ? 'Delivery' : quoteFormat.sectionHeadings.commercial} />
         </h3>
         {isDeliveryNote ? (
           <>
             <div>This document is a delivery note, not a tax invoice.</div>
-            <div>Delivery: {doc.delivery_terms || settings.deliveryTerms || '—'}</div>
+            <div><Bi en="Delivery" />: {doc.delivery_terms || settings.deliveryTerms || '—'}</div>
             {deliveryNote?.vehicle_notes ? (
               <div>Vehicle / driver: {deliveryNote.vehicle_notes}</div>
             ) : null}
@@ -983,16 +992,16 @@ export default function DocumentPage() {
         ) : (
           <>
         <div>
-          Payment terms:{' '}
+          <Bi en="Payment terms" />:{' '}
           {'payment_terms' in doc
             ? doc.payment_terms || quoteFormat.defaultPaymentTerms || settings.paymentTerms || '—'
             : quoteFormat.defaultPaymentTerms || settings.paymentTerms || '—'}
         </div>
         {quoteFormat.showDelivery ? (
-          <div>Delivery: {doc.delivery_terms || settings.deliveryTerms || '—'}</div>
+          <div><Bi en="Delivery" />: {doc.delivery_terms || settings.deliveryTerms || '—'}</div>
         ) : null}
         {quoteFormat.showMoq && 'moq' in doc ? (
-          <div>MOQ: {doc.moq || settings.moqDefault || '—'}</div>
+          <div><Bi en="MOQ" />: {doc.moq || settings.moqDefault || '—'}</div>
         ) : null}
         {docType === 'quote' && quoteFormat.showHoursBilling ? (
           <div style={{ marginTop: 8 }}>
@@ -1075,7 +1084,7 @@ export default function DocumentPage() {
         (isWandersQuote && wandersTermsBlock)) && (
         <div style={{ marginTop: 14, fontSize: 12.5, lineHeight: 1.45, color: '#333' }}>
           <h3 style={{ margin: '0 0 6px', fontSize: 13, color: '#c1121f' }}>
-            {quoteFormat.sectionHeadings.terms}
+            <Bi en={quoteFormat.sectionHeadings.terms} />
           </h3>
           {(() => {
             const blocks = (
@@ -1235,6 +1244,24 @@ export default function DocumentPage() {
               </option>
             ))}
           </select>
+        </label>
+        <label
+          title="Print fixed labels (title, headings, columns, totals) in English and Arabic"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '6px 12px',
+            borderRadius: 999,
+            background: 'rgba(232, 93, 4, 0.22)',
+            color: '#fff',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          <input type="checkbox" checked={bilingual} onChange={(e) => setBilingual(e.target.checked)} />
+          {t('page.document.bilingual')}
         </label>
         <ToolbarBtn onClick={() => void downloadPdf()} disabled={pdfBusy}>
           <Download size={14} />{' '}
@@ -1436,6 +1463,7 @@ export default function DocumentPage() {
         </div>
       ) : null}
 
+      <BilingualContext.Provider value={bilingual}>
       <div className={styles.preview}>
         {pageLayout === 'split' ? (
           <div ref={sheetRef} className={styles.pageStack} data-pdf-split>
@@ -1465,6 +1493,7 @@ export default function DocumentPage() {
           </div>
         )}
       </div>
+      </BilingualContext.Provider>
 
       {docType === 'quote' && quote ? (
         <QuoteAcceptLinksModal
