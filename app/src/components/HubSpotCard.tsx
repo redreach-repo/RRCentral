@@ -5,8 +5,9 @@ import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { errorMessage } from '../lib/errors'
 import { getHubSpotNudge, type HubSpotSyncRun, listHubSpotRuns, runHubSpotSync, runSummary } from '../lib/hubspotSync'
+import { exportListCsv } from '../lib/listIo'
 import { PRODUCT } from '../lib/product'
-import { buttonPrimaryStyle, cardStyle, colors, sectionTitleStyle } from '../lib/uiStyles'
+import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../lib/uiStyles'
 
 const when = (iso: string) => new Date(iso).toLocaleString()
 
@@ -59,8 +60,54 @@ export default function HubSpotCard() {
   const last = runs[0]
   return (
     <div style={{ ...cardStyle, marginBottom: 20 }}>
-      <h2 style={sectionTitleStyle}>{t('page.settings.section.hubspot')}</h2>
-      <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.5 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.settings.section.hubspot')}</h2>
+        {runs.length ? (
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            onClick={() => {
+              exportListCsv(
+                'hubspot-sync-runs.csv',
+                [
+                  'started_at',
+                  'finished_at',
+                  'trigger',
+                  'requested_by',
+                  'companies_created',
+                  'companies_updated',
+                  'contacts_created',
+                  'contacts_updated',
+                  'deals_created',
+                  'deals_updated',
+                  'failed',
+                  'summary',
+                  'message',
+                ],
+                runs.map((r) => ({
+                  started_at: r.started_at || '',
+                  finished_at: r.finished_at || '',
+                  trigger: r.trigger,
+                  requested_by: r.requested_by || '',
+                  companies_created: r.companies_created,
+                  companies_updated: r.companies_updated,
+                  contacts_created: r.contacts_created,
+                  contacts_updated: r.contacts_updated,
+                  deals_created: r.deals_created,
+                  deals_updated: r.deals_updated,
+                  failed: r.failed,
+                  summary: runSummary(r),
+                  message: r.message || '',
+                })),
+              )
+              showToast('HubSpot sync runs CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        ) : null}
+      </div>
+      <p style={{ color: colors.muted, fontSize: 13, marginTop: 8, lineHeight: 1.5 }}>
         {PRODUCT.name} sends its accounts to HubSpot as companies, account contacts as contacts (matched by email) and AI
         CRM deals as deals in the Sales Pipeline, nightly and when you press Sync now. It is one way: changes made in
         HubSpot do not come back, and deleting something here leaves it in HubSpot. Deal amounts are the first year
