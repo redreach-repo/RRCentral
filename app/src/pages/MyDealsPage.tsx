@@ -37,6 +37,8 @@ import {
   formatInventoryDigest,
   openDealInvariantSummary,
 } from '../lib/pipelineInventory'
+import { recordVisible } from '../lib/recordRules'
+import { listRecordRules } from '../lib/recordRulesStore'
 import { parseMyDealPatchForm } from '../lib/schemas/myDealPatch'
 import { can } from '../lib/permissions'
 import type { AppUser } from '../lib/types'
@@ -156,8 +158,19 @@ export default function MyDealsPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await loadMyDeals(userRole, settings)
-      setDeals(result.deals)
+      const [result, rules] = await Promise.all([
+        loadMyDeals(userRole, settings),
+        listRecordRules('deal').catch(() => []),
+      ])
+      const viewer = {
+        userId: appUserId || null,
+        email: user?.email || null,
+        role: userRole,
+      }
+      const visible = result.deals.filter((d) =>
+        recordVisible(rules, 'deal', { owner_user_id: d.owner_user_id }, viewer),
+      )
+      setDeals(visible)
       setTeam(result.team)
       setLinkPlan(result.linkPlan)
       setError('')
@@ -166,7 +179,7 @@ export default function MyDealsPage() {
     } finally {
       setLoading(false)
     }
-  }, [userRole, settings])
+  }, [userRole, settings, appUserId, user?.email])
 
   async function linkUniqueMatches() {
     if (!linkPlan.unique.length || linkBusy) return

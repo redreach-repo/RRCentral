@@ -701,8 +701,14 @@ export default function InvoicesPage() {
       const ref = deleteTarget.reference_number
       await deleteLineItems('Invoice', [ref])
       await deleteFinanceForInvoiceRef(ref)
-      const { error } = await db.from('invoices').delete().eq('id', deleteTarget.id)
-      if (error) throw error
+      let { error } = await db
+        .from('invoices')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', deleteTarget.id)
+      if (error) {
+        const hard = await db.from('invoices').delete().eq('id', deleteTarget.id)
+        if (hard.error) throw hard.error
+      }
       await logActivity('delete_invoice', 'invoice', ref, deleteTarget.client, who)
       showToast('Invoice deleted', 'success')
       setDeleteTarget(null)

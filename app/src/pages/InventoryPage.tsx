@@ -28,6 +28,10 @@ import { errorMessage } from '../lib/errors'
 import { parseInventoryAdjust } from '../lib/schemas/inventoryAdjust'
 import { exportListCsv } from '../lib/listIo'
 import { createWarehouse, listWarehouses } from '../lib/warehouseStore'
+import {
+  listWarehouseStock,
+  type WarehouseStockListRow,
+} from '../lib/warehouseStockStore'
 import { defaultWarehouse, warehouseLabel, type Warehouse } from '../lib/warehouses'
 
 export default function InventoryPage() {
@@ -36,6 +40,7 @@ export default function InventoryPage() {
   const { showToast } = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
+  const [stockRows, setStockRows] = useState<WarehouseStockListRow[]>([])
   const [warehouseId, setWarehouseId] = useState('')
   const [newWhCode, setNewWhCode] = useState('')
   const [newWhName, setNewWhName] = useState('')
@@ -50,15 +55,17 @@ export default function InventoryPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [{ data, error }, wh] = await Promise.all([
+      const [{ data, error }, wh, stock] = await Promise.all([
         db.from('products').select('*').order('sku'),
         listWarehouses().catch(() => [] as Warehouse[]),
+        listWarehouseStock().catch(() => [] as WarehouseStockListRow[]),
       ])
       if (error) throw error
       setProducts(
         ((data || []) as (Product & { deleted_at?: string | null })[]).filter((p) => !p.deleted_at),
       )
       setWarehouses(wh)
+      setStockRows(stock)
       setWarehouseId((prev) => prev || defaultWarehouse(wh)?.id || '')
     } catch (e) {
       showToast(errorMessage(e, 'Failed to load inventory'), 'error')
@@ -256,6 +263,38 @@ export default function InventoryPage() {
           </button>
         </div>
       </div>
+
+      {stockRows.length > 0 ? (
+        <div style={{ ...cardStyle, marginBottom: 16 }}>
+          <strong style={{ fontSize: 14 }}>Per-warehouse stock</strong>
+          <p style={{ margin: '4px 0 10px', fontSize: 12, color: colors.muted }}>
+            Stub rows from adjustments / PO receive. Product rollup remains the source of truth for reorder.
+          </p>
+          <div style={tableWrapStyle}>
+            <table style={tableStyle}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>Warehouse</th>
+                  <th style={thStyle}>SKU</th>
+                  <th style={thStyle}>Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stockRows.slice(0, 50).map((r) => (
+                  <tr key={r.id}>
+                    <td style={tdStyle}>
+                      {r.warehouse_code || r.warehouse_id}
+                      {r.warehouse_name ? ` · ${r.warehouse_name}` : ''}
+                    </td>
+                    <td style={tdStyle}>{r.sku}</td>
+                    <td style={tdStyle}>{r.qty_on_hand}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
 
       {loading ? (
         <div style={{ ...cardStyle, color: colors.muted }}>Loading inventory…</div>

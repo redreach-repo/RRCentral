@@ -144,13 +144,24 @@ export async function updateDeliveryNote(id: string, patch: Partial<DeliveryNote
 }
 
 export async function deleteDeliveryNote(id: string): Promise<void> {
+  const deletedAt = new Date().toISOString()
   if (tableMissing !== true) {
-    const { error } = await db.from('delivery_notes').delete().eq('id', id)
-    if (error && shouldFallbackDeliveryNoteStorage(error)) tableMissing = true
-    else if (error) throw asError(error, 'Could not delete delivery note')
+    const soft = await db.from('delivery_notes').update({ deleted_at: deletedAt }).eq('id', id)
+    if (soft.error && shouldFallbackDeliveryNoteStorage(soft.error)) {
+      tableMissing = true
+    } else if (soft.error) {
+      const hard = await db.from('delivery_notes').delete().eq('id', id)
+      if (hard.error && shouldFallbackDeliveryNoteStorage(hard.error)) tableMissing = true
+      else if (hard.error) throw asError(hard.error, 'Could not delete delivery note')
+    } else {
+      tableMissing = false
+    }
   }
   const blob = await readBlob()
   const note = blob.notes.find((n) => n.id === id)
+  if (note) {
+    ;(note as DeliveryNote & { deleted_at?: string }).deleted_at = deletedAt
+  }
   blob.notes = blob.notes.filter((n) => n.id !== id)
   if (note?.reference_number) {
     blob.items = blob.items.filter((i) => i.reference !== note.reference_number)
