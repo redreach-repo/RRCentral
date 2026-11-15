@@ -1832,16 +1832,139 @@ ${sign}`
   };
 }
 
+// src/lib/money/index.ts
+var ZERO_DECIMAL = /* @__PURE__ */ new Set([
+  "BIF",
+  "CLP",
+  "DJF",
+  "GNF",
+  "ISK",
+  "JPY",
+  "KMF",
+  "KRW",
+  "PYG",
+  "RWF",
+  "UGX",
+  "VND",
+  "VUV",
+  "XAF",
+  "XOF",
+  "XPF"
+]);
+var THREE_DECIMAL = /* @__PURE__ */ new Set(["BHD", "IQD", "JOD", "KWD", "LYD", "OMR", "TND"]);
+function currencyDecimals(currency) {
+  const c = String(currency || "").trim().toUpperCase();
+  if (ZERO_DECIMAL.has(c)) return 0;
+  if (THREE_DECIMAL.has(c)) return 3;
+  return 2;
+}
+var POW10 = [];
+function pow10(n) {
+  if (n < 0 || !Number.isInteger(n)) throw new RangeError(`bad power ${n}`);
+  if (POW10[n] === void 0) POW10[n] = 10n ** BigInt(n);
+  return POW10[n];
+}
+function isDecimal(v) {
+  return typeof v === "object" && v !== null && "coef" in v && "scale" in v;
+}
+var DECIMAL_RE = /^([+-])?(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/;
+function parseDecimal(input) {
+  if (isDecimal(input)) return input;
+  if (typeof input === "bigint") return { coef: input, scale: 0 };
+  if (typeof input === "number" && !Number.isFinite(input)) throw new RangeError(`Not a finite amount: ${input}`);
+  const s = String(input).trim().replace(/_/g, "");
+  const m = DECIMAL_RE.exec(s);
+  if (!m || !m[2] && !m[3]) throw new RangeError(`Not a decimal amount: "${String(input)}"`);
+  const sign = m[1] === "-" ? -1n : 1n;
+  const frac = m[3] || "";
+  const exp = m[4] ? Number(m[4]) : 0;
+  let coef = BigInt((m[2] || "0") + frac) * sign;
+  let scale = frac.length - exp;
+  if (scale < 0) {
+    coef *= pow10(-scale);
+    scale = 0;
+  }
+  return { coef, scale };
+}
+function toDecimalOrZero(input) {
+  if (input === null || input === void 0 || input === "") return { coef: 0n, scale: 0 };
+  try {
+    if (typeof input === "number" || typeof input === "string" || typeof input === "bigint" || isDecimal(input)) {
+      return parseDecimal(input);
+    }
+  } catch {
+  }
+  return { coef: 0n, scale: 0 };
+}
+function roundRational(num, den, mode) {
+  if (den === 0n) throw new RangeError("Division by zero");
+  if (den < 0n) {
+    num = -num;
+    den = -den;
+  }
+  const q = num / den;
+  const r = num % den;
+  if (r === 0n || mode === "down") return q;
+  const sign = num < 0n ? -1n : 1n;
+  const twice = (r < 0n ? -r : r) * 2n;
+  if (twice > den) return q + sign;
+  if (twice < den) return q;
+  if (mode === "half-even") return q % 2n === 0n ? q : q + sign;
+  return q + sign;
+}
+function roundToScale(d, scale, mode = "half-up") {
+  const v = parseDecimal(d);
+  if (v.scale <= scale) return v.coef * pow10(scale - v.scale);
+  return roundRational(v.coef, pow10(v.scale - scale), mode);
+}
+function decimalToString(d) {
+  const neg = d.coef < 0n;
+  let digits = (neg ? -d.coef : d.coef).toString();
+  if (d.scale === 0) return (neg ? "-" : "") + digits;
+  digits = digits.padStart(d.scale + 1, "0");
+  const int = digits.slice(0, digits.length - d.scale);
+  const frac = digits.slice(digits.length - d.scale);
+  return `${neg ? "-" : ""}${int}.${frac}`;
+}
+function normCurrency(currency) {
+  const c = String(currency || "").trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(c)) throw new RangeError(`Not a currency code: "${currency}"`);
+  return c;
+}
+function money(amount, currency, mode = "half-up") {
+  const c = normCurrency(currency);
+  return { minor: roundToScale(amount, currencyDecimals(c), mode), currency: c };
+}
+function moneyOrZero(amount, currency, mode = "half-up") {
+  return money(toDecimalOrZero(amount), currency, mode);
+}
+function toDecimal(m) {
+  return { coef: m.minor, scale: currencyDecimals(m.currency) };
+}
+function toDecimalString(m) {
+  return decimalToString(toDecimal(m));
+}
+function toNumber(m) {
+  return Number(toDecimalString(m));
+}
+function formatAmount(m, locale = "en-AE") {
+  const d = currencyDecimals(m.currency);
+  const nf = new Intl.NumberFormat(locale, { minimumFractionDigits: d, maximumFractionDigits: d });
+  return nf.format(toDecimalString(m));
+}
+function formatMoney(m, locale = "en-AE") {
+  return `${m.currency} ${formatAmount(m, locale)}`;
+}
+function roundAmount(n, currency = "AED") {
+  return toNumber(moneyOrZero(n, currency));
+}
+
 // src/lib/money.ts
 function round2(n) {
-  return Math.round((Number(n) || 0) * 100) / 100;
+  return roundAmount(n, "AED");
 }
 function formatAED(n) {
-  const amount = round2(n);
-  return `AED ${amount.toLocaleString("en-AE", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })}`;
+  return formatMoney(money(round2(n), "AED"));
 }
 
 // src/lib/paymentReminder.ts
