@@ -152,6 +152,26 @@ No database migrations. Documentation and `brand-assets/` only.
 **Future retirement**
 - When a dedicated demo tenant UUID is provisioned (not the Red Reach id), stop renaming tenant `a000…001` and seed into the real demo tenant id instead.
 
+## M7 — `20261230120000_accounting_ledger.sql`
+
+**What**
+- `gl_accounts`, `gl_journals`, `gl_journal_lines`
+- Balanced post via `rr_gl_post_journal`; posted immutability triggers
+- Seed starter CoA for Red Reach tenant (Unverified tax mapping)
+- RLS: manager/admin + restrictive tenant isolation
+
+**Rollback**
+- Drop triggers/functions; drop three tables (destructive — ask before production).
+
+## M6 deepen — `20261230130000_hr_leave.sql`
+
+**What**
+- `hr_leave_requests` + `rr_hr_leave_decide`
+- Manager/admin RLS + tenant isolation
+
+**Rollback**
+- Drop function + table (ask before production).
+
 
 ## M8a — `20261230150000_country_packs.sql`
 

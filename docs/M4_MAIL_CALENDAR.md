@@ -18,6 +18,11 @@
 - Reconnect required for accounts that connected on Phase A scopes only
 - Gmail Phase B still deferred (restricted `gmail.readonly` + CASA)
 
+## Batch M4–M7 (15 Nov 2026)
+
+- IMAP remains listed but **unavailable**; resolve falls back to Zoho (tests assert this)
+- No Gmail Phase B — still CASA-gated (`COMPLIANCE_NOTES`)
+
 ## Later
 
 1. Gmail Phase B inbox when restricted verification + CASA plan allow

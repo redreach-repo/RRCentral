@@ -53,3 +53,17 @@ export type QtspProvider = {
     req: QtspSignRequest,
   ) => Promise<QtspSignSession>
 }
+
+/** Document kinds that may require a stronger e-sign level once a QTSP is live. */
+export type EsignDocType = 'nda' | 'service_agreement' | 'employment' | 'other'
+
+/**
+ * Policy matrix (product default — counsel may override).
+ * Until a QTSP is connected, the live path remains canvas assent for all types.
+ */
+export const REQUIRED_ESIGN_LEVEL: Record<EsignDocType, EsignLevel> = {
+  nda: 'assent_capture',
+  service_agreement: 'ades',
+  employment: 'qes',
+  other: 'assent_capture',
+}

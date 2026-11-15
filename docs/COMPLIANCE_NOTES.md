@@ -7,7 +7,7 @@ Findings from official sources go here **before** shipping tax, payroll, e-sign,
 | UAE electronic signatures / trust services | **concluded** | See § E-sign below | 13 Nov 2026 | Decree-Law 46/2021 + Cabinet Res. 28/2023. Today’s `/sign` canvas is **not** AdES/QES. Keep as operational evidence; QES only via TDRA-licensed QTSP (ask before paid vendor). |
 | UAE WPS SIF format | **draft only** | See § WPS below | 15 Nov 2026 | Product ships SCR/EDR-like **draft** + CSV. **Not** bank-certified. Counsel + agent bank must sign off before live upload. |
 | UAE end-of-service gratuity | **draft only** | See § WPS below | 15 Nov 2026 | Planning accrual helper (21/30-day bands + resignation taper stub). **Not legal advice** — counsel must verify before EOS settlements. |
-| UAE VAT rates / return layout | not started | — | — | Partial product VAT today; verify before M7 return |
+| UAE VAT rates / return layout | **Unverified** | Starter CoA only — see § Ledger | 15 Nov 2026 | M7 ships double-entry + starter CoA incl. “VAT payable”. **Not** a VAT return engine. Accountant must map codes before filing. |
 | UAE corporate tax | not started | — | — | M7+ |
 | UAE e-invoicing timeline / format | not started | — | — | Design invoice model for accredited provider |
 | Google restricted Gmail scopes assessment | **concluded** | See § Gmail below | 13 Nov 2026 | Phase A **implemented** (`gmail.send` + `calendar.events` via `gmail-calendar` Edge Function). Phase B inbox (`gmail.readonly`) still blocked until restricted verification + CASA plan. |
@@ -221,3 +221,15 @@ Avoid **application** `Mail.Send` / `Mail.Read` / `Calendars.ReadWrite` for the 
 
 - This note is **not** legal advice and does **not** certify any RR Central signature as AdES or QES.
 - No QTSP integration, new Edge Function, or paid vendor ships in this assessment-only slice.
+
+---
+
+## Accounting ledger / starter CoA (M7) — Unverified
+
+**Date:** 15 November 2026 (Asia/Dubai)
+
+**What ships:** `gl_accounts` / `gl_journals` / `gl_journal_lines` with balanced post (`rr_gl_post_journal`) and immutability for posted rows. Default Red Reach CoA includes Cash, Bank, AR, AP, VAT payable, Equity, Revenue, COGS, OpEx, Salaries.
+
+**Explicit non-claims:** This is **not** a VAT return, e-invoice accreditation, or FTA-certified chart. Account codes and “VAT payable” naming are Unverified until an accountant maps them for the tenant’s books.
+
+**Source:** Internal product design only — no FTA circular cited for CoA structure. Marked Unverified in the Ledger UI.

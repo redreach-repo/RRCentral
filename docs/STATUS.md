@@ -22,6 +22,11 @@
 - Libs: `countryPacks`, `purchasing`, `projectAccounting`, `clientPurchaseOrders`, `opsSliceStores`
 - Module SQL tests + unit tests; nav + EN/AR i18n keys
 - Docs: RUN_PLAN, COMPLIANCE country-pack note, MIGRATIONS, module stubs
+- Light-mode sidebar contrast fix for axe (theme tokens)
+
+## Prior on main (M4–M7 via #437)
+
+- CoA + journals + Ledger; HR leave; e-sign doc-type matrix
 
 ## Not done (with reason)
 
@@ -32,20 +37,17 @@
 5. Client PO ↔ invoice auto-match — later finance link  
 6. Official Boost/Care/Trading SVG masters — waiting on zip  
 7. Demo Supabase project + `DEMO_*` secrets + Pages workflow — Alfred  
-8. M4–M7 PR #437 may still be open; this batch does not depend on it  
+8. Gmail Phase B / IMAP / QTSP / GL auto-post / VAT return — see M4–M7 Not done  
 
-## Test results (this batch)
+## Test results
 
 - Typecheck: pass  
 - Lint: pass (existing warnings only)  
-- Vitest: **1316** passed / 245 files  
-- SQL `tests/run.sh`: pass (incl. module tests for country packs, POs, projects, client POs)
+- Vitest: **1316** passed / 245 files (this branch before merge; main also has M4–M7 tests)  
+- SQL `tests/run.sh`: pass (incl. country packs, POs, projects, client POs; ledger/leave from main)  
+- A11y: pass after sidebar contrast fix  
 
 ```bash
 cd app && npm run typecheck && npm run lint && npx vitest run
 sudo -u postgres bash -c 'cd /workspace/supabase && bash tests/run.sh'
 ```
-
-## Still externally blocked (unchanged)
-
-CASA · paid QTSP · WPS counsel · SVG zip · native app store accounts (v6) · §19 residency lock

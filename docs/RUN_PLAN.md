@@ -3,7 +3,7 @@
 **Started:** 15 November 2026 (Asia/Dubai)  
 **Branch:** `cursor/batch-m8-m9a-d3d5` (from `main`)  
 **Spec:** Master Spec v2.1  
-**Note:** M4–M7 PR #437 may still be open; this batch does not depend on it.
+**Note:** M4–M7 merged via #437; this batch is additive on top.
 
 ---
 
