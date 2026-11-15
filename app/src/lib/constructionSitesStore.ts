@@ -1,5 +1,6 @@
 import { db } from './db'
 import { isMissingRelationError } from './errors'
+import { withoutSoftDeleted } from './softDelete'
 import { isSupabaseConfigured } from './supabaseConfig'
 
 export type ConstructionSite = {
@@ -9,6 +10,7 @@ export type ConstructionSite = {
   location: string
   status: string
   notes: string
+  deleted_at?: string | null
 }
 
 export type SiteWorkforceAssignment = {
@@ -22,17 +24,47 @@ export type SiteWorkforceAssignment = {
   hr_employees?: { full_name: string } | null
 }
 
-export async function listConstructionSites(): Promise<ConstructionSite[]> {
+const SITE_SELECT = 'id, code, name, location, status, notes, deleted_at'
+const SITE_SELECT_LEGACY = 'id, code, name, location, status, notes'
+
+export async function listConstructionSites(opts?: {
+  includeDeleted?: boolean
+}): Promise<ConstructionSite[]> {
   if (!isSupabaseConfigured()) return []
-  const { data, error } = await db
-    .from('construction_sites')
-    .select('id, code, name, location, status, notes')
-    .order('code')
+  let q = db.from('construction_sites').select(SITE_SELECT)
+  if (!opts?.includeDeleted) q = q.is('deleted_at', null)
+  const { data, error } = await q.order('code')
   if (error) {
     if (isMissingRelationError(error)) return []
+    // Fallback when deleted_at column is not yet migrated.
+    if (String(error.message || '').toLowerCase().includes('deleted_at')) {
+      const res = await db.from('construction_sites').select(SITE_SELECT_LEGACY).order('code')
+      if (res.error) {
+        if (isMissingRelationError(res.error)) return []
+        throw res.error
+      }
+      return (res.data || []) as ConstructionSite[]
+    }
     throw error
   }
-  return (data || []) as ConstructionSite[]
+  const rows = (data || []) as ConstructionSite[]
+  return opts?.includeDeleted ? rows : withoutSoftDeleted(rows)
+}
+
+export async function softDeleteConstructionSite(id: string): Promise<void> {
+  const { error } = await db
+    .from('construction_sites')
+    .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function restoreConstructionSite(id: string): Promise<void> {
+  const { error } = await db
+    .from('construction_sites')
+    .update({ deleted_at: null, updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
 }
 
 export async function createConstructionSite(input: {
