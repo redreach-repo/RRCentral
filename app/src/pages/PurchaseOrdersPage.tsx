@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Truck } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -17,7 +17,8 @@ import {
   type PurchaseOrderLine,
   type PurchaseOrderRow,
 } from '../lib/opsSliceStores'
-import { exportListCsv } from '../lib/listIo'
+import { PURCHASE_ORDERS_CSV_COLUMNS } from '../lib/purchaseOrdersCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import { listWarehouses } from '../lib/warehouseStore'
 import { defaultWarehouse, warehouseLabel, type Warehouse } from '../lib/warehouses'
 import {
@@ -48,6 +49,8 @@ export default function PurchaseOrdersPage() {
   const [landed, setLanded] = useState('0')
   const [loading, setLoading] = useState(true)
   const [showArchived, setShowArchived] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -69,6 +72,48 @@ export default function PurchaseOrdersPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  async function importPurchaseOrdersCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of PURCHASE_ORDERS_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, PURCHASE_ORDERS_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid PO rows', 'error')
+        return
+      }
+      let saved = 0
+      for (const row of ok) {
+        await createPurchaseOrder({
+          vendorName: row.vendor_name,
+          orderDate: row.order_date || new Date().toISOString().slice(0, 10),
+          sku: row.sku || '',
+          description: row.description || '',
+          qty: Number(row.qty) || 1,
+          unitCost: Number(row.unit_cost) || 0,
+          landedCostAed: Number(row.landed_cost_aed) || 0,
+          warehouseId: warehouseId || null,
+        })
+        saved += 1
+      }
+      const skipNote = errors.length ? ` · ${errors.length} row(s) skipped` : ''
+      showToast(`Imported ${saved} PO(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'PO CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
 
   async function openPo(po: PurchaseOrder) {
     setSelected(po)
@@ -93,6 +138,25 @@ export default function PurchaseOrdersPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importPurchaseOrdersCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}

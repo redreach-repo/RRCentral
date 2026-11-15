@@ -41,6 +41,7 @@ import {
   inputStyle,
   labelStyle,
   sectionTitleStyle,
+  selectStyle,
 } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 import { logActivity } from '../lib/activity'
@@ -76,6 +77,7 @@ export default function FollowupsPage() {
   const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
   const [emailTarget, setEmailTarget] = useState<CrmEntry | null>(null)
   const [calendarSettingsOpen, setCalendarSettingsOpen] = useState(false)
+  const [ownerFilter, setOwnerFilter] = useState('All')
 
   async function openFollowUpWhatsApp(entry: CrmEntry) {
     const contacts = hydrateContacts(entry)
@@ -140,11 +142,24 @@ export default function FollowupsPage() {
   const today = startOfDay(new Date())
   const upcomingEnd = addDays(today, 14)
 
+  const ownerOptions = useMemo(() => {
+    const names = new Set<string>()
+    for (const e of entries) {
+      if (e.owner?.trim()) names.add(e.owner.trim())
+    }
+    for (const u of team) {
+      if (u.name?.trim()) names.add(u.name.trim())
+      else if (u.email?.trim()) names.add(u.email.trim())
+    }
+    return ['All', ...Array.from(names).sort((a, b) => a.localeCompare(b))]
+  }, [entries, team])
+
   const { overdue, upcoming } = useMemo(() => {
     const od: CrmEntry[] = []
     const up: CrmEntry[] = []
     for (const e of entries) {
       if (!e.follow_up_date) continue
+      if (ownerFilter !== 'All' && (e.owner || '').trim() !== ownerFilter) continue
       try {
         const d = startOfDay(parseISO(e.follow_up_date.slice(0, 10)))
         if (d < today) od.push(e)
@@ -154,7 +169,7 @@ export default function FollowupsPage() {
       }
     }
     return { overdue: od, upcoming: up }
-  }, [entries, today, upcomingEnd])
+  }, [entries, today, upcomingEnd, ownerFilter])
 
   async function snooze(entry: CrmEntry) {
     if (!entry.follow_up_date) return
@@ -481,8 +496,9 @@ export default function FollowupsPage() {
             type="button"
             className={docsStyles.newBtn}
             style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-            disabled={!entries.length}
+            disabled={!(overdue.length + upcoming.length)}
             onClick={() => {
+              const rows = [...overdue, ...upcoming]
               exportListCsv(
                 'follow-ups.csv',
                 [
@@ -494,7 +510,7 @@ export default function FollowupsPage() {
                   'quote_ref',
                   'primary_contact',
                 ],
-                entries.map((e) => ({
+                rows.map((e) => ({
                   company_name: e.company_name,
                   pipeline_stage: e.pipeline_stage,
                   follow_up_date: e.follow_up_date || '',
@@ -523,6 +539,24 @@ export default function FollowupsPage() {
       {error ? (
         <div style={{ ...cardStyle, color: colors.danger, marginBottom: 16 }}>{error}</div>
       ) : null}
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+        <label style={{ ...labelStyle, margin: 0 }}>
+          Owner
+          <select
+            style={{ ...selectStyle, minWidth: 180 }}
+            value={ownerFilter}
+            onChange={(e) => setOwnerFilter(e.target.value)}
+            aria-label="Filter follow-ups by owner"
+          >
+            {ownerOptions.map((name) => (
+              <option key={name} value={name}>
+                {name === 'All' ? 'All owners' : name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       {loading ? (
         <div className={docsStyles.loading}>Loading follow-ups…</div>
