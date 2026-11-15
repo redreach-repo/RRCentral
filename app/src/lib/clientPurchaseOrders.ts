@@ -61,3 +61,12 @@ export function clientPoStatusAfterMatch(poAmount: number, invoiceAmount: number
   if (inv > 0) return 'partial'
   return 'open'
 }
+
+/** Status from cumulative received_amount vs PO amount. */
+export function clientPoStatusAfterReceipt(poAmount: number, receivedAmount: number): ClientPoStatus {
+  return clientPoStatusAfterMatch(poAmount, receivedAmount)
+}
+
+export function clientPoRemaining(poAmount: number, receivedAmount: number): number {
+  return Math.max(0, Math.round(((Number(poAmount) || 0) - (Number(receivedAmount) || 0)) * 100) / 100)
+}

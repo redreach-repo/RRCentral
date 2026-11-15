@@ -18,6 +18,7 @@ import type { Account, Client, Invoice, PaymentLogEntry } from '../lib/types'
 import { accountTypeLabel } from '../lib/accounts'
 import { listAccounts } from '../lib/accountsStore'
 import { resolveCreditWarnForClient } from '../lib/creditSoftWarn'
+import { exportListCsv } from '../lib/listIo'
 import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { can, roleAtLeast } from '../lib/permissions'
@@ -771,9 +772,34 @@ export default function InvoicesPage() {
           <h1 className={docsStyles.title}>{t('page.invoices.title')}</h1>
           <p className={docsStyles.subtitle}>{t('page.invoices.subtitle')}</p>
         </div>
-        <button type="button" className={docsStyles.newBtn} onClick={openCreate}>
-          <Plus size={16} /> {t('page.invoices.new')}
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!invoices.length}
+            onClick={() => {
+              exportListCsv(
+                'invoices.csv',
+                ['reference_number', 'client', 'status', 'payment_status', 'amount', 'date'],
+                invoices.map((inv) => ({
+                  reference_number: inv.reference_number,
+                  client: inv.client,
+                  status: inv.status,
+                  payment_status: inv.payment_status,
+                  amount: inv.amount,
+                  date: inv.date || '',
+                })),
+              )
+              showToast('Invoices CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+          <button type="button" className={docsStyles.newBtn} onClick={openCreate}>
+            <Plus size={16} /> {t('page.invoices.new')}
+          </button>
+        </div>
       </header>
 
       {roleAtLeast(userRole, 'sales') ? <PaymentRemindersCard /> : null}

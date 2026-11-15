@@ -14,6 +14,7 @@ import HrLeavePage from './pages/HrLeavePage'
 import HrAttendancePage from './pages/HrAttendancePage'
 import ConstructionSitesPage from './pages/ConstructionSitesPage'
 import PlanningGoalsPage from './pages/PlanningGoalsPage'
+import EngFoundationPage from './pages/EngFoundationPage'
 import LedgerPage from './pages/LedgerPage'
 import PayrollPage from './pages/PayrollPage'
 import MarketingPage from './pages/MarketingPage'
@@ -182,6 +183,7 @@ export default function App() {
               <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
               <Route path="projects" element={<ProjectsPage />} />
               <Route path="construction-sites" element={<ConstructionSitesPage />} />
+              <Route path="eng-register" element={<EngFoundationPage />} />
               <Route path="client-pos" element={<ClientPosPage />} />
               <Route path="planning-goals" element={<PlanningGoalsPage />} />
               <Route path="approvals" element={<ApprovalsPage />} />

@@ -94,7 +94,10 @@ export async function savePolicy(
 export async function listTickets(accountId?: string): Promise<Ticket[]> {
   let q = db.from('tickets').select('*')
   if (accountId) q = q.eq('account_id', accountId)
-  return rows<Ticket>(q.order('created_at', { ascending: false }))
+  const list = await rows<Ticket & { deleted_at?: string | null }>(
+    q.order('created_at', { ascending: false }),
+  )
+  return list.filter((t) => !t.deleted_at)
 }
 
 export async function getTicket(id: string): Promise<Ticket | null> {

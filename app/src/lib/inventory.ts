@@ -72,11 +72,41 @@ export async function adjustStock(opts: {
     warehouse_id: opts.warehouseId || null,
   })
 
+  if (opts.warehouseId && qtyDelta) {
+    try {
+      await bumpWarehouseStock(opts.warehouseId, product.sku, qtyDelta)
+    } catch {
+      /* warehouse_stock migration may be absent */
+    }
+  }
+
   return {
     ...product,
     stock_on_hand: nextOnHand,
     stock_reserved: nextReserved,
   }
+}
+
+async function bumpWarehouseStock(warehouseId: string, sku: string, delta: number): Promise<void> {
+  const { data } = await db
+    .from('warehouse_stock')
+    .select('id, qty_on_hand')
+    .eq('warehouse_id', warehouseId)
+    .eq('sku', sku)
+    .maybeSingle()
+  if (data?.id) {
+    const next = Math.max(0, Number(data.qty_on_hand || 0) + Number(delta || 0))
+    await db
+      .from('warehouse_stock')
+      .update({ qty_on_hand: next, updated_at: new Date().toISOString() })
+      .eq('id', data.id)
+    return
+  }
+  await db.from('warehouse_stock').insert({
+    warehouse_id: warehouseId,
+    sku,
+    qty_on_hand: Math.max(0, Number(delta || 0)),
+  })
 }
 
 function skuFromLine(line: Pick<LineItem, 'description' | 'remarks'> & { sku?: string | null }): string | null {

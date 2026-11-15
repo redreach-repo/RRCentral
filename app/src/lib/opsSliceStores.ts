@@ -340,6 +340,7 @@ export type ClientPurchaseOrder = {
   amount: number
   notes: string
   invoice_id?: string | null
+  received_amount?: number
   accounts?: { name: string } | null
 }
 
@@ -348,7 +349,7 @@ export async function listClientPurchaseOrders(): Promise<ClientPurchaseOrder[]>
   const { data, error } = await db
     .from('client_purchase_orders')
     .select(
-      'id, account_id, po_number, status, issued_on, currency, amount, notes, invoice_id, accounts(name)',
+      'id, account_id, po_number, status, issued_on, currency, amount, notes, invoice_id, received_amount, accounts(name)',
     )
     .order('issued_on', { ascending: false })
     .limit(100)
@@ -356,7 +357,22 @@ export async function listClientPurchaseOrders(): Promise<ClientPurchaseOrder[]>
     if (isMissingRelationError(error)) return []
     throw error
   }
-  return (data || []) as ClientPurchaseOrder[]
+  return ((data || []) as ClientPurchaseOrder[]).map((r) => ({
+    ...r,
+    received_amount: Number(r.received_amount) || 0,
+  }))
+}
+
+export async function recordClientPoReceipt(id: string, receivedAmount: number, status: string): Promise<void> {
+  const { error } = await db
+    .from('client_purchase_orders')
+    .update({
+      received_amount: Number(receivedAmount) || 0,
+      status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+  if (error) throw error
 }
 
 export async function linkClientPoInvoice(

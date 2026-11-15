@@ -162,7 +162,9 @@ export default function ExpensesPage() {
         listVendors().catch(() => [] as Vendor[]),
       ])
       if (expRes.error) throw expRes.error
-      setExpenses((expRes.data || []) as Expense[])
+      setExpenses(
+        ((expRes.data || []) as (Expense & { deleted_at?: string | null })[]).filter((e) => !e.deleted_at),
+      )
       if (!quoteRes.error) setQuotes((quoteRes.data || []) as Quotation[])
       setVendors(vendorRows)
     } catch (e) {
@@ -589,8 +591,14 @@ export default function ExpensesPage() {
       for (const a of (atts || []) as { id: string }[]) {
         await db.from('attachments').delete().eq('id', a.id)
       }
-      const { error } = await db.from('expenses').delete().eq('id', deleteTarget.id)
-      if (error) throw error
+      let { error } = await db
+        .from('expenses')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', deleteTarget.id)
+      if (error) {
+        const hard = await db.from('expenses').delete().eq('id', deleteTarget.id)
+        if (hard.error) throw hard.error
+      }
       await logActivity('delete_expense', 'expense', deleteTarget.vendor, '', user?.email || '')
       showToast('Expense deleted', 'success')
       setDeleteTarget(null)

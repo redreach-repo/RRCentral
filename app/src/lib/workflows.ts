@@ -87,6 +87,36 @@ export function buildNotifyStep(opts?: {
   }
 }
 
+export function buildUpdateFieldStep(opts?: {
+  name?: string
+  fieldKey?: string
+  value?: string
+}): WorkflowStep {
+  return {
+    type: 'update_field',
+    name: opts?.name || 'Update field',
+    config: {
+      field_key: opts?.fieldKey || 'status',
+      value: opts?.value ?? '',
+    },
+  }
+}
+
+export function buildCreateRecordStep(opts?: {
+  name?: string
+  objectType?: string
+  label?: string
+}): WorkflowStep {
+  return {
+    type: 'create_record',
+    name: opts?.name || 'Create record',
+    config: {
+      object_type: opts?.objectType || 'note',
+      label: opts?.label || 'Workflow record',
+    },
+  }
+}
+
 export function parseWorkflowSteps(raw: unknown): WorkflowStep[] {
   if (!Array.isArray(raw)) return []
   return raw

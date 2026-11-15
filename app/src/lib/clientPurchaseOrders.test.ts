@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  clientPoRemaining,
   clientPoStatusAfterMatch,
+  clientPoStatusAfterReceipt,
   suggestClientPoInvoiceMatch,
 } from './clientPurchaseOrders'
 
@@ -22,5 +24,10 @@ describe('client PO invoice match', () => {
     expect(clientPoStatusAfterMatch(1000, 1000)).toBe('fulfilled')
     expect(clientPoStatusAfterMatch(1000, 400)).toBe('partial')
     expect(clientPoStatusAfterMatch(1000, 0)).toBe('open')
+  })
+
+  it('tracks remaining after receipt', () => {
+    expect(clientPoStatusAfterReceipt(1000, 250)).toBe('partial')
+    expect(clientPoRemaining(1000, 250)).toBe(750)
   })
 })
