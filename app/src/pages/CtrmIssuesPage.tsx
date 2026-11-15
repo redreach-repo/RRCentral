@@ -5,7 +5,9 @@ import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { listAccounts, listTeam } from '../lib/accountsStore'
 import { CLIENT_UPDATE_DAYS, groupIssuesByClient, isCtrmIssue, needsClientUpdate, vendorStatusLabel } from '../lib/ctrmIssues'
+import { CTRM_ISSUES_CSV_COLUMNS } from '../lib/ctrmIssuesCsv'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import { TICKET_STATUSES, isOpenTicket, optionLabel } from '../lib/support'
 import { listTickets } from '../lib/supportStore'
 import type { Account, AppUser, Ticket } from '../lib/types'
@@ -53,6 +55,28 @@ export default function CtrmIssuesPage() {
   const openCount = (tickets || []).filter(isOpenTicket).length
   const flagged = (tickets || []).filter((issue) => needsClientUpdate(issue, now)).length
   const owner = (id: string | null) => team.find((u) => u.id === id)?.name || team.find((u) => u.id === id)?.email || 'Nobody'
+  const exportRows = useMemo(
+    () =>
+      groups.flatMap((g) =>
+        g.issues.map((issue) => {
+          const assignee =
+            team.find((u) => u.id === issue.assignee_user_id)?.name ||
+            team.find((u) => u.id === issue.assignee_user_id)?.email ||
+            'Nobody'
+          return {
+            subject: issue.subject || '',
+            client: g.name,
+            status: issue.status,
+            vendor_status: issue.vendor_status || '',
+            vendor_ticket_ref: issue.vendor_ticket_ref || '',
+            owner: assignee,
+            created_at: issue.created_at,
+            client_updated_at: issue.client_updated_at || '',
+          }
+        }),
+      ),
+    [groups, team],
+  )
 
   return (
     <div style={pageStyle}>
@@ -66,6 +90,21 @@ export default function CtrmIssuesPage() {
         </button>
         <button type="button" style={tab(showAll)} onClick={() => setShowAll(true)}>
           {t('page.ctrmIssues.all')}
+        </button>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={!exportRows.length}
+          onClick={() => {
+            exportListCsv(
+              'ctrm-issues.csv',
+              CTRM_ISSUES_CSV_COLUMNS.map((c) => c.key),
+              exportRows,
+            )
+            showToast('CTRM issues CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
         </button>
         {flagged ? (
           <span style={{ color: colors.danger, fontSize: 13 }}>
