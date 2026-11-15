@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CustomerDocumentCategory } from '../lib/types'
 import { useToast } from '../contexts/ToastContext'
 import Modal from './Modal'
@@ -10,7 +10,7 @@ import {
   suggestedDocumentTitle,
   type RelatedRefOption,
 } from '../lib/customerFiles'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { parseLinkDriveFileForm } from '../lib/schemas/linkDriveFile'
 import {
   buttonPrimaryStyle,
@@ -67,6 +67,8 @@ export default function LinkDriveFileModal({
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [titleTouched, setTitleTouched] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const resolvedCategory: CustomerDocumentCategory =
     mode === 'communication'
@@ -173,6 +175,70 @@ export default function LinkDriveFileModal({
       }
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function importDriveLinkCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      if (!objects.length) {
+        showToast('No Drive link draft rows in CSV', 'error')
+        return
+      }
+
+      let applied = 0
+      for (const row of objects) {
+        const field = String(row.field || row.key || '').trim().toLowerCase()
+        const value = String(row.value ?? '').trim()
+        if (!field) continue
+        if (field === 'company' || field === 'mode') continue
+        if (field === 'category') {
+          if (mode === 'communication') {
+            const kindMatch = COMMUNICATION_KINDS.find(
+              (k) => k.id === value || k.label.toLowerCase() === value.toLowerCase(),
+            )
+            if (kindMatch) {
+              setKind(kindMatch.id)
+              setTitleTouched(false)
+              applied += 1
+            }
+          }
+        } else if (field === 'title') {
+          setDocTitle(value)
+          setTitleTouched(true)
+          applied += 1
+        } else if (field === 'drive_url' || field === 'driveurl') {
+          setDriveUrl(value)
+          applied += 1
+        } else if (field === 'related_ref' || field === 'relatedref') {
+          setRelatedRef(value)
+          setTitleTouched(false)
+          applied += 1
+        } else if (field === 'notes') {
+          if (mode === 'communication' || mode === 'purchasing' || value) {
+            setNotes(value)
+            applied += 1
+          }
+        }
+      }
+
+      if (!applied) {
+        showToast('No Drive link draft fields to import in CSV', 'error')
+        return
+      }
+      showToast(`Imported ${applied} Drive link draft field(s)`, 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Drive link draft CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
     }
   }
 
@@ -297,10 +363,28 @@ export default function LinkDriveFileModal({
         </div>
       ) : null}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".csv,text/csv"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) void importDriveLinkCsv(file)
+          }}
+        />
         <button
           type="button"
           style={buttonSecondaryStyle}
-          disabled={saving}
+          disabled={saving || importing}
+          onClick={() => importInputRef.current?.click()}
+        >
+          {importing ? 'Importing…' : 'Import CSV'}
+        </button>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={saving || importing}
           onClick={() => {
             exportListCsv(
               `link-drive-${company.replace(/\s+/g, '-').toLowerCase() || 'draft'}.csv`,
@@ -320,13 +404,13 @@ export default function LinkDriveFileModal({
         >
           Export CSV
         </button>
-        <button type="button" style={buttonSecondaryStyle} onClick={onClose} disabled={saving}>
+        <button type="button" style={buttonSecondaryStyle} onClick={onClose} disabled={saving || importing}>
           Cancel
         </button>
         <button
           type="button"
           style={buttonPrimaryStyle}
-          disabled={saving}
+          disabled={saving || importing}
           onClick={() => void handleSave()}
         >
           {saving
