@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import {
@@ -21,7 +21,7 @@ import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import SavedViewsBar from '../components/SavedViewsBar'
 import StatusPill from '../components/StatusPill'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import LinkDriveFileModal, { type LinkDriveFileMode } from '../components/LinkDriveFileModal'
 import { logActivity } from '../lib/activity'
 import { errorMessage, isMissingRelationError } from '../lib/errors'
@@ -96,6 +96,8 @@ function sectionToMode(section: FolderSection): LinkDriveFileMode {
   return 'signed'
 }
 
+const CUSTOMER_FILES_CSV_HEADERS = ['company_name', 'primary_contact', 'owner', 'drive_folder_url'] as const
+
 export default function CustomerFilesPage() {
   const { t } = useI18n()
   const { user, isLocalMode, appUserId } = useAuth()
@@ -117,6 +119,8 @@ export default function CustomerFilesPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [addSection, setAddSection] = useState<FolderSection>(CUSTOMER_FOLDER_SECTIONS[0])
   const [showArchivedDocs, setShowArchivedDocs] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const filesViewFilters = useMemo(
     () => ({ q: search, archived: showArchivedDocs ? '1' : '0' }),
     [search, showArchivedDocs],
@@ -270,6 +274,71 @@ export default function CustomerFilesPage() {
     }
   }
 
+  async function importCompaniesCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const byName = new Map(companies.map((c) => [c.company_name.trim().toLowerCase(), c] as const))
+      let updated = 0
+      let skipped = 0
+      for (const row of objects) {
+        const name = String(row.company_name || '').trim()
+        if (!name) {
+          skipped += 1
+          continue
+        }
+        const company = byName.get(name.toLowerCase())
+        if (!company?.id) {
+          skipped += 1
+          continue
+        }
+        if (!Object.prototype.hasOwnProperty.call(row, 'drive_folder_url')) {
+          skipped += 1
+          continue
+        }
+        const nextUrl = String(row.drive_folder_url ?? '').trim()
+        const currentUrl = String(company.drive_folder_url || '').trim()
+        if (nextUrl === currentUrl) {
+          skipped += 1
+          continue
+        }
+        try {
+          await updateCrmDriveFolderUrl(company.id, nextUrl)
+          await logActivity(
+            'set_customer_drive_folder',
+            'crm',
+            company.company_name,
+            nextUrl || '(cleared)',
+            who,
+            company.id,
+          )
+          updated += 1
+        } catch {
+          skipped += 1
+        }
+      }
+      if (!updated) {
+        showToast(skipped ? 'No matching company Drive folder rows to import' : 'CSV has no data rows', 'error')
+        return
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Updated ${updated} Drive folder link(s)${skipNote}`, 'success')
+      await loadCompanies()
+      if (selected) await openCompany(selected)
+    } catch (e) {
+      showToast(errorMessage(e, 'Customer files CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
@@ -279,6 +348,25 @@ export default function CustomerFilesPage() {
           <p className={docsStyles.subtitle}>{t('page.customerFiles.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importCompaniesCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing || !companies.length}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}
@@ -287,7 +375,7 @@ export default function CustomerFilesPage() {
             onClick={() => {
               exportListCsv(
                 'customer-files-companies.csv',
-                ['company_name', 'primary_contact', 'owner', 'drive_folder_url'],
+                [...CUSTOMER_FILES_CSV_HEADERS],
                 companies.map((c) => ({
                   company_name: c.company_name,
                   primary_contact: c.primary_contact || '',
