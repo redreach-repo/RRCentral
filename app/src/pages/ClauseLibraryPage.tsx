@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
@@ -9,7 +9,9 @@ import {
   clauseCategoryLabel,
   clauseStatusLabel,
 } from '../lib/clauseLibrary'
+import { CLAUSE_LIBRARY_CSV_COLUMNS } from '../lib/clauseLibraryCsv'
 import { deleteContractClause, listContractClauses, saveContractClause } from '../lib/clauseLibraryStore'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import { can } from '../lib/permissions'
 import { parseClauseForm } from '../lib/schemas/clause'
 import type { ContractClause, ContractClauseCategory, ContractClauseStatus } from '../lib/types'
@@ -45,6 +47,8 @@ export default function ClauseLibraryPage() {
   const [selectedId, setSelectedId] = useState('')
   const [form, setForm] = useState(emptyForm)
   const [busy, setBusy] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(
     async (select?: string) => {
@@ -118,6 +122,65 @@ export default function ClauseLibraryPage() {
     }
   }
 
+  async function importClausesCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, csvRows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of CLAUSE_LIBRARY_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, CLAUSE_LIBRARY_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid clause rows', 'error')
+        return
+      }
+      const categorySet = new Set(CLAUSE_CATEGORIES.map((c) => c.value))
+      const statusSet = new Set(CLAUSE_STATUSES.map((s) => s.value))
+      const byKey = new Map(rows.map((r) => [r.clause_key.toLowerCase(), r.id] as const))
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        const category = categorySet.has(row.category as ContractClauseCategory)
+          ? (row.category as ContractClauseCategory)
+          : 'general'
+        const status = statusSet.has(row.status as ContractClauseStatus)
+          ? (row.status as ContractClauseStatus)
+          : 'draft'
+        const sortOrder = row.sort_order ? Number(row.sort_order) : 100
+        const parsed = parseClauseForm({
+          clause_key: row.clause_key,
+          title: row.title,
+          body: row.body,
+          category,
+          status,
+          sort_order: Number.isFinite(sortOrder) ? sortOrder : 100,
+          notes: row.notes || '',
+        })
+        if (!parsed.ok) {
+          skipped += 1
+          continue
+        }
+        const existingId = byKey.get(parsed.data.clause_key.toLowerCase())
+        const id = await saveContractClause(parsed.data, user?.email || '', existingId)
+        byKey.set(parsed.data.clause_key.toLowerCase(), id)
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} clause(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Clause CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <div style={pageStyle}>
       <h1 style={pageTitleStyle}>{t('page.clauseLibrary.title')}</h1>
@@ -128,13 +191,58 @@ export default function ClauseLibraryPage() {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 280px) 1fr', gap: 16 }}>
           <div style={card}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <strong style={{ fontSize: 14 }}>{t('page.clauseLibrary.list')}</strong>
-              {editing ? (
-                <button type="button" style={btnGhost} onClick={newClause}>
-                  {t('page.clauseLibrary.new')}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <input
+                  ref={importInputRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) void importClausesCsv(file)
+                  }}
+                />
+                {editing ? (
+                  <button
+                    type="button"
+                    style={btnGhost}
+                    disabled={importing}
+                    onClick={() => importInputRef.current?.click()}
+                  >
+                    {importing ? 'Importing…' : 'Import CSV'}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  style={btnGhost}
+                  disabled={!rows.length}
+                  onClick={() => {
+                    exportListCsv(
+                      'clause-library.csv',
+                      CLAUSE_LIBRARY_CSV_COLUMNS.map((c) => c.key),
+                      rows.map((c) => ({
+                        clause_key: c.clause_key,
+                        title: c.title,
+                        body: c.body,
+                        category: c.category,
+                        status: c.status,
+                        sort_order: c.sort_order,
+                        notes: c.notes,
+                      })),
+                    )
+                    showToast('Clause library CSV downloaded', 'success')
+                  }}
+                >
+                  Export CSV
                 </button>
-              ) : null}
+                {editing ? (
+                  <button type="button" style={btnGhost} onClick={newClause}>
+                    {t('page.clauseLibrary.new')}
+                  </button>
+                ) : null}
+              </div>
             </div>
             <div style={{ display: 'grid', gap: 6, maxHeight: 480, overflow: 'auto' }}>
               {rows.map((c) => (
