@@ -1,22 +1,21 @@
 # HighMast / RR Central status
 
 **Last updated:** 15 November 2026 (Asia/Dubai)  
-**Current milestone:** Theme studio deepen (fonts / BU kits / density)
+**Current milestone:** Active-BU chrome brand kit switch
 
 ## Shipped this turn
 
-- Theme studio: heading/body fonts + density in `brand_kits.fonts`, BU scope editor, live CSS vars (`docs/theme-studio.md`)
+- Top-bar business unit switcher applies BU brand kit to chrome (falls through to company kit); see `docs/theme-studio.md`
 
 ## Already on main
 
-- WPS SIF draft (#426) · Theme studio first slice (#425) · HighMast SaaS Checkout (#424) · M6–M12 deepen (#415)
+- Theme studio deepen (#427) · WPS SIF draft (#426) · Theme studio (#425) · SaaS Checkout (#424)
 
 ## Still open (agent queue)
 
 1. Bank-certified WPS + counsel review (format deepen shipped; counsel still blocked)  
 2. Official SVG masters when zip lands  
-3. Active-BU chrome kit switch (Theme studio BU edit shipped)  
-4. Demo / M3a after Alfred  
+3. Demo / M3a after Alfred  
 
 ## Still externally blocked
 

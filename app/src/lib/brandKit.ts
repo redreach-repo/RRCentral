@@ -274,3 +274,29 @@ export function contrastRatio(fgHex: string, bgHex: string): number {
   const darker = Math.min(a, b)
   return Math.round(((lighter + 0.05) / (darker + 0.05)) * 100) / 100
 }
+
+/**
+ * Chrome kit resolution: active BU kit → company kit → tenant default → fallback.
+ * Missing BU kit falls through to company (does not invent colours).
+ */
+export function resolveBrandKit(input: {
+  kits: BrandKit[]
+  companyId: string | null | undefined
+  businessUnitId: string | null | undefined
+  fallback?: BrandKit
+}): BrandKit {
+  const fallback = input.fallback || REDREACH_DEFAULT_BRAND
+  const kits = input.kits || []
+  const buId = input.businessUnitId || null
+  const companyId = input.companyId || null
+  if (buId) {
+    const buKit = kits.find((k) => k.business_unit_id === buId)
+    if (buKit) return buKit
+  }
+  if (companyId) {
+    const companyKit = kits.find((k) => k.company_id === companyId && k.business_unit_id == null)
+    if (companyKit) return companyKit
+  }
+  const tenantKit = kits.find((k) => k.company_id == null && k.business_unit_id == null)
+  return tenantKit || fallback
+}

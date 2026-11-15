@@ -11,6 +11,8 @@ export const LOCALES: { id: Locale; label: string; dir: 'ltr' | 'rtl' }[] = [
 const STRINGS: Record<Locale, Record<string, string>> = {
   en: {
     'shell.company': 'Company',
+    'shell.businessUnit': 'Business unit',
+    'shell.businessUnitAll': 'All (company kit)',
     'shell.signOut': 'Sign out',
     'shell.mainNav': 'Main',
     'shell.openMenu': 'Open menu',
@@ -993,6 +995,8 @@ const STRINGS: Record<Locale, Record<string, string>> = {
   },
   ar: {
     'shell.company': 'الشركة',
+    'shell.businessUnit': 'وحدة الأعمال',
+    'shell.businessUnitAll': 'الكل (هوية الشركة)',
     'shell.signOut': 'تسجيل الخروج',
     'shell.mainNav': 'الرئيسية',
     'shell.openMenu': 'فتح القائمة',

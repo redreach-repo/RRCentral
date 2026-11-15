@@ -14,8 +14,10 @@ import {
   BRAND_KIT_COLUMNS,
   coerceBrandKit,
   REDREACH_DEFAULT_BRAND,
+  resolveBrandKit,
   type BrandKit,
 } from '../lib/brandKit'
+import { listBrandKitsForCompany, listCompanyBusinessUnits, type BusinessUnitRow } from '../lib/brandKitStore'
 import { REDREACH_COMPANY_ID, REDREACH_TENANT_ID } from '../modules/registry'
 
 export type TenantCompany = {
@@ -33,8 +35,13 @@ type TenantValue = {
   activeCompanyId: string | null
   activeCompany: TenantCompany | null
   setActiveCompanyId: (id: string) => void
+  businessUnits: BusinessUnitRow[]
+  /** null = company-wide chrome kit */
+  activeBusinessUnitId: string | null
+  activeBusinessUnit: BusinessUnitRow | null
+  setActiveBusinessUnitId: (id: string | null) => void
   brandKit: BrandKit
-  /** Apply a kit immediately (Theme Studio save / preview). */
+  /** Apply a kit immediately (Theme Studio save / preview). Also merges into kit cache. */
   setBrandKit: (kit: BrandKit) => void
   loading: boolean
 }
@@ -42,6 +49,7 @@ type TenantValue = {
 const TenantContext = createContext<TenantValue | undefined>(undefined)
 
 const COMPANY_KEY = 'rrcentral_active_company'
+const BU_KEY = 'rrcentral_active_business_unit'
 
 function readStoredCompany(): string | null {
   try {
@@ -51,14 +59,42 @@ function readStoredCompany(): string | null {
   }
 }
 
+function readStoredBu(): string | null {
+  try {
+    return localStorage.getItem(BU_KEY)
+  } catch {
+    return null
+  }
+}
+
+const FALLBACK_COMPANY: TenantCompany = {
+  id: REDREACH_COMPANY_ID,
+  name: 'Red Reach Middle East FZE',
+  legal_name: 'Red Reach Middle East FZE',
+  is_default: true,
+  active: true,
+  currency: 'AED',
+}
+
 export function TenantProvider({ children }: { children: ReactNode }) {
   const { user, hasAccess, tenantId: authTenantId, isLocalMode } = useAuth()
   const [companies, setCompanies] = useState<TenantCompany[]>([])
-  const [brandKit, setBrandKit] = useState<BrandKit>(REDREACH_DEFAULT_BRAND)
+  const [businessUnits, setBusinessUnits] = useState<BusinessUnitRow[]>([])
+  const [kitCache, setKitCache] = useState<BrandKit[]>([REDREACH_DEFAULT_BRAND])
+  const [brandKit, setBrandKitState] = useState<BrandKit>(REDREACH_DEFAULT_BRAND)
   const [activeCompanyId, setActiveCompanyIdState] = useState<string | null>(null)
+  const [activeBusinessUnitId, setActiveBusinessUnitIdState] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   const tenantId = authTenantId || (isLocalMode ? REDREACH_TENANT_ID : null)
+
+  const applyResolved = useCallback(
+    (kits: BrandKit[], companyId: string | null, buId: string | null) => {
+      const resolved = resolveBrandKit({ kits, companyId, businessUnitId: buId })
+      setBrandKitState(resolved)
+    },
+    [],
+  )
 
   const setActiveCompanyId = useCallback((id: string) => {
     setActiveCompanyIdState(id)
@@ -69,24 +105,51 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const setActiveBusinessUnitId = useCallback((id: string | null) => {
+    setActiveBusinessUnitIdState(id)
+    try {
+      if (id) localStorage.setItem(BU_KEY, id)
+      else localStorage.removeItem(BU_KEY)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const setBrandKit = useCallback(
+    (kit: BrandKit) => {
+      setBrandKitState(kit)
+      setKitCache((prev) => {
+        const coerced = coerceBrandKit(kit)
+        if (coerced.business_unit_id) {
+          return [...prev.filter((k) => k.business_unit_id !== coerced.business_unit_id), coerced]
+        }
+        if (coerced.company_id) {
+          return [
+            ...prev.filter(
+              (k) => !(k.company_id === coerced.company_id && k.business_unit_id == null),
+            ),
+            coerced,
+          ]
+        }
+        return [...prev.filter((k) => !(k.company_id == null && k.business_unit_id == null)), coerced]
+      })
+    },
+    [],
+  )
+
+  // Initial companies + tenant default kit
   useEffect(() => {
     let cancelled = false
 
     async function load() {
       if (!user || !hasAccess) {
         if (!cancelled) {
-          setCompanies([
-            {
-              id: REDREACH_COMPANY_ID,
-              name: 'Red Reach Middle East FZE',
-              legal_name: 'Red Reach Middle East FZE',
-              is_default: true,
-              active: true,
-              currency: 'AED',
-            },
-          ])
+          setCompanies([FALLBACK_COMPANY])
           setActiveCompanyIdState(REDREACH_COMPANY_ID)
-          setBrandKit(REDREACH_DEFAULT_BRAND)
+          setBusinessUnits([])
+          setActiveBusinessUnitIdState(null)
+          setKitCache([REDREACH_DEFAULT_BRAND])
+          setBrandKitState(REDREACH_DEFAULT_BRAND)
           setLoading(false)
         }
         return
@@ -102,20 +165,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           .order('name')
 
         const list = (companyRows || []) as TenantCompany[]
-        const fallback: TenantCompany[] =
-          list.length > 0
-            ? list
-            : [
-                {
-                  id: REDREACH_COMPANY_ID,
-                  name: 'Red Reach Middle East FZE',
-                  legal_name: 'Red Reach Middle East FZE',
-                  is_default: true,
-                  active: true,
-                  currency: 'AED',
-                },
-              ]
-
+        const fallback = list.length > 0 ? list : [FALLBACK_COMPANY]
         if (cancelled) return
         setCompanies(fallback)
 
@@ -126,31 +176,13 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           fallback[0]?.id ||
           null
         setActiveCompanyIdState(pick)
-
-        const { data: kitRows } = await db
-          .from('brand_kits')
-          .select(BRAND_KIT_COLUMNS)
-          .is('business_unit_id', null)
-          .order('company_id', { ascending: true, nullsFirst: false })
-
-        const kits = (kitRows || []).map((row) => coerceBrandKit(row as BrandKit))
-        const companyKit = kits.find((k) => k.company_id === pick)
-        const tenantKit = kits.find((k) => k.company_id == null)
-        setBrandKit(companyKit || tenantKit || REDREACH_DEFAULT_BRAND)
       } catch {
         if (!cancelled) {
-          setCompanies([
-            {
-              id: REDREACH_COMPANY_ID,
-              name: 'Red Reach Middle East FZE',
-              legal_name: 'Red Reach Middle East FZE',
-              is_default: true,
-              active: true,
-              currency: 'AED',
-            },
-          ])
+          setCompanies([FALLBACK_COMPANY])
           setActiveCompanyIdState(REDREACH_COMPANY_ID)
-          setBrandKit(REDREACH_DEFAULT_BRAND)
+          setBusinessUnits([])
+          setKitCache([REDREACH_DEFAULT_BRAND])
+          setBrandKitState(REDREACH_DEFAULT_BRAND)
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -163,6 +195,66 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     }
   }, [user, hasAccess, tenantId])
 
+  // When company changes: load BUs + kits and resolve chrome kit
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadCompanyScope() {
+      if (!activeCompanyId) return
+
+      if (isLocalMode || !user || !hasAccess) {
+        setBusinessUnits([])
+        setActiveBusinessUnitIdState(null)
+        setKitCache([REDREACH_DEFAULT_BRAND])
+        applyResolved([REDREACH_DEFAULT_BRAND], activeCompanyId, null)
+        return
+      }
+
+      try {
+        const [units, companyKits, tenantKitResult] = await Promise.all([
+          listCompanyBusinessUnits(activeCompanyId),
+          listBrandKitsForCompany(activeCompanyId),
+          db
+            .from('brand_kits')
+            .select(BRAND_KIT_COLUMNS)
+            .is('company_id', null)
+            .is('business_unit_id', null)
+            .limit(1),
+        ])
+        if (cancelled) return
+
+        setBusinessUnits(units)
+
+        const storedBu = readStoredBu()
+        const buPick = storedBu && units.some((u) => u.id === storedBu) ? storedBu : null
+        setActiveBusinessUnitIdState(buPick)
+
+        const tenantKits = (tenantKitResult.data || []).map((row) => coerceBrandKit(row as BrandKit))
+        const merged = [...tenantKits, ...companyKits]
+        setKitCache(merged.length ? merged : [REDREACH_DEFAULT_BRAND])
+        applyResolved(merged, activeCompanyId, buPick)
+      } catch {
+        if (!cancelled) {
+          setBusinessUnits([])
+          setActiveBusinessUnitIdState(null)
+          setKitCache([REDREACH_DEFAULT_BRAND])
+          applyResolved([REDREACH_DEFAULT_BRAND], activeCompanyId, null)
+        }
+      }
+    }
+
+    void loadCompanyScope()
+    return () => {
+      cancelled = true
+    }
+  }, [activeCompanyId, user, hasAccess, isLocalMode, applyResolved])
+
+  // When BU selection changes (same company), re-resolve without refetch
+  useEffect(() => {
+    if (!activeCompanyId) return
+    applyResolved(kitCache, activeCompanyId, activeBusinessUnitId)
+  }, [activeBusinessUnitId, activeCompanyId, kitCache, applyResolved])
+
   useEffect(() => {
     applyBrandCssVars(brandKit)
   }, [brandKit])
@@ -172,6 +264,11 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     [companies, activeCompanyId],
   )
 
+  const activeBusinessUnit = useMemo(
+    () => businessUnits.find((u) => u.id === activeBusinessUnitId) || null,
+    [businessUnits, activeBusinessUnitId],
+  )
+
   const value = useMemo(
     () => ({
       tenantId,
@@ -179,11 +276,27 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       activeCompanyId: activeCompany?.id ?? null,
       activeCompany,
       setActiveCompanyId,
+      businessUnits,
+      activeBusinessUnitId,
+      activeBusinessUnit,
+      setActiveBusinessUnitId,
       brandKit,
       setBrandKit,
       loading,
     }),
-    [tenantId, companies, activeCompany, setActiveCompanyId, brandKit, loading],
+    [
+      tenantId,
+      companies,
+      activeCompany,
+      setActiveCompanyId,
+      businessUnits,
+      activeBusinessUnitId,
+      activeBusinessUnit,
+      setActiveBusinessUnitId,
+      brandKit,
+      setBrandKit,
+      loading,
+    ],
   )
 
   return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>
