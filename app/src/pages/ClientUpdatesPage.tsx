@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { addDays, format, parseISO } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
@@ -8,11 +8,20 @@ import SavedViewsBar from '../components/SavedViewsBar'
 import { runAi } from '../lib/aiAssistStore'
 import { buildUpdateDrafts, loadUpdateQueue, saveUpdateBody, sendUpdate, setUpdateSkipped, type UpdateContact, type UpdateQueue } from '../lib/clientUpdatesStore'
 import { errorMessage } from '../lib/errors'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { roleAtLeast } from '../lib/permissions'
 import { parseClientUpdateBody } from '../lib/schemas/clientUpdate'
 import type { ClientUpdateDraft } from '../lib/types'
-import { CLIENT_UPDATE_BODY_MAX, CLIENT_UPDATE_STATUSES, updateRecipients, weekLabelOf, weekStartFor, whatsAppLink, type ClientUpdateChannel } from '../lib/weeklyUpdates'
+import {
+  CLIENT_UPDATE_BODY_MAX,
+  CLIENT_UPDATE_STATUSES,
+  updateRecipients,
+  weekLabelOf,
+  weekStartFor,
+  whatsAppLink,
+  type ClientUpdateChannel,
+  type ClientUpdateStatus,
+} from '../lib/weeklyUpdates'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -25,6 +34,26 @@ import docsStyles from '../styles/docsList.module.css'
 
 const smallBtn = { ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 13 }
 const muted = { color: colors.muted, fontSize: 13 }
+
+const CLIENT_UPDATES_CSV_HEADERS = [
+  'account',
+  'status',
+  'week_start',
+  'body',
+  'sent_via',
+  'sent_to',
+  'sent_at',
+  'sent_by',
+] as const
+
+function parseUpdateStatus(raw: string): ClientUpdateStatus | null {
+  const token = raw.trim().toLowerCase()
+  if (!token) return null
+  const byValue = CLIENT_UPDATE_STATUSES.find((s) => s.value === token)
+  if (byValue) return byValue.value
+  const byLabel = CLIENT_UPDATE_STATUSES.find((s) => s.label.toLowerCase() === token)
+  return byLabel?.value ?? null
+}
 
 /**
  * The Approve queue for weekly CTRM Next client updates. Every Thursday each
@@ -43,10 +72,13 @@ export default function ClientUpdatesPage() {
   const [queue, setQueue] = useState<UpdateQueue | null>(null)
   const [building, setBuilding] = useState(false)
   const [statusFilter, setStatusFilter] = useState('all')
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const updatesViewFilters = useMemo(
     () => ({ status: statusFilter, week }),
     [statusFilter, week],
   )
+  const canImport = userRole !== 'viewer' && !queue?.missingTable
 
   const load = useCallback(async () => {
     try {
@@ -80,6 +112,86 @@ export default function ClientUpdatesPage() {
     await load()
   }
 
+  async function importUpdatesCsv(file: File) {
+    if (!canImport) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const remaining = [...(queue?.drafts || [])]
+      const byAccount = new Map(
+        remaining.map((d) => [d.accountName.trim().toLowerCase(), d] as const),
+      )
+      let saved = 0
+      let skipped = 0
+      for (const row of objects) {
+        const account = String(row.account || '').trim()
+        if (!account) {
+          skipped += 1
+          continue
+        }
+        const weekStart = String(row.week_start || '').trim()
+        if (weekStart && weekStart !== week) {
+          skipped += 1
+          continue
+        }
+        const draft = byAccount.get(account.toLowerCase())
+        if (!draft || draft.status === 'sent') {
+          skipped += 1
+          continue
+        }
+
+        let changed = false
+        const bodyRaw = String(row.body ?? '')
+        if (bodyRaw.trim() && bodyRaw.trim() !== draft.body.trim()) {
+          const parsed = parseClientUpdateBody({ body: bodyRaw })
+          if (!parsed.ok) {
+            skipped += 1
+            continue
+          }
+          await saveUpdateBody(draft.id, parsed.data.body)
+          draft.body = parsed.data.body
+          changed = true
+        }
+
+        const nextStatus = parseUpdateStatus(String(row.status || ''))
+        if (nextStatus === 'skipped' && draft.status === 'draft') {
+          await setUpdateSkipped(draft.id, true)
+          draft.status = 'skipped'
+          changed = true
+        } else if (nextStatus === 'draft' && draft.status === 'skipped') {
+          await setUpdateSkipped(draft.id, false)
+          draft.status = 'draft'
+          changed = true
+        } else if (nextStatus === 'sent' && !changed) {
+          skipped += 1
+          continue
+        }
+
+        if (changed) saved += 1
+        else skipped += 1
+      }
+
+      if (!saved) {
+        showToast(skipped ? 'No matching client update rows in CSV' : 'CSV has no data rows', 'error')
+        return
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} client update(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Client updates CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   const waiting = queue?.drafts.filter((d) => d.status === 'draft').length ?? 0
   const sent = queue?.drafts.filter((d) => d.status === 'sent').length ?? 0
   const visibleDrafts = useMemo(() => {
@@ -96,32 +208,55 @@ export default function ClientUpdatesPage() {
           <h1 className={docsStyles.title}>{t('page.clientUpdates.title')}</h1>
           <p className={docsStyles.subtitle}>{t('page.clientUpdates.subtitle')}</p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-          disabled={!queue?.drafts.length}
-          onClick={() => {
-            if (!queue?.drafts.length) return
-            exportListCsv(
-              `client-updates-${week}.csv`,
-              ['account', 'status', 'week_start', 'body', 'sent_via', 'sent_to', 'sent_at', 'sent_by'],
-              queue.drafts.map((d) => ({
-                account: d.accountName,
-                status: d.status,
-                week_start: d.week_start || week,
-                body: d.body || '',
-                sent_via: d.sent_via || '',
-                sent_to: d.sent_to || '',
-                sent_at: d.sent_at || '',
-                sent_by: d.sent_by || '',
-              })),
-            )
-            showToast('Client updates CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importUpdatesCsv(file)
+            }}
+          />
+          {canImport ? (
+            <button
+              type="button"
+              className={docsStyles.newBtn}
+              style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+              disabled={importing || building}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!queue?.drafts.length}
+            onClick={() => {
+              if (!queue?.drafts.length) return
+              exportListCsv(
+                `client-updates-${week}.csv`,
+                [...CLIENT_UPDATES_CSV_HEADERS],
+                queue.drafts.map((d) => ({
+                  account: d.accountName,
+                  status: d.status,
+                  week_start: d.week_start || week,
+                  body: d.body || '',
+                  sent_via: d.sent_via || '',
+                  sent_to: d.sent_to || '',
+                  sent_at: d.sent_at || '',
+                  sent_by: d.sent_by || '',
+                })),
+              )
+              showToast('Client updates CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </header>
 
       <SavedViewsBar

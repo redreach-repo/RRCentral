@@ -1,15 +1,26 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { AlertTriangle, HeartPulse } from 'lucide-react'
 import { useToast } from '../../contexts/ToastContext'
 import { HEALTH_BAND_COLORS, HEALTH_BAND_LABELS, REPORT_CALL_LABELS, reportCallMonths } from '../../lib/clientHealth'
 import { listReportCalls, loadClientHealth, saveReportCall, type HealthRow } from '../../lib/clientHealthStore'
 import { monthKey } from '../../lib/delivery'
 import { errorMessage } from '../../lib/errors'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import type { Account, ReportCall } from '../../lib/types'
 import { buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
 
 const smallBtn: CSSProperties = { ...buttonSecondaryStyle, padding: '4px 9px', fontSize: 12 }
+
+const REPORT_CALL_STATUSES = Object.keys(REPORT_CALL_LABELS) as ReportCall['status'][]
+
+function parseReportCallStatus(raw: string): ReportCall['status'] | null {
+  const token = raw.trim().toLowerCase()
+  if (!token || token === 'not_recorded' || token === 'not recorded') return null
+  const byKey = REPORT_CALL_STATUSES.find((s) => s === token)
+  if (byKey) return byKey
+  const byLabel = REPORT_CALL_STATUSES.find((s) => REPORT_CALL_LABELS[s].toLowerCase() === token)
+  return byLabel ?? null
+}
 
 /** Health score for one client, with the monthly report call record that feeds it. */
 export default function ClientHealthCard({ account, editable, author }: { account: Account; editable: boolean; author: string }) {
@@ -17,6 +28,8 @@ export default function ClientHealthCard({ account, editable, author }: { accoun
   const [row, setRow] = useState<HealthRow | null>(null)
   const [calls, setCalls] = useState<ReportCall[]>([])
   const [busy, setBusy] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     try {
@@ -44,6 +57,55 @@ export default function ClientHealthCard({ account, editable, author }: { accoun
     }
   }
 
+  async function importHealthCsv(file: File) {
+    if (!editable) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows)
+      let existing = await listReportCalls(account.id)
+      let applied = 0
+      let skipped = 0
+      for (const obj of objects) {
+        const metric = String(obj.metric || obj.key || '').trim()
+        if (!metric.startsWith('report_call_')) {
+          skipped += 1
+          continue
+        }
+        const month = metric.slice('report_call_'.length).trim()
+        if (!month) {
+          skipped += 1
+          continue
+        }
+        const status = parseReportCallStatus(String(obj.value ?? ''))
+        if (!status) {
+          skipped += 1
+          continue
+        }
+        await saveReportCall(account.id, month, status, author, existing)
+        existing = await listReportCalls(account.id)
+        applied += 1
+      }
+      if (!applied) {
+        showToast('No report call rows to import in CSV', 'error')
+        return
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${applied} report call(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Client health CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   if (!row) return null
   const { health } = row
   const color = HEALTH_BAND_COLORS[health.band]
@@ -54,32 +116,54 @@ export default function ClientHealthCard({ account, editable, author }: { accoun
         <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
           <HeartPulse size={16} style={{ color }} /> Health
         </h2>
-        <button
-          type="button"
-          style={smallBtn}
-          onClick={() => {
-            exportListCsv(
-              `client-health-${account.id.slice(0, 8)}.csv`,
-              ['metric', 'value', 'note'],
-              [
-                { metric: 'score', value: health.score, note: HEALTH_BAND_LABELS[health.band] },
-                { metric: 'churn_warning', value: health.churnWarning ? 'yes' : 'no', note: health.flags.join('; ') },
-                ...health.parts.map((p) => ({ metric: p.label, value: `${p.points}/25`, note: p.note })),
-                ...reportCallMonths().map((m) => {
-                  const rec = calls.find((c) => monthKey(c.month) === m.key)
-                  return {
-                    metric: `report_call_${m.key}`,
-                    value: rec ? REPORT_CALL_LABELS[rec.status] : 'not_recorded',
-                    note: m.label,
-                  }
-                }),
-              ],
-            )
-            showToast('Client health CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importHealthCsv(file)
+            }}
+          />
+          {editable ? (
+            <button
+              type="button"
+              style={smallBtn}
+              disabled={importing || busy}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            style={smallBtn}
+            onClick={() => {
+              exportListCsv(
+                `client-health-${account.id.slice(0, 8)}.csv`,
+                ['metric', 'value', 'note'],
+                [
+                  { metric: 'score', value: health.score, note: HEALTH_BAND_LABELS[health.band] },
+                  { metric: 'churn_warning', value: health.churnWarning ? 'yes' : 'no', note: health.flags.join('; ') },
+                  ...health.parts.map((p) => ({ metric: p.label, value: `${p.points}/25`, note: p.note })),
+                  ...reportCallMonths().map((m) => {
+                    const rec = calls.find((c) => monthKey(c.month) === m.key)
+                    return {
+                      metric: `report_call_${m.key}`,
+                      value: rec ? REPORT_CALL_LABELS[rec.status] : 'not_recorded',
+                      note: m.label,
+                    }
+                  }),
+                ],
+              )
+              showToast('Client health CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
         <span style={{ fontSize: 30, fontWeight: 700, color }}>{health.score}</span>

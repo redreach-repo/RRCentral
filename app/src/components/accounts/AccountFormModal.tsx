@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Modal from '../Modal'
 import EditorSectionTabs, {
   editorPanelStyle,
@@ -7,7 +7,8 @@ import EditorSectionTabs, {
 import { useToast } from '../../contexts/ToastContext'
 import { ACCOUNT_TYPES, accountStatusLabel, accountTypeInfo } from '../../lib/accounts'
 import type { AccountInput, ContactInput } from '../../lib/accountsStore'
-import { exportListCsv } from '../../lib/listIo'
+import { errorMessage } from '../../lib/errors'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import { parseAccountForm } from '../../lib/schemas/account'
 import type { Account, AccountType, AppUser } from '../../lib/types'
 import {
@@ -20,6 +21,31 @@ import {
   labelStyle,
   selectStyle,
 } from '../../lib/uiStyles'
+
+const ACCOUNT_FORM_CSV_COLUMNS = [
+  'type',
+  'name',
+  'industry',
+  'country',
+  'city',
+  'website',
+  'status',
+  'owner_user_id',
+  'source',
+  'notes',
+  'contact_name',
+  'contact_email',
+  'contact_phone',
+] as const
+
+function resolveAccountType(raw: string, fallback: AccountType): AccountType {
+  const v = raw.trim()
+  if (!v) return fallback
+  const byValue = ACCOUNT_TYPES.find((t) => t.value === v)
+  if (byValue) return byValue.value
+  const byLabel = ACCOUNT_TYPES.find((t) => t.label.toLowerCase() === v.toLowerCase())
+  return byLabel?.value ?? fallback
+}
 
 type Props = {
   open: boolean
@@ -72,6 +98,8 @@ export default function AccountFormModal({
   const { showToast } = useToast()
   const [form, setForm] = useState<Form>(() => emptyForm(defaultType, defaultOwnerId))
   const [editorSection, setEditorSection] = useState<EditorSection>('basics')
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -102,6 +130,70 @@ export default function AccountFormModal({
 
   const statuses = accountTypeInfo(form.type).statuses
   const ownerLocked = Boolean(lockedOwnerId) || (Boolean(account) && !canReassign)
+
+  async function importAccountCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows)
+      const row =
+        objects.find((r) => String(r.name || '').trim() || String(r.type || '').trim()) || objects[0]
+      if (!row) {
+        showToast('No account form rows in CSV', 'error')
+        return
+      }
+
+      const nextType = resolveAccountType(String(row.type || ''), form.type)
+      const typeInfo = accountTypeInfo(nextType)
+      let nextStatus = String(row.status || '').trim() || form.status
+      if (!typeInfo.statuses.includes(nextStatus)) {
+        nextStatus = typeInfo.statuses[0]
+      }
+
+      let nextOwner = form.owner_user_id
+      if (!ownerLocked) {
+        const ownerRaw = String(row.owner_user_id || '').trim()
+        if (!ownerRaw) {
+          nextOwner = null
+        } else if (team.some((u) => u.id === ownerRaw)) {
+          nextOwner = ownerRaw
+        }
+      } else if (lockedOwnerId) {
+        nextOwner = lockedOwnerId
+      }
+
+      setForm((f) => ({
+        ...f,
+        type: nextType,
+        name: row.name != null ? String(row.name).trim() : f.name,
+        industry: row.industry != null ? String(row.industry).trim() : f.industry,
+        country: row.country != null ? String(row.country).trim() : f.country,
+        city: row.city != null ? String(row.city).trim() : f.city,
+        website: row.website != null ? String(row.website).trim() : f.website,
+        status: nextStatus,
+        owner_user_id: nextOwner,
+        source: row.source != null ? String(row.source).trim() : f.source,
+        notes: row.notes != null ? String(row.notes) : f.notes,
+        contactName:
+          !account && row.contact_name != null ? String(row.contact_name).trim() : f.contactName,
+        contactEmail:
+          !account && row.contact_email != null ? String(row.contact_email).trim() : f.contactEmail,
+        contactPhone:
+          !account && row.contact_phone != null ? String(row.contact_phone).trim() : f.contactPhone,
+      }))
+      showToast('Account form draft imported', 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Account form CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
 
   function submit() {
     const parsed = parseAccountForm({
@@ -275,28 +367,32 @@ export default function AccountFormModal({
       </div>
 
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8, flexWrap: 'wrap' }}>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".csv,text/csv"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) void importAccountCsv(file)
+          }}
+        />
         <button
           type="button"
           style={buttonSecondaryStyle}
-          disabled={saving}
+          disabled={saving || importing}
+          onClick={() => importInputRef.current?.click()}
+        >
+          {importing ? 'Importing…' : 'Import CSV'}
+        </button>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={saving || importing}
           onClick={() => {
             exportListCsv(
               `account-form-${(form.name || account?.reference || 'draft').replace(/\s+/g, '-').toLowerCase()}.csv`,
-              [
-                'type',
-                'name',
-                'industry',
-                'country',
-                'city',
-                'website',
-                'status',
-                'owner_user_id',
-                'source',
-                'notes',
-                'contact_name',
-                'contact_email',
-                'contact_phone',
-              ],
+              [...ACCOUNT_FORM_CSV_COLUMNS],
               [
                 {
                   type: form.type,
@@ -320,14 +416,14 @@ export default function AccountFormModal({
         >
           Export CSV
         </button>
-        <button type="button" style={buttonSecondaryStyle} onClick={onClose} disabled={saving}>
+        <button type="button" style={buttonSecondaryStyle} onClick={onClose} disabled={saving || importing}>
           Cancel
         </button>
         <button
           type="button"
           style={buttonPrimaryStyle}
           onClick={submit}
-          disabled={saving || !form.name.trim()}
+          disabled={saving || importing || !form.name.trim()}
         >
           {saving ? 'Saving…' : account ? 'Save changes' : 'Create account'}
         </button>

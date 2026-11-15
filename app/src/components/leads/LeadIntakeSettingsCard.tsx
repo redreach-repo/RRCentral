@@ -1,14 +1,25 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useSettings } from '../../contexts/SettingsContext'
 import { useToast } from '../../contexts/ToastContext'
 import { listTeam } from '../../lib/accountsStore'
 import { errorMessage } from '../../lib/errors'
 import { canSetLeadOwners, DEFAULT_LEAD_WHATSAPP, LEAD_OWNER_KEYS, LEAD_WHATSAPP_KEY } from '../../lib/leadIntake'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import { parseLeadIntakeForm } from '../../lib/schemas/leadIntake'
 import type { AppUser } from '../../lib/types'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, fieldStyle, formGridStyle, inputStyle, labelStyle, sectionTitleStyle } from '../../lib/uiStyles'
+
+function resolveSellerId(raw: string, sellers: AppUser[]): string | null {
+  const token = raw.trim()
+  if (!token) return ''
+  const lower = token.toLowerCase()
+  const match =
+    sellers.find((u) => u.id === token) ||
+    sellers.find((u) => u.email.toLowerCase() === lower) ||
+    sellers.find((u) => (u.name || '').toLowerCase() === lower)
+  return match ? match.id : null
+}
 
 /** Who gets new leads from lead-intake, and the number WhatsApp links open. */
 export default function LeadIntakeSettingsCard() {
@@ -21,6 +32,8 @@ export default function LeadIntakeSettingsCard() {
   const [pool, setPool] = useState<string[]>([])
   const [whatsapp, setWhatsapp] = useState('')
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const allowed = canSetLeadOwners(userRole)
 
   useEffect(() => {
@@ -57,38 +70,147 @@ export default function LeadIntakeSettingsCard() {
     }
   }
 
+  async function importSettingsCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows)
+      if (!objects.length) {
+        showToast('No setting rows in CSV', 'error')
+        return
+      }
+
+      const bySetting: Record<string, string> = {}
+      for (const row of objects) {
+        const key = String(row.setting || row.key || '').trim().toLowerCase()
+        if (!key) continue
+        bySetting[key] = String(row.value ?? '').trim()
+      }
+
+      const nextModeRaw = (bySetting.mode ?? mode).toLowerCase()
+      const nextMode = nextModeRaw === 'round_robin' ? 'round_robin' : 'fixed'
+
+      let nextFixed = fixed
+      if (Object.prototype.hasOwnProperty.call(bySetting, 'fixed_owner')) {
+        const resolved = resolveSellerId(bySetting.fixed_owner, sellers)
+        if (resolved === null) {
+          showToast(`Unknown fixed owner: ${bySetting.fixed_owner}`, 'error')
+          return
+        }
+        nextFixed = resolved
+      }
+
+      let nextPool = pool
+      let skippedPool = 0
+      if (Object.prototype.hasOwnProperty.call(bySetting, 'round_robin_pool')) {
+        const tokens = bySetting.round_robin_pool
+          .split(/[;|]/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+        const resolvedIds: string[] = []
+        for (const token of tokens) {
+          const id = resolveSellerId(token, sellers)
+          if (id === null || id === '') {
+            skippedPool += 1
+            continue
+          }
+          if (!resolvedIds.includes(id)) resolvedIds.push(id)
+        }
+        nextPool = resolvedIds
+      }
+
+      const nextWhatsapp = Object.prototype.hasOwnProperty.call(bySetting, 'whatsapp')
+        ? bySetting.whatsapp
+        : whatsapp
+
+      const parsed = parseLeadIntakeForm({
+        mode: nextMode,
+        fixed: nextFixed,
+        pool: nextPool,
+        whatsapp: nextWhatsapp,
+      })
+      if (!parsed.ok) {
+        showToast(parsed.error, 'error')
+        return
+      }
+
+      setMode(parsed.data.mode)
+      setFixed(parsed.data.fixed)
+      setPool(parsed.data.pool)
+      setWhatsapp(parsed.data.whatsappDigits)
+
+      await updateSetting(LEAD_OWNER_KEYS.mode, parsed.data.mode)
+      await updateSetting(LEAD_OWNER_KEYS.fixed, parsed.data.fixed)
+      await updateSetting(LEAD_OWNER_KEYS.pool, parsed.data.pool.join(','))
+      await updateSetting(LEAD_WHATSAPP_KEY, parsed.data.whatsappDigits)
+
+      const skipNote = skippedPool ? ` · ${skippedPool} pool name(s) skipped` : ''
+      showToast(`Lead intake settings imported${skipNote}`, 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Lead intake settings CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <section style={{ ...cardStyle, marginBottom: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>New leads: who gets them</h2>
-        <button
-          type="button"
-          style={buttonSecondaryStyle}
-          onClick={() => {
-            const fixedUser = sellers.find((u) => u.id === fixed)
-            exportListCsv(
-              'lead-intake-settings.csv',
-              ['setting', 'value'],
-              [
-                { setting: 'mode', value: mode },
-                { setting: 'fixed_owner', value: fixedUser ? fixedUser.name || fixedUser.email : fixed || '' },
-                {
-                  setting: 'round_robin_pool',
-                  value: pool
-                    .map((id) => {
-                      const u = sellers.find((s) => s.id === id)
-                      return u ? u.name || u.email : id
-                    })
-                    .join('; '),
-                },
-                { setting: 'whatsapp', value: whatsapp || DEFAULT_LEAD_WHATSAPP },
-              ],
-            )
-            showToast('Lead intake settings CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importSettingsCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            onClick={() => {
+              const fixedUser = sellers.find((u) => u.id === fixed)
+              exportListCsv(
+                'lead-intake-settings.csv',
+                ['setting', 'value'],
+                [
+                  { setting: 'mode', value: mode },
+                  { setting: 'fixed_owner', value: fixedUser ? fixedUser.name || fixedUser.email : fixed || '' },
+                  {
+                    setting: 'round_robin_pool',
+                    value: pool
+                      .map((id) => {
+                        const u = sellers.find((s) => s.id === id)
+                        return u ? u.name || u.email : id
+                      })
+                      .join('; '),
+                  },
+                  { setting: 'whatsapp', value: whatsapp || DEFAULT_LEAD_WHATSAPP },
+                ],
+              )
+              showToast('Lead intake settings CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </div>
       <p style={{ color: colors.muted, fontSize: 13, margin: '8px 0 12px' }}>
         Leads from the website, WhatsApp and the AI CRM landing page get this owner. With no owner set they

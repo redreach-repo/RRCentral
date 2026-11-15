@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { addMonths, format, parseISO } from 'date-fns'
+import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { getAccount } from '../lib/accountsStore'
@@ -17,6 +18,7 @@ import {
   stageLabel,
 } from '../lib/delivery'
 import {
+  addTimeEntry,
   currentContract,
   listContracts,
   listPackages,
@@ -28,7 +30,7 @@ import {
 import { errorMessage } from '../lib/errors'
 import { reportFacts } from '../lib/aiAssist'
 import { runAi } from '../lib/aiAssistStore'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { resolvedInMonth } from '../lib/support'
 import { listTickets } from '../lib/supportStore'
 import { formatAED } from '../lib/money'
@@ -40,10 +42,22 @@ import type {
   DeliveryPackage,
   Requirement,
   Ticket,
+  TimeCategory,
   TimeEntry,
   UsageRecord,
 } from '../lib/types'
 import styles from './ClientReportPage.module.css'
+
+const HOURS_CSV_HEADERS = ['date', 'category', 'hours', 'notes'] as const
+const TIME_CATEGORY_VALUES = new Set(TIME_CATEGORIES.map((c) => c.value))
+
+function parseTimeCategory(raw: string): TimeCategory | null {
+  const token = raw.trim().toLowerCase()
+  if (!token) return null
+  if (TIME_CATEGORY_VALUES.has(token as TimeCategory)) return token as TimeCategory
+  const byLabel = TIME_CATEGORIES.find((c) => c.label.toLowerCase() === token)
+  return byLabel?.value ?? null
+}
 
 /** Printable monthly client report: hours, usage, tickets, build status, next month plan. */
 export default function ClientReportPage() {
@@ -51,6 +65,7 @@ export default function ClientReportPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { t } = useI18n()
   const { settings } = useSettings()
+  const { user, appUserId } = useAuth()
   const { showToast } = useToast()
   const rates = useMemo(() => ratesFromSettings(settings), [settings])
   const month = monthKey(searchParams.get('month') ? `${searchParams.get('month')}-01` : new Date())
@@ -68,6 +83,8 @@ export default function ClientReportPage() {
   const [aiError, setAiError] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     let alive = true
@@ -105,6 +122,53 @@ export default function ClientReportPage() {
       alive = false
     }
   }, [id])
+
+  async function importHoursCsv(file: File) {
+    if (!account) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const author = { appUserId, email: user?.email || '' }
+      let added = 0
+      let skipped = 0
+      for (const row of objects) {
+        const dateRaw = String(row.date || '').trim()
+        const date = /^\d{4}-\d{2}-\d{2}/.test(dateRaw) ? dateRaw.slice(0, 10) : ''
+        const category = parseTimeCategory(String(row.category || ''))
+        const hours = Number(row.hours)
+        const note = String(row.notes ?? row.note ?? '').trim().slice(0, 500)
+        if (!date || !category || !Number.isFinite(hours) || hours <= 0) {
+          skipped += 1
+          continue
+        }
+        try {
+          await addTimeEntry(account.id, { date, hours, category, note }, author)
+          added += 1
+        } catch {
+          skipped += 1
+        }
+      }
+      if (!added) {
+        showToast(skipped ? 'No valid hours rows to import' : 'CSV has no data rows', 'error')
+        return
+      }
+      const nextEntries = await listTimeEntries(account.id)
+      setEntries(nextEntries)
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${added} hour entr${added === 1 ? 'y' : 'ies'}${skipNote}`, 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Client report CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
 
   const monthEntries = entries.filter((e) => monthKey(e.date) === month)
   const totalHours = hoursInMonth(entries, month)
@@ -196,6 +260,23 @@ export default function ClientReportPage() {
           <button type="button" disabled={aiBusy} onClick={() => void writeSummary()}>
             {aiBusy ? t('page.clientReport.writing') : t('page.clientReport.writeSummary')}
           </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importHoursCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            disabled={importing || aiBusy}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -203,7 +284,7 @@ export default function ClientReportPage() {
               const slug = account.name.replace(/\s+/g, '-').toLowerCase()
               exportListCsv(
                 `client-report-${slug}-${stamp}-hours.csv`,
-                ['date', 'category', 'hours', 'notes'],
+                [...HOURS_CSV_HEADERS],
                 monthEntries.map((e) => ({
                   date: e.date,
                   category: e.category,

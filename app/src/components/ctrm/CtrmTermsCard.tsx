@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
 import { renewalInfo, renewalText } from '../../lib/ctrmRenewals'
 import { listTerms, saveTerms, type TermsDraft } from '../../lib/ctrmTermsStore'
 import { errorMessage } from '../../lib/errors'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import { parseCtrmTermsForm } from '../../lib/schemas/ctrmTerms'
 import { roleAtLeast } from '../../lib/permissions'
 import type { Account, CtrmClientTerms } from '../../lib/types'
@@ -14,6 +14,8 @@ import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, fieldStyle
 const smallBtn = { ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }
 const muted = { color: colors.muted, fontSize: 13 }
 const day = (d: string | null) => (d ? format(parseISO(d), 'd MMM yyyy') : 'Not set')
+
+const TERMS_CSV_HEADERS = ['contract_start', 'renewal_date', 'notice_days', 'stage', 'days_to_renewal', 'notice_by', 'summary'] as const
 
 /**
  * Contract start, renewal date and notice period for a CTRM Next client, the
@@ -27,6 +29,8 @@ export default function CtrmTermsCard({ account, editable, author }: { account: 
   const [loaded, setLoaded] = useState(false)
   const [draft, setDraft] = useState<(TermsDraft & { notice: string }) | null>(null)
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     try {
@@ -63,6 +67,43 @@ export default function CtrmTermsCard({ account, editable, author }: { account: 
     }
   }
 
+  async function importTermsCsv(file: File) {
+    if (!canEdit) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows)
+      if (!objects.length) {
+        showToast('No terms rows in CSV', 'error')
+        return
+      }
+      const row = objects[0]
+      const parsed = parseCtrmTermsForm({
+        contract_start: String(row.contract_start ?? '').trim() || null,
+        renewal_date: String(row.renewal_date ?? '').trim() || null,
+        notice: String(row.notice_days ?? row.notice ?? '').trim(),
+      })
+      if (!parsed.ok) {
+        showToast(parsed.error, 'error')
+        return
+      }
+      await saveTerms(account.id, terms, parsed.data, author)
+      showToast('CTRM terms imported', 'success')
+      setDraft(null)
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'CTRM terms CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   const info = terms ? renewalInfo(terms) : null
   const warn = info?.stage ? info.days <= 30 || (info.noticeDaysLeft !== null && info.noticeDaysLeft <= 7) : false
 
@@ -71,6 +112,28 @@ export default function CtrmTermsCard({ account, editable, author }: { account: 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Contract and renewal</h2>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {canEdit && loaded && !draft ? (
+            <>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) void importTermsCsv(file)
+                }}
+              />
+              <button
+                type="button"
+                style={smallBtn}
+                disabled={importing}
+                onClick={() => importInputRef.current?.click()}
+              >
+                {importing ? 'Importing…' : 'Import CSV'}
+              </button>
+            </>
+          ) : null}
           {terms && loaded && !draft ? (
             <button
               type="button"
@@ -78,7 +141,7 @@ export default function CtrmTermsCard({ account, editable, author }: { account: 
               onClick={() => {
                 exportListCsv(
                   `ctrm-terms-${account.id.slice(0, 8)}.csv`,
-                  ['contract_start', 'renewal_date', 'notice_days', 'stage', 'days_to_renewal', 'notice_by', 'summary'],
+                  [...TERMS_CSV_HEADERS],
                   [
                     {
                       contract_start: terms.contract_start || '',

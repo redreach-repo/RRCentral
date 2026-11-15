@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { CreditCard } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
@@ -12,10 +12,32 @@ import {
   type TenantSubscription,
 } from '../lib/featureSliceStores'
 import { openSaasBillingPortal, startSaasCheckout } from '../lib/saasCheckoutStore'
-import { exportListCsv } from '../lib/listIo'
-import { SAAS_PLANS, planByKey, seatUsageLabel, seatsOverLimit } from '../lib/saasBillingPlans'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
+import {
+  SAAS_PLANS,
+  planByKey,
+  seatUsageLabel,
+  seatsOverLimit,
+  type SaasSubscriptionStatus,
+} from '../lib/saasBillingPlans'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, selectStyle } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
+
+const SAAS_SUB_STATUSES = new Set<SaasSubscriptionStatus>(['trialing', 'active', 'past_due', 'canceled'])
+
+const SAAS_SUBSCRIPTION_CSV_COLUMNS = [
+  'plan_key',
+  'status',
+  'seats',
+  'active_people',
+  'stripe_customer_id',
+  'current_period_end',
+] as const
+
+function parseSubStatus(raw: string): SaasSubscriptionStatus | null {
+  const v = raw.trim().toLowerCase() as SaasSubscriptionStatus
+  return SAAS_SUB_STATUSES.has(v) ? v : null
+}
 
 /** M11: HighMast SaaS plan + Stripe Checkout / Customer Portal. */
 export default function SaasBillingPage() {
@@ -26,6 +48,8 @@ export default function SaasBillingPage() {
   const [activePeople, setActivePeople] = useState(0)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -116,6 +140,49 @@ export default function SaasBillingPage() {
     }
   }
 
+  /** Import local subscription fields only (plan/status/seats). Ignores Stripe ids and active_people. */
+  async function importSubscriptionCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows)
+      let applied = 0
+      let skipped = 0
+      for (const row of objects) {
+        const key = String(row.plan_key || row.plan || '').trim()
+        const plan = planByKey(key)
+        if (!plan) {
+          skipped += 1
+          continue
+        }
+        const status = parseSubStatus(String(row.status || 'trialing')) || 'trialing'
+        const seatsRaw = String(row.seats ?? '').trim()
+        const seatsNum = seatsRaw ? Number(seatsRaw) : plan.seatsIncluded
+        const seats = Number.isFinite(seatsNum) && seatsNum > 0 ? Math.floor(seatsNum) : plan.seatsIncluded
+        await upsertTenantSubscription(plan.key, seats, status)
+        setPlanKey(plan.key)
+        applied += 1
+      }
+      if (!applied && skipped) {
+        showToast('No valid subscription rows (need plan_key matching catalog)', 'error')
+        return
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${applied} subscription row(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'SaaS subscription CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   const currentPlan = planByKey(sub?.plan_key || planKey)
   const seats = sub?.seats ?? currentPlan?.seatsIncluded ?? 0
   const over = seatsOverLimit(activePeople, seats)
@@ -132,50 +199,64 @@ export default function SaasBillingPage() {
             stays available for demos. Separate from customer invoice pay links.
           </p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-          onClick={() => {
-            exportListCsv(
-              'saas-plans.csv',
-              ['plan_key', 'name', 'monthly_aed', 'seats_included', 'features'],
-              SAAS_PLANS.map((p) => ({
-                plan_key: p.key,
-                name: p.name,
-                monthly_aed: p.monthlyAed,
-                seats_included: p.seatsIncluded,
-                features: p.features.join('; '),
-              })),
-            )
-            if (sub) {
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importSubscriptionCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => {
               exportListCsv(
-                'saas-subscription.csv',
-                [
-                  'plan_key',
-                  'status',
-                  'seats',
-                  'active_people',
-                  'stripe_customer_id',
-                  'current_period_end',
-                ],
-                [
-                  {
-                    plan_key: sub.plan_key,
-                    status: sub.status,
-                    seats: sub.seats ?? '',
-                    active_people: activePeople,
-                    stripe_customer_id: sub.stripe_customer_id || '',
-                    current_period_end: sub.current_period_end || '',
-                  },
-                ],
+                'saas-plans.csv',
+                ['plan_key', 'name', 'monthly_aed', 'seats_included', 'features'],
+                SAAS_PLANS.map((p) => ({
+                  plan_key: p.key,
+                  name: p.name,
+                  monthly_aed: p.monthlyAed,
+                  seats_included: p.seatsIncluded,
+                  features: p.features.join('; '),
+                })),
               )
-            }
-            showToast(sub ? 'Plan catalog and subscription CSV downloaded' : 'Plan catalog CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+              if (sub) {
+                exportListCsv(
+                  'saas-subscription.csv',
+                  [...SAAS_SUBSCRIPTION_CSV_COLUMNS],
+                  [
+                    {
+                      plan_key: sub.plan_key,
+                      status: sub.status,
+                      seats: sub.seats ?? '',
+                      active_people: activePeople,
+                      stripe_customer_id: sub.stripe_customer_id || '',
+                      current_period_end: sub.current_period_end || '',
+                    },
+                  ],
+                )
+              }
+              showToast(sub ? 'Plan catalog and subscription CSV downloaded' : 'Plan catalog CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </header>
 
       <div

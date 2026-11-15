@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useAuth } from '../../../contexts/AuthContext'
 import { useI18n } from '../../../contexts/I18nContext'
 import { useToast } from '../../../contexts/ToastContext'
 import SavedViewsBar from '../../../components/SavedViewsBar'
-import { exportListCsv } from '../../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../../lib/listIo'
 import { isSupabaseConfigured } from '../../../lib/supabaseConfig'
 import {
   ACCOUNT_FIELDS,
@@ -58,6 +58,8 @@ export default function AiApprovalsPage() {
   const [editing, setEditing] = useState<string>('')
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [note, setNote] = useState('')
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const aiqViewFilters = useMemo(() => ({ status: filter }), [filter])
 
   const load = useCallback(async () => {
@@ -96,6 +98,51 @@ export default function AiApprovalsPage() {
     )
   }
 
+  async function importDecisionsCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const byId = new Map(rows.map((p) => [p.id, p]))
+      let done = 0
+      let skipped = 0
+      for (const row of objects) {
+        const id = String(row.id || row.proposal_id || '').trim()
+        const decisionRaw = String(row.decision || row.action_decision || row.status || '').trim().toLowerCase()
+        const decision: AiDecision | null =
+          decisionRaw === 'approve' || decisionRaw === 'approved'
+            ? 'approve'
+            : decisionRaw === 'reject' || decisionRaw === 'rejected'
+              ? 'reject'
+              : null
+        const p = byId.get(id)
+        if (!p || !decision || p.status !== 'pending') {
+          skipped += 1
+          continue
+        }
+        const r = await decideAiProposal(p.id, decision, null, note)
+        if (r.error) {
+          skipped += 1
+          continue
+        }
+        done += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Processed ${done} AI proposal decision(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(String((e as Error)?.message || e || 'AI proposals CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   if (localMode || missing) {
     return (
       <div style={pageStyle}>
@@ -112,31 +159,65 @@ export default function AiApprovalsPage() {
           <h1 style={pageTitleStyle}>{t('aiq.title')}</h1>
           <p style={pageSubtitleStyle}>{t('aiq.subtitle')}</p>
         </div>
-        <button
-          type="button"
-          style={buttonSecondaryStyle}
-          disabled={!rows.length}
-          onClick={() => {
-            exportListCsv(
-              'ai-proposals.csv',
-              ['account', 'action', 'status', 'summary', 'prompt', 'proposed_by', 'created_at', 'decided_by', 'error'],
-              rows.map((p) => ({
-                account: p.accounts?.name || p.account_id,
-                action: p.action,
-                status: p.status,
-                summary: p.summary || '',
-                prompt: p.prompt || '',
-                proposed_by: p.proposed_by_email || '',
-                created_at: p.created_at,
-                decided_by: p.decided_by_email || '',
-                error: p.error || '',
-              })),
-            )
-            showToast('AI proposals CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importDecisionsCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={importing || !rows.length}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={!rows.length}
+            onClick={() => {
+              exportListCsv(
+                'ai-proposals.csv',
+                [
+                  'id',
+                  'decision',
+                  'account',
+                  'action',
+                  'status',
+                  'summary',
+                  'prompt',
+                  'proposed_by',
+                  'created_at',
+                  'decided_by',
+                  'error',
+                ],
+                rows.map((p) => ({
+                  id: p.id,
+                  decision: '',
+                  account: p.accounts?.name || p.account_id,
+                  action: p.action,
+                  status: p.status,
+                  summary: p.summary || '',
+                  prompt: p.prompt || '',
+                  proposed_by: p.proposed_by_email || '',
+                  created_at: p.created_at,
+                  decided_by: p.decided_by_email || '',
+                  error: p.error || '',
+                })),
+              )
+              showToast('AI proposals CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </div>
 
       <SavedViewsBar

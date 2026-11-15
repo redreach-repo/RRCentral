@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import Modal from '../Modal'
 import EditorSectionTabs, {
@@ -18,7 +18,8 @@ import type {
   CtrmRegion,
   CtrmStage,
 } from '../../lib/types'
-import { exportListCsv } from '../../lib/listIo'
+import { errorMessage } from '../../lib/errors'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import { useToast } from '../../contexts/ToastContext'
 import {
   buttonPrimaryStyle,
@@ -67,6 +68,34 @@ type Props = {
 }
 
 const today = () => format(new Date(), 'yyyy-MM-dd')
+const num = (raw: string) => Number(String(raw).replace(/,/g, '')) || 0
+
+function parseStage(raw: string): CtrmStage | null {
+  const token = raw.trim().toLowerCase()
+  if (!token) return null
+  const byValue = CTRM_STAGES.find((s) => s.value === token)
+  if (byValue) return byValue.value
+  const byLabel = CTRM_STAGES.find((s) => s.label.toLowerCase() === token)
+  return byLabel?.value ?? null
+}
+
+function parseRegion(raw: string): CtrmRegion | null {
+  const token = raw.trim().toLowerCase()
+  if (!token) return null
+  const byValue = CTRM_REGIONS.find((r) => r.value === token)
+  if (byValue) return byValue.value
+  const byLabel = CTRM_REGIONS.find((r) => r.label.toLowerCase() === token)
+  return byLabel?.value ?? null
+}
+
+function parseCompanyType(raw: string): CtrmCompanyType | null {
+  const token = raw.trim().toLowerCase()
+  if (!token) return null
+  const byValue = CTRM_COMPANY_TYPES.find((t) => t.value === token)
+  if (byValue) return byValue.value
+  const byLabel = CTRM_COMPANY_TYPES.find((t) => t.label.toLowerCase() === token)
+  return byLabel?.value ?? null
+}
 
 export default function DealFormModal({
   open,
@@ -86,6 +115,8 @@ export default function DealFormModal({
   const [v, setV] = useState<DealFormValues | null>(null)
   const [error, setError] = useState('')
   const [editorSection, setEditorSection] = useState<EditorSection>('basics')
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -116,6 +147,7 @@ export default function DealFormModal({
   const accountContacts = contacts.filter((c) => c.account_id === v.accountId)
   const sorted = [...prospects].sort((a, b) => a.name.localeCompare(b.name))
   const isOpen = v.stage !== 'signed' && v.stage !== 'lost'
+  const accountLocked = Boolean(deal || lockedAccountId)
 
   function submit() {
     if (!v) return
@@ -125,6 +157,127 @@ export default function DealFormModal({
       return
     }
     onSave({ ...v, ...parsed.data })
+  }
+
+  async function importDealCsv(file: File) {
+    if (!v) return
+    setImporting(true)
+    setError('')
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      if (!objects.length) {
+        showToast('No CTRM deal draft rows in CSV', 'error')
+        return
+      }
+
+      const next: DealFormValues = {
+        accountId: v.accountId,
+        newCompany: v.newCompany,
+        stage: v.stage,
+        region: v.region,
+        company_type: v.company_type,
+        primary_contact_id: v.primary_contact_id,
+        source: v.source,
+        owner_user_id: v.owner_user_id,
+        next_action: v.next_action,
+        next_action_date: v.next_action_date,
+        lost_reason: v.lost_reason,
+        lost_reason_code: v.lost_reason_code,
+        notes: v.notes,
+        commission: v.commission
+          ? { expected: v.commission.expected, received: v.commission.received }
+          : null,
+      }
+      let applied = 0
+      const row = objects[0]
+      const has = (key: string) => Object.prototype.hasOwnProperty.call(row, key)
+
+      if (!accountLocked && has('account_id')) {
+        const accountId = String(row.account_id ?? '').trim()
+        if (!accountId || prospects.some((p) => p.id === accountId)) {
+          next.accountId = accountId
+          if (accountId) next.newCompany = ''
+          next.primary_contact_id = null
+          applied += 1
+        }
+      }
+      if (!accountLocked && has('new_company')) {
+        next.newCompany = String(row.new_company ?? '').trim()
+        applied += 1
+      }
+      if (has('stage')) {
+        const stage = parseStage(String(row.stage ?? ''))
+        if (stage) {
+          next.stage = stage
+          applied += 1
+        }
+      }
+      if (has('region')) {
+        const region = parseRegion(String(row.region ?? ''))
+        if (region) {
+          next.region = region
+          applied += 1
+        }
+      }
+      if (has('company_type')) {
+        const companyType = parseCompanyType(String(row.company_type ?? ''))
+        if (companyType) {
+          next.company_type = companyType
+          applied += 1
+        }
+      }
+      if (has('source')) {
+        next.source = String(row.source ?? '').trim()
+        applied += 1
+      }
+      if (has('owner_user_id')) {
+        const owner = String(row.owner_user_id ?? '').trim()
+        if (!owner || team.some((u) => u.id === owner)) {
+          next.owner_user_id = owner || null
+          applied += 1
+        }
+      }
+      if (has('next_action')) {
+        next.next_action = String(row.next_action ?? '').trim()
+        applied += 1
+      }
+      if (has('next_action_date')) {
+        next.next_action_date = String(row.next_action_date ?? '').trim() || null
+        applied += 1
+      }
+      if (has('notes')) {
+        next.notes = String(row.notes ?? '').trim()
+        applied += 1
+      }
+      if (showCommission && next.commission) {
+        if (has('commission_expected')) {
+          next.commission.expected = num(String(row.commission_expected ?? ''))
+          applied += 1
+        }
+        if (has('commission_received')) {
+          next.commission.received = num(String(row.commission_received ?? ''))
+          applied += 1
+        }
+      }
+
+      if (!applied) {
+        showToast('No CTRM deal draft fields to import in CSV', 'error')
+        return
+      }
+      setV(next)
+      showToast(`Imported ${applied} CTRM deal draft field(s)`, 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'CTRM deal draft CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
   }
 
   return (
@@ -359,9 +512,28 @@ export default function DealFormModal({
 
         {error ? <p style={{ color: colors.danger, margin: '0 0 10px', fontSize: 13 }}>{error}</p> : null}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importDealCsv(file)
+            }}
+          />
           <button
             type="button"
             style={buttonSecondaryStyle}
+            disabled={importing || saving}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={importing || saving}
             onClick={() => {
               if (!v) return
               exportListCsv(
@@ -402,10 +574,10 @@ export default function DealFormModal({
           >
             Export CSV
           </button>
-          <button type="button" style={buttonSecondaryStyle} onClick={onClose}>
+          <button type="button" style={buttonSecondaryStyle} onClick={onClose} disabled={importing || saving}>
             Cancel
           </button>
-          <button type="submit" style={buttonPrimaryStyle} disabled={saving}>
+          <button type="submit" style={buttonPrimaryStyle} disabled={saving || importing}>
             {saving ? 'Saving…' : deal ? 'Save deal' : 'Add deal'}
           </button>
         </div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { addDays, format, parseISO, startOfDay } from 'date-fns'
 import { CalendarClock, ExternalLink, Loader2, Plus, RefreshCw, Settings } from 'lucide-react'
@@ -6,7 +6,7 @@ import type { AppUser, CrmEntry } from '../lib/types'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { db } from '../lib/db'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { hydrateContacts, primaryContact } from '../lib/contacts'
 import { getCalendarProvider } from '../lib/mailCalendar'
 import { enrichCalendarEvents, type CalendarEventRow } from '../lib/zohoCalendarMatch'
@@ -35,6 +35,18 @@ type Props = {
 
 type Filter = 'all' | 'follow_up' | 'meeting'
 
+const SCHEDULE_CSV_COLUMNS = [
+  'when',
+  'kind',
+  'title',
+  'detail',
+  'owner',
+  'crm',
+  'quote_ref',
+  'attendees',
+  'overdue',
+] as const
+
 function formatWhen(row: ScheduleRow): string {
   try {
     if (row.kind === 'follow_up') {
@@ -54,6 +66,20 @@ function kindBadge(kind: ScheduleKind): { label: string; color: string } {
   return { label: 'Calendar', color: '#a78bfa' }
 }
 
+function parseScheduleKind(raw: string): ScheduleKind {
+  const k = String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]+/g, '_')
+  if (k === 'follow_up' || k === 'followup') return 'follow_up'
+  if (k === 'meeting') return 'meeting'
+  return 'calendar'
+}
+
+function scheduleMatchKey(when: string, kind: string, title: string, crm: string): string {
+  return `${when.trim()}|${kind.trim().toLowerCase()}|${title.trim().toLowerCase()}|${crm.trim().toLowerCase()}`
+}
+
 export default function ZohoCalendarPanel({ crmEntries }: Props) {
   const navigate = useNavigate()
   const { settings } = useSettings()
@@ -67,6 +93,10 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [daysAhead, setDaysAhead] = useState(14)
   const [filter, setFilter] = useState<Filter>('all')
+  const [importing, setImporting] = useState(false)
+  const [csvFiltered, setCsvFiltered] = useState(false)
+  const [importedRows, setImportedRows] = useState<ScheduleRow[] | null>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const calendar = getCalendarProvider(settings)
   const enabled = calendar.isEnabled(settings)
@@ -82,6 +112,8 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
   }, [])
 
   const load = useCallback(async () => {
+    setCsvFiltered(false)
+    setImportedRows(null)
     if (!enabled) {
       setCalendarEvents([])
       setError('')
@@ -120,17 +152,100 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
     [crmEntries, calendarEvents, daysAhead],
   )
 
+  const boardRows = csvFiltered && importedRows ? importedRows : scheduleRows
+
   const visible = useMemo(() => {
-    if (filter === 'all') return scheduleRows
-    if (filter === 'follow_up') return scheduleRows.filter((r) => r.kind === 'follow_up')
-    return scheduleRows.filter((r) => r.kind === 'meeting' || r.kind === 'calendar')
-  }, [scheduleRows, filter])
+    if (filter === 'all') return boardRows
+    if (filter === 'follow_up') return boardRows.filter((r) => r.kind === 'follow_up')
+    return boardRows.filter((r) => r.kind === 'meeting' || r.kind === 'calendar')
+  }, [boardRows, filter])
 
   const counts = useMemo(() => {
-    const followUps = scheduleRows.filter((r) => r.kind === 'follow_up').length
-    const meetings = scheduleRows.filter((r) => r.kind !== 'follow_up').length
-    return { all: scheduleRows.length, followUps, meetings }
-  }, [scheduleRows])
+    const followUps = boardRows.filter((r) => r.kind === 'follow_up').length
+    const meetings = boardRows.filter((r) => r.kind !== 'follow_up').length
+    return { all: boardRows.length, followUps, meetings }
+  }, [boardRows])
+
+  async function importScheduleCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const byKey = new Map(
+        scheduleRows.map(
+          (r) => [scheduleMatchKey(formatWhen(r), r.kind, r.title, r.crmName), r] as const,
+        ),
+      )
+      const next: ScheduleRow[] = []
+      const seen = new Set<string>()
+      let matched = 0
+      let softLoaded = 0
+      let skipped = 0
+
+      objects.forEach((row, idx) => {
+        const when = String(row.when || '').trim()
+        const title = String(row.title || '').trim()
+        if (!when && !title) {
+          skipped += 1
+          return
+        }
+        const kind = parseScheduleKind(String(row.kind || ''))
+        const crm = String(row.crm || '').trim()
+        const matchKey = scheduleMatchKey(when, kind, title, crm)
+        if (seen.has(matchKey)) {
+          skipped += 1
+          return
+        }
+        seen.add(matchKey)
+        const existing = byKey.get(matchKey)
+        if (existing) {
+          next.push(existing)
+          matched += 1
+          return
+        }
+        next.push({
+          id: `import-${idx}`,
+          kind,
+          sortKey: when || `import-${idx}`,
+          whenLabel: when || '—',
+          title: title || '—',
+          detail: String(row.detail || '').trim(),
+          owner: String(row.owner || '').trim() || '—',
+          crmId: '',
+          crmName: crm,
+          quoteRef: String(row.quote_ref || '').trim(),
+          attendees: String(row.attendees || '').trim(),
+          overdue:
+            String(row.overdue || '')
+              .trim()
+              .toLowerCase() === 'yes',
+        })
+        softLoaded += 1
+      })
+
+      if (!next.length) {
+        showToast('No matching schedule rows in CSV', 'error')
+        return
+      }
+      setImportedRows(next)
+      setCsvFiltered(true)
+      const parts = [matched ? `${matched} matched` : '', softLoaded ? `${softLoaded} soft-loaded` : '']
+        .filter(Boolean)
+        .join(', ')
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${next.length} schedule row(s) (${parts})${skipNote}`, 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Schedule CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
 
   const filterBtn = (key: Filter, label: string) => {
     const active = filter === key
@@ -256,6 +371,28 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
           >
             <Settings size={14} /> {compact ? 'Settings' : 'Calendar settings'}
           </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importScheduleCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            style={{
+              ...buttonSecondaryStyle,
+              minHeight: compact ? 40 : undefined,
+              padding: compact ? '8px 12px' : buttonSecondaryStyle.padding,
+            }}
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
           <button
             type="button"
             style={{
@@ -267,7 +404,7 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
             onClick={() => {
               exportListCsv(
                 'schedule.csv',
-                ['when', 'kind', 'title', 'detail', 'owner', 'crm', 'quote_ref', 'attendees', 'overdue'],
+                [...SCHEDULE_CSV_COLUMNS],
                 visible.map((r) => ({
                   when: formatWhen(r),
                   kind: r.kind,
@@ -307,6 +444,13 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
           ? ' — turn on Calendar sync in Settings to pull Zoho meetings and schedule team invites.'
           : '.'}
       </p>
+
+      {csvFiltered ? (
+        <p style={{ color: colors.muted, fontSize: 13, margin: '0 0 12px', lineHeight: 1.45 }}>
+          Showing {boardRows.length} schedule row{boardRows.length === 1 ? '' : 's'} from CSV (session only —
+          Refresh clears).
+        </p>
+      ) : null}
 
       <div className={resp.chipRow} style={{ marginBottom: 12 }}>
         {filterBtn('all', compact ? `All · ${counts.all}` : `All (${counts.all})`)}

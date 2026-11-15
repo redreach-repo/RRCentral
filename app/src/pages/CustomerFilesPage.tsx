@@ -56,6 +56,12 @@ import {
 } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
+const COMPANY_CSV_COLUMNS = ['company_name', 'primary_contact', 'owner', 'drive_folder_url'] as const
+
+function companyKey(name: string): string {
+  return name.trim().toLowerCase()
+}
+
 function formatWhen(value?: string | null): string {
   if (!value) return ''
   try {
@@ -96,8 +102,6 @@ function sectionToMode(section: FolderSection): LinkDriveFileMode {
   return 'signed'
 }
 
-const CUSTOMER_FILES_CSV_HEADERS = ['company_name', 'primary_contact', 'owner', 'drive_folder_url'] as const
-
 export default function CustomerFilesPage() {
   const { t } = useI18n()
   const { user, isLocalMode, appUserId } = useAuth()
@@ -120,6 +124,8 @@ export default function CustomerFilesPage() {
   const [addSection, setAddSection] = useState<FolderSection>(CUSTOMER_FOLDER_SECTIONS[0])
   const [showArchivedDocs, setShowArchivedDocs] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [csvFiltered, setCsvFiltered] = useState(false)
+  const [csvCompanyKeys, setCsvCompanyKeys] = useState<Set<string> | null>(null)
   const importInputRef = useRef<HTMLInputElement>(null)
   const filesViewFilters = useMemo(
     () => ({ q: search, archived: showArchivedDocs ? '1' : '0' }),
@@ -226,12 +232,85 @@ export default function CustomerFilesPage() {
   }, [showArchivedDocs]) // eslint-disable-line react-hooks/exhaustive-deps -- reload folder when archive filter flips
 
   const filteredCompanies = useMemo(() => {
+    let list = companies
+    if (csvFiltered && csvCompanyKeys) {
+      list = list.filter((c) => csvCompanyKeys.has(companyKey(c.company_name)))
+    }
     const q = search.trim().toLowerCase()
-    if (!q) return companies
-    return companies.filter((c) =>
+    if (!q) return list
+    return list.filter((c) =>
       `${c.company_name} ${c.primary_contact} ${c.owner}`.toLowerCase().includes(q),
     )
-  }, [companies, search])
+  }, [companies, search, csvFiltered, csvCompanyKeys])
+
+  async function importCompaniesCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const byName = new Map(companies.map((c) => [companyKey(c.company_name), c] as const))
+      const matchedKeys = new Set<string>()
+      let updated = 0
+      let matched = 0
+      let skipped = 0
+
+      for (const row of objects) {
+        const name = String(row.company_name || row.company || row.name || '').trim()
+        if (!name) {
+          skipped += 1
+          continue
+        }
+        const key = companyKey(name)
+        const existing = byName.get(key)
+        if (!existing) {
+          skipped += 1
+          continue
+        }
+        matchedKeys.add(key)
+        matched += 1
+        const nextUrl = String(row.drive_folder_url || row.drive_url || '').trim()
+        if (nextUrl && nextUrl !== (existing.drive_folder_url || '').trim()) {
+          await updateCrmDriveFolderUrl(existing.id, nextUrl)
+          await logActivity(
+            'set_customer_drive_folder',
+            'crm',
+            existing.company_name,
+            nextUrl,
+            who,
+            existing.id,
+          )
+          updated += 1
+        }
+      }
+
+      if (!matched) {
+        showToast('No matching customer companies in CSV', 'error')
+        return
+      }
+
+      setCsvCompanyKeys(matchedKeys)
+      setCsvFiltered(true)
+      if (updated) await loadCompanies()
+      const updateNote = updated ? ` · ${updated} Drive folder link(s) updated` : ''
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Matched ${matched} compan${matched === 1 ? 'y' : 'ies'}${updateNote}${skipNote}`, 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Customer companies CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
+  function clearCsvFilter() {
+    setCsvFiltered(false)
+    setCsvCompanyKeys(null)
+  }
 
   async function saveDriveFolder() {
     if (!folder?.crm?.id) {
@@ -367,6 +446,16 @@ export default function CustomerFilesPage() {
           >
             {importing ? 'Importing…' : 'Import CSV'}
           </button>
+          {csvFiltered ? (
+            <button
+              type="button"
+              className={docsStyles.newBtn}
+              style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+              onClick={clearCsvFilter}
+            >
+              Clear CSV filter
+            </button>
+          ) : null}
           <button
             type="button"
             className={docsStyles.newBtn}
@@ -375,7 +464,7 @@ export default function CustomerFilesPage() {
             onClick={() => {
               exportListCsv(
                 'customer-files-companies.csv',
-                [...CUSTOMER_FILES_CSV_HEADERS],
+                [...COMPANY_CSV_COLUMNS],
                 companies.map((c) => ({
                   company_name: c.company_name,
                   primary_contact: c.primary_contact || '',

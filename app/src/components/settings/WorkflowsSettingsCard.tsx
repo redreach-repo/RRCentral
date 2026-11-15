@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Plus } from 'lucide-react'
 import Modal from '../Modal'
 import SimpleRowActions from '../SimpleRowActions'
@@ -21,7 +21,7 @@ import {
   type WorkflowTriggerType,
 } from '../../lib/workflows'
 import { startWorkflowRun } from '../../lib/workflowRunner'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -59,6 +59,8 @@ export default function WorkflowsSettingsCard() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<WorkflowDefinition | null>(null)
   const [busy, setBusy] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const [actionsId, setActionsId] = useState<string | null>(null)
   const [form, setForm] = useState({
     name: '',
@@ -70,6 +72,14 @@ export default function WorkflowsSettingsCard() {
     notify_message: 'Approved',
     active: true,
   })
+
+  const knownTriggers = new Set(WORKFLOW_TRIGGERS.map((t) => t.value))
+
+  function parseActiveFlag(raw: string): boolean {
+    const v = raw.trim().toLowerCase()
+    if (!v) return true
+    return !['0', 'false', 'no', 'n', 'off'].includes(v)
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -202,11 +212,98 @@ export default function WorkflowsSettingsCard() {
     }
   }
 
+  async function importWorkflowsCsv(file: File) {
+    if (!manage) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const byKey = new Map(
+        rows.map((r) => [r.workflow_key.trim().toLowerCase(), r] as const),
+      )
+      let saved = 0
+      let skipped = 0
+      for (const row of objects) {
+        const name = String(row.name || '').trim()
+        const workflow_key = (
+          String(row.workflow_key || '').trim() || slugifyWorkflowKey(name)
+        ).slice(0, 48)
+        const triggerRaw = String(row.trigger_type || '').trim() as WorkflowTriggerType
+        const description = String(row.description || '').trim()
+        const active = parseActiveFlag(String(row.active ?? 'yes'))
+        if (!name || !workflow_key || !knownTriggers.has(triggerRaw)) {
+          skipped += 1
+          continue
+        }
+        const existing = byKey.get(workflow_key.toLowerCase())
+        const trigger_config =
+          existing?.trigger_config ||
+          (triggerRaw === 'stage_enter'
+            ? { pipeline_key: 'crm', stage_key: 'Won' }
+            : {})
+        const steps =
+          existing?.steps?.length
+            ? existing.steps
+            : [
+                buildApprovalStep({ name: 'Approval', approverRole: 'admin' }),
+                buildNotifyStep({ name: 'Notify', message: 'Approved' }),
+              ]
+        const savedRow = await saveWorkflowDefinition(
+          {
+            workflow_key,
+            name,
+            description,
+            trigger_type: triggerRaw,
+            trigger_config,
+            steps,
+            active,
+          },
+          existing?.id,
+        )
+        byKey.set(savedRow.workflow_key.trim().toLowerCase(), savedRow)
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} workflow(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Workflows CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <div id="workflows" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.settings.section.workflows')}</h2>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importWorkflowsCsv(file)
+            }}
+          />
+          {manage ? (
+            <button
+              type="button"
+              style={buttonSecondaryStyle}
+              disabled={importing}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
+          ) : null}
           <button
             type="button"
             style={buttonSecondaryStyle}

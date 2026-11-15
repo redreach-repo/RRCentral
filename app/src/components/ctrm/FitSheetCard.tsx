@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FileText } from 'lucide-react'
 import { useSettings } from '../../contexts/SettingsContext'
@@ -12,11 +12,12 @@ import {
   emptyFitSheet,
   fitSheetMissing,
   fitSheetRows,
+  focusLabel,
   parseSettingsList,
   type FitSheetDraft,
 } from '../../lib/fitSheet'
 import { loadFitSheet, saveFitSheet } from '../../lib/fitSheetStore'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import { parseFitSheetForm } from '../../lib/schemas/fitSheet'
 import type { Account, AccountContact, CtrmFitFocus, CtrmFitSheet } from '../../lib/types'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, fieldStyle, inputStyle, labelStyle, sectionTitleStyle, selectStyle } from '../../lib/uiStyles'
@@ -48,6 +49,8 @@ export default function FitSheetCard({
   const [draft, setDraft] = useState<FitSheetDraft | null>(null)
   const [users, setUsers] = useState('')
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     try {
@@ -97,6 +100,83 @@ export default function FitSheetCard({
     }
   }
 
+  async function importFitSheetCsv(file: File) {
+    if (!editable) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const next: FitSheetDraft = sheet ? { ...sheet, modules: [...sheet.modules] } : emptyFitSheet()
+      let usersRaw = next.user_count === null ? '' : String(next.user_count)
+      let applied = 0
+      for (const row of objects) {
+        const field = String(row.field || row.label || '').trim().toLowerCase()
+        let value = String(row.value ?? '').trim()
+        if (!field) continue
+        if (value === 'Not recorded') value = ''
+        if (field.startsWith('commodit')) {
+          next.commodities = value
+          applied += 1
+        } else if (field === 'focus') {
+          const match = FIT_FOCUS.find(
+            (f) => f.value === value || focusLabel(f.value).toLowerCase() === value.toLowerCase(),
+          )
+          next.focus = (match?.value || '') as CtrmFitFocus | ''
+          applied += 1
+        } else if (field.includes('user')) {
+          usersRaw = value
+          applied += 1
+        } else if (field.includes('current system')) {
+          next.current_system = value
+          applied += 1
+        } else if (field.includes('decision maker')) {
+          const c = contacts.find(
+            (x) =>
+              x.name.toLowerCase() === value.toLowerCase() ||
+              [x.name, x.role].filter(Boolean).join(', ').toLowerCase() === value.toLowerCase(),
+          )
+          next.decision_maker_id = c?.id || null
+          applied += 1
+        } else if (field.includes('module')) {
+          next.modules = value
+            ? value.split(/[,;]/).map((s) => s.trim()).filter(Boolean)
+            : []
+          applied += 1
+        } else if (field === 'notes') {
+          next.notes = value
+          applied += 1
+        }
+      }
+      const parsed = parseFitSheetForm({
+        commodities: next.commodities,
+        focus: next.focus,
+        users: usersRaw,
+        current_system: next.current_system,
+        decision_maker_id: next.decision_maker_id,
+        modules: next.modules,
+        notes: next.notes,
+      })
+      if (!parsed.ok) {
+        showToast(parsed.error, 'error')
+        return
+      }
+      await saveFitSheet(account.id, sheet, parsed.data, author)
+      showToast(`Imported ${applied} fit sheet field(s)`, 'success')
+      setDraft(null)
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Fit sheet CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   const dmName = (id: string | null) => {
     const c = contacts.find((x) => x.id === id)
     return c ? [c.name, c.role].filter(Boolean).join(', ') : ''
@@ -110,6 +190,26 @@ export default function FitSheetCard({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Fit sheet</h2>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importFitSheetCsv(file)
+            }}
+          />
+          {editable && loaded ? (
+            <button
+              type="button"
+              style={smallBtn}
+              disabled={importing}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
+          ) : null}
           {sheet ? (
             <>
               <button

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useSettings } from '../../contexts/SettingsContext'
 import { useToast } from '../../contexts/ToastContext'
@@ -12,10 +12,12 @@ import {
   TEMPLATE_CHANNELS,
   TEMPLATE_PURPOSES,
   type MessageTemplate,
+  type TemplateChannel,
+  type TemplatePurpose,
 } from '../../lib/quoteNudges'
 import { deleteTemplate, listTemplates, saveTemplate, type TemplateInput } from '../../lib/quoteNudgesStore'
 import { parseMessageTemplateForm } from '../../lib/schemas/messageTemplate'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -27,6 +29,20 @@ import {
   labelStyle,
   sectionTitleStyle,
 } from '../../lib/uiStyles'
+
+const KNOWN_CHANNELS = new Set(TEMPLATE_CHANNELS.map((c) => c.value))
+const KNOWN_PURPOSES = new Set(TEMPLATE_PURPOSES.map((p) => p.value))
+const KNOWN_DIVISIONS = new Set(DIVISION_OPTIONS.map((d) => d.value))
+
+function parseActiveFlag(raw: string): boolean {
+  const v = raw.trim().toLowerCase()
+  if (!v) return true
+  return !(v === 'no' || v === 'false' || v === '0' || v === 'off' || v === 'n')
+}
+
+function templateMatchKey(t: Pick<TemplateInput, 'name' | 'division_code' | 'channel' | 'purpose'>): string {
+  return `${t.name.trim().toLowerCase()}::${t.division_code}::${t.channel}::${t.purpose}`
+}
 
 const EMPTY: TemplateInput = {
   name: '',
@@ -58,6 +74,8 @@ export default function MessageTemplatesCard() {
   const [form, setForm] = useState<TemplateInput>(EMPTY)
   const [editId, setEditId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     const r = await listTemplates()
@@ -100,35 +118,113 @@ export default function MessageTemplatesCard() {
     }
   }
 
+  async function importTemplatesCsv(file: File) {
+    if (missing) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const byKey = new Map(rows.map((r) => [templateMatchKey(r), r] as const))
+      let saved = 0
+      let skipped = 0
+      for (const row of objects) {
+        const name = String(row.name || '').trim()
+        const division_code = String(row.division_code ?? '').trim()
+        const channel = String(row.channel || '').trim().toLowerCase() as TemplateChannel
+        const purpose = String(row.purpose || '').trim().toLowerCase() as TemplatePurpose
+        const subject = String(row.subject || '')
+        const body = String(row.body || '')
+        const active = parseActiveFlag(String(row.active ?? 'yes'))
+        if (!name || !KNOWN_CHANNELS.has(channel) || !KNOWN_PURPOSES.has(purpose) || !KNOWN_DIVISIONS.has(division_code)) {
+          skipped += 1
+          continue
+        }
+        const parsed = parseMessageTemplateForm({
+          name,
+          division_code,
+          channel,
+          purpose,
+          subject,
+          body,
+          active,
+        })
+        if (!parsed.ok) {
+          skipped += 1
+          continue
+        }
+        const key = templateMatchKey(parsed.data)
+        const existing = byKey.get(key)
+        await saveTemplate(parsed.data, user?.email || '', existing?.id)
+        if (existing?.id) {
+          byKey.set(key, { ...existing, ...parsed.data })
+        }
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} message template(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Message templates CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   const preview = renderTemplate(form, { ...SAMPLE, company: settings.companyName || SAMPLE.company })
 
   return (
     <section style={{ ...cardStyle, marginBottom: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'start' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Follow up templates</h2>
-        <button
-          type="button"
-          style={buttonSecondaryStyle}
-          disabled={!rows.length}
-          onClick={() => {
-            exportListCsv(
-              'message-templates.csv',
-              ['name', 'division_code', 'channel', 'purpose', 'subject', 'body', 'active'],
-              rows.map((r) => ({
-                name: r.name,
-                division_code: r.division_code,
-                channel: r.channel,
-                purpose: r.purpose,
-                subject: r.subject || '',
-                body: r.body || '',
-                active: r.active ? 'yes' : 'no',
-              })),
-            )
-            showToast('Message templates CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importTemplatesCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={importing || missing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={!rows.length}
+            onClick={() => {
+              exportListCsv(
+                'message-templates.csv',
+                ['name', 'division_code', 'channel', 'purpose', 'subject', 'body', 'active'],
+                rows.map((r) => ({
+                  name: r.name,
+                  division_code: r.division_code,
+                  channel: r.channel,
+                  purpose: r.purpose,
+                  subject: r.subject || '',
+                  body: r.body || '',
+                  active: r.active ? 'yes' : 'no',
+                })),
+              )
+              showToast('Message templates CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </div>
       <p style={{ color: colors.muted, fontSize: 13, margin: '12px 0 12px' }}>
         Used by "Quotes waiting for a reply" in My Day. A division's own template wins, then one for every division,

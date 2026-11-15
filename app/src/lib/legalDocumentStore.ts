@@ -88,6 +88,34 @@ export async function voidLegalDocument(id: string): Promise<void> {
   )
 }
 
+/** Update mutable vault metadata on a non-signed document (CSV upsert). */
+export async function updateLegalDocumentMeta(
+  id: string,
+  patch: {
+    title?: string
+    docType?: LegalDocType
+    partyName?: string
+    partyEmail?: string
+    driveUrl?: string
+  },
+): Promise<void> {
+  const now = new Date().toISOString()
+  const update: Record<string, unknown> = { updated_at: now }
+  if (patch.title !== undefined) update.title = patch.title.trim() || 'Non-disclosure agreement'
+  if (patch.docType !== undefined) update.doc_type = patch.docType
+  if (patch.partyName !== undefined) update.party_name = patch.partyName.trim()
+  if (patch.partyEmail !== undefined) update.party_email = patch.partyEmail.trim()
+  if (patch.driveUrl !== undefined) update.drive_url = patch.driveUrl.trim()
+  check(
+    await db
+      .from('legal_documents')
+      .update(update)
+      .eq('id', id)
+      .neq('status', 'signed')
+      .neq('status', 'void'),
+  )
+}
+
 export async function listSignLinks(legalDocumentId: string): Promise<LegalSignLink[]> {
   const { data, error } = await db
     .from('legal_sign_links')

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type DragEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { Briefcase, Columns3, List } from 'lucide-react'
@@ -31,6 +31,15 @@ import {
   type DealPipeline,
   type DealRow,
 } from '../lib/myDeals'
+import {
+  MY_DEALS_CSV_COLUMNS,
+  MY_DEALS_CSV_HEADERS,
+  buildMyDealCsvPatch,
+  isTerminalDealStage,
+  resolveDealStage,
+  resolvePipeline,
+  takeMatchingDeal,
+} from '../lib/myDealsCsv'
 import { loadMyDeals, moveMyDeal, patchMyDeal } from '../lib/myDealsStore'
 import {
   crmAccountCoverage,
@@ -56,7 +65,7 @@ import {
   thStyle,
 } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 
 const VIEW_KEY = 'rr.myDeals.view'
 
@@ -138,6 +147,8 @@ export default function MyDealsPage() {
   const [outcomeReason, setOutcomeReason] = useState('')
   const [lostNote, setLostNote] = useState('')
   const [linkBusy, setLinkBusy] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const [view, setView] = useState<'table' | 'board'>(() => {
     const q = searchParams.get('view')
     if (q === 'board' || q === 'table') return q
@@ -327,6 +338,83 @@ export default function MyDealsPage() {
       showToast(errorMessage(e, 'Could not update the deal'), 'error')
     } finally {
       setBusyKey(null)
+    }
+  }
+
+  async function importMyDealsCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of MY_DEALS_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, MY_DEALS_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid deal rows', 'error')
+        return
+      }
+      const remaining = [...deals]
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        const pipeline = resolvePipeline(row.pipeline)
+        if (!pipeline || !access.pipelines.includes(pipeline)) {
+          skipped += 1
+          continue
+        }
+        const deal = takeMatchingDeal(remaining, pipeline, row.account, row.deal || '')
+        if (!deal) {
+          skipped += 1
+          continue
+        }
+        let changed = false
+        const patch = buildMyDealCsvPatch(row, deal, team)
+        if (!patch) {
+          skipped += 1
+          continue
+        }
+        if (Object.keys(patch).length) {
+          try {
+            await patchMyDeal(deal, patch, author)
+            changed = true
+          } catch {
+            skipped += 1
+            continue
+          }
+        }
+        const nextStage = resolveDealStage(pipeline, row.stage || '')
+        if (nextStage && nextStage !== deal.stage && !isTerminalDealStage(pipeline, nextStage)) {
+          try {
+            await moveMyDeal(deal, { stage: nextStage }, author)
+            changed = true
+          } catch {
+            // Keep the patch if the stage move was blocked.
+          }
+        }
+        if (changed) saved += 1
+        else skipped += 1
+      }
+      if (!saved) {
+        showToast(skipped ? 'No matching deal rows in CSV' : 'CSV has no data rows', 'error')
+        return
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} deal(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Pipeline deals CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
     }
   }
 
@@ -613,50 +701,57 @@ export default function MyDealsPage() {
             ) : null}
           </p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-          disabled={!shown.length}
-          onClick={() => {
-            exportListCsv(
-              'pipeline-deals.csv',
-              [
-                'pipeline',
-                'account',
-                'deal',
-                'stage',
-                'value',
-                'weighted',
-                'next_action',
-                'next_action_date',
-                'days_in_stage',
-                'owner',
-                'source',
-                'division',
-                'quote_ref',
-              ],
-              shown.map((d) => ({
-                pipeline: d.pipeline,
-                account: d.account,
-                deal: d.deal,
-                stage: d.stageLabel || d.stage,
-                value: d.value ?? '',
-                weighted: d.weighted ?? '',
-                next_action: d.next_action || '',
-                next_action_date: d.next_action_date || '',
-                days_in_stage: d.days_in_stage,
-                owner: d.owner_label || '',
-                source: d.source || '',
-                division: d.division || '',
-                quote_ref: d.quote_ref || '',
-              })),
-            )
-            showToast('Pipeline CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importMyDealsCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing || !deals.length}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!shown.length}
+            onClick={() => {
+              exportListCsv(
+                'pipeline-deals.csv',
+                MY_DEALS_CSV_HEADERS,
+                shown.map((d) => ({
+                  pipeline: d.pipeline,
+                  account: d.account,
+                  deal: d.deal,
+                  stage: d.stageLabel || d.stage,
+                  value: d.value ?? '',
+                  weighted: d.weighted ?? '',
+                  next_action: d.next_action || '',
+                  next_action_date: d.next_action_date || '',
+                  days_in_stage: d.days_in_stage,
+                  owner: d.owner_label || '',
+                  source: d.source || '',
+                  division: d.division || '',
+                  quote_ref: d.quote_ref || '',
+                })),
+              )
+              showToast('Pipeline CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </header>
 
       {filterBar}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { differenceInCalendarDays, format, parseISO, startOfMonth, subMonths } from 'date-fns'
 import { Download } from 'lucide-react'
 import { db } from '../lib/db'
@@ -57,6 +57,7 @@ import {
 } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 import { errorMessage } from '../lib/errors'
+import { csvRowsToObjects, parseCsv } from '../lib/listIo'
 import { buildStatement, entriesLabel, quarterRange, signedAmount, signedVat, statementCsv, statementPdf } from '../lib/statementReport'
 import { downloadBlob } from '../lib/documents'
 import { statementXlsx, XLSX_MIME } from '../lib/statementXlsx'
@@ -69,11 +70,42 @@ import {
   revenueByLeadSource,
   winRateByPipeline,
   winRateBySource,
+  type CashForecast,
   type RevenueRow,
   type WinRateRow,
 } from '../lib/salesReports'
 
 type Tab = 'answers' | 'cashflow' | 'winrate' | 'aging' | 'pnl' | 'vat' | 'statement' | 'funnel' | 'fx'
+
+type AgingRow = { key: string; min: number; max: number; count: number; amount: number }
+type WinRateDiv = {
+  code: string
+  brand: string
+  total: number
+  awarded: number
+  notAwarded: number
+  expired: number
+  winPct: number
+}
+type PnlRow = { key: string; label: string; income: number; expenses: number; net: number }
+
+type ImportedSlice =
+  | { tab: 'aging'; aging: AgingRow[] }
+  | { tab: 'winrate'; winRate: WinRateDiv[] }
+  | { tab: 'pnl'; monthlyPnl: PnlRow[] }
+  | { tab: 'cashflow'; forecast: CashForecast }
+
+function numOr(raw: string, fallback = 0): number {
+  const cleaned = String(raw || '')
+    .trim()
+    .replace(/,/g, '')
+  const n = Number(cleaned)
+  return Number.isFinite(n) ? n : fallback
+}
+
+function headerSet(headers: string[]): Set<string> {
+  return new Set(headers.map((h) => h.trim().toLowerCase()).filter(Boolean))
+}
 
 export default function ReportsPage() {
   const { t } = useI18n()
@@ -104,6 +136,10 @@ export default function ReportsPage() {
   const [vatQuarter, setVatQuarter] = useState<VatQuarter>(nowQ.quarter)
   const [stmtFrom, setStmtFrom] = useState(() => quarterRange(nowQ.year, nowQ.quarter).from)
   const [stmtTo, setStmtTo] = useState(() => quarterRange(nowQ.year, nowQ.quarter).to)
+  const [importing, setImporting] = useState(false)
+  const [csvFiltered, setCsvFiltered] = useState(false)
+  const [importedSlice, setImportedSlice] = useState<ImportedSlice | null>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -151,6 +187,8 @@ export default function ReportsPage() {
       setSuppliers((sup.data || []) as SupplierCommitment[])
       setPaymentLog((plog.data || []) as PaymentLogEntry[])
       setDeletedInvoiceRefs([...deleted])
+      setCsvFiltered(false)
+      setImportedSlice(null)
     } catch (e) {
       showToast(errorMessage(e, 'Failed to load reports'), 'error')
     } finally {
@@ -410,7 +448,226 @@ export default function ReportsPage() {
     setStmtTo(r.to)
   }
 
-  const maxPnl = Math.max(1, ...monthlyPnl.map((m) => Math.max(m.income, m.expenses)))
+  const liveAging = aging
+  const liveWinRate = winRate
+  const liveMonthlyPnl = monthlyPnl
+  const liveForecast = forecast
+
+  const boardAging =
+    csvFiltered && importedSlice?.tab === 'aging' ? importedSlice.aging : liveAging
+  const boardWinRate =
+    csvFiltered && importedSlice?.tab === 'winrate' ? importedSlice.winRate : liveWinRate
+  const boardMonthlyPnl =
+    csvFiltered && importedSlice?.tab === 'pnl' ? importedSlice.monthlyPnl : liveMonthlyPnl
+  const boardForecast =
+    csvFiltered && importedSlice?.tab === 'cashflow' ? importedSlice.forecast : liveForecast
+
+  const maxPnl = Math.max(1, ...boardMonthlyPnl.map((m) => Math.max(m.income, m.expenses)))
+
+  async function importReportsCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const headersLower = headerSet(headers)
+      const objects = csvRowsToObjects(headers, csvRows)
+
+      // invoice-aging.csv — Bucket,Count,Amount
+      if (headersLower.has('bucket') && headersLower.has('count') && headersLower.has('amount')) {
+        const next: AgingRow[] = []
+        let softLoaded = 0
+        let skipped = 0
+        for (const row of objects) {
+          const key = String(row.Bucket || row.bucket || '').trim()
+          if (!key) {
+            skipped += 1
+            continue
+          }
+          next.push({
+            key,
+            min: 0,
+            max: 0,
+            count: numOr(String(row.Count ?? row.count ?? '')),
+            amount: numOr(String(row.Amount ?? row.amount ?? '')),
+          })
+          softLoaded += 1
+        }
+        if (!next.length) {
+          showToast('No matching aging rows in CSV', 'error')
+          return
+        }
+        setImportedSlice({ tab: 'aging', aging: next })
+        setCsvFiltered(true)
+        setTab('aging')
+        const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+        showToast(`Imported ${softLoaded} aging row(s) (soft-loaded)${skipNote}`, 'success')
+        return
+      }
+
+      // win-rate-by-division.csv — Division,Brand,Total,Awarded,Not awarded,Expired,Win %
+      if (
+        headersLower.has('division') &&
+        (headersLower.has('awarded') || headersLower.has('win %') || headersLower.has('win%'))
+      ) {
+        const next: WinRateDiv[] = []
+        let softLoaded = 0
+        let skipped = 0
+        for (const row of objects) {
+          const code = String(row.Division || row.division || '').trim()
+          const brand = String(row.Brand || row.brand || '').trim()
+          if (!code && !brand) {
+            skipped += 1
+            continue
+          }
+          const awarded = numOr(String(row.Awarded ?? row.awarded ?? ''))
+          const notAwarded = numOr(String(row['Not awarded'] ?? row.not_awarded ?? ''))
+          const expired = numOr(String(row.Expired ?? row.expired ?? ''))
+          const total = numOr(String(row.Total ?? row.total ?? ''), awarded + notAwarded + expired)
+          const winPctRaw = String(row['Win %'] ?? row.win_pct ?? row['win %'] ?? '').replace(/%/g, '')
+          const winPct = numOr(winPctRaw, total > 0 ? Math.round((awarded / Math.max(1, awarded + notAwarded + expired)) * 1000) / 10 : 0)
+          next.push({
+            code: code || brand || `row-${softLoaded + 1}`,
+            brand: brand || code,
+            total,
+            awarded,
+            notAwarded,
+            expired,
+            winPct,
+          })
+          softLoaded += 1
+        }
+        if (!next.length) {
+          showToast('No matching win-rate rows in CSV', 'error')
+          return
+        }
+        setImportedSlice({ tab: 'winrate', winRate: next })
+        setCsvFiltered(true)
+        setTab('winrate')
+        const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+        showToast(`Imported ${softLoaded} win-rate row(s) (soft-loaded)${skipNote}`, 'success')
+        return
+      }
+
+      // monthly-pnl.csv — Month,Income (paid),Expenses,Net
+      if (
+        headersLower.has('month') &&
+        (headersLower.has('expenses') || headersLower.has('net')) &&
+        [...headersLower].some((h) => h.includes('income'))
+      ) {
+        const incomeKey =
+          headers.find((h) => h.trim().toLowerCase().includes('income')) || 'Income (paid)'
+        const next: PnlRow[] = []
+        let softLoaded = 0
+        let skipped = 0
+        for (const row of objects) {
+          const label = String(row.Month || row.month || '').trim()
+          if (!label) {
+            skipped += 1
+            continue
+          }
+          const income = numOr(String(row[incomeKey] ?? row.income ?? ''))
+          const expenses = numOr(String(row.Expenses ?? row.expenses ?? ''))
+          const net = numOr(String(row.Net ?? row.net ?? ''), income - expenses)
+          next.push({ key: label, label, income, expenses, net })
+          softLoaded += 1
+        }
+        if (!next.length) {
+          showToast('No matching P&L rows in CSV', 'error')
+          return
+        }
+        if (!seesProfit) {
+          showToast('P&L CSV import is for managers and admins', 'error')
+          return
+        }
+        setImportedSlice({ tab: 'pnl', monthlyPnl: next })
+        setCsvFiltered(true)
+        setTab('pnl')
+        const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+        showToast(`Imported ${softLoaded} P&L row(s) (soft-loaded)${skipNote}`, 'success')
+        return
+      }
+
+      // cash-forecast-*.csv — Date,Type,Item,Amount
+      if (
+        headersLower.has('date') &&
+        headersLower.has('type') &&
+        headersLower.has('item') &&
+        headersLower.has('amount')
+      ) {
+        const nextLines: CashForecast['lines'] = []
+        let softLoaded = 0
+        let skipped = 0
+        let cashIn = 0
+        let cashOut = 0
+        let vat = 0
+        for (const row of objects) {
+          const date = String(row.Date || row.date || '').trim()
+          const typeRaw = String(row.Type || row.type || '').trim().toLowerCase()
+          const label = String(row.Item || row.item || '').trim()
+          const amountRaw = numOr(String(row.Amount || row.amount || ''))
+          if (!date && !label) {
+            skipped += 1
+            continue
+          }
+          let kind: CashForecast['lines'][number]['kind'] = 'out'
+          let overdue = false
+          if (typeRaw.includes('vat')) {
+            kind = 'vat'
+            vat += Math.abs(amountRaw)
+          } else if (typeRaw.startsWith('in') || amountRaw > 0) {
+            kind = 'in'
+            overdue = typeRaw.includes('overdue')
+            cashIn += Math.abs(amountRaw)
+          } else {
+            kind = 'out'
+            cashOut += Math.abs(amountRaw)
+          }
+          nextLines.push({
+            date: date || '—',
+            kind,
+            label: label || typeRaw || 'Item',
+            amount: Math.abs(amountRaw),
+            overdue,
+          })
+          softLoaded += 1
+        }
+        if (!nextLines.length) {
+          showToast('No matching cash-flow rows in CSV', 'error')
+          return
+        }
+        const dates = nextLines.map((l) => l.date).filter((d) => /^\d{4}-\d{2}-\d{2}/.test(d)).sort()
+        setImportedSlice({
+          tab: 'cashflow',
+          forecast: {
+            from: dates[0] || liveForecast.from,
+            to: dates[dates.length - 1] || liveForecast.to,
+            lines: nextLines,
+            weeks: [],
+            totals: { cashIn, cashOut, vat, net: cashIn - cashOut - vat },
+          },
+        })
+        setCsvFiltered(true)
+        setTab('cashflow')
+        const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+        showToast(`Imported ${softLoaded} cash-flow row(s) (soft-loaded)${skipNote}`, 'success')
+        return
+      }
+
+      showToast(
+        'CSV shape not recognised. Use Export CSV from Aging, Win rate, P&L, or Cash flow, then re-import.',
+        'error',
+      )
+    } catch (e) {
+      showToast(errorMessage(e, 'Reports CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
 
   function exportCsv() {
     if (tab === 'statement') {
@@ -481,7 +738,7 @@ export default function ReportsPage() {
       )
     } else if (tab === 'winrate') {
       const header = ['Division', 'Brand', 'Total', 'Awarded', 'Not awarded', 'Expired', 'Win %']
-      const rows = winRate.map((r) =>
+      const rows = boardWinRate.map((r) =>
         [r.code, r.brand, r.total, r.awarded, r.notAwarded, r.expired, r.winPct]
           .map(escapeCsv)
           .join(','),
@@ -489,7 +746,7 @@ export default function ReportsPage() {
       downloadCsv('win-rate-by-division.csv', [header.join(','), ...rows].join('\n'))
     } else if (tab === 'aging') {
       const header = ['Bucket', 'Count', 'Amount']
-      const rows = aging.map((r) => [r.key, r.count, r.amount].map(escapeCsv).join(','))
+      const rows = boardAging.map((r) => [r.key, r.count, r.amount].map(escapeCsv).join(','))
       downloadCsv('invoice-aging.csv', [header.join(','), ...rows].join('\n'))
     } else if (tab === 'answers') {
       const winLines = (rows: WinRateRow[]) => rows.map((r) => [r.label, r.open, r.won, r.lost, r.winPct ?? ''].map(escapeCsv).join(','))
@@ -520,16 +777,16 @@ export default function ReportsPage() {
       )
     } else if (tab === 'cashflow') {
       const header = ['Date', 'Type', 'Item', 'Amount']
-      const rows = forecast.lines.map((l) =>
+      const rows = boardForecast.lines.map((l) =>
         [l.date, l.kind === 'in' ? (l.overdue ? 'In (overdue)' : 'In') : l.kind === 'vat' ? 'VAT' : 'Out', l.label, l.kind === 'in' ? l.amount : -l.amount]
           .map(escapeCsv)
           .join(','),
       )
-      downloadCsv(`cash-forecast-${forecast.from}.csv`, [header.join(','), ...rows].join('\n'))
+      downloadCsv(`cash-forecast-${boardForecast.from}.csv`, [header.join(','), ...rows].join('\n'))
     } else if (tab === 'pnl') {
       if (!seesProfit) return
       const header = ['Month', 'Income (paid)', 'Expenses', 'Net']
-      const rows = monthlyPnl.map((r) =>
+      const rows = boardMonthlyPnl.map((r) =>
         [r.label, r.income, r.expenses, r.net].map(escapeCsv).join(','),
       )
       downloadCsv('monthly-pnl.csv', [header.join(','), ...rows].join('\n'))
@@ -617,10 +874,51 @@ export default function ReportsPage() {
           <h1 className={docsStyles.title}>{t('page.reports.title')}</h1>
           <p className={docsStyles.subtitle}>{t('page.reports.subtitle')}</p>
         </div>
-        <button type="button" className={docsStyles.newBtn} onClick={exportCsv} disabled={loading}>
-          <Download size={16} /> Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importReportsCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={loading || importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button type="button" className={docsStyles.newBtn} onClick={exportCsv} disabled={loading || importing}>
+            <Download size={16} /> Export CSV
+          </button>
+          {csvFiltered ? (
+            <button
+              type="button"
+              className={docsStyles.newBtn}
+              style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+              onClick={() => {
+                setCsvFiltered(false)
+                setImportedSlice(null)
+              }}
+            >
+              Clear CSV filter
+            </button>
+          ) : null}
+        </div>
       </header>
+
+      {csvFiltered ? (
+        <p style={{ color: colors.muted, fontSize: 13, margin: '0 0 12px', lineHeight: 1.45 }}>
+          Showing report from CSV (session only — Clear CSV filter resets). Supports Aging, Win rate, P&amp;L, and
+          Cash flow exports.
+        </p>
+      ) : null}
 
       <SavedViewsBar
         moduleId="reports"
@@ -765,44 +1063,46 @@ export default function ReportsPage() {
       ) : tab === 'cashflow' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 12 }}>
-            <StatementKpi label="Invoices due in" value={formatAED(forecast.totals.cashIn)} color={colors.success} sub="Open balances, overdue counted today" />
-            <StatementKpi label="Recurring costs out" value={formatAED(forecast.totals.cashOut)} color={colors.danger} sub="Bank deductions and fixed monthly cost" />
-            <StatementKpi label="VAT due" value={formatAED(forecast.totals.vat)} color={colors.danger} sub="Returns due by the 28th in the window" />
+            <StatementKpi label="Invoices due in" value={formatAED(boardForecast.totals.cashIn)} color={colors.success} sub="Open balances, overdue counted today" />
+            <StatementKpi label="Recurring costs out" value={formatAED(boardForecast.totals.cashOut)} color={colors.danger} sub="Bank deductions and fixed monthly cost" />
+            <StatementKpi label="VAT due" value={formatAED(boardForecast.totals.vat)} color={colors.danger} sub="Returns due by the 28th in the window" />
             <StatementKpi
               label="Net cash"
-              value={formatAED(forecast.totals.net)}
-              color={forecast.totals.net < 0 ? colors.danger : colors.success}
-              sub={`${forecast.from} to ${forecast.to}`}
+              value={formatAED(boardForecast.totals.net)}
+              color={boardForecast.totals.net < 0 ? colors.danger : colors.success}
+              sub={`${boardForecast.from} to ${boardForecast.to}`}
             />
           </div>
-          <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
-            <div style={tableWrapStyle}>
-              <table style={tableStyle}>
-                <thead>
-                  <tr>
-                    <th style={thStyle}>Week</th>
-                    <th style={thStyle}>In</th>
-                    <th style={thStyle}>Out</th>
-                    <th style={thStyle}>Net</th>
-                    <th style={thStyle}>Running</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {forecast.weeks.map((w) => (
-                    <tr key={w.start}>
-                      <td style={tdStyle}>{format(parseISO(w.start), 'd MMM')} to {format(parseISO(w.end), 'd MMM')}</td>
-                      <td style={tdStyle}>{formatAED(w.cashIn)}</td>
-                      <td style={tdStyle}>{formatAED(w.cashOut)}</td>
-                      <td style={{ ...tdStyle, color: w.net < 0 ? colors.danger : undefined }}>{formatAED(w.net)}</td>
-                      <td style={{ ...tdStyle, color: w.running < 0 ? colors.danger : undefined }}>{formatAED(w.running)}</td>
+          {boardForecast.weeks.length ? (
+            <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+              <div style={tableWrapStyle}>
+                <table style={tableStyle}>
+                  <thead>
+                    <tr>
+                      <th style={thStyle}>Week</th>
+                      <th style={thStyle}>In</th>
+                      <th style={thStyle}>Out</th>
+                      <th style={thStyle}>Net</th>
+                      <th style={thStyle}>Running</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {boardForecast.weeks.map((w) => (
+                      <tr key={w.start}>
+                        <td style={tdStyle}>{format(parseISO(w.start), 'd MMM')} to {format(parseISO(w.end), 'd MMM')}</td>
+                        <td style={tdStyle}>{formatAED(w.cashIn)}</td>
+                        <td style={tdStyle}>{formatAED(w.cashOut)}</td>
+                        <td style={{ ...tdStyle, color: w.net < 0 ? colors.danger : undefined }}>{formatAED(w.net)}</td>
+                        <td style={{ ...tdStyle, color: w.running < 0 ? colors.danger : undefined }}>{formatAED(w.running)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          ) : null}
           <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
-            {forecast.lines.length === 0 ? (
+            {boardForecast.lines.length === 0 ? (
               <EmptyState title="Nothing due" subtitle="No open invoices, costs or VAT fall in the next 90 days." />
             ) : (
               <div style={tableWrapStyle}>
@@ -815,7 +1115,7 @@ export default function ReportsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {forecast.lines.map((l, i) => (
+                    {boardForecast.lines.map((l, i) => (
                       <tr key={`${l.date}-${l.label}-${i}`}>
                         <td style={tdStyle}>{l.date}</td>
                         <td style={tdStyle}>
@@ -1277,7 +1577,7 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody>
-                {winRate.map((r) => (
+                {boardWinRate.map((r) => (
                   <tr key={r.code}>
                     <td style={tdStyle}>{r.code} — {r.brand}</td>
                     <td style={tdStyle}>{r.total}</td>
@@ -1293,7 +1593,7 @@ export default function ReportsPage() {
         </div>
       ) : tab === 'aging' ? (
         <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
-          {aging.every((b) => b.count === 0) ? (
+          {boardAging.every((b) => b.count === 0) ? (
             <EmptyState title="No open invoices" subtitle="Aging appears for unpaid invoices." />
           ) : (
             <div style={tableWrapStyle}>
@@ -1306,7 +1606,7 @@ export default function ReportsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {aging.map((b) => (
+                  {boardAging.map((b) => (
                     <tr key={b.key}>
                       <td style={tdStyle}>{b.key}</td>
                       <td style={tdStyle}>{b.count}</td>
@@ -1324,7 +1624,7 @@ export default function ReportsPage() {
             Income includes paid / awarded entries only — not awarded quotes are excluded.
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {monthlyPnl.map((m) => (
+            {boardMonthlyPnl.map((m) => (
               <div key={m.key}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13 }}>
                   <strong>{m.label}</strong>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { addMonths, format, startOfMonth } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
@@ -8,7 +8,7 @@ import SavedViewsBar from '../components/SavedViewsBar'
 import { CLIENT_REPORT_STATUSES, CLIENT_REPORT_SUMMARY_MAX, monthLabelOf, reportMonthFor, reportRecipients } from '../lib/clientReports'
 import { buildReportDrafts, loadReportQueue, saveReportSummary, sendReport, setReportSkipped, type ReportContact, type ReportQueue } from '../lib/clientReportsStore'
 import { errorMessage } from '../lib/errors'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { roleAtLeast } from '../lib/permissions'
 import type { ClientReportDraft } from '../lib/types'
 import {
@@ -40,11 +40,14 @@ export default function ClientReportsPage() {
   const [month, setMonth] = useState(months[0])
   const [queue, setQueue] = useState<ReportQueue | null>(null)
   const [building, setBuilding] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const [statusFilter, setStatusFilter] = useState('all')
   const reportsViewFilters = useMemo(
     () => ({ status: statusFilter, month }),
     [statusFilter, month],
   )
+  const canImport = userRole !== 'viewer'
 
   const load = useCallback(async () => {
     try {
@@ -70,6 +73,95 @@ export default function ClientReportsPage() {
     await load()
   }
 
+  function normalizeReportMonth(raw: string): string {
+    const value = raw.trim()
+    if (!value) return ''
+    if (/^\d{4}-\d{2}$/.test(value)) return `${value}-01`
+    if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10)
+    return value
+  }
+
+  function parseReportStatus(raw: string): 'draft' | 'skipped' | null {
+    const token = raw.trim().toLowerCase()
+    if (!token) return null
+    if (token === 'skipped' || token === 'skip') return 'skipped'
+    if (token === 'draft' || token === 'waiting for approval' || token === 'waiting') return 'draft'
+    const byLabel = CLIENT_REPORT_STATUSES.find((s) => s.label.toLowerCase() === token)
+    if (byLabel?.value === 'skipped' || byLabel?.value === 'draft') return byLabel.value
+    return null
+  }
+
+  async function importReportsCsv(file: File) {
+    if (!canImport) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const drafts = queue?.drafts || []
+      const byAccount = new Map(drafts.map((d) => [d.accountName.trim().toLowerCase(), d] as const))
+      let applied = 0
+      let skipped = 0
+      for (const row of objects) {
+        const account = String(row.account || '').trim()
+        if (!account) {
+          skipped += 1
+          continue
+        }
+        const draft = byAccount.get(account.toLowerCase())
+        if (!draft || draft.status === 'sent') {
+          skipped += 1
+          continue
+        }
+        const monthRaw = normalizeReportMonth(String(row.month || ''))
+        if (monthRaw && monthRaw !== draft.month && monthRaw !== month) {
+          skipped += 1
+          continue
+        }
+
+        let changed = false
+        const summary = String(row.summary ?? '')
+        if (Object.prototype.hasOwnProperty.call(row, 'summary') && summary.trim() !== draft.summary.trim()) {
+          if (summary.trim().length > CLIENT_REPORT_SUMMARY_MAX) {
+            skipped += 1
+            continue
+          }
+          await saveReportSummary(draft.id, summary)
+          changed = true
+        }
+
+        const nextStatus = parseReportStatus(String(row.status || ''))
+        if (nextStatus === 'skipped' && draft.status !== 'skipped') {
+          await setReportSkipped(draft.id, true)
+          changed = true
+        } else if (nextStatus === 'draft' && draft.status === 'skipped') {
+          await setReportSkipped(draft.id, false)
+          changed = true
+        }
+
+        if (changed) applied += 1
+        else skipped += 1
+      }
+
+      if (!applied) {
+        showToast(skipped ? 'No matching client report rows to import' : 'CSV has no data rows', 'error')
+        return
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Updated ${applied} client report(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Client reports CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   const waiting = queue?.drafts.filter((d) => d.status === 'draft').length ?? 0
   const sent = queue?.drafts.filter((d) => d.status === 'sent').length ?? 0
   const visibleDrafts = useMemo(() => {
@@ -86,32 +178,55 @@ export default function ClientReportsPage() {
           <h1 className={docsStyles.title}>{t('page.clientReports.title')}</h1>
           <p className={docsStyles.subtitle}>{t('page.clientReports.subtitle')}</p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-          disabled={!queue?.drafts.length}
-          onClick={() => {
-            if (!queue?.drafts.length) return
-            exportListCsv(
-              `client-reports-${month.slice(0, 7)}.csv`,
-              ['account', 'status', 'month', 'summary', 'sent_email_to', 'sent_whatsapp_to', 'sent_at', 'sent_by'],
-              queue.drafts.map((d) => ({
-                account: d.accountName,
-                status: d.status,
-                month: d.month || month,
-                summary: d.summary || '',
-                sent_email_to: d.sent_email_to || '',
-                sent_whatsapp_to: d.sent_whatsapp_to || '',
-                sent_at: d.sent_at || '',
-                sent_by: d.sent_by || '',
-              })),
-            )
-            showToast('Client reports CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importReportsCsv(file)
+            }}
+          />
+          {canImport ? (
+            <button
+              type="button"
+              className={docsStyles.newBtn}
+              style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+              disabled={importing || !queue?.drafts.length}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!queue?.drafts.length}
+            onClick={() => {
+              if (!queue?.drafts.length) return
+              exportListCsv(
+                `client-reports-${month.slice(0, 7)}.csv`,
+                ['account', 'status', 'month', 'summary', 'sent_email_to', 'sent_whatsapp_to', 'sent_at', 'sent_by'],
+                queue.drafts.map((d) => ({
+                  account: d.accountName,
+                  status: d.status,
+                  month: d.month || month,
+                  summary: d.summary || '',
+                  sent_email_to: d.sent_email_to || '',
+                  sent_whatsapp_to: d.sent_whatsapp_to || '',
+                  sent_at: d.sent_at || '',
+                  sent_by: d.sent_by || '',
+                })),
+              )
+              showToast('Client reports CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </header>
 
       <SavedViewsBar

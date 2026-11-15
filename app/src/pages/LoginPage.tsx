@@ -1,12 +1,13 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth, LOGIN_DOMAIN_REJECT_KEY } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
+import { isAllowedLoginEmail, normalizeEmail } from '../lib/allowedLoginEmail'
 import { authApi, MIN_PASSWORD_LENGTH } from '../lib/authApi'
 import { parseLoginCredentials } from '../lib/schemas/login'
 import styles from './LoginPage.module.css'
 import { errorMessage } from '../lib/errors'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { PRODUCT, productAssetUrls } from '../lib/product'
 
 const highmastAssets = productAssetUrls(import.meta.env.BASE_URL)
@@ -31,6 +32,8 @@ export default function LoginPage() {
   const [seedEmails, setSeedEmails] = useState<string[]>([])
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     try {
@@ -82,6 +85,56 @@ export default function LoginPage() {
     }
   }
 
+  async function importSeedEmailsCsv(file: File) {
+    if (!isLocalMode) return
+    setImporting(true)
+    setError('')
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        setError('CSV has no header row')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const existing = new Set(seedEmails.map((e) => normalizeEmail(e)))
+      let added = 0
+      let skipped = 0
+      const next = [...seedEmails]
+      for (const row of objects) {
+        const raw = String(row.email || row.Email || row.address || '').trim()
+        if (!raw) {
+          skipped += 1
+          continue
+        }
+        const addr = normalizeEmail(raw)
+        if (!isAllowedLoginEmail(addr)) {
+          skipped += 1
+          continue
+        }
+        if (existing.has(addr)) {
+          skipped += 1
+          continue
+        }
+        existing.add(addr)
+        next.push(addr)
+        added += 1
+      }
+      if (!added) {
+        setError(skipped ? 'No new @redreach.ae seed emails in CSV' : 'CSV has no data rows')
+        return
+      }
+      next.sort((a, b) => a.localeCompare(b))
+      setSeedEmails(next)
+      if (!email && next[0]) setEmail(next[0])
+    } catch (err) {
+      setError(errorMessage(err, 'Seed emails CSV import failed'))
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <div className={styles.page} data-theme="dark">
       <div className={styles.glow} aria-hidden />
@@ -124,8 +177,18 @@ export default function LoginPage() {
               <option key={addr} value={addr} />
             ))}
           </datalist>
-          {seedEmails.length > 0 && (
+          {isLocalMode ? (
             <div className={styles.seedList}>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) void importSeedEmailsCsv(file)
+                }}
+              />
               {seedEmails.map((addr) => (
                 <button
                   key={addr}
@@ -139,18 +202,28 @@ export default function LoginPage() {
               <button
                 type="button"
                 className={styles.seedChip}
-                onClick={() => {
-                  exportListCsv(
-                    'login-seed-emails.csv',
-                    ['email'],
-                    seedEmails.map((addr) => ({ email: addr })),
-                  )
-                }}
+                disabled={importing}
+                onClick={() => importInputRef.current?.click()}
               >
-                Export CSV
+                {importing ? 'Importing…' : 'Import CSV'}
               </button>
+              {seedEmails.length > 0 ? (
+                <button
+                  type="button"
+                  className={styles.seedChip}
+                  onClick={() => {
+                    exportListCsv(
+                      'login-seed-emails.csv',
+                      ['email'],
+                      seedEmails.map((addr) => ({ email: addr })),
+                    )
+                  }}
+                >
+                  Export CSV
+                </button>
+              ) : null}
             </div>
-          )}
+          ) : null}
           <label className={styles.fieldLabel} htmlFor="login-password">
             {t('page.login.password')}
           </label>

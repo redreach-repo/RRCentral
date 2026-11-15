@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { format, parseISO, startOfMonth, subMonths } from 'date-fns'
 import { BellRing, Briefcase, Church, Clock, Handshake, Inbox, LifeBuoy, Scale, UserPlus } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useSettings } from '../../contexts/SettingsContext'
+import { useToast } from '../../contexts/ToastContext'
 import { listAccounts } from '../../lib/accountsStore'
 import { monthCosts, type MonthCosts } from '../../lib/attention'
 import { isOverdue, isStale } from '../../lib/ctrm'
@@ -12,6 +13,7 @@ import { db } from '../../lib/db'
 import { HOURS_ALERT_MESSAGE, hoursAlert, monthLabel, ratesFromSettings, renewalFlag, renewalLabel } from '../../lib/delivery'
 import { listAiUsage } from '../../lib/aiAssistStore'
 import { currentContract, listContracts, listPackages, listTimeEntries, listUsage } from '../../lib/deliveryStore'
+import { errorMessage } from '../../lib/errors'
 import { formatAED } from '../../lib/money'
 import { canViewField } from '../../lib/fieldPermissions'
 import { roleAtLeast } from '../../lib/permissions'
@@ -22,10 +24,43 @@ import { TICKET_CHANNELS, isOpenTicket, optionLabel } from '../../lib/support'
 import { listTickets } from '../../lib/supportStore'
 import { billingLabel, churchView, hasBillingIssue, joinRequests, renewalSoon } from '../../lib/worshiphub'
 import { fetchLiveTenants, listChurchProfiles } from '../../lib/worshiphubStore'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import type { Invoice, WorshipTenant } from '../../lib/types'
 import ChurchActionButtons from '../worshiphub/ChurchActionButtons'
 import { buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
+
+const PANEL_KEYS = [
+  'AI CRM clients',
+  'Hours this week',
+  'Payment reminders',
+  'New support tickets',
+  'Tickets near SLA',
+  'CTRM next action overdue',
+  'CTRM stale deals',
+  'WorshipHub joins',
+  'WorshipHub churches',
+] as const
+
+type PanelKey = (typeof PANEL_KEYS)[number]
+
+function matchPanel(raw: string): PanelKey | null {
+  const v = raw.trim().toLowerCase()
+  if (!v) return null
+  for (const p of PANEL_KEYS) {
+    if (p.toLowerCase() === v) return p
+  }
+  // Allow shorter labels from older exports or hand-edited sheets.
+  if (v.includes('hours')) return 'Hours this week'
+  if (v.includes('payment')) return 'Payment reminders'
+  if (v.includes('new support') || v === 'new tickets') return 'New support tickets'
+  if (v.includes('sla')) return 'Tickets near SLA'
+  if (v.includes('overdue')) return 'CTRM next action overdue'
+  if (v.includes('stale')) return 'CTRM stale deals'
+  if (v.includes('join')) return 'WorshipHub joins'
+  if (v.includes('church')) return 'WorshipHub churches'
+  if (v.includes('ai crm') || v.includes('client')) return 'AI CRM clients'
+  return null
+}
 
 type Line = { key: string; to: string; name: string; detail: string; tone: string; tenant?: WorshipTenant }
 
@@ -55,12 +90,15 @@ const EMPTY: Data = { clients: [], newTickets: [], tickets: [], overdueDeals: []
 export default function ModuleAlertsCard() {
   const { userRole } = useAuth()
   const { settings } = useSettings()
+  const { showToast } = useToast()
   const rates = useMemo(() => ratesFromSettings(settings), [settings])
   const seesMoney = canViewField(userRole, 'delivery.profitability')
   const chasesPayments = roleAtLeast(userRole, 'sales')
   const reviewsChurches = userRole === 'admin' || userRole === 'manager'
   const [data, setData] = useState<Data | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     let alive = true
@@ -236,6 +274,73 @@ export default function ModuleAlertsCard() {
     }
   }, [rates, seesMoney, chasesPayments, reviewsChurches, reloadKey])
 
+  async function importAlertsCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const buckets: Record<PanelKey, Line[]> = {
+        'AI CRM clients': [],
+        'Hours this week': [],
+        'Payment reminders': [],
+        'New support tickets': [],
+        'Tickets near SLA': [],
+        'CTRM next action overdue': [],
+        'CTRM stale deals': [],
+        'WorshipHub joins': [],
+        'WorshipHub churches': [],
+      }
+      let applied = 0
+      let skipped = 0
+      objects.forEach((row, idx) => {
+        const panel = matchPanel(String(row.panel || row.section || ''))
+        const name = String(row.name || '').trim()
+        const detail = String(row.detail || '').trim()
+        const link = String(row.link || row.to || row.path || '').trim()
+        if (!panel || !name) {
+          skipped += 1
+          return
+        }
+        buckets[panel].push({
+          key: `import-${idx}-${name}`,
+          to: link || '/',
+          name,
+          detail,
+          tone: colors.muted,
+        })
+        applied += 1
+      })
+      if (!applied) {
+        showToast('No matching module alert rows in CSV', 'error')
+        return
+      }
+      setData((prev) => ({
+        clients: buckets['AI CRM clients'],
+        newTickets: buckets['New support tickets'],
+        tickets: buckets['Tickets near SLA'],
+        overdueDeals: buckets['CTRM next action overdue'],
+        staleDeals: buckets['CTRM stale deals'],
+        churches: buckets['WorshipHub churches'],
+        joins: buckets['WorshipHub joins'].length ? buckets['WorshipHub joins'] : null,
+        noHours: buckets['Hours this week'].length ? buckets['Hours this week'] : null,
+        reminders: buckets['Payment reminders'].length ? buckets['Payment reminders'] : null,
+        costs: prev?.costs ?? null,
+      }))
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${applied} module alert(s)${skipNote}`, 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Module alerts CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   if (!data) return null
 
   const showCtrm = data.overdueDeals.length > 0 || data.staleDeals.length > 0
@@ -252,37 +357,51 @@ export default function ModuleAlertsCard() {
   ]
   if (!panels.some(Boolean)) return null
 
-  const allLines: { panel: string; name: string; detail: string; to: string }[] = [
-    ...data.clients.map((l) => ({ panel: 'AI CRM clients', name: l.name, detail: l.detail, to: l.to })),
-    ...(data.noHours || []).map((l) => ({ panel: 'Hours this week', name: l.name, detail: l.detail, to: l.to })),
-    ...(data.reminders || []).map((l) => ({ panel: 'Payment reminders', name: l.name, detail: l.detail, to: l.to })),
-    ...data.newTickets.map((l) => ({ panel: 'New support tickets', name: l.name, detail: l.detail, to: l.to })),
-    ...data.tickets.map((l) => ({ panel: 'Tickets near SLA', name: l.name, detail: l.detail, to: l.to })),
-    ...data.overdueDeals.map((l) => ({ panel: 'CTRM next action overdue', name: l.name, detail: l.detail, to: l.to })),
-    ...data.staleDeals.map((l) => ({ panel: 'CTRM stale deals', name: l.name, detail: l.detail, to: l.to })),
-    ...(data.joins || []).map((l) => ({ panel: 'WorshipHub joins', name: l.name, detail: l.detail, to: l.to })),
-    ...data.churches.map((l) => ({ panel: 'WorshipHub churches', name: l.name, detail: l.detail, to: l.to })),
+  const allLines: { panel: string; name: string; detail: string; link: string }[] = [
+    ...data.clients.map((l) => ({ panel: 'AI CRM clients', name: l.name, detail: l.detail, link: l.to })),
+    ...(data.noHours || []).map((l) => ({ panel: 'Hours this week', name: l.name, detail: l.detail, link: l.to })),
+    ...(data.reminders || []).map((l) => ({ panel: 'Payment reminders', name: l.name, detail: l.detail, link: l.to })),
+    ...data.newTickets.map((l) => ({ panel: 'New support tickets', name: l.name, detail: l.detail, link: l.to })),
+    ...data.tickets.map((l) => ({ panel: 'Tickets near SLA', name: l.name, detail: l.detail, link: l.to })),
+    ...data.overdueDeals.map((l) => ({ panel: 'CTRM next action overdue', name: l.name, detail: l.detail, link: l.to })),
+    ...data.staleDeals.map((l) => ({ panel: 'CTRM stale deals', name: l.name, detail: l.detail, link: l.to })),
+    ...(data.joins || []).map((l) => ({ panel: 'WorshipHub joins', name: l.name, detail: l.detail, link: l.to })),
+    ...data.churches.map((l) => ({ panel: 'WorshipHub churches', name: l.name, detail: l.detail, link: l.to })),
   ]
 
   return (
     <div style={{ marginBottom: 16 }}>
-      {allLines.length ? (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-          <button
-            type="button"
-            style={buttonSecondaryStyle}
-            onClick={() => {
-              exportListCsv(
-                'module-alerts.csv',
-                ['panel', 'name', 'detail', 'link'],
-                allLines,
-              )
-            }}
-          >
-            Export CSV
-          </button>
-        </div>
-      ) : null}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".csv,text/csv"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) void importAlertsCsv(file)
+          }}
+        />
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={importing}
+          onClick={() => importInputRef.current?.click()}
+        >
+          {importing ? 'Importing…' : 'Import CSV'}
+        </button>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={!allLines.length}
+          onClick={() => {
+            exportListCsv('module-alerts.csv', ['panel', 'name', 'detail', 'link'], allLines)
+            showToast('Module alerts CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
+      </div>
     <div
       style={{
         display: 'grid',
