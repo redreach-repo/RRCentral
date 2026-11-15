@@ -5,9 +5,11 @@ import {
   DEFAULT_API_KEY_SCOPES,
   hasApiScope,
   nextCursorFromPage,
+  parseAccountWrite,
   parseCursorPage,
   shouldRetryWebhookStatus,
   signWebhookBody,
+  webhookDueForRetry,
   webhookRetryDelayMs,
   webhookSignatureHeader,
 } from './publicApi'
@@ -74,8 +76,34 @@ describe('webhook retries', () => {
 })
 
 describe('DEFAULT_API_KEY_SCOPES', () => {
-  it('includes invoices and quotations', () => {
+  it('includes invoices and quotations but not writes by default', () => {
     expect(DEFAULT_API_KEY_SCOPES).toContain('read:invoices')
     expect(DEFAULT_API_KEY_SCOPES).toContain('read:quotations')
+    expect(DEFAULT_API_KEY_SCOPES).not.toContain('write:accounts')
+  })
+})
+
+describe('parseAccountWrite', () => {
+  it('requires name on create and validates type', () => {
+    expect(parseAccountWrite({}, { partial: false }).ok).toBe(false)
+    const created = parseAccountWrite({ name: 'Acme', type: 'ai_crm_client' }, { partial: false })
+    expect(created.ok).toBe(true)
+    if (created.ok) expect(created.patch.name).toBe('Acme')
+    expect(parseAccountWrite({ name: 'X', type: 'nope' }, { partial: false }).ok).toBe(false)
+  })
+
+  it('rejects empty patches', () => {
+    expect(parseAccountWrite({}, { partial: true }).ok).toBe(false)
+    const patched = parseAccountWrite({ status: 'paused' }, { partial: true })
+    expect(patched.ok).toBe(true)
+  })
+})
+
+describe('webhookDueForRetry', () => {
+  it('only returns due active endpoints', () => {
+    const now = Date.parse('2026-11-15T10:00:00Z')
+    expect(webhookDueForRetry({ active: true, next_retry_at: '2026-11-15T09:00:00Z' }, now)).toBe(true)
+    expect(webhookDueForRetry({ active: true, next_retry_at: '2026-11-15T11:00:00Z' }, now)).toBe(false)
+    expect(webhookDueForRetry({ active: false, next_retry_at: '2026-11-15T09:00:00Z' }, now)).toBe(false)
   })
 })
