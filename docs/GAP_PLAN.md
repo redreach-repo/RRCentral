@@ -19,7 +19,7 @@ Status key: **exists** · **partial** · **missing**
 | Zod validation everywhere | partial | Login, password, app-user, account, ticket form schemas; keep expanding forms/API |
 | Module registry manifests | partial | M1 `APP_MODULES`; Layout + Cmd+K use `visibleAppModules`; Settings Module flags card (`overview`, `sales`, `ops`, `finance`, `delivery`, `clients`); Admin stays always on; more polish later |
 | Domain events / `event_outbox` | partial | M1 enqueue + worker + HubSpot/digest/webhook handlers; digest + HubSpot nudge consumption live |
-| Public REST API + webhooks | partial | M11: reads + account/invoice/quotation writes + HMAC webhooks + `webhook-retry`; line items / finalize later |
+| Public REST API + webhooks | partial | M11: reads/writes + lines + invoice/quote finalize + HMAC webhooks + `webhook-retry` |
 | Exact money `numeric` / no float | partial | SQL numeric exists; TS `number`+round — fix path in M7 |
 | Tenant / company / BU model | partial | M1 tables + seed + `tenant_id` retrofit; company switcher live |
 | RLS on every table | exists | M1 RESTRICTIVE tenant isolation on stamped tables |
@@ -27,7 +27,7 @@ Status key: **exists** · **partial** · **missing**
 | Roles + record rules + field permissions | partial | Fixed 5 roles; field-mask API started (`fieldPermissions`); record rules later |
 | Maker-checker | partial | M7: Approvals queue; payroll, expenses, refunds, supplier commitments ≥ AED 5k wired |
 | Customization layer (fields, pipelines, objects, workflows, templates, views, dashboards, labels, numbering) | partial | M2 layer largely in: numbering, fields, views, pipelines, workflow defs + runner (approval/notify); more step types / dashboards later |
-| Industry packs | partial | M12: catalog + activate enables moduleFlags; deeper object templates later |
+| Industry packs | partial | M12: catalog + templates (eng/construction/trading/logistics/events); domain objects later |
 | Shell: Inbox/Sales/… areas, Cmd+K, AI button | partial | Accordion nav exists; restructure shell in M1 |
 | Company switcher | partial | M1 top-bar switcher; multi-company ops still thin |
 | EN+AR RTL | partial | M1 `I18nContext` + dir; guide + shell/nav + sales/finance/clients/admin/ops/delivery list chrome (Dashboard → Domains through Wanders, Settings/Account, CTRM weekly summary, ticket + account detail, CTRM fit sheet, quote/invoice/DN viewer, legal e-sign + quote-accept + client portal + monthly client report + Wanders tour-ops + monthly reports + weekly updates queue + client health + module-flags Settings card + CTRM issues + obligations board + clause library + NDA template + build templates + agreement template + domains + app errors + Settings section chrome); more page bodies later |
@@ -38,7 +38,7 @@ Status key: **exists** · **partial** · **missing**
 | Sign-up + provisioner §6.13.1–2 | partial | M11: `/workspace-setup` + `business_type_packs` + idempotent Edge scaffold; auth user create later |
 | Engineering pack §11.3 | partial | Templates on activate (fields/pipelines); shared foundation M12a later |
 | Construction pack §11.4 | partial | Templates on activate; workforce/site objects M12b later |
-| Trading pack §11.2 light | partial | `trading_import` starter exists; landed cost / credit limits later |
+| Trading pack §11.2 light | partial | landed cost + credit limits soft gate; multi-warehouse later |
 | Languages §5.5 (v3) | partial | EN+AR only; all new strings must stay key-based for v3 |
 | Country packs §12 | partial | AE/IN/CA catalog + activate shipped (Unverified); residency §19 |
 
@@ -56,11 +56,11 @@ Status key: **exists** · **partial** · **missing**
 | 6.6 Payroll | partial | M8: runs + WPS/gratuity draft + `payroll_exports` audit (not legal advice / not bank-certified) |
 | 6.7 Accounting (ledger) | partial | CoA + journals + invoice→draft auto-post + VAT return stub UI; posted auto + FTA later |
 | 6.8 Inventory and purchasing | partial | M9: POs + receive→stock + landed cost allocate; multi-warehouse later |
-| 6.9 Delivery (projects/support) | partial | M9b: projects + cost lines + WIP/retention stub; billing schedules later |
-| 6.10 Marketing | partial | M10: campaigns + consent + segments + recipients (no live ESP) |
+| 6.9 Delivery (projects/support) | partial | M9b: projects + WIP/retention + billing schedules; full job-cost later |
+| 6.10 Marketing | partial | M10: campaigns + consent + dry-run send; live ESP later |
 | 6.11 Documents and knowledge | partial | Drive + customer_documents; not full DMS → expand with M5/M11 |
 | 6.12 Planning and reports | partial | Reports/MRR/insights; no goals/scenarios builder → M12-ish / planning |
-| 6.13 Tenant billing | partial | M11: `tenant_subscriptions` + plan catalog + Stripe Checkout/portal (`saas-checkout`); Tax registration later |
+| 6.13 Tenant billing | partial | M11: Checkout/portal + Tax stub flag (off); live Tax registration later |
 | 6.14 Demo / showcase | partial | Code-side isolation + seed/tour/role switcher; Alfred still provisions demo project |
 
 ---

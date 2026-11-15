@@ -8,6 +8,7 @@ import {
   saasApplyFromSubscription,
   saasCheckoutProblem,
   SAAS_CHECKOUT_SOURCE,
+  stripeTaxStubEnabled,
 } from './saasCheckout'
 
 describe('aedToFils', () => {
@@ -49,6 +50,21 @@ describe('buildSaasCheckoutParams', () => {
     expect(params.metadata.source).toBe(SAAS_CHECKOUT_SOURCE)
     expect(params.line_items[0].price_data.unit_amount).toBe(149900)
     expect(params.line_items[0].price_data.currency).toBe('aed')
+    expect(params.automatic_tax).toBeUndefined()
+  })
+
+  it('adds tax stub when enabled', () => {
+    expect(stripeTaxStubEnabled({})).toBe(false)
+    expect(stripeTaxStubEnabled({ STRIPE_TAX_STUB: '1' })).toBe(true)
+    const plan = planByKey('starter')!
+    const params = buildSaasCheckoutParams({
+      plan,
+      tenantId: 't',
+      successUrl: 'https://a',
+      cancelUrl: 'https://b',
+      enableTaxStub: true,
+    })
+    expect(params.automatic_tax).toEqual({ enabled: true })
   })
 })
 

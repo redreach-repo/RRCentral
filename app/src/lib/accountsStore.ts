@@ -13,7 +13,18 @@ import type {
 
 export type AccountInput = Pick<
   Account,
-  'type' | 'name' | 'industry' | 'country' | 'city' | 'website' | 'status' | 'owner_user_id' | 'source' | 'notes'
+  | 'type'
+  | 'name'
+  | 'industry'
+  | 'country'
+  | 'city'
+  | 'website'
+  | 'status'
+  | 'owner_user_id'
+  | 'source'
+  | 'notes'
+  | 'credit_limit_aed'
+  | 'credit_hold'
 >
 
 export type ContactInput = Pick<

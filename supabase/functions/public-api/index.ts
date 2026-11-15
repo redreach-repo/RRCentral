@@ -324,6 +324,7 @@ Deno.serve(async (req) => {
         "PATCH /v1/quotations/:id",
         "GET /v1/quotations/:id/lines",
         "POST /v1/quotations/:id/lines",
+        "POST /v1/quotations/:id/finalize",
       ],
     })
   }
@@ -730,6 +731,27 @@ Deno.serve(async (req) => {
       .eq("id", invoiceFinalizeMatch[1])
       .eq("tenant_id", key.tenant_id)
       .select(INVOICE_COLUMNS)
+      .maybeSingle()
+    if (error) return json({ error: "update_failed", detail: error.message }, 500)
+    if (!data) return json({ error: "not_found" }, 404)
+    return json({ data })
+  }
+
+  const quoteFinalizeMatch = path.match(/^\/v1\/quotations\/([0-9a-f-]{36})\/finalize$/i)
+  if (req.method === "POST" && quoteFinalizeMatch) {
+    if (!hasScope(scopes, "write:quotations")) {
+      return json({ error: "forbidden_scope", need: "write:quotations" }, 403)
+    }
+    const { data, error } = await sb
+      .from("quotations")
+      .update({
+        status: "Finalized",
+        updated_by: `api_key:${key.key_prefix}`,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", quoteFinalizeMatch[1])
+      .eq("tenant_id", key.tenant_id)
+      .select(QUOTATION_COLUMNS)
       .maybeSingle()
     if (error) return json({ error: "update_failed", detail: error.message }, 500)
     if (!data) return json({ error: "not_found" }, 404)

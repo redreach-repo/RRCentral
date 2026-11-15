@@ -201,8 +201,8 @@ export default function SaasBillingPage() {
               <div style={{ color: colors.warn, marginTop: 6 }}>Active people exceed included seats — upgrade or trim roster.</div>
             ) : null}
             <p style={{ margin: '8px 0 0', fontSize: 12, color: colors.muted2 }}>
-              UAE/GCC VAT: enable Stripe Tax + an active registration before charging live customers; Checkout does not
-              collect tax until then.
+              UAE/GCC VAT: live Stripe Tax registration is Not done. Optional stub: set <code>STRIPE_TAX_STUB=1</code> on
+              saas-checkout to pass <code>automatic_tax.enabled</code> (still Unverified — not for production).
             </p>
           </div>
         ) : null}

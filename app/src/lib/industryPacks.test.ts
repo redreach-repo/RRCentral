@@ -15,6 +15,7 @@ describe('BUILTIN_INDUSTRY_PACKS', () => {
         'church_saas',
         'trading_import',
         'events_tours',
+        'logistics',
         'engineering',
         'construction',
       ]),

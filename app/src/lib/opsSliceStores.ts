@@ -276,6 +276,52 @@ export async function addProjectCost(input: {
   if (error) throw error
 }
 
+export type ProjectBillingSchedule = {
+  id: string
+  project_id: string
+  milestone_label: string
+  pct: number
+  amount_aed: number
+  due_on: string | null
+  status: string
+}
+
+export async function listProjectBillingSchedules(projectId: string): Promise<ProjectBillingSchedule[]> {
+  const { data, error } = await db
+    .from('project_billing_schedules')
+    .select('id, project_id, milestone_label, pct, amount_aed, due_on, status')
+    .eq('project_id', projectId)
+    .order('due_on', { ascending: true })
+  if (error) {
+    if (isMissingRelationError(error)) return []
+    throw error
+  }
+  return (data || []) as ProjectBillingSchedule[]
+}
+
+export async function addProjectBillingSchedule(input: {
+  projectId: string
+  label: string
+  pct: number
+  amountAed: number
+  dueOn?: string | null
+}): Promise<void> {
+  const { error } = await db.from('project_billing_schedules').insert({
+    project_id: input.projectId,
+    milestone_label: input.label.trim(),
+    pct: Number(input.pct) || 0,
+    amount_aed: Number(input.amountAed) || 0,
+    due_on: input.dueOn || null,
+    status: 'planned',
+  })
+  if (error) throw error
+}
+
+export async function markProjectMilestoneBilled(scheduleId: string): Promise<void> {
+  const { error } = await db.rpc('rr_project_mark_milestone_billed', { p_schedule: scheduleId })
+  if (error) throw error
+}
+
 export type ClientPurchaseOrder = {
   id: string
   account_id: string

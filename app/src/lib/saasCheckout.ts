@@ -42,6 +42,8 @@ export type SaasCheckoutSessionParams = {
     }
   }>
   customer?: string
+  /** Stub only — live Stripe Tax registration is Not done / Alfred. Default off. */
+  automatic_tax?: { enabled: boolean }
 }
 
 /** AED major units → fils (Stripe smallest currency unit). */
@@ -64,12 +66,19 @@ export function saasCheckoutProblem(body: SaasCheckoutRequest): string | null {
   return null
 }
 
+export function stripeTaxStubEnabled(env: Record<string, string | undefined> = {}): boolean {
+  const v = String(env.STRIPE_TAX_STUB || env.VITE_STRIPE_TAX_STUB || '').toLowerCase()
+  return v === '1' || v === 'true' || v === 'yes'
+}
+
 export function buildSaasCheckoutParams(input: {
   plan: SaasPlan
   tenantId: string
   successUrl: string
   cancelUrl: string
   stripeCustomerId?: string | null
+  /** When true, include automatic_tax.enabled (still Unverified / not registered). */
+  enableTaxStub?: boolean
 }): SaasCheckoutSessionParams {
   const params: SaasCheckoutSessionParams = {
     mode: 'subscription',
@@ -102,6 +111,9 @@ export function buildSaasCheckoutParams(input: {
         },
       },
     ],
+  }
+  if (input.enableTaxStub) {
+    params.automatic_tax = { enabled: true }
   }
   if (input.stripeCustomerId) params.customer = input.stripeCustomerId
   return params

@@ -473,6 +473,46 @@ export default function AccountDetailPage() {
             {account.notes ? <div style={{ whiteSpace: 'pre-wrap', marginTop: 6 }}>{account.notes}</div> : null}
           </div>
         ) : null}
+        {editable ? (
+          <div style={{ marginTop: 12, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'end' }}>
+            <label style={{ fontSize: 12, color: colors.muted, display: 'grid', gap: 4 }}>
+              Credit limit (AED)
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                defaultValue={account.credit_limit_aed ?? ''}
+                style={{ padding: '6px 8px', borderRadius: 6, border: `1px solid ${colors.border}` }}
+                onBlur={(e) => {
+                  const raw = e.target.value.trim()
+                  const credit_limit_aed = raw === '' ? null : Number(raw)
+                  void updateAccount(account.id, { credit_limit_aed }).then(() => {
+                    showToast('Credit limit saved', 'success')
+                    void load()
+                  })
+                }}
+              />
+            </label>
+            <label style={{ fontSize: 12, color: colors.muted, display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input
+                type="checkbox"
+                checked={Boolean(account.credit_hold)}
+                onChange={(e) => {
+                  void updateAccount(account.id, { credit_hold: e.target.checked }).then(() => {
+                    showToast(e.target.checked ? 'Credit hold on' : 'Credit hold cleared', 'success')
+                    void load()
+                  })
+                }}
+              />
+              Credit hold
+            </label>
+          </div>
+        ) : account.credit_limit_aed != null || account.credit_hold ? (
+          <div style={{ marginTop: 10, fontSize: 13, color: colors.muted }}>
+            Credit limit: {account.credit_limit_aed != null ? `${Number(account.credit_limit_aed).toFixed(2)} AED` : '—'}
+            {account.credit_hold ? ' · ON HOLD' : ''}
+          </div>
+        ) : null}
       </div>
 
       <AccountCustomFieldsCard

@@ -9,7 +9,12 @@ import {
   updateMarketingCampaign,
   type MarketingCampaign,
 } from '../lib/featureSliceStores'
-import { createMarketingSegment, listMarketingSegments, type MarketingSegment } from '../lib/m10m12Stores'
+import {
+  createMarketingSegment,
+  dryRunCampaignSend,
+  listMarketingSegments,
+  type MarketingSegment,
+} from '../lib/m10m12Stores'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle, selectStyle } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
@@ -100,7 +105,7 @@ export default function MarketingPage() {
           <p className={docsStyles.kicker}>Marketing</p>
           <h1 className={docsStyles.title}>Campaigns</h1>
           <p className={docsStyles.subtitle}>
-            Plan campaigns and opt-in segments. Live ESP send is out of scope; recipients respect marketing consent.
+            Plan campaigns and opt-in segments. Live ESP send is out of scope; use Dry-run to mark queued recipients locally.
           </p>
         </div>
       </header>
@@ -216,6 +221,19 @@ export default function MarketingPage() {
                 {r.status !== 'done' ? (
                   <button type="button" style={buttonSecondaryStyle} onClick={() => void setStatus(r.id, 'done')}>
                     Mark done
+                  </button>
+                ) : null}
+                {r.status === 'active' || r.status === 'scheduled' ? (
+                  <button
+                    type="button"
+                    style={buttonSecondaryStyle}
+                    onClick={() => {
+                      void dryRunCampaignSend(r.id)
+                        .then((s) => showToast(`Dry-run: ${s.sent} marked, ${s.skipped} skipped (no ESP)`, 'success'))
+                        .catch((err) => showToast(errorMessage(err, 'Dry-run failed'), 'error'))
+                    }}
+                  >
+                    Dry-run send
                   </button>
                 ) : null}
               </div>

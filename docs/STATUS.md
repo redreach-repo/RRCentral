@@ -2,23 +2,23 @@
 
 **Last updated:** 15 November 2026 (Asia/Dubai)  
 **Spec:** Master Specification **v2.1**  
-**Batch:** Post-M13 deepen — M9/M12 leftovers + wiring (`docs/RUN_PLAN.md`)  
-**Branch:** `cursor/batch-m12-deepen-d3d5`
+**Batch:** M11 / M12 leftovers deepen (`docs/RUN_PLAN.md`)  
+**Branch:** `cursor/batch-m11-m12a-d3d5`
 
 ## Milestone verdict
 
 | Slice | Result |
 |-------|--------|
-| GL auto-post on invoice finalize | **Pass** (draft only, Unverified) |
-| VAT return boxes UI | **Pass** (Unverified) |
-| listIo on more lists | **Pass** |
-| PO landed cost | **Pass** |
-| Project WIP / retention | **Pass** (stub) |
-| Public API lines + finalize | **Pass** |
-| M14 native / live ESP / Stripe Tax / pgvector | **Not done** |
+| Public API quote finalize | **Pass** |
+| Logistics + events pack templates | **Pass** |
+| Trading credit limits | **Pass** (soft gate helpers + account UI) |
+| Project billing schedules | **Pass** |
+| Marketing ESP dry-run | **Pass** (local only) |
+| Stripe Tax stub flag | **Pass** (default off) |
+| M14 / live ESP / live Tax / pgvector | **Not done** |
 
 ## Test results
 
 - Typecheck / lint: pass  
-- Vitest: **1344** passed / 257 files  
-- SQL `tests/run.sh`: pass (incl. landed cost + WIP assertions)
+- Vitest: **1347** passed / 259 files  
+- SQL `tests/run.sh`: pass

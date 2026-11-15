@@ -265,3 +265,14 @@ No database migrations. Documentation and `brand-assets/` only.
 
 **Tests**
 - Extended `purchase_orders_test.sql`, `project_accounting_test.sql`
+
+
+## M11/M12 leftovers — `20261303120000` … `20261303140000`
+
+**What**
+- Industry packs: logistics seed + events_tours templates
+- `accounts.credit_limit_aed` / `credit_hold`
+- `project_billing_schedules` + `rr_project_mark_milestone_billed`
+
+**Tests**
+- Extended industry/project tests; `trading_credit_limits_test.sql`
