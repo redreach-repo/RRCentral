@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { ClipboardList, Copy, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import Modal from '../components/Modal'
+import SavedViewsBar from '../components/SavedViewsBar'
 import { BUILD_STAGES } from '../lib/delivery'
 import { codeFromName, copyName, sortItems, templateHours } from '../lib/buildTemplates'
 import {
@@ -17,9 +18,11 @@ import {
   saveTemplateItem,
   type TemplateItemInput,
 } from '../lib/buildTemplatesStore'
+import { BUILD_TEMPLATES_CSV_COLUMNS } from '../lib/buildTemplatesCsv'
 import { listPackages } from '../lib/deliveryStore'
 import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import { hoursLabel } from '../lib/timeTracking'
 import type { BuildStageKey, BuildTemplate, BuildTemplateItem, BuildTemplateItemKind, DeliveryPackage, GoLiveOwner } from '../lib/types'
 import { GO_LIVE_OWNERS, ownerLabel } from '../lib/goLive'
@@ -62,7 +65,7 @@ type ItemForm = {
 
 export default function BuildTemplatesPage() {
   const { t } = useI18n()
-  const { userRole } = useAuth()
+  const { userRole, appUserId } = useAuth()
   const { showToast } = useToast()
   const canEdit = can(userRole, 'delivery.packages')
   const [templates, setTemplates] = useState<BuildTemplate[]>([])
@@ -70,8 +73,17 @@ export default function BuildTemplatesPage() {
   const [items, setItems] = useState<BuildTemplateItem[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [busy, setBusy] = useState(false)
+  const [activeFilter, setActiveFilter] = useState('active')
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const [templateForm, setTemplateForm] = useState<TemplateForm | null>(null)
   const [itemForm, setItemForm] = useState<ItemForm | null>(null)
+  const templatesViewFilters = useMemo(() => ({ active: activeFilter }), [activeFilter])
+  const visibleTemplates = useMemo(() => {
+    if (activeFilter === 'all') return templates
+    if (activeFilter === 'inactive') return templates.filter((row) => !row.active)
+    return templates.filter((row) => row.active)
+  }, [templates, activeFilter])
 
   const load = useCallback(async () => {
     try {
@@ -175,6 +187,54 @@ export default function BuildTemplatesPage() {
     })
   }
 
+  async function importTemplatesCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of BUILD_TEMPLATES_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, BUILD_TEMPLATES_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid build template rows', 'error')
+        return
+      }
+      const byCode = new Map(templates.map((row) => [row.code.trim().toLowerCase(), row] as const))
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        const code = row.code.trim()
+        const existing = byCode.get(code.toLowerCase())
+        const activeRaw = row.active.trim().toLowerCase()
+        const active = !['0', 'false', 'no', 'n'].includes(activeRaw)
+        await saveBuildTemplate(
+          {
+            code,
+            name: row.name,
+            description: row.description || '',
+            package_id: row.package_id.trim() || null,
+            active,
+          },
+          existing?.id,
+        )
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} build template(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Build templates CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   function itemRow(i: BuildTemplateItem) {
     return (
       <li key={i.id} style={rowStyle}>
@@ -228,16 +288,72 @@ export default function BuildTemplatesPage() {
           <h1 className={docsStyles.title}>{t('page.buildTemplates.title')}</h1>
           <p className={docsStyles.subtitle}>{t('page.buildTemplates.subtitle')}</p>
         </div>
-        {canEdit ? (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importTemplatesCsv(file)
+            }}
+          />
+          {canEdit ? (
+            <button
+              type="button"
+              className={docsStyles.newBtn}
+              style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+              disabled={importing}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
+          ) : null}
           <button
             type="button"
             className={docsStyles.newBtn}
-            onClick={() => setTemplateForm({ name: '', description: '', package_id: '', active: true })}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!templates.length}
+            onClick={() => {
+              exportListCsv(
+                'build-templates.csv',
+                BUILD_TEMPLATES_CSV_COLUMNS.map((c) => c.key),
+                templates.map((row) => ({
+                  code: row.code,
+                  name: row.name,
+                  description: row.description || '',
+                  package_id: row.package_id || '',
+                  active: row.active,
+                })),
+              )
+              showToast('Build templates CSV downloaded', 'success')
+            }}
           >
-            <Plus size={14} /> {t('page.buildTemplates.new')}
+            Export CSV
           </button>
-        ) : null}
+          {canEdit ? (
+            <button
+              type="button"
+              className={docsStyles.newBtn}
+              onClick={() => setTemplateForm({ name: '', description: '', package_id: '', active: true })}
+            >
+              <Plus size={14} /> {t('page.buildTemplates.new')}
+            </button>
+          ) : null}
+        </div>
       </header>
+
+      <SavedViewsBar
+        moduleId="build_templates"
+        filters={templatesViewFilters}
+        ownerUserId={appUserId}
+        canWrite={canEdit}
+        applyDefaultOnLoad={false}
+        onApply={(f) => setActiveFilter(String(f.active || 'active'))}
+        onToast={showToast}
+        filtersEqual={(a, b) => String(a.active || 'active') === String(b.active || 'active')}
+      />
 
       {templates.length === 0 ? (
         <EmptyState
@@ -248,9 +364,21 @@ export default function BuildTemplatesPage() {
       ) : (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start' }}>
           <section style={{ ...cardStyle, flex: '1 1 260px', minWidth: 0 }}>
-            <h2 style={sectionTitleStyle}>{t('page.buildTemplates.list')}</h2>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+              <h2 style={{ ...sectionTitleStyle, margin: 0, flex: 1 }}>{t('page.buildTemplates.list')}</h2>
+              <select
+                style={selectStyle}
+                value={activeFilter}
+                onChange={(e) => setActiveFilter(e.target.value)}
+                aria-label="Template active filter"
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="all">All</option>
+              </select>
+            </div>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-              {templates.map((row) => {
+              {visibleTemplates.map((row) => {
                 const pkg = pkgOf(row)
                 const hours = hoursFor(row)
                 return (
