@@ -113,3 +113,12 @@ No database migrations. Documentation and `brand-assets/` only.
 
 **Rollback**
 - Forward-only preferred. Drop new tables only after confirming no production data.
+
+
+## WPS SIF draft fields — `20261217160000_wps_sif_draft_fields.sql`
+
+**What**
+- Adds `hr_employees.labour_card_no` and `hr_employees.bank_routing_code` for SIF/CSV drafts (not bank-certified)
+
+**Rollback**
+- `alter table public.hr_employees drop column if exists labour_card_no, drop column if exists bank_routing_code;`

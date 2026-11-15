@@ -5,8 +5,8 @@ Findings from official sources go here **before** shipping tax, payroll, e-sign,
 | Topic | Status | Source checked | Date | Notes |
 |-------|--------|----------------|------|-------|
 | UAE electronic signatures / trust services | **concluded** | See § E-sign below | 13 Nov 2026 | Decree-Law 46/2021 + Cabinet Res. 28/2023. Today’s `/sign` canvas is **not** AdES/QES. Keep as operational evidence; QES only via TDRA-licensed QTSP (ask before paid vendor). |
-| UAE WPS SIF format | not started | — | — | Required before M8 bank file |
-| UAE end-of-service gratuity | not started | — | — | Required before M8 formula |
+| UAE WPS SIF format | **draft only** | See § WPS below | 15 Nov 2026 | Product ships SCR/EDR-like **draft** + CSV. **Not** bank-certified. Counsel + agent bank must sign off before live upload. |
+| UAE end-of-service gratuity | **draft only** | See § WPS below | 15 Nov 2026 | Planning accrual helper (21/30-day bands + resignation taper stub). **Not legal advice** — counsel must verify before EOS settlements. |
 | UAE VAT rates / return layout | not started | — | — | Partial product VAT today; verify before M7 return |
 | UAE corporate tax | not started | — | — | M7+ |
 | UAE e-invoicing timeline / format | not started | — | — | Design invoice model for accredited provider |
@@ -16,6 +16,31 @@ Findings from official sources go here **before** shipping tax, payroll, e-sign,
 | Data residency (UAE hosting options) | not started | — | — | Decide before first external customer / M13 |
 
 Do not rely on model memory for legal or tax rules.
+
+---
+
+## UAE WPS SIF + end-of-service gratuity (M8) — draft status
+
+**Purpose:** Record what the product may claim for WPS file generation and gratuity planning until counsel and the agent bank certify formats/rules.
+
+### What ships in product (draft)
+
+- `app/src/lib/wpsGratuity.ts`: CSV draft (code/name/labour/routing/IBAN/amount/value-date), SIF-like draft (`SCR` + `EDR` rows with disclaimer banner), AE IBAN mod-97 check, labour-card / 9-digit routing validators, readiness helpers, period bounds.
+- HR fields: `labour_card_no`, `bank_routing_code` (migration `20261217160000_wps_sif_draft_fields.sql`).
+- Payroll UI: Download WPS CSV + Download SIF draft; employer MoL / establishment ID (browser-local); readiness issues listed.
+- Gratuity: planning accrual (21 days/year first 5, 30 thereafter; resignation under 1y → 0; resignation under 5y → 50% taper stub).
+
+### Explicit non-claims
+
+- Files are **not** bank-certified and must **not** be uploaded to a live WPS channel without counsel + bank validation.
+- Gratuity figures are **not** legal advice and must **not** be used for final EOS payouts without counsel.
+- Column layout follows common public WPS examples only — agent-bank field order, filler rules, and file naming may differ.
+
+### Still required before live WPS / EOS
+
+1. Red Reach counsel review of labour law (Federal Decree-Law 33/2021 and applicable MoHRE / free-zone rules) for each contract type.
+2. Agent-bank SIF specification (exact SCR/EDR columns, employer ID format, routing codes).
+3. Update this table to **concluded** only after those reviews; keep UI/docs labelled DRAFT until then.
 
 ---
 

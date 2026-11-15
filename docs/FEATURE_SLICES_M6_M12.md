@@ -5,9 +5,9 @@
 
 | Feature | Spec | Usable slice |
 |---------|------|----------------|
-| HR | §6.5 / M6 | People CRUD, status filter, salary/IBAN, draft gratuity preview |
-| Payroll | §6.6 / M8 | Runs, generate lines from active HR, WPS CSV from lines, submit/approve/paid |
-| WPS / gratuity | §11 / M8 | `wpsGratuity.ts` (years-of-service, daily wage, net, CSV) |
+| HR | §6.5 / M6 | People CRUD, salary/IBAN/labour card/routing, draft gratuity preview |
+| Payroll | §6.6 / M8 | Runs, generate lines from HR, WPS CSV + SIF draft export, submit/approve/paid |
+| WPS / gratuity | §11 / M8 | `wpsGratuity.ts` (CSV + SCR/EDR SIF draft, IBAN/labour/routing validators, readiness) |
 | Marketing | §6.10 / M10 | Campaigns with budget/dates + activate/pause/done |
 | SaaS tenant billing | §6.13 / M11 | Plan catalog, trial/activate/cancel, seat usage; Stripe Checkout + portal (`docs/saas-billing.md`) |
 | Industry packs | §3 / M12 | Catalog + tenant activate/retire (`tenant_industry_packs`) |
@@ -20,10 +20,11 @@ Module flags (default **hidden** until Settings): `hr`, `payroll`, `marketing`, 
 
 - `20261217120000_feature_slices_m6_m12.sql` — tables + RLS
 - `20261217140000_feature_slices_deepen.sql` — HR IBAN/allowances, webhook delivery audit, extra packs
+- `20261217160000_wps_sif_draft_fields.sql` — HR labour card + bank routing for SIF drafts
 
 ## Still later (not claimed done)
 
-- Bank-certified WPS/SIF file format + legal counsel sign-off
+- Bank-certified WPS/SIF file format + legal counsel sign-off (draft deepen shipped; see `docs/COMPLIANCE_NOTES.md` § WPS)
 - Real marketing send providers
 - Full public API write surface + signed webhook retries
 - Stripe Tax registration for live UAE/GCC SaaS charges
