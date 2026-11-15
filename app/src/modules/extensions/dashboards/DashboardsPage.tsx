@@ -11,6 +11,7 @@ import {
   type DashboardWidget,
 } from '../../../lib/dashboardWidgets'
 import { errorMessage, isMissingRelationError } from '../../../lib/errors'
+import { exportListCsv } from '../../../lib/listIo'
 import { isSupabaseConfigured } from '../../../lib/supabaseConfig'
 import {
   buttonPrimaryStyle,
@@ -150,8 +151,35 @@ export default function DashboardsPage() {
 
   return (
     <div style={pageStyle}>
-      <h1 style={pageTitleStyle}>{t('page.dashboards.title')}</h1>
-      <p style={pageSubtitleStyle}>{t('page.dashboards.subtitle')}</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'start' }}>
+        <div>
+          <h1 style={pageTitleStyle}>{t('page.dashboards.title')}</h1>
+          <p style={pageSubtitleStyle}>{t('page.dashboards.subtitle')}</p>
+        </div>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={!rows.length}
+          onClick={() => {
+            exportListCsv(
+              'custom-dashboards.csv',
+              ['name', 'active', 'widget_count', 'widget_types'],
+              rows.map((r) => {
+                const widgets = parseDashboardLayout(r.layout_json).widgets
+                return {
+                  name: r.name,
+                  active: r.active ? 'yes' : 'no',
+                  widget_count: widgets.length,
+                  widget_types: widgets.map((w) => w.type).join('; '),
+                }
+              }),
+            )
+            showToast('Dashboards CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
+      </div>
       <SetupNotice
         localMode={!isSupabaseConfigured()}
         missingTable={missing && isSupabaseConfigured()}
