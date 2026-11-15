@@ -16,14 +16,21 @@ Admin route `/theme-studio` edits `brand_kits` for the active company (and optio
 
 Fonts persist in `brand_kits.fonts` JSONB (`{ heading, body, density }`).
 
+## Chrome resolution
+
+Top bar **Company** + **Business unit** switchers (`TenantContext`):
+
+1. Active BU kit (when a unit is selected and has a kit)
+2. Else company kit
+3. Else tenant default / HighMast seed
+
+BU choice is stored in `localStorage` (`rrcentral_active_business_unit`). Missing BU kit falls through to company — it does not invent colours.
+
 ## Persistence
 
 `saveBrandKit` upserts `brand_kits` for `(tenant_id, company_id)` or a BU row (`business_unit_id`). Local mode applies in-memory only; BU list requires Supabase.
 
-Company kit remains the chrome default after save. BU kits are edited/previewed in Theme studio; wiring active-BU chrome swap stays later.
-
 ## Not in this slice
 
 - Official SVG masters (blocked on asset zip)
-- Active business-unit switcher in the top bar applying BU kit to chrome
 - Custom uploaded webfonts / arbitrary CSS

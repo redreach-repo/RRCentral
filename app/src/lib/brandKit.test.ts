@@ -14,6 +14,7 @@ import {
   normalizeBrandFonts,
   normalizeHexColor,
   REDREACH_DEFAULT_BRAND,
+  resolveBrandKit,
 } from './brandKit'
 
 describe('brandKit', () => {
@@ -120,5 +121,48 @@ describe('BRAND_PRESETS', () => {
   it('includes highmast_red with fonts', () => {
     const p = BRAND_PRESETS.find((x) => x.key === 'highmast_red')
     expect(p?.kit.fonts?.heading).toBe('dm_sans')
+  })
+})
+
+describe('resolveBrandKit', () => {
+  const companyId = 'company-1'
+  const buId = 'bu-1'
+  const companyKit = coerceBrandKit({
+    ...REDREACH_DEFAULT_BRAND,
+    company_id: companyId,
+    business_unit_id: null,
+    primary_color: '#111111',
+  })
+  const buKit = coerceBrandKit({
+    ...REDREACH_DEFAULT_BRAND,
+    company_id: companyId,
+    business_unit_id: buId,
+    primary_color: '#222222',
+  })
+  const tenantKit = coerceBrandKit({
+    ...REDREACH_DEFAULT_BRAND,
+    company_id: null,
+    business_unit_id: null,
+    primary_color: '#333333',
+  })
+
+  it('prefers BU kit, then company, then tenant', () => {
+    expect(
+      resolveBrandKit({ kits: [tenantKit, companyKit, buKit], companyId, businessUnitId: buId })
+        .primary_color,
+    ).toBe('#222222')
+    expect(
+      resolveBrandKit({ kits: [tenantKit, companyKit, buKit], companyId, businessUnitId: null })
+        .primary_color,
+    ).toBe('#111111')
+    expect(
+      resolveBrandKit({ kits: [tenantKit], companyId: 'missing', businessUnitId: null }).primary_color,
+    ).toBe('#333333')
+  })
+
+  it('falls through when BU kit is missing', () => {
+    expect(
+      resolveBrandKit({ kits: [companyKit], companyId, businessUnitId: 'nope' }).primary_color,
+    ).toBe('#111111')
   })
 })

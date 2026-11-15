@@ -117,12 +117,25 @@ function writeSavedSection(id: string) {
 export default function Layout() {
   const { user, userRole, signOut, isLocalMode } = useAuth()
   const { settings } = useSettings()
-  const { companies, activeCompanyId, setActiveCompanyId, activeCompany } = useTenant()
+  const {
+    companies,
+    activeCompanyId,
+    setActiveCompanyId,
+    activeCompany,
+    businessUnits,
+    activeBusinessUnitId,
+    setActiveBusinessUnitId,
+    activeBusinessUnit,
+  } = useTenant()
   const { mode, setMode } = useTheme()
   const { t } = useI18n()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const companyLabel =
-    activeCompany?.name || settings.companyName || settings.brand || PRODUCT.name
+    activeBusinessUnit?.name ||
+    activeCompany?.name ||
+    settings.companyName ||
+    settings.brand ||
+    PRODUCT.name
   const [commandOpen, setCommandOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
@@ -466,6 +479,25 @@ export default function Layout() {
                   {companies.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            {businessUnits.length > 0 ? (
+              <label className={styles.companySwitcher}>
+                <span className={styles.companySwitcherLabel}>{t('shell.businessUnit')}</span>
+                <select
+                  className={styles.companySelect}
+                  value={activeBusinessUnitId || ''}
+                  onChange={(e) => setActiveBusinessUnitId(e.target.value || null)}
+                  aria-label={t('shell.businessUnit')}
+                  title={activeBusinessUnit?.name || t('shell.businessUnitAll')}
+                >
+                  <option value="">{t('shell.businessUnitAll')}</option>
+                  {businessUnits.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.code} · {u.name}
                     </option>
                   ))}
                 </select>
