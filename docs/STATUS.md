@@ -1,15 +1,15 @@
 # HighMast / RR Central status
 
 **Last updated:** 15 November 2026 (Asia/Dubai)  
-**Current milestone:** Public API invoice + quotation writes
+**Current milestone:** AI Suggest on account detail
 
 ## Shipped this turn
 
-- `POST/PATCH /v1/invoices` + `/v1/quotations` (`write:invoices` / `write:quotations`) with webhooks
+- Account detail **Suggest with AI** → `hm-ai-propose` / AI approval queue (approve still on `/ai-approvals`)
 
 ## Already on main
 
-- Maker-checker refunds (#432) · Packs + expense maker-checker (#431) · Public API account writes (#430)
+- Public API doc writes (#433) · Maker-checker refunds (#432) · Packs + expense maker-checker (#431)
 
 ## Still open (agent queue)
 

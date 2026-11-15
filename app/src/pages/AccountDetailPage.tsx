@@ -13,6 +13,7 @@ import StatusPill from '../components/StatusPill'
 import AccountFormModal from '../components/accounts/AccountFormModal'
 import DeliveryPanel from '../components/accounts/DeliveryPanel'
 import AccountCustomFieldsCard from '../components/accounts/AccountCustomFieldsCard'
+import AiSuggestButton from '../components/accounts/AiSuggestButton'
 import CallBriefButton from '../components/accounts/CallBriefButton'
 import ClientExportButton from '../components/accounts/ClientExportButton'
 import PortalLinksCard from '../components/accounts/PortalLinksCard'
@@ -449,6 +450,7 @@ export default function AccountDetailPage() {
               author={author}
               onSaved={() => void load()}
             />
+            <AiSuggestButton account={account} editable={editable} />
             {editable ? (
               <ClientExportButton account={account} canFull={can(userRole, 'delivery.packages')} author={author} />
             ) : null}

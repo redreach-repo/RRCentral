@@ -18,6 +18,23 @@ export async function listAiProposals(status: AiProposalStatus | 'all'): Promise
   return { rows: (data || []) as unknown as AiProposal[], missing: false, error: '' }
 }
 
+/** Pending (or filtered) proposals for one account — used by the account-detail Suggest button. */
+export async function listAiProposalsForAccount(
+  accountId: string,
+  status: AiProposalStatus | 'all' = 'pending',
+): Promise<{ rows: AiProposal[]; missing: boolean; error: string }> {
+  let q = getSupabaseClient()
+    .from('ai_action_proposals')
+    .select(COLUMNS)
+    .eq('account_id', accountId)
+    .order('created_at', { ascending: false })
+    .limit(50)
+  if (status !== 'all') q = q.eq('status', status)
+  const { data, error } = await q
+  if (error) return { rows: [], missing: isMissingSetup(error), error: error.message }
+  return { rows: (data || []) as unknown as AiProposal[], missing: false, error: '' }
+}
+
 export async function searchAccounts(term: string): Promise<{ id: string; name: string }[]> {
   const t = term.trim()
   if (t.length < 2) return []
