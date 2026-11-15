@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Package } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
@@ -16,7 +16,7 @@ import { DEFAULT_DELIVERY_RATES, DELIVERY_RATE_KEYS, type DeliveryRates, ratesFr
 import { listPackages, updatePackage } from '../lib/deliveryStore'
 import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { parseDeliveryPackageForm, parseDeliveryRatesForm } from '../lib/schemas/deliverySettings'
 import type { DeliveryPackage } from '../lib/types'
 import {
@@ -77,8 +77,43 @@ export default function DeliverySettingsPage() {
   const [drafts, setDrafts] = useState<Record<string, PackageDraft>>({})
   const [rateDraft, setRateDraft] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState('')
+  const [importingRates, setImportingRates] = useState(false)
+  const ratesImportRef = useRef<HTMLInputElement>(null)
   const canPackages = can(userRole, 'delivery.packages')
   const canRates = can(userRole, 'delivery.rates')
+
+  async function importRatesCsv(file: File) {
+    setImportingRates(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, rows)
+      if (!objects.length) {
+        showToast('No rate rows in CSV', 'error')
+        return
+      }
+      const row = objects[0]
+      const next: Record<string, string> = { ...rateDraft }
+      let filled = 0
+      for (const f of RATE_FIELDS) {
+        const raw = row[f.key] ?? row[f.label]
+        if (raw == null || String(raw).trim() === '') continue
+        next[f.key] = String(raw).trim()
+        filled += 1
+      }
+      if (!filled) {
+        showToast('CSV had no matching rate columns', 'error')
+        return
+      }
+      setRateDraft(next)
+      showToast('Rates loaded from CSV — review and Save rates', 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not import rates CSV'), 'error')
+    } finally {
+      setImportingRates(false)
+      if (ratesImportRef.current) ratesImportRef.current.value = ''
+    }
+  }
 
   const load = useCallback(async () => {
     try {
@@ -240,6 +275,28 @@ export default function DeliverySettingsPage() {
           >
             Export rates CSV
           </button>
+          {canRates ? (
+            <>
+              <input
+                ref={ratesImportRef}
+                type="file"
+                accept=".csv,text/csv"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) void importRatesCsv(f)
+                }}
+              />
+              <button
+                type="button"
+                style={buttonSecondaryStyle}
+                disabled={importingRates}
+                onClick={() => ratesImportRef.current?.click()}
+              >
+                {importingRates ? 'Importing…' : 'Import rates CSV'}
+              </button>
+            </>
+          ) : null}
         </div>
       </header>
 
