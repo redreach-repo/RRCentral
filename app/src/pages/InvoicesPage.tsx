@@ -28,6 +28,13 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { can, roleAtLeast } from '../lib/permissions'
+import CustomFieldsCard from '../components/CustomFieldsCard'
+import SavedViewsBar from '../components/SavedViewsBar'
+import {
+  invoicesFiltersEqual,
+  normalizeInvoicesFilters,
+  type InvoicesViewFilters,
+} from '../lib/savedViews'
 import PaymentRemindersCard from '../components/invoices/PaymentRemindersCard'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
@@ -159,7 +166,7 @@ async function syncIncome(inv: {
 
 export default function InvoicesPage() {
   const { t } = useI18n()
-  const { user, userRole } = useAuth()
+  const { user, userRole, appUserId } = useAuth()
   const { settings } = useSettings()
   const { showToast } = useToast()
   const who = user?.email || ''
@@ -804,6 +811,29 @@ export default function InvoicesPage() {
 
   const filterAccount = accountFilter ? accountById.get(accountFilter) : undefined
 
+  const currentInvoiceViewFilters = useMemo(
+    () =>
+      normalizeInvoicesFilters({
+        q: search,
+        status: statusTab,
+        payment: payTab,
+      }),
+    [search, statusTab, payTab],
+  )
+
+  function applyInvoiceViewFilters(filters: Record<string, unknown>) {
+    const next = filters as InvoicesViewFilters
+    setSearch(typeof next.q === 'string' ? next.q : '')
+    const status = typeof next.status === 'string' ? next.status : 'All'
+    setStatusTab(
+      status === 'Draft' || status === 'Sent' || status === 'Cancelled' ? status : 'All',
+    )
+    const payment = typeof next.payment === 'string' ? next.payment : 'All'
+    setPayTab(
+      payment === 'Pending' || payment === 'Partial' || payment === 'Paid' ? payment : 'All',
+    )
+  }
+
   return (
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
@@ -865,6 +895,19 @@ export default function InvoicesPage() {
       </header>
 
       {roleAtLeast(userRole, 'sales') ? <PaymentRemindersCard /> : null}
+
+      <SavedViewsBar
+        moduleId="invoices"
+        filters={currentInvoiceViewFilters}
+        ownerUserId={appUserId}
+        canWrite={userRole !== 'viewer'}
+        applyDefaultOnLoad={!accountFilter}
+        onApply={applyInvoiceViewFilters}
+        onToast={showToast}
+        filtersEqual={(a, b) =>
+          invoicesFiltersEqual(a as InvoicesViewFilters, b as InvoicesViewFilters)
+        }
+      />
 
       {accountFilter ? (
         <p style={{ fontSize: 13, color: colors.muted, margin: '0 0 12px' }}>
@@ -1288,6 +1331,19 @@ export default function InvoicesPage() {
             onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
           />
         </div>
+        {editing?.id ? (
+          <CustomFieldsCard
+            objectType="invoice"
+            recordId={String(editing.id)}
+            editable={userRole !== 'viewer'}
+            onToast={showToast}
+            framed={false}
+          />
+        ) : (
+          <p style={{ margin: '12px 0 0', fontSize: 12, color: colors.muted }}>
+            Save the draft once to edit invoice custom fields.
+          </p>
+        )}
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>

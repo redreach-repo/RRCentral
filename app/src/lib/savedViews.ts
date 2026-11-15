@@ -106,6 +106,33 @@ export function quotationsFiltersEqual(
   return (a.q || '') === (b.q || '') && (a.status || 'All') === (b.status || 'All')
 }
 
+export type InvoicesViewFilters = {
+  q?: string
+  status?: string
+  payment?: string
+}
+
+export function normalizeInvoicesFilters(input: {
+  q: string
+  status: string
+  payment: string
+}): InvoicesViewFilters {
+  const out: InvoicesViewFilters = {}
+  const q = input.q.trim()
+  if (q) out.q = q
+  if (input.status && input.status !== 'All') out.status = input.status
+  if (input.payment && input.payment !== 'All') out.payment = input.payment
+  return out
+}
+
+export function invoicesFiltersEqual(a: InvoicesViewFilters, b: InvoicesViewFilters): boolean {
+  return (
+    (a.q || '') === (b.q || '') &&
+    (a.status || 'All') === (b.status || 'All') &&
+    (a.payment || 'All') === (b.payment || 'All')
+  )
+}
+
 export async function listSavedViews(moduleId: string): Promise<SavedView[]> {
   const { data, error } = await db
     .from('saved_views')
