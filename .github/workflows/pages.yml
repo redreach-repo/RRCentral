@@ -35,6 +35,8 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          # Optional error monitoring (docs/modules/observability.md). Blank = off.
+          VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
       # Staging copy at /RRCentral/staging/, built only once its own Supabase
       # project is set up (docs/STAGING.md). Never with the live project.
       - name: Build staging copy

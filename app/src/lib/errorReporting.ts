@@ -1,4 +1,6 @@
 import { db, currentAuthMode } from './db'
+import { scrubText } from './observability/scrub'
+import { sendToSentry } from './observability/sentry'
 
 /**
  * Error monitoring: errors people hit in the app are saved to app_errors
@@ -88,8 +90,11 @@ let count = 0
 export async function reportError(kind: AppErrorKind, value: unknown): Promise<void> {
   try {
     if (currentAuthMode() !== 'supabase') return
-    const { message, detail } = describeError(value)
-    if (!shouldReport(message)) return
+    const raw = describeError(value)
+    if (!shouldReport(raw.message)) return
+    // Gap plan module 3: never store tokens, emails, IBANs or ids in error reports.
+    const message = scrubText(raw.message)
+    const detail = scrubText(raw.detail)
     const key = `${kind}|${errorKey(message)}`
     if (sent.has(key) || count >= MAX_REPORTS_PER_SESSION) return
     sent.add(key)
@@ -101,6 +106,14 @@ export async function reportError(kind: AppErrorKind, value: unknown): Promise<v
       page: `${window.location.pathname}${window.location.hash ? '#…' : ''}`.slice(0, 500),
       user_agent: navigator.userAgent.slice(0, 500),
       release: String(import.meta.env.VITE_RELEASE || import.meta.env.MODE || '').slice(0, 100),
+    })
+    // Optional: also to Sentry when VITE_SENTRY_DSN is set at build time (off by default).
+    void sendToSentry(import.meta.env.VITE_SENTRY_DSN as string | undefined, {
+      message,
+      detail,
+      environment: String(import.meta.env.VITE_APP_ENV || import.meta.env.MODE || 'production'),
+      release: String(import.meta.env.VITE_RELEASE || ''),
+      tags: { kind, page: window.location.pathname.slice(0, 200) },
     })
   } catch {
     // Never let reporting an error cause another one.
