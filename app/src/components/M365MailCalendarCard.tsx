@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import {
   disconnectM365,
   getM365Status,
@@ -80,10 +81,33 @@ export default function M365MailCalendarCard() {
 
   return (
     <div id="m365" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
-      <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <Plug size={18} /> {t('page.settings.section.m365')}
-      </h2>
-      <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.55 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+          <Plug size={18} /> {t('page.settings.section.m365')}
+        </h2>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={loading}
+          onClick={() => {
+            exportListCsv(
+              'm365-status.csv',
+              ['field', 'value'],
+              [
+                { field: 'configured', value: status.configured ? 'yes' : 'no' },
+                { field: 'connected', value: status.connected ? 'yes' : 'no' },
+                { field: 'account_email', value: status.account_email || '' },
+                { field: 'redirect_uri', value: status.redirect_uri || '' },
+                { field: 'scopes', value: status.scopes || '' },
+              ],
+            )
+            showToast('Microsoft 365 status CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
+      </div>
+      <p style={{ color: colors.muted, fontSize: 13, marginTop: 8, lineHeight: 1.55 }}>
         Phase A+B: send, inbox/sent, and calendar with delegated{' '}
         <code style={{ color: '#ff9f4a' }}>Mail.Send</code> +{' '}
         <code style={{ color: '#ff9f4a' }}>Mail.Read</code> +{' '}
