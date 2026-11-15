@@ -22,10 +22,41 @@ function check(result: { error: unknown }) {
   if (result.error) throw result.error
 }
 
-export async function listDeals(accountId?: string): Promise<CtrmDeal[]> {
+export async function listDeals(
+  accountId?: string,
+  opts?: { includeDeleted?: boolean },
+): Promise<CtrmDeal[]> {
   let q = db.from('ctrm_deals').select('*')
   if (accountId) q = q.eq('account_id', accountId)
-  return rows<CtrmDeal>(q.order('created_at', { ascending: false }))
+  if (!opts?.includeDeleted) q = q.is('deleted_at', null)
+  try {
+    return await rows<CtrmDeal>(q.order('created_at', { ascending: false }))
+  } catch (e) {
+    if (String((e as { message?: string })?.message || '').toLowerCase().includes('deleted_at')) {
+      let fallback = db.from('ctrm_deals').select('*')
+      if (accountId) fallback = fallback.eq('account_id', accountId)
+      return rows<CtrmDeal>(fallback.order('created_at', { ascending: false }))
+    }
+    throw e
+  }
+}
+
+export async function softDeleteCtrmDeal(id: string): Promise<void> {
+  check(
+    await db
+      .from('ctrm_deals')
+      .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq('id', id),
+  )
+}
+
+export async function restoreCtrmDeal(id: string): Promise<void> {
+  check(
+    await db
+      .from('ctrm_deals')
+      .update({ deleted_at: null, updated_at: new Date().toISOString() })
+      .eq('id', id),
+  )
 }
 
 export async function listStageChanges(sinceIso?: string): Promise<CtrmStageChange[]> {
