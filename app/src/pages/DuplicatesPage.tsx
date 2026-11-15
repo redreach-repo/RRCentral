@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
+import SavedViewsBar from '../components/SavedViewsBar'
 import { accountFills, findAccountDuplicates, findContactDuplicates, mergeSummary, suggestKeep, type DuplicateKind, type DuplicatePair } from '../lib/duplicates'
 import { accountWeights, dismissPair, loadDuplicateData, mergePair, type DuplicateData } from '../lib/duplicatesStore'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import { roleAtLeast } from '../lib/permissions'
 import type { Account, AccountContact } from '../lib/types'
 import { buttonDangerStyle, buttonSecondaryStyle, cardStyle, colors } from '../lib/uiStyles'
@@ -23,11 +25,12 @@ const nice = (t: string) => t.replace(/_/g, ' ')
  */
 export default function DuplicatesPage() {
   const { t } = useI18n()
-  const { userRole, user } = useAuth()
+  const { userRole, user, appUserId } = useAuth()
   const { showToast } = useToast()
   const [data, setData] = useState<DuplicateData | null>(null)
   const [kind, setKind] = useState<DuplicateKind>('account')
   const [open, setOpen] = useState<DuplicatePair | null>(null)
+  const duplicatesViewFilters = useMemo(() => ({ kind }), [kind])
 
   const load = useCallback(async () => {
     try {
@@ -92,7 +95,44 @@ export default function DuplicatesPage() {
           <h1 className={docsStyles.title}>{t('page.duplicates.title')}</h1>
           <p className={docsStyles.subtitle}>{t('page.duplicates.subtitle')}</p>
         </div>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+          disabled={!list.length}
+          onClick={() => {
+            exportListCsv(
+              `duplicates-${kind}.csv`,
+              ['kind', 'keep_id', 'dup_id', 'keep_label', 'dup_label', 'reasons'],
+              list.map((p) => ({
+                kind: p.kind,
+                keep_id: p.a,
+                dup_id: p.b,
+                keep_label: label(p, p.a),
+                dup_label: label(p, p.b),
+                reasons: p.reasons.join('; '),
+              })),
+            )
+            showToast('Duplicates CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
       </header>
+      <SavedViewsBar
+        moduleId="duplicates"
+        filters={duplicatesViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => {
+          const next = String(f.kind || 'account') as DuplicateKind
+          setKind(next === 'contact' ? 'contact' : 'account')
+          setOpen(null)
+        }}
+        onToast={showToast}
+        filtersEqual={(a, b) => String(a.kind || 'account') === String(b.kind || 'account')}
+      />
       <div style={{ display: 'flex', gap: 8, margin: '12px 0 16px' }}>
         <button type="button" style={tab(kind === 'account')} onClick={() => (setKind('account'), setOpen(null))}>
           Accounts ({pairs.account.length})

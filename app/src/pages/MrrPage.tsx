@@ -7,6 +7,7 @@ import { listAccounts } from '../lib/accountsStore'
 import { loadClientHealth } from '../lib/clientHealthStore'
 import { listContracts } from '../lib/deliveryStore'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import { formatAED } from '../lib/money'
 import { PIPELINE_WEIGHTS, mrrByAccount, mrrForecast, mrrHistory } from '../lib/mrr'
 import { canViewField } from '../lib/fieldPermissions'
@@ -94,6 +95,54 @@ export default function MrrPage() {
           <h1 className={docsStyles.title}>{t('page.mrr.title')}</h1>
           <p className={docsStyles.subtitle}>{t('page.mrr.subtitle')}</p>
         </div>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+          disabled={!view}
+          onClick={() => {
+            if (!view) return
+            exportListCsv(
+              'mrr-history.csv',
+              ['section', 'month', 'label', 'mrr', 'clients', 'added', 'expansion', 'contraction', 'lost', 'pipeline', 'contracted', 'forecast', 'renewals_due'],
+              [
+                ...view.history.map((m) => ({
+                  section: 'history',
+                  month: m.month,
+                  label: m.label,
+                  mrr: m.mrr,
+                  clients: m.clients,
+                  added: m.added,
+                  expansion: m.expansion,
+                  contraction: m.contraction,
+                  lost: m.lost,
+                  pipeline: '',
+                  contracted: '',
+                  forecast: '',
+                  renewals_due: '',
+                })),
+                ...view.forecast.map((f) => ({
+                  section: 'forecast',
+                  month: f.month,
+                  label: f.label,
+                  mrr: '',
+                  clients: '',
+                  added: '',
+                  expansion: '',
+                  contraction: '',
+                  lost: '',
+                  pipeline: f.pipeline,
+                  contracted: f.contracted,
+                  forecast: f.total,
+                  renewals_due: f.renewalsDue,
+                })),
+              ],
+            )
+            showToast('MRR CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
       </header>
 
       {!view ? (
