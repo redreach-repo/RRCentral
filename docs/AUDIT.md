@@ -1,17 +1,17 @@
-# RR Central / RRCRM — Repository audit (M0)
+# HighMast / RR Central — Repository audit (M0)
 
-**Date:** 13 November 2026 (Asia/Dubai)  
-**Authority:** RRCRM Master Specification v1.1  
-**Scope:** Read-only audit of the live Red Reach operations app. No product code was changed in this step.  
+**Date:** 15 November 2026 (Asia/Dubai) — refreshed for Master Spec **v2.1**  
+**Authority:** HighMast Master Specification v2.1 (`MASTER_SPEC.md`, `docs/SPEC_POINTER.md`)  
+**Original pass:** 13 November 2026 (v1.1 read-only audit)  
 **Repo:** `redreach-repo/RRCentral` (Vite + React SPA, Supabase Postgres / Auth / Storage / Edge Functions, Stripe, GitHub Pages).
 
 ---
 
 ## 1. Executive summary
 
-RR Central is a **single-tenant** operations suite for Red Reach Middle East FZE. It already covers CRM/pipelines, quotes→invoices→delivery notes, accounts/delivery/support, finance lists, Drive, WhatsApp/email intake, NDA e-sign, contract auto-billing, WorshipHub, Wanders, and Tee Tribe shop — with **89 public tables, all RLS-enabled**.
+The live **Red Reach** operations app (still hosted as RR Central) is the first HighMast tenant. It covers CRM/pipelines, quotes→invoices→delivery notes, accounts/delivery/support, finance lists, Drive, WhatsApp/email intake, NDA e-sign, contract auto-billing, WorshipHub, Wanders, and Tee Tribe shop. Public tables remain **RLS-enabled**.
 
-It is **not** yet a multi-tenant subscription platform. There is no `tenant_id`, no customization layer, no double-entry ledger, no HR/payroll, and no full mail sync beyond Zoho Mail/Calendar proxy. TypeScript `strict` is on in the main app.
+**Multi-tenant platform (M1) is in:** `tenants` / `companies` / `business_units` / `brand_kits`, `tenant_id` stamps, RESTRICTIVE tenant RLS, and `tenant_isolation_test.sql`. Customization (M2) and CRM unify soft-retire (M3) are largely in. Demo isolation code (M3a) is in; the **separate demo Supabase project is not provisioned** (Alfred). Still missing relative to v2.1: double-entry ledger (M7), full HR/payroll (M6/M8), SaaS provisioner (M11), and deeper industry packs (M12*). TypeScript `strict` is on in the main app. Product name is **HighMast** via `PRODUCT`.
 
 **M0 RLS criterion:** pass — every `CREATE TABLE` in `supabase/migrations` has RLS enabled. Tables with RLS and **no policies** (deny-all to anon/authenticated; service-role only): `drive_connection`, `gmail_connection`, `m365_connection`, `worship_setup_log`. `contract_clauses` has staff-read / manager-edit policies (M5).
 

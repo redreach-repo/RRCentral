@@ -61,7 +61,7 @@ Status key: **exists** · **partial** · **missing**
 | 6.11 Documents and knowledge | partial | Drive + customer_documents; not full DMS → expand with M5/M11 |
 | 6.12 Planning and reports | partial | Reports/MRR/insights; no goals/scenarios builder → M12-ish / planning |
 | 6.13 Tenant billing | partial | M11: `tenant_subscriptions` + plan catalog + Stripe Checkout/portal (`saas-checkout`); Tax registration later |
-| 6.14 Demo / showcase | missing | M3a after CRM rebuild |
+| 6.14 Demo / showcase | partial | Code-side isolation + seed/tour/role switcher; Alfred still provisions demo project |
 
 ---
 
@@ -76,7 +76,7 @@ Status key: **exists** · **partial** · **missing**
 | Append-only audit | partial | `audit_log` exists; CI asserts authenticated cannot INSERT/UPDATE/DELETE (REVOKE); prune stays security definer |
 | Sentry / structured logs | missing | M0/M1 add |
 | Soft delete / retention tooling | partial | Soft patterns vary; DSR tooling missing |
-| Demo isolation + outbound block | missing | M3a |
+| Demo isolation + outbound block | partial | Browser + Edge guards + seed; demo cloud project + deploy workflow still Alfred |
 
 ---
 
@@ -130,12 +130,14 @@ WorshipHub admin, Tee Tribe shop, RR Wanders tour ops, CTRM commission tables �
 
 ## Asks before proceeding past docs
 
-1. Confirm job runner remains **pg_cron + Edge** for now (recommended).  
-2. Confirm when to provision a **second Supabase project** for demo (M3a).  
-3. Confirm data residency preference timing (before first external customer).  
-4. Provide Boost / Care / Trading logos + SVGs + light variants when available.  
-5. Confirm workspace address domain for §5.6 (open decision §19.1 / §19.14).  
-6. Confirm native build approach only after a short spike (§19.29) — not before M14.
+Defaults applied in `docs/DECISIONS.md` / `docs/QUESTIONS.md` for this batch:
+
+1. Job runner remains **pg_cron + Edge** (D1).  
+2. Second Supabase demo project waits on Alfred (D2 / Q1).  
+3. Data residency preference deferred until before first external customer (Q3).  
+4. Boost / Care / Trading logos still waiting on zip (Q5).  
+5. Workspace / PWA host domain: partial after-sign-in brand; remainder M11 (Q4).  
+6. Native build only after M14 spike (§19.29).
 
 ---
 

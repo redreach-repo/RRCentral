@@ -14,13 +14,18 @@ import { db } from '../lib/db'
 import { tryAutoImportSheetsDump } from '../lib/migrateFromSheets'
 import { isAllowedLoginEmail, loginEmailDomainError } from '../lib/allowedLoginEmail'
 import { normalizeUserRole } from '../lib/permissions'
+import { DEMO_ROLE_EVENT, effectiveDemoRole } from '../lib/demo/demoRole'
+import { isDemoBuild } from '../lib/demo/demoMode'
 import type { UserRole } from '../lib/types'
 
 export const LOGIN_DOMAIN_REJECT_KEY = 'rrcentral_login_domain_reject'
 
 interface AuthContextValue {
   user: User | null
+  /** Effective role for the shell (demo build may override via presenter switcher). */
   userRole: UserRole
+  /** Raw app_users role before any demo UI override. */
+  membershipRole: UserRole
   /** app_users.id of the signed-in person (owner of accounts). Null in local mode or before lookup. */
   appUserId: string | null
   /** Tenant the signed-in member belongs to (RRCRM M1). */
@@ -178,10 +183,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMembership(NO_MEMBERSHIP)
   }, [])
 
+  // Demo presenter role switcher: re-read sessionStorage when the chrome fires DEMO_ROLE_EVENT.
+  const [demoRoleTick, setDemoRoleTick] = useState(0)
+  useEffect(() => {
+    if (!isDemoBuild()) return
+    const bump = () => setDemoRoleTick((n) => n + 1)
+    window.addEventListener(DEMO_ROLE_EVENT, bump)
+    return () => window.removeEventListener(DEMO_ROLE_EVENT, bump)
+  }, [])
+
   const value = useMemo(
     () => ({
       user,
-      userRole: membership.role,
+      userRole: effectiveDemoRole(membership.role),
+      membershipRole: membership.role,
       appUserId: membership.id,
       tenantId: membership.tenantId,
       hasAccess: membership.active || !isSupabaseConfigured(),
@@ -192,7 +207,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authMode,
       isLocalMode: !isSupabaseConfigured(),
     }),
-    [user, membership, signInWithPassword, changePassword, signOut, loading],
+    // demoRoleTick forces a refresh when the presenter switches roles
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional tick dependency
+    [user, membership, signInWithPassword, changePassword, signOut, loading, demoRoleTick],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

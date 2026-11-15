@@ -23,10 +23,17 @@ select pg_temp.expect((select count(*) from public.accounts where source = 'demo
 truncate public.invoices, public.quotations cascade;
 select pg_temp.expect(pg_temp.try_sql(:'seed_sql') = 'ok', 'loads into an empty database');
 select pg_temp.expect((select count(*) from public.accounts where source = 'demo') = 4, '4 fictional accounts');
+select pg_temp.expect((select count(*) from public.account_contacts where id::text like 'd11%') = 4, '4 fictional contacts');
+select pg_temp.expect((select count(*) from public.sales_deals where id::text like 'd21%') = 1, '1 demo sales deal');
 select pg_temp.expect((select count(*) from public.invoices where reference_number like 'DEMO-%') = 2, '2 demo invoices');
 select pg_temp.expect(
   (select is_demo and name like '%(demo)' from public.tenants where id = 'a0000000-0000-4000-8000-000000000001'),
   'tenant marked as demo');
+select pg_temp.expect(
+  (select legal_footer ilike '%Falcon Bay%' from public.brand_kits
+    where tenant_id = 'a0000000-0000-4000-8000-000000000001'
+      and company_id is null and business_unit_id is null),
+  'demo brand kit footer');
 select pg_temp.expect(
   not exists (
     select 1 from public.accounts where source = 'demo' and (name ilike '%red reach%' or name ilike '%tee tribe%' or website not like '%.example')

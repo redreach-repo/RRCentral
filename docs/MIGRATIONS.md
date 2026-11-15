@@ -141,3 +141,13 @@ No database migrations. Documentation and `brand-assets/` only.
 
 **Rollback**
 - Drop attempts table; drop new columns on `webhook_endpoints`.
+
+## M3a — demo seed / reset (not a schema migration)
+
+**What**
+- `supabase/seed/demo/demo_seed.sql` — Falcon Bay story (accounts, contacts, CRM, sales deal, quotes, invoices, brand kit)
+- `supabase/seed/demo/demo_reset.sql` — wipe demo-prefixed rows when `tenants.is_demo`, then re-seed
+- No production schema change; gated by `app.demo_seed` + empty finance tables (seed) / `is_demo` (reset)
+
+**Future retirement**
+- When a dedicated demo tenant UUID is provisioned (not the Red Reach id), stop renaming tenant `a000…001` and seed into the real demo tenant id instead.
