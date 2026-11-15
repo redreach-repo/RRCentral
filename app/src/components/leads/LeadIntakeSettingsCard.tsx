@@ -5,9 +5,10 @@ import { useToast } from '../../contexts/ToastContext'
 import { listTeam } from '../../lib/accountsStore'
 import { errorMessage } from '../../lib/errors'
 import { canSetLeadOwners, DEFAULT_LEAD_WHATSAPP, LEAD_OWNER_KEYS, LEAD_WHATSAPP_KEY } from '../../lib/leadIntake'
+import { exportListCsv } from '../../lib/listIo'
 import { parseLeadIntakeForm } from '../../lib/schemas/leadIntake'
 import type { AppUser } from '../../lib/types'
-import { buttonPrimaryStyle, cardStyle, colors, fieldStyle, formGridStyle, inputStyle, labelStyle, sectionTitleStyle } from '../../lib/uiStyles'
+import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, fieldStyle, formGridStyle, inputStyle, labelStyle, sectionTitleStyle } from '../../lib/uiStyles'
 
 /** Who gets new leads from lead-intake, and the number WhatsApp links open. */
 export default function LeadIntakeSettingsCard() {
@@ -58,8 +59,38 @@ export default function LeadIntakeSettingsCard() {
 
   return (
     <section style={{ ...cardStyle, marginBottom: 16 }}>
-      <h2 style={sectionTitleStyle}>New leads: who gets them</h2>
-      <p style={{ color: colors.muted, fontSize: 13, margin: '0 0 12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>New leads: who gets them</h2>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          onClick={() => {
+            const fixedUser = sellers.find((u) => u.id === fixed)
+            exportListCsv(
+              'lead-intake-settings.csv',
+              ['setting', 'value'],
+              [
+                { setting: 'mode', value: mode },
+                { setting: 'fixed_owner', value: fixedUser ? fixedUser.name || fixedUser.email : fixed || '' },
+                {
+                  setting: 'round_robin_pool',
+                  value: pool
+                    .map((id) => {
+                      const u = sellers.find((s) => s.id === id)
+                      return u ? u.name || u.email : id
+                    })
+                    .join('; '),
+                },
+                { setting: 'whatsapp', value: whatsapp || DEFAULT_LEAD_WHATSAPP },
+              ],
+            )
+            showToast('Lead intake settings CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
+      </div>
+      <p style={{ color: colors.muted, fontSize: 13, margin: '8px 0 12px' }}>
         Leads from the website, WhatsApp and the AI CRM landing page get this owner. With no owner set they
         arrive unassigned and show on the dashboard for everyone in sales.
       </p>
