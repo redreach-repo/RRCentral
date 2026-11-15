@@ -4,9 +4,11 @@ import { addMonths, format, startOfMonth } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
+import SavedViewsBar from '../components/SavedViewsBar'
 import { CLIENT_REPORT_STATUSES, CLIENT_REPORT_SUMMARY_MAX, monthLabelOf, reportMonthFor, reportRecipients } from '../lib/clientReports'
 import { buildReportDrafts, loadReportQueue, saveReportSummary, sendReport, setReportSkipped, type ReportContact, type ReportQueue } from '../lib/clientReportsStore'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import { roleAtLeast } from '../lib/permissions'
 import type { ClientReportDraft } from '../lib/types'
 import {
@@ -29,7 +31,7 @@ const muted = { color: colors.muted, fontSize: 13 }
  */
 export default function ClientReportsPage() {
   const { t } = useI18n()
-  const { userRole } = useAuth()
+  const { userRole, appUserId } = useAuth()
   const { showToast } = useToast()
   const months = useMemo(() => {
     const latest = reportMonthFor(new Date())
@@ -38,6 +40,11 @@ export default function ClientReportsPage() {
   const [month, setMonth] = useState(months[0])
   const [queue, setQueue] = useState<ReportQueue | null>(null)
   const [building, setBuilding] = useState(false)
+  const [statusFilter, setStatusFilter] = useState('all')
+  const reportsViewFilters = useMemo(
+    () => ({ status: statusFilter, month }),
+    [statusFilter, month],
+  )
 
   const load = useCallback(async () => {
     try {
@@ -65,6 +72,11 @@ export default function ClientReportsPage() {
 
   const waiting = queue?.drafts.filter((d) => d.status === 'draft').length ?? 0
   const sent = queue?.drafts.filter((d) => d.status === 'sent').length ?? 0
+  const visibleDrafts = useMemo(() => {
+    const rows = queue?.drafts || []
+    if (statusFilter === 'all') return rows
+    return rows.filter((d) => d.status === statusFilter)
+  }, [queue, statusFilter])
 
   return (
     <div className={docsStyles.page}>
@@ -74,13 +86,70 @@ export default function ClientReportsPage() {
           <h1 className={docsStyles.title}>{t('page.clientReports.title')}</h1>
           <p className={docsStyles.subtitle}>{t('page.clientReports.subtitle')}</p>
         </div>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+          disabled={!queue?.drafts.length}
+          onClick={() => {
+            if (!queue?.drafts.length) return
+            exportListCsv(
+              `client-reports-${month.slice(0, 7)}.csv`,
+              ['account', 'status', 'month', 'summary', 'sent_email_to', 'sent_whatsapp_to', 'sent_at', 'sent_by'],
+              queue.drafts.map((d) => ({
+                account: d.accountName,
+                status: d.status,
+                month: d.month || month,
+                summary: d.summary || '',
+                sent_email_to: d.sent_email_to || '',
+                sent_whatsapp_to: d.sent_whatsapp_to || '',
+                sent_at: d.sent_at || '',
+                sent_by: d.sent_by || '',
+              })),
+            )
+            showToast('Client reports CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
       </header>
+
+      <SavedViewsBar
+        moduleId="client_reports"
+        filters={reportsViewFilters}
+        ownerUserId={appUserId}
+        canWrite={userRole !== 'viewer'}
+        applyDefaultOnLoad={false}
+        onApply={(f) => {
+          const nextMonth = String(f.month || '')
+          if (nextMonth && months.includes(nextMonth)) setMonth(nextMonth)
+          setStatusFilter(String(f.status || 'all'))
+        }}
+        onToast={showToast}
+        filtersEqual={(a, b) =>
+          String(a.status || 'all') === String(b.status || 'all') &&
+          String(a.month || '') === String(b.month || '')
+        }
+      />
 
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', margin: '12px 0 16px' }}>
         <select aria-label="Report month" style={{ ...selectStyle, width: 'auto' }} value={month} onChange={(e) => setMonth(e.target.value)}>
           {months.map((m) => (
             <option key={m} value={m}>
               {monthLabelOf(m)}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="Status filter"
+          style={{ ...selectStyle, width: 'auto' }}
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="all">All statuses</option>
+          {CLIENT_REPORT_STATUSES.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
             </option>
           ))}
         </select>
@@ -106,13 +175,17 @@ export default function ClientReportsPage() {
             {t('page.clientReports.empty').replace('{month}', monthLabelOf(month))}
           </p>
         </section>
+      ) : visibleDrafts.length === 0 ? (
+        <section style={cardStyle}>
+          <p style={{ ...muted, margin: 0 }}>No reports match this status filter.</p>
+        </section>
       ) : (
         <div style={{ display: 'grid', gap: 12 }}>
-          {queue?.drafts.map((d) => (
+          {visibleDrafts.map((d) => (
             <DraftCard
               key={d.id}
               draft={d}
-              contacts={queue.contacts.filter((c) => c.account_id === d.account_id)}
+              contacts={queue!.contacts.filter((c) => c.account_id === d.account_id)}
               canSend={roleAtLeast(userRole, 'sales')}
               canEdit={userRole !== 'viewer'}
               onChanged={load}
