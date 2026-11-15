@@ -226,3 +226,14 @@ No database migrations. Documentation and `brand-assets/` only.
 
 **Rollback**
 - `drop table if exists public.payroll_exports;`
+
+
+## M13 — `20261301120000` … `20261301140000`
+
+**What**
+- `dsr_requests`, `retention_runs`, `rr_retention_run`, `rr_dsr_anonymize_contact`, soft-delete columns on accounts/contacts
+- `rate_limit_buckets` + `rr_rate_limit_hit` (service_role)
+- Unique `(tenant_id, source_type, source_id)` on non-void GL journals for auto-post drafts
+
+**Tests**
+- `dsr_retention_test.sql`, `rate_limit_test.sql`

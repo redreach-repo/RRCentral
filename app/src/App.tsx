@@ -21,6 +21,7 @@ import PurchaseOrdersPage from './pages/PurchaseOrdersPage'
 import ProjectsPage from './pages/ProjectsPage'
 import ClientPosPage from './pages/ClientPosPage'
 import ApprovalsPage from './pages/ApprovalsPage'
+import DsrPage from './pages/DsrPage'
 import PublicApiPage from './pages/PublicApiPage'
 import ThemeStudioPage from './pages/ThemeStudioPage'
 import Layout from './components/Layout'
@@ -217,6 +218,7 @@ export default function App() {
               <Route path="domains" element={<DomainsPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="audit-log" element={<AuditLogPage />} />
+              <Route path="dsr" element={<DsrPage />} />
               <Route path="app-errors" element={<AppErrorsPage />} />
               <Route path="system-check" element={<SystemCheckPage />} />
               {/* Gap plan modules (docs/MODULE_BUILD_PLAN.md): one folder each under modules/extensions. */}
