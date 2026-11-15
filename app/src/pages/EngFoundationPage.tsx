@@ -12,12 +12,17 @@ import {
   createEngDocument,
   listEngClaims,
   listEngDocuments,
+  restoreEngClaim,
+  restoreEngDocument,
+  softDeleteEngClaim,
+  softDeleteEngDocument,
   type EngClaim,
   type EngDocument,
 } from '../lib/engFoundationStore'
 import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
+  buttonSecondaryStyle,
   cardStyle,
   colors,
   inputStyle,
@@ -42,12 +47,19 @@ export default function EngFoundationPage() {
   const [importing, setImporting] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
   const [kindFilter, setKindFilter] = useState<'all' | 'document' | 'claim'>('all')
-  const engViewFilters = useMemo(() => ({ kind: kindFilter }), [kindFilter])
+  const [showArchived, setShowArchived] = useState(false)
+  const engViewFilters = useMemo(
+    () => ({ kind: kindFilter, archived: showArchived ? '1' : '0' }),
+    [kindFilter, showArchived],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [d, c] = await Promise.all([listEngDocuments(), listEngClaims()])
+      const [d, c] = await Promise.all([
+        listEngDocuments({ includeDeleted: showArchived }),
+        listEngClaims({ includeDeleted: showArchived }),
+      ])
       setDocs(d)
       setClaims(c)
     } catch (e) {
@@ -55,7 +67,7 @@ export default function EngFoundationPage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [showToast, showArchived])
 
   useEffect(() => {
     void load()
@@ -209,6 +221,14 @@ export default function EngFoundationPage() {
           >
             Export CSV
           </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
+          </button>
         </div>
       </header>
 
@@ -221,9 +241,13 @@ export default function EngFoundationPage() {
         onApply={(f) => {
           const kind = String(f.kind || 'all')
           if (kind === 'all' || kind === 'document' || kind === 'claim') setKindFilter(kind)
+          setShowArchived(String(f.archived || '0') === '1')
         }}
         onToast={showToast}
-        filtersEqual={(a, b) => String(a.kind || 'all') === String(b.kind || 'all')}
+        filtersEqual={(a, b) =>
+          String(a.kind || 'all') === String(b.kind || 'all') &&
+          String(a.archived || '0') === String(b.archived || '0')
+        }
       />
 
       <div style={{ marginBottom: 12 }}>
@@ -305,12 +329,59 @@ export default function EngFoundationPage() {
                 <EmptyState title="No documents" subtitle="Add a register entry above." />
               ) : (
                 <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
-                  {docs.map((d) => (
-                    <li key={d.id} style={{ fontSize: 13, borderTop: `1px solid ${colors.border}`, paddingTop: 6 }}>
-                      {engDocLabel(d.doc_no, d.title)} · {d.status}
-                      {d.discipline ? ` · ${d.discipline}` : ''} · rev {d.revision}
-                    </li>
-                  ))}
+                  {docs.map((d) => {
+                    const archived = Boolean(d.deleted_at)
+                    return (
+                      <li
+                        key={d.id}
+                        style={{
+                          fontSize: 13,
+                          borderTop: `1px solid ${colors.border}`,
+                          paddingTop: 6,
+                          display: 'flex',
+                          gap: 8,
+                          flexWrap: 'wrap',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <span>
+                          {engDocLabel(d.doc_no, d.title)} · {d.status}
+                          {d.discipline ? ` · ${d.discipline}` : ''} · rev {d.revision}
+                          {archived ? ' · archived' : ''}
+                        </span>
+                        <button
+                          type="button"
+                          style={buttonSecondaryStyle}
+                          onClick={() => {
+                            if (
+                              !window.confirm(
+                                archived
+                                  ? `Restore ${d.doc_no || d.title}?`
+                                  : `Archive ${d.doc_no || d.title}?`,
+                              )
+                            ) {
+                              return
+                            }
+                            void (archived
+                              ? restoreEngDocument(d.id)
+                              : softDeleteEngDocument(d.id))
+                              .then(() => {
+                                showToast(
+                                  archived ? 'Document restored' : 'Document archived',
+                                  'success',
+                                )
+                                return load()
+                              })
+                              .catch((err) =>
+                                showToast(errorMessage(err, 'Archive failed'), 'error'),
+                              )
+                          }}
+                        >
+                          {archived ? 'Restore' : 'Archive'}
+                        </button>
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
             </section>
@@ -323,11 +394,56 @@ export default function EngFoundationPage() {
                 <EmptyState title="No claims" subtitle="Log a claim above." />
               ) : (
                 <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
-                  {claims.map((c) => (
-                    <li key={c.id} style={{ fontSize: 13, borderTop: `1px solid ${colors.border}`, paddingTop: 6 }}>
-                      {engClaimLabel(c.claim_no, c.title, c.amount_aed)} · {c.status}
-                    </li>
-                  ))}
+                  {claims.map((c) => {
+                    const archived = Boolean(c.deleted_at)
+                    return (
+                      <li
+                        key={c.id}
+                        style={{
+                          fontSize: 13,
+                          borderTop: `1px solid ${colors.border}`,
+                          paddingTop: 6,
+                          display: 'flex',
+                          gap: 8,
+                          flexWrap: 'wrap',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <span>
+                          {engClaimLabel(c.claim_no, c.title, c.amount_aed)} · {c.status}
+                          {archived ? ' · archived' : ''}
+                        </span>
+                        <button
+                          type="button"
+                          style={buttonSecondaryStyle}
+                          onClick={() => {
+                            if (
+                              !window.confirm(
+                                archived
+                                  ? `Restore ${c.claim_no || c.title}?`
+                                  : `Archive ${c.claim_no || c.title}?`,
+                              )
+                            ) {
+                              return
+                            }
+                            void (archived ? restoreEngClaim(c.id) : softDeleteEngClaim(c.id))
+                              .then(() => {
+                                showToast(
+                                  archived ? 'Claim restored' : 'Claim archived',
+                                  'success',
+                                )
+                                return load()
+                              })
+                              .catch((err) =>
+                                showToast(errorMessage(err, 'Archive failed'), 'error'),
+                              )
+                          }}
+                        >
+                          {archived ? 'Restore' : 'Archive'}
+                        </button>
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
             </section>
