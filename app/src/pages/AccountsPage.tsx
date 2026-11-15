@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Contact, Plus } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -48,7 +48,8 @@ import {
   colors,
   selectStyle,
 } from '../lib/uiStyles'
-import { exportListCsv } from '../lib/listIo'
+import { ACCOUNT_CSV_COLUMNS } from '../lib/accountsCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import docsStyles from '../styles/docsList.module.css'
 
 type TypeFilter = 'all' | AccountType
@@ -71,6 +72,8 @@ export default function AccountsPage() {
   const [customValues, setCustomValues] = useState<Record<string, Record<string, unknown>>>({})
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const typeParam = searchParams.get('type')
   const typeFilter: TypeFilter = ACCOUNT_TYPES.some((t) => t.value === typeParam)
@@ -199,6 +202,79 @@ export default function AccountsPage() {
     setSearchParams(params, { replace: true })
   }
 
+
+  async function importAccountsCsv(file: File) {
+    if (!canWrite) {
+      showToast('You cannot import accounts', 'error')
+      return
+    }
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of ACCOUNT_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const parsed = parseListIoRows(objects, ACCOUNT_CSV_COLUMNS)
+      const ok = parsed.ok
+      const errors = [...parsed.errors]
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid account rows', 'error')
+        return
+      }
+      const knownRefs = accounts.map((a) => a.reference)
+      let saved = 0
+      for (const row of ok) {
+        const typeOk = ACCOUNT_TYPES.some((t) => t.value === row.type)
+        if (!typeOk) {
+          errors.push(`Skipped ${row.name}: unknown type ${row.type}`)
+          continue
+        }
+        const typeInfo = accountTypeInfo(row.type)
+        const status =
+          row.status && typeInfo.statuses.includes(row.status)
+            ? row.status
+            : typeInfo.statuses[0]
+        const account = await createAccount(
+          {
+            type: row.type as AccountType,
+            name: row.name,
+            industry: row.industry || '',
+            country: row.country || '',
+            city: row.city || '',
+            website: row.website || '',
+            status,
+            owner_user_id: null,
+            source: row.source || 'csv_import',
+            notes: row.notes || '',
+            credit_limit_aed: 0,
+            credit_hold: false,
+          },
+          user?.email || '',
+          knownRefs,
+        )
+        knownRefs.push(account.reference)
+        saved += 1
+      }
+      const skipNote = errors.length ? ` · ${errors.length} row(s) skipped` : ''
+      showToast(`Imported ${saved} account(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Account CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   async function handleCreate(input: AccountInput, primary: ContactInput | null) {
     if (!input.name) {
       showToast('Give the account a name', 'error')
@@ -246,6 +322,27 @@ export default function AccountsPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importAccountsCsv(file)
+            }}
+          />
+          {canWrite ? (
+            <button
+              type="button"
+              className={docsStyles.newBtn}
+              style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+              disabled={missingTable || importing}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
+          ) : null}
           <button
             type="button"
             className={docsStyles.newBtn}
@@ -253,12 +350,18 @@ export default function AccountsPage() {
             onClick={() => {
               exportListCsv(
                 'accounts.csv',
-                ['name', 'type', 'reference', 'status'],
+                ['name', 'type', 'status', 'industry', 'country', 'city', 'website', 'source', 'notes', 'reference'],
                 filtered.map((a) => ({
                   name: a.name,
                   type: a.type,
-                  reference: a.reference || '',
                   status: a.status || '',
+                  industry: a.industry || '',
+                  country: a.country || '',
+                  city: a.city || '',
+                  website: a.website || '',
+                  source: a.source || '',
+                  notes: a.notes || '',
+                  reference: a.reference || '',
                 })),
               )
               showToast('Accounts CSV downloaded', 'success')

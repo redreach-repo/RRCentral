@@ -96,7 +96,8 @@ export default function InvoiceRowActions({
       </button>
       {showDelete ? (
         <button type="button" className={styles.danger} onClick={() => onDelete(inv)}>
-          <Trash2 size={13} /> Delete
+          <Trash2 size={13} />{' '}
+          {(inv as Invoice & { deleted_at?: string | null }).deleted_at ? 'Restore' : 'Archive'}
         </button>
       ) : null}
     </div>

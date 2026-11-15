@@ -13,10 +13,10 @@
 - [x] Vendors listIo CSV import pilot
 - [x] Contracts vault CSV export
 - [x] Guide HR deepen (payroll cross-link)
-- [ ] Accounts listIo Import CSV pilot
-- [ ] Quotes / Invoices restore polish
-- [ ] Workflow dry-run UI
-- [ ] HR attendance date/person filter
+- [x] Accounts listIo Import CSV pilot
+- [x] Quotes / Invoices restore polish
+- [x] Workflow dry-run UI
+- [x] HR attendance date/person filter
 - [ ] M14 / live ESP / Tax / CASA / QTSP (Not done)
 
 ## Merged from #451 (main)
@@ -28,4 +28,4 @@
 
 ## Quality gates
 
-- [ ] typecheck / vitest
+- [x] typecheck / vitest (guideHr, vendorsCsv, accountsCsv, listIo)
