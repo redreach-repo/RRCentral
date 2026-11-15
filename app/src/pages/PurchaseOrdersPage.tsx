@@ -15,6 +15,8 @@ import {
   type PurchaseOrderLine,
 } from '../lib/opsSliceStores'
 import { exportListCsv } from '../lib/listIo'
+import { listWarehouses } from '../lib/warehouseStore'
+import { defaultWarehouse, warehouseLabel, type Warehouse } from '../lib/warehouses'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -22,6 +24,7 @@ import {
   colors,
   inputStyle,
   labelStyle,
+  selectStyle,
 } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
@@ -30,6 +33,8 @@ export default function PurchaseOrdersPage() {
   const { user } = useAuth()
   const { showToast } = useToast()
   const [rows, setRows] = useState<PurchaseOrder[]>([])
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
+  const [warehouseId, setWarehouseId] = useState('')
   const [selected, setSelected] = useState<PurchaseOrder | null>(null)
   const [lines, setLines] = useState<PurchaseOrderLine[]>([])
   const [vendor, setVendor] = useState('')
@@ -43,7 +48,13 @@ export default function PurchaseOrdersPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await listPurchaseOrders())
+      const [pos, wh] = await Promise.all([
+        listPurchaseOrders(),
+        listWarehouses().catch(() => [] as Warehouse[]),
+      ])
+      setRows(pos)
+      setWarehouses(wh)
+      setWarehouseId((prev) => prev || defaultWarehouse(wh)?.id || '')
     } catch (e) {
       showToast(errorMessage(e, 'Could not load POs'), 'error')
     } finally {
@@ -117,6 +128,7 @@ export default function PurchaseOrdersPage() {
                 qty: Number(qty),
                 unitCost: Number(cost),
                 landedCostAed: Number(landed) || 0,
+                warehouseId: warehouseId || null,
               })
                 .then(() => {
                   showToast('PO created', 'success')
@@ -155,6 +167,22 @@ export default function PurchaseOrdersPage() {
                 Landed cost (AED)
                 <input style={inputStyle} type="number" min={0} step="0.01" value={landed} onChange={(e) => setLanded(e.target.value)} />
               </label>
+              <label style={labelStyle}>
+                Warehouse
+                <select
+                  style={selectStyle}
+                  value={warehouseId}
+                  onChange={(e) => setWarehouseId(e.target.value)}
+                  aria-label="Receive warehouse"
+                >
+                  <option value="">Default / none</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {warehouseLabel(w)}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
             <button type="submit" style={{ ...buttonPrimaryStyle, marginTop: 10 }}>
               Create
@@ -171,6 +199,9 @@ export default function PurchaseOrdersPage() {
                   <li key={po.id}>
                     <button type="button" style={buttonSecondaryStyle} onClick={() => void openPo(po)}>
                       {po.po_number} · {po.vendor_name} · {po.status}
+                      {po.warehouse_id
+                        ? ` · ${warehouses.find((w) => w.id === po.warehouse_id)?.code || 'WH'}`
+                        : ''}
                     </button>
                   </li>
                 ))}

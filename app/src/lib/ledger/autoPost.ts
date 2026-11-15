@@ -25,7 +25,18 @@ export const AUTO_POST_CODES = {
   ar: '1200',
   revenue: '4000',
   vatPayable: '2100',
+  bank: '1100',
+  opex: '6000',
 } as const
+
+export type ExpenseAutoPostInput = {
+  expenseId: string
+  label: string
+  entryDate: string
+  exclusiveAed: number
+  vatAed: number
+  inclusiveAed: number
+}
 
 export function invoiceToDraftLines(input: InvoiceAutoPostInput): AutoPostLine[] {
   const ex = round2(input.exclusiveAed)
@@ -63,6 +74,45 @@ export function autoPostMemo(input: InvoiceAutoPostInput): string {
 
 export function autoPostSourceId(invoiceId: string): string {
   return `invoice:${invoiceId}`
+}
+
+/** Expense → Dr opex (+ optional VAT as opex), Cr bank (Unverified). */
+export function expenseToDraftLines(input: ExpenseAutoPostInput): AutoPostLine[] {
+  const ex = round2(input.exclusiveAed)
+  const vat = round2(input.vatAed)
+  const inc = round2(input.inclusiveAed || ex + vat)
+  if (inc <= 0) return []
+  const lines: AutoPostLine[] = [
+    {
+      code: AUTO_POST_CODES.opex,
+      memo: `Expense ${input.label}`,
+      debit: ex > 0 ? ex : inc,
+      credit: 0,
+    },
+    {
+      code: AUTO_POST_CODES.bank,
+      memo: `Pay ${input.label}`,
+      debit: 0,
+      credit: inc,
+    },
+  ]
+  if (vat > 0 && ex > 0) {
+    lines.splice(1, 0, {
+      code: AUTO_POST_CODES.opex,
+      memo: `Input VAT stub ${input.label}`,
+      debit: vat,
+      credit: 0,
+    })
+  }
+  return lines
+}
+
+export function expenseAutoPostMemo(input: ExpenseAutoPostInput): string {
+  return `Auto draft from expense ${input.label} (Unverified — not tax advice)`
+}
+
+export function expenseAutoPostSourceId(expenseId: string): string {
+  return `expense:${expenseId}`
 }
 
 function round2(n: number): number {

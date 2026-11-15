@@ -17,6 +17,7 @@ import {
 import type { Account, Client, Invoice, PaymentLogEntry } from '../lib/types'
 import { accountTypeLabel } from '../lib/accounts'
 import { listAccounts } from '../lib/accountsStore'
+import { resolveCreditWarnForClient } from '../lib/creditSoftWarn'
 import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { can, roleAtLeast } from '../lib/permissions'
@@ -445,6 +446,15 @@ export default function InvoicesPage() {
       await logActivity('save_invoice', 'invoice', reference, `${payload.client} · ${status}`, who)
       await saveBillToForClient(payload.client)
       showToast('Invoice saved', 'success')
+      try {
+        const creditWarn = await resolveCreditWarnForClient(
+          payload.client,
+          isCancelledInvoice({ status }) ? 0 : totals.total,
+        )
+        if (creditWarn) showToast(`Credit soft warn: ${creditWarn}`, 'info')
+      } catch {
+        /* credit check is advisory */
+      }
       setEditorOpen(false)
       await load()
     } catch (e) {

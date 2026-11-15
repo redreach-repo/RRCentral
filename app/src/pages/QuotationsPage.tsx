@@ -75,6 +75,7 @@ import { parseQuotationFinalizeForm } from '../lib/schemas/quotationFinalize'
 import { sortByDateDesc } from '../lib/finance'
 import { isQuotePastValidity, quoteValidUntil } from '../lib/documents'
 import { errorMessage, isUndefinedColumnError } from '../lib/errors'
+import { resolveCreditWarnForClient } from '../lib/creditSoftWarn'
 import { createDeliveryNoteFromQuote, matchQuoteForDeliveryNote } from '../lib/deliveryNotes'
 import { resolveDealRef } from '../lib/dealQuotes'
 import { registerLineItemSkus } from '../lib/skuRegistry'
@@ -751,6 +752,12 @@ export default function QuotationsPage() {
           'success',
         )
       }
+      try {
+        const creditWarn = await resolveCreditWarnForClient(payload.client, amount)
+        if (creditWarn) showToast(`Credit soft warn: ${creditWarn}`, 'info')
+      } catch {
+        /* credit check is advisory */
+      }
       setEditorOpen(false)
       await load()
     } catch (e) {
@@ -817,6 +824,12 @@ export default function QuotationsPage() {
         userEmail: who,
       })
       showToast(`Finalized as ${reference}`, 'success')
+      try {
+        const creditWarn = await resolveCreditWarnForClient(q.client, Number(q.amount) || 0)
+        if (creditWarn) showToast(`Credit soft warn: ${creditWarn}`, 'info')
+      } catch {
+        /* credit check is advisory */
+      }
       await load()
     } catch (e) {
       showToast(errorMessage(e, 'Finalize failed'), 'error')

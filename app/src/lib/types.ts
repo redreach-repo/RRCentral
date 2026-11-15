@@ -493,6 +493,8 @@ export interface Expense {
   payment_method: string
   references_text: string
   notes: string
+  /** Recorded | Pending Approval | Canceled */
+  status?: string
   /** Linked quotation reference (e.g. RR-01-26003) for COGS / profit. */
   quote_ref?: string
   /** Supplier tax invoice number. */

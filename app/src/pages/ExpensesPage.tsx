@@ -39,7 +39,7 @@ import { ensureVendor, listVendors } from '../lib/vendors'
 import { exportListCsv } from '../lib/listIo'
 import { isUndefinedColumnError, errorMessage } from '../lib/errors'
 import { ensureMoneyApproval } from '../lib/featureSliceStores'
-import { DEFAULT_APPROVAL_THRESHOLD_AED } from '../lib/makerChecker'
+import { DEFAULT_APPROVAL_THRESHOLD_AED, moneyActionRowStatus } from '../lib/makerChecker'
 import { Link } from 'react-router-dom'
 import {
   buttonDangerStyle,
@@ -504,6 +504,7 @@ export default function ExpensesPage() {
       )
 
       let approvalNote = ''
+      let expenseStatus = 'Recorded'
       if (expenseId && parts.amount >= DEFAULT_APPROVAL_THRESHOLD_AED) {
         try {
           const gate = await ensureMoneyApproval({
@@ -514,12 +515,46 @@ export default function ExpensesPage() {
             requestedBy: appUserId || user?.email || null,
           })
           if (gate.needsApproval) {
+            expenseStatus = moneyActionRowStatus({
+              proceed: gate.proceed,
+              needsApproval: true,
+              approvedStatus: 'Recorded',
+            })
             approvalNote = gate.proceed
               ? ''
               : ` · maker-checker requested (≥ AED ${DEFAULT_APPROVAL_THRESHOLD_AED})`
           }
         } catch {
           /* approvals table may be missing in local mode */
+        }
+      }
+      if (expenseId && expenseStatus !== 'Recorded') {
+        try {
+          await db.from('expenses').update({ status: expenseStatus }).eq('id', expenseId)
+        } catch {
+          /* status column may be missing until migration */
+        }
+      } else if (expenseId && !editing) {
+        try {
+          await db.from('expenses').update({ status: 'Recorded' }).eq('id', expenseId)
+        } catch {
+          /* ignore */
+        }
+      }
+
+      if (expenseId && expenseStatus === 'Recorded' && parts.amount > 0) {
+        try {
+          const { createExpenseAutoPostDraft } = await import('../lib/ledger/ledgerStore')
+          await createExpenseAutoPostDraft({
+            expenseId,
+            label: payload.vendor || payload.category || expenseId,
+            entryDate: (payload.date as string) || new Date().toISOString().slice(0, 10),
+            exclusiveAed: parts.amount_ex_vat,
+            vatAed: parts.vat_amount,
+            inclusiveAed: parts.amount,
+          })
+        } catch {
+          /* best-effort — ledger migration may be absent */
         }
       }
 
@@ -664,6 +699,7 @@ export default function ExpensesPage() {
                   <th>Date</th>
                   <th>Vendor</th>
                   <th>Category</th>
+                  <th>Status</th>
                   <th>Ex-VAT</th>
                   <th>VAT paid</th>
                   <th>Total</th>
@@ -689,6 +725,7 @@ export default function ExpensesPage() {
                         ) : null}
                       </td>
                       <td>{e.category || '—'}</td>
+                      <td>{e.status || 'Recorded'}</td>
                       <td className={docsStyles.amount}>{formatAED(parts.exclusive)}</td>
                       <td className={docsStyles.amount}>{formatAED(parts.vat)}</td>
                       <td className={docsStyles.amount}>{formatAED(parts.inclusive)}</td>
