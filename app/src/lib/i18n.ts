@@ -187,6 +187,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.admin.settings.body':
       'Company, bank, users, and integrations live here. Prefer Settings over editing env files on a running tenant.',
     'guide.admin.settings.link': 'Open Settings',
+    'guide.admin.workflows.title': 'Workflows',
+    'guide.admin.workflows.body':
+      'Approval chains and dry-run runs under Settings. Webhook and ask_ai steps stay local until live gateways are cleared.',
+    'guide.admin.workflows.link': 'Open Workflows',
     'guide.admin.moduleFlags.title': 'Module flags',
     'guide.admin.moduleFlags.body':
       'Soft-hide Overview, Sales, Operations, Finance, Delivery, or Clients from the sidebar for everyone. Direct URLs still work.',
@@ -1219,6 +1223,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.admin.settings.body':
       'الشركة والبنك والمستخدمون والتكاملات هنا. فضّل الإعدادات على تعديل ملفات البيئة على مستأجر يعمل.',
     'guide.admin.settings.link': 'فتح الإعدادات',
+    'guide.admin.workflows.title': 'سير العمل',
+    'guide.admin.workflows.body':
+      'سلاسل الموافقة وتشغيلات التجربة تحت الإعدادات. خطوات webhook و ask_ai تبقى محلية حتى تُفتح البوابات الحية.',
+    'guide.admin.workflows.link': 'فتح سير العمل',
     'guide.admin.moduleFlags.title': 'أعلام الوحدات',
     'guide.admin.moduleFlags.body':
       'أخفِ النظرة العامة أو المبيعات أو العمليات أو المالية أو التسليم أو العملاء من الشريط الجانبي للجميع. الروابط المباشرة تبقى تعمل.',

@@ -104,28 +104,51 @@ export default function PlanningGoalsPage() {
             Period targets for revenue and deals. Scenario stubs hold assumptions only — no live forecast.
           </p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-          disabled={!rows.length}
-          onClick={() => {
-            exportListCsv(
-              'planning-goals.csv',
-              ['name', 'metric_key', 'target_value', 'period_yyyy_mm', 'status'],
-              rows.map((r) => ({
-                name: r.name,
-                metric_key: r.metric_key,
-                target_value: r.target_value,
-                period_yyyy_mm: r.period_yyyy_mm,
-                status: r.status,
-              })),
-            )
-            showToast('Goals CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!rows.length}
+            onClick={() => {
+              exportListCsv(
+                'planning-goals.csv',
+                ['name', 'metric_key', 'target_value', 'period_yyyy_mm', 'status'],
+                rows.map((r) => ({
+                  name: r.name,
+                  metric_key: r.metric_key,
+                  target_value: r.target_value,
+                  period_yyyy_mm: r.period_yyyy_mm,
+                  status: r.status,
+                })),
+              )
+              showToast('Goals CSV downloaded', 'success')
+            }}
+          >
+            Export goals CSV
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!scenarios.length}
+            onClick={() => {
+              exportListCsv(
+                'planning-scenarios.csv',
+                ['name', 'description', 'assumptions_json', 'active'],
+                scenarios.map((s) => ({
+                  name: s.name,
+                  description: s.description || '',
+                  assumptions_json: JSON.stringify(s.assumptions_json ?? {}),
+                  active: s.active,
+                })),
+              )
+              showToast('Scenarios CSV downloaded', 'success')
+            }}
+          >
+            Export scenarios CSV
+          </button>
+        </div>
       </header>
 
       {loading ? (

@@ -11,6 +11,7 @@ import {
   summarizeRun,
   type WorkflowRun,
 } from '../../lib/workflowRunner'
+import { exportListCsv } from '../../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -86,11 +87,38 @@ export default function WorkflowRunsCard() {
 
   return (
     <div id="workflow-runs" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.settings.section.workflowRuns')}</h2>
-        <button type="button" style={buttonSecondaryStyle} onClick={() => void load()} disabled={loading}>
-          {loading ? t('page.settings.loading') : t('page.settings.refresh')}
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={!pending.length && !recent.length}
+            onClick={() => {
+              const rows = [...pending, ...recent]
+              exportListCsv(
+                'workflow-runs.csv',
+                ['id', 'status', 'definition', 'pipeline', 'stage', 'record_label', 'created_at', 'summary'],
+                rows.map((run) => ({
+                  id: run.id,
+                  status: run.status,
+                  definition: run.definition?.name || run.definition_id,
+                  pipeline: String(run.context.pipeline_key || ''),
+                  stage: String(run.context.stage_key || ''),
+                  record_label: String(run.context.record_label || ''),
+                  created_at: run.created_at || '',
+                  summary: summarizeRun(run),
+                })),
+              )
+              showToast('Workflow runs CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+          <button type="button" style={buttonSecondaryStyle} onClick={() => void load()} disabled={loading}>
+            {loading ? t('page.settings.loading') : t('page.settings.refresh')}
+          </button>
+        </div>
       </div>
       <p style={{ margin: '8px 0 14px', fontSize: 13, color: colors.muted, lineHeight: 1.45 }}>
         Approvals pause a chain until an admin (or configured role) confirms. Notify steps write to
