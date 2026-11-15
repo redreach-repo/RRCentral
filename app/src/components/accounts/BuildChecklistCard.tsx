@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ClipboardList, Plus, Trash2 } from 'lucide-react'
 import { useToast } from '../../contexts/ToastContext'
@@ -14,7 +14,7 @@ import {
 } from '../../lib/buildTemplatesStore'
 import { errorMessage } from '../../lib/errors'
 import { isGoLive } from '../../lib/goLive'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import { parseBuildTaskForm } from '../../lib/schemas/buildTask'
 import { hoursLabel } from '../../lib/timeTracking'
 import type { BuildStageKey, BuildTask, BuildTemplate, DeliveryPackage, Requirement } from '../../lib/types'
@@ -26,6 +26,26 @@ import {
   sectionTitleStyle,
   selectStyle,
 } from '../../lib/uiStyles'
+
+const STAGE_VALUES = new Set(BUILD_STAGES.map((s) => s.value))
+const STAGE_BY_LABEL = new Map(BUILD_STAGES.map((s) => [s.label.toLowerCase(), s.value]))
+
+function taskMatchKey(stage: string, title: string): string {
+  return `${stage}|${title.trim().toLowerCase()}`
+}
+
+function parseDoneFlag(raw: string): boolean {
+  const v = raw.trim().toLowerCase()
+  if (!v) return false
+  return !(v === 'no' || v === 'false' || v === '0' || v === 'off' || v === 'n')
+}
+
+function resolveStage(raw: string): BuildStageKey | '' {
+  const value = raw.trim()
+  if (!value) return ''
+  if (STAGE_VALUES.has(value as BuildStageKey)) return value as BuildStageKey
+  return STAGE_BY_LABEL.get(value.toLowerCase()) || ''
+}
 
 type Props = {
   accountId: string
@@ -61,6 +81,8 @@ export default function BuildChecklistCard({
   const [templates, setTemplates] = useState<BuildTemplate[]>([])
   const [templateId, setTemplateId] = useState('')
   const [busy, setBusy] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState({ stage: 'build' as BuildStageKey, title: '', hours: '' })
 
   const load = useCallback(async () => {
@@ -135,39 +157,151 @@ export default function BuildChecklistCard({
     }, 'Could not add the task')
   }
 
+  async function importChecklistCsv(file: File) {
+    if (!canEdit) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const byKey = new Map(buildTasks.map((t) => [taskMatchKey(t.stage, t.title), t] as const))
+      const seen = new Set(byKey.keys())
+      let working: Pick<BuildTask, 'sort'>[] = [...tasks]
+      let added = 0
+      let updated = 0
+      let skipped = 0
+      const pendingDone: Array<{ key: string; done: boolean; by: string }> = []
+
+      for (const row of objects) {
+        const title = String(row.title || '').trim()
+        const stage = resolveStage(String(row.stage || ''))
+        if (!title || !stage) {
+          skipped += 1
+          continue
+        }
+        const detail = String(row.detail ?? '')
+        const hoursRaw = String(row.est_hours ?? '').trim()
+        const est_hours = hoursRaw === '' ? 0 : Number(hoursRaw)
+        if (!Number.isFinite(est_hours) || est_hours < 0) {
+          skipped += 1
+          continue
+        }
+        const done = parseDoneFlag(String(row.done ?? ''))
+        const doneBy = String(row.done_by || '').trim() || authorEmail
+        const key = taskMatchKey(stage, title)
+        const existing = byKey.get(key)
+        if (existing) {
+          if (Boolean(existing.done) !== done) {
+            await setBuildTaskDone(existing.id, done, done ? doneBy : '')
+            updated += 1
+          }
+          continue
+        }
+        if (seen.has(key)) {
+          skipped += 1
+          continue
+        }
+        await addBuildTask(accountId, { stage, title, detail, est_hours }, working)
+        const nextSort = working.reduce((max, t) => Math.max(max, t.sort), 0) + 1
+        working = [...working, { sort: nextSort }]
+        seen.add(key)
+        added += 1
+        if (done) pendingDone.push({ key, done: true, by: doneBy })
+      }
+
+      if (pendingDone.length) {
+        const fresh = (await listBuildTasks(accountId)).filter((t) => !isGoLive(t))
+        const freshByKey = new Map(fresh.map((t) => [taskMatchKey(t.stage, t.title), t] as const))
+        for (const item of pendingDone) {
+          const task = freshByKey.get(item.key)
+          if (task && Boolean(task.done) !== item.done) {
+            await setBuildTaskDone(task.id, item.done, item.done ? item.by : '')
+            updated += 1
+          }
+        }
+      }
+
+      if (!added && !updated && skipped) {
+        showToast('No matching build checklist rows in CSV', 'error')
+        return
+      }
+      const parts = [
+        added ? `${added} added` : '',
+        updated ? `${updated} updated` : '',
+      ].filter(Boolean)
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(
+        parts.length ? `Imported build checklist (${parts.join(', ')})${skipNote}` : `No build checklist changes${skipNote}`,
+        'success',
+      )
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Build checklist CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <section style={cardStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Build checklist</h2>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {buildTasks.length ? (
+            <span style={{ fontSize: 12, color: colors.muted }}>
+              {progress.done} of {progress.total} done, about {hoursLabel(progress.estHoursLeft)} left
+            </span>
+          ) : null}
+          {canEdit ? (
             <>
-              <span style={{ fontSize: 12, color: colors.muted }}>
-                {progress.done} of {progress.total} done, about {hoursLabel(progress.estHoursLeft)} left
-              </span>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) void importChecklistCsv(file)
+                }}
+              />
               <button
                 type="button"
                 style={smallBtn}
-                onClick={() => {
-                  exportListCsv(
-                    `build-checklist-${accountId.slice(0, 8)}.csv`,
-                    ['stage', 'title', 'detail', 'est_hours', 'done', 'done_at', 'done_by', 'sort'],
-                    buildTasks.map((t) => ({
-                      stage: t.stage,
-                      title: t.title,
-                      detail: t.detail || '',
-                      est_hours: t.est_hours,
-                      done: t.done ? 'yes' : 'no',
-                      done_at: t.done_at || '',
-                      done_by: t.done_by || '',
-                      sort: t.sort,
-                    })),
-                  )
-                }}
+                disabled={importing || busy}
+                onClick={() => importInputRef.current?.click()}
               >
-                Export CSV
+                {importing ? 'Importing…' : 'Import CSV'}
               </button>
             </>
+          ) : null}
+          {buildTasks.length ? (
+            <button
+              type="button"
+              style={smallBtn}
+              onClick={() => {
+                exportListCsv(
+                  `build-checklist-${accountId.slice(0, 8)}.csv`,
+                  ['stage', 'title', 'detail', 'est_hours', 'done', 'done_at', 'done_by', 'sort'],
+                  buildTasks.map((t) => ({
+                    stage: t.stage,
+                    title: t.title,
+                    detail: t.detail || '',
+                    est_hours: t.est_hours,
+                    done: t.done ? 'yes' : 'no',
+                    done_at: t.done_at || '',
+                    done_by: t.done_by || '',
+                    sort: t.sort,
+                  })),
+                )
+              }}
+            >
+              Export CSV
+            </button>
           ) : null}
         </div>
       </div>
