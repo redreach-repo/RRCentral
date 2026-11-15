@@ -78,6 +78,7 @@ export default function ChurchDetailsModal({ open, onClose, profile, saving, onS
   }
 
   async function importChurchCsv(file: File) {
+    if (!d) return
     setImporting(true)
     setError('')
     try {
@@ -93,7 +94,17 @@ export default function ChurchDetailsModal({ open, onClose, profile, saving, onS
         return
       }
 
-      const next: Draft = { ...d }
+      const next: Draft = {
+        tenant_slug: d.tenant_slug,
+        plan: d.plan,
+        modules: d.modules,
+        whatsapp_month: d.whatsapp_month,
+        whatsapp_conversations: d.whatsapp_conversations,
+        billing_status: d.billing_status,
+        renewal_date: d.renewal_date,
+        admin_url: d.admin_url,
+        notes: d.notes,
+      }
       let applied = 0
       const headerSet = new Set(headers.map((h) => h.trim().toLowerCase()))
       const isWide =
