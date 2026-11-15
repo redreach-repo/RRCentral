@@ -1,7 +1,6 @@
-Status: built and tested (draft)
-Owner: Claude
-PR: see the PR titled "Demo isolation" (draft)
-Stubbed / unverified: the separate demo Supabase project does not exist yet (Alfred decides, per docs/M3A_DEMO.md); no demo deploy workflow yet; never run against a real demo project; presenter vs self-serve mode not built (open spec question); the demo still shows Red Reach brand kit assets until a demo brand kit is set.
+Status: built and tested (code-side)
+Owner: Cursor agent (M0–M3a batch)
+Stubbed / unverified: the separate demo Supabase project does not exist yet (Alfred, per docs/M3A_DEMO.md); no demo deploy workflow yet; self-serve rate limits / expiry deferred (docs/DECISIONS.md D3).
 
 # Demo isolation
 
@@ -12,17 +11,19 @@ Goal: a showcase copy of the CRM with made-up data where **nothing can leave**: 
 |---|---|
 | Build | `npm run build` refuses a demo build (`VITE_APP_ENV=demo`) whose Supabase URL is the live project (`scripts/demo-target.mjs`, called from `assert-client-supabase-key.mjs`). Extra live URLs can be listed in `LIVE_SUPABASE_URL`. |
 | Browser | In a demo build `window.fetch` only reaches this site and its own Supabase project; anything else is refused (`lib/demo/demoMode.ts`). An orange DEMO banner shows on every page. |
-| Edge Functions | With the function secret `APP_ENV=demo`, every function (through `withErrorLog`) can only call its own Supabase URL plus hosts in `DEMO_OUTBOUND_ALLOW`. Stripe, Meta/WhatsApp, Zoho/Gmail/Microsoft mail, Anthropic and webhooks are all refused and logged as `demo outbound blocked`. `bootstrap-admin` and Cursor's `public-api` don't use the wrapper but only call Supabase. |
-| Data | `supabase/seed/demo/demo_seed.sql`: 4 fictional accounts, 3 leads, 2 quotations, 2 invoices on `.example` domains, tenant renamed "Falcon Bay Trading (demo)". Refuses unless `set app.demo_seed = 'yes';` is run first **and** the database has no invoices or quotations, so it cannot run on live by mistake. |
+| Edge Functions | With the function secret `APP_ENV=demo`, every function (through `withErrorLog`) can only call its own Supabase URL plus hosts in `DEMO_OUTBOUND_ALLOW`. Stripe, Meta/WhatsApp, Zoho/Gmail/Microsoft mail, Anthropic and webhooks are all refused and logged as `demo outbound blocked`. |
+| Data | `supabase/seed/demo/demo_seed.sql`: Falcon Bay brand kit, 4 accounts, 4 contacts, 3 CRM leads, 1 sales deal, 2 quotations, 2 invoices on `.example` domains. Refuses unless `set app.demo_seed = 'yes';` **and** the database has no invoices/quotations. |
+| Reset | `supabase/seed/demo/demo_reset.sql`: deletes demo-prefixed rows only when `is_demo` is true, then re-seeds. |
+| Presenter UI | `DemoPresenterChrome`: guided tour checklist + UI role switcher (shell only; RLS unchanged). |
 
 ## Setup for Alfred (when you decide to have a demo)
 1. Create a second Supabase project (e.g. `highmast-demo`). Never reuse live keys.
-2. Apply the migrations to it (same SQL as live, through its own SQL editor).
-3. In its SQL editor: `set app.demo_seed = 'yes';` then paste `supabase/seed/demo/demo_seed.sql`.
-4. Its Edge Function secrets: `APP_ENV=demo` (plus the usual Supabase ones). Deploy functions to that project.
-5. Build the site with `VITE_APP_ENV=demo`, `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` of the demo project. A deploy workflow for this is the next step once the project exists (not added, so nothing points at a project that doesn't exist).
+2. Apply the migrations to it (same SQL as live).
+3. SQL editor: `set app.demo_seed = 'yes';` then run `demo_seed.sql`.
+4. Edge Function secrets: `APP_ENV=demo` (plus the usual Supabase ones). Deploy functions to that project.
+5. Build with `VITE_APP_ENV=demo` and the demo project's URL/anon key. Add a deploy workflow only after the project exists.
 
 ## Tests
-- `app/src/lib/demo/demoMode.test.ts`: demo detection, live-target refusal, browser fetch guard.
-- `supabase/tests/functions/demo_guard_test.ts`: Stripe, Meta, Anthropic, Zoho, webhook hosts refused in demo; own Supabase allowed; nothing wrapped outside demo.
-- `supabase/tests/modules/demo_isolation_test.sql`: seed refuses without the flag and on a database with invoices; loads cleanly into an empty one; fictional data only.
+- `app/src/lib/demo/demoMode.test.ts`, `demoRole.test.ts`, `demoTour.test.ts`
+- `supabase/tests/functions/demo_guard_test.ts`
+- `supabase/tests/modules/demo_isolation_test.sql`

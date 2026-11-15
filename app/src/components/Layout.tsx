@@ -55,8 +55,10 @@ import {
 import type { ModuleNavItem } from '../modules/registry'
 import BrandLogo from './BrandLogo'
 import CommandPalette from './CommandPalette'
+import DemoPresenterChrome from './DemoPresenterChrome'
 import ErrorBoundary from './ErrorBoundary'
 import RouteAnnouncer from './RouteAnnouncer'
+import { isDemoBuild } from '../lib/demo/demoMode'
 import styles from './Layout.module.css'
 
 const highmastAssets = productAssetUrls(import.meta.env.BASE_URL)
@@ -115,7 +117,7 @@ function writeSavedSection(id: string) {
 }
 
 export default function Layout() {
-  const { user, userRole, signOut, isLocalMode } = useAuth()
+  const { user, userRole, membershipRole, signOut, isLocalMode } = useAuth()
   const { settings } = useSettings()
   const {
     companies,
@@ -561,6 +563,7 @@ export default function Layout() {
           </nav>
         ) : null}
       </div>
+      {isDemoBuild() ? <DemoPresenterChrome membershipRole={membershipRole} /> : null}
     </div>
   )
 }
