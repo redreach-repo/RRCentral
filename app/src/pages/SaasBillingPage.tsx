@@ -12,6 +12,7 @@ import {
   type TenantSubscription,
 } from '../lib/featureSliceStores'
 import { openSaasBillingPortal, startSaasCheckout } from '../lib/saasCheckoutStore'
+import { exportListCsv } from '../lib/listIo'
 import { SAAS_PLANS, planByKey, seatUsageLabel, seatsOverLimit } from '../lib/saasBillingPlans'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, selectStyle } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
@@ -131,6 +132,50 @@ export default function SaasBillingPage() {
             stays available for demos. Separate from customer invoice pay links.
           </p>
         </div>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+          onClick={() => {
+            exportListCsv(
+              'saas-plans.csv',
+              ['plan_key', 'name', 'monthly_aed', 'seats_included', 'features'],
+              SAAS_PLANS.map((p) => ({
+                plan_key: p.key,
+                name: p.name,
+                monthly_aed: p.monthlyAed,
+                seats_included: p.seatsIncluded,
+                features: p.features.join('; '),
+              })),
+            )
+            if (sub) {
+              exportListCsv(
+                'saas-subscription.csv',
+                [
+                  'plan_key',
+                  'status',
+                  'seats',
+                  'active_people',
+                  'stripe_customer_id',
+                  'current_period_end',
+                ],
+                [
+                  {
+                    plan_key: sub.plan_key,
+                    status: sub.status,
+                    seats: sub.seats ?? '',
+                    active_people: activePeople,
+                    stripe_customer_id: sub.stripe_customer_id || '',
+                    current_period_end: sub.current_period_end || '',
+                  },
+                ],
+              )
+            }
+            showToast(sub ? 'Plan catalog and subscription CSV downloaded' : 'Plan catalog CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
       </header>
 
       <div
