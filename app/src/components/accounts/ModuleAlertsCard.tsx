@@ -22,9 +22,10 @@ import { TICKET_CHANNELS, isOpenTicket, optionLabel } from '../../lib/support'
 import { listTickets } from '../../lib/supportStore'
 import { billingLabel, churchView, hasBillingIssue, joinRequests, renewalSoon } from '../../lib/worshiphub'
 import { fetchLiveTenants, listChurchProfiles } from '../../lib/worshiphubStore'
+import { exportListCsv } from '../../lib/listIo'
 import type { Invoice, WorshipTenant } from '../../lib/types'
 import ChurchActionButtons from '../worshiphub/ChurchActionButtons'
-import { cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
+import { buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
 
 type Line = { key: string; to: string; name: string; detail: string; tone: string; tenant?: WorshipTenant }
 
@@ -251,13 +252,42 @@ export default function ModuleAlertsCard() {
   ]
   if (!panels.some(Boolean)) return null
 
+  const allLines: { panel: string; name: string; detail: string; to: string }[] = [
+    ...data.clients.map((l) => ({ panel: 'AI CRM clients', name: l.name, detail: l.detail, to: l.to })),
+    ...(data.noHours || []).map((l) => ({ panel: 'Hours this week', name: l.name, detail: l.detail, to: l.to })),
+    ...(data.reminders || []).map((l) => ({ panel: 'Payment reminders', name: l.name, detail: l.detail, to: l.to })),
+    ...data.newTickets.map((l) => ({ panel: 'New support tickets', name: l.name, detail: l.detail, to: l.to })),
+    ...data.tickets.map((l) => ({ panel: 'Tickets near SLA', name: l.name, detail: l.detail, to: l.to })),
+    ...data.overdueDeals.map((l) => ({ panel: 'CTRM next action overdue', name: l.name, detail: l.detail, to: l.to })),
+    ...data.staleDeals.map((l) => ({ panel: 'CTRM stale deals', name: l.name, detail: l.detail, to: l.to })),
+    ...(data.joins || []).map((l) => ({ panel: 'WorshipHub joins', name: l.name, detail: l.detail, to: l.to })),
+    ...data.churches.map((l) => ({ panel: 'WorshipHub churches', name: l.name, detail: l.detail, to: l.to })),
+  ]
+
   return (
+    <div style={{ marginBottom: 16 }}>
+      {allLines.length ? (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            onClick={() => {
+              exportListCsv(
+                'module-alerts.csv',
+                ['panel', 'name', 'detail', 'link'],
+                allLines,
+              )
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
+      ) : null}
     <div
       style={{
         display: 'grid',
         gap: 16,
         gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))',
-        marginBottom: 16,
       }}
     >
       {data.clients.length > 0 ? (
@@ -308,6 +338,7 @@ export default function ModuleAlertsCard() {
         <Panel icon={<Church size={18} />} title="WorshipHub churches" link="/products" lines={data.churches} />
       ) : null}
       {data.costs ? <CostsPanel costs={data.costs} /> : null}
+    </div>
     </div>
   )
 }
