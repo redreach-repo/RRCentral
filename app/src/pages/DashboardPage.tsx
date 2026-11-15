@@ -45,8 +45,10 @@ import { useSettings } from '../contexts/SettingsContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useTenant } from '../contexts/TenantContext'
 import { useI18n } from '../contexts/I18nContext'
+import { useToast } from '../contexts/ToastContext'
 import { PRODUCT } from '../lib/product'
 import { can } from '../lib/permissions'
+import { exportListCsv } from '../lib/listIo'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
 import PageHeader from '../components/PageHeader'
@@ -70,6 +72,7 @@ export default function DashboardPage() {
   const { settings } = useSettings()
   const { activeCompany } = useTenant()
   const { t } = useI18n()
+  const { showToast } = useToast()
   const companyLabel =
     activeCompany?.name || settings.companyName || settings.brand || PRODUCT.name
   const [loading, setLoading] = useState(true)
@@ -316,6 +319,54 @@ export default function DashboardPage() {
           <Link to="/quotations" className={dash.heroSecondary}>
             {t('page.dashboard.quotations')}
           </Link>
+          <button
+            type="button"
+            className={dash.heroSecondary}
+            onClick={() => {
+              const today = startOfDay(new Date())
+              exportListCsv(
+                'dashboard-snapshot.csv',
+                ['metric', 'value'],
+                [
+                  { metric: 'overdue_follow_ups', value: overdueFollowUps },
+                  { metric: 'due_today_follow_ups', value: dueTodayFollowUps },
+                  { metric: 'open_pipeline', value: openPipeline },
+                  { metric: 'open_quotes', value: openQuotes },
+                  { metric: 'pending_invoices', value: pendingInvoices },
+                  { metric: 'month_income', value: monthIncome },
+                  { metric: 'month_expenses', value: monthExpenses },
+                  { metric: 'month_net', value: monthNet },
+                ],
+              )
+              exportListCsv(
+                'dashboard-follow-ups-due.csv',
+                ['company', 'owner', 'stage', 'follow_up_date', 'bucket'],
+                crm
+                  .filter((c) => c.follow_up_date)
+                  .map((c) => {
+                    let bucket = 'upcoming'
+                    try {
+                      const d = parseISO(c.follow_up_date!.slice(0, 10))
+                      if (d < today) bucket = 'overdue'
+                      else if (isToday(d)) bucket = 'due_today'
+                    } catch {
+                      bucket = 'unknown'
+                    }
+                    return {
+                      company: c.company_name || '',
+                      owner: c.owner || '',
+                      stage: c.pipeline_stage || '',
+                      follow_up_date: c.follow_up_date || '',
+                      bucket,
+                    }
+                  })
+                  .filter((r) => r.bucket === 'overdue' || r.bucket === 'due_today'),
+              )
+              showToast('Dashboard CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
         </div>
         <div className={dash.heroStats}>
           <div className={dash.heroStat}>
