@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import BrandLogo from '../components/BrandLogo'
 import { useI18n } from '../contexts/I18nContext'
+import { useToast } from '../contexts/ToastContext'
 import {
   PORTAL_MESSAGE_MAX,
   PORTAL_UPLOAD_TYPES,
@@ -13,11 +14,19 @@ import {
   type PortalUsage,
   type PortalView,
 } from '../lib/clientPortal'
+import {
+  PORTAL_BUILD_CSV_HEADERS,
+  PORTAL_INVOICES_CSV_HEADERS,
+  PORTAL_QUOTES_CSV_HEADERS,
+  PORTAL_TICKETS_CSV_HEADERS,
+  applyPortalCsv,
+  detectPortalCsvKind,
+} from '../lib/clientPortalCsv'
 import { parseQuoteAcceptForm } from '../lib/schemas/quoteAccept'
 import { fileToBase64, loadPortal, portalAction } from '../lib/clientPortalStore'
 import { formatAED } from '../lib/money'
 import { invoiceKindLabel } from '../lib/documentRefs'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -57,12 +66,15 @@ const rowStyle: CSSProperties = {
  */
 export default function ClientPortalPage() {
   const { t } = useI18n()
+  const { showToast } = useToast()
   const { hash } = useLocation()
   const token = decodeURIComponent(hash.replace(/^#/, ''))
   const [view, setView] = useState<PortalView | null>(null)
   const [error, setError] = useState('')
   const [month, setMonth] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -86,6 +98,38 @@ export default function ClientPortalPage() {
       : t('page.clientPortal.docTitle')
   }, [view, t])
 
+  async function importPortalCsv(file: File) {
+    if (!view) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const kind = detectPortalCsvKind(headers)
+      if (!kind) {
+        showToast('CSV must match a portal export (build, tickets, quotes, or invoices)', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const result = applyPortalCsv(view, kind, objects)
+      if (!result.applied && result.skipped) {
+        showToast('No matching portal rows in CSV', 'error')
+        return
+      }
+      setView(result.view)
+      const skipNote = result.skipped ? ` · ${result.skipped} row(s) skipped` : ''
+      showToast(`Imported ${result.applied} ${kind} row(s)${skipNote}`, 'success')
+    } catch {
+      showToast('Portal CSV import failed', 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   if (!view) {
     return (
       <div style={wrap}>
@@ -102,6 +146,7 @@ export default function ClientPortalPage() {
   }
 
   const { build, report } = view
+  const slug = view.account.name.replace(/\s+/g, '-').toLowerCase() || 'portal'
   return (
     <div style={wrap}>
       <div style={column}>
@@ -109,14 +154,31 @@ export default function ClientPortalPage() {
           <BrandLogo height={32} />
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <span style={muted}>{view.companyName}</span>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) void importPortalCsv(file)
+              }}
+            />
+            <button
+              type="button"
+              style={smallButton}
+              disabled={importing}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
             <button
               type="button"
               style={smallButton}
               onClick={() => {
-                const slug = view.account.name.replace(/\s+/g, '-').toLowerCase() || 'portal'
                 exportListCsv(
                   `portal-${slug}-build.csv`,
-                  ['stage', 'status', 'due'],
+                  [...PORTAL_BUILD_CSV_HEADERS],
                   view.build.stages.map((s) => ({
                     stage: s.label,
                     status: s.status,
@@ -126,19 +188,19 @@ export default function ClientPortalPage() {
                 if (view.openTickets.length) {
                   exportListCsv(
                     `portal-${slug}-tickets.csv`,
-                    ['subject', 'status', 'opened', 'note'],
-                    view.openTickets.map((t) => ({
-                      subject: t.subject,
-                      status: t.status,
-                      opened: t.opened,
-                      note: t.note || '',
+                    [...PORTAL_TICKETS_CSV_HEADERS],
+                    view.openTickets.map((ticket) => ({
+                      subject: ticket.subject,
+                      status: ticket.status,
+                      opened: ticket.opened,
+                      note: ticket.note || '',
                     })),
                   )
                 }
                 if (view.quotes.length) {
                   exportListCsv(
                     `portal-${slug}-quotes.csv`,
-                    ['reference', 'date', 'amount', 'currency', 'state'],
+                    [...PORTAL_QUOTES_CSV_HEADERS],
                     view.quotes.map((q) => ({
                       reference: q.reference,
                       date: q.date || '',
@@ -151,7 +213,7 @@ export default function ClientPortalPage() {
                 if (view.invoices.length) {
                   exportListCsv(
                     `portal-${slug}-invoices.csv`,
-                    ['reference', 'date', 'amount', 'currency', 'balance', 'paid'],
+                    [...PORTAL_INVOICES_CSV_HEADERS],
                     view.invoices.map((inv) => ({
                       reference: inv.reference,
                       date: inv.date || '',
