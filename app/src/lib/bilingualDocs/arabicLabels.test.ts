@@ -10,6 +10,8 @@ describe('arabicFor', () => {
     expect(arabicFor('Date:')).toBe('التاريخ')
     expect(arabicFor('VAT (5%)')).toBe('ضريبة القيمة المضافة')
     expect(arabicFor('Total (AED)')).toBe('الإجمالي')
+    expect(arabicFor('Authorised signature')).toBe('التوقيع المعتمد')
+    expect(arabicFor('Fulfilment partner')).toBe('شريك التنفيذ')
   })
   it('returns empty for unknown or custom text', () => {
     expect(arabicFor('CUSTOM CLIENT PROPOSAL')).toBe('')

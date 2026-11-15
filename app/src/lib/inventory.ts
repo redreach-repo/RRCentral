@@ -11,6 +11,7 @@ export type InventoryMovement = {
   reason: string
   reference: string
   user_email: string
+  warehouse_id?: string | null
   created_at: string
 }
 
@@ -41,6 +42,7 @@ export async function adjustStock(opts: {
   reason: string
   reference?: string
   userEmail?: string
+  warehouseId?: string | null
 }): Promise<Product | null> {
   const product = await findProductBySku(opts.sku)
   if (!product) return null
@@ -67,6 +69,7 @@ export async function adjustStock(opts: {
     reason: opts.reason,
     reference: opts.reference || '',
     user_email: opts.userEmail || '',
+    warehouse_id: opts.warehouseId || null,
   })
 
   return {

@@ -52,6 +52,7 @@ export type HrEmployee = {
   labour_card_no: string
   bank_routing_code: string
   notes: string
+  reports_to_id: string | null
 }
 
 export type PayrollRun = {
@@ -182,6 +183,7 @@ function normalizeHr(row: Record<string, unknown>): HrEmployee {
     labour_card_no: String(row.labour_card_no || ''),
     bank_routing_code: String(row.bank_routing_code || ''),
     notes: String(row.notes || ''),
+    reports_to_id: (row.reports_to_id as string | null) ?? null,
   }
 }
 
@@ -198,6 +200,7 @@ export async function createHrEmployee(input: {
   bank_routing_code?: string
   start_date?: string | null
   employment_status?: string
+  reports_to_id?: string | null
 }): Promise<void> {
   const code = (input.employee_code || `E${Date.now().toString().slice(-6)}`).trim()
   const { error } = await db.from('hr_employees').insert({
@@ -213,6 +216,7 @@ export async function createHrEmployee(input: {
     bank_routing_code: (input.bank_routing_code || '').trim(),
     start_date: input.start_date || null,
     employment_status: input.employment_status || 'active',
+    reports_to_id: input.reports_to_id || null,
   })
   if (error) throw error
 }
@@ -233,6 +237,7 @@ export async function updateHrEmployee(
     bank_routing_code: string
     start_date: string | null
     notes: string
+    reports_to_id: string | null
   }>,
 ): Promise<void> {
   const { error } = await db
@@ -797,7 +802,13 @@ export async function decideApproval(
       await db.from('supplier_commitments').update({ status: 'Canceled' }).eq('id', objectId)
     }
   }
-  // expense approvals remain advisory — expenses have no Pending Approval column yet
+  if (row.object_type === 'expense') {
+    if (status === 'approved') {
+      await db.from('expenses').update({ status: 'Recorded' }).eq('id', objectId)
+    } else if (status === 'rejected' || status === 'canceled') {
+      await db.from('expenses').update({ status: 'Canceled' }).eq('id', objectId)
+    }
+  }
 }
 
 /** Latest approval status for an object (pending preferred over older terminals). */

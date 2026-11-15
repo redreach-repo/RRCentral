@@ -27,12 +27,18 @@ import docsStyles from '../styles/docsList.module.css'
 import { errorMessage } from '../lib/errors'
 import { parseInventoryAdjust } from '../lib/schemas/inventoryAdjust'
 import { exportListCsv } from '../lib/listIo'
+import { createWarehouse, listWarehouses } from '../lib/warehouseStore'
+import { defaultWarehouse, warehouseLabel, type Warehouse } from '../lib/warehouses'
 
 export default function InventoryPage() {
   const { t } = useI18n()
   const { user } = useAuth()
   const { showToast } = useToast()
   const [products, setProducts] = useState<Product[]>([])
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
+  const [warehouseId, setWarehouseId] = useState('')
+  const [newWhCode, setNewWhCode] = useState('')
+  const [newWhName, setNewWhName] = useState('')
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'low' | 'reserved'>('all')
   const [search, setSearch] = useState('')
@@ -44,9 +50,14 @@ export default function InventoryPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const { data, error } = await db.from('products').select('*').order('sku')
+      const [{ data, error }, wh] = await Promise.all([
+        db.from('products').select('*').order('sku'),
+        listWarehouses().catch(() => [] as Warehouse[]),
+      ])
       if (error) throw error
       setProducts((data || []) as Product[])
+      setWarehouses(wh)
+      setWarehouseId((prev) => prev || defaultWarehouse(wh)?.id || '')
     } catch (e) {
       showToast(errorMessage(e, 'Failed to load inventory'), 'error')
     } finally {
@@ -111,6 +122,7 @@ export default function InventoryPage() {
         qtyDelta: parsed.data.qtyDelta,
         reason: parsed.data.reason,
         userEmail: user?.email || '',
+        warehouseId: warehouseId || null,
       })
       showToast('Stock updated', 'success')
       setAdjustTarget(null)
@@ -190,6 +202,57 @@ export default function InventoryPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        <select
+          style={selectStyle}
+          value={warehouseId}
+          onChange={(e) => setWarehouseId(e.target.value)}
+          aria-label="Warehouse for adjustments"
+        >
+          <option value="">No warehouse</option>
+          {warehouses.map((w) => (
+            <option key={w.id} value={w.id}>
+              {warehouseLabel(w)}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div style={{ ...cardStyle, marginBottom: 16, display: 'grid', gap: 8, maxWidth: 560 }}>
+        <strong style={{ fontSize: 14 }}>Warehouses (stub)</strong>
+        <p style={{ margin: 0, fontSize: 12, color: colors.muted }}>
+          Stock still rolls up on the product. Adjustments stamp the selected warehouse on the movement.
+        </p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            style={{ ...inputStyle, maxWidth: 100 }}
+            placeholder="Code"
+            value={newWhCode}
+            onChange={(e) => setNewWhCode(e.target.value)}
+          />
+          <input
+            style={{ ...inputStyle, flex: 1, minWidth: 140 }}
+            placeholder="Name"
+            value={newWhName}
+            onChange={(e) => setNewWhName(e.target.value)}
+          />
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={busy || !newWhCode.trim() || !newWhName.trim()}
+            onClick={() => {
+              void createWarehouse({ code: newWhCode, name: newWhName })
+                .then(() => {
+                  showToast('Warehouse added', 'success')
+                  setNewWhCode('')
+                  setNewWhName('')
+                  return load()
+                })
+                .catch((e) => showToast(errorMessage(e, 'Could not add warehouse'), 'error'))
+            }}
+          >
+            <Plus size={14} /> Add
+          </button>
+        </div>
       </div>
 
       {loading ? (

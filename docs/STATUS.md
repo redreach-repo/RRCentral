@@ -2,23 +2,23 @@
 
 **Last updated:** 15 November 2026 (Asia/Dubai)  
 **Spec:** Master Specification **v2.1**  
-**Batch:** M11 / M12 leftovers deepen (`docs/RUN_PLAN.md`)  
-**Branch:** `cursor/batch-m11-m12a-d3d5`
+**Batch:** M9 / M12b leftovers deepen (`docs/RUN_PLAN.md`)  
+**Branch:** `cursor/batch-m9-m12b-d3d5`
 
 ## Milestone verdict
 
 | Slice | Result |
 |-------|--------|
-| Public API quote finalize | **Pass** |
-| Logistics + events pack templates | **Pass** |
-| Trading credit limits | **Pass** (soft gate helpers + account UI) |
-| Project billing schedules | **Pass** |
-| Marketing ESP dry-run | **Pass** (local only) |
-| Stripe Tax stub flag | **Pass** (default off) |
-| M14 / live ESP / live Tax / pgvector | **Not done** |
+| Multi-warehouse stub | **Pass** |
+| HR reports_to | **Pass** |
+| Expense GL draft auto-post | **Pass** (draft only) |
+| Expense Pending Approval | **Pass** |
+| creditGate soft warn on save | **Pass** |
+| Arabic PDF label polish | **Pass** (Unverified) |
+| M14 / live ESP / Tax / CASA / QTSP | **Not done** |
 
 ## Test results
 
 - Typecheck / lint: pass  
-- Vitest: **1347** passed / 259 files  
+- Vitest: **1352** passed / 260 files  
 - SQL `tests/run.sh`: pass

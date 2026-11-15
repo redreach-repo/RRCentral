@@ -31,6 +31,7 @@ const STATUSES = ['active', 'onboarding', 'leave', 'exited'] as const
 export default function HrPeoplePage() {
   const { showToast } = useToast()
   const [rows, setRows] = useState<HrEmployee[]>([])
+  const [directory, setDirectory] = useState<HrEmployee[]>([])
   const [filter, setFilter] = useState('active')
   const [editing, setEditing] = useState<HrEmployee | null>(null)
   const [name, setName] = useState('')
@@ -44,12 +45,15 @@ export default function HrPeoplePage() {
   const [labourCard, setLabourCard] = useState('')
   const [routing, setRouting] = useState('')
   const [startDate, setStartDate] = useState('')
+  const [reportsToId, setReportsToId] = useState('')
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await listHrEmployees(filter))
+      const [filtered, all] = await Promise.all([listHrEmployees(filter), listHrEmployees('all')])
+      setRows(filtered)
+      setDirectory(all)
     } catch (e) {
       showToast(errorMessage(e, 'Could not load people'), 'error')
     } finally {
@@ -74,6 +78,7 @@ export default function HrPeoplePage() {
     setLabourCard('')
     setRouting('')
     setStartDate('')
+    setReportsToId('')
   }
 
   function startEdit(r: HrEmployee) {
@@ -89,6 +94,7 @@ export default function HrPeoplePage() {
     setLabourCard(r.labour_card_no || '')
     setRouting(r.bank_routing_code || '')
     setStartDate(r.start_date || '')
+    setReportsToId(r.reports_to_id || '')
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -106,6 +112,7 @@ export default function HrPeoplePage() {
       labour_card_no: labourCard,
       bank_routing_code: routing,
       start_date: startDate || null,
+      reports_to_id: reportsToId || null,
     }
     try {
       if (editing) {
@@ -218,6 +225,24 @@ export default function HrPeoplePage() {
             Bank routing (9 digits)
             <input style={inputStyle} value={routing} onChange={(e) => setRouting(e.target.value)} />
           </label>
+          <label style={labelStyle}>
+            Reports to
+            <select
+              style={selectStyle}
+              value={reportsToId}
+              onChange={(e) => setReportsToId(e.target.value)}
+              aria-label="Reports to"
+            >
+              <option value="">—</option>
+              {directory
+                .filter((r) => r.id !== editing?.id)
+                .map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.full_name}
+                  </option>
+                ))}
+            </select>
+          </label>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button type="submit" style={buttonPrimaryStyle}>
@@ -253,6 +278,9 @@ export default function HrPeoplePage() {
                     </strong>
                     <div style={{ color: colors.muted, fontSize: 13, marginTop: 4 }}>
                       {[r.job_title, r.department, r.email, r.employment_status].filter(Boolean).join(' · ')}
+                      {r.reports_to_id
+                        ? ` · reports to ${directory.find((m) => m.id === r.reports_to_id)?.full_name || '…'}`
+                        : ''}
                     </div>
                     <div style={{ color: colors.muted, fontSize: 12, marginTop: 4 }}>
                       Basic AED {Number(r.basic_salary_aed || 0).toFixed(2)} · Allowances AED{' '}

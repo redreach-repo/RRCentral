@@ -81,6 +81,17 @@ export const ARABIC_DOC_LABELS: Record<string, string> = {
   'payment terms': 'شروط الدفع',
   'no line items': 'لا توجد بنود',
   'moq': 'الحد الأدنى للطلب',
+  // Page-two / fulfilment polish (Unverified — native review later)
+  'currency': 'العملة',
+  'quotation currency': 'عملة عرض السعر',
+  'other payment currencies': 'عملات دفع أخرى',
+  'bank / conversion charges': 'رسوم البنك / التحويل',
+  'bank': 'البنك',
+  'fulfilment partner': 'شريك التنفيذ',
+  'authorised signature': 'التوقيع المعتمد',
+  'company stamp': 'ختم الشركة',
+  'received by': 'استلم بواسطة',
+  'delivered by': 'سلّم بواسطة',
 }
 
 const norm = (s: string) => s.trim().replace(/\s+/g, ' ').replace(/:$/, '').toLowerCase()

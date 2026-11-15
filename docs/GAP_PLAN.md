@@ -38,7 +38,7 @@ Status key: **exists** · **partial** · **missing**
 | Sign-up + provisioner §6.13.1–2 | partial | M11: `/workspace-setup` + `business_type_packs` + idempotent Edge scaffold; auth user create later |
 | Engineering pack §11.3 | partial | Templates on activate (fields/pipelines); shared foundation M12a later |
 | Construction pack §11.4 | partial | Templates on activate; workforce/site objects M12b later |
-| Trading pack §11.2 light | partial | landed cost + credit limits soft gate; multi-warehouse later |
+| Trading pack §11.2 light | partial | landed cost + credit soft warn on save; warehouse stub (stock still rolls up) |
 | Languages §5.5 (v3) | partial | EN+AR only; all new strings must stay key-based for v3 |
 | Country packs §12 | partial | AE/IN/CA catalog + activate shipped (Unverified); residency §19 |
 
@@ -52,10 +52,10 @@ Status key: **exists** · **partial** · **missing**
 | 6.2 CRM and sales | partial | Strong ops CRM; three pipelines; Pipeline-first soft-retire (M3 slice 4); schema merge later (ask) |
 | 6.3 Email and calendar | partial | Zoho + Gmail Phase A + M365 Phase A/B (incl. inbox); Gmail inbox still CASA-gated; IMAP deferred |
 | 6.4 Contracts and e-sign | partial | NDA `/sign` + clauses + obligations board + spawn-on-sign; QTSP → M5 later |
-| 6.5 HR | partial | People + leave requests; attendance/org chart later |
+| 6.5 HR | partial | People + leave + reports_to stub; attendance later |
 | 6.6 Payroll | partial | M8: runs + WPS/gratuity draft + `payroll_exports` audit (not legal advice / not bank-certified) |
-| 6.7 Accounting (ledger) | partial | CoA + journals + invoice→draft auto-post + VAT return stub UI; posted auto + FTA later |
-| 6.8 Inventory and purchasing | partial | M9: POs + receive→stock + landed cost allocate; multi-warehouse later |
+| 6.7 Accounting (ledger) | partial | CoA + journals + invoice/expense→draft auto-post + VAT return stub UI; posted auto + FTA later |
+| 6.8 Inventory and purchasing | partial | M9: POs + receive→stock + landed cost + warehouse stub stamp |
 | 6.9 Delivery (projects/support) | partial | M9b: projects + WIP/retention + billing schedules; full job-cost later |
 | 6.10 Marketing | partial | M10: campaigns + consent + dry-run send; live ESP later |
 | 6.11 Documents and knowledge | partial | Drive + customer_documents; not full DMS → expand with M5/M11 |

@@ -69,6 +69,7 @@ export type PurchaseOrder = {
   currency: string
   notes: string
   landed_cost_aed: number
+  warehouse_id?: string | null
 }
 
 export type PurchaseOrderLine = {
@@ -87,7 +88,7 @@ export async function listPurchaseOrders(): Promise<PurchaseOrder[]> {
   if (!isSupabaseConfigured()) return []
   const { data, error } = await db
     .from('purchase_orders')
-    .select('id, po_number, vendor_name, status, order_date, currency, notes, landed_cost_aed')
+    .select('id, po_number, vendor_name, status, order_date, currency, notes, landed_cost_aed, warehouse_id')
     .order('order_date', { ascending: false })
     .limit(100)
   if (error) {
@@ -97,6 +98,7 @@ export async function listPurchaseOrders(): Promise<PurchaseOrder[]> {
   return (data || []).map((r: PurchaseOrder) => ({
     ...r,
     landed_cost_aed: Number(r.landed_cost_aed) || 0,
+    warehouse_id: r.warehouse_id || null,
   }))
 }
 
@@ -108,6 +110,7 @@ export async function createPurchaseOrder(input: {
   qty: number
   unitCost: number
   landedCostAed?: number
+  warehouseId?: string | null
 }): Promise<PurchaseOrder> {
   const existing = await listPurchaseOrders()
   const po_number = nextPoNumber(
@@ -123,8 +126,9 @@ export async function createPurchaseOrder(input: {
       status: 'ordered',
       notes: '',
       landed_cost_aed: Number(input.landedCostAed) || 0,
+      warehouse_id: input.warehouseId || null,
     })
-    .select('id, po_number, vendor_name, status, order_date, currency, notes, landed_cost_aed')
+    .select('id, po_number, vendor_name, status, order_date, currency, notes, landed_cost_aed, warehouse_id')
     .single()
   if (error) throw error
   const { error: lErr } = await db.from('purchase_order_lines').insert({
@@ -137,7 +141,11 @@ export async function createPurchaseOrder(input: {
     unit_cost: input.unitCost,
   })
   if (lErr) throw lErr
-  return { ...data, landed_cost_aed: Number(data.landed_cost_aed) || 0 } as PurchaseOrder
+  return {
+    ...data,
+    landed_cost_aed: Number(data.landed_cost_aed) || 0,
+    warehouse_id: data.warehouse_id || null,
+  } as PurchaseOrder
 }
 
 export async function listPoLines(poId: string): Promise<PurchaseOrderLine[]> {

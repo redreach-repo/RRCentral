@@ -157,6 +157,43 @@ export async function createInvoiceAutoPostDraft(input: {
   }
 }
 
+/** M9/M12b: create draft journal from an expense (Unverified). */
+export async function createExpenseAutoPostDraft(input: {
+  expenseId: string
+  label: string
+  entryDate: string
+  exclusiveAed: number
+  vatAed: number
+  inclusiveAed: number
+}): Promise<GlJournal | null> {
+  const { expenseAutoPostMemo, expenseAutoPostSourceId, expenseToDraftLines, linesBalance } = await import(
+    './autoPost'
+  )
+  const draftLines = expenseToDraftLines(input)
+  if (!draftLines.length || !linesBalance(draftLines)) return null
+
+  const accounts = await listGlAccounts()
+  const map = new Map(accounts.map((a) => [a.code, a.id]))
+  const resolved = draftLines.map((l) => {
+    const accountId = map.get(l.code)
+    if (!accountId) return null
+    return { accountId, memo: l.memo, debit: l.debit, credit: l.credit }
+  })
+  if (resolved.some((r) => !r)) return null
+  try {
+    return await createDraftJournal({
+      entryDate: input.entryDate,
+      memo: expenseAutoPostMemo(input),
+      lines: resolved as JournalLineInput[],
+      sourceType: 'expense',
+      sourceId: expenseAutoPostSourceId(input.expenseId),
+    })
+  } catch (e) {
+    if (String((e as { code?: string })?.code || '').includes('23505')) return null
+    throw e
+  }
+}
+
 export async function postJournal(journalId: string, lines: JournalLineInput[]): Promise<GlJournal> {
   const gate = canPostJournal({ status: 'draft', lines })
   if (!gate.ok) throw new Error(gate.reason)
