@@ -15,7 +15,7 @@ Stubbed / unverified: VAT return boxes / GL peek; planning scenario assumptions 
 - CRM pipeline list: custom field columns + CSV export of those fields
 - Planning scenarios table + store + Planning Goals UI stub (assumptions JSON only)
 - Purchase orders: Archive soft-delete from list
-- `public-api` Edge Function: `installDemoGuard()` at boot
+- `public-api` Edge Function: wrapped with `withErrorLog` (installs demoGuard)
 
 ## Explicit non-claims
 
