@@ -25,9 +25,11 @@ import {
   stageLabel,
 } from '../lib/ctrm'
 import { listCommissions, listDeals, logTouch, saveDealForm, updateDeal } from '../lib/ctrmStore'
+import { CTRM_DEALS_CSV_COLUMNS } from '../lib/ctrmDealsCsv'
 import { canViewField } from '../lib/fieldPermissions'
 import { lostText, stageMoveProblem } from '../lib/dealRules'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import { formatAED } from '../lib/money'
 import type { Account, AccountContact, AppUser, CtrmCommission, CtrmDeal, CtrmStage } from '../lib/types'
 import {
@@ -327,6 +329,31 @@ export default function CtrmPage() {
           >
             {t('page.ctrmDetail.weeklySummary')}
           </Link>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!filtered.length}
+            onClick={() => {
+              exportListCsv(
+                'ctrm-deals.csv',
+                CTRM_DEALS_CSV_COLUMNS.map((c) => c.key),
+                filtered.map((d) => ({
+                  company: nameOf(d),
+                  stage: d.stage,
+                  region: d.region,
+                  company_type: d.company_type,
+                  owner: personName(d.owner_user_id),
+                  next_action: d.next_action,
+                  next_action_date: d.next_action_date || '',
+                  last_touch_at: d.last_touch_at,
+                })),
+              )
+              showToast('CTRM deals CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
           {canWrite ? (
             <button type="button" className={docsStyles.newBtn} onClick={() => setEditing({ deal: null })}>
               <Plus size={16} /> {t('page.ctrmDetail.new')}
