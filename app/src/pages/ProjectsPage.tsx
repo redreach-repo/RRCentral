@@ -176,7 +176,7 @@ export default function ProjectsPage() {
             onClick={() => {
               exportListCsv(
                 'projects.csv',
-                PROJECTS_CSV_COLUMNS.map((c) => c.key),
+                ['code', 'name', 'status', 'budget_aed', 'retention_pct', 'billed_to_date_aed', 'wip_aed'],
                 rows.map((r) => ({
                   code: r.code,
                   name: r.name,
