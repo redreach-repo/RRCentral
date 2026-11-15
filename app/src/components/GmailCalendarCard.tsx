@@ -11,6 +11,7 @@ import {
   type GmailStatus,
   GMAIL_OFF,
 } from '../lib/gmailCalendarApi'
+import { exportListCsv } from '../lib/listIo'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../lib/uiStyles'
 
 /**
@@ -85,10 +86,33 @@ export default function GmailCalendarCard() {
 
   return (
     <div id="gmail" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
-      <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <Plug size={18} /> {t('page.settings.section.gmail')}
-      </h2>
-      <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.55 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <h2 style={{ ...sectionTitleStyle, display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+          <Plug size={18} /> {t('page.settings.section.gmail')}
+        </h2>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={loading}
+          onClick={() => {
+            exportListCsv(
+              'gmail-status.csv',
+              ['field', 'value'],
+              [
+                { field: 'configured', value: status.configured ? 'yes' : 'no' },
+                { field: 'connected', value: status.connected ? 'yes' : 'no' },
+                { field: 'account_email', value: status.account_email || '' },
+                { field: 'redirect_uri', value: status.redirect_uri || '' },
+                { field: 'scopes', value: status.scopes || '' },
+              ],
+            )
+            showToast('Gmail status CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
+      </div>
+      <p style={{ color: colors.muted, fontSize: 13, marginTop: 8, lineHeight: 1.55 }}>
         Phase A: send mail and sync follow-ups / meetings with{' '}
         <code style={{ color: '#ff9f4a' }}>gmail.send</code> +{' '}
         <code style={{ color: '#ff9f4a' }}>calendar.events</code> only. Inbox / Sent need Phase B
