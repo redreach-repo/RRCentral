@@ -87,3 +87,6 @@ verify_jwt = false
 
 [functions.event-outbox]
 verify_jwt = false
+
+[functions.public-api]
+verify_jwt = false

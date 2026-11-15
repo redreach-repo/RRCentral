@@ -122,3 +122,13 @@ No database migrations. Documentation and `brand-assets/` only.
 
 **Rollback**
 - `alter table public.hr_employees drop column if exists labour_card_no, drop column if exists bank_routing_code;`
+
+
+## Public API webhook retries — `20261217170000_public_api_webhook_retries.sql`
+
+**What**
+- `webhook_endpoints.delivery_failures` / `next_retry_at`
+- `webhook_delivery_attempts` audit table (admin RLS)
+
+**Rollback**
+- Drop attempts table; drop new columns on `webhook_endpoints`.

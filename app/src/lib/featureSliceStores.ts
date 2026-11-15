@@ -23,6 +23,11 @@ import {
   yearsOfServiceFromStart,
 } from './wpsGratuity'
 import { nextSubscriptionStatus, planByKey, type SaasSubscriptionStatus } from './saasBillingPlans'
+import {
+  buildSignedWebhookHeaders,
+  DEFAULT_API_KEY_SCOPES,
+  deliverWebhookWithRetries,
+} from './publicApi'
 
 export type HrEmployee = {
   id: string
@@ -118,6 +123,8 @@ export type WebhookEndpoint = {
   event_types: unknown
   last_delivery_at: string | null
   last_delivery_status: string
+  delivery_failures?: number
+  next_retry_at?: string | null
 }
 
 export type TenantIndustryPackRow = {
@@ -668,7 +675,7 @@ export async function listApiKeys(): Promise<ApiKeyRow[]> {
 export async function createApiKey(
   name: string,
   createdBy?: string | null,
-  scopes: string[] = ['read:accounts'],
+  scopes: string[] = DEFAULT_API_KEY_SCOPES,
 ): Promise<{ plaintext: string; prefix: string }> {
   const plaintext = `hm_${crypto.randomUUID().replace(/-/g, '')}`
   const prefix = plaintext.slice(0, 10)
@@ -697,7 +704,7 @@ export async function listWebhookEndpoints(): Promise<WebhookEndpoint[]> {
   return emptyOnMissing(async () => {
     const { data, error } = await db
       .from('webhook_endpoints')
-      .select('id, url, active, event_types, last_delivery_at, last_delivery_status')
+      .select('id, url, active, event_types, last_delivery_at, last_delivery_status, delivery_failures, next_retry_at')
       .order('created_at', { ascending: false })
     if (error) throw error
     return (data || []) as WebhookEndpoint[]
@@ -723,8 +730,8 @@ export async function setWebhookActive(id: string, active: boolean): Promise<voi
   if (error) throw error
 }
 
-/** Best-effort outbound ping; records status on the endpoint row. */
-export async function testWebhookDelivery(id: string): Promise<{ ok: boolean; status: string }> {
+/** Signed outbound ping with retries; records status on the endpoint row. */
+export async function testWebhookDelivery(id: string): Promise<{ ok: boolean; status: string; attempts: number }> {
   const { data: hook, error: readErr } = await db.from('webhook_endpoints').select('*').eq('id', id).single()
   if (readErr) throw readErr
   const payload = {
@@ -732,33 +739,33 @@ export async function testWebhookDelivery(id: string): Promise<{ ok: boolean; st
     sent_at: new Date().toISOString(),
     message: 'HighMast webhook test event',
   }
-  let status = 'ok'
-  let ok = true
-  try {
-    const res = await fetch(String(hook.url), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-HighMast-Event': 'highmast.test',
-        'X-HighMast-Signature': String(hook.secret || ''),
-      },
-      body: JSON.stringify(payload),
-    })
-    status = `http_${res.status}`
-    ok = res.ok
-  } catch (e) {
-    status = e instanceof Error ? `error:${e.message.slice(0, 80)}` : 'error'
-    ok = false
+  const body = JSON.stringify(payload)
+  const headers = await buildSignedWebhookHeaders(String(hook.secret || 'whsec_missing'), body, 'highmast.test')
+  const result = await deliverWebhookWithRetries({
+    url: String(hook.url),
+    body,
+    headers,
+    maxAttempts: 3,
+  })
+  const patch: Record<string, unknown> = {
+    last_delivery_at: new Date().toISOString(),
+    last_delivery_status: `${result.status}×${result.attempts}`,
+    updated_at: new Date().toISOString(),
+    delivery_failures: result.ok ? 0 : Number(hook.delivery_failures || 0) + 1,
+    next_retry_at: result.ok ? null : new Date(Date.now() + 60_000).toISOString(),
   }
-  await db
-    .from('webhook_endpoints')
-    .update({
-      last_delivery_at: new Date().toISOString(),
-      last_delivery_status: status,
-      updated_at: new Date().toISOString(),
+  await db.from('webhook_endpoints').update(patch).eq('id', id)
+  try {
+    await db.from('webhook_delivery_attempts').insert({
+      endpoint_id: id,
+      event_type: 'highmast.test',
+      attempt: result.attempts,
+      status: result.status,
     })
-    .eq('id', id)
-  return { ok, status }
+  } catch {
+    /* table may not be migrated yet */
+  }
+  return result
 }
 
 export function publicApiConfigured(): boolean {
