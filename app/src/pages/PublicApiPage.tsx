@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { KeyRound } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -17,9 +17,38 @@ import {
   type WebhookEndpoint,
 } from '../lib/featureSliceStores'
 import { DEFAULT_API_KEY_SCOPES } from '../lib/publicApi'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
+
+const PUBLIC_API_CSV_HEADERS = [
+  'kind',
+  'name',
+  'key_prefix',
+  'scopes',
+  'url',
+  'active',
+  'revoked_at',
+  'last_used_at',
+  'last_delivery_status',
+  'last_delivery_at',
+  'created_at',
+] as const
+
+function parseYesNo(raw: string): boolean | null {
+  const v = raw.trim().toLowerCase()
+  if (!v) return null
+  if (v === 'yes' || v === 'true' || v === '1' || v === 'y' || v === 'active' || v === 'on') return true
+  if (v === 'no' || v === 'false' || v === '0' || v === 'n' || v === 'off' || v === 'inactive') return false
+  return null
+}
+
+function parseScopes(raw: string): string[] {
+  return String(raw || '')
+    .split(/[|;,]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
 
 /** M11: API keys + webhook endpoints with revoke / test delivery. */
 export default function PublicApiPage() {
@@ -34,6 +63,8 @@ export default function PublicApiPage() {
   const [hookUrl, setHookUrl] = useState('')
   const [plaintext, setPlaintext] = useState('')
   const [loading, setLoading] = useState(true)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -116,6 +147,131 @@ export default function PublicApiPage() {
     }
   }
 
+  async function importPublicApiCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const hooksByUrl = new Map(hooks.map((h) => [h.url.trim().toLowerCase(), h] as const))
+      const keysByName = new Map(keys.map((k) => [k.name.trim().toLowerCase(), k] as const))
+      let createdHooks = 0
+      let updatedHooks = 0
+      let createdKeys = 0
+      let skipped = 0
+      let lastPlaintext = ''
+
+      for (const row of objects) {
+        const kind = String(row.kind || '').trim().toLowerCase().replace(/[\s-]+/g, '_')
+        if (kind === 'webhook' || (!kind && String(row.url || '').trim())) {
+          const url = String(row.url || '').trim()
+          if (!url) {
+            skipped += 1
+            continue
+          }
+          const eventTypes = parseScopes(String(row.scopes || ''))
+          const active = parseYesNo(String(row.active ?? ''))
+          const existing = hooksByUrl.get(url.toLowerCase())
+          try {
+            if (!existing) {
+              await createWebhookEndpoint(url, eventTypes.length ? eventTypes : ['*'])
+              createdHooks += 1
+              if (active === false) {
+                const refreshed = await listWebhookEndpoints()
+                const created = refreshed.find((h) => h.url.trim().toLowerCase() === url.toLowerCase())
+                if (created) {
+                  await setWebhookActive(created.id, false)
+                  hooksByUrl.set(url.toLowerCase(), { ...created, active: false })
+                }
+              } else {
+                hooksByUrl.set(url.toLowerCase(), {
+                  id: `pending-${url}`,
+                  url,
+                  active: true,
+                  event_types: eventTypes.length ? eventTypes : ['*'],
+                  last_delivery_at: null,
+                  last_delivery_status: '',
+                  delivery_failures: 0,
+                  next_retry_at: null,
+                })
+              }
+            } else if (active !== null && active !== existing.active) {
+              await setWebhookActive(existing.id, active)
+              hooksByUrl.set(url.toLowerCase(), { ...existing, active })
+              updatedHooks += 1
+            } else {
+              skipped += 1
+            }
+          } catch {
+            skipped += 1
+          }
+          continue
+        }
+
+        if (kind === 'api_key' || kind === 'key') {
+          const name = String(row.name || '').trim()
+          if (!name) {
+            skipped += 1
+            continue
+          }
+          if (keysByName.has(name.toLowerCase())) {
+            skipped += 1
+            continue
+          }
+          const scopes = parseScopes(String(row.scopes || ''))
+          const active = parseYesNo(String(row.active ?? 'yes'))
+          if (active === false) {
+            skipped += 1
+            continue
+          }
+          try {
+            const created = await createApiKey(name, appUserId, scopes.length ? scopes : DEFAULT_API_KEY_SCOPES)
+            lastPlaintext = created.plaintext
+            keysByName.set(name.toLowerCase(), {
+              id: `pending-${name}`,
+              name,
+              key_prefix: created.prefix,
+              scopes: scopes.length ? scopes : DEFAULT_API_KEY_SCOPES,
+              revoked_at: null,
+              last_used_at: null,
+              created_at: new Date().toISOString(),
+            } as ApiKeyRow)
+            createdKeys += 1
+          } catch {
+            skipped += 1
+          }
+          continue
+        }
+
+        skipped += 1
+      }
+
+      const applied = createdHooks + updatedHooks + createdKeys
+      if (!applied) {
+        showToast(skipped ? 'No public API rows to import' : 'CSV has no data rows', 'error')
+        return
+      }
+      if (lastPlaintext) setPlaintext(lastPlaintext)
+      const parts = [
+        createdHooks ? `${createdHooks} webhook(s) added` : '',
+        updatedHooks ? `${updatedHooks} webhook(s) updated` : '',
+        createdKeys ? `${createdKeys} API key(s) created` : '',
+      ].filter(Boolean)
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`${parts.join(' · ')}${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Public API CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
@@ -129,59 +285,63 @@ export default function PublicApiPage() {
             {publicApiConfigured() ? '' : ' Supabase is not configured in this environment.'}
           </p>
         </div>
-        <button
-          type="button"
-          style={buttonSecondaryStyle}
-          disabled={loading || (keys.length === 0 && hooks.length === 0)}
-          onClick={() => {
-            const keyRows = keys.map((k) => ({
-              kind: 'api_key',
-              name: k.name,
-              key_prefix: k.key_prefix,
-              scopes: Array.isArray(k.scopes) ? (k.scopes as string[]).join('|') : String(k.scopes ?? ''),
-              url: '',
-              active: k.revoked_at ? 'no' : 'yes',
-              revoked_at: k.revoked_at || '',
-              last_used_at: k.last_used_at || '',
-              last_delivery_status: '',
-              last_delivery_at: '',
-              created_at: k.created_at,
-            }))
-            const hookRows = hooks.map((h) => ({
-              kind: 'webhook',
-              name: '',
-              key_prefix: '',
-              scopes: Array.isArray(h.event_types) ? (h.event_types as string[]).join('|') : String(h.event_types ?? ''),
-              url: h.url,
-              active: h.active ? 'yes' : 'no',
-              revoked_at: '',
-              last_used_at: '',
-              last_delivery_status: h.last_delivery_status || '',
-              last_delivery_at: h.last_delivery_at || '',
-              created_at: '',
-            }))
-            exportListCsv(
-              'public-api.csv',
-              [
-                'kind',
-                'name',
-                'key_prefix',
-                'scopes',
-                'url',
-                'active',
-                'revoked_at',
-                'last_used_at',
-                'last_delivery_status',
-                'last_delivery_at',
-                'created_at',
-              ],
-              [...keyRows, ...hookRows],
-            )
-            showToast('Public API CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importPublicApiCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={importing || loading}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={loading || (keys.length === 0 && hooks.length === 0)}
+            onClick={() => {
+              const keyRows = keys.map((k) => ({
+                kind: 'api_key',
+                name: k.name,
+                key_prefix: k.key_prefix,
+                scopes: Array.isArray(k.scopes) ? (k.scopes as string[]).join('|') : String(k.scopes ?? ''),
+                url: '',
+                active: k.revoked_at ? 'no' : 'yes',
+                revoked_at: k.revoked_at || '',
+                last_used_at: k.last_used_at || '',
+                last_delivery_status: '',
+                last_delivery_at: '',
+                created_at: k.created_at,
+              }))
+              const hookRows = hooks.map((h) => ({
+                kind: 'webhook',
+                name: '',
+                key_prefix: '',
+                scopes: Array.isArray(h.event_types) ? (h.event_types as string[]).join('|') : String(h.event_types ?? ''),
+                url: h.url,
+                active: h.active ? 'yes' : 'no',
+                revoked_at: '',
+                last_used_at: '',
+                last_delivery_status: h.last_delivery_status || '',
+                last_delivery_at: h.last_delivery_at || '',
+                created_at: '',
+              }))
+              exportListCsv('public-api.csv', [...PUBLIC_API_CSV_HEADERS], [...keyRows, ...hookRows])
+              showToast('Public API CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </header>
 
       <form onSubmit={(e) => void onCreateKey(e)} style={{ ...cardStyle, marginBottom: 16, display: 'grid', gap: 10, maxWidth: 520 }}>
