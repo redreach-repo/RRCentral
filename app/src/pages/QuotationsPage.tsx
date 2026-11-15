@@ -1071,27 +1071,39 @@ export default function QuotationsPage() {
   async function confirmDelete() {
     if (!deleteTarget) return
     if (!canDeleteQuote) {
-      showToast('Only managers and admins can delete quotations', 'error')
+      showToast('Only managers and admins can archive quotations', 'error')
       setDeleteTarget(null)
       return
     }
+    const archived = Boolean((deleteTarget as Quotation & { deleted_at?: string | null }).deleted_at)
     setSaving(true)
     try {
-      await deleteLineItems('Quote', [deleteTarget.quote_id])
-      let { error } = await db
-        .from('quotations')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('id', deleteTarget.id)
-      if (error) {
-        const hard = await db.from('quotations').delete().eq('id', deleteTarget.id)
-        if (hard.error) throw hard.error
+      if (archived) {
+        const { error } = await db
+          .from('quotations')
+          .update({ deleted_at: null, updated_at: new Date().toISOString(), updated_by: who })
+          .eq('id', deleteTarget.id)
+        if (error) throw error
+        await logActivity('restore_quote', 'quotation', deleteTarget.quote_id, deleteTarget.client, who)
+        showToast('Quotation restored', 'success')
+      } else {
+        // Soft-archive keeps line items so restore is lossless.
+        let { error } = await db
+          .from('quotations')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', deleteTarget.id)
+        if (error) {
+          await deleteLineItems('Quote', [deleteTarget.quote_id])
+          const hard = await db.from('quotations').delete().eq('id', deleteTarget.id)
+          if (hard.error) throw hard.error
+        }
+        await logActivity('archive_quote', 'quotation', deleteTarget.quote_id, deleteTarget.client, who)
+        showToast('Quotation archived', 'success')
       }
-      await logActivity('delete_quote', 'quotation', deleteTarget.quote_id, deleteTarget.client, who)
-      showToast('Quotation deleted', 'success')
       setDeleteTarget(null)
       await load()
     } catch (e) {
-      showToast(errorMessage(e, 'Delete failed'), 'error')
+      showToast(errorMessage(e, archived ? 'Restore failed' : 'Archive failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -2490,14 +2502,42 @@ export default function QuotationsPage() {
         </div>
       </Modal>
 
-      <Modal open={!!deleteTarget} title="Delete quotation?" onClose={() => setDeleteTarget(null)} width={420}>
+      <Modal
+        open={!!deleteTarget}
+        title={
+          (deleteTarget as (Quotation & { deleted_at?: string | null }) | null)?.deleted_at
+            ? 'Restore quotation?'
+            : 'Archive quotation?'
+        }
+        onClose={() => setDeleteTarget(null)}
+        width={420}
+      >
         <p style={{ color: colors.muted, fontSize: 14 }}>
-          Delete <strong style={{ color: colors.text }}>{deleteTarget?.reference_number || deleteTarget?.quote_id}</strong> and its line items? This cannot be undone.
+          {(deleteTarget as (Quotation & { deleted_at?: string | null }) | null)?.deleted_at ? (
+            <>
+              Restore <strong style={{ color: colors.text }}>{deleteTarget?.reference_number || deleteTarget?.quote_id}</strong>{' '}
+              to the active list. Line items are kept.
+            </>
+          ) : (
+            <>
+              Archive <strong style={{ color: colors.text }}>{deleteTarget?.reference_number || deleteTarget?.quote_id}</strong>{' '}
+              (soft-delete). Use Show archived to restore later. Line items stay attached.
+            </>
+          )}
         </p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setDeleteTarget(null)}>Cancel</button>
-          <button type="button" style={buttonDangerStyle} disabled={saving} onClick={() => void confirmDelete()}>
-            Delete
+          <button
+            type="button"
+            style={
+              (deleteTarget as (Quotation & { deleted_at?: string | null }) | null)?.deleted_at
+                ? buttonSecondaryStyle
+                : buttonDangerStyle
+            }
+            disabled={saving}
+            onClick={() => void confirmDelete()}
+          >
+            {(deleteTarget as (Quotation & { deleted_at?: string | null }) | null)?.deleted_at ? 'Restore' : 'Archive'}
           </button>
         </div>
       </Modal>

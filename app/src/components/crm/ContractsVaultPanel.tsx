@@ -27,6 +27,7 @@ import {
   setObligationStatus,
 } from '../../lib/obligationBoardStore'
 import { parseObligationForm } from '../../lib/schemas/obligation'
+import { exportListCsv } from '../../lib/listIo'
 import { btn, btnGhost, btnPrimary, colors, input } from '../../lib/pageStyles'
 import type {
   ContractObligation,
@@ -210,6 +211,41 @@ export default function ContractsVaultPanel({
             placeholder="optional"
           />
         </label>
+        <button
+          type="button"
+          style={btn}
+          disabled={!rows.length}
+          onClick={() => {
+            exportListCsv(
+              `contracts-${entry.company_name || 'vault'}.csv`,
+              [
+                'title',
+                'doc_type',
+                'status',
+                'party_name',
+                'party_email',
+                'created_at',
+                'sent_at',
+                'signed_at',
+                'drive_url',
+              ],
+              rows.map((d) => ({
+                title: d.title,
+                doc_type: d.doc_type,
+                status: d.status,
+                party_name: d.party_name,
+                party_email: d.party_email,
+                created_at: d.created_at,
+                sent_at: d.sent_at || '',
+                signed_at: d.signed_at || '',
+                drive_url: d.drive_url || '',
+              })),
+            )
+            showToast('Contracts CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
         <button type="button" style={btnPrimary} disabled={busy} onClick={() => void createNda()}>
           <Plus size={14} /> New NDA
         </button>

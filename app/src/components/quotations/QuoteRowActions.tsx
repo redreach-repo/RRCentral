@@ -155,7 +155,8 @@ export default function QuoteRowActions({
       </button>
       {canDelete ? (
         <button type="button" className={styles.danger} onClick={() => onDelete(q)}>
-          <Trash2 size={13} /> Delete
+          <Trash2 size={13} />{' '}
+          {(q as Quotation & { deleted_at?: string | null }).deleted_at ? 'Restore' : 'Archive'}
         </button>
       ) : null}
     </div>

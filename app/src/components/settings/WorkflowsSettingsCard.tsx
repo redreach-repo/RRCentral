@@ -20,6 +20,7 @@ import {
   type WorkflowDefinition,
   type WorkflowTriggerType,
 } from '../../lib/workflows'
+import { startWorkflowRun } from '../../lib/workflowRunner'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -48,7 +49,7 @@ const tdStyle: CSSProperties = {
 
 /** Settings → Workflows: approval chains and other automation definitions. */
 export default function WorkflowsSettingsCard() {
-  const { userRole } = useAuth()
+  const { user, userRole } = useAuth()
   const { t } = useI18n()
   const { showToast } = useToast()
   const manage = can(userRole, 'settings.manage')
@@ -156,6 +157,37 @@ export default function WorkflowsSettingsCard() {
     }
   }
 
+
+  async function dryRun(row: WorkflowDefinition) {
+    setBusy(true)
+    try {
+      const run = await startWorkflowRun(row, {
+        object_type: 'dry_run',
+        record_id: 'dry-run',
+        record_label: `Dry-run · ${row.name}`,
+        pipeline_key: String(row.trigger_config?.pipeline_key || ''),
+        stage_key: String(row.trigger_config?.stage_key || ''),
+        actor_email: user?.email || '',
+        notifications: [],
+        step_log: [],
+        webhook_dry_logs: [],
+        ask_ai_dry_logs: [],
+      })
+      const steps = (run.context.step_log || []).map((s) => s.detail || s.status).join('; ')
+      const hooks = (run.context.webhook_dry_logs || []).length
+      const asks = (run.context.ask_ai_dry_logs || []).length
+      showToast(
+        `Dry-run ${run.status}${hooks || asks ? ` · ${hooks} webhook / ${asks} ask_ai logged (no outbound)` : ''}${steps ? ` · ${steps}` : ''}`,
+        run.status === 'failed' ? 'error' : 'success',
+      )
+    } catch (e) {
+      showToast(errorMessage(e, 'Dry-run failed'), 'error')
+    } finally {
+      setBusy(false)
+      setActionsId(null)
+    }
+  }
+
   async function toggleActive(row: WorkflowDefinition) {
     setBusy(true)
     try {
@@ -181,8 +213,8 @@ export default function WorkflowsSettingsCard() {
         ) : null}
       </div>
       <p style={{ margin: '8px 0 14px', fontSize: 13, color: colors.muted, lineHeight: 1.45 }}>
-        Define triggers and steps (approval → notify). Runs are recorded later; this slice stores the
-        chains as tenant data so admins can add them without a code change.
+        Define triggers and steps (approval → notify). Dry-run starts a workflow run without outbound
+        webhook or ask_ai calls — step logs stay on the run context.
       </p>
       {loading ? (
         <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>Loading…</p>
@@ -220,13 +252,23 @@ export default function WorkflowsSettingsCard() {
                   <td style={tdStyle}>{row.active ? 'Active' : 'Off'}</td>
                   <td style={tdStyle}>
                     {manage ? (
-                      <SimpleRowActions
-                        expanded={actionsId === row.id}
-                        onToggle={() => setActionsId((id) => (id === row.id ? null : row.id))}
-                        onEdit={() => openEdit(row)}
-                        onDelete={() => void toggleActive(row)}
-                        deleteLabel={row.active ? 'Deactivate' : 'Activate'}
-                      />
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          style={{ ...buttonSecondaryStyle, padding: '4px 8px', fontSize: 12 }}
+                          disabled={busy}
+                          onClick={() => void dryRun(row)}
+                        >
+                          Dry-run
+                        </button>
+                        <SimpleRowActions
+                          expanded={actionsId === row.id}
+                          onToggle={() => setActionsId((id) => (id === row.id ? null : row.id))}
+                          onEdit={() => openEdit(row)}
+                          onDelete={() => void toggleActive(row)}
+                          deleteLabel={row.active ? 'Deactivate' : 'Activate'}
+                        />
+                      </div>
                     ) : null}
                   </td>
                 </tr>

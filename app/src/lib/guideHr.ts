@@ -1,4 +1,4 @@
-/** Guide pack: HR people / leave / attendance paths. */
+/** Guide pack: HR people / leave / attendance / payroll paths. */
 
 import type { GuideCrmSection } from './guideCrm'
 
@@ -25,5 +25,12 @@ export const GUIDE_HR_SECTIONS: GuideHrSection[] = [
     bodyKey: 'guide.hr.attendance.body',
     to: '/hr/attendance',
     linkKey: 'guide.hr.attendance.link',
+  },
+  {
+    id: 'payroll',
+    titleKey: 'guide.hr.payroll.title',
+    bodyKey: 'guide.hr.payroll.body',
+    to: '/payroll',
+    linkKey: 'guide.hr.payroll.link',
   },
 ]

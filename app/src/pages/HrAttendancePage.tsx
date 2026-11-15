@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Clock } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
@@ -33,11 +33,17 @@ export default function HrAttendancePage() {
   const [hours, setHours] = useState('8')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(true)
+  const [filterPerson, setFilterPerson] = useState('all')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [p, r] = await Promise.all([listHrEmployees('active'), listHrAttendanceDays()])
+      const [p, r] = await Promise.all([
+        listHrEmployees('active'),
+        listHrAttendanceDays(fromDate || undefined),
+      ])
       setPeople(p)
       setRows(r)
       if (!employeeId && p[0]) setEmployeeId(p[0].id)
@@ -46,11 +52,20 @@ export default function HrAttendancePage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast, employeeId])
+  }, [showToast, employeeId, fromDate])
 
   useEffect(() => {
     void load()
   }, [load])
+
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((r) => {
+      if (filterPerson !== 'all' && r.employee_id !== filterPerson) return false
+      if (toDate && r.work_date > toDate) return false
+      return true
+    })
+  }, [rows, filterPerson, toDate])
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -87,12 +102,12 @@ export default function HrAttendancePage() {
           type="button"
           className={docsStyles.newBtn}
           style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-          disabled={!rows.length}
+          disabled={!filteredRows.length}
           onClick={() => {
             exportListCsv(
               'hr-attendance.csv',
               ['work_date', 'employee', 'status', 'hours', 'notes'],
-              rows.map((r) => ({
+              filteredRows.map((r) => ({
                 work_date: r.work_date,
                 employee: r.hr_employees?.full_name || r.employee_id,
                 status: r.status,
@@ -172,11 +187,53 @@ export default function HrAttendancePage() {
 
           <section style={cardStyle}>
             <h2 style={{ marginTop: 0, fontSize: 16 }}>Recent</h2>
-            {rows.length === 0 ? (
-              <EmptyState title="No attendance yet" subtitle="Log the first day above." />
+            <div
+              style={{
+                display: 'grid',
+                gap: 8,
+                gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                marginBottom: 12,
+              }}
+            >
+              <label style={labelStyle}>
+                Person filter
+                <select
+                  style={selectStyle}
+                  value={filterPerson}
+                  onChange={(e) => setFilterPerson(e.target.value)}
+                >
+                  <option value="all">All people</option>
+                  {people.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.full_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label style={labelStyle}>
+                From
+                <input
+                  style={inputStyle}
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                />
+              </label>
+              <label style={labelStyle}>
+                To
+                <input
+                  style={inputStyle}
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                />
+              </label>
+            </div>
+            {filteredRows.length === 0 ? (
+              <EmptyState title="No attendance yet" subtitle="Log the first day above, or widen the filters." />
             ) : (
               <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
-                {rows.map((r) => (
+                {filteredRows.map((r) => (
                   <li key={r.id} style={{ borderTop: `1px solid ${colors.border}`, paddingTop: 8, fontSize: 13 }}>
                     <strong>{r.hr_employees?.full_name || r.employee_id}</strong> · {r.work_date} ·{' '}
                     {attendanceLabel(r.status, r.hours)}

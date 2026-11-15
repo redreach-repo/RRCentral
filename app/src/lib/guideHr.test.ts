@@ -4,8 +4,13 @@ import { GUIDE_PACKS } from './guidePacks'
 import { t } from './i18n'
 
 describe('GUIDE_HR_SECTIONS', () => {
-  it('covers the three HR paths', () => {
-    expect(GUIDE_HR_SECTIONS.map((s) => s.id)).toEqual(['people', 'leave', 'attendance'])
+  it('covers the four HR paths', () => {
+    expect(GUIDE_HR_SECTIONS.map((s) => s.id)).toEqual([
+      'people',
+      'leave',
+      'attendance',
+      'payroll',
+    ])
   })
 
   it('routes into the app', () => {

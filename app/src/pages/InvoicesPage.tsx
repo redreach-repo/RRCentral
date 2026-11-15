@@ -694,28 +694,40 @@ export default function InvoicesPage() {
   async function confirmDelete() {
     if (!deleteTarget) return
     if (!can(userRole, 'invoice.delete')) {
-      showToast('Only admins can delete invoices', 'error')
+      showToast('Only admins can archive invoices', 'error')
       return
     }
+    const archived = Boolean((deleteTarget as Invoice & { deleted_at?: string | null }).deleted_at)
     setSaving(true)
     try {
       const ref = deleteTarget.reference_number
-      await deleteLineItems('Invoice', [ref])
-      await deleteFinanceForInvoiceRef(ref)
-      let { error } = await db
-        .from('invoices')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('id', deleteTarget.id)
-      if (error) {
-        const hard = await db.from('invoices').delete().eq('id', deleteTarget.id)
-        if (hard.error) throw hard.error
+      if (archived) {
+        const { error } = await db
+          .from('invoices')
+          .update({ deleted_at: null, updated_at: new Date().toISOString() })
+          .eq('id', deleteTarget.id)
+        if (error) throw error
+        await logActivity('restore_invoice', 'invoice', ref, deleteTarget.client, who)
+        showToast('Invoice restored', 'success')
+      } else {
+        // Soft-archive keeps lines/finance so restore is lossless.
+        let { error } = await db
+          .from('invoices')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', deleteTarget.id)
+        if (error) {
+          await deleteLineItems('Invoice', [ref])
+          await deleteFinanceForInvoiceRef(ref)
+          const hard = await db.from('invoices').delete().eq('id', deleteTarget.id)
+          if (hard.error) throw hard.error
+        }
+        await logActivity('archive_invoice', 'invoice', ref, deleteTarget.client, who)
+        showToast('Invoice archived', 'success')
       }
-      await logActivity('delete_invoice', 'invoice', ref, deleteTarget.client, who)
-      showToast('Invoice deleted', 'success')
       setDeleteTarget(null)
       await load()
     } catch (e) {
-      showToast(errorMessage(e, 'Delete failed'), 'error')
+      showToast(errorMessage(e, archived ? 'Restore failed' : 'Archive failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -1291,15 +1303,42 @@ export default function InvoicesPage() {
         </div>
       </Modal>
 
-      <Modal open={!!deleteTarget} title="Delete invoice?" onClose={() => setDeleteTarget(null)} width={420}>
+      <Modal
+        open={!!deleteTarget}
+        title={
+          (deleteTarget as (Invoice & { deleted_at?: string | null }) | null)?.deleted_at
+            ? 'Restore invoice?'
+            : 'Archive invoice?'
+        }
+        onClose={() => setDeleteTarget(null)}
+        width={420}
+      >
         <p style={{ color: colors.muted, fontSize: 14 }}>
-          Delete <strong style={{ color: colors.text }}>{deleteTarget?.reference_number}</strong>, its line items,
-          linked payments, and income?
+          {(deleteTarget as (Invoice & { deleted_at?: string | null }) | null)?.deleted_at ? (
+            <>
+              Restore <strong style={{ color: colors.text }}>{deleteTarget?.reference_number}</strong> to the active
+              list. Line items and linked finance stay attached.
+            </>
+          ) : (
+            <>
+              Archive <strong style={{ color: colors.text }}>{deleteTarget?.reference_number}</strong> (soft-delete).
+              Use Show archived to restore later. Line items and linked finance stay attached.
+            </>
+          )}
         </p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setDeleteTarget(null)}>Cancel</button>
-          <button type="button" style={buttonDangerStyle} disabled={saving} onClick={() => void confirmDelete()}>
-            Delete
+          <button
+            type="button"
+            style={
+              (deleteTarget as (Invoice & { deleted_at?: string | null }) | null)?.deleted_at
+                ? buttonSecondaryStyle
+                : buttonDangerStyle
+            }
+            disabled={saving}
+            onClick={() => void confirmDelete()}
+          >
+            {(deleteTarget as (Invoice & { deleted_at?: string | null }) | null)?.deleted_at ? 'Restore' : 'Archive'}
           </button>
         </div>
       </Modal>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { Building2, ExternalLink, Plus } from 'lucide-react'
 import VendorRowActions from '../components/vendors/VendorRowActions'
@@ -24,8 +24,9 @@ import {
   listExpenseAttachmentsForIds,
   listExpensesForVendor,
 } from '../lib/supplierInvoiceStore'
-import { listVendors, restoreVendor, type VendorRow } from '../lib/vendors'
-import { exportListCsv } from '../lib/listIo'
+import { ensureVendor, listVendors, restoreVendor, type VendorRow } from '../lib/vendors'
+import { VENDOR_CSV_COLUMNS } from '../lib/vendorsCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import {
   buttonDangerStyle,
   buttonPrimaryStyle,
@@ -98,6 +99,8 @@ export default function VendorsPage() {
   const [vendorInvoices, setVendorInvoices] = useState<Expense[]>([])
   const [invoiceAttachments, setInvoiceAttachments] = useState<Attachment[]>([])
   const [invoicesLoading, setInvoicesLoading] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -250,6 +253,45 @@ export default function VendorsPage() {
     }
   }
 
+
+  async function importVendorsCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows)
+      const { ok, errors } = parseListIoRows(objects, VENDOR_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid vendor rows', 'error')
+        return
+      }
+      let saved = 0
+      for (const row of ok) {
+        const result = await ensureVendor({
+          company_name: row.company_name,
+          primary_contact: row.primary_contact || '',
+          email: row.email || '',
+          mobile: row.mobile || '',
+          trn: row.trn || '',
+        })
+        if (result) saved += 1
+      }
+      await logActivity('import_vendors_csv', 'vendor', `${saved} rows`, '', user?.email || '')
+      const skipNote = errors.length ? ` · ${errors.length} row(s) skipped` : ''
+      showToast(`Imported ${saved} vendor(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Vendor CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   async function confirmDelete() {
     if (!deleteTarget) return
     const archived = Boolean((deleteTarget as VendorRow).deleted_at)
@@ -295,6 +337,25 @@ export default function VendorsPage() {
           <p className={docsStyles.subtitle}>{t('page.vendors.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importVendorsCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={missingTable || importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}
