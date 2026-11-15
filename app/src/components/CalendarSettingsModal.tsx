@@ -6,6 +6,7 @@ import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { errorMessage } from '../lib/errors'
 import { parseCalendarSettingsForm } from '../lib/schemas/calendarSettings'
+import { exportListCsv } from '../lib/listIo'
 import {
   isZohoConfigured,
   listZohoCalendars,
@@ -164,17 +165,56 @@ export default function CalendarSettingsModal({ open, onClose, onSaved }: Props)
           />
         </div>
         <div style={{ ...fieldStyle, gridColumn: '1 / -1' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <label style={{ ...labelStyle, marginBottom: 0 }}>Which calendar</label>
-            <button
-              type="button"
-              style={{ ...buttonSecondaryStyle, padding: '4px 8px', fontSize: 12 }}
-              disabled={!configured || loadingCals}
-              onClick={() => void loadCalendars()}
-            >
-              {loadingCals ? <Loader2 size={12} /> : <RefreshCw size={12} />}
-              Reload list
-            </button>
+            <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                style={{ ...buttonSecondaryStyle, padding: '4px 8px', fontSize: 12 }}
+                disabled={calendars.length === 0 && !enabled && !domain && !calendarUid}
+                onClick={() => {
+                  const rows =
+                    calendars.length > 0
+                      ? calendars.map((c) => ({
+                          kind: 'calendar',
+                          uid: c.uid,
+                          name: c.name,
+                          is_default: c.isDefault ? 'yes' : 'no',
+                          sync_enabled: enabled,
+                          domain,
+                          selected_uid: calendarUid,
+                        }))
+                      : [
+                          {
+                            kind: 'settings',
+                            uid: calendarUid,
+                            name: '',
+                            is_default: '',
+                            sync_enabled: enabled,
+                            domain,
+                            selected_uid: calendarUid,
+                          },
+                        ]
+                  exportListCsv(
+                    'calendar-settings.csv',
+                    ['kind', 'uid', 'name', 'is_default', 'sync_enabled', 'domain', 'selected_uid'],
+                    rows,
+                  )
+                  showToast('Calendar settings CSV downloaded', 'success')
+                }}
+              >
+                Export CSV
+              </button>
+              <button
+                type="button"
+                style={{ ...buttonSecondaryStyle, padding: '4px 8px', fontSize: 12 }}
+                disabled={!configured || loadingCals}
+                onClick={() => void loadCalendars()}
+              >
+                {loadingCals ? <Loader2 size={12} /> : <RefreshCw size={12} />}
+                Reload list
+              </button>
+            </span>
           </div>
           {calendars.length > 0 ? (
             <select
