@@ -91,13 +91,34 @@ export async function savePolicy(
   check(await db.from('sla_policies').insert({ ...input, id: crypto.randomUUID(), updated_at: now }))
 }
 
-export async function listTickets(accountId?: string): Promise<Ticket[]> {
+export type TicketRow = Ticket & { deleted_at?: string | null }
+
+export async function listTickets(
+  accountId?: string,
+  opts?: { includeDeleted?: boolean },
+): Promise<TicketRow[]> {
   let q = db.from('tickets').select('*')
   if (accountId) q = q.eq('account_id', accountId)
-  const list = await rows<Ticket & { deleted_at?: string | null }>(
-    q.order('created_at', { ascending: false }),
+  const list = await rows<TicketRow>(q.order('created_at', { ascending: false }))
+  return opts?.includeDeleted ? list : list.filter((t) => !t.deleted_at)
+}
+
+export async function softDeleteTicket(id: string): Promise<void> {
+  check(
+    await db
+      .from('tickets')
+      .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq('id', id),
   )
-  return list.filter((t) => !t.deleted_at)
+}
+
+export async function restoreTicket(id: string): Promise<void> {
+  check(
+    await db
+      .from('tickets')
+      .update({ deleted_at: null, updated_at: new Date().toISOString() })
+      .eq('id', id),
+  )
 }
 
 export async function getTicket(id: string): Promise<Ticket | null> {

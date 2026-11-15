@@ -11,9 +11,11 @@ Stubbed / unverified: none in this batch (DSR prune remains destructive by desig
 ## What shipped
 
 - Settings numbering: Pad column + Edit pad (2–6) for all sequences; prefix edit still PO/expense only
-- CSV export on Delivery notes, Domains, Marketing campaigns, Payments (selected booking), Follow-ups
+- CSV export on Delivery notes, Domains, Marketing campaigns, Payments (selected booking), Follow-ups, Approvals
 - DSR page: notes field, Export CSV, confirm before retention prune, retention run history
 - Guide packs: admin → Data subject requests; ops → Purchase orders (EN + AR)
+- Support tickets: Show archived + Archive/Restore (soft-delete)
+- Delivery notes: Show archived + Archive/Restore (soft-delete)
 
 ## Explicit non-claims
 

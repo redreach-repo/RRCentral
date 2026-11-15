@@ -63,8 +63,14 @@ async function writeBlob(blob: DeliveryNotesStoreBlob): Promise<void> {
   if (error) throw asError(error, 'Could not save delivery note')
 }
 
-export async function listDeliveryNotes(): Promise<DeliveryNote[]> {
+export type DeliveryNoteRow = DeliveryNote & { deleted_at?: string | null }
+
+export async function listDeliveryNotes(opts?: {
+  includeDeleted?: boolean
+}): Promise<DeliveryNoteRow[]> {
   const blob = await readBlob()
+  const keep = <T extends { deleted_at?: string | null }>(rows: T[]) =>
+    opts?.includeDeleted ? rows : withoutSoftDeleted(rows)
   if (tableMissing !== true) {
     const { data, error } = await db
       .from('delivery_notes')
@@ -73,13 +79,9 @@ export async function listDeliveryNotes(): Promise<DeliveryNote[]> {
     if (!error) {
       tableMissing = false
       const byId = new Map(
-        withoutSoftDeleted((data || []) as (DeliveryNote & { deleted_at?: string | null })[]).map(
-          (n) => [n.id, n],
-        ),
+        keep((data || []) as DeliveryNoteRow[]).map((n) => [n.id, n]),
       )
-      for (const note of withoutSoftDeleted(
-        blob.notes as (DeliveryNote & { deleted_at?: string | null })[],
-      )) {
+      for (const note of keep(blob.notes as DeliveryNoteRow[])) {
         if (!byId.has(note.id)) byId.set(note.id, note)
       }
       return sortNotes([...byId.values()])
@@ -87,7 +89,25 @@ export async function listDeliveryNotes(): Promise<DeliveryNote[]> {
     if (shouldFallbackDeliveryNoteStorage(error)) tableMissing = true
     else throw asError(error, 'Could not load delivery notes')
   }
-  return sortNotes(blob.notes)
+  return sortNotes(keep(blob.notes as DeliveryNoteRow[]))
+}
+
+export async function restoreDeliveryNote(id: string): Promise<void> {
+  if (tableMissing !== true) {
+    const { error } = await db
+      .from('delivery_notes')
+      .update({ deleted_at: null })
+      .eq('id', id)
+    if (error && shouldFallbackDeliveryNoteStorage(error)) tableMissing = true
+    else if (error) throw asError(error, 'Could not restore delivery note')
+    else tableMissing = false
+  }
+  const blob = await readBlob()
+  const idx = blob.notes.findIndex((n) => n.id === id)
+  if (idx >= 0) {
+    delete (blob.notes[idx] as DeliveryNoteRow).deleted_at
+    await writeBlob(blob)
+  }
 }
 
 export async function listDeliveryNoteRefs(): Promise<string[]> {
@@ -160,9 +180,10 @@ export async function deleteDeliveryNote(id: string): Promise<void> {
   const blob = await readBlob()
   const note = blob.notes.find((n) => n.id === id)
   if (note) {
-    ;(note as DeliveryNote & { deleted_at?: string }).deleted_at = deletedAt
+    ;(note as DeliveryNoteRow).deleted_at = deletedAt
+  } else {
+    // Cloud soft-delete may not have a local blob row; nothing else to sync.
   }
-  blob.notes = blob.notes.filter((n) => n.id !== id)
   if (note?.reference_number) {
     blob.items = blob.items.filter((i) => i.reference !== note.reference_number)
   }

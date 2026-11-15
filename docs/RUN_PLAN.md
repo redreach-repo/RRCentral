@@ -13,6 +13,7 @@
 - [x] CSV export: delivery notes, domains, marketing, payments, follow-ups
 - [x] DSR / retention polish (CSV, confirm prune, retention run history)
 - [x] Guide pack deepen (admin DSR + ops POs)
+- [x] Support tickets soft-archive + Approvals CSV + DN show-archived
 - [ ] M14 / live ESP / Tax / CASA / QTSP (Not done)
 
 ## Quality gates

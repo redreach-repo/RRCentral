@@ -29,11 +29,12 @@ import {
 } from '../lib/deliveryNotes'
 import {
   deleteDeliveryNote,
-  deleteDeliveryNoteLineItems,
   listDeliveryNotes,
   loadDeliveryNoteLineItems,
+  restoreDeliveryNote,
   saveDeliveryNoteLineItems,
   updateDeliveryNote,
+  type DeliveryNoteRow,
 } from '../lib/deliveryNoteStore'
 import {
   deleteSignedDeliveryNoteAttachment,
@@ -94,11 +95,12 @@ export default function DeliveryNotesPage() {
   const who = user?.email || ''
   const prefix = settings.deliveryNotePrefix || 'DN'
 
-  const [notes, setNotes] = useState<DeliveryNote[]>([])
+  const [notes, setNotes] = useState<DeliveryNoteRow[]>([])
   const [quotes, setQuotes] = useState<Quotation[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState<StatusTab>('All')
+  const [showArchived, setShowArchived] = useState(false)
   const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
@@ -137,7 +139,7 @@ export default function DeliveryNotesPage() {
     setLoading(true)
     try {
       const [notesRows, qRes] = await Promise.all([
-        listDeliveryNotes(),
+        listDeliveryNotes({ includeDeleted: showArchived }),
         db.from('quotations').select('*').order('created_at', { ascending: false }),
       ])
       if (qRes.error) throw qRes.error
@@ -148,7 +150,7 @@ export default function DeliveryNotesPage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [showToast, showArchived])
 
   useEffect(() => {
     void load()
@@ -290,9 +292,17 @@ export default function DeliveryNotesPage() {
 
   async function confirmDelete() {
     if (!deleteTarget) return
+    const archived = Boolean((deleteTarget as DeliveryNoteRow).deleted_at)
     setSaving(true)
     try {
-      await deleteDeliveryNoteLineItems(deleteTarget.reference_number)
+      if (archived) {
+        await restoreDeliveryNote(deleteTarget.id)
+        showToast('Delivery note restored', 'success')
+        setDeleteTarget(null)
+        await load()
+        return
+      }
+      // Soft-archive keeps line items so restore is lossless.
       await deleteDeliveryNote(deleteTarget.id)
       await logActivity(
         'delete_delivery_note',
@@ -301,11 +311,11 @@ export default function DeliveryNotesPage() {
         deleteTarget.client,
         who,
       )
-      showToast('Delivery note deleted', 'success')
+      showToast('Delivery note archived', 'success')
       setDeleteTarget(null)
       await load()
     } catch (e) {
-      showToast(errorMessage(e, 'Delete failed'), 'error')
+      showToast(errorMessage(e, 'Archive failed'), 'error')
     } finally {
       setSaving(false)
     }
@@ -354,6 +364,14 @@ export default function DeliveryNotesPage() {
             }}
           >
             Export CSV
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
           </button>
           <button type="button" className={docsStyles.newBtn} onClick={() => setCreateOpen(true)}>
             <Plus size={16} /> {t('page.deliveryNotes.new')}
@@ -699,17 +717,44 @@ export default function DeliveryNotesPage() {
         }
       />
 
-      <Modal open={!!deleteTarget} title="Delete delivery note?" onClose={() => setDeleteTarget(null)} width={420}>
+      <Modal
+        open={!!deleteTarget}
+        title={
+          (deleteTarget as DeliveryNoteRow | null)?.deleted_at
+            ? 'Restore delivery note?'
+            : 'Archive delivery note?'
+        }
+        onClose={() => setDeleteTarget(null)}
+        width={420}
+      >
         <p style={{ color: colors.muted, fontSize: 14 }}>
-          Delete <strong style={{ color: colors.text }}>{deleteTarget?.reference_number}</strong> and its
-          line items? The quotation is not affected.
+          {(deleteTarget as DeliveryNoteRow | null)?.deleted_at ? (
+            <>
+              Restore <strong style={{ color: colors.text }}>{deleteTarget?.reference_number}</strong> to
+              the active list.
+            </>
+          ) : (
+            <>
+              Archive <strong style={{ color: colors.text }}>{deleteTarget?.reference_number}</strong>{' '}
+              (soft-delete). Use Show archived to restore later. The quotation is not affected.
+            </>
+          )}
         </p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setDeleteTarget(null)}>
             Cancel
           </button>
-          <button type="button" style={buttonDangerStyle} disabled={saving} onClick={() => void confirmDelete()}>
-            Delete
+          <button
+            type="button"
+            style={
+              (deleteTarget as DeliveryNoteRow | null)?.deleted_at
+                ? buttonSecondaryStyle
+                : buttonDangerStyle
+            }
+            disabled={saving}
+            onClick={() => void confirmDelete()}
+          >
+            {(deleteTarget as DeliveryNoteRow | null)?.deleted_at ? 'Restore' : 'Archive'}
           </button>
         </div>
       </Modal>

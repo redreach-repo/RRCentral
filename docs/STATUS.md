@@ -13,6 +13,7 @@
 | CSV: DN / domains / marketing / payments / follow-ups | **Pass** |
 | DSR / retention polish | **Pass** |
 | Guide pack deepen (DSR + POs) | **Pass** |
+| Support + DN soft-archive / Approvals CSV | **Pass** |
 | M14 / live ESP / Tax / CASA / QTSP | **Not done** |
 
 ## Test results

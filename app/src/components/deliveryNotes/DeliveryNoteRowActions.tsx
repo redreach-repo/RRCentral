@@ -40,7 +40,8 @@ export default function DeliveryNoteRowActions({
         <ExternalLink size={13} /> PDF / Print
       </Link>
       <button type="button" className={styles.danger} onClick={() => onDelete(note)}>
-        <Trash2 size={13} /> Delete
+        <Trash2 size={13} />{' '}
+        {(note as DeliveryNote & { deleted_at?: string | null }).deleted_at ? 'Restore' : 'Archive'}
       </button>
     </div>
   )
