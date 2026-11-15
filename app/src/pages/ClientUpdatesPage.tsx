@@ -4,9 +4,11 @@ import { addDays, format, parseISO } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
+import SavedViewsBar from '../components/SavedViewsBar'
 import { runAi } from '../lib/aiAssistStore'
 import { buildUpdateDrafts, loadUpdateQueue, saveUpdateBody, sendUpdate, setUpdateSkipped, type UpdateContact, type UpdateQueue } from '../lib/clientUpdatesStore'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import { roleAtLeast } from '../lib/permissions'
 import { parseClientUpdateBody } from '../lib/schemas/clientUpdate'
 import type { ClientUpdateDraft } from '../lib/types'
@@ -31,7 +33,7 @@ const muted = { color: colors.muted, fontSize: 13 }
  */
 export default function ClientUpdatesPage() {
   const { t } = useI18n()
-  const { userRole, user } = useAuth()
+  const { userRole, user, appUserId } = useAuth()
   const { showToast } = useToast()
   const weeks = useMemo(() => {
     const latest = parseISO(weekStartFor(new Date()))
@@ -40,6 +42,11 @@ export default function ClientUpdatesPage() {
   const [week, setWeek] = useState(weeks[0])
   const [queue, setQueue] = useState<UpdateQueue | null>(null)
   const [building, setBuilding] = useState(false)
+  const [statusFilter, setStatusFilter] = useState('all')
+  const updatesViewFilters = useMemo(
+    () => ({ status: statusFilter, week }),
+    [statusFilter, week],
+  )
 
   const load = useCallback(async () => {
     try {
@@ -75,6 +82,11 @@ export default function ClientUpdatesPage() {
 
   const waiting = queue?.drafts.filter((d) => d.status === 'draft').length ?? 0
   const sent = queue?.drafts.filter((d) => d.status === 'sent').length ?? 0
+  const visibleDrafts = useMemo(() => {
+    const rows = queue?.drafts || []
+    if (statusFilter === 'all') return rows
+    return rows.filter((d) => d.status === statusFilter)
+  }, [queue, statusFilter])
 
   return (
     <div className={docsStyles.page}>
@@ -84,13 +96,70 @@ export default function ClientUpdatesPage() {
           <h1 className={docsStyles.title}>{t('page.clientUpdates.title')}</h1>
           <p className={docsStyles.subtitle}>{t('page.clientUpdates.subtitle')}</p>
         </div>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+          disabled={!queue?.drafts.length}
+          onClick={() => {
+            if (!queue?.drafts.length) return
+            exportListCsv(
+              `client-updates-${week}.csv`,
+              ['account', 'status', 'week_start', 'body', 'sent_via', 'sent_to', 'sent_at', 'sent_by'],
+              queue.drafts.map((d) => ({
+                account: d.accountName,
+                status: d.status,
+                week_start: d.week_start || week,
+                body: d.body || '',
+                sent_via: d.sent_via || '',
+                sent_to: d.sent_to || '',
+                sent_at: d.sent_at || '',
+                sent_by: d.sent_by || '',
+              })),
+            )
+            showToast('Client updates CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
       </header>
+
+      <SavedViewsBar
+        moduleId="client_updates"
+        filters={updatesViewFilters}
+        ownerUserId={appUserId}
+        canWrite={userRole !== 'viewer'}
+        applyDefaultOnLoad={false}
+        onApply={(f) => {
+          const nextWeek = String(f.week || '')
+          if (nextWeek && weeks.includes(nextWeek)) setWeek(nextWeek)
+          setStatusFilter(String(f.status || 'all'))
+        }}
+        onToast={showToast}
+        filtersEqual={(a, b) =>
+          String(a.status || 'all') === String(b.status || 'all') &&
+          String(a.week || '') === String(b.week || '')
+        }
+      />
 
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', margin: '12px 0 16px' }}>
         <select aria-label="Week" style={{ ...selectStyle, width: 'auto' }} value={week} onChange={(e) => setWeek(e.target.value)}>
           {weeks.map((w) => (
             <option key={w} value={w}>
               {weekLabelOf(w)}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="Status filter"
+          style={{ ...selectStyle, width: 'auto' }}
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="all">All statuses</option>
+          {CLIENT_UPDATE_STATUSES.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
             </option>
           ))}
         </select>
@@ -116,13 +185,17 @@ export default function ClientUpdatesPage() {
             {t('page.clientUpdates.empty').replace('{week}', weekLabelOf(week))}
           </p>
         </section>
+      ) : visibleDrafts.length === 0 ? (
+        <section style={cardStyle}>
+          <p style={{ ...muted, margin: 0 }}>No updates match this status filter.</p>
+        </section>
       ) : (
         <div style={{ display: 'grid', gap: 12 }}>
-          {queue?.drafts.map((d) => (
+          {visibleDrafts.map((d) => (
             <DraftCard
               key={d.id}
               draft={d}
-              contacts={queue.contacts.filter((c) => c.account_id === d.account_id)}
+              contacts={queue!.contacts.filter((c) => c.account_id === d.account_id)}
               canSend={roleAtLeast(userRole, 'sales')}
               canEdit={userRole !== 'viewer'}
               onChanged={load}
