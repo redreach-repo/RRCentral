@@ -54,9 +54,9 @@ Status key: **exists** · **partial** · **missing**
 | 6.4 Contracts and e-sign | partial | NDA `/sign` + clauses + obligations board + spawn-on-sign; QTSP → M5 later |
 | 6.5 HR | partial | People + leave requests; attendance/org chart later |
 | 6.6 Payroll | partial | M8: runs + WPS/gratuity draft + `payroll_exports` audit (not legal advice / not bank-certified) |
-| 6.7 Accounting (ledger) | partial | CoA + journals + post/immutability shipped; auto-post from invoices + VAT return later |
-| 6.8 Inventory and purchasing | partial | M9: POs + receive→stock; landed cost / multi-warehouse later |
-| 6.9 Delivery (projects/support) | partial | M9b: `delivery_projects` + cost lines; WIP/retention later |
+| 6.7 Accounting (ledger) | partial | CoA + journals + invoice→draft auto-post + VAT return stub UI; posted auto + FTA later |
+| 6.8 Inventory and purchasing | partial | M9: POs + receive→stock + landed cost allocate; multi-warehouse later |
+| 6.9 Delivery (projects/support) | partial | M9b: projects + cost lines + WIP/retention stub; billing schedules later |
 | 6.10 Marketing | partial | M10: campaigns + consent + segments + recipients (no live ESP) |
 | 6.11 Documents and knowledge | partial | Drive + customer_documents; not full DMS → expand with M5/M11 |
 | 6.12 Planning and reports | partial | Reports/MRR/insights; no goals/scenarios builder → M12-ish / planning |

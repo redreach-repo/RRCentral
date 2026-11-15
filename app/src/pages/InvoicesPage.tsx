@@ -385,6 +385,7 @@ export default function InvoicesPage() {
         updated_at: new Date().toISOString(),
       }
 
+      let invoiceId = editing?.id || ''
       if (editing) {
         // If reference changed, migrate line items
         if (editing.reference_number && editing.reference_number !== reference) {
@@ -393,11 +394,16 @@ export default function InvoicesPage() {
         const { error } = await db.from('invoices').update(payload).eq('id', editing.id)
         if (error) throw error
       } else {
-        const { error } = await db.from('invoices').insert({
-          ...payload,
-          created_by: who,
-        })
+        const { data: inserted, error } = await db
+          .from('invoices')
+          .insert({
+            ...payload,
+            created_by: who,
+          })
+          .select('id')
+          .single()
         if (error) throw error
+        invoiceId = String(inserted?.id || '')
       }
 
       if (isCancelledInvoice({ status })) {
@@ -420,6 +426,22 @@ export default function InvoicesPage() {
         },
         totals,
       )
+      // M13/M12 deepen: draft GL journal when leaving Draft (Unverified CoA; never auto-posts).
+      if (leavingDraft && invoiceId && !isCancelledInvoice({ status })) {
+        try {
+          const { createInvoiceAutoPostDraft } = await import('../lib/ledger/ledgerStore')
+          await createInvoiceAutoPostDraft({
+            invoiceId,
+            invoiceNumber: reference,
+            entryDate: (payload.date as string) || new Date().toISOString().slice(0, 10),
+            exclusiveAed: totals.subtotal,
+            vatAed: totals.vat,
+            inclusiveAed: totals.total,
+          })
+        } catch {
+          /* best-effort — ledger migration may be absent */
+        }
+      }
       await logActivity('save_invoice', 'invoice', reference, `${payload.client} · ${status}`, who)
       await saveBillToForClient(payload.client)
       showToast('Invoice saved', 'success')

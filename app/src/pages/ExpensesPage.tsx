@@ -36,6 +36,7 @@ import {
   syncQuoteSupplierCostFromExpense,
 } from '../lib/supplierInvoiceStore'
 import { ensureVendor, listVendors } from '../lib/vendors'
+import { exportListCsv } from '../lib/listIo'
 import { isUndefinedColumnError, errorMessage } from '../lib/errors'
 import { ensureMoneyApproval } from '../lib/featureSliceStores'
 import { DEFAULT_APPROVAL_THRESHOLD_AED } from '../lib/makerChecker'
@@ -580,6 +581,29 @@ export default function ExpensesPage() {
           <p className={docsStyles.subtitle}>{t('page.expenses.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!filtered.length}
+            onClick={() => {
+              exportListCsv(
+                'expenses.csv',
+                ['date', 'vendor', 'category', 'amount', 'payment_method', 'notes'],
+                filtered.map((e) => ({
+                  date: e.date || '',
+                  vendor: e.vendor || '',
+                  category: e.category || '',
+                  amount: e.amount,
+                  payment_method: e.payment_method || '',
+                  notes: e.notes || '',
+                })),
+              )
+              showToast('Expenses CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}

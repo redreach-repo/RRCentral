@@ -3,15 +3,18 @@ import { Briefcase } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import { errorMessage } from '../lib/errors'
-import { projectCostTotal, projectHealth } from '../lib/projectAccounting'
+import { computeWipAed, projectCostTotal, projectHealth } from '../lib/projectAccounting'
 import {
   addProjectCost,
   createDeliveryProject,
   listDeliveryProjects,
   listProjectCosts,
+  refreshProjectWip,
+  updateProjectBilling,
   type DeliveryProject,
   type ProjectCostLine,
 } from '../lib/opsSliceStores'
+import { exportListCsv } from '../lib/listIo'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle, selectStyle } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
@@ -24,6 +27,8 @@ export default function ProjectsPage() {
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [budget, setBudget] = useState('')
+  const [retention, setRetention] = useState('0')
+  const [billed, setBilled] = useState('')
   const [category, setCategory] = useState('labour')
   const [desc, setDesc] = useState('')
   const [amount, setAmount] = useState('')
@@ -65,8 +70,34 @@ export default function ProjectsPage() {
             <Briefcase size={22} style={{ verticalAlign: 'middle', marginRight: 8 }} />
             Projects
           </h1>
-          <p className={docsStyles.subtitle}>Track delivery projects and cost lines against a budget.</p>
+          <p className={docsStyles.subtitle}>
+            Track delivery projects, cost lines, WIP and retention (Unverified stub — not full job-cost accounting).
+          </p>
         </div>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+          disabled={!rows.length}
+          onClick={() => {
+            exportListCsv(
+              'projects.csv',
+              ['code', 'name', 'status', 'budget_aed', 'retention_pct', 'billed_to_date_aed', 'wip_aed'],
+              rows.map((r) => ({
+                code: r.code,
+                name: r.name,
+                status: r.status,
+                budget_aed: r.budget_aed ?? '',
+                retention_pct: r.retention_pct,
+                billed_to_date_aed: r.billed_to_date_aed,
+                wip_aed: r.wip_aed,
+              })),
+            )
+            showToast('Projects CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
       </header>
 
       {loading ? (
@@ -81,19 +112,21 @@ export default function ProjectsPage() {
                 code,
                 name,
                 budgetAed: budget ? Number(budget) : null,
+                retentionPct: Number(retention) || 0,
               })
                 .then(() => {
                   showToast('Project created', 'success')
                   setCode('')
                   setName('')
                   setBudget('')
+                  setRetention('0')
                   return load()
                 })
                 .catch((err) => showToast(errorMessage(err, 'Create failed'), 'error'))
             }}
           >
             <h2 style={{ marginTop: 0, fontSize: 16 }}>New project</h2>
-            <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 1fr 1fr' }}>
+            <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
               <label style={labelStyle}>
                 Code
                 <input style={inputStyle} value={code} onChange={(e) => setCode(e.target.value)} />
@@ -105,6 +138,10 @@ export default function ProjectsPage() {
               <label style={labelStyle}>
                 Budget (AED)
                 <input style={inputStyle} type="number" min={0} step="0.01" value={budget} onChange={(e) => setBudget(e.target.value)} />
+              </label>
+              <label style={labelStyle}>
+                Retention %
+                <input style={inputStyle} type="number" min={0} max={100} step="0.01" value={retention} onChange={(e) => setRetention(e.target.value)} />
               </label>
             </div>
             <button type="submit" style={{ ...buttonPrimaryStyle, marginTop: 10 }}>
@@ -130,8 +167,60 @@ export default function ProjectsPage() {
             {selected ? (
               <div style={{ marginTop: 12 }}>
                 <h3 style={{ fontSize: 14 }}>
-                  {selected.name} — spent {spent.toFixed(2)} AED · health {health}
+                  {selected.name} — spent {spent.toFixed(2)} AED · health {health} · WIP{' '}
+                  {computeWipAed({
+                    spentAed: spent,
+                    billedToDateAed: selected.billed_to_date_aed,
+                    retentionPct: selected.retention_pct,
+                  }).toFixed(2)}{' '}
+                  AED
                 </h3>
+                <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 1fr auto', marginTop: 8, alignItems: 'end' }}>
+                  <label style={labelStyle}>
+                    Billed to date (AED)
+                    <input style={inputStyle} type="number" min={0} step="0.01" value={billed} onChange={(e) => setBilled(e.target.value)} placeholder={String(selected.billed_to_date_aed)} />
+                  </label>
+                  <label style={labelStyle}>
+                    Retention %
+                    <input style={inputStyle} type="number" min={0} max={100} step="0.01" value={retention} onChange={(e) => setRetention(e.target.value)} />
+                  </label>
+                  <button
+                    type="button"
+                    style={buttonSecondaryStyle}
+                    onClick={() => {
+                      void updateProjectBilling({
+                        projectId: selected.id,
+                        billedToDateAed: billed === '' ? selected.billed_to_date_aed : Number(billed),
+                        retentionPct: Number(retention) || selected.retention_pct,
+                      })
+                        .then(async () => {
+                          showToast('Billing / WIP updated', 'success')
+                          await load()
+                          const next = (await listDeliveryProjects()).find((p) => p.id === selected.id)
+                          if (next) await openProject(next)
+                        })
+                        .catch((err) => showToast(errorMessage(err, 'WIP update failed'), 'error'))
+                    }}
+                  >
+                    Save billing
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  style={{ ...buttonSecondaryStyle, marginTop: 8 }}
+                  onClick={() => {
+                    void refreshProjectWip(selected.id)
+                      .then(async () => {
+                        showToast('WIP refreshed', 'success')
+                        await load()
+                        const next = (await listDeliveryProjects()).find((p) => p.id === selected.id)
+                        if (next) await openProject(next)
+                      })
+                      .catch((err) => showToast(errorMessage(err, 'Refresh failed'), 'error'))
+                  }}
+                >
+                  Refresh WIP
+                </button>
                 <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 2fr 1fr', marginTop: 8 }}>
                   <select style={selectStyle} value={category} onChange={(e) => setCategory(e.target.value)}>
                     {['labour', 'materials', 'subcontractor', 'expense', 'other'].map((c) => (

@@ -21,3 +21,16 @@ export function projectHealth(
   if (v < Number(budgetAed) * 0.1) return 'watch'
   return 'ok'
 }
+
+/** WIP stub: costs − billed + retention hold on billed. */
+export function computeWipAed(input: {
+  spentAed: number
+  billedToDateAed: number
+  retentionPct: number
+}): number {
+  const spent = Number(input.spentAed) || 0
+  const billed = Number(input.billedToDateAed) || 0
+  const pct = Math.min(100, Math.max(0, Number(input.retentionPct) || 0))
+  const hold = Math.round(billed * (pct / 100) * 100) / 100
+  return Math.round((spent - billed + hold) * 100) / 100
+}

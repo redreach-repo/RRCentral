@@ -32,6 +32,7 @@ import {
 import docsStyles from '../styles/docsList.module.css'
 import { errorMessage } from '../lib/errors'
 import { parseCatalogProductForm } from '../lib/schemas/catalogProduct'
+import { exportListCsv } from '../lib/listIo'
 
 type ProductForm = {
   sku: string
@@ -246,6 +247,30 @@ export default function CatalogPage() {
           <p className={docsStyles.subtitle}>{t('page.catalog.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!filtered.length}
+            onClick={() => {
+              exportListCsv(
+                'catalog.csv',
+                ['sku', 'name', 'division_code', 'unit_price', 'unit_cost', 'stock_on_hand', 'active'],
+                filtered.map((p) => ({
+                  sku: p.sku,
+                  name: p.name,
+                  division_code: p.division_code,
+                  unit_price: p.unit_price,
+                  unit_cost: p.unit_cost,
+                  stock_on_hand: p.stock_on_hand,
+                  active: p.active,
+                })),
+              )
+              showToast('Catalog CSV downloaded', 'success')
+            }}
+          >
+            <Download size={16} /> Export CSV
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}

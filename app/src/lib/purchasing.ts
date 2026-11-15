@@ -26,3 +26,15 @@ export function rollupPoStatus(lines: { qty_ordered: number; qty_received: numbe
   if (anyRecv) return 'partial'
   return 'ordered'
 }
+
+/** Allocate header landed cost evenly per ordered unit across lines. */
+export function landedSharePerUnit(landedCostAed: number, totalQtyOrdered: number): number {
+  const landed = Number(landedCostAed) || 0
+  const qty = Number(totalQtyOrdered) || 0
+  if (landed <= 0 || qty <= 0) return 0
+  return Math.round((landed / qty) * 100) / 100
+}
+
+export function effectiveLandedUnitCost(unitCost: number, sharePerUnit: number): number {
+  return Math.round(((Number(unitCost) || 0) + (Number(sharePerUnit) || 0)) * 100) / 100
+}
