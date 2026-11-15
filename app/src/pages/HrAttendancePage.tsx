@@ -13,10 +13,17 @@ import {
   type AttendanceStatus,
 } from '../lib/hrAttendance'
 import { HR_ATTENDANCE_CSV_COLUMNS } from '../lib/hrAttendanceCsv'
-import { listHrAttendanceDays, upsertHrAttendanceDay, type HrAttendanceDay } from '../lib/hrAttendanceStore'
+import {
+  listHrAttendanceDays,
+  restoreHrAttendanceDay,
+  softDeleteHrAttendanceDay,
+  upsertHrAttendanceDay,
+  type HrAttendanceDay,
+} from '../lib/hrAttendanceStore'
 import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
+  buttonSecondaryStyle,
   cardStyle,
   colors,
   inputStyle,
@@ -41,10 +48,11 @@ export default function HrAttendancePage() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [importing, setImporting] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
   const attendanceViewFilters = useMemo(
-    () => ({ person: filterPerson, from: fromDate, to: toDate }),
-    [filterPerson, fromDate, toDate],
+    () => ({ person: filterPerson, from: fromDate, to: toDate, archived: showArchived ? '1' : '0' }),
+    [filterPerson, fromDate, toDate, showArchived],
   )
 
   const load = useCallback(async () => {
@@ -52,7 +60,7 @@ export default function HrAttendancePage() {
     try {
       const [p, r] = await Promise.all([
         listHrEmployees('active'),
-        listHrAttendanceDays(fromDate || undefined),
+        listHrAttendanceDays(fromDate || undefined, { includeDeleted: showArchived }),
       ])
       setPeople(p)
       setRows(r)
@@ -62,7 +70,7 @@ export default function HrAttendancePage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast, employeeId, fromDate])
+  }, [showToast, employeeId, fromDate, showArchived])
 
   useEffect(() => {
     void load()
@@ -203,6 +211,14 @@ export default function HrAttendancePage() {
           >
             Export CSV
           </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
+          </button>
         </div>
       </header>
 
@@ -279,12 +295,14 @@ export default function HrAttendancePage() {
               setFilterPerson(String(f.person || 'all'))
               setFromDate(String(f.from || ''))
               setToDate(String(f.to || ''))
+              setShowArchived(String(f.archived || '0') === '1')
             }}
             onToast={showToast}
             filtersEqual={(a, b) =>
               String(a.person || 'all') === String(b.person || 'all') &&
               String(a.from || '') === String(b.from || '') &&
-              String(a.to || '') === String(b.to || '')
+              String(a.to || '') === String(b.to || '') &&
+              String(a.archived || '0') === String(b.archived || '0')
             }
           />
 
@@ -336,13 +354,64 @@ export default function HrAttendancePage() {
               <EmptyState title="No attendance yet" subtitle="Log the first day above, or widen the filters." />
             ) : (
               <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
-                {filteredRows.map((r) => (
-                  <li key={r.id} style={{ borderTop: `1px solid ${colors.border}`, paddingTop: 8, fontSize: 13 }}>
-                    <strong>{r.hr_employees?.full_name || r.employee_id}</strong> · {r.work_date} ·{' '}
-                    {attendanceLabel(r.status, r.hours)}
-                    {r.notes ? <div style={{ color: colors.muted }}>{r.notes}</div> : null}
-                  </li>
-                ))}
+                {filteredRows.map((r) => {
+                  const archived = Boolean(r.deleted_at)
+                  const personLabel = r.hr_employees?.full_name || r.employee_id
+                  return (
+                    <li
+                      key={r.id}
+                      style={{
+                        borderTop: `1px solid ${colors.border}`,
+                        paddingTop: 8,
+                        fontSize: 13,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        flexWrap: 'wrap',
+                        alignItems: 'start',
+                      }}
+                    >
+                      <div>
+                        <strong>{personLabel}</strong>
+                        {archived ? (
+                          <span style={{ color: colors.muted, fontWeight: 400 }}> · archived</span>
+                        ) : null}{' '}
+                        · {r.work_date} · {attendanceLabel(r.status, r.hours)}
+                        {r.notes ? <div style={{ color: colors.muted }}>{r.notes}</div> : null}
+                      </div>
+                      <button
+                        type="button"
+                        style={buttonSecondaryStyle}
+                        onClick={() => {
+                          if (
+                            !window.confirm(
+                              archived
+                                ? `Restore attendance for ${personLabel} on ${r.work_date}?`
+                                : `Archive attendance for ${personLabel} on ${r.work_date}?`,
+                            )
+                          ) {
+                            return
+                          }
+                          void (archived
+                            ? restoreHrAttendanceDay(r.id)
+                            : softDeleteHrAttendanceDay(r.id))
+                            .then(() => {
+                              showToast(
+                                archived ? 'Attendance restored' : 'Attendance archived',
+                                'success',
+                              )
+                              return load()
+                            })
+                            .catch((err) =>
+                              showToast(errorMessage(err, 'Archive failed'), 'error'),
+                            )
+                        }}
+                      >
+                        {archived ? 'Restore' : 'Archive'}
+                      </button>
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </section>
