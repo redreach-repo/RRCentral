@@ -23,6 +23,7 @@ import { useI18n } from '../contexts/I18nContext'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import { formatAED } from '../lib/money'
 import { buildVatReturnBoxes } from '../lib/vatReturn/vatReturnStub'
 import { BASE_CURRENCY, formatMoneyAmount } from '../lib/currency'
@@ -78,7 +79,7 @@ export default function ReportsPage() {
   const { t } = useI18n()
   const { showToast } = useToast()
   const { settings } = useSettings()
-  const { userRole } = useAuth()
+  const { userRole, appUserId } = useAuth()
   const seesProfit = canSeeProfit(userRole)
   const vatRate = Number(settings.vatRate || VAT_RATE) || VAT_RATE
   const [tab, setTab] = useState<Tab>('vat')
@@ -585,6 +586,29 @@ export default function ReportsPage() {
     return [y, y - 1, y - 2]
   }, [])
 
+  const reportsViewFilters = useMemo(
+    () => ({
+      tab,
+      vatYear: String(vatYear),
+      vatQuarter: String(vatQuarter),
+      stmtFrom,
+      stmtTo,
+    }),
+    [tab, vatYear, vatQuarter, stmtFrom, stmtTo],
+  )
+
+  const TAB_VALUES: Tab[] = [
+    'vat',
+    'answers',
+    'cashflow',
+    'statement',
+    'fx',
+    'funnel',
+    'winrate',
+    'aging',
+    'pnl',
+  ]
+
   return (
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
@@ -597,6 +621,32 @@ export default function ReportsPage() {
           <Download size={16} /> Export CSV
         </button>
       </header>
+
+      <SavedViewsBar
+        moduleId="reports"
+        filters={reportsViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => {
+          const nextTab = String(f.tab || 'vat') as Tab
+          setTab(TAB_VALUES.includes(nextTab) ? nextTab : 'vat')
+          const y = Number(f.vatYear)
+          if (Number.isFinite(y) && y > 2000) setVatYear(y)
+          const q = Number(f.vatQuarter)
+          if (q === 1 || q === 2 || q === 3 || q === 4) setVatQuarter(q as VatQuarter)
+          if (f.stmtFrom) setStmtFrom(String(f.stmtFrom))
+          if (f.stmtTo) setStmtTo(String(f.stmtTo))
+        }}
+        onToast={showToast}
+        filtersEqual={(a, b) =>
+          String(a.tab || '') === String(b.tab || '') &&
+          String(a.vatYear || '') === String(b.vatYear || '') &&
+          String(a.vatQuarter || '') === String(b.vatQuarter || '') &&
+          String(a.stmtFrom || '') === String(b.stmtFrom || '') &&
+          String(a.stmtTo || '') === String(b.stmtTo || '')
+        }
+      />
 
       <div className={docsStyles.controls}>
         <div className={docsStyles.tabs} role="tablist" aria-label="Report views">
