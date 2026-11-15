@@ -28,9 +28,11 @@ import {
 import { errorMessage } from '../lib/errors'
 import { reportFacts } from '../lib/aiAssist'
 import { runAi } from '../lib/aiAssistStore'
+import { exportListCsv } from '../lib/listIo'
 import { resolvedInMonth } from '../lib/support'
 import { listTickets } from '../lib/supportStore'
 import { formatAED } from '../lib/money'
+import { useToast } from '../contexts/ToastContext'
 import type {
   Account,
   BuildStage,
@@ -49,6 +51,7 @@ export default function ClientReportPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { t } = useI18n()
   const { settings } = useSettings()
+  const { showToast } = useToast()
   const rates = useMemo(() => ratesFromSettings(settings), [settings])
   const month = monthKey(searchParams.get('month') ? `${searchParams.get('month')}-01` : new Date())
   const [account, setAccount] = useState<Account | null>(null)
@@ -192,6 +195,41 @@ export default function ClientReportPage() {
           />
           <button type="button" disabled={aiBusy} onClick={() => void writeSummary()}>
             {aiBusy ? t('page.clientReport.writing') : t('page.clientReport.writeSummary')}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const stamp = month.slice(0, 7)
+              const slug = account.name.replace(/\s+/g, '-').toLowerCase()
+              exportListCsv(
+                `client-report-${slug}-${stamp}-hours.csv`,
+                ['date', 'category', 'hours', 'notes'],
+                monthEntries.map((e) => ({
+                  date: e.date,
+                  category: e.category,
+                  hours: e.hours,
+                  notes: e.note || '',
+                })),
+              )
+              const monthTickets = tickets.filter(
+                (tk) => monthKey(tk.created_at) === month || (tk.resolved_at && monthKey(tk.resolved_at) === month),
+              )
+              if (monthTickets.length) {
+                exportListCsv(
+                  `client-report-${slug}-${stamp}-tickets.csv`,
+                  ['subject', 'status', 'created_at', 'resolved_at'],
+                  monthTickets.map((tk) => ({
+                    subject: tk.subject || '',
+                    status: tk.status,
+                    created_at: tk.created_at,
+                    resolved_at: tk.resolved_at || '',
+                  })),
+                )
+              }
+              showToast('Client report CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
           </button>
           <button type="button" onClick={() => window.print()}>
             {t('page.clientReport.print')}
