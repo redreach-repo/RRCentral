@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
+import SavedViewsBar from '../components/SavedViewsBar'
 import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { errorMessage } from '../lib/errors'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import {
   OBLIGATION_OWNERS,
   OBLIGATION_STATUSES,
@@ -16,6 +18,7 @@ import {
   saveContractObligation,
   setObligationStatus,
 } from '../lib/obligationBoardStore'
+import { OBLIGATIONS_CSV_COLUMNS } from '../lib/obligationsCsv'
 import { can } from '../lib/permissions'
 import { parseObligationForm } from '../lib/schemas/obligation'
 import type {
@@ -50,7 +53,7 @@ type Filter = 'open' | 'done' | 'cancelled' | 'all'
 
 export default function ObligationsBoardPage() {
   const { t } = useI18n()
-  const { userRole, user } = useAuth()
+  const { userRole, user, appUserId } = useAuth()
   const { showToast } = useToast()
   const canEdit = can(userRole, 'delivery.contracts')
   const [rows, setRows] = useState<ContractObligation[]>([])
@@ -60,6 +63,9 @@ export default function ObligationsBoardPage() {
   const [editingId, setEditingId] = useState('')
   const [busy, setBusy] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
+  const obligationsViewFilters = useMemo(() => ({ status: filter }), [filter])
 
   const load = useCallback(async () => {
     const r = await listContractObligations()
@@ -131,6 +137,65 @@ export default function ObligationsBoardPage() {
     }
   }
 
+  async function importObligationsCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, csvRows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of OBLIGATIONS_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, OBLIGATIONS_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid obligation rows', 'error')
+        return
+      }
+      const ownerSet = new Set(OBLIGATION_OWNERS.map((o) => o.value))
+      const statusSet = new Set(OBLIGATION_STATUSES.map((s) => s.value))
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        const owner = ownerSet.has(row.owner_party as ContractObligationOwner)
+          ? (row.owner_party as ContractObligationOwner)
+          : 'red_reach'
+        const status = statusSet.has(row.status as ContractObligationStatus)
+          ? (row.status as ContractObligationStatus)
+          : 'open'
+        const due = row.due_date && /^\d{4}-\d{2}-\d{2}$/.test(row.due_date.slice(0, 10))
+          ? row.due_date.slice(0, 10)
+          : null
+        const parsed = parseObligationForm({
+          company_name: row.company_name,
+          crm_id: row.crm_id || '',
+          legal_document_id: null,
+          title: row.title,
+          description: row.description || '',
+          owner_party: owner,
+          due_date: due,
+          status,
+        })
+        if (!parsed.ok) {
+          skipped += 1
+          continue
+        }
+        await saveContractObligation(parsed.data, user?.email || '')
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} obligation(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Obligations CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <div style={pageStyle}>
       <h1 style={pageTitleStyle}>{t('page.obligations.title')}</h1>
@@ -146,6 +211,22 @@ export default function ObligationsBoardPage() {
         <p style={{ color: colors.muted, fontSize: 13 }}>{t('page.obligations.missingTable')}</p>
       ) : (
         <>
+          <SavedViewsBar
+            moduleId="obligations"
+            filters={obligationsViewFilters}
+            ownerUserId={appUserId}
+            canWrite={canEdit}
+            applyDefaultOnLoad={false}
+            onApply={(f) => {
+              const next = String(f.status || 'open')
+              if (next === 'open' || next === 'done' || next === 'cancelled' || next === 'all') {
+                setFilter(next)
+              }
+            }}
+            onToast={showToast}
+            filtersEqual={(a, b) => String(a.status || 'open') === String(b.status || 'open')}
+          />
+
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 12 }}>
             {(['open', 'done', 'cancelled', 'all'] as Filter[]).map((f) => (
               <button
@@ -161,6 +242,49 @@ export default function ObligationsBoardPage() {
                 {f === 'all' ? t('page.obligations.filterAll') : obligationStatusLabel(f)}
               </button>
             ))}
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) void importObligationsCsv(file)
+              }}
+            />
+            {canEdit ? (
+              <button
+                type="button"
+                style={btnGhost}
+                disabled={importing}
+                onClick={() => importInputRef.current?.click()}
+              >
+                {importing ? 'Importing…' : 'Import CSV'}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              style={btnGhost}
+              disabled={!visible.length}
+              onClick={() => {
+                exportListCsv(
+                  'obligations.csv',
+                  OBLIGATIONS_CSV_COLUMNS.map((c) => c.key),
+                  visible.map((r) => ({
+                    company_name: r.company_name,
+                    title: r.title,
+                    owner_party: r.owner_party,
+                    due_date: r.due_date || '',
+                    status: r.status,
+                    description: r.description,
+                    crm_id: r.crm_id,
+                  })),
+                )
+                showToast('Obligations CSV downloaded', 'success')
+              }}
+            >
+              Export CSV
+            </button>
             {canEdit ? (
               <button type="button" style={btnPrimary} onClick={startNew}>
                 {t('page.obligations.new')}
