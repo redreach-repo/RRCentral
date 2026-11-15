@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { buildWpsCsvDraft, draftGratuityAccrualAed } from './wpsGratuity'
+import {
+  buildWpsCsvDraft,
+  dailyWageFromBasicMonthly,
+  draftGratuityAccrualAed,
+  payrollNetAed,
+  yearsOfServiceFromStart,
+} from './wpsGratuity'
 
 describe('draftGratuityAccrualAed', () => {
   it('returns 0 for incomplete service', () => {
@@ -25,5 +31,25 @@ describe('buildWpsCsvDraft', () => {
       'EmployeeCode,EmployeeName,IBAN,AmountAED,ValueDate',
       'E1,Ada,AE00,12.50,2026-11-15',
     ])
+  })
+})
+
+describe('yearsOfServiceFromStart', () => {
+  it('floors full years', () => {
+    expect(yearsOfServiceFromStart('2020-01-01', '2023-01-01')).toBe(3)
+    expect(yearsOfServiceFromStart(null)).toBe(0)
+  })
+})
+
+describe('dailyWageFromBasicMonthly', () => {
+  it('divides by 30', () => {
+    expect(dailyWageFromBasicMonthly(3000)).toBe(100)
+  })
+})
+
+describe('payrollNetAed', () => {
+  it('never goes negative', () => {
+    expect(payrollNetAed(1000, 100, 50)).toBe(1050)
+    expect(payrollNetAed(100, 0, 500)).toBe(0)
   })
 })
