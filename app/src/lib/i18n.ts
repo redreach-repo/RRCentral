@@ -207,6 +207,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.admin.dsr.body':
       'Log access, erasure, and export requests, then run retention prune when aged logs should go. Export the list as CSV for counsel.',
     'guide.admin.dsr.link': 'Open Data requests',
+    'guide.admin.publicApi.title': 'Public API',
+    'guide.admin.publicApi.body':
+      'Mint API keys with read or write scopes, register webhook endpoints, and test deliveries. Partners use x-api-key; cron retries use the webhook-retry function.',
+    'guide.admin.publicApi.link': 'Open Public API',
     'guide.ops.wanders.title': 'Wanders',
     'guide.ops.wanders.body':
       'Travel leads, packages, partners, departures and bookings for RR Wanders — kept separate from RR Threads deals.',
@@ -1243,6 +1247,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.admin.dsr.body':
       'سجّل طلبات الوصول والمسح والتصدير، ثم شغّل تقليم الاحتفاظ عندما يحين وقت حذف السجلات القديمة. صدّر القائمة كـ CSV للمستشار.',
     'guide.admin.dsr.link': 'فتح طلبات البيانات',
+    'guide.admin.publicApi.title': 'واجهة برمجة عامة',
+    'guide.admin.publicApi.body':
+      'أنشئ مفاتيح API بصلاحيات قراءة أو كتابة، سجّل نقاط webhook، واختبر التسليم. الشركاء يستخدمون x-api-key؛ وإعادة المحاولة تتم عبر دالة webhook-retry.',
+    'guide.admin.publicApi.link': 'فتح الواجهة العامة',
     'guide.ops.wanders.title': 'Wanders',
     'guide.ops.wanders.body':
       'عملاء محتملون وباقات وشركاء ومغادرات وحجوزات لـ RR Wanders — منفصلة عن صفقات RR Threads.',

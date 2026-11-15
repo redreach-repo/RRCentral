@@ -30,6 +30,7 @@ import {
   type TicketRow,
 } from '../lib/supportStore'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import type { Account, AccountContact, AppUser } from '../lib/types'
 import {
   buttonSecondaryStyle,
@@ -196,6 +197,46 @@ export default function SupportPage() {
           <p className={docsStyles.subtitle}>{t('page.support.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!visible.length}
+            onClick={() => {
+              exportListCsv(
+                'support-tickets.csv',
+                [
+                  'subject',
+                  'status',
+                  'priority',
+                  'channel',
+                  'account',
+                  'assignee',
+                  'sla_due_at',
+                  'created_at',
+                ],
+                visible.map((row) => ({
+                  subject: row.subject,
+                  status: row.status,
+                  priority: row.priority,
+                  channel: row.channel,
+                  account: row.account_id
+                    ? accountById.get(row.account_id)?.name || row.account_id
+                    : '',
+                  assignee: row.assignee_user_id
+                    ? teamById.get(row.assignee_user_id)?.name ||
+                      teamById.get(row.assignee_user_id)?.email ||
+                      row.assignee_user_id
+                    : '',
+                  sla_due_at: row.sla_due_at || '',
+                  created_at: row.created_at || '',
+                })),
+              )
+              showToast('Tickets CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}
