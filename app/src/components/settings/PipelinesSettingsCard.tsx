@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Plus } from 'lucide-react'
 import Modal from '../Modal'
 import SimpleRowActions from '../SimpleRowActions'
@@ -21,7 +21,7 @@ import {
   type PipelineOutcome,
   type PipelineStage,
 } from '../../lib/pipelines'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -61,6 +61,8 @@ export default function PipelinesSettingsCard() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<PipelineStage | null>(null)
   const [busy, setBusy] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const [actionsId, setActionsId] = useState<string | null>(null)
   const [form, setForm] = useState<{
     label: string
@@ -78,6 +80,84 @@ export default function PipelinesSettingsCard() {
 
   const selected = pipelines.find((p) => p.pipeline_key === selectedKey) || pipelines[0] || null
   const stages = selected ? stagesByPipe[selected.id] || [] : []
+
+  function parseActiveFlag(raw: string): boolean {
+    const v = raw.trim().toLowerCase()
+    if (!v) return true
+    return !(v === 'no' || v === 'false' || v === '0' || v === 'off')
+  }
+
+  function parseOutcome(raw: string): PipelineOutcome {
+    const v = raw.trim().toLowerCase()
+    if (v === 'won' || v === 'lost' || v === 'open') return v
+    return 'open'
+  }
+
+  async function importStagesCsv(file: File) {
+    if (!manage) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const pipesByKey = new Map(pipelines.map((p) => [p.pipeline_key.toLowerCase(), p]))
+      const stageIndex = new Map<string, PipelineStage>()
+      for (const p of pipelines) {
+        for (const s of stagesByPipe[p.id] || []) {
+          stageIndex.set(`${p.id}::${s.stage_key}`.toLowerCase(), s)
+        }
+      }
+      let saved = 0
+      let skipped = 0
+      for (const row of objects) {
+        const pipelineKey = String(row.pipeline_key || selected?.pipeline_key || '').trim()
+        const label = String(row.label || '').trim()
+        const pipe = pipesByKey.get(pipelineKey.toLowerCase())
+        if (!pipe || !label) {
+          skipped += 1
+          continue
+        }
+        const style = stageKeyStyleForPipeline(pipe.pipeline_key)
+        const stageKey =
+          String(row.stage_key || '').trim() || slugifyStageKey(label, style)
+        if (!stageKey) {
+          skipped += 1
+          continue
+        }
+        const color = String(row.color || '').trim() || DEFAULT_STAGE_COLORS[0]
+        const outcome = parseOutcome(String(row.outcome || 'open'))
+        const sort_order = Number(row.sort_order)
+        const active = parseActiveFlag(String(row.active ?? 'yes'))
+        const existing = stageIndex.get(`${pipe.id}::${stageKey}`.toLowerCase())
+        const savedRow = await savePipelineStage(
+          {
+            pipeline_id: pipe.id,
+            stage_key: stageKey,
+            label,
+            color,
+            outcome,
+            sort_order: Number.isFinite(sort_order) ? sort_order : existing?.sort_order || 0,
+            active,
+          },
+          existing?.id,
+        )
+        stageIndex.set(`${pipe.id}::${savedRow.stage_key}`.toLowerCase(), savedRow)
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} pipeline stage(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Pipeline stages CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -179,6 +259,26 @@ export default function PipelinesSettingsCard() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.settings.section.pipelines')}</h2>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importStagesCsv(file)
+            }}
+          />
+          {manage ? (
+            <button
+              type="button"
+              style={buttonSecondaryStyle}
+              disabled={importing || pipelines.length === 0}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
+          ) : null}
           <button
             type="button"
             style={buttonSecondaryStyle}
