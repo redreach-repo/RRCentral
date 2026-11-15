@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import { FileUp } from 'lucide-react'
 import Modal from '../Modal'
@@ -31,8 +31,36 @@ import {
   selectStyle,
 } from '../../lib/uiStyles'
 import { errorMessage } from '../../lib/errors'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import { parseSupplierInvoiceForm } from '../../lib/schemas/supplierInvoice'
+
+const SUPPLIER_INVOICE_CSV_HEADERS = [
+  'kind',
+  'date',
+  'vendor',
+  'category',
+  'amount',
+  'amount_ex_vat',
+  'vat_amount',
+  'payment_method',
+  'supplier_invoice_no',
+  'status',
+  'notes',
+  'file_name',
+  'url',
+] as const
+
+function parseCsvNumber(raw: string): number {
+  const n = Number(String(raw || '').replace(/,/g, '').trim())
+  return Number.isFinite(n) ? round2(n) : 0
+}
+
+function pickPaymentMethod(raw: string): string {
+  const v = raw.trim()
+  if (!v) return PAYMENT_METHODS[0] || 'Bank transfer'
+  const exact = PAYMENT_METHODS.find((m) => m.toLowerCase() === v.toLowerCase())
+  return exact || v
+}
 
 type Props = {
   /** Quotation to record a supplier invoice for; null keeps the dialog closed. */
@@ -68,6 +96,8 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
   const [supplierInvoiceExpenses, setSupplierInvoiceExpenses] = useState<Expense[]>([])
   const [supplierInvoiceHint, setSupplierInvoiceHint] = useState('')
   const [vendorSuggest, setVendorSuggest] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const supplierInvoiceProfitPreview = useMemo(() => {
     if (!supplierInvoiceTarget) return null
@@ -182,6 +212,85 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
       showToast(errorMessage(e, 'Could not load supplier invoices'), 'error')
       setSupplierInvoiceAttachments([])
       setSupplierInvoiceExpenses([])
+    }
+  }
+
+  async function importSupplierInvoiceCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows)
+      if (!objects.length) {
+        showToast('No supplier invoice rows in CSV', 'error')
+        return
+      }
+
+      const expenseRow =
+        objects.find((r) => {
+          const kind = String(r.kind || '').trim().toLowerCase()
+          return kind === 'expense' || (!kind && (r.vendor || r.amount || r.amount_ex_vat))
+        }) || null
+      const attachmentRow =
+        objects.find((r) => String(r.kind || '').trim().toLowerCase() === 'attachment' && String(r.url || '').trim()) ||
+        objects.find((r) => String(r.url || '').trim()) ||
+        null
+
+      if (!expenseRow && !attachmentRow) {
+        showToast('CSV had no matching expense or attachment rows', 'error')
+        return
+      }
+
+      if (expenseRow) {
+        const amountIn = parseCsvNumber(String(expenseRow.amount ?? ''))
+        const exIn = parseCsvNumber(String(expenseRow.amount_ex_vat ?? ''))
+        const vatIn = parseCsvNumber(String(expenseRow.vat_amount ?? ''))
+        const charges_vat = vatIn > 0 || (amountIn > 0 && exIn > 0 && amountIn > exIn)
+        let amount_ex_vat: number
+        let vat_amount: number
+        let amount: number
+        if (!charges_vat) {
+          amount = amountIn || exIn
+          amount_ex_vat = amount
+          vat_amount = 0
+        } else {
+          amount_ex_vat =
+            exIn > 0 ? exIn : amountIn > 0 && vatRate > 0 ? round2(amountIn / (1 + vatRate)) : amountIn
+          vat_amount = vatIn > 0 ? vatIn : round2(Math.max(0, (amountIn || amount_ex_vat) - amount_ex_vat))
+          amount = amountIn > 0 ? amountIn : round2(amount_ex_vat + vat_amount)
+        }
+        const dateRaw = String(expenseRow.date || '').trim().slice(0, 10)
+        setSupplierInvoiceForm({
+          date: /^\d{4}-\d{2}-\d{2}$/.test(dateRaw) ? dateRaw : format(new Date(), 'yyyy-MM-dd'),
+          vendor: String(expenseRow.vendor || '').trim(),
+          supplier_invoice_no: String(expenseRow.supplier_invoice_no || '').trim(),
+          amount,
+          amount_ex_vat,
+          vat_amount,
+          charges_vat,
+          payment_method: pickPaymentMethod(String(expenseRow.payment_method || '')),
+          notes: String(expenseRow.notes || ''),
+        })
+      }
+
+      if (attachmentRow) {
+        const url = String(attachmentRow.url || '').trim()
+        if (url) {
+          setSupplierInvoiceDriveUrl(url)
+          setSupplierInvoiceDriveTitle(String(attachmentRow.file_name || '').trim())
+        }
+      }
+
+      showToast('Supplier invoice CSV loaded into the form', 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Supplier invoice CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
     }
   }
 
@@ -568,6 +677,24 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
         </div>
       ) : null}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".csv,text/csv"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) void importSupplierInvoiceCsv(file)
+          }}
+        />
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={importing}
+          onClick={() => importInputRef.current?.click()}
+        >
+          {importing ? 'Importing…' : 'Import CSV'}
+        </button>
         {supplierInvoiceExpenses.length > 0 || supplierInvoiceAttachments.length > 0 ? (
           <button
             type="button"
@@ -606,21 +733,7 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
               }))
               exportListCsv(
                 `supplier-invoice-${ref}.csv`,
-                [
-                  'kind',
-                  'date',
-                  'vendor',
-                  'category',
-                  'amount',
-                  'amount_ex_vat',
-                  'vat_amount',
-                  'payment_method',
-                  'supplier_invoice_no',
-                  'status',
-                  'notes',
-                  'file_name',
-                  'url',
-                ],
+                [...SUPPLIER_INVOICE_CSV_HEADERS],
                 [...expenseRows, ...attachmentRows],
               )
               showToast('Supplier invoice CSV downloaded', 'success')
