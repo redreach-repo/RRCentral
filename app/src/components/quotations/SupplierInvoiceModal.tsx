@@ -31,6 +31,7 @@ import {
   selectStyle,
 } from '../../lib/uiStyles'
 import { errorMessage } from '../../lib/errors'
+import { exportListCsv } from '../../lib/listIo'
 import { parseSupplierInvoiceForm } from '../../lib/schemas/supplierInvoice'
 
 type Props = {
@@ -566,7 +567,68 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
           </ul>
         </div>
       ) : null}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+        {supplierInvoiceExpenses.length > 0 || supplierInvoiceAttachments.length > 0 ? (
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            onClick={() => {
+              const ref = quote?.reference_number || 'quote'
+              const expenseRows = supplierInvoiceExpenses.map((e) => ({
+                kind: 'expense',
+                date: e.date || '',
+                vendor: e.vendor,
+                category: e.category,
+                amount: e.amount,
+                amount_ex_vat: e.amount_ex_vat ?? '',
+                vat_amount: e.vat_amount ?? '',
+                payment_method: e.payment_method,
+                supplier_invoice_no: e.supplier_invoice_no || '',
+                status: e.status || '',
+                notes: e.notes || '',
+                file_name: '',
+                url: '',
+              }))
+              const attachmentRows = supplierInvoiceAttachments.map((a) => ({
+                kind: 'attachment',
+                date: a.uploaded_at || '',
+                vendor: '',
+                category: '',
+                amount: '',
+                amount_ex_vat: '',
+                vat_amount: '',
+                payment_method: '',
+                supplier_invoice_no: '',
+                status: '',
+                notes: '',
+                file_name: a.file_name || '',
+                url: a.url || '',
+              }))
+              exportListCsv(
+                `supplier-invoice-${ref}.csv`,
+                [
+                  'kind',
+                  'date',
+                  'vendor',
+                  'category',
+                  'amount',
+                  'amount_ex_vat',
+                  'vat_amount',
+                  'payment_method',
+                  'supplier_invoice_no',
+                  'status',
+                  'notes',
+                  'file_name',
+                  'url',
+                ],
+                [...expenseRows, ...attachmentRows],
+              )
+              showToast('Supplier invoice CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        ) : null}
         <button
           type="button"
           style={buttonSecondaryStyle}
