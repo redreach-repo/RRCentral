@@ -16,9 +16,12 @@ import {
   loadPaymentsForBooking,
   loadRefundsForBooking,
   loadSuppliersForBooking,
+  restoreCustomerPayment,
   saveCustomerPayment,
   saveCustomerRefund,
   saveSupplierCommitment,
+  softDeleteCustomerPayment,
+  type CustomerPaymentRow,
 } from '../lib/customerPayments'
 import type { CustomerPayment, CustomerRefund, Quotation, SupplierCommitment } from '../lib/types'
 import { useAuth } from '../contexts/AuthContext'
@@ -106,12 +109,13 @@ export default function PaymentsPage() {
   const { user, appUserId } = useAuth()
   const { showToast } = useToast()
   const [quotes, setQuotes] = useState<Quotation[]>([])
-  const [payments, setPayments] = useState<CustomerPayment[]>([])
+  const [payments, setPayments] = useState<CustomerPaymentRow[]>([])
   const [refunds, setRefunds] = useState<CustomerRefund[]>([])
   const [suppliers, setSuppliers] = useState<SupplierCommitment[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [loading, setLoading] = useState(true)
   const [importing, setImporting] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
   const [payOpen, setPayOpen] = useState(false)
   const [refundOpen, setRefundOpen] = useState(false)
@@ -162,14 +166,14 @@ export default function PaymentsPage() {
       return
     }
     const [p, r, s] = await Promise.all([
-      loadPaymentsForBooking(bookingId),
+      loadPaymentsForBooking(bookingId, { includeDeleted: showArchived }),
       loadRefundsForBooking(bookingId),
       loadSuppliersForBooking(bookingId),
     ])
     setPayments(p)
     setRefunds(r)
     setSuppliers(s)
-  }, [])
+  }, [showArchived])
 
   useEffect(() => {
     void (async () => {
@@ -187,6 +191,17 @@ export default function PaymentsPage() {
   useEffect(() => {
     void loadLedger(selectedId)
   }, [selectedId, loadLedger])
+
+  async function archivePayment(p: CustomerPaymentRow) {
+    try {
+      if (p.deleted_at) await restoreCustomerPayment(p.id)
+      else await softDeleteCustomerPayment(p.id)
+      showToast(p.deleted_at ? 'Payment restored' : 'Payment archived', 'success')
+      await loadLedger(selectedId)
+    } catch (e) {
+      showToast(errorMessage(e, 'Could not update payment archive'), 'error')
+    }
+  }
 
   async function importPaymentsCsv(file: File) {
     setImporting(true)
@@ -528,6 +543,14 @@ export default function PaymentsPage() {
             type="button"
             className={docsStyles.newBtn}
             style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
             disabled={!payments.length}
             onClick={() => {
               exportListCsv(
@@ -763,18 +786,27 @@ export default function PaymentsPage() {
                           <StatusPill status={p.status} />
                         </td>
                         <td style={tdStyle}>{p.transaction_ref || '—'}</td>
-                        <td style={tdStyle}>
+                        <td style={{ ...tdStyle, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {!p.deleted_at ? (
+                            <button
+                              type="button"
+                              style={buttonSecondaryStyle}
+                              onClick={() => {
+                                setRefundPayment(p)
+                                setRefundAmount(p.net_amount || p.amount_received)
+                                setRefundReason('')
+                                setRefundOpen(true)
+                              }}
+                            >
+                              Refund
+                            </button>
+                          ) : null}
                           <button
                             type="button"
                             style={buttonSecondaryStyle}
-                            onClick={() => {
-                              setRefundPayment(p)
-                              setRefundAmount(p.net_amount || p.amount_received)
-                              setRefundReason('')
-                              setRefundOpen(true)
-                            }}
+                            onClick={() => void archivePayment(p)}
                           >
-                            Refund
+                            {p.deleted_at ? 'Restore' : 'Archive'}
                           </button>
                         </td>
                       </tr>

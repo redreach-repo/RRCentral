@@ -38,13 +38,14 @@ export async function createPlanningGoal(input: {
   targetValue: number
   periodYyyyMm?: string
   notes?: string
+  status?: string
 }): Promise<void> {
   const { error } = await db.from('planning_goals').insert({
     name: input.name.trim(),
     metric_key: input.metricKey || 'revenue_aed',
     target_value: Number(input.targetValue) || 0,
     period_yyyy_mm: input.periodYyyyMm || currentPeriodYyyyMm(),
-    status: 'active',
+    status: (input.status || 'active').trim() || 'active',
     notes: (input.notes || '').trim(),
   })
   if (error) throw error

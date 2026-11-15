@@ -1,6 +1,7 @@
 import { format } from 'date-fns'
 import { BASE_CURRENCY, netReceived, toBaseAmount } from './currency'
 import { db } from './db'
+import { withoutSoftDeleted } from './softDelete'
 import type {
   CustomerPayment,
   CustomerRefund,
@@ -9,14 +10,36 @@ import type {
   SupplierCommitment,
 } from './types'
 
-export async function loadPaymentsForBooking(bookingId: string): Promise<CustomerPayment[]> {
+export type CustomerPaymentRow = CustomerPayment & { deleted_at?: string | null }
+
+export async function loadPaymentsForBooking(
+  bookingId: string,
+  opts?: { includeDeleted?: boolean },
+): Promise<CustomerPaymentRow[]> {
   const { data, error } = await db
     .from('customer_payments')
     .select('*')
     .eq('booking_id', bookingId)
     .order('payment_date', { ascending: false })
   if (error) throw error
-  return (data || []) as CustomerPayment[]
+  const rows = (data || []) as CustomerPaymentRow[]
+  return opts?.includeDeleted ? rows : (withoutSoftDeleted(rows) as CustomerPaymentRow[])
+}
+
+export async function softDeleteCustomerPayment(id: string): Promise<void> {
+  const { error } = await db
+    .from('customer_payments')
+    .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function restoreCustomerPayment(id: string): Promise<void> {
+  const { error } = await db
+    .from('customer_payments')
+    .update({ deleted_at: null, updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
 }
 
 export async function loadRefundsForBooking(bookingId: string): Promise<CustomerRefund[]> {
