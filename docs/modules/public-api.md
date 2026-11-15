@@ -22,9 +22,15 @@
 | GET | `/v1/invoices` | `read:invoices` | Tenant-scoped; cursor pagination |
 | POST | `/v1/invoices` | `write:invoices` | Create draft invoice; emits `invoice.created` |
 | PATCH | `/v1/invoices/:id` | `write:invoices` | Update; emits `invoice.updated` |
+| GET | `/v1/invoices/:id/lines` | `read:invoices` | Line items for the invoice reference |
+| POST | `/v1/invoices/:id/lines` | `write:invoices` | Append a line item |
+| POST | `/v1/invoices/:id/finalize` | `write:invoices` | Sets status `Sent` |
 | GET | `/v1/quotations` | `read:quotations` | Tenant-scoped; cursor pagination |
 | POST | `/v1/quotations` | `write:quotations` | Create draft quotation; emits `quotation.created` |
 | PATCH | `/v1/quotations/:id` | `write:quotations` | Update; emits `quotation.updated` |
+| GET | `/v1/quotations/:id/lines` | `read:quotations` | Line items for the quote reference |
+| POST | `/v1/quotations/:id/lines` | `write:quotations` | Append a line item |
+| POST | `/v1/quotations/:id/finalize` | `write:quotations` | Sets status `Finalized` |
 
 Cursor = last row `id` from the previous page. Response shape: `{ data, next_cursor }`.
 
@@ -40,7 +46,9 @@ Cursor = last row `id` from the previous page. Response shape: `{ data, next_cur
 
 `client` (required on create), `reference_number`, `status` (default `Draft`), `amount` (≥ 0, default `0`), `currency` (default `AED`), `date` (`YYYY-MM-DD`), `description`, `notes`, `deal_ref`.
 
-Line items are not in this slice — partners create header rows; staff edit lines in-app.
+### Line item write body
+
+`description` (required), `qty` (default `1`), `unit_price` / `amount`, `vat_rate` (default `0.05`), `sku`, `remarks`, `line_no`.
 
 ## Webhooks
 
@@ -76,6 +84,6 @@ Header: x-cron-secret: <secret>
 
 ## Not in this slice
 
-- Line-item writes / finalize / PDF generation via API
+- PDF generation via API
 - OpenAPI codegen
 - Partner-facing delivery guarantee SLAs

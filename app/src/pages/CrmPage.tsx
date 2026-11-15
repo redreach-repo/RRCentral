@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { format, isBefore, isToday, parseISO, startOfDay } from 'date-fns'
 import {
@@ -120,7 +120,8 @@ import {
   loadCustomFieldValuesForRecords,
   type CustomFieldDefinition,
 } from '../lib/customFields'
-import { exportListCsv } from '../lib/listIo'
+import { CRM_CSV_COLUMNS } from '../lib/crmCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import QuoteNudgesCard from '../components/quotes/QuoteNudgesCard'
 import SessionFollowUpsCard from '../components/ctrm/SessionFollowUpsCard'
 import ContractsVaultPanel from '../components/crm/ContractsVaultPanel'
@@ -207,6 +208,8 @@ export default function CrmPage() {
   const [customValues, setCustomValues] = useState<Record<string, Record<string, unknown>>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [stageFilter, setStageFilter] = useState<string>('All')
@@ -344,6 +347,74 @@ export default function CrmPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  async function importCrmCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of CRM_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, CRM_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid CRM rows', 'error')
+        return
+      }
+      const who = user?.email || ''
+      const stageSet = new Set<string>(PIPELINE_STAGES)
+      let saved = 0
+      for (const row of ok) {
+        const stage = stageSet.has(row.pipeline_stage) ? row.pipeline_stage : 'Lead'
+        const nextAction = (NEXT_ACTIONS as readonly string[]).includes(row.next_action)
+          ? row.next_action
+          : row.next_action || ''
+        const companyName = row.company_name.trim()
+        const { data: existing } = await db
+          .from('crm')
+          .select('id')
+          .ilike('company_name', companyName)
+          .maybeSingle()
+        const payload = {
+          company_name: companyName,
+          pipeline_stage: stage,
+          company_owner: row.company_owner || '',
+          follow_up_date: row.follow_up_date || null,
+          next_action: nextAction,
+          owner: row.owner || who,
+          notes: row.notes || '',
+          updated_by: who,
+          updated_at: new Date().toISOString(),
+        }
+        if (existing?.id) {
+          const { error: err } = await db.from('crm').update(payload).eq('id', existing.id)
+          if (err) throw err
+        } else {
+          const { error: err } = await db.from('crm').insert({
+            ...payload,
+            id: crypto.randomUUID(),
+            created_by: who,
+            calendar_event_id: '',
+            contacts: [],
+          })
+          if (err) throw err
+        }
+        saved += 1
+      }
+      const skipNote = errors.length ? ` · ${errors.length} row(s) skipped` : ''
+      showToast(`Imported ${saved} CRM row(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'CRM CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
 
   const openEdit = useCallback((entry: CrmEntry) => {
     setEditing(entry)
@@ -1196,6 +1267,30 @@ export default function CrmPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importCrmCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{
+              background: 'transparent',
+              color: 'inherit',
+              border: '1px solid var(--border)',
+              minHeight: compact ? 44 : undefined,
+            }}
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}
@@ -1215,6 +1310,8 @@ export default function CrmPage() {
                   'company_owner',
                   'follow_up_date',
                   'next_action',
+                  'owner',
+                  'notes',
                   ...customDefs.map((d) => d.field_key),
                 ],
                 entries.map((e) => {
@@ -1224,6 +1321,8 @@ export default function CrmPage() {
                     company_owner: e.company_owner,
                     follow_up_date: e.follow_up_date || '',
                     next_action: e.next_action || '',
+                    owner: e.owner || '',
+                    notes: e.notes || '',
                   }
                   for (const d of customDefs) {
                     row[d.field_key] = displayFieldValue(d, customValues[e.id]?.[d.id])

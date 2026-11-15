@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { GUIDE_CRM_SECTIONS } from './guideCrm'
 
 describe('GUIDE_CRM_SECTIONS', () => {
-  it('covers the five daily CRM paths', () => {
+  it('covers the daily CRM paths', () => {
     expect(GUIDE_CRM_SECTIONS.map((s) => s.id)).toEqual([
       'myday',
       'pipeline',
       'quotes',
       'support',
+      'followups',
       'contracts',
     ])
   })

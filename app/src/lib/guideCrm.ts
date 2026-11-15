@@ -38,6 +38,13 @@ export const GUIDE_CRM_SECTIONS: GuideCrmSection[] = [
     linkKey: 'guide.crm.support.link',
   },
   {
+    id: 'followups',
+    titleKey: 'guide.crm.followups.title',
+    bodyKey: 'guide.crm.followups.body',
+    to: '/follow-ups',
+    linkKey: 'guide.crm.followups.link',
+  },
+  {
     id: 'contracts',
     titleKey: 'guide.crm.contracts.title',
     bodyKey: 'guide.crm.contracts.body',

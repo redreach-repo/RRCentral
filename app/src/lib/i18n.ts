@@ -139,6 +139,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.crm.support.body':
       'Open tickets against an account, reply or add an internal note, and keep SLA packages honest.',
     'guide.crm.support.link': 'Open support',
+    'guide.crm.followups.title': 'Follow-ups',
+    'guide.crm.followups.body':
+      'Work the due queue: overdue and today first, snooze or complete each reminder, and jump back into the company when you need context.',
+    'guide.crm.followups.link': 'Open follow-ups',
     'guide.crm.contracts.title': 'Contracts vault',
     'guide.crm.contracts.body':
       'From a My Day company, create an NDA draft for the right signer, send for signature, and track obligations after sign.',
@@ -1179,6 +1183,10 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.crm.support.body':
       'افتح تذاكر على الحساب، أرسل رداً أو ملاحظة داخلية، وحافظ على حزم اتفاقية مستوى الخدمة.',
     'guide.crm.support.link': 'فتح الدعم',
+    'guide.crm.followups.title': 'المتابعات',
+    'guide.crm.followups.body':
+      'اعمل قائمة المستحق: المتأخر واليوم أولاً، أجّل أو أكمل كل تذكير، وارجع للشركة عند الحاجة للسياق.',
+    'guide.crm.followups.link': 'فتح المتابعات',
     'guide.crm.contracts.title': 'خزنة العقود',
     'guide.crm.contracts.body':
       'من شركة في يومي، أنشئ مسودة NDA للموقّع الصحيح، أرسل للتوقيع، وتابع الالتزامات بعد التوقيع.',

@@ -43,6 +43,8 @@ type InvoiceOpt = {
 }
 
 /** M9a: customer purchase order tracker + soft invoice match. */
+const PO_STATUSES = ['all', 'open', 'partial', 'fulfilled', 'canceled'] as const
+
 export default function ClientPosPage() {
   const { showToast } = useToast()
   const [rows, setRows] = useState<ClientPurchaseOrder[]>([])
@@ -52,6 +54,8 @@ export default function ClientPosPage() {
   const [poNumber, setPoNumber] = useState('')
   const [amount, setAmount] = useState('')
   const [notes, setNotes] = useState('')
+  const [statusFilter, setStatusFilter] = useState<(typeof PO_STATUSES)[number]>('all')
+  const [receiptDrafts, setReceiptDrafts] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -204,12 +208,30 @@ export default function ClientPosPage() {
           </form>
 
           <section style={cardStyle}>
-            <h2 style={{ marginTop: 0, fontSize: 16 }}>Tracked POs</h2>
-            {rows.length === 0 ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'end', marginBottom: 8 }}>
+              <h2 style={{ margin: 0, fontSize: 16, flex: 1 }}>Tracked POs</h2>
+              <label style={labelStyle}>
+                Status
+                <select
+                  style={selectStyle}
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as (typeof PO_STATUSES)[number])}
+                >
+                  {PO_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s === 'all' ? 'All' : s}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            {rows.filter((r) => statusFilter === 'all' || r.status === statusFilter).length === 0 ? (
               <EmptyState title="No client POs" subtitle="Add a customer PO number above." />
             ) : (
               <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}>
-                {rows.map((r) => {
+                {rows
+                  .filter((r) => statusFilter === 'all' || r.status === statusFilter)
+                  .map((r) => {
                   const suggestion = clientPoIsOpen(r.status)
                     ? suggestClientPoInvoiceMatch(
                         { amount: Number(r.amount) },
@@ -239,31 +261,53 @@ export default function ClientPosPage() {
                           </div>
                         ) : null}
                       </div>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
                         {clientPoIsOpen(r.status) && !r.invoice_id ? (
                           <button type="button" style={buttonSecondaryStyle} onClick={() => void matchInvoice(r)}>
                             Soft-match invoice
                           </button>
                         ) : null}
                         {clientPoIsOpen(r.status) ? (
-                          <button
-                            type="button"
-                            style={buttonSecondaryStyle}
-                            onClick={() => {
-                              const add = window.prompt('Received amount to add (AED)', '0')
-                              if (add == null) return
-                              const next = Number(r.received_amount || 0) + (Number(add) || 0)
-                              const status = clientPoStatusAfterReceipt(Number(r.amount), next)
-                              void recordClientPoReceipt(r.id, next, status)
-                                .then(() => {
-                                  showToast(`Receipt recorded → ${status}`, 'success')
-                                  return load()
-                                })
-                                .catch((err) => showToast(errorMessage(err, 'Receipt failed'), 'error'))
-                            }}
-                          >
-                            Record receipt
-                          </button>
+                          <>
+                            <input
+                              style={{ ...inputStyle, maxWidth: 120, height: 36 }}
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              placeholder="Add AED"
+                              aria-label={`Receipt amount for ${r.po_number}`}
+                              value={receiptDrafts[r.id] ?? ''}
+                              onChange={(e) =>
+                                setReceiptDrafts((prev) => ({ ...prev, [r.id]: e.target.value }))
+                              }
+                            />
+                            <button
+                              type="button"
+                              style={buttonSecondaryStyle}
+                              onClick={() => {
+                                const add = Number(receiptDrafts[r.id] || 0)
+                                if (!(add > 0)) {
+                                  showToast('Enter a receipt amount greater than 0', 'error')
+                                  return
+                                }
+                                const next = Number(r.received_amount || 0) + add
+                                const status = clientPoStatusAfterReceipt(Number(r.amount), next)
+                                void recordClientPoReceipt(r.id, next, status)
+                                  .then(() => {
+                                    showToast(`Receipt recorded → ${status}`, 'success')
+                                    setReceiptDrafts((prev) => {
+                                      const copy = { ...prev }
+                                      delete copy[r.id]
+                                      return copy
+                                    })
+                                    return load()
+                                  })
+                                  .catch((err) => showToast(errorMessage(err, 'Receipt failed'), 'error'))
+                              }}
+                            >
+                              Record receipt
+                            </button>
+                          </>
                         ) : null}
                         {r.status === 'open' || r.status === 'partial' ? (
                           <button

@@ -3,6 +3,7 @@ import {
   createSavedView,
   deleteSavedView,
   listSavedViews,
+  setDefaultSavedView,
   type SavedView,
 } from '../lib/savedViews'
 import { errorMessage } from '../lib/errors'
@@ -133,6 +134,25 @@ export default function SavedViewsBar({
     }
   }
 
+  async function makeDefault() {
+    if (!selected || selected.is_default) return
+    setSaving(true)
+    try {
+      await setDefaultSavedView(moduleId, selected.id)
+      setViews((prev) =>
+        prev.map((v) => ({
+          ...v,
+          is_default: v.id === selected.id,
+        })),
+      )
+      onToast('Default view updated', 'success')
+    } catch (e) {
+      onToast(errorMessage(e, 'Could not set default view'), 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div
       style={{
@@ -213,14 +233,25 @@ export default function SavedViewsBar({
               Save view
             </button>
             {selected && !selected.is_default ? (
-              <button
-                type="button"
-                style={buttonSecondaryStyle}
-                disabled={saving}
-                onClick={() => void removeSelected()}
-              >
-                Delete
-              </button>
+              <>
+                <button
+                  type="button"
+                  style={buttonSecondaryStyle}
+                  disabled={saving}
+                  onClick={() => void makeDefault()}
+                  title="Use this view when the page loads"
+                >
+                  Set default
+                </button>
+                <button
+                  type="button"
+                  style={buttonSecondaryStyle}
+                  disabled={saving}
+                  onClick={() => void removeSelected()}
+                >
+                  Delete
+                </button>
+              </>
             ) : null}
           </>
         )
