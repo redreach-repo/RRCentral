@@ -65,13 +65,7 @@ Deno.serve(withErrorLog("saas-billing-webhook", async (req) => {
   const stripe = new Stripe(stripeKey, { apiVersion: "2026-07-29.dahlia" as Stripe.LatestApiVersion })
   let event: Stripe.Event
   try {
-    event = await stripe.webhooks.constructEventAsync(
-      raw,
-      signature,
-      webhookSecret,
-      undefined,
-      Stripe.createSubtleCryptoProvider(),
-    )
+    event = await stripe.webhooks.constructEventAsync(raw, signature, webhookSecret, undefined, Stripe.createSubtleCryptoProvider())
   } catch {
     return json({ error: "Unauthorized" }, 401)
   }
