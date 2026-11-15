@@ -9,8 +9,9 @@ import {
   DEFAULT_CONTRACT_INVOICE_TERMS,
 } from '../../lib/contractBilling'
 import { errorMessage } from '../../lib/errors'
+import { exportListCsv } from '../../lib/listIo'
 import { parseContractInvoiceSettings } from '../../lib/schemas/contractInvoiceSettings'
-import { buttonPrimaryStyle, cardStyle, colors, fieldStyle, formGridStyle, labelStyle, sectionTitleStyle, selectStyle } from '../../lib/uiStyles'
+import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, fieldStyle, formGridStyle, labelStyle, sectionTitleStyle, selectStyle } from '../../lib/uiStyles'
 
 /** Which division and payment terms automatic contract invoices use. */
 export default function ContractInvoiceSettingsCard() {
@@ -45,8 +46,28 @@ export default function ContractInvoiceSettingsCard() {
 
   return (
     <section style={{ ...cardStyle, marginBottom: 16 }}>
-      <h2 style={sectionTitleStyle}>Automatic contract invoices</h2>
-      <p style={{ color: colors.muted, fontSize: 13, margin: '0 0 12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Automatic contract invoices</h2>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          onClick={() => {
+            const div = DIVISIONS.find((d) => d.code === division)
+            exportListCsv(
+              'contract-invoice-settings.csv',
+              ['setting', 'value'],
+              [
+                { setting: 'division', value: div ? `${div.code} ${div.brand}` : division },
+                { setting: 'payment_terms', value: terms },
+              ],
+            )
+            showToast('Contract invoice settings CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
+      </div>
+      <p style={{ color: colors.muted, fontSize: 13, margin: '8px 0 12px' }}>
         Used for the setup fee and monthly invoices raised from contracts. The division sets the RR reference number given
         when you finalise each draft. Payment reminders go out 3, 7 and 14 days after the due date.
       </p>
