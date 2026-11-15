@@ -8,7 +8,7 @@
 | HR | §6.5 / M6 | People CRUD, salary/IBAN/labour card/routing, draft gratuity preview |
 | Payroll | §6.6 / M8 | Runs, generate lines from HR, WPS CSV + SIF draft export, submit/approve/paid |
 | WPS / gratuity | §11 / M8 | `wpsGratuity.ts` (CSV + SCR/EDR SIF draft, IBAN/labour/routing validators, readiness) |
-| Marketing | §6.10 / M10 | Campaigns with budget/dates + activate/pause/done |
+| Marketing | §6.10 / M10 | Campaigns + opt-in consent + segments + recipient queue (no live ESP) |
 | SaaS tenant billing | §6.13 / M11 | Plan catalog, trial/activate/cancel, seat usage; Stripe Checkout + portal (`docs/saas-billing.md`) |
 | Industry packs | §3 / M12 | Catalog + activate/retire; activation enables shell module flags from manifest |
 | Maker-checker | §3 / M7 | Approvals queue; payroll, expenses, refunds, supplier commitments (≥ AED 5k) |
@@ -27,5 +27,6 @@ Module flags (default **hidden** until Settings): `hr`, `payroll`, `marketing`, 
 
 - Bank-certified WPS/SIF file format + legal counsel sign-off (draft deepen shipped; see `docs/COMPLIANCE_NOTES.md` § WPS)
 - Real marketing send providers
-- Invoice/quotation write endpoints
+- pgvector embeddings + live model answers (FTS gateway shipped)
 - Stripe Tax registration for live UAE/GCC SaaS charges
+- Per-host PWA DNS (`*.highmast.app`)

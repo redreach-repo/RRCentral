@@ -16,6 +16,7 @@ import PayrollPage from './pages/PayrollPage'
 import MarketingPage from './pages/MarketingPage'
 import SaasBillingPage from './pages/SaasBillingPage'
 import IndustryPacksPage from './pages/IndustryPacksPage'
+import WorkspaceSetupPage from './pages/WorkspaceSetupPage'
 import ApprovalsPage from './pages/ApprovalsPage'
 import PublicApiPage from './pages/PublicApiPage'
 import ThemeStudioPage from './pages/ThemeStudioPage'
@@ -114,6 +115,7 @@ export default function App() {
             </Route>
             <Route path="teetribe" element={<Navigate to="/shop" replace />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/workspace-setup" element={<WorkspaceSetupPage />} />
             {/* Clients open this from a private link; no sign in. */}
             <Route path="/portal" element={<ClientPortalPage />} />
             <Route path="/accept" element={<QuoteAcceptPage />} />

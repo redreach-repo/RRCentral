@@ -528,7 +528,7 @@ export async function listTenantIndustryPacks(): Promise<TenantIndustryPackRow[]
 
 export async function activateIndustryPack(
   packKey: string,
-): Promise<{ enabledFlags: string[] }> {
+): Promise<{ enabledFlags: string[]; fieldsCreated: number; pipelinesCreated: number }> {
   const { data: pack, error: packErr } = await db
     .from('industry_packs')
     .select('id, manifest')
@@ -562,7 +562,92 @@ export async function activateIndustryPack(
 
   const builtin = BUILTIN_INDUSTRY_PACKS.find((p) => p.pack_key === packKey)
   const manifest = (pack.manifest as IndustryPackManifest) || builtin?.manifest || {}
-  return applyPackModuleFlags({ manifest })
+  const flags = await applyPackModuleFlags({ manifest })
+  const applied = await applyPackTemplates(manifest)
+  return { ...flags, ...applied }
+}
+
+/** Idempotently create custom fields / pipelines from pack manifest.templates. */
+async function applyPackTemplates(
+  manifest: IndustryPackManifest | Record<string, unknown>,
+): Promise<{ fieldsCreated: number; pipelinesCreated: number }> {
+  const { templatesFromManifest, fieldKeysToCreate, pipelineNamesToCreate } = await import('./industryPackTemplates')
+  const templates = templatesFromManifest(manifest)
+  let fieldsCreated = 0
+  let pipelinesCreated = 0
+
+  const fields = templates.custom_fields || []
+  if (fields.length) {
+    const { data: existingDefs } = await db
+      .from('custom_field_definitions')
+      .select('object_type, field_key')
+    const existing = new Set(
+      ((existingDefs || []) as Array<{ object_type: string; field_key: string }>).map(
+        (r) => `${r.object_type}:${r.field_key}`,
+      ),
+    )
+    const toCreate = fieldKeysToCreate(fields, existing)
+    for (const f of toCreate) {
+      const { error } = await db.from('custom_field_definitions').insert({
+        object_type: f.object_type,
+        field_key: f.field_key,
+        label: f.label,
+        field_type: f.field_type || 'text',
+        options: f.options || [],
+      })
+      if (!error) fieldsCreated += 1
+    }
+  }
+
+  const pipelines = templates.pipelines || []
+  if (pipelines.length) {
+    const { data: existingPipes } = await db.from('pipelines').select('name')
+    const existingNames = new Set(
+      ((existingPipes || []) as Array<{ name: string }>).map((p) => String(p.name || '').trim().toLowerCase()),
+    )
+    const toCreate = pipelineNamesToCreate(pipelines, existingNames)
+    for (const p of toCreate) {
+      const pipelineKey = String(p.name || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_|_$/g, '')
+        .slice(0, 48) || 'pack_pipeline'
+      const { data: created, error } = await db
+        .from('pipelines')
+        .insert({
+          pipeline_key: pipelineKey,
+          name: p.name,
+          object_type: p.object_type || 'deal',
+          active: true,
+        })
+        .select('id')
+        .maybeSingle()
+      if (error || !created?.id) continue
+      pipelinesCreated += 1
+      const stages = p.stages || []
+      for (let i = 0; i < stages.length; i++) {
+        const label = stages[i]
+        const stageKey =
+          String(label || '')
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_|_$/g, '')
+            .slice(0, 48) || `stage_${i + 1}`
+        const outcome = /won/i.test(label) ? 'won' : /lost/i.test(label) ? 'lost' : 'open'
+        await db.from('pipeline_stages').insert({
+          pipeline_id: created.id,
+          stage_key: stageKey,
+          label,
+          outcome,
+          sort_order: i + 1,
+        })
+      }
+    }
+  }
+
+  return { fieldsCreated, pipelinesCreated }
 }
 
 /** Enable shell modules listed in a pack manifest via app_settings.moduleFlags. */

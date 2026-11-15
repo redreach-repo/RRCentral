@@ -1,43 +1,46 @@
-# Run plan — Batch M4 through M7
+# Run plan — Batch M10, M11, M12 deepen
 
 **Started:** 15 November 2026 (Asia/Dubai)  
-**Branch:** `cursor/batch-m4-m7-d3d5`  
-**Spec:** Master Spec v2.1 (`MASTER_SPEC.md`)  
-**Prior batch:** M0–M3a merged (#436)
+**Branch:** `cursor/batch-m10-m12-d3d5` (from `main`)  
+**Spec:** Master Spec v2.1  
+**Note:** M8–M9a PR #438 may still be open; this batch does not depend on it.
 
 ---
 
-## M4 — Mail and calendar
+## M10 — Marketing deepen
 
-- [x] Zoho + Gmail Phase A + M365 Phase A/B already on main
-- [x] IMAP remains unavailable in Settings (explicit stub + resolve tests)
-- [ ] Gmail Phase B inbox — blocked on CASA (Not done)
-- [ ] IMAP live adapter — deferred until a real non-API mailbox need (Not done)
+- [x] Campaigns CRUD already on main
+- [x] Contact marketing consent + segments + campaign recipients
+- [ ] Live ESP / send providers (Not done — Alfred / secrets)
 
-## M5 — Contracts and e-sign
+## M10 — AI retrieval (light)
 
-- [x] NDA /sign, clauses, obligations, QTSP stub already on main
-- [x] Doc-type → required e-sign level matrix (honest labels; canvas stays assent)
-- [ ] TDRA-licensed QTSP vendor — Alfred / paid (Not done)
+- [x] FTS knowledge docs table + search helper (no pgvector yet)
+- [x] Thin `hm-ai-gateway` Edge (retrieve + stub answer; tools-as-user later)
+- [ ] Live embedding / pgvector (Not done)
 
-## M6 — HR core
+## M10 — Fireflies webhook
 
-- [x] People directory + FLE + gratuity draft already on main
-- [x] Leave requests table + RLS + People-adjacent Leave page
-- [ ] Full attendance / org chart / contracts HR pack — later (Not done)
+- [x] `fireflies-webhook` Edge + shared-secret ingest → account activity
+- [ ] Fireflies dashboard URL config in production (Alfred)
 
-## M7 — Accounting core
+## M11 — Workspace provisioner
 
-- [x] Maker-checker / Approvals already on main
-- [x] Chart of accounts + journals + balanced post + immutable posted rows
-- [x] Ledger page under Finance (manager+)
-- [x] Seed default CoA (UAE SME starter — Unverified for tax mapping)
-- [ ] Auto-post from invoices/expenses — later deepen (Not done)
-- [ ] Full VAT return engine — M7+ / COMPLIANCE (Not done)
+- [x] `business_type_packs` + idempotent provision RPC/Edge scaffold
+- [x] `/workspace-setup` form (local/demo safe)
+- [ ] Live multi-tenant DNS / Stripe Tax (Not done)
+
+## M11 — App identity remainder
+
+- [x] `tenant_app_identities` table + helpers
+- [ ] Per-host served manifests at `*.highmast.app` (Alfred / hosting)
+
+## M12 — Industry pack templates
+
+- [x] Object/field/pipeline template seeds for eng/construction/trading
+- [x] Apply templates on activate (idempotent client helpers)
+- [ ] Full Eng/Construction domain objects (later M12a/b)
 
 ## Quality gates
 
-- [x] typecheck
-- [x] lint (existing warnings only)
-- [x] vitest (ledger, leave, esign, mailCalendar)
-- [x] SQL module tests: `accounting_ledger_test` + `hr_leave_test` (+ full `run.sh`)
+- [x] typecheck / lint / vitest / SQL module tests

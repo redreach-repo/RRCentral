@@ -76,6 +76,24 @@ export function appNameProblem(name: string): string | null {
   return null
 }
 
+/** Host slug for tenant_app_identities (e.g. alnoor → alnoor.highmast.app later). */
+export function hostSlugProblem(slug: string): string | null {
+  const s = String(slug || '')
+    .trim()
+    .toLowerCase()
+  if (!s) return 'host_slug_required'
+  if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(s)) return 'host_slug_invalid'
+  if (RESERVED_APP_NAMES.some((r) => s === r.replace(/\s+/g, ''))) return 'host_slug_reserved'
+  return null
+}
+
+export function fullAppHost(slug: string, root = 'highmast.app'): string {
+  const s = String(slug || '')
+    .trim()
+    .toLowerCase()
+  return s ? `${s}.${root}` : root
+}
+
 /** Stable manifest id so two tenant installs on one device do not overwrite. */
 export function tenantManifestId(tenantId: string, companyId?: string | null): string {
   const base = (import.meta.env.BASE_URL || '/').replace(/\/?$/, '/')
