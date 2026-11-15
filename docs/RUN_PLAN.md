@@ -1,43 +1,40 @@
-# Run plan — Batch M4 through M7
+# Run plan — Batch M8, M8a, M9, M9b, M9a
 
 **Started:** 15 November 2026 (Asia/Dubai)  
-**Branch:** `cursor/batch-m4-m7-d3d5`  
-**Spec:** Master Spec v2.1 (`MASTER_SPEC.md`)  
-**Prior batch:** M0–M3a merged (#436)
+**Branch:** `cursor/batch-m8-m9a-d3d5` (from `main`)  
+**Spec:** Master Spec v2.1  
+**Note:** M4–M7 merged via #437; this batch is additive on top.
 
 ---
 
-## M4 — Mail and calendar
+## M8 — Payroll deepen
 
-- [x] Zoho + Gmail Phase A + M365 Phase A/B already on main
-- [x] IMAP remains unavailable in Settings (explicit stub + resolve tests)
-- [ ] Gmail Phase B inbox — blocked on CASA (Not done)
-- [ ] IMAP live adapter — deferred until a real non-API mailbox need (Not done)
+- [x] Runs / lines / WPS draft already on main
+- [x] Export audit log (`payroll_exports`) when CSV/SIF downloaded
+- [ ] Bank-certified WPS — counsel (Not done)
 
-## M5 — Contracts and e-sign
+## M8a — India / Canada country packs
 
-- [x] NDA /sign, clauses, obligations, QTSP stub already on main
-- [x] Doc-type → required e-sign level matrix (honest labels; canvas stays assent)
-- [ ] TDRA-licensed QTSP vendor — Alfred / paid (Not done)
+- [x] Country pack data module (AE / IN / CA) — Unverified rates/labels
+- [x] Catalog page + activate sets tenant default country pack key
+- [ ] Specialist sign-off of tax/payroll rules (Not done)
 
-## M6 — HR core
+## M9 — Inventory / purchasing
 
-- [x] People directory + FLE + gratuity draft already on main
-- [x] Leave requests table + RLS + People-adjacent Leave page
-- [ ] Full attendance / org chart / contracts HR pack — later (Not done)
+- [x] Products + stock adjust already on main
+- [x] Purchase orders + lines + receive into stock
+- [ ] Full landed cost / multi-warehouse (Not done)
 
-## M7 — Accounting core
+## M9b — Project accounting
 
-- [x] Maker-checker / Approvals already on main
-- [x] Chart of accounts + journals + balanced post + immutable posted rows
-- [x] Ledger page under Finance (manager+)
-- [x] Seed default CoA (UAE SME starter — Unverified for tax mapping)
-- [ ] Auto-post from invoices/expenses — later deepen (Not done)
-- [ ] Full VAT return engine — M7+ / COMPLIANCE (Not done)
+- [x] Projects + cost lines linked to accounts
+- [ ] Full WIP / retention / billing schedules (Not done)
+
+## M9a — Client PO tracker
+
+- [x] Client purchase orders against accounts (status + amount)
+- [ ] Auto-match to invoices (Not done)
 
 ## Quality gates
 
-- [x] typecheck
-- [x] lint (existing warnings only)
-- [x] vitest (ledger, leave, esign, mailCalendar)
-- [x] SQL module tests: `accounting_ledger_test` + `hr_leave_test` (+ full `run.sh`)
+- [x] typecheck / lint / vitest / SQL module tests

@@ -40,7 +40,7 @@ Status key: **exists** · **partial** · **missing**
 | Construction pack §11.4 | partial | Builtin pack key + module flags; workforce/site objects M12b not built |
 | Trading pack §11.2 light | partial | `trading_import` starter exists; landed cost / credit limits later |
 | Languages §5.5 (v3) | partial | EN+AR only; all new strings must stay key-based for v3 |
-| Country packs §12 | partial | UAE helpers exist; India/Canada packs M8a; residency §19 |
+| Country packs §12 | partial | AE/IN/CA catalog + activate shipped (Unverified); residency §19 |
 
 ---
 
@@ -53,10 +53,10 @@ Status key: **exists** · **partial** · **missing**
 | 6.3 Email and calendar | partial | Zoho + Gmail Phase A + M365 Phase A/B (incl. inbox); Gmail inbox still CASA-gated; IMAP deferred |
 | 6.4 Contracts and e-sign | partial | NDA `/sign` + clauses + obligations board + spawn-on-sign; QTSP → M5 later |
 | 6.5 HR | partial | People + leave requests; attendance/org chart later |
-| 6.6 Payroll | partial | M8 first slice: payroll runs + WPS/gratuity draft helpers (not legal advice) |
+| 6.6 Payroll | partial | M8: runs + WPS/gratuity draft + `payroll_exports` audit (not legal advice / not bank-certified) |
 | 6.7 Accounting (ledger) | partial | CoA + journals + post/immutability shipped; auto-post from invoices + VAT return later |
-| 6.8 Inventory and purchasing | partial | Catalog/inventory thin; DN as delivery doc → M9 |
-| 6.9 Delivery (projects/support) | partial | AI CRM delivery + tickets strong; generalize projects → M3/M9 continuity |
+| 6.8 Inventory and purchasing | partial | M9: POs + receive→stock; landed cost / multi-warehouse later |
+| 6.9 Delivery (projects/support) | partial | M9b: `delivery_projects` + cost lines; WIP/retention later |
 | 6.10 Marketing | partial | M10 first slice: `marketing_campaigns` + Campaigns page |
 | 6.11 Documents and knowledge | partial | Drive + customer_documents; not full DMS → expand with M5/M11 |
 | 6.12 Planning and reports | partial | Reports/MRR/insights; no goals/scenarios builder → M12-ish / planning |
@@ -85,7 +85,8 @@ Status key: **exists** · **partial** · **missing**
 | Requirement | Status | Step |
 |-------------|--------|------|
 | UAE VAT codes / TRN / e-invoice ready model | partial | VAT on docs; no CoA tax engine → M7 + COMPLIANCE_NOTES |
-| WPS / gratuity | partial | M8 draft CSV + SIF-like SCR/EDR + validators shipped; **verify law + bank** before live use |
+| WPS / gratuity | partial | M8 draft CSV + SIF + export audit; **verify law + bank** before live use |
+| Client PO tracker | partial | M9a table + UI; invoice auto-match later |
 | Arabic bilingual PDFs | missing | M1/M7 |
 | Import/export every list | partial | Some CSV; not universal → M1 framework |
 | Keep RR Central workflows | exists | Must not break §B.3 during M1–M3 |
@@ -97,7 +98,7 @@ Status key: **exists** · **partial** · **missing**
 | Gap | Spec handling |
 |-----|---------------|
 | Dual CRM | M3 |
-| Shallow inventory | M9 |
+| Shallow inventory | M9 (PO receive shipped; warehouse later) |
 | Domains tracker | Stay custom object; optional registrar later |
 | HubSpot one-way | Optional connector once CRM is hub (§14) |
 | Fireflies manual | M10 webhook ingest |

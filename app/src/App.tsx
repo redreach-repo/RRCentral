@@ -16,6 +16,10 @@ import PayrollPage from './pages/PayrollPage'
 import MarketingPage from './pages/MarketingPage'
 import SaasBillingPage from './pages/SaasBillingPage'
 import IndustryPacksPage from './pages/IndustryPacksPage'
+import CountryPacksPage from './pages/CountryPacksPage'
+import PurchaseOrdersPage from './pages/PurchaseOrdersPage'
+import ProjectsPage from './pages/ProjectsPage'
+import ClientPosPage from './pages/ClientPosPage'
 import ApprovalsPage from './pages/ApprovalsPage'
 import PublicApiPage from './pages/PublicApiPage'
 import ThemeStudioPage from './pages/ThemeStudioPage'
@@ -167,6 +171,10 @@ export default function App() {
               <Route path="marketing" element={<MarketingPage />} />
               <Route path="saas-billing" element={<SaasBillingPage />} />
               <Route path="industry-packs" element={<IndustryPacksPage />} />
+              <Route path="country-packs" element={<CountryPacksPage />} />
+              <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
+              <Route path="projects" element={<ProjectsPage />} />
+              <Route path="client-pos" element={<ClientPosPage />} />
               <Route path="approvals" element={<ApprovalsPage />} />
               <Route path="public-api" element={<PublicApiPage />} />
               <Route path="theme-studio" element={<ThemeStudioPage />} />

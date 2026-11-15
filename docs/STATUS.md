@@ -1,41 +1,51 @@
 # HighMast / RR Central status
 
 **Last updated:** 15 November 2026 (Asia/Dubai)  
-**Spec:** Master Specification **v2.1** (`MASTER_SPEC.md`)  
-**Batch:** M4 through M7 (`docs/RUN_PLAN.md`)  
-**Branch:** `cursor/batch-m4-m7-d3d5`
+**Spec:** Master Specification **v2.1** (`MASTER_SPEC.md`, `docs/SPEC_POINTER.md`)  
+**Batch:** M8, M8a, M9, M9b, M9a (`docs/RUN_PLAN.md`)  
+**Branch:** `cursor/batch-m8-m9a-d3d5`
 
 ## Milestone verdict (this batch)
 
-| Milestone | Result |
-|-----------|--------|
-| **M4** | **Pass** existing providers; IMAP stays unavailable; Gmail Phase B Not done (CASA) |
-| **M5** | **Pass** deepen (doc-type e-sign matrix); QTSP vendor Not done |
-| **M6** | **Pass** leave requests + Leave page; attendance later Not done |
-| **M7** | **Pass** CoA + journals + Ledger page; auto-post / VAT return Not done |
+| Milestone | Accept when | Result |
+|-----------|-------------|--------|
+| **M8** | Payroll deepen + export audit | **Pass** with Not done: bank-certified WPS / counsel |
+| **M8a** | India/Canada country pack scaffolds | **Pass** with Not done: specialist tax/payroll sign-off (Unverified) |
+| **M9** | Inventory/purchasing deepen | **Pass** with Not done: landed cost / multi-warehouse |
+| **M9b** | Project accounting slice | **Pass** with Not done: WIP / retention / billing schedules |
+| **M9a** | Client PO tracker | **Pass** with Not done: auto-match to invoices |
 
 ## Shipped this batch
 
-- Accounting ledger migration + `/ledger` + unit/SQL tests
-- HR leave migration + `/hr/leave`
-- E-sign doc-type required vs available levels
-- Compliance note for Unverified starter CoA
+- Migrations: `country_packs` / `tenant_country_packs`, `purchase_orders` + `rr_po_receive_line`, `delivery_projects` / `project_cost_lines`, `client_purchase_orders`, `payroll_exports`
+- Pages: Country packs, Purchase orders, Projects, Client POs; Payroll export logging
+- Libs: `countryPacks`, `purchasing`, `projectAccounting`, `clientPurchaseOrders`, `opsSliceStores`
+- Module SQL tests + unit tests; nav + EN/AR i18n keys
+- Docs: RUN_PLAN, COMPLIANCE country-pack note, MIGRATIONS, module stubs
+- Light-mode sidebar contrast fix for axe (theme tokens)
+
+## Prior on main (M4–M7 via #437)
+
+- CoA + journals + Ledger; HR leave; e-sign doc-type matrix
 
 ## Not done (with reason)
 
-1. Gmail Phase B inbox — CASA / restricted verification  
-2. IMAP live adapter — deferred  
-3. TDRA QTSP paid vendor — Alfred  
-4. Auto-post invoices/expenses to GL — later deepen  
-5. VAT return engine — compliance  
-6. Prior external blocks: WPS counsel, SVG zip, demo Supabase, MFA/SSO  
+1. Bank-certified WPS + counsel review — external legal/bank  
+2. India/Canada/UAE country-pack rule verification — counsel  
+3. Landed cost / multi-warehouse — later inventory deepen  
+4. WIP / retention / billing schedules — later project accounting  
+5. Client PO ↔ invoice auto-match — later finance link  
+6. Official Boost/Care/Trading SVG masters — waiting on zip  
+7. Demo Supabase project + `DEMO_*` secrets + Pages workflow — Alfred  
+8. Gmail Phase B / IMAP / QTSP / GL auto-post / VAT return — see M4–M7 Not done  
 
 ## Test results
 
 - Typecheck: pass  
 - Lint: pass (existing warnings only)  
-- Vitest: **1320** passed / 244 files  
-- SQL `run.sh`: pass (incl. `accounting_ledger_test`, `hr_leave_test`)
+- Vitest: **1316** passed / 245 files (this branch before merge; main also has M4–M7 tests)  
+- SQL `tests/run.sh`: pass (incl. country packs, POs, projects, client POs; ledger/leave from main)  
+- A11y: pass after sidebar contrast fix  
 
 ```bash
 cd app && npm run typecheck && npm run lint && npx vitest run
