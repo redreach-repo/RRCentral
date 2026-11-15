@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import { can } from '../lib/permissions'
 import { errorMessage, isMissingRelationError } from '../lib/errors'
 import { clearAppErrors, errorKey, groupErrors, listAppErrors, type AppError } from '../lib/errorReporting'
@@ -20,13 +21,14 @@ import docsStyles from '../styles/docsList.module.css'
 
 export default function AppErrorsPage() {
   const { t } = useI18n()
-  const { userRole } = useAuth()
+  const { userRole, appUserId } = useAuth()
   const { showToast } = useToast()
   const [days, setDays] = useState(7)
   const [errors, setErrors] = useState<AppError[]>([])
   const [loading, setLoading] = useState(true)
   const [problem, setProblem] = useState('')
   const [open, setOpen] = useState('')
+  const errorsViewFilters = useMemo(() => ({ days: String(days) }), [days])
 
   const kindLabel = (kind: AppError['kind']) => {
     if (kind === 'browser') return t('page.appErrors.kindBrowser')
@@ -140,6 +142,19 @@ export default function AppErrorsPage() {
           </button>
         </div>
       </header>
+      <SavedViewsBar
+        moduleId="app_errors"
+        filters={errorsViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => {
+          const next = Number(f.days)
+          if ([1, 7, 30, 90].includes(next)) setDays(next)
+        }}
+        onToast={showToast}
+        filtersEqual={(a, b) => String(a.days || '7') === String(b.days || '7')}
+      />
       {problem ? (
         <div style={{ ...cardStyle, color: colors.danger }}>{problem}</div>
       ) : !loading && groups.length === 0 ? (

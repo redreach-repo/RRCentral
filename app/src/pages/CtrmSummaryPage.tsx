@@ -9,13 +9,16 @@ import { summaryText, weeklySummary } from '../lib/ctrm'
 // Commission is deliberately not loaded on this page: the summary goes to CTRM Next.
 import { listDeals, listStageChanges } from '../lib/ctrmStore'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import type { Account, CtrmDeal, CtrmStageChange } from '../lib/types'
+import { useToast } from '../contexts/ToastContext'
 import styles from './ClientReportPage.module.css'
 
 /** Weekly pipeline update for CTRM Next, to copy or print. No commission or fees. */
 export default function CtrmSummaryPage() {
   const { t } = useI18n()
   const { userRole, appUserId } = useAuth()
+  const { showToast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const day = searchParams.get('week') || format(new Date(), 'yyyy-MM-dd')
   const [deals, setDeals] = useState<CtrmDeal[]>([])
@@ -93,6 +96,56 @@ export default function CtrmSummaryPage() {
           </label>
           <button type="button" onClick={() => void copy()}>
             {t('page.ctrmSummary.copy')}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              exportListCsv(
+                `ctrm-summary-${summary.weekStart}.csv`,
+                ['section', 'label', 'value', 'extra'],
+                [
+                  ...summary.byStage.map((b) => ({
+                    section: 'by_stage',
+                    label: b.label,
+                    value: b.count,
+                    extra: b.stage,
+                  })),
+                  ...summary.newThisWeek.map((n) => ({
+                    section: 'new_this_week',
+                    label: n.name,
+                    value: n.region,
+                    extra: n.stage,
+                  })),
+                  ...summary.callsBooked.map((n) => ({
+                    section: 'calls_booked',
+                    label: n,
+                    value: '',
+                    extra: '',
+                  })),
+                  ...summary.demosDone.map((n) => ({
+                    section: 'demos_done',
+                    label: n,
+                    value: '',
+                    extra: '',
+                  })),
+                  ...summary.signed.map((n) => ({
+                    section: 'signed',
+                    label: n,
+                    value: '',
+                    extra: '',
+                  })),
+                  ...summary.nextSteps.map((n) => ({
+                    section: 'next_steps',
+                    label: n.name,
+                    value: n.action,
+                    extra: `${n.date}|${n.stage}`,
+                  })),
+                ],
+              )
+              showToast('CTRM summary CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
           </button>
           <button type="button" onClick={() => window.print()}>
             {t('page.ctrmSummary.print')}
