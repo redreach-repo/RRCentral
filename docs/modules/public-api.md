@@ -8,7 +8,7 @@
 - Caller sends `x-api-key: hm_…` (plaintext shown once at create time; only SHA-256 hash stored)
 - Scopes on `api_keys.scopes` (JSON array). Wildcard `*` allowed.
 - Default scopes (read-only): `read:accounts`, `read:invoices`, `read:quotations`
-- Opt-in write scope: `write:accounts` (checkbox on `/public-api`)
+- Opt-in write scopes: `write:accounts`, `write:invoices`, `write:quotations` (checkboxes on `/public-api`)
 
 ## Routes
 
@@ -17,10 +17,14 @@
 | GET | `/functions/v1/public-api` | — | Health + route list |
 | GET | `/v1/me` | any valid key | Key metadata |
 | GET | `/v1/accounts` | `read:accounts` | Tenant-scoped; `?limit=&cursor=` |
-| POST | `/v1/accounts` | `write:accounts` | Create account; emits `account.created` webhook |
-| PATCH | `/v1/accounts/:id` | `write:accounts` | Update allowed fields; emits `account.updated` |
+| POST | `/v1/accounts` | `write:accounts` | Create account; emits `account.created` |
+| PATCH | `/v1/accounts/:id` | `write:accounts` | Update; emits `account.updated` |
 | GET | `/v1/invoices` | `read:invoices` | Tenant-scoped; cursor pagination |
+| POST | `/v1/invoices` | `write:invoices` | Create draft invoice; emits `invoice.created` |
+| PATCH | `/v1/invoices/:id` | `write:invoices` | Update; emits `invoice.updated` |
 | GET | `/v1/quotations` | `read:quotations` | Tenant-scoped; cursor pagination |
+| POST | `/v1/quotations` | `write:quotations` | Create draft quotation; emits `quotation.created` |
+| PATCH | `/v1/quotations/:id` | `write:quotations` | Update; emits `quotation.updated` |
 
 Cursor = last row `id` from the previous page. Response shape: `{ data, next_cursor }`.
 
@@ -28,11 +32,21 @@ Cursor = last row `id` from the previous page. Response shape: `{ data, next_cur
 
 `name` (required on create), `type` (`ai_crm_client` \| `worship_church` \| `ctrm_prospect`), `reference`, `status`, `industry`, `country`, `city`, `website`, `notes`, `source`.
 
+### Invoice write body
+
+`client` (required on create), `reference_number`, `status` (default `Draft`), `payment_status` (default `Unpaid`), `amount` (≥ 0, default `0`), `currency` (default `AED`), `date` (`YYYY-MM-DD`), `description`, `notes`.
+
+### Quotation write body
+
+`client` (required on create), `reference_number`, `status` (default `Draft`), `amount` (≥ 0, default `0`), `currency` (default `AED`), `date` (`YYYY-MM-DD`), `description`, `notes`, `deal_ref`.
+
+Line items are not in this slice — partners create header rows; staff edit lines in-app.
+
 ## Webhooks
 
 Admin UI `/public-api` stores `webhook_endpoints` with a `whsec_…` secret.
 
-Deliveries (test, account events, retries) sign the body:
+Deliveries (test, account/invoice/quotation events, retries) sign the body:
 
 - `X-HighMast-Event`
 - `X-HighMast-Timestamp` (unix seconds)
@@ -57,6 +71,6 @@ Header: x-cron-secret: <secret>
 
 ## Not in this slice
 
-- Invoice/quotation writes
+- Line-item writes / finalize / PDF generation via API
 - OpenAPI codegen
 - Partner-facing delivery guarantee SLAs

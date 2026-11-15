@@ -28,6 +28,8 @@ export default function PublicApiPage() {
   const [hooks, setHooks] = useState<WebhookEndpoint[]>([])
   const [keyName, setKeyName] = useState('Partner read')
   const [allowWriteAccounts, setAllowWriteAccounts] = useState(false)
+  const [allowWriteInvoices, setAllowWriteInvoices] = useState(false)
+  const [allowWriteQuotations, setAllowWriteQuotations] = useState(false)
   const [hookUrl, setHookUrl] = useState('')
   const [plaintext, setPlaintext] = useState('')
   const [loading, setLoading] = useState(true)
@@ -52,9 +54,12 @@ export default function PublicApiPage() {
   async function onCreateKey(e: React.FormEvent) {
     e.preventDefault()
     try {
-      const scopes = allowWriteAccounts
-        ? [...DEFAULT_API_KEY_SCOPES, 'write:accounts']
-        : [...DEFAULT_API_KEY_SCOPES]
+      const scopes = [
+        ...DEFAULT_API_KEY_SCOPES,
+        ...(allowWriteAccounts ? ['write:accounts'] : []),
+        ...(allowWriteInvoices ? ['write:invoices'] : []),
+        ...(allowWriteQuotations ? ['write:quotations'] : []),
+      ]
       const created = await createApiKey(keyName, appUserId, scopes)
       setPlaintext(created.plaintext)
       showToast('API key created — copy it now', 'success')
@@ -117,8 +122,8 @@ export default function PublicApiPage() {
           <p className={docsStyles.kicker}>Public API</p>
           <h1 className={docsStyles.title}>API and webhooks</h1>
           <p className={docsStyles.subtitle}>
-            Hashed API keys (`x-api-key`) and partner webhooks. Reads: `/v1/accounts|invoices|quotations`. Writes:
-            `POST/PATCH /v1/accounts` with `write:accounts`. Failed deliveries are retried by Edge `webhook-retry`.
+            Hashed API keys (`x-api-key`) and partner webhooks. Reads: `/v1/accounts|invoices|quotations`. Writes
+            (opt-in scopes): accounts, invoices, quotations. Failed deliveries are retried by Edge `webhook-retry`.
             {publicApiConfigured() ? '' : ' Supabase is not configured in this environment.'}
           </p>
         </div>
@@ -136,6 +141,22 @@ export default function PublicApiPage() {
             onChange={(e) => setAllowWriteAccounts(e.target.checked)}
           />
           Allow account writes (`write:accounts`)
+        </label>
+        <label style={{ ...labelStyle, display: 'flex', gap: 8, alignItems: 'center', flexDirection: 'row' }}>
+          <input
+            type="checkbox"
+            checked={allowWriteInvoices}
+            onChange={(e) => setAllowWriteInvoices(e.target.checked)}
+          />
+          Allow invoice writes (`write:invoices`)
+        </label>
+        <label style={{ ...labelStyle, display: 'flex', gap: 8, alignItems: 'center', flexDirection: 'row' }}>
+          <input
+            type="checkbox"
+            checked={allowWriteQuotations}
+            onChange={(e) => setAllowWriteQuotations(e.target.checked)}
+          />
+          Allow quotation writes (`write:quotations`)
         </label>
         <button type="submit" style={buttonPrimaryStyle}>
           Create API key

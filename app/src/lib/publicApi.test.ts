@@ -7,6 +7,8 @@ import {
   nextCursorFromPage,
   parseAccountWrite,
   parseCursorPage,
+  parseInvoiceWrite,
+  parseQuotationWrite,
   shouldRetryWebhookStatus,
   signWebhookBody,
   webhookDueForRetry,
@@ -96,6 +98,36 @@ describe('parseAccountWrite', () => {
     expect(parseAccountWrite({}, { partial: true }).ok).toBe(false)
     const patched = parseAccountWrite({ status: 'paused' }, { partial: true })
     expect(patched.ok).toBe(true)
+  })
+})
+
+describe('parseInvoiceWrite / parseQuotationWrite', () => {
+  it('requires client and defaults money fields on create', () => {
+    expect(parseInvoiceWrite({}, { partial: false }).ok).toBe(false)
+    const inv = parseInvoiceWrite({ client: 'Acme', amount: '12.5' }, { partial: false })
+    expect(inv.ok).toBe(true)
+    if (inv.ok) {
+      expect(inv.patch.client).toBe('Acme')
+      expect(inv.patch.amount).toBe(12.5)
+      expect(inv.patch.status).toBe('Draft')
+      expect(inv.patch.payment_status).toBe('Unpaid')
+      expect(inv.patch.currency).toBe('AED')
+    }
+    const quote = parseQuotationWrite(
+      { client: 'Acme', deal_ref: 'D-1', currency: 'usd' },
+      { partial: false },
+    )
+    expect(quote.ok).toBe(true)
+    if (quote.ok) {
+      expect(quote.patch.deal_ref).toBe('D-1')
+      expect(quote.patch.currency).toBe('USD')
+    }
+  })
+
+  it('rejects bad amounts/dates and empty patches', () => {
+    expect(parseInvoiceWrite({ client: 'X', amount: -1 }, { partial: false }).ok).toBe(false)
+    expect(parseInvoiceWrite({ date: '15-11-2026' }, { partial: true }).ok).toBe(false)
+    expect(parseQuotationWrite({}, { partial: true }).ok).toBe(false)
   })
 })
 

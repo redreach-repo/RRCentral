@@ -9,7 +9,11 @@ export const PUBLIC_API_READ_SCOPES = [
   'read:quotations',
 ] as const
 
-export const PUBLIC_API_WRITE_SCOPES = ['write:accounts'] as const
+export const PUBLIC_API_WRITE_SCOPES = [
+  'write:accounts',
+  'write:invoices',
+  'write:quotations',
+] as const
 
 export type PublicApiReadScope = (typeof PUBLIC_API_READ_SCOPES)[number]
 export type PublicApiWriteScope = (typeof PUBLIC_API_WRITE_SCOPES)[number]
@@ -95,6 +99,129 @@ export function parseAccountWrite(
   if (body.website !== undefined) patch.website = trimStr(body.website, 200)
   if (body.notes !== undefined) patch.notes = trimStr(body.notes, 2000)
   if (body.source !== undefined) patch.source = trimStr(body.source, 80)
+
+  if (opts.partial && Object.keys(patch).length === 0) {
+    return { ok: false, error: 'empty_patch' }
+  }
+  return { ok: true, patch }
+}
+
+export type DocumentWritePatch = {
+  client: string
+  reference_number: string
+  status: string
+  amount: number
+  currency: string
+  date: string | null
+  description: string
+  notes: string
+  payment_status?: string
+  deal_ref?: string
+}
+
+function parseMoneyAmount(value: unknown): number | null {
+  if (value === undefined || value === null || value === '') return null
+  const n = typeof value === 'number' ? value : Number(String(value).trim())
+  if (!Number.isFinite(n) || n < 0) return null
+  return Math.round(n * 100) / 100
+}
+
+function parseOptionalDate(value: unknown): { ok: true; date: string | null } | { ok: false; error: string } {
+  if (value === undefined || value === null || value === '') return { ok: true, date: null }
+  const date = trimStr(value, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: 'invalid_date' }
+  return { ok: true, date }
+}
+
+/**
+ * Validate POST/PATCH invoice body.
+ * Create requires `client`; amount defaults to 0; status defaults to Draft.
+ */
+export function parseInvoiceWrite(
+  raw: unknown,
+  opts: { partial: boolean },
+): { ok: true; patch: Partial<DocumentWritePatch> } | { ok: false; error: string } {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, error: 'body_must_be_object' }
+  }
+  const body = raw as Record<string, unknown>
+  const patch: Partial<DocumentWritePatch> = {}
+
+  if (body.client !== undefined || !opts.partial) {
+    const client = trimStr(body.client, 200)
+    if (!client) return { ok: false, error: 'client_required' }
+    patch.client = client
+  }
+  if (body.reference_number !== undefined) patch.reference_number = trimStr(body.reference_number, 80)
+  if (body.status !== undefined || !opts.partial) {
+    patch.status = trimStr(body.status || 'Draft', 40) || 'Draft'
+  }
+  if (body.payment_status !== undefined || !opts.partial) {
+    patch.payment_status = trimStr(body.payment_status || 'Unpaid', 40) || 'Unpaid'
+  }
+  if (body.amount !== undefined || !opts.partial) {
+    const amount = parseMoneyAmount(body.amount !== undefined ? body.amount : 0)
+    if (amount == null) return { ok: false, error: 'invalid_amount' }
+    patch.amount = amount
+  }
+  if (body.currency !== undefined || !opts.partial) {
+    const currency = trimStr(body.currency || 'AED', 8).toUpperCase() || 'AED'
+    patch.currency = currency
+  }
+  if (body.date !== undefined) {
+    const d = parseOptionalDate(body.date)
+    if (!d.ok) return d
+    patch.date = d.date
+  }
+  if (body.description !== undefined) patch.description = trimStr(body.description, 2000)
+  if (body.notes !== undefined) patch.notes = trimStr(body.notes, 2000)
+
+  if (opts.partial && Object.keys(patch).length === 0) {
+    return { ok: false, error: 'empty_patch' }
+  }
+  return { ok: true, patch }
+}
+
+/**
+ * Validate POST/PATCH quotation body.
+ * Create requires `client`; amount defaults to 0; status defaults to Draft.
+ */
+export function parseQuotationWrite(
+  raw: unknown,
+  opts: { partial: boolean },
+): { ok: true; patch: Partial<DocumentWritePatch> } | { ok: false; error: string } {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, error: 'body_must_be_object' }
+  }
+  const body = raw as Record<string, unknown>
+  const patch: Partial<DocumentWritePatch> = {}
+
+  if (body.client !== undefined || !opts.partial) {
+    const client = trimStr(body.client, 200)
+    if (!client) return { ok: false, error: 'client_required' }
+    patch.client = client
+  }
+  if (body.reference_number !== undefined) patch.reference_number = trimStr(body.reference_number, 80)
+  if (body.status !== undefined || !opts.partial) {
+    patch.status = trimStr(body.status || 'Draft', 40) || 'Draft'
+  }
+  if (body.amount !== undefined || !opts.partial) {
+    const amount = parseMoneyAmount(body.amount !== undefined ? body.amount : 0)
+    if (amount == null) return { ok: false, error: 'invalid_amount' }
+    patch.amount = amount
+  }
+  if (body.currency !== undefined || !opts.partial) {
+    const currency = trimStr(body.currency || 'AED', 8).toUpperCase() || 'AED'
+    patch.currency = currency
+  }
+  if (body.date !== undefined) {
+    const d = parseOptionalDate(body.date)
+    if (!d.ok) return d
+    patch.date = d.date
+  }
+  if (body.description !== undefined) patch.description = trimStr(body.description, 2000)
+  if (body.notes !== undefined) patch.notes = trimStr(body.notes, 2000)
+  if (body.deal_ref !== undefined) patch.deal_ref = trimStr(body.deal_ref, 80)
 
   if (opts.partial && Object.keys(patch).length === 0) {
     return { ok: false, error: 'empty_patch' }
