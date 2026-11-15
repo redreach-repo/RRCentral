@@ -21,6 +21,7 @@ import {
   wpsFileReadiness,
   type WpsLine,
 } from '../lib/wpsGratuity'
+import { logPayrollExport } from '../lib/opsSliceStores'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
@@ -145,20 +146,32 @@ export default function PayrollPage() {
 
   function downloadWpsCsv() {
     const selected = rows.find((r) => r.id === selectedId)
-    const bounds = periodBoundsFromYyyyMm(selected?.period_yyyy_mm || period)
-    const csv = buildWpsCsvDraft(toWpsLines(), bounds.payEndIso)
+    if (!selected) return
+    const bounds = periodBoundsFromYyyyMm(selected.period_yyyy_mm || period)
+    const wpsLines = toWpsLines()
+    const csv = buildWpsCsvDraft(wpsLines, bounds.payEndIso)
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `wps-draft-${selected?.period_yyyy_mm || period}.csv`
+    a.download = `wps-draft-${selected.period_yyyy_mm || period}.csv`
     a.click()
     URL.revokeObjectURL(url)
+    void logPayrollExport({
+      runId: selected.id,
+      kind: 'wps_csv',
+      lineCount: wpsLines.length,
+      employerId,
+      exportedBy: appUserId,
+    }).catch(() => {
+      /* audit is best-effort */
+    })
   }
 
   function downloadWpsSif() {
     const selected = rows.find((r) => r.id === selectedId)
-    const periodKey = selected?.period_yyyy_mm || period
+    if (!selected) return
+    const periodKey = selected.period_yyyy_mm || period
     const bounds = periodBoundsFromYyyyMm(periodKey)
     const wpsLines = toWpsLines()
     const employer = { employerUniqueId: employerId, bankLabel: 'DRAFT' }
@@ -183,6 +196,15 @@ export default function PayrollPage() {
     a.download = `wps-sif-DRAFT-${periodKey}.txt`
     a.click()
     URL.revokeObjectURL(url)
+    void logPayrollExport({
+      runId: selected.id,
+      kind: 'wps_sif',
+      lineCount: wpsLines.length,
+      employerId,
+      exportedBy: appUserId,
+    }).catch(() => {
+      /* audit is best-effort */
+    })
   }
 
   const selected = rows.find((r) => r.id === selectedId) || null

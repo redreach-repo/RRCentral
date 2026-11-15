@@ -38,6 +38,7 @@ import {
   colors,
   selectStyle,
 } from '../lib/uiStyles'
+import { exportListCsv } from '../lib/listIo'
 import docsStyles from '../styles/docsList.module.css'
 
 type TypeFilter = 'all' | AccountType
@@ -224,16 +225,39 @@ export default function AccountsPage() {
             {isStaff ? t('page.accounts.subtitleStaff') : t('page.accounts.subtitleAll')}
           </p>
         </div>
-        {canWrite ? (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
             type="button"
             className={docsStyles.newBtn}
-            onClick={() => setModalOpen(true)}
-            disabled={missingTable}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => {
+              exportListCsv(
+                'accounts.csv',
+                ['name', 'type', 'reference', 'status'],
+                filtered.map((a) => ({
+                  name: a.name,
+                  type: a.type,
+                  reference: a.reference || '',
+                  status: a.status || '',
+                })),
+              )
+              showToast('Accounts CSV downloaded', 'success')
+            }}
+            disabled={loading || accounts.length === 0}
           >
-            <Plus size={16} /> {newLabel}
+            Export CSV
           </button>
-        ) : null}
+          {canWrite ? (
+            <button
+              type="button"
+              className={docsStyles.newBtn}
+              onClick={() => setModalOpen(true)}
+              disabled={missingTable}
+            >
+              <Plus size={16} /> {newLabel}
+            </button>
+          ) : null}
+        </div>
       </header>
 
       {missingTable ? (

@@ -173,6 +173,61 @@ No database migrations. Documentation and `brand-assets/` only.
 - Drop function + table (ask before production).
 
 
+## M8a — `20261230150000_country_packs.sql`
+
+**What**
+- `country_packs` catalog (AE/IN/CA seeds) + `tenant_country_packs` activations
+- RLS: staff read packs; admin write activations; restrictive tenant isolation
+- Rule payloads Unverified — see `docs/COMPLIANCE_NOTES.md`
+
+**Tests**
+- `supabase/tests/modules/country_packs_test.sql`
+
+**Rollback**
+- Forward-only preferred. Drop tenant activations then catalog only if unused.
+
+
+## M9 — `20261230160000_purchase_orders.sql`
+
+**What**
+- `purchase_orders` / `purchase_order_lines`
+- `rr_po_receive_line` security definer: receive qty, bump `products.stock_on_hand` by SKU, log `inventory_movements`
+- Strip Staff full access / Viewers after policy create
+
+**Tests**
+- `supabase/tests/modules/purchase_orders_test.sql`
+
+**Rollback**
+- Drop function then tables after confirming no production rows.
+
+
+## M9b — `20261230170000_project_accounting.sql`
+
+**What**
+- `delivery_projects` + `project_cost_lines` with tenant RLS
+
+**Tests**
+- `supabase/tests/modules/project_accounting_test.sql`
+
+
+## M9a — `20261230180000_client_purchase_orders.sql`
+
+**What**
+- `client_purchase_orders` linked to `accounts`
+
+**Tests**
+- `supabase/tests/modules/client_purchase_orders_test.sql`
+
+
+## M8 deepen — `20261230190000_payroll_exports.sql`
+
+**What**
+- `payroll_exports` audit rows for CSV/SIF draft downloads
+
+**Rollback**
+- `drop table if exists public.payroll_exports;`
+
+
 ## M10–M12 deepen — `20261230200000` … `20261230240000`
 
 **What**
@@ -188,3 +243,15 @@ No database migrations. Documentation and `brand-assets/` only.
 
 **Tests**
 - `supabase/tests/modules/marketing_test.sql`, `ai_retrieval_test.sql`, `app_identity_test.sql`, `industry_packs_templates_test.sql`
+
+
+## M13 — `20261301120000` … `20261301140000`
+
+**What**
+- `dsr_requests`, `retention_runs`, `rr_retention_run`, `rr_dsr_anonymize_contact`, soft-delete columns on accounts/contacts
+- `rate_limit_buckets` + `rr_rate_limit_hit` (service_role)
+- Unique `(tenant_id, source_type, source_id)` on non-void GL journals for auto-post drafts
+
+**Tests**
+- `dsr_retention_test.sql`, `rate_limit_test.sql`
+

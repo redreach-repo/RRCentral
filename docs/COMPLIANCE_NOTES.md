@@ -14,6 +14,8 @@ Findings from official sources go here **before** shipping tax, payroll, e-sign,
 | Microsoft 365 Graph mail/calendar assessment | **concluded** | See § M365 below | 13 Nov 2026 | Phase A+B **implemented** (`Mail.Send` + `Mail.Read` + `Calendars.ReadWrite` via `m365-mail-calendar`). Prefer delegated over application permissions. |
 | IMAP / other mail hosts assessment | **concluded** | See § IMAP below | 13 Nov 2026 | Prefer Gmail API / Microsoft Graph over IMAP. Gmail IMAP needs restricted `mail.google.com`; M365 IMAP basic auth is dead. Generic IMAP deferred until a real non-Gmail/M365 customer need. |
 | Data residency (UAE hosting options) | not started | — | — | Decide before first external customer / M13 |
+| VAT return CSV stub / GL invoice auto-post | **Unverified** | Product draft helpers only | 15 Nov 2026 | Not for FTA filing; journals stay draft until human post. |
+| Country pack tax/payroll rules (AE/IN/CA) | **Unverified** | See § Country packs below | 15 Nov 2026 | Starter labels/hints only. **Not** tax, GST, CPP/EI, PF/ESI, or WPS advice. Counsel must verify before production reliance. |
 
 Do not rely on model memory for legal or tax rules.
 
@@ -41,6 +43,34 @@ Do not rely on model memory for legal or tax rules.
 1. Red Reach counsel review of labour law (Federal Decree-Law 33/2021 and applicable MoHRE / free-zone rules) for each contract type.
 2. Agent-bank SIF specification (exact SCR/EDR columns, employer ID format, routing codes).
 3. Update this table to **concluded** only after those reviews; keep UI/docs labelled DRAFT until then.
+
+### Payroll export audit (M8 deepen)
+
+- Table `payroll_exports` records CSV/SIF draft downloads (period, format, line count, actor).
+- Audit rows do **not** imply certification; UI remains DRAFT-labelled.
+
+---
+
+## Country packs (M8a) — Unverified
+
+**Purpose:** Ship AE / IN / CA pack scaffolds as **data** without claiming verified tax or payroll rules.
+
+### What ships
+
+- `country_packs` catalog + `tenant_country_packs` activation; UI at `/country-packs`.
+- Builtin fallback in `app/src/lib/countryPacks.ts` when the table is missing.
+- Rules JSON holds labels/hints only (`taxIdLabel`, leave type names, payroll hint strings, optional `vatRateHint` for AE).
+
+### Explicit non-claims
+
+- India GST/PF/ESI/TDS, Canada GST/HST/CPP/EI/provincial tax, and UAE VAT/WPS details are **Unverified**.
+- Activating a pack does **not** enable calculated statutory deductions or certified filings.
+- Product must keep Unverified / DRAFT labelling until counsel updates this table to **concluded** per country.
+
+### Still required
+
+1. Counsel (or licensed tax advisor) review per country before production reliance.
+2. Update the summary table status from **Unverified** to **concluded** only after that review.
 
 ---
 

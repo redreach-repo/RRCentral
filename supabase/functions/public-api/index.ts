@@ -11,12 +11,14 @@
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2"
+import { withSecurityHeaders } from "../_shared/securityHeaders.ts"
+import { rateLimitAllow } from "../_shared/rateLimit.ts"
 
-const cors = {
+const cors = withSecurityHeaders({
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-api-key, content-type",
   "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
-}
+})
 
 const ACCOUNT_TYPES = new Set(["ai_crm_client", "worship_church", "ctrm_prospect"])
 const ACCOUNT_COLUMNS = "id, name, type, status, reference, industry, country, city, website, source, notes, created_at, updated_at"
@@ -347,6 +349,9 @@ Deno.serve(async (req) => {
   if (!keyRow || keyRow.key_hash !== hash) return json({ error: "unauthorized" }, 401)
 
   const key = keyRow as ApiKeyRow
+  const rl = await rateLimitAllow(sb, `public-api:${key.id}`, 120, 60)
+  if (!rl.allowed) return json({ error: "rate_limited", detail: rl.error || "too_many_requests" }, 429)
+
   await sb.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", key.id)
   const scopes = scopesOf(key)
 

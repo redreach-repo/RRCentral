@@ -212,7 +212,7 @@
   border: 1px solid transparent;
   border-radius: 9px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--text-muted);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -226,8 +226,8 @@
 }
 
 .sideGroupBtn:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #fff;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: var(--text);
 }
 
 .sideGroupBtnActive {
@@ -265,7 +265,7 @@
   gap: 1px;
   padding: 2px 0 8px 8px;
   margin: 0 0 4px 8px;
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 1px solid var(--border);
 }
 
 .panelSectionLabel {
@@ -274,7 +274,7 @@
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.32);
+  color: var(--text-muted);
 }
 
 .panelSectionLabel:first-child {
@@ -287,7 +287,7 @@
   gap: 9px;
   padding: 7px 10px;
   border-radius: 8px;
-  color: rgba(255, 255, 255, 0.58);
+  color: var(--text-muted);
   text-decoration: none;
   font-size: 13px;
   font-weight: 500;
@@ -298,8 +298,8 @@
 }
 
 .navItem:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #fff;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: var(--text);
 }
 
 .navBadge {
@@ -316,7 +316,7 @@
 }
 
 .navItemActive {
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
   color: var(--text, #f4f5f7);
   border-color: transparent;
   font-weight: 600;

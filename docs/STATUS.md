@@ -2,10 +2,10 @@
 
 **Last updated:** 15 November 2026 (Asia/Dubai)  
 **Spec:** Master Specification **v2.1** (`MASTER_SPEC.md`, `docs/SPEC_POINTER.md`)  
-**Batch:** M10 / M11 / M12 deepen (`docs/RUN_PLAN.md`)  
+**Batch:** M10 / M11 / M12 deepen (`docs/RUN_PLAN.md`) — merging `main` (M8–M9a + M13)  
 **Branch:** `cursor/batch-m10-m12-d3d5`
 
-## Milestone verdict (this batch)
+## Milestone verdict (this PR)
 
 | Milestone | Accept when | Result |
 |-----------|-------------|--------|
@@ -15,6 +15,13 @@
 | **M11 provisioner** | Business-type map + idempotent request | **Pass** with Not done: auth user + DNS |
 | **M11 app identity** | `tenant_app_identities` | **Pass** with Not done: per-host served manifests |
 | **M12 templates** | Eng/Construction/Trading templates on activate | **Pass** with Not done: full domain objects |
+
+## Already on `main` (merged alongside)
+
+| Slice | Result |
+|-------|--------|
+| M8–M9a country packs / PO / projects / client PO / payroll export | **Pass** (#438) |
+| M13 DSR / rate limits / headers / listIo / GL·VAT stubs | **Pass** (#440) |
 
 ## Shipped this batch
 
@@ -30,13 +37,12 @@
 3. Fireflies production webhook URL — Alfred  
 4. Full provisioner (auth users, domains) — Alfred / ops  
 5. `*.highmast.app` DNS + host manifests — hosting  
-6. M8–M9a PR #438 may still be open; this batch does not depend on it  
+6. Sentry DSN / residency / CASA / QTSP / WPS counsel — external  
 
 ## Test results (this batch)
 
-- Typecheck: pass  
-- Lint: pass (existing warnings only)  
-- Vitest: **1331** passed / 249 files  
+- Typecheck / lint: pass  
+- Vitest: **1331** passed / 249 files (pre-merge; re-verify after conflict fix)  
 - SQL `tests/run.sh`: pass (incl. marketing, ai_retrieval, app_identity, industry_packs_templates)
 
 ## Still externally blocked (unchanged)

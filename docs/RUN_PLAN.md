@@ -3,7 +3,7 @@
 **Started:** 15 November 2026 (Asia/Dubai)  
 **Branch:** `cursor/batch-m10-m12-d3d5` (from `main`)  
 **Spec:** Master Spec v2.1  
-**Note:** M8–M9a PR #438 may still be open; this batch does not depend on it.
+**Note:** Merging `main` which includes M8–M9a (#438) and M13 (#440). This PR remains the M10–M12 deepen batch.
 
 ---
 
