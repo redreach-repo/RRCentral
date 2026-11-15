@@ -8,6 +8,7 @@ import MakeContractModal from './MakeContractModal'
 import SalesDealFormModal, { type SalesDealFormValues } from './SalesDealFormModal'
 import { listPackages } from '../../lib/deliveryStore'
 import { errorMessage } from '../../lib/errors'
+import { exportListCsv } from '../../lib/listIo'
 import { formatAED } from '../../lib/money'
 import { canMakeContract, hasQuote, isSalesDealOverdue, quoteFirstYear, salesStageLabel } from '../../lib/salesPipeline'
 import { listSalesDeals, makeContractFromDeal, saveSalesDealForm } from '../../lib/salesPipelineStore'
@@ -86,7 +87,37 @@ export default function AccountSalesDealCard({ account, team, editable, canContr
     <section style={{ ...cardStyle, marginTop: 16 }} aria-label="Sales deal">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Sales deal</h2>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {deals.length ? (
+            <button
+              type="button"
+              style={{ ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }}
+              onClick={() => {
+                exportListCsv(
+                  `sales-deals-${account.id.slice(0, 8)}.csv`,
+                  ['stage', 'source', 'package', 'option', 'monthly_fee', 'setup_fee', 'next_action', 'next_action_date', 'lost_reason', 'notes'],
+                  deals.map((d) => {
+                    const pkg = packages.find((p) => p.id === d.package_id)
+                    return {
+                      stage: salesStageLabel(d.stage),
+                      source: d.source || '',
+                      package: pkg?.name || '',
+                      option: d.option || '',
+                      monthly_fee: d.monthly_fee,
+                      setup_fee: d.setup_fee,
+                      next_action: d.next_action || '',
+                      next_action_date: d.next_action_date || '',
+                      lost_reason: d.stage === 'lost' ? lostText(d.lost_reason_code || '', d.lost_reason) : '',
+                      notes: d.notes || '',
+                    }
+                  }),
+                )
+                showToast('Sales deals CSV downloaded', 'success')
+              }}
+            >
+              Export CSV
+            </button>
+          ) : null}
           <Link to="/deals?pipeline=sales&view=board" style={{ color: colors.muted, fontSize: 12 }}>
             Open Pipeline
           </Link>
