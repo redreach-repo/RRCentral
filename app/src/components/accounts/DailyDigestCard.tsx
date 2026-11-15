@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { Send, Trash2 } from 'lucide-react'
@@ -16,8 +16,9 @@ import {
   type RecipientInput,
 } from '../../lib/dailyDigestStore'
 import { errorMessage } from '../../lib/errors'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import type { DigestRecipientRow, DigestRun } from '../../lib/types'
+import { phoneDigits } from '../../lib/usageImport'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -32,6 +33,21 @@ const BLANK: RecipientInput = { name: '', email: '', whatsapp_phone: '', by_emai
 const smallBtn = { ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }
 const row = { display: 'flex', flexWrap: 'wrap' as const, gap: 8, alignItems: 'center' }
 
+function parseYesNo(raw: string, defaultValue: boolean): boolean {
+  const v = raw.trim().toLowerCase()
+  if (!v) return defaultValue
+  return !(v === 'no' || v === 'false' || v === '0' || v === 'off' || v === 'n')
+}
+
+function recipientMatchKeys(r: Pick<RecipientInput, 'email' | 'whatsapp_phone'>): string[] {
+  const keys: string[] = []
+  const email = r.email.trim().toLowerCase()
+  const phone = phoneDigits(r.whatsapp_phone)
+  if (email) keys.push(`email:${email}`)
+  if (phone) keys.push(`phone:${phone}`)
+  return keys
+}
+
 /**
  * The morning digest: who gets it, a preview of today's, and Send now.
  * The schedule itself runs on the server (docs/daily-digest.md).
@@ -45,6 +61,8 @@ export default function DailyDigestCard() {
   const [preview, setPreview] = useState<Digest | null>(null)
   const [draft, setDraft] = useState<RecipientInput>(BLANK)
   const [busy, setBusy] = useState('')
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     try {
@@ -131,56 +149,133 @@ export default function DailyDigestCard() {
     }
   }
 
+  async function importRecipientsCsv(file: File) {
+    if (missingTable) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const byKey = new Map<string, DigestRecipientRow>()
+      for (const r of recipients) {
+        for (const key of recipientMatchKeys(r)) byKey.set(key, r)
+      }
+      let saved = 0
+      let skipped = 0
+      for (const row of objects) {
+        const name = String(row.name || '').trim()
+        const email = String(row.email || '').trim()
+        const whatsapp_phone = String(row.whatsapp_phone || '').trim()
+        if (!email && !whatsapp_phone) {
+          skipped += 1
+          continue
+        }
+        const by_email = parseYesNo(String(row.by_email ?? ''), Boolean(email))
+        const by_whatsapp = parseYesNo(String(row.by_whatsapp ?? ''), Boolean(whatsapp_phone))
+        const active = parseYesNo(String(row.active ?? 'yes'), true)
+        const input: RecipientInput = { name, email, whatsapp_phone, by_email, by_whatsapp, active }
+        const keys = recipientMatchKeys(input)
+        const existing = keys.map((k) => byKey.get(k)).find(Boolean)
+        const problem = await saveRecipient(input, user?.email || '', existing?.id)
+        if (problem) {
+          skipped += 1
+          continue
+        }
+        if (existing?.id) {
+          const updated = { ...existing, ...input }
+          for (const key of recipientMatchKeys(updated)) byKey.set(key, updated)
+        }
+        saved += 1
+      }
+      if (!saved && skipped) {
+        showToast('No matching daily digest recipient rows in CSV', 'error')
+        return
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} daily digest recipient(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Daily digest CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   const last = runs[0]
 
   return (
     <section style={{ ...cardStyle, marginBottom: 16 }} aria-label="Daily digest">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Daily digest</h2>
-        {recipients.length || runs.length ? (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importRecipientsCsv(file)
+            }}
+          />
           <button
             type="button"
             style={buttonSecondaryStyle}
-            onClick={() => {
-              if (recipients.length) {
-                exportListCsv(
-                  'daily-digest-recipients.csv',
-                  ['name', 'email', 'whatsapp_phone', 'by_email', 'by_whatsapp', 'active', 'created_at'],
-                  recipients.map((r) => ({
-                    name: r.name || '',
-                    email: r.email || '',
-                    whatsapp_phone: r.whatsapp_phone || '',
-                    by_email: r.by_email ? 'yes' : 'no',
-                    by_whatsapp: r.by_whatsapp ? 'yes' : 'no',
-                    active: r.active ? 'yes' : 'no',
-                    created_at: r.created_at || '',
-                  })),
-                )
-              }
-              if (runs.length) {
-                exportListCsv(
-                  'daily-digest-runs.csv',
-                  ['run_date', 'started_at', 'finished_at', 'trigger', 'item_count', 'emails_sent', 'whatsapp_sent', 'email_status', 'whatsapp_status', 'message'],
-                  runs.map((r) => ({
-                    run_date: r.run_date || '',
-                    started_at: r.started_at || '',
-                    finished_at: r.finished_at || '',
-                    trigger: r.trigger,
-                    item_count: r.item_count,
-                    emails_sent: r.emails_sent,
-                    whatsapp_sent: r.whatsapp_sent,
-                    email_status: CHANNEL_STATUS_LABEL[r.email_status] ?? r.email_status,
-                    whatsapp_status: CHANNEL_STATUS_LABEL[r.whatsapp_status] ?? r.whatsapp_status,
-                    message: r.message || '',
-                  })),
-                )
-              }
-              showToast('Daily digest CSV downloaded', 'success')
-            }}
+            disabled={importing || missingTable}
+            onClick={() => importInputRef.current?.click()}
           >
-            Export CSV
+            {importing ? 'Importing…' : 'Import CSV'}
           </button>
-        ) : null}
+          {recipients.length || runs.length ? (
+            <button
+              type="button"
+              style={buttonSecondaryStyle}
+              onClick={() => {
+                if (recipients.length) {
+                  exportListCsv(
+                    'daily-digest-recipients.csv',
+                    ['name', 'email', 'whatsapp_phone', 'by_email', 'by_whatsapp', 'active', 'created_at'],
+                    recipients.map((r) => ({
+                      name: r.name || '',
+                      email: r.email || '',
+                      whatsapp_phone: r.whatsapp_phone || '',
+                      by_email: r.by_email ? 'yes' : 'no',
+                      by_whatsapp: r.by_whatsapp ? 'yes' : 'no',
+                      active: r.active ? 'yes' : 'no',
+                      created_at: r.created_at || '',
+                    })),
+                  )
+                }
+                if (runs.length) {
+                  exportListCsv(
+                    'daily-digest-runs.csv',
+                    ['run_date', 'started_at', 'finished_at', 'trigger', 'item_count', 'emails_sent', 'whatsapp_sent', 'email_status', 'whatsapp_status', 'message'],
+                    runs.map((r) => ({
+                      run_date: r.run_date || '',
+                      started_at: r.started_at || '',
+                      finished_at: r.finished_at || '',
+                      trigger: r.trigger,
+                      item_count: r.item_count,
+                      emails_sent: r.emails_sent,
+                      whatsapp_sent: r.whatsapp_sent,
+                      email_status: CHANNEL_STATUS_LABEL[r.email_status] ?? r.email_status,
+                      whatsapp_status: CHANNEL_STATUS_LABEL[r.whatsapp_status] ?? r.whatsapp_status,
+                      message: r.message || '',
+                    })),
+                  )
+                }
+                showToast('Daily digest CSV downloaded', 'success')
+              }}
+            >
+              Export CSV
+            </button>
+          ) : null}
+        </div>
       </div>
       <p style={{ color: colors.muted, fontSize: 13, margin: '8px 0 12px', lineHeight: 1.5 }}>
         Every morning at 8:00 (UAE time), the people below get a short list of what needs attention: tickets near or past
