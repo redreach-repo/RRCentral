@@ -7,6 +7,7 @@ import ChurchFacts from './ChurchFacts'
 import { churchView } from '../../lib/worshiphub'
 import { fetchLiveTenants, listChurchProfiles, saveChurchProfile, type ChurchDetailsInput, type LiveResult } from '../../lib/worshiphubStore'
 import { errorMessage } from '../../lib/errors'
+import { exportListCsv } from '../../lib/listIo'
 import type { Account, WorshipChurchProfile } from '../../lib/types'
 import { buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
 
@@ -67,7 +68,34 @@ export default function ChurchProductCard({ account, editable, author, onChanged
     <section style={{ ...cardStyle, marginTop: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>WorshipHub</h2>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {profile || tenant ? (
+            <button
+              type="button"
+              style={{ ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }}
+              onClick={() => {
+                exportListCsv(
+                  `worshiphub-${account.id.slice(0, 8)}.csv`,
+                  ['field', 'value'],
+                  [
+                    { field: 'slug', value: slug },
+                    { field: 'source', value: view.source },
+                    { field: 'plan', value: view.plan },
+                    { field: 'modules', value: view.modules.join('; ') },
+                    { field: 'billing_status', value: view.billingStatus },
+                    { field: 'renewal_date', value: view.renewalDate || '' },
+                    { field: 'whatsapp_month', value: view.whatsappMonth },
+                    { field: 'whatsapp_total', value: view.whatsappTotal ?? '' },
+                    { field: 'admin_url', value: view.adminUrl },
+                    { field: 'notes', value: profile?.notes || '' },
+                  ],
+                )
+                showToast('WorshipHub CSV downloaded', 'success')
+              }}
+            >
+              Export CSV
+            </button>
+          ) : null}
           <Link to="/products" style={{ color: colors.muted, fontSize: 12 }}>
             All churches
           </Link>
