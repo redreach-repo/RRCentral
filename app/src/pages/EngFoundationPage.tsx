@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { DraftingCompass } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import { errorMessage } from '../lib/errors'
 import { engClaimLabel, engDocLabel } from '../lib/engFoundation'
 import { ENG_FOUNDATION_CSV_COLUMNS } from '../lib/engFoundationCsv'
@@ -20,11 +22,13 @@ import {
   colors,
   inputStyle,
   labelStyle,
+  selectStyle,
 } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
 /** M12a engineering pack: document register + claims stubs. */
 export default function EngFoundationPage() {
+  const { appUserId } = useAuth()
   const { showToast } = useToast()
   const [docs, setDocs] = useState<EngDocument[]>([])
   const [claims, setClaims] = useState<EngClaim[]>([])
@@ -37,6 +41,8 @@ export default function EngFoundationPage() {
   const [loading, setLoading] = useState(true)
   const [importing, setImporting] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
+  const [kindFilter, setKindFilter] = useState<'all' | 'document' | 'claim'>('all')
+  const engViewFilters = useMemo(() => ({ kind: kindFilter }), [kindFilter])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -206,89 +212,126 @@ export default function EngFoundationPage() {
         </div>
       </header>
 
+      <SavedViewsBar
+        moduleId="eng_foundation"
+        filters={engViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => {
+          const kind = String(f.kind || 'all')
+          if (kind === 'all' || kind === 'document' || kind === 'claim') setKindFilter(kind)
+        }}
+        onToast={showToast}
+        filtersEqual={(a, b) => String(a.kind || 'all') === String(b.kind || 'all')}
+      />
+
+      <div style={{ marginBottom: 12 }}>
+        <label style={labelStyle}>
+          Show
+          <select
+            style={selectStyle}
+            value={kindFilter}
+            onChange={(e) => setKindFilter(e.target.value as typeof kindFilter)}
+          >
+            <option value="all">Documents + claims</option>
+            <option value="document">Documents only</option>
+            <option value="claim">Claims only</option>
+          </select>
+        </label>
+      </div>
+
       {loading ? (
         <p>Loading…</p>
       ) : (
         <div style={{ display: 'grid', gap: 16 }}>
-          <form style={cardStyle} onSubmit={(e) => void onDoc(e)}>
-            <h2 style={{ marginTop: 0, fontSize: 16 }}>New document</h2>
-            <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 2fr 1fr' }}>
-              <label style={labelStyle}>
-                Doc no
-                <input style={inputStyle} value={docNo} onChange={(e) => setDocNo(e.target.value)} />
-              </label>
-              <label style={labelStyle}>
-                Title
-                <input style={inputStyle} value={docTitle} onChange={(e) => setDocTitle(e.target.value)} required />
-              </label>
-              <label style={labelStyle}>
-                Discipline
-                <input style={inputStyle} value={discipline} onChange={(e) => setDiscipline(e.target.value)} />
-              </label>
-            </div>
-            <button type="submit" style={{ ...buttonPrimaryStyle, marginTop: 10 }}>
-              Add document
-            </button>
-          </form>
+          {kindFilter !== 'claim' ? (
+            <form style={cardStyle} onSubmit={(e) => void onDoc(e)}>
+              <h2 style={{ marginTop: 0, fontSize: 16 }}>New document</h2>
+              <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 2fr 1fr' }}>
+                <label style={labelStyle}>
+                  Doc no
+                  <input style={inputStyle} value={docNo} onChange={(e) => setDocNo(e.target.value)} />
+                </label>
+                <label style={labelStyle}>
+                  Title
+                  <input style={inputStyle} value={docTitle} onChange={(e) => setDocTitle(e.target.value)} required />
+                </label>
+                <label style={labelStyle}>
+                  Discipline
+                  <input style={inputStyle} value={discipline} onChange={(e) => setDiscipline(e.target.value)} />
+                </label>
+              </div>
+              <button type="submit" style={{ ...buttonPrimaryStyle, marginTop: 10 }}>
+                Add document
+              </button>
+            </form>
+          ) : null}
 
-          <form style={cardStyle} onSubmit={(e) => void onClaim(e)}>
-            <h2 style={{ marginTop: 0, fontSize: 16 }}>New claim</h2>
-            <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 2fr 1fr' }}>
-              <label style={labelStyle}>
-                Claim no
-                <input style={inputStyle} value={claimNo} onChange={(e) => setClaimNo(e.target.value)} />
-              </label>
-              <label style={labelStyle}>
-                Title
-                <input style={inputStyle} value={claimTitle} onChange={(e) => setClaimTitle(e.target.value)} required />
-              </label>
-              <label style={labelStyle}>
-                Amount (AED)
-                <input
-                  style={inputStyle}
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={claimAmount}
-                  onChange={(e) => setClaimAmount(e.target.value)}
-                />
-              </label>
-            </div>
-            <button type="submit" style={{ ...buttonPrimaryStyle, marginTop: 10 }}>
-              Add claim
-            </button>
-          </form>
+          {kindFilter !== 'document' ? (
+            <form style={cardStyle} onSubmit={(e) => void onClaim(e)}>
+              <h2 style={{ marginTop: 0, fontSize: 16 }}>New claim</h2>
+              <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 2fr 1fr' }}>
+                <label style={labelStyle}>
+                  Claim no
+                  <input style={inputStyle} value={claimNo} onChange={(e) => setClaimNo(e.target.value)} />
+                </label>
+                <label style={labelStyle}>
+                  Title
+                  <input style={inputStyle} value={claimTitle} onChange={(e) => setClaimTitle(e.target.value)} required />
+                </label>
+                <label style={labelStyle}>
+                  Amount (AED)
+                  <input
+                    style={inputStyle}
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={claimAmount}
+                    onChange={(e) => setClaimAmount(e.target.value)}
+                  />
+                </label>
+              </div>
+              <button type="submit" style={{ ...buttonPrimaryStyle, marginTop: 10 }}>
+                Add claim
+              </button>
+            </form>
+          ) : null}
 
-          <section style={cardStyle}>
-            <h2 style={{ marginTop: 0, fontSize: 16 }}>Documents</h2>
-            {docs.length === 0 ? (
-              <EmptyState title="No documents" subtitle="Add a register entry above." />
-            ) : (
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
-                {docs.map((d) => (
-                  <li key={d.id} style={{ fontSize: 13, borderTop: `1px solid ${colors.border}`, paddingTop: 6 }}>
-                    {engDocLabel(d.doc_no, d.title)} · {d.status}
-                    {d.discipline ? ` · ${d.discipline}` : ''} · rev {d.revision}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          {kindFilter !== 'claim' ? (
+            <section style={cardStyle}>
+              <h2 style={{ marginTop: 0, fontSize: 16 }}>Documents</h2>
+              {docs.length === 0 ? (
+                <EmptyState title="No documents" subtitle="Add a register entry above." />
+              ) : (
+                <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
+                  {docs.map((d) => (
+                    <li key={d.id} style={{ fontSize: 13, borderTop: `1px solid ${colors.border}`, paddingTop: 6 }}>
+                      {engDocLabel(d.doc_no, d.title)} · {d.status}
+                      {d.discipline ? ` · ${d.discipline}` : ''} · rev {d.revision}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          ) : null}
 
-          <section style={cardStyle}>
-            <h2 style={{ marginTop: 0, fontSize: 16 }}>Claims</h2>
-            {claims.length === 0 ? (
-              <EmptyState title="No claims" subtitle="Log a claim above." />
-            ) : (
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
-                {claims.map((c) => (
-                  <li key={c.id} style={{ fontSize: 13, borderTop: `1px solid ${colors.border}`, paddingTop: 6 }}>
-                    {engClaimLabel(c.claim_no, c.title, c.amount_aed)} · {c.status}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          {kindFilter !== 'document' ? (
+            <section style={cardStyle}>
+              <h2 style={{ marginTop: 0, fontSize: 16 }}>Claims</h2>
+              {claims.length === 0 ? (
+                <EmptyState title="No claims" subtitle="Log a claim above." />
+              ) : (
+                <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
+                  {claims.map((c) => (
+                    <li key={c.id} style={{ fontSize: 13, borderTop: `1px solid ${colors.border}`, paddingTop: 6 }}>
+                      {engClaimLabel(c.claim_no, c.title, c.amount_aed)} · {c.status}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          ) : null}
         </div>
       )}
     </div>
