@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Users } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import { errorMessage } from '../lib/errors'
 import {
   createHrEmployee,
@@ -33,6 +35,7 @@ const STATUSES = ['active', 'onboarding', 'leave', 'exited'] as const
 
 /** M6: employee directory with edit + gratuity draft preview. */
 export default function HrPeoplePage() {
+  const { appUserId } = useAuth()
   const { showToast } = useToast()
   const [rows, setRows] = useState<HrEmployee[]>([])
   const [directory, setDirectory] = useState<HrEmployee[]>([])
@@ -54,6 +57,10 @@ export default function HrPeoplePage() {
   const [importing, setImporting] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
+  const peopleViewFilters = useMemo(
+    () => ({ status: filter, archived: showArchived ? '1' : '0' }),
+    [filter, showArchived],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -297,6 +304,23 @@ export default function HrPeoplePage() {
           </button>
         </div>
       </header>
+
+      <SavedViewsBar
+        moduleId="hr_people"
+        filters={peopleViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => {
+          setFilter(String(f.status || 'active'))
+          setShowArchived(String(f.archived || '0') === '1')
+        }}
+        onToast={showToast}
+        filtersEqual={(a, b) =>
+          String(a.status || 'active') === String(b.status || 'active') &&
+          String(a.archived || '0') === String(b.archived || '0')
+        }
+      />
 
       <div style={{ marginBottom: 12, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <label style={labelStyle}>
