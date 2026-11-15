@@ -10,7 +10,9 @@ import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import SimpleRowActions from '../components/SimpleRowActions'
+import { useAuth } from '../contexts/AuthContext'
 import { formatAED } from '../lib/money'
 import {
   buttonDangerStyle,
@@ -69,11 +71,16 @@ const emptyForm = (): ProductForm => ({
 
 export default function CatalogPage() {
   const { t } = useI18n()
+  const { appUserId } = useAuth()
   const { showToast } = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [divisionFilter, setDivisionFilter] = useState('all')
   const [search, setSearch] = useState('')
+  const catalogViewFilters = useMemo(
+    () => ({ division: divisionFilter, q: search }),
+    [divisionFilter, search],
+  )
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
   const [form, setForm] = useState<ProductForm>(emptyForm())
@@ -482,6 +489,23 @@ export default function CatalogPage() {
           </div>
         </div>
       ) : null}
+
+      <SavedViewsBar
+        moduleId="catalog"
+        filters={catalogViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => {
+          setDivisionFilter(String(f.division || 'all'))
+          setSearch(String(f.q || ''))
+        }}
+        onToast={showToast}
+        filtersEqual={(a, b) =>
+          String(a.division || 'all') === String(b.division || 'all') &&
+          String(a.q || '') === String(b.q || '')
+        }
+      />
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
         <select style={selectStyle} value={divisionFilter} onChange={(e) => setDivisionFilter(e.target.value)}>
