@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { Copy, ExternalLink, MessageCircle } from 'lucide-react'
 import { useToast } from '../../contexts/ToastContext'
@@ -7,13 +7,23 @@ import { createPortalLink, listPortalLinks, revokePortalLink } from '../../lib/c
 import { errorMessage } from '../../lib/errors'
 import type { Account, AccountContact, PortalAccess } from '../../lib/types'
 import { buildWhatsAppUrl } from '../../lib/whatsapp'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle, sectionTitleStyle } from '../../lib/uiStyles'
 
 const smallBtn = { ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }
 const row = { display: 'flex', flexWrap: 'wrap' as const, gap: 8, alignItems: 'center' }
 const STATE_LABEL = { active: 'Working', revoked: 'Turned off', expired: 'Expired' } as const
+const PORTAL_LINKS_CSV_HEADERS = ['label', 'state', 'created_at', 'expires_at', 'revoked_at', 'last_used_at'] as const
 const day = (iso: string | null) => (iso ? format(parseISO(iso), 'd MMM yyyy') : '')
+
+function parsePortalLinkState(raw: string, revokedAt: string): 'active' | 'revoked' | 'expired' | null {
+  if (revokedAt.trim()) return 'revoked'
+  const v = raw.trim().toLowerCase()
+  if (!v || v === 'working' || v === 'active') return 'active'
+  if (v === 'turned off' || v === 'revoked' || v === 'off') return 'revoked'
+  if (v === 'expired') return 'expired'
+  return null
+}
 
 /**
  * Private links to the client portal. Each link is shown once, when it is
@@ -36,6 +46,8 @@ export default function PortalLinksCard({
   const [contactId, setContactId] = useState('')
   const [fresh, setFresh] = useState<{ url: string; label: string; phone: string } | null>(null)
   const [busy, setBusy] = useState('')
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     try {
@@ -89,6 +101,95 @@ export default function PortalLinksCard({
     }
   }
 
+  async function importLinksCsv(file: File) {
+    if (!editable || missingTable) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const byLabel = new Map<string, PortalAccess[]>()
+      for (const link of links) {
+        const key = (link.label || '').trim().toLowerCase()
+        if (!key) continue
+        const list = byLabel.get(key) || []
+        list.push(link)
+        byLabel.set(key, list)
+      }
+      const createdActive = new Set<string>()
+      let saved = 0
+      let skipped = 0
+      let lastUrl: string | null = null
+      let lastLabel = ''
+      let lastPhone = ''
+      for (const csvRow of objects) {
+        const label = String(csvRow.label || '').trim()
+        if (!label) {
+          skipped += 1
+          continue
+        }
+        const desired = parsePortalLinkState(String(csvRow.state || ''), String(csvRow.revoked_at || ''))
+        if (!desired || desired === 'expired') {
+          skipped += 1
+          continue
+        }
+        const key = label.toLowerCase()
+        const existing = byLabel.get(key) || []
+        if (desired === 'revoked') {
+          const active = existing.filter((l) => portalAccessState(l) === 'active')
+          if (!active.length) {
+            skipped += 1
+            continue
+          }
+          for (const link of active) {
+            await revokePortalLink(link.id)
+          }
+          byLabel.set(
+            key,
+            existing.map((l) =>
+              portalAccessState(l) === 'active' ? { ...l, revoked_at: new Date().toISOString() } : l,
+            ),
+          )
+          createdActive.delete(key)
+          saved += 1
+          continue
+        }
+        if (createdActive.has(key) || existing.some((l) => portalAccessState(l) === 'active')) {
+          skipped += 1
+          continue
+        }
+        const contact = contacts.find((c) => c.name.trim().toLowerCase() === key) ?? null
+        const url = await createPortalLink(
+          account.id,
+          { contactId: contact?.id ?? null, label },
+          author.email,
+        )
+        createdActive.add(key)
+        lastUrl = url
+        lastLabel = label
+        lastPhone = contact?.whatsapp || contact?.phone || ''
+        saved += 1
+      }
+      if (!saved && skipped) {
+        showToast('No matching portal link rows in CSV', 'error')
+        return
+      }
+      if (lastUrl) setFresh({ url: lastUrl, label: lastLabel, phone: lastPhone })
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} portal link row(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Portal links CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   const message = (url: string, label: string) =>
     `Hi ${label.split(' ')[0]}, here is your private Red Reach portal. You can see your requests, build progress, usage, monthly report, quotes and invoices, and send us files: ${url}`
 
@@ -96,31 +197,53 @@ export default function PortalLinksCard({
     <section style={{ ...cardStyle, marginTop: 16 }} aria-label="Client portal">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'start' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Client portal</h2>
-        <button
-          type="button"
-          style={smallBtn}
-          disabled={!links.length}
-          onClick={() => {
-            exportListCsv(
-              `portal-links-${account.reference || account.id}.csv`,
-              ['label', 'state', 'created_at', 'expires_at', 'revoked_at', 'last_used_at'],
-              links.map((link) => {
-                const state = portalAccessState(link)
-                return {
-                  label: link.label,
-                  state: STATE_LABEL[state] || state,
-                  created_at: link.created_at || '',
-                  expires_at: link.expires_at || '',
-                  revoked_at: link.revoked_at || '',
-                  last_used_at: link.last_used_at || '',
-                }
-              }),
-            )
-            showToast('Portal links CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importLinksCsv(file)
+            }}
+          />
+          {editable && !missingTable ? (
+            <button
+              type="button"
+              style={smallBtn}
+              disabled={importing}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            style={smallBtn}
+            disabled={!links.length}
+            onClick={() => {
+              exportListCsv(
+                `portal-links-${account.reference || account.id}.csv`,
+                [...PORTAL_LINKS_CSV_HEADERS],
+                links.map((link) => {
+                  const state = portalAccessState(link)
+                  return {
+                    label: link.label,
+                    state: STATE_LABEL[state] || state,
+                    created_at: link.created_at || '',
+                    expires_at: link.expires_at || '',
+                    revoked_at: link.revoked_at || '',
+                    last_used_at: link.last_used_at || '',
+                  }
+                }),
+              )
+              showToast('Portal links CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </div>
       <p style={{ color: colors.muted, fontSize: 13, margin: '12px 0 12px' }}>
         Send a private link so the client can see their requests, build progress, usage against plan and monthly report,
