@@ -10,13 +10,16 @@ export type PlanningScenario = {
   active: boolean
 }
 
-export async function listPlanningScenarios(): Promise<PlanningScenario[]> {
+export async function listPlanningScenarios(opts?: {
+  includeInactive?: boolean
+}): Promise<PlanningScenario[]> {
   if (!isSupabaseConfigured()) return []
-  const { data, error } = await db
+  let q = db
     .from('planning_scenarios')
     .select('id, name, description, assumptions_json, active')
-    .eq('active', true)
     .order('name')
+  if (!opts?.includeInactive) q = q.eq('active', true)
+  const { data, error } = await q
   if (error) {
     if (isMissingRelationError(error)) return []
     throw error
@@ -53,5 +56,10 @@ export async function updatePlanningScenario(
 
 export async function deactivatePlanningScenario(id: string): Promise<void> {
   const { error } = await db.from('planning_scenarios').update({ active: false }).eq('id', id)
+  if (error) throw error
+}
+
+export async function reactivatePlanningScenario(id: string): Promise<void> {
+  const { error } = await db.from('planning_scenarios').update({ active: true }).eq('id', id)
   if (error) throw error
 }
