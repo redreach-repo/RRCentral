@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Users } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
@@ -14,7 +14,8 @@ import {
   draftGratuityAccrualAed,
   yearsOfServiceFromStart,
 } from '../lib/wpsGratuity'
-import { exportListCsv } from '../lib/listIo'
+import { HR_PEOPLE_CSV_COLUMNS } from '../lib/hrPeopleCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -48,6 +49,8 @@ export default function HrPeoplePage() {
   const [startDate, setStartDate] = useState('')
   const [reportsToId, setReportsToId] = useState('')
   const [loading, setLoading] = useState(true)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -143,6 +146,74 @@ export default function HrPeoplePage() {
     }
   }
 
+  async function importPeopleCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, csvRows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of HR_PEOPLE_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, HR_PEOPLE_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid people rows', 'error')
+        return
+      }
+      const byCode = new Map(
+        directory
+          .filter((p) => p.employee_code)
+          .map((p) => [p.employee_code.toLowerCase(), p] as const),
+      )
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        const status = (STATUSES as readonly string[]).includes(row.employment_status)
+          ? row.employment_status
+          : 'active'
+        const salary = row.basic_salary_aed ? Number(row.basic_salary_aed) : null
+        const code = (row.employee_code || '').trim()
+        const existing = code ? byCode.get(code.toLowerCase()) : undefined
+        if (existing) {
+          await updateHrEmployee(existing.id, {
+            full_name: row.full_name,
+            email: row.email || existing.email,
+            job_title: row.job_title || existing.job_title,
+            department: row.department || existing.department,
+            employment_status: status,
+            start_date: row.start_date || existing.start_date,
+            basic_salary_aed: salary != null && Number.isFinite(salary) ? salary : existing.basic_salary_aed,
+            reports_to_id: row.reports_to_id || existing.reports_to_id,
+          })
+        } else {
+          await createHrEmployee({
+            full_name: row.full_name,
+            email: row.email || '',
+            job_title: row.job_title || '',
+            department: row.department || '',
+            employee_code: code || undefined,
+            employment_status: status,
+            start_date: row.start_date || null,
+            basic_salary_aed: salary != null && Number.isFinite(salary) ? salary : null,
+            reports_to_id: row.reports_to_id || null,
+          })
+        }
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} person(s)${skipNote}`, 'success')
+      await load()
+    } catch (err) {
+      showToast(errorMessage(err, 'People CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
@@ -153,30 +224,63 @@ export default function HrPeoplePage() {
             Directory, pay components, and draft gratuity preview. Not legal advice.
           </p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-          disabled={!rows.length}
-          onClick={() => {
-            exportListCsv(
-              'hr-people.csv',
-              ['employee_code', 'full_name', 'email', 'job_title', 'department', 'employment_status', 'reports_to_id'],
-              rows.map((r) => ({
-                employee_code: r.employee_code,
-                full_name: r.full_name,
-                email: r.email,
-                job_title: r.job_title,
-                department: r.department,
-                employment_status: r.employment_status,
-                reports_to_id: r.reports_to_id || '',
-              })),
-            )
-            showToast('People CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importPeopleCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!rows.length}
+            onClick={() => {
+              exportListCsv(
+                'hr-people.csv',
+                [
+                  'employee_code',
+                  'full_name',
+                  'email',
+                  'job_title',
+                  'department',
+                  'employment_status',
+                  'start_date',
+                  'basic_salary_aed',
+                  'reports_to_id',
+                ],
+                rows.map((r) => ({
+                  employee_code: r.employee_code,
+                  full_name: r.full_name,
+                  email: r.email,
+                  job_title: r.job_title,
+                  department: r.department,
+                  employment_status: r.employment_status,
+                  start_date: r.start_date || '',
+                  basic_salary_aed: r.basic_salary_aed ?? '',
+                  reports_to_id: r.reports_to_id || '',
+                })),
+              )
+              showToast('People CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </header>
 
       <div style={{ marginBottom: 12, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
