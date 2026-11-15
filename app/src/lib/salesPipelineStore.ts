@@ -13,15 +13,47 @@ function check(result: { error: unknown }) {
   if (result.error) throw result.error
 }
 
-export async function listSalesDeals(accountId?: string): Promise<{ rows: SalesDeal[]; missingTable: boolean }> {
+export async function listSalesDeals(
+  accountId?: string,
+  opts?: { includeDeleted?: boolean },
+): Promise<{ rows: SalesDeal[]; missingTable: boolean }> {
   let q = db.from('sales_deals').select('*')
   if (accountId) q = q.eq('account_id', accountId)
+  if (!opts?.includeDeleted) q = q.is('deleted_at', null)
   const { data, error } = await q.order('created_at', { ascending: false })
   if (error) {
     if (isMissingRelationError(error)) return { rows: [], missingTable: true }
+    if (String(error.message || '').toLowerCase().includes('deleted_at')) {
+      let fallback = db.from('sales_deals').select('*')
+      if (accountId) fallback = fallback.eq('account_id', accountId)
+      const res = await fallback.order('created_at', { ascending: false })
+      if (res.error) {
+        if (isMissingRelationError(res.error)) return { rows: [], missingTable: true }
+        throw res.error
+      }
+      return { rows: (res.data || []) as SalesDeal[], missingTable: false }
+    }
     throw error
   }
   return { rows: (data || []) as SalesDeal[], missingTable: false }
+}
+
+export async function softDeleteSalesDeal(id: string): Promise<void> {
+  check(
+    await db
+      .from('sales_deals')
+      .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq('id', id),
+  )
+}
+
+export async function restoreSalesDeal(id: string): Promise<void> {
+  check(
+    await db
+      .from('sales_deals')
+      .update({ deleted_at: null, updated_at: new Date().toISOString() })
+      .eq('id', id),
+  )
 }
 
 export type SalesDealInput = Omit<

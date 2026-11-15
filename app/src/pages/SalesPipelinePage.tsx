@@ -30,7 +30,15 @@ import {
   salesDealProblem,
   salesStageLabel,
 } from '../lib/salesPipeline'
-import { listSalesDeals, logSalesTouch, makeContractFromDeal, saveSalesDealForm, updateSalesDeal } from '../lib/salesPipelineStore'
+import {
+  listSalesDeals,
+  logSalesTouch,
+  makeContractFromDeal,
+  restoreSalesDeal,
+  saveSalesDealForm,
+  softDeleteSalesDeal,
+  updateSalesDeal,
+} from '../lib/salesPipelineStore'
 import type { Account, AppUser, DeliveryPackage, SalesDeal, SalesStage } from '../lib/types'
 import {
   buttonPrimaryStyle,
@@ -74,6 +82,7 @@ export default function SalesPipelinePage() {
   const [search, setSearch] = useState('')
   const [stageFilter, setStageFilter] = useState<SalesStage | 'all'>('all')
   const [overdueOnly, setOverdueOnly] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
 
   const author = useMemo(() => ({ appUserId, email: user?.email || '' }), [appUserId, user?.email])
   const canWrite = userRole !== 'viewer'
@@ -83,13 +92,19 @@ export default function SalesPipelinePage() {
       q: search,
       stage: stageFilter,
       overdue: overdueOnly ? '1' : '0',
+      archived: showArchived ? '1' : '0',
     }),
-    [search, stageFilter, overdueOnly],
+    [search, stageFilter, overdueOnly, showArchived],
   )
 
   const load = useCallback(async () => {
     try {
-      const [d, { rows }, people, pkgs] = await Promise.all([listSalesDeals(), listAccounts(), listTeam(), listPackages()])
+      const [d, { rows }, people, pkgs] = await Promise.all([
+        listSalesDeals(undefined, { includeDeleted: showArchived }),
+        listAccounts(),
+        listTeam(),
+        listPackages(),
+      ])
       setDeals(d.rows)
       setMissingTable(d.missingTable)
       setAccounts(rows)
@@ -100,7 +115,7 @@ export default function SalesPipelinePage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [showToast, showArchived])
 
   useEffect(() => {
     void load()
@@ -331,6 +346,42 @@ export default function SalesPipelinePage() {
             ) : null}
           </div>
         ) : null}
+        {canWrite ? (
+          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+            {d.deleted_at ? (
+              <button
+                type="button"
+                style={{ ...buttonSecondaryStyle, padding: '4px 8px', fontSize: 11 }}
+                onClick={() =>
+                  void restoreSalesDeal(d.id)
+                    .then(() => {
+                      showToast('Deal restored', 'success')
+                      return load()
+                    })
+                    .catch((err) => showToast(errorMessage(err, 'Could not restore'), 'error'))
+                }
+              >
+                Restore
+              </button>
+            ) : (
+              <button
+                type="button"
+                style={{ ...buttonSecondaryStyle, padding: '4px 8px', fontSize: 11 }}
+                onClick={() => {
+                  if (!window.confirm(`Archive ${nameOf(d)}? Use Show archived to restore later.`)) return
+                  void softDeleteSalesDeal(d.id)
+                    .then(() => {
+                      showToast('Deal archived', 'success')
+                      return load()
+                    })
+                    .catch((err) => showToast(errorMessage(err, 'Could not archive'), 'error'))
+                }}
+              >
+                Archive
+              </button>
+            )}
+          </div>
+        ) : null}
       </div>
     )
   }
@@ -350,6 +401,14 @@ export default function SalesPipelinePage() {
             type="button"
             className={docsStyles.newBtn}
             style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
             disabled={!visibleDeals.length}
             onClick={() => {
               exportListCsv(
@@ -364,6 +423,7 @@ export default function SalesPipelinePage() {
                   'setup_fee',
                   'package',
                   'overdue',
+                  'archived',
                 ],
                 visibleDeals.map((d) => ({
                   company: nameOf(d),
@@ -375,6 +435,7 @@ export default function SalesPipelinePage() {
                   setup_fee: d.setup_fee ?? '',
                   package: d.package_id ? packageById.get(d.package_id)?.name || d.package_id : '',
                   overdue: isSalesDealOverdue(d, now) ? 'yes' : 'no',
+                  archived: d.deleted_at ? 'yes' : 'no',
                 })),
               )
               showToast('Sales deals CSV downloaded', 'success')
@@ -403,12 +464,14 @@ export default function SalesPipelinePage() {
             stage === 'all' || SALES_STAGES.some((s) => s.value === stage) ? (stage as SalesStage | 'all') : 'all',
           )
           setOverdueOnly(String(f.overdue || '0') === '1')
+          setShowArchived(String(f.archived || '0') === '1')
         }}
         onToast={showToast}
         filtersEqual={(a, b) =>
           String(a.q || '') === String(b.q || '') &&
           String(a.stage || 'all') === String(b.stage || 'all') &&
-          String(a.overdue || '0') === String(b.overdue || '0')
+          String(a.overdue || '0') === String(b.overdue || '0') &&
+          String(a.archived || '0') === String(b.archived || '0')
         }
       />
 
