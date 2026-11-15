@@ -2,7 +2,7 @@
 
 Status: built and tested (draft)  
 Owner: Cursor  
-PR: (pending)  
+PR: #449  
 Stubbed / unverified: VAT return boxes / GL peek; planning scenario assumptions (no forecast)
 
 **Batch:** after #448 widgets/PO/fields  
