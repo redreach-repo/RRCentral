@@ -16,6 +16,7 @@ import {
   type FitSheetDraft,
 } from '../../lib/fitSheet'
 import { loadFitSheet, saveFitSheet } from '../../lib/fitSheetStore'
+import { exportListCsv } from '../../lib/listIo'
 import { parseFitSheetForm } from '../../lib/schemas/fitSheet'
 import type { Account, AccountContact, CtrmFitFocus, CtrmFitSheet } from '../../lib/types'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, fieldStyle, inputStyle, labelStyle, sectionTitleStyle, selectStyle } from '../../lib/uiStyles'
@@ -108,11 +109,30 @@ export default function FitSheetCard({
     <section style={{ ...cardStyle, marginTop: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Fit sheet</h2>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {sheet ? (
-            <Link to={`/accounts/${account.id}/fit-sheet`} style={{ ...smallBtn, textDecoration: 'none' }}>
-              <FileText size={14} /> PDF
-            </Link>
+            <>
+              <button
+                type="button"
+                style={smallBtn}
+                onClick={() => {
+                  exportListCsv(
+                    `fit-sheet-${account.id.slice(0, 8)}.csv`,
+                    ['field', 'value'],
+                    fitSheetRows(sheet, dmName(sheet.decision_maker_id)).map((r) => ({
+                      field: r.label,
+                      value: r.value,
+                    })),
+                  )
+                  showToast('Fit sheet CSV downloaded', 'success')
+                }}
+              >
+                Export CSV
+              </button>
+              <Link to={`/accounts/${account.id}/fit-sheet`} style={{ ...smallBtn, textDecoration: 'none' }}>
+                <FileText size={14} /> PDF
+              </Link>
+            </>
           ) : null}
           {editable && !draft && loaded ? (
             <button type="button" style={smallBtn} onClick={edit}>
