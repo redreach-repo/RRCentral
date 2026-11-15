@@ -104,17 +104,8 @@ export default function CrmLogTouchModal({
             applied += 1
           }
         } else if (field === 'next_action') {
-          if (
-            !value ||
-            (NEXT_ACTIONS as readonly string[]).includes(value) ||
-            value === nextActionVal
-          ) {
-            nextActionVal = value
-            applied += 1
-          } else {
-            nextActionVal = value
-            applied += 1
-          }
+          nextActionVal = value
+          applied += 1
         } else if (field === 'follow_up_date') {
           if (!value || /^\d{4}-\d{2}-\d{2}$/.test(value)) {
             nextFollow = value
