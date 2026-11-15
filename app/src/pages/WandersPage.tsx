@@ -38,7 +38,9 @@ import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import Modal from '../components/Modal'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import StatusPill from '../components/StatusPill'
+import { exportListCsv } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -65,7 +67,7 @@ type Mode = 'leads' | 'tourops'
 
 export default function WandersPage() {
   const { t } = useI18n()
-  const { user, userRole } = useAuth()
+  const { user, userRole, appUserId } = useAuth()
   const { settings, refresh } = useSettings()
   const { showToast } = useToast()
   const [mode, setMode] = useState<Mode>('leads')
@@ -80,6 +82,7 @@ export default function WandersPage() {
   const [paxOpen, setPaxOpen] = useState(false)
   const [paxForm, setPaxForm] = useState<WandersPassenger | null>(null)
   const [stageFilter, setStageFilter] = useState('All')
+  const wandersViewFilters = useMemo(() => ({ mode, stage: stageFilter }), [mode, stageFilter])
   const canViewSensitive = userRole === 'admin' || userRole === 'sales'
 
   const baseCurrency = resolveWandersBaseCurrency(settings.wandersBaseCurrency)
@@ -287,6 +290,46 @@ export default function WandersPage() {
           <button
             type="button"
             className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!deals.length}
+            onClick={() => {
+              exportListCsv(
+                'wanders-deals.csv',
+                [
+                  'client_name',
+                  'sales_stage',
+                  'booking_status',
+                  'destination_country',
+                  'departure_date',
+                  'return_date',
+                  'lead_contact',
+                  'email',
+                  'mobile',
+                  'budget_amount',
+                  'budget_currency',
+                ],
+                deals.map((d) => ({
+                  client_name: d.client_name,
+                  sales_stage: d.sales_stage,
+                  booking_status: d.booking_status,
+                  destination_country: d.destination_country,
+                  departure_date: d.departure_date || '',
+                  return_date: d.return_date || '',
+                  lead_contact: d.lead_contact,
+                  email: d.email,
+                  mobile: d.mobile,
+                  budget_amount: d.budget_amount,
+                  budget_currency: d.budget_currency,
+                })),
+              )
+              showToast('Wanders deals CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
             style={{
               background: mode === 'leads' ? undefined : 'rgba(255,255,255,0.08)',
             }}
@@ -311,6 +354,29 @@ export default function WandersPage() {
           ) : null}
         </div>
       </header>
+
+      <SavedViewsBar
+        moduleId="wanders"
+        filters={wandersViewFilters}
+        ownerUserId={appUserId}
+        canWrite={userRole !== 'viewer'}
+        applyDefaultOnLoad={false}
+        onApply={(f) => {
+          const nextMode = String(f.mode || 'leads') as Mode
+          setMode(nextMode === 'tourops' ? 'tourops' : 'leads')
+          const nextStage = String(f.stage || 'All')
+          setStageFilter(
+            nextStage === 'All' || (WANDERS_SALES_STAGES as readonly string[]).includes(nextStage)
+              ? nextStage
+              : 'All',
+          )
+        }}
+        onToast={showToast}
+        filtersEqual={(a, b) =>
+          String(a.mode || 'leads') === String(b.mode || 'leads') &&
+          String(a.stage || 'All') === String(b.stage || 'All')
+        }
+      />
 
       {mode === 'tourops' ? (
         <WandersTourOpsPanel deals={deals} />
