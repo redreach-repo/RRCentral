@@ -24,9 +24,9 @@ Status key: **exists** · **partial** · **missing**
 | RLS on every table | exists | M1 RESTRICTIVE tenant isolation on stamped tables |
 | Cross-tenant CI tests | partial | `tenant_isolation_test.sql` covers CRM, vendors, accounts, quotations, invoices, sales_deals, expenses, delivery_notes, payment_log, contracts, tickets, ctrm_deals, legal_documents, owned_domains, customer_documents, products, inventory_movements, quote_templates, income, follow_up_updates, supplier_commitments, saved_views, pipelines, pipeline_stages, custom_field_definitions, custom_field_values, numbering_sequences, brand_kits, business_units, workflow_definitions, workflow_runs, event_outbox + audit append-only; keep expanding stamped tables |
 | Roles + record rules + field permissions | partial | Fixed 5 roles; field-mask API started (`fieldPermissions`); record rules later |
-| Maker-checker | partial | M7 first slice: `approval_requests` + Approvals queue; wire into pay flows next |
+| Maker-checker | partial | M7: Approvals queue; payroll + large expenses wired; supplier payments / refunds next |
 | Customization layer (fields, pipelines, objects, workflows, templates, views, dashboards, labels, numbering) | partial | M2 layer largely in: numbering, fields, views, pipelines, workflow defs + runner (approval/notify); more step types / dashboards later |
-| Industry packs | partial | M12 first slice: pack catalog + Settings flag; activation wiring next |
+| Industry packs | partial | M12: catalog + activate enables moduleFlags; deeper object templates later |
 | Shell: Inbox/Sales/… areas, Cmd+K, AI button | partial | Accordion nav exists; restructure shell in M1 |
 | Company switcher | partial | M1 top-bar switcher; multi-company ops still thin |
 | EN+AR RTL | partial | M1 `I18nContext` + dir; guide + shell/nav + sales/finance/clients/admin/ops/delivery list chrome (Dashboard → Domains through Wanders, Settings/Account, CTRM weekly summary, ticket + account detail, CTRM fit sheet, quote/invoice/DN viewer, legal e-sign + quote-accept + client portal + monthly client report + Wanders tour-ops + monthly reports + weekly updates queue + client health + module-flags Settings card + CTRM issues + obligations board + clause library + NDA template + build templates + agreement template + domains + app errors + Settings section chrome); more page bodies later |

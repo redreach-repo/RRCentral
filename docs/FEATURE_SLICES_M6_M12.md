@@ -10,8 +10,8 @@
 | WPS / gratuity | §11 / M8 | `wpsGratuity.ts` (CSV + SCR/EDR SIF draft, IBAN/labour/routing validators, readiness) |
 | Marketing | §6.10 / M10 | Campaigns with budget/dates + activate/pause/done |
 | SaaS tenant billing | §6.13 / M11 | Plan catalog, trial/activate/cancel, seat usage; Stripe Checkout + portal (`docs/saas-billing.md`) |
-| Industry packs | §3 / M12 | Catalog + tenant activate/retire (`tenant_industry_packs`) |
-| Maker-checker | §3 / M7 | Approvals queue, self-approve block, payroll auto-wire ≥ AED 5k |
+| Industry packs | §3 / M12 | Catalog + activate/retire; activation enables shell module flags from manifest |
+| Maker-checker | §3 / M7 | Approvals queue, self-approve block; payroll + large expenses (≥ AED 5k) |
 | Public REST + webhooks | §3 / M11 | Keys + HMAC webhooks; reads + `POST/PATCH /v1/accounts`; Edge `webhook-retry` worker |
 
 Module flags (default **hidden** until Settings): `hr`, `payroll`, `marketing`, `saasBilling`, `industryPacks`. Approvals and API live under Admin.

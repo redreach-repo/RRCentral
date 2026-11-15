@@ -73,7 +73,8 @@ export default function ApprovalsPage() {
           <p className={docsStyles.kicker}>Maker-checker</p>
           <h1 className={docsStyles.title}>Approvals</h1>
           <p className={docsStyles.subtitle}>
-            Second pair of eyes for money actions (≥ AED {DEFAULT_APPROVAL_THRESHOLD_AED}). Payroll submit wires here
+            Second pair of eyes for money actions (≥ AED {DEFAULT_APPROVAL_THRESHOLD_AED}). Payroll submit and large
+            expenses wire here
             automatically. Maker cannot approve their own request.
           </p>
         </div>

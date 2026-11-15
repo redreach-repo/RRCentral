@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyPackFlagsToMap,
   BUILTIN_INDUSTRY_PACKS,
+  moduleFlagsForPack,
   nextTenantPackStatus,
   packModuleHints,
 } from './industryPacks'
@@ -30,5 +32,20 @@ describe('nextTenantPackStatus', () => {
 
   it('blocks activate after retire', () => {
     expect(nextTenantPackStatus('retired', 'activate')).toBeNull()
+  })
+})
+
+describe('moduleFlagsForPack / applyPackFlagsToMap', () => {
+  it('maps manifest modules to shell flags and clears hides', () => {
+    const trading = BUILTIN_INDUSTRY_PACKS.find((p) => p.pack_key === 'trading_import')!
+    expect(moduleFlagsForPack(trading)).toEqual(['sales', 'ops', 'finance'])
+    const { flags, enabled } = applyPackFlagsToMap(
+      { sales: false, ops: false, hr: false },
+      trading,
+    )
+    expect(enabled).toEqual(['sales', 'ops', 'finance'])
+    expect(flags.sales).toBeUndefined()
+    expect(flags.ops).toBeUndefined()
+    expect(flags.hr).toBe(false)
   })
 })

@@ -37,6 +37,8 @@ import {
 } from '../lib/supplierInvoiceStore'
 import { ensureVendor, listVendors } from '../lib/vendors'
 import { isUndefinedColumnError, errorMessage } from '../lib/errors'
+import { ensureMoneyApproval } from '../lib/featureSliceStores'
+import { DEFAULT_APPROVAL_THRESHOLD_AED } from '../lib/makerChecker'
 import { Link } from 'react-router-dom'
 import {
   buttonDangerStyle,
@@ -106,7 +108,7 @@ function applyExVat(exclusive: number, rate: number): Pick<ExpenseForm, 'amount'
 
 export default function ExpensesPage() {
   const { t } = useI18n()
-  const { user, userRole } = useAuth()
+  const { user, userRole, appUserId } = useAuth()
   const showVendorTrn = canViewField(userRole, 'vendor.trn')
   const { settings } = useSettings()
   const { showToast } = useToast()
@@ -499,10 +501,31 @@ export default function ExpensesPage() {
         `${payload.category} · ${formatAED(payload.amount)}${payload.quote_ref ? ` · ${payload.quote_ref}` : ''}`,
         user?.email || '',
       )
+
+      let approvalNote = ''
+      if (expenseId && parts.amount >= DEFAULT_APPROVAL_THRESHOLD_AED) {
+        try {
+          const gate = await ensureMoneyApproval({
+            objectType: 'expense',
+            objectId: expenseId,
+            action: 'record_expense',
+            amountAed: parts.amount,
+            requestedBy: appUserId || user?.email || null,
+          })
+          if (gate.needsApproval) {
+            approvalNote = gate.proceed
+              ? ''
+              : ` · maker-checker requested (≥ AED ${DEFAULT_APPROVAL_THRESHOLD_AED})`
+          }
+        } catch {
+          /* approvals table may be missing in local mode */
+        }
+      }
+
       showToast(
         linkedQuote
-          ? `Saved on quotation ${linkedQuote.reference_number || linkedQuote.quote_id} and in expenses`
-          : 'Expense saved — it will show in finance reports',
+          ? `Saved on quotation ${linkedQuote.reference_number || linkedQuote.quote_id} and in expenses${approvalNote}`
+          : `Expense saved — it will show in finance reports${approvalNote}`,
         'success',
       )
       setOpen(false)

@@ -6,13 +6,21 @@ import { db } from './db'
 import { isMissingRelationError } from './errors'
 import { isSupabaseConfigured } from './supabaseConfig'
 import {
+  applyPackFlagsToMap,
   BUILTIN_INDUSTRY_PACKS,
   nextTenantPackStatus,
+  type IndustryPackManifest,
   type TenantPackStatus,
 } from './industryPacks'
 import {
+  MODULE_FLAGS_KEY,
+  parseModuleFlags,
+  serializeModuleFlags,
+} from '../modules/registry'
+import {
   approvalNeedsChecker,
   canDecideApproval,
+  gateMoneyAction,
   summarizeApproval,
   type ApprovalStatus,
 } from './makerChecker'
@@ -518,10 +526,12 @@ export async function listTenantIndustryPacks(): Promise<TenantIndustryPackRow[]
   }, [])
 }
 
-export async function activateIndustryPack(packKey: string): Promise<void> {
+export async function activateIndustryPack(
+  packKey: string,
+): Promise<{ enabledFlags: string[] }> {
   const { data: pack, error: packErr } = await db
     .from('industry_packs')
-    .select('id')
+    .select('id, manifest')
     .eq('pack_key', packKey)
     .maybeSingle()
   if (packErr) throw packErr
@@ -541,15 +551,38 @@ export async function activateIndustryPack(packKey: string): Promise<void> {
       .update({ status: next, activated_at: new Date().toISOString() })
       .eq('id', existing.id)
     if (error) throw error
-    return
+  } else {
+    const { error } = await db.from('tenant_industry_packs').insert({
+      pack_id: pack.id,
+      status: 'active',
+      activated_at: new Date().toISOString(),
+    })
+    if (error) throw error
   }
 
-  const { error } = await db.from('tenant_industry_packs').insert({
-    pack_id: pack.id,
-    status: 'active',
-    activated_at: new Date().toISOString(),
-  })
+  const builtin = BUILTIN_INDUSTRY_PACKS.find((p) => p.pack_key === packKey)
+  const manifest = (pack.manifest as IndustryPackManifest) || builtin?.manifest || {}
+  return applyPackModuleFlags({ manifest })
+}
+
+/** Enable shell modules listed in a pack manifest via app_settings.moduleFlags. */
+async function applyPackModuleFlags(pack: {
+  manifest: IndustryPackManifest
+}): Promise<{ enabledFlags: string[] }> {
+  const { data: row } = await db
+    .from('app_settings')
+    .select('value')
+    .eq('key', MODULE_FLAGS_KEY)
+    .maybeSingle()
+  const current = parseModuleFlags({ [MODULE_FLAGS_KEY]: row?.value })
+  const { flags, enabled } = applyPackFlagsToMap(current, pack)
+  if (!enabled.length) return { enabledFlags: [] }
+  const serialized = serializeModuleFlags(flags)
+  const { error } = await db
+    .from('app_settings')
+    .upsert({ key: MODULE_FLAGS_KEY, value: serialized }, { onConflict: 'key' })
   if (error) throw error
+  return { enabledFlags: enabled }
 }
 
 export async function retireIndustryPack(packKey: string): Promise<void> {
@@ -655,6 +688,63 @@ export async function decideApproval(
   if (status === 'rejected' && row.object_type === 'payroll_run') {
     await setPayrollRunStatus(String(row.object_id), 'draft')
   }
+  // expense approvals are advisory locks for pay flows — no row status column yet
+}
+
+/** Latest approval status for an object (pending preferred over older terminals). */
+export async function latestApprovalStatus(
+  objectType: string,
+  objectId: string,
+): Promise<ApprovalStatus | null> {
+  return emptyOnMissing(async () => {
+    const { data, error } = await db
+      .from('approval_requests')
+      .select('status')
+      .eq('object_type', objectType)
+      .eq('object_id', objectId)
+      .order('created_at', { ascending: false })
+      .limit(5)
+    if (error) throw error
+    const rows = (data || []) as Array<{ status: string }>
+    const pending = rows.find((r) => r.status === 'pending')
+    if (pending) return 'pending'
+    const approved = rows.find((r) => r.status === 'approved')
+    if (approved) return 'approved'
+    if (!rows.length) return null
+    return rows[0].status as ApprovalStatus
+  }, null)
+}
+
+/**
+ * Gate a money action and optionally open a maker-checker request.
+ * Returns whether the caller may proceed (approved / under threshold).
+ */
+export async function ensureMoneyApproval(input: {
+  objectType: string
+  objectId: string
+  action: string
+  amountAed: number
+  requestedBy?: string | null
+}): Promise<{ proceed: boolean; needsApproval: boolean; reason?: string }> {
+  const existing = await latestApprovalStatus(input.objectType, input.objectId)
+  const gate = gateMoneyAction({ amountAed: input.amountAed, existingStatus: existing })
+  if (!gate.ok) {
+    return { proceed: false, needsApproval: true, reason: gate.reason }
+  }
+  if (!gate.needsApproval) {
+    return { proceed: true, needsApproval: false }
+  }
+  // Open a new request when none pending/approved
+  if (existing !== 'pending') {
+    await requestApproval({
+      objectType: input.objectType,
+      objectId: input.objectId,
+      action: input.action,
+      amountAed: input.amountAed,
+      requestedBy: input.requestedBy,
+    })
+  }
+  return { proceed: false, needsApproval: true, reason: gate.reason }
 }
 
 //------------------------------------------------------------
