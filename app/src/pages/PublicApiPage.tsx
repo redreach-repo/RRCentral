@@ -50,7 +50,7 @@ export default function PublicApiPage() {
   async function onCreateKey(e: React.FormEvent) {
     e.preventDefault()
     try {
-      const created = await createApiKey(keyName, appUserId, ['read:accounts'])
+      const created = await createApiKey(keyName, appUserId)
       setPlaintext(created.plaintext)
       showToast('API key created — copy it now', 'success')
       await load()
@@ -93,7 +93,12 @@ export default function PublicApiPage() {
   async function onTestHook(id: string) {
     try {
       const result = await testWebhookDelivery(id)
-      showToast(result.ok ? `Delivery OK (${result.status})` : `Delivery failed (${result.status})`, result.ok ? 'success' : 'error')
+      showToast(
+        result.ok
+          ? `Delivery OK (${result.status}, ${result.attempts} attempt${result.attempts === 1 ? '' : 's'})`
+          : `Delivery failed (${result.status}, ${result.attempts} attempt${result.attempts === 1 ? '' : 's'})`,
+        result.ok ? 'success' : 'error',
+      )
       await load()
     } catch (err) {
       showToast(errorMessage(err, 'Could not test webhook'), 'error')
@@ -107,7 +112,8 @@ export default function PublicApiPage() {
           <p className={docsStyles.kicker}>Public API</p>
           <h1 className={docsStyles.title}>API and webhooks</h1>
           <p className={docsStyles.subtitle}>
-            Hashed API keys (`x-api-key`) and partner webhooks. Edge routes: health, `/v1/me`, `/v1/accounts`.
+            Hashed API keys (`x-api-key`) and partner webhooks. Edge routes: `/v1/me`, `/v1/accounts`, `/v1/invoices`,
+            `/v1/quotations` (cursor pagination). Webhook tests use HMAC signatures with retries.
             {publicApiConfigured() ? '' : ' Supabase is not configured in this environment.'}
           </p>
         </div>

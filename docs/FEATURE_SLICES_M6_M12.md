@@ -12,7 +12,7 @@
 | SaaS tenant billing | §6.13 / M11 | Plan catalog, trial/activate/cancel, seat usage; Stripe Checkout + portal (`docs/saas-billing.md`) |
 | Industry packs | §3 / M12 | Catalog + tenant activate/retire (`tenant_industry_packs`) |
 | Maker-checker | §3 / M7 | Approvals queue, self-approve block, payroll auto-wire ≥ AED 5k |
-| Public REST + webhooks | §3 / M11 | Key revoke, webhook test fire, Edge `public-api` `/v1/me` + `/v1/accounts` |
+| Public REST + webhooks | §3 / M11 | Keys + HMAC webhooks with retries; Edge `/v1/me` `/v1/accounts` `/v1/invoices` `/v1/quotations` (cursor) |
 
 Module flags (default **hidden** until Settings): `hr`, `payroll`, `marketing`, `saasBilling`, `industryPacks`. Approvals and API live under Admin.
 
@@ -21,10 +21,11 @@ Module flags (default **hidden** until Settings): `hr`, `payroll`, `marketing`, 
 - `20261217120000_feature_slices_m6_m12.sql` — tables + RLS
 - `20261217140000_feature_slices_deepen.sql` — HR IBAN/allowances, webhook delivery audit, extra packs
 - `20261217160000_wps_sif_draft_fields.sql` — HR labour card + bank routing for SIF drafts
+- `20261217170000_public_api_webhook_retries.sql` — webhook failure counters + delivery attempt log
 
 ## Still later (not claimed done)
 
 - Bank-certified WPS/SIF file format + legal counsel sign-off (draft deepen shipped; see `docs/COMPLIANCE_NOTES.md` § WPS)
 - Real marketing send providers
-- Full public API write surface + signed webhook retries
+- Public API write surface + background webhook retry worker
 - Stripe Tax registration for live UAE/GCC SaaS charges

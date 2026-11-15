@@ -1,10 +1,13 @@
 /**
  * Public API (M11 deepen).
- * GET /public-api              → health
- * GET /public-api/v1/me        → key metadata (x-api-key)
- * GET /public-api/v1/accounts  → account list (read:accounts)
+ * GET /public-api                 → health
+ * GET /public-api/v1/me           → key metadata (x-api-key)
+ * GET /public-api/v1/accounts     → accounts (read:accounts)
+ * GET /public-api/v1/invoices     → invoices (read:invoices)
+ * GET /public-api/v1/quotations   → quotations (read:quotations)
  *
- * Deploy with verify_jwt = false; auth is via hashed api_keys.
+ * List routes support ?limit=1..100&cursor=<last-id>.
+ * Deploy with verify_jwt = false; auth is via hashed api_keys (x-api-key).
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
@@ -40,7 +43,6 @@ async function sha256Hex(value: string): Promise<string> {
 
 function pathOf(req: Request): string {
   const url = new URL(req.url)
-  // Function is mounted at /functions/v1/public-api
   return url.pathname.replace(/^\/functions\/v1\/public-api/, "") || "/"
 }
 
@@ -49,9 +51,26 @@ function scopesOf(row: ApiKeyRow): string[] {
   return []
 }
 
+function hasScope(scopes: string[], need: string): boolean {
+  return scopes.includes("*") || scopes.includes(need)
+}
+
+function parsePage(url: URL): { limit: number; cursor: string | null } {
+  const raw = Number(url.searchParams.get("limit") || 50)
+  const limit = Number.isFinite(raw) ? Math.min(100, Math.max(1, Math.floor(raw))) : 50
+  const cursor = String(url.searchParams.get("cursor") || "").trim() || null
+  return { limit, cursor }
+}
+
+function nextCursor(rows: Array<{ id: string }>, limit: number): string | null {
+  if (rows.length < limit || !rows.length) return null
+  return rows[rows.length - 1]?.id || null
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors })
 
+  const url = new URL(req.url)
   const path = pathOf(req)
 
   if (req.method === "GET" && (path === "/" || path === "")) {
@@ -59,8 +78,14 @@ Deno.serve(async (req) => {
       ok: true,
       product: "HighMast",
       api: "public-api",
-      version: "0.2.0",
-      routes: ["GET /", "GET /v1/me", "GET /v1/accounts"],
+      version: "0.3.0",
+      routes: [
+        "GET /",
+        "GET /v1/me",
+        "GET /v1/accounts",
+        "GET /v1/invoices",
+        "GET /v1/quotations",
+      ],
     })
   }
 
@@ -91,35 +116,66 @@ Deno.serve(async (req) => {
 
   const key = keyRow as ApiKeyRow
   await sb.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", key.id)
+  const scopes = scopesOf(key)
 
   if (req.method === "GET" && path === "/v1/me") {
     return json({
       key_id: key.id,
       name: key.name,
       prefix: key.key_prefix,
-      scopes: scopesOf(key),
+      scopes,
       tenant_id: key.tenant_id,
     })
   }
 
-  if (req.method === "GET" && path === "/v1/accounts") {
-    const scopes = scopesOf(key)
-    if (!scopes.includes("read:accounts") && !scopes.includes("*")) {
-      return json({ error: "forbidden_scope", need: "read:accounts" }, 403)
+  async function listResource(
+    needScope: string,
+    table: string,
+    columns: string,
+  ): Promise<Response> {
+    if (!hasScope(scopes, needScope)) {
+      return json({ error: "forbidden_scope", need: needScope }, 403)
     }
-    const { data, error } = await sb
-      .from("accounts")
-      .select("id, name, type, status, reference")
+    const { limit, cursor } = parsePage(url)
+    let q = sb
+      .from(table)
+      .select(columns)
       .eq("tenant_id", key.tenant_id)
-      .order("name")
-      .limit(100)
+      .order("id", { ascending: true })
+      .limit(limit)
+    if (cursor) q = q.gt("id", cursor)
+    const { data, error } = await q
     if (error) {
-      // Older DBs may lack tenant_id on accounts — fall back to unscoped staff list capped.
-      const fallback = await sb.from("accounts").select("id, name, type, status, reference").order("name").limit(100)
-      if (fallback.error) return json({ error: "query_failed", detail: error.message }, 500)
-      return json({ data: fallback.data || [], truncated: true })
+      // Older DBs may lack tenant_id — fall back capped without tenant filter.
+      let fallback = sb.from(table).select(columns).order("id", { ascending: true }).limit(limit)
+      if (cursor) fallback = fallback.gt("id", cursor)
+      const fb = await fallback
+      if (fb.error) return json({ error: "query_failed", detail: error.message }, 500)
+      const rows = (fb.data || []) as Array<{ id: string }>
+      return json({ data: rows, next_cursor: nextCursor(rows, limit), truncated: true })
     }
-    return json({ data: data || [] })
+    const rows = (data || []) as Array<{ id: string }>
+    return json({ data: rows, next_cursor: nextCursor(rows, limit) })
+  }
+
+  if (req.method === "GET" && path === "/v1/accounts") {
+    return await listResource("read:accounts", "accounts", "id, name, type, status, reference")
+  }
+
+  if (req.method === "GET" && path === "/v1/invoices") {
+    return await listResource(
+      "read:invoices",
+      "invoices",
+      "id, client, reference_number, status, payment_status, amount, date, currency, created_at",
+    )
+  }
+
+  if (req.method === "GET" && path === "/v1/quotations") {
+    return await listResource(
+      "read:quotations",
+      "quotations",
+      "id, client, reference_number, status, amount, date, currency, deal_ref, created_at",
+    )
   }
 
   return json({ error: "not_found", path }, 404)
