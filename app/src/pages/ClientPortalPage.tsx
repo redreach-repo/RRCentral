@@ -17,6 +17,7 @@ import { parseQuoteAcceptForm } from '../lib/schemas/quoteAccept'
 import { fileToBase64, loadPortal, portalAction } from '../lib/clientPortalStore'
 import { formatAED } from '../lib/money'
 import { invoiceKindLabel } from '../lib/documentRefs'
+import { exportListCsv } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -106,7 +107,66 @@ export default function ClientPortalPage() {
       <div style={column}>
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <BrandLogo height={32} />
-          <span style={muted}>{view.companyName}</span>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={muted}>{view.companyName}</span>
+            <button
+              type="button"
+              style={smallButton}
+              onClick={() => {
+                const slug = view.account.name.replace(/\s+/g, '-').toLowerCase() || 'portal'
+                exportListCsv(
+                  `portal-${slug}-build.csv`,
+                  ['stage', 'status', 'due'],
+                  view.build.stages.map((s) => ({
+                    stage: s.label,
+                    status: s.status,
+                    due: s.due || '',
+                  })),
+                )
+                if (view.openTickets.length) {
+                  exportListCsv(
+                    `portal-${slug}-tickets.csv`,
+                    ['subject', 'status', 'opened', 'note'],
+                    view.openTickets.map((t) => ({
+                      subject: t.subject,
+                      status: t.status,
+                      opened: t.opened,
+                      note: t.note || '',
+                    })),
+                  )
+                }
+                if (view.quotes.length) {
+                  exportListCsv(
+                    `portal-${slug}-quotes.csv`,
+                    ['reference', 'date', 'amount', 'currency', 'state'],
+                    view.quotes.map((q) => ({
+                      reference: q.reference,
+                      date: q.date || '',
+                      amount: q.amount,
+                      currency: q.currency,
+                      state: q.state,
+                    })),
+                  )
+                }
+                if (view.invoices.length) {
+                  exportListCsv(
+                    `portal-${slug}-invoices.csv`,
+                    ['reference', 'date', 'amount', 'currency', 'balance', 'paid'],
+                    view.invoices.map((inv) => ({
+                      reference: inv.reference,
+                      date: inv.date || '',
+                      amount: inv.amount,
+                      currency: inv.currency,
+                      balance: inv.balance,
+                      paid: inv.paid ? 'yes' : 'no',
+                    })),
+                  )
+                }
+              }}
+            >
+              Export CSV
+            </button>
+          </div>
         </header>
 
         <div>
