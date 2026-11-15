@@ -7,6 +7,7 @@ import { createPortalLink, listPortalLinks, revokePortalLink } from '../../lib/c
 import { errorMessage } from '../../lib/errors'
 import type { Account, AccountContact, PortalAccess } from '../../lib/types'
 import { buildWhatsAppUrl } from '../../lib/whatsapp'
+import { exportListCsv } from '../../lib/listIo'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle, sectionTitleStyle } from '../../lib/uiStyles'
 
 const smallBtn = { ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }
@@ -93,8 +94,35 @@ export default function PortalLinksCard({
 
   return (
     <section style={{ ...cardStyle, marginTop: 16 }} aria-label="Client portal">
-      <h2 style={sectionTitleStyle}>Client portal</h2>
-      <p style={{ color: colors.muted, fontSize: 13, margin: '0 0 12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'start' }}>
+        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Client portal</h2>
+        <button
+          type="button"
+          style={smallBtn}
+          disabled={!links.length}
+          onClick={() => {
+            exportListCsv(
+              `portal-links-${account.reference || account.id}.csv`,
+              ['label', 'state', 'created_at', 'expires_at', 'revoked_at', 'last_used_at'],
+              links.map((link) => {
+                const state = portalAccessState(link)
+                return {
+                  label: link.label,
+                  state: STATE_LABEL[state] || state,
+                  created_at: link.created_at || '',
+                  expires_at: link.expires_at || '',
+                  revoked_at: link.revoked_at || '',
+                  last_used_at: link.last_used_at || '',
+                }
+              }),
+            )
+            showToast('Portal links CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
+      </div>
+      <p style={{ color: colors.muted, fontSize: 13, margin: '12px 0 12px' }}>
         Send a private link so the client can see their requests, build progress, usage against plan and monthly report,
         accept quotes, pay invoices, reply on open requests and send files. No password needed. Links work for 12 months and you can turn one off at any time.
       </p>
