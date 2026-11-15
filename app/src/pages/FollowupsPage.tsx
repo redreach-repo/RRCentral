@@ -47,8 +47,10 @@ import {
 import docsStyles from '../styles/docsList.module.css'
 import { logActivity } from '../lib/activity'
 import { errorMessage } from '../lib/errors'
+import { softDeleteCrmEntry, restoreCrmEntry } from '../lib/crmSoftDelete'
 import { FOLLOWUPS_CSV_COLUMNS } from '../lib/followupsCsv'
 import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
+import { isSoftDeleted, withoutSoftDeleted, type SoftDeletable } from '../lib/softDelete'
 
 function daysLabel(dateStr: string, today: Date): string {
   const d = startOfDay(parseISO(dateStr.slice(0, 10)))
@@ -82,7 +84,11 @@ export default function FollowupsPage() {
   const [ownerFilter, setOwnerFilter] = useState('All')
   const [importing, setImporting] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
-  const followupsViewFilters = useMemo(() => ({ owner: ownerFilter }), [ownerFilter])
+  const [showArchived, setShowArchived] = useState(false)
+  const followupsViewFilters = useMemo(
+    () => ({ owner: ownerFilter, archived: showArchived ? '1' : '0' }),
+    [ownerFilter, showArchived],
+  )
 
   async function importFollowupsCsv(file: File) {
     setImporting(true)
@@ -189,19 +195,26 @@ export default function FollowupsPage() {
     setLoading(true)
     setError('')
     try {
+      let crmQuery = db
+        .from('crm')
+        .select('*')
+        .not('follow_up_date', 'is', null)
+        .order('follow_up_date', { ascending: true })
+      if (!showArchived) crmQuery = crmQuery.is('deleted_at', null)
       const [crmRes, usersRes] = await Promise.all([
-        db.from('crm').select('*').not('follow_up_date', 'is', null).order('follow_up_date', { ascending: true }),
+        crmQuery,
         db.from('app_users').select('*').eq('active', true).order('name'),
       ])
       if (crmRes.error) throw crmRes.error
-      setEntries((crmRes.data || []) as CrmEntry[])
+      const raw = (crmRes.data || []) as Array<CrmEntry & SoftDeletable>
+      setEntries(showArchived ? raw : withoutSoftDeleted(raw))
       if (!usersRes.error && usersRes.data) setTeam(usersRes.data as AppUser[])
     } catch (e) {
       setError(errorMessage(e, 'Failed to load follow-ups'))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [showArchived])
 
   useEffect(() => {
     void load()
@@ -448,18 +461,49 @@ export default function FollowupsPage() {
       setUpdateClearDate(false)
     }
 
+    const archived = isSoftDeleted(entry as CrmEntry & SoftDeletable)
     const actions = (
-      <FollowUpCardActions
-        entry={entry}
-        expanded={actionsOpenId === entry.id}
-        onToggle={() => setActionsOpenId((id) => (id === entry.id ? null : entry.id))}
-        busy={busy}
-        onSnooze={(row) => void snooze(row)}
-        onClear={(row) => void clearFollowUp(row)}
-        onEmail={(row) => setEmailTarget(row)}
-        onWhatsApp={(row) => void openFollowUpWhatsApp(row)}
-        onUpdate={() => openUpdate()}
-      />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+        {!archived ? (
+          <FollowUpCardActions
+            entry={entry}
+            expanded={actionsOpenId === entry.id}
+            onToggle={() => setActionsOpenId((id) => (id === entry.id ? null : entry.id))}
+            busy={busy}
+            onSnooze={(row) => void snooze(row)}
+            onClear={(row) => void clearFollowUp(row)}
+            onEmail={(row) => setEmailTarget(row)}
+            onWhatsApp={(row) => void openFollowUpWhatsApp(row)}
+            onUpdate={() => openUpdate()}
+          />
+        ) : null}
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={busy}
+          onClick={() => {
+            void (async () => {
+              setBusyId(entry.id)
+              try {
+                if (archived) {
+                  await restoreCrmEntry(entry.id)
+                  showToast('Follow-up restored', 'success')
+                } else {
+                  await softDeleteCrmEntry(entry.id)
+                  showToast('Follow-up archived', 'success')
+                }
+                await load()
+              } catch (e) {
+                showToast(errorMessage(e, 'Could not update follow-up'), 'error')
+              } finally {
+                setBusyId(null)
+              }
+            })()
+          }}
+        >
+          {archived ? 'Restore' : 'Archive'}
+        </button>
+      </div>
     )
 
     if (compact) {
@@ -615,6 +659,14 @@ export default function FollowupsPage() {
           <button
             type="button"
             className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
             style={{ background: 'rgba(255,255,255,0.08)' }}
             onClick={() => setCalendarSettingsOpen(true)}
           >
@@ -633,9 +685,15 @@ export default function FollowupsPage() {
         ownerUserId={appUserId}
         canWrite
         applyDefaultOnLoad={false}
-        onApply={(f) => setOwnerFilter(String(f.owner || 'All'))}
+        onApply={(f) => {
+          setOwnerFilter(String(f.owner || 'All'))
+          setShowArchived(String(f.archived || '0') === '1')
+        }}
         onToast={showToast}
-        filtersEqual={(a, b) => String(a.owner || 'All') === String(b.owner || 'All')}
+        filtersEqual={(a, b) =>
+          String(a.owner || 'All') === String(b.owner || 'All') &&
+          String(a.archived || '0') === String(b.archived || '0')
+        }
       />
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
