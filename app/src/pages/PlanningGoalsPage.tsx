@@ -16,6 +16,11 @@ import {
   setPlanningGoalStatus,
   type PlanningGoal,
 } from '../lib/planningGoalsStore'
+import {
+  createPlanningScenario,
+  listPlanningScenarios,
+  type PlanningScenario,
+} from '../lib/planningScenariosStore'
 import { exportListCsv } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
@@ -28,10 +33,11 @@ import {
 } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
-/** §6.12 planning goals stub (scenarios later). */
+/** §6.12 planning goals + scenario stubs. */
 export default function PlanningGoalsPage() {
   const { showToast } = useToast()
   const [rows, setRows] = useState<PlanningGoal[]>([])
+  const [scenarios, setScenarios] = useState<PlanningScenario[]>([])
   const [invoices, setInvoices] = useState<
     { amount?: number; status?: string; date?: string | null; created_at?: string | null }[]
   >([])
@@ -40,19 +46,22 @@ export default function PlanningGoalsPage() {
   const [metricKey, setMetricKey] = useState('revenue_aed')
   const [target, setTarget] = useState('')
   const [period, setPeriod] = useState(currentPeriodYyyyMm())
+  const [scenarioName, setScenarioName] = useState('')
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [goals, inv, sd] = await Promise.all([
+      const [goals, inv, sd, sc] = await Promise.all([
         listPlanningGoals(),
         db.from('invoices').select('amount, status, date, created_at').limit(500),
         db.from('sales_deals').select('created_at').limit(500),
+        listPlanningScenarios().catch(() => [] as PlanningScenario[]),
       ])
       setRows(goals)
       setInvoices((inv.data || []) as typeof invoices)
       setDeals((sd.data || []) as typeof deals)
+      setScenarios(sc)
     } catch (e) {
       showToast(errorMessage(e, 'Could not load goals'), 'error')
     } finally {
@@ -92,7 +101,7 @@ export default function PlanningGoalsPage() {
             Goals
           </h1>
           <p className={docsStyles.subtitle}>
-            Period targets for revenue and deals. Scenario builder comes later.
+            Period targets for revenue and deals. Scenario stubs hold assumptions only — no live forecast.
           </p>
         </div>
         <button
@@ -161,6 +170,49 @@ export default function PlanningGoalsPage() {
               Save goal
             </button>
           </form>
+
+          <section style={cardStyle}>
+            <h2 style={{ marginTop: 0, fontSize: 16 }}>Scenarios (stub)</h2>
+            <p style={{ margin: '0 0 10px', fontSize: 12, color: colors.muted }}>
+              Named what-if rows with assumptions JSON. Forecasting engine later.
+            </p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+              <input
+                style={{ ...inputStyle, maxWidth: 240 }}
+                placeholder="Scenario name"
+                value={scenarioName}
+                onChange={(e) => setScenarioName(e.target.value)}
+              />
+              <button
+                type="button"
+                style={buttonSecondaryStyle}
+                disabled={!scenarioName.trim()}
+                onClick={() => {
+                  void createPlanningScenario({ name: scenarioName })
+                    .then(() => {
+                      showToast('Scenario saved', 'success')
+                      setScenarioName('')
+                      return load()
+                    })
+                    .catch((err) => showToast(errorMessage(err, 'Could not save scenario'), 'error'))
+                }}
+              >
+                Add scenario
+              </button>
+            </div>
+            {scenarios.length === 0 ? (
+              <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>No scenarios yet.</p>
+            ) : (
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
+                {scenarios.map((s) => (
+                  <li key={s.id} style={{ fontSize: 13 }}>
+                    <strong>{s.name}</strong>
+                    {s.description ? ` · ${s.description}` : ''}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
 
           <section style={cardStyle}>
             <h2 style={{ marginTop: 0, fontSize: 16 }}>Goals</h2>

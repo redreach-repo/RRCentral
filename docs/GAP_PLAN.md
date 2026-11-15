@@ -54,7 +54,7 @@ Status key: **exists** · **partial** · **missing**
 | 6.4 Contracts and e-sign | partial | NDA `/sign` + clauses + obligations board + spawn-on-sign; QTSP → M5 later |
 | 6.5 HR | partial | People + leave + reports_to + attendance day stub |
 | 6.6 Payroll | partial | M8: runs + WPS/gratuity draft + `payroll_exports` audit (not legal advice / not bank-certified) |
-| 6.7 Accounting (ledger) | partial | CoA + journals + invoice/expense→draft auto-post + VAT return stub UI; posted auto + FTA later |
+| 6.7 Accounting (ledger) | partial | CoA + journals + invoice/expense→draft auto-post + VAT return stub UI (extra boxes/GL peek Unverified); posted auto + FTA later |
 | 6.8 Inventory and purchasing | partial | M9: POs + landed cost + warehouse stamp + warehouse_stock stub |
 | 6.9 Delivery (projects/support) | partial | M9b: projects + WIP/retention + billing schedules; full job-cost later |
 | 6.10 Marketing | partial | M10: campaigns + consent + dry-run send; live ESP later |
@@ -75,7 +75,7 @@ Status key: **exists** · **partial** · **missing**
 | Field-level encryption (salary, IBAN, tokens) | missing | M1 for tokens; M6/M8 for HR fields |
 | Append-only audit | partial | `audit_log` exists; CI asserts authenticated cannot INSERT/UPDATE/DELETE (REVOKE); prune stays security definer |
 | Sentry / structured logs | partial | Built behind DSN (off until Alfred); App errors + structured Edge logs |
-| Soft delete / retention tooling | partial | M13: DSR + accounts/contacts/vendors/products/expenses/tickets soft-delete |
+| Soft delete / retention tooling | partial | M13: DSR + accounts/contacts/vendors/products/expenses/tickets/POs soft-delete; AccountDetail archive/restore |
 | Demo isolation + outbound block | partial | Browser + Edge guards + seed; demo cloud project + deploy workflow still Alfred |
 
 ---

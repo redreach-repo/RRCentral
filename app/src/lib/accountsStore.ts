@@ -119,9 +119,14 @@ export async function updateAccount(id: string, patch: Partial<AccountInput>): P
   if (error) throw error
 }
 
+/** Soft-delete preferred; falls back to hard delete if deleted_at is unavailable. */
 export async function deleteAccount(id: string): Promise<void> {
-  const { error } = await db.from('accounts').delete().eq('id', id)
-  if (error) throw error
+  try {
+    await softDeleteAccount(id)
+  } catch {
+    const { error } = await db.from('accounts').delete().eq('id', id)
+    if (error) throw error
+  }
 }
 
 export async function listContacts(accountId?: string): Promise<AccountContact[]> {

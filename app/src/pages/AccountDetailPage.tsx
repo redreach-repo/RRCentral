@@ -49,6 +49,7 @@ import {
   listContacts,
   listTeam,
   logAccountEvent,
+  restoreAccount,
   saveContact,
   setDocumentAccount,
   updateAccount,
@@ -337,13 +338,20 @@ export default function AccountDetailPage() {
 
   async function handleDelete() {
     if (!account) return
+    const archived = Boolean((account as { deleted_at?: string | null }).deleted_at)
     setSaving(true)
     try {
-      await deleteAccount(account.id)
-      showToast(`${account.name} deleted`, 'success')
-      navigate('/accounts')
+      if (archived) {
+        await restoreAccount(account.id)
+        showToast(`${account.name} restored`, 'success')
+        await load()
+      } else {
+        await deleteAccount(account.id)
+        showToast(`${account.name} archived`, 'success')
+        navigate('/accounts')
+      }
     } catch (e) {
-      showToast(errorMessage(e, 'Could not delete the account'), 'error')
+      showToast(errorMessage(e, 'Could not update the account'), 'error')
     } finally {
       setSaving(false)
     }
@@ -460,8 +468,19 @@ export default function AccountDetailPage() {
               </button>
             ) : null}
             {can(userRole, 'accounts.delete') ? (
-              <button type="button" style={buttonDangerStyle} onClick={() => setConfirmDelete(true)}>
-                <Trash2 size={14} /> {t('page.accountDetail.delete')}
+              <button
+                type="button"
+                style={
+                  (account as { deleted_at?: string | null }).deleted_at
+                    ? buttonSecondaryStyle
+                    : buttonDangerStyle
+                }
+                onClick={() => setConfirmDelete(true)}
+              >
+                <Trash2 size={14} />{' '}
+                {(account as { deleted_at?: string | null }).deleted_at
+                  ? 'Restore account'
+                  : 'Archive account'}
               </button>
             ) : null}
           </div>
@@ -867,17 +886,36 @@ export default function AccountDetailPage() {
         ) : null}
       </Modal>
 
-      <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Delete account" width={440}>
+      <Modal
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        title={
+          (account as { deleted_at?: string | null }).deleted_at ? 'Restore account' : 'Archive account'
+        }
+        width={440}
+      >
         <p style={{ color: colors.muted, fontSize: 14, lineHeight: 1.55, marginTop: 0 }}>
-          This removes {account.name}, its contacts and its timeline. Linked invoices and quotations stay
-          as they are and simply lose the link.
+          {(account as { deleted_at?: string | null }).deleted_at
+            ? `Restore ${account.name} to the active accounts list.`
+            : `This archives ${account.name} (soft-delete). Contacts stay; linked invoices and quotations keep their links. Restore later with Show archived.`}
         </p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setConfirmDelete(false)}>
-            Keep it
+            Cancel
           </button>
-          <button type="button" style={buttonDangerStyle} disabled={saving} onClick={() => void handleDelete()}>
-            Delete account
+          <button
+            type="button"
+            style={
+              (account as { deleted_at?: string | null }).deleted_at
+                ? buttonSecondaryStyle
+                : buttonDangerStyle
+            }
+            disabled={saving}
+            onClick={() => void handleDelete()}
+          >
+            {(account as { deleted_at?: string | null }).deleted_at
+              ? 'Restore account'
+              : 'Archive account'}
           </button>
         </div>
       </Modal>

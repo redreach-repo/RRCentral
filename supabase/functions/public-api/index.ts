@@ -11,9 +11,12 @@
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2"
-import { isDemoEnv } from "../_shared/demoGuard.ts"
+import { installDemoGuard, isDemoEnv } from "../_shared/demoGuard.ts"
 import { withSecurityHeaders } from "../_shared/securityHeaders.ts"
 import { rateLimitAllow } from "../_shared/rateLimit.ts"
+
+// Demo outbound block (belt-and-suspenders with emitWebhook dry short-circuit).
+installDemoGuard()
 
 const cors = withSecurityHeaders({
   "Access-Control-Allow-Origin": "*",
