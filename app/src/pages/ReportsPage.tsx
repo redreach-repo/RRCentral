@@ -88,20 +88,12 @@ type WinRateDiv = {
   winPct: number
 }
 type PnlRow = { key: string; label: string; income: number; expenses: number; net: number }
-type CashLine = { date: string; kind: 'in' | 'out' | 'vat'; label: string; amount: number; overdue?: boolean }
-type CashForecastSoft = {
-  from: string
-  to: string
-  lines: CashLine[]
-  weeks: { start: string; end: string; cashIn: number; cashOut: number; net: number; running: number }[]
-  totals: { cashIn: number; cashOut: number; vat: number; net: number }
-}
 
 type ImportedSlice =
   | { tab: 'aging'; aging: AgingRow[] }
   | { tab: 'winrate'; winRate: WinRateDiv[] }
   | { tab: 'pnl'; monthlyPnl: PnlRow[] }
-  | { tab: 'cashflow'; forecast: CashForecastSoft }
+  | { tab: 'cashflow'; forecast: CashForecast }
 
 function numOr(raw: string, fallback = 0): number {
   const cleaned = String(raw || '')
@@ -606,7 +598,7 @@ export default function ReportsPage() {
         headersLower.has('item') &&
         headersLower.has('amount')
       ) {
-        const nextLines: CashLine[] = []
+        const nextLines: CashForecast['lines'] = []
         let softLoaded = 0
         let skipped = 0
         let cashIn = 0
@@ -621,7 +613,7 @@ export default function ReportsPage() {
             skipped += 1
             continue
           }
-          let kind: CashLine['kind'] = 'out'
+          let kind: CashForecast['lines'][number]['kind'] = 'out'
           let overdue = false
           if (typeRaw.includes('vat')) {
             kind = 'vat'
