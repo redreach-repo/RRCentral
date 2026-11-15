@@ -128,6 +128,29 @@ export default function DsrPage() {
           >
             Export CSV
           </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!retentionRuns.length}
+            onClick={() => {
+              exportListCsv(
+                'retention-runs.csv',
+                ['id', 'created_at', 'ran_by', 'app_errors_deleted', 'audit_deleted', 'detail'],
+                retentionRuns.map((r) => ({
+                  id: r.id,
+                  created_at: r.created_at,
+                  ran_by: r.ran_by || '',
+                  app_errors_deleted: r.app_errors_deleted,
+                  audit_deleted: r.audit_deleted,
+                  detail: r.detail || '',
+                })),
+              )
+              showToast('Retention CSV downloaded', 'success')
+            }}
+          >
+            Export retention CSV
+          </button>
           <button type="button" className={docsStyles.newBtn} onClick={() => void onPrune()}>
             Run retention prune
           </button>
