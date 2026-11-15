@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { differenceInCalendarDays, format, parseISO } from 'date-fns'
 import { Handshake, Plus } from 'lucide-react'
@@ -13,6 +13,7 @@ import DealFormModal, { type DealFormValues } from '../components/ctrm/DealFormM
 import { canEditAccount, visibleAccounts } from '../lib/accounts'
 import { listAccounts, listContacts, listTeam } from '../lib/accountsStore'
 import {
+  CTRM_COMPANY_TYPES,
   CTRM_REGIONS,
   CTRM_STAGES,
   STALE_DAYS,
@@ -35,11 +36,21 @@ import {
 } from '../lib/ctrmStore'
 import { CTRM_DEALS_CSV_COLUMNS } from '../lib/ctrmDealsCsv'
 import { canViewField } from '../lib/fieldPermissions'
-import { lostText, stageMoveProblem } from '../lib/dealRules'
+import { LOST_REASONS, lostText, stageMoveProblem } from '../lib/dealRules'
 import { errorMessage } from '../lib/errors'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { formatAED } from '../lib/money'
-import type { Account, AccountContact, AppUser, CtrmCommission, CtrmDeal, CtrmStage } from '../lib/types'
+import { parseCtrmDealForm } from '../lib/schemas/ctrmDeal'
+import type {
+  Account,
+  AccountContact,
+  AppUser,
+  CtrmCommission,
+  CtrmCompanyType,
+  CtrmDeal,
+  CtrmRegion,
+  CtrmStage,
+} from '../lib/types'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -65,6 +76,44 @@ const chip = (bg: string, color: string): CSSProperties => ({
   whiteSpace: 'nowrap',
 })
 
+function matchLabeledValue<T extends string>(
+  raw: string,
+  options: { value: T; label: string }[],
+): T | null {
+  const v = raw.trim()
+  if (!v) return null
+  const lower = v.toLowerCase()
+  const byValue = options.find((o) => o.value === v || o.value === lower.replace(/\s+/g, '_'))
+  if (byValue) return byValue.value
+  const byLabel = options.find((o) => o.label.toLowerCase() === lower)
+  return byLabel?.value ?? null
+}
+
+function parseYmd(raw: string): string | null {
+  const v = raw.trim()
+  if (!v) return null
+  const day = v.slice(0, 10)
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null
+}
+
+function parseLostReason(raw: string): { code: string; note: string } {
+  const v = raw.trim()
+  if (!v) return { code: '', note: '' }
+  const colon = v.indexOf(':')
+  if (colon > 0) {
+    const code = v.slice(0, colon).trim()
+    const note = v.slice(colon + 1).trim()
+    if ((LOST_REASONS as readonly string[]).includes(code)) return { code, note: note || code }
+  }
+  if ((LOST_REASONS as readonly string[]).includes(v)) return { code: v, note: v }
+  return { code: '', note: v }
+}
+
+function isArchivedFlag(raw: string): boolean {
+  const v = raw.trim().toLowerCase()
+  return v === '1' || v === 'yes' || v === 'true' || v === 'y'
+}
+
 export default function CtrmPage() {
   const { t } = useI18n()
   const { user, userRole, appUserId } = useAuth()
@@ -82,6 +131,8 @@ export default function CtrmPage() {
   const [saving, setSaving] = useState(false)
   const [dragId, setDragId] = useState<string | null>(null)
   const [showArchived, setShowArchived] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const view = searchParams.get('view') === 'table' ? 'table' : 'board'
   const region = searchParams.get('region') || 'all'
@@ -241,6 +292,114 @@ export default function CtrmPage() {
     }
   }
 
+  async function importDealsCsv(file: File) {
+    if (!canWrite) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of CTRM_DEALS_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        normalized.archived = String(row.archived ?? '').trim()
+        normalized.lost_reason = String(row.lost_reason ?? '').trim()
+        normalized.notes = String(row.notes ?? '').trim()
+        normalized.source = String(row.source ?? '').trim()
+        return normalized
+      })
+      const byName = new Map(prospects.map((a) => [a.name.trim().toLowerCase(), a] as const))
+      const ownerByLabel = new Map(
+        team.flatMap((u) => {
+          const entries: [string, string][] = []
+          if (u.name?.trim()) entries.push([u.name.trim().toLowerCase(), u.id])
+          if (u.email?.trim()) entries.push([u.email.trim().toLowerCase(), u.id])
+          return entries
+        }),
+      )
+      const today = format(new Date(), 'yyyy-MM-dd')
+      const knownRefs = accounts.map((a) => a.reference)
+      let saved = 0
+      let skipped = 0
+      for (const row of objects) {
+        if (isArchivedFlag(row.archived || '')) {
+          skipped += 1
+          continue
+        }
+        const company = String(row.company || '').trim()
+        if (!company) {
+          skipped += 1
+          continue
+        }
+        const account = byName.get(company.toLowerCase())
+        const stage =
+          matchLabeledValue(String(row.stage || ''), CTRM_STAGES) ?? ('identified' as CtrmStage)
+        // Signed deals need a fit sheet — skip them on bulk import.
+        if (stage === 'signed') {
+          skipped += 1
+          continue
+        }
+        const lost = parseLostReason(String(row.lost_reason || ''))
+        if (stage === 'lost' && !lost.code) {
+          skipped += 1
+          continue
+        }
+        const region =
+          matchLabeledValue(String(row.region || ''), CTRM_REGIONS) ?? ('middle_east' as CtrmRegion)
+        const companyType =
+          matchLabeledValue(String(row.company_type || ''), CTRM_COMPANY_TYPES) ??
+          ('trading_house' as CtrmCompanyType)
+        const ownerRaw = String(row.owner || '').trim().toLowerCase()
+        const ownerId =
+          (ownerRaw && ownerRaw !== 'nobody yet' ? ownerByLabel.get(ownerRaw) : null) ??
+          account?.owner_user_id ??
+          author.appUserId
+        const nextAction = String(row.next_action || '').trim()
+        const nextDate = parseYmd(String(row.next_action_date || ''))
+        const values: DealFormValues = {
+          accountId: account?.id ?? '',
+          newCompany: account ? '' : company,
+          stage,
+          region,
+          company_type: companyType,
+          primary_contact_id: null,
+          source: String(row.source || '').trim(),
+          owner_user_id: ownerId,
+          next_action: nextAction || (stage !== 'lost' ? 'Follow up' : ''),
+          next_action_date: nextDate || (stage !== 'lost' ? today : null),
+          lost_reason: stage === 'lost' ? lost.note : '',
+          lost_reason_code: stage === 'lost' ? lost.code : '',
+          notes: String(row.notes || '').trim(),
+          commission: showCommission ? { expected: 0, received: 0 } : null,
+        }
+        const parsed = parseCtrmDealForm(values)
+        if (!parsed.ok) {
+          skipped += 1
+          continue
+        }
+        await saveDealForm(parsed.data, null, undefined, knownRefs, author)
+        saved += 1
+      }
+      if (!saved && skipped) {
+        showToast('No matching CTRM deal rows in CSV', 'error')
+        return
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} CTRM deal(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'CTRM deals CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   const editingDeal = editing?.deal ? { ...editing.deal, stage: editing.stage ?? editing.deal.stage } : null
 
   function nextLine(d: CtrmDeal) {
@@ -382,6 +541,27 @@ export default function CtrmPage() {
           >
             {showArchived ? 'Hide archived' : 'Show archived'}
           </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importDealsCsv(file)
+            }}
+          />
+          {canWrite ? (
+            <button
+              type="button"
+              className={docsStyles.newBtn}
+              style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+              disabled={importing}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
+          ) : null}
           <button
             type="button"
             className={docsStyles.newBtn}
