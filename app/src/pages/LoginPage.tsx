@@ -6,6 +6,7 @@ import { authApi, MIN_PASSWORD_LENGTH } from '../lib/authApi'
 import { parseLoginCredentials } from '../lib/schemas/login'
 import styles from './LoginPage.module.css'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import { PRODUCT, productAssetUrls } from '../lib/product'
 
 const highmastAssets = productAssetUrls(import.meta.env.BASE_URL)
@@ -135,6 +136,19 @@ export default function LoginPage() {
                   {addr}
                 </button>
               ))}
+              <button
+                type="button"
+                className={styles.seedChip}
+                onClick={() => {
+                  exportListCsv(
+                    'login-seed-emails.csv',
+                    ['email'],
+                    seedEmails.map((addr) => ({ email: addr })),
+                  )
+                }}
+              >
+                Export CSV
+              </button>
             </div>
           )}
           <label className={styles.fieldLabel} htmlFor="login-password">
