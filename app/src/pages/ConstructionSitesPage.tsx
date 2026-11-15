@@ -13,6 +13,8 @@ import {
   createConstructionSite,
   listConstructionSites,
   listSiteAssignments,
+  restoreConstructionSite,
+  softDeleteConstructionSite,
   type ConstructionSite,
   type SiteWorkforceAssignment,
 } from '../lib/constructionSitesStore'
@@ -42,10 +44,14 @@ export default function ConstructionSitesPage() {
   const [employeeId, setEmployeeId] = useState('')
   const [roleLabel, setRoleLabel] = useState('')
   const [loading, setLoading] = useState(true)
+  const [showArchived, setShowArchived] = useState(false)
   const [importing, setImporting] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
   const [statusFilter, setStatusFilter] = useState('all')
-  const sitesViewFilters = useMemo(() => ({ status: statusFilter }), [statusFilter])
+  const sitesViewFilters = useMemo(
+    () => ({ status: statusFilter, archived: showArchived ? '1' : '0' }),
+    [statusFilter, showArchived],
+  )
   const visibleSites = useMemo(
     () => (statusFilter === 'all' ? sites : sites.filter((s) => s.status === statusFilter)),
     [sites, statusFilter],
@@ -54,7 +60,10 @@ export default function ConstructionSitesPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [s, p] = await Promise.all([listConstructionSites(), listHrEmployees('active')])
+      const [s, p] = await Promise.all([
+        listConstructionSites({ includeDeleted: showArchived }),
+        listHrEmployees('active'),
+      ])
       setSites(s)
       setPeople(p)
       if (!employeeId && p[0]) setEmployeeId(p[0].id)
@@ -63,7 +72,7 @@ export default function ConstructionSitesPage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast, employeeId])
+  }, [showToast, employeeId, showArchived])
 
   useEffect(() => {
     void load()
@@ -194,6 +203,14 @@ export default function ConstructionSitesPage() {
           >
             Export CSV
           </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
+          </button>
         </div>
       </header>
 
@@ -203,9 +220,15 @@ export default function ConstructionSitesPage() {
         ownerUserId={appUserId}
         canWrite
         applyDefaultOnLoad={false}
-        onApply={(f) => setStatusFilter(String(f.status || 'all'))}
+        onApply={(f) => {
+          setStatusFilter(String(f.status || 'all'))
+          setShowArchived(String(f.archived || '0') === '1')
+        }}
         onToast={showToast}
-        filtersEqual={(a, b) => String(a.status || 'all') === String(b.status || 'all')}
+        filtersEqual={(a, b) =>
+          String(a.status || 'all') === String(b.status || 'all') &&
+          String(a.archived || '0') === String(b.archived || '0')
+        }
       />
 
       <div style={{ marginBottom: 12 }}>
@@ -253,14 +276,43 @@ export default function ConstructionSitesPage() {
               <EmptyState title="No sites" subtitle="Create a site above. Apply construction_sites migration if empty." />
             ) : (
               <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
-                {visibleSites.map((s) => (
-                  <li key={s.id}>
-                    <button type="button" style={buttonSecondaryStyle} onClick={() => void openSite(s)}>
-                      {siteLabel(s.code, s.name)} · {s.status}
-                      {SITE_STATUSES.includes(s.status as (typeof SITE_STATUSES)[number]) ? '' : ''}
-                    </button>
-                  </li>
-                ))}
+                {visibleSites.map((s) => {
+                  const archived = Boolean(s.deleted_at)
+                  return (
+                    <li key={s.id} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <button type="button" style={buttonSecondaryStyle} onClick={() => void openSite(s)}>
+                        {siteLabel(s.code, s.name)} · {s.status}
+                        {archived ? ' · archived' : ''}
+                      </button>
+                      <button
+                        type="button"
+                        style={buttonSecondaryStyle}
+                        onClick={() => {
+                          if (
+                            !window.confirm(
+                              archived
+                                ? `Restore ${s.code || s.name}?`
+                                : `Archive ${s.code || s.name}?`,
+                            )
+                          ) {
+                            return
+                          }
+                          void (archived
+                            ? restoreConstructionSite(s.id)
+                            : softDeleteConstructionSite(s.id))
+                            .then(() => {
+                              showToast(archived ? 'Site restored' : 'Site archived', 'success')
+                              if (selected?.id === s.id) setSelected(null)
+                              return load()
+                            })
+                            .catch((err) => showToast(errorMessage(err, 'Archive failed'), 'error'))
+                        }}
+                      >
+                        {archived ? 'Restore' : 'Archive'}
+                      </button>
+                    </li>
+                  )
+                })}
               </ul>
             )}
 
