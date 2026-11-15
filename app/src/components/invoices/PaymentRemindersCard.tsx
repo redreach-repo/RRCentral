@@ -15,6 +15,7 @@ import { reminderRecipient } from '../../lib/paymentReminder'
 import { buildWhatsAppUrl } from '../../lib/whatsapp'
 import { isZohoMailEnabled } from '../../lib/zoho'
 import type { AccountContact, CrmContact, InvoiceReminder } from '../../lib/types'
+import { exportListCsv } from '../../lib/listIo'
 import { buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
 
 const smallBtn = { ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }
@@ -176,6 +177,30 @@ export default function PaymentRemindersCard() {
 
       {open ? (
         <>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+            <button
+              type="button"
+              style={smallBtn}
+              onClick={(e) => {
+                e.stopPropagation()
+                exportListCsv(
+                  'payment-reminders-due.csv',
+                  ['reference', 'client', 'balance', 'due_date', 'days_late', 'stage'],
+                  rows.map((row) => ({
+                    reference: row.invoice.reference_number,
+                    client: row.invoice.client || '',
+                    balance: row.balance,
+                    due_date: row.due.dueDate,
+                    days_late: row.due.daysLate,
+                    stage: row.due.stage,
+                  })),
+                )
+                showToast('Payment reminders CSV downloaded', 'success')
+              }}
+            >
+              Export CSV
+            </button>
+          </div>
           <p style={{ color: colors.muted, fontSize: 12, margin: '10px 0 6px', lineHeight: 1.45 }}>
             Due at 3, 7 and 14 days after the due date. Email or WhatsApp sends once per stage and records it.
           </p>
