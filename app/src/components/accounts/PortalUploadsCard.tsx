@@ -5,6 +5,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { sizeLabel } from '../../lib/clientPortal'
 import { downloadPortalUpload, listPortalUploads, markPortalUploadFiled } from '../../lib/clientPortalStore'
 import { errorMessage } from '../../lib/errors'
+import { exportListCsv } from '../../lib/listIo'
 import type { Account, PortalUpload } from '../../lib/types'
 import { buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
 
@@ -66,8 +67,33 @@ export default function PortalUploadsCard({ account, editable }: { account: Acco
 
   return (
     <section style={{ ...cardStyle, marginTop: 16 }} aria-label="Files from the client">
-      <h2 style={sectionTitleStyle}>Files from the client</h2>
-      <p style={{ color: colors.muted, fontSize: 13, margin: '0 0 12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Files from the client</h2>
+        <button
+          type="button"
+          style={smallBtn}
+          onClick={() => {
+            exportListCsv(
+              `portal-uploads-${account.id.slice(0, 8)}.csv`,
+              ['filename', 'status', 'size_bytes', 'content_type', 'note', 'drive_url', 'error', 'created_at'],
+              rows.map((u) => ({
+                filename: u.filename,
+                status: u.status,
+                size_bytes: u.size_bytes,
+                content_type: u.content_type || '',
+                note: u.note || '',
+                drive_url: u.drive_url || '',
+                error: u.error || '',
+                created_at: u.created_at || '',
+              })),
+            )
+            showToast('Portal uploads CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
+      </div>
+      <p style={{ color: colors.muted, fontSize: 13, margin: '8px 0 12px' }}>
         {waiting
           ? `${waiting} ${waiting === 1 ? 'file is' : 'files are'} waiting here. Download, put it in the client's Google Drive folder, then mark it filed.`
           : 'Everything the client sent is in their Google Drive folder.'}
