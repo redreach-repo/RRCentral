@@ -4,16 +4,20 @@ import { Activity } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
+import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
 import { isAuditAvailable } from '../lib/auditLog'
 import type { OutboxHealth } from '../lib/eventOutboxWorker'
+import { exportListCsv } from '../lib/listIo'
 import { summarise, type CheckState, type FunctionCheck } from '../lib/systemCheck'
 import { loadOutboxHealth, runSystemCheck } from '../lib/systemCheckStore'
 import {
   cardStyle,
   colors,
+  selectStyle,
   tableStyle,
   tableWrapStyle,
   tdStyle,
@@ -26,14 +30,21 @@ const STATE_LABEL: Record<CheckState, string> = { green: 'OK', amber: 'Check', r
 
 export default function SystemCheckPage() {
   const { t } = useI18n()
-  const { userRole } = useAuth()
+  const { userRole, appUserId } = useAuth()
+  const { showToast } = useToast()
   const [checks, setChecks] = useState<FunctionCheck[]>([])
   const [outbox, setOutbox] = useState<OutboxHealth | null>(null)
   const [loading, setLoading] = useState(false)
   const [problem, setProblem] = useState('')
   const [checkedAt, setCheckedAt] = useState<Date | null>(null)
+  const [stateFilter, setStateFilter] = useState<CheckState | 'all'>('all')
 
   const allowed = can(userRole, 'system.check')
+  const checkViewFilters = useMemo(() => ({ state: stateFilter }), [stateFilter])
+  const visibleChecks = useMemo(
+    () => (stateFilter === 'all' ? checks : checks.filter((c) => c.state === stateFilter)),
+    [checks, stateFilter],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -89,6 +100,30 @@ export default function SystemCheckPage() {
           <button
             type="button"
             className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!visibleChecks.length}
+            onClick={() => {
+              exportListCsv(
+                'system-check.csv',
+                ['state', 'feature', 'function', 'reason', 'last_error', 'last_error_at', 'live_test'],
+                visibleChecks.map((c) => ({
+                  state: c.state,
+                  feature: c.fn.feature,
+                  function: c.fn.name,
+                  reason: c.reason,
+                  last_error: c.lastError?.message || '',
+                  last_error_at: c.lastError?.created_at || '',
+                  live_test: c.fn.liveTest,
+                })),
+              )
+              showToast('System check CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
             style={{ background: 'rgba(255,255,255,0.08)' }}
             disabled={loading}
             onClick={() => void load()}
@@ -102,6 +137,34 @@ export default function SystemCheckPage() {
           ) : null}
         </div>
       </header>
+
+      <SavedViewsBar
+        moduleId="system_check"
+        filters={checkViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => {
+          const next = String(f.state || 'all')
+          setStateFilter(next === 'green' || next === 'amber' || next === 'red' ? next : 'all')
+        }}
+        onToast={showToast}
+        filtersEqual={(a, b) => String(a.state || 'all') === String(b.state || 'all')}
+      />
+
+      <div style={{ marginBottom: 12 }}>
+        <select
+          style={{ ...selectStyle, maxWidth: 200 }}
+          value={stateFilter}
+          onChange={(e) => setStateFilter(e.target.value as CheckState | 'all')}
+        >
+          <option value="all">All states</option>
+          <option value="green">OK</option>
+          <option value="amber">Check</option>
+          <option value="red">Down</option>
+        </select>
+      </div>
+
       {problem ? (
         <div style={{ ...cardStyle, color: colors.danger }}>{problem}</div>
       ) : (
@@ -134,7 +197,7 @@ export default function SystemCheckPage() {
                 </tr>
               </thead>
               <tbody>
-                {checks.map((c) => (
+                {visibleChecks.map((c) => (
                   <tr key={c.fn.name}>
                     <td style={tdStyle}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, color: STATE_COLOR[c.state] }}>
@@ -164,6 +227,13 @@ export default function SystemCheckPage() {
                   <tr>
                     <td style={tdStyle} colSpan={5}>
                       Checking every function…
+                    </td>
+                  </tr>
+                ) : null}
+                {!loading && checks.length && !visibleChecks.length ? (
+                  <tr>
+                    <td style={tdStyle} colSpan={5}>
+                      No functions match this state filter.
                     </td>
                   </tr>
                 ) : null}
