@@ -1,3 +1,4 @@
+import { formatAmount, moneyOrZero, sumAmounts, toDecimalString } from '../lib/money/index'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Wallet } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -155,8 +156,8 @@ export default function PayrollPage() {
       const result = await submitPayrollForApproval(selectedId, appUserId)
       showToast(
         result.needsApproval
-          ? `Submitted for approval (AED ${result.totalNet.toFixed(2)})`
-          : `Auto-approved under threshold (AED ${result.totalNet.toFixed(2)})`,
+          ? `Submitted for approval (AED ${formatAmount(moneyOrZero(result.totalNet, "AED"))})`
+          : `Auto-approved under threshold (AED ${formatAmount(moneyOrZero(result.totalNet, "AED"))})`,
         'success',
       )
       await load()
@@ -253,8 +254,8 @@ export default function PayrollPage() {
   }
 
   const selected = rows.find((r) => r.id === selectedId) || null
-  const totalNet = lines.reduce((s, l) => s + Number(l.net_aed || 0), 0)
-  const totalGratuity = lines.reduce((s, l) => s + Number(l.gratuity_accrual_aed || 0), 0)
+  const totalNet = sumAmounts(lines.map((l) => l.net_aed))
+  const totalGratuity = sumAmounts(lines.map((l) => l.gratuity_accrual_aed))
   const readiness = selected
     ? wpsFileReadiness({ employerUniqueId: employerId }, toWpsLines())
     : null
@@ -372,7 +373,7 @@ export default function PayrollPage() {
                 {selected.period_yyyy_mm} · {selected.status}
               </strong>
               <div style={{ color: colors.muted, fontSize: 13, marginTop: 4 }}>
-                Net AED {totalNet.toFixed(2)} · Draft gratuity AED {totalGratuity.toFixed(2)} · {lines.length} line(s)
+                Net AED {formatAmount(moneyOrZero(totalNet, 'AED'))} · Draft gratuity AED {formatAmount(moneyOrZero(totalGratuity, 'AED'))} · {lines.length} line(s)
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -435,11 +436,11 @@ export default function PayrollPage() {
                         {l.hr_employees?.full_name || l.employee_id.slice(0, 8)}
                         <div style={{ color: colors.muted, fontSize: 11 }}>{l.hr_employees?.employee_code}</div>
                       </td>
-                      <td style={{ padding: '6px 8px' }}>{Number(l.basic_aed).toFixed(2)}</td>
-                      <td style={{ padding: '6px 8px' }}>{Number(l.allowances_aed).toFixed(2)}</td>
-                      <td style={{ padding: '6px 8px' }}>{Number(l.deductions_aed).toFixed(2)}</td>
-                      <td style={{ padding: '6px 8px' }}>{Number(l.net_aed).toFixed(2)}</td>
-                      <td style={{ padding: '6px 8px' }}>{Number(l.gratuity_accrual_aed).toFixed(2)}</td>
+                      <td style={{ padding: '6px 8px' }}>{toDecimalString(moneyOrZero(l.basic_aed, 'AED'))}</td>
+                      <td style={{ padding: '6px 8px' }}>{toDecimalString(moneyOrZero(l.allowances_aed, 'AED'))}</td>
+                      <td style={{ padding: '6px 8px' }}>{toDecimalString(moneyOrZero(l.deductions_aed, 'AED'))}</td>
+                      <td style={{ padding: '6px 8px' }}>{toDecimalString(moneyOrZero(l.net_aed, 'AED'))}</td>
+                      <td style={{ padding: '6px 8px' }}>{toDecimalString(moneyOrZero(l.gratuity_accrual_aed, 'AED'))}</td>
                       <td style={{ padding: '6px 8px' }}>{l.wps_ready ? 'ready' : '—'}</td>
                     </tr>
                   ))}

@@ -18,13 +18,15 @@ export const MONEY_PATH = [
   'lib/ledger/ledger.ts',
   'lib/ledger/autoPost.ts',
   'lib/wpsGratuity.ts',
+  'lib/payroll/payrollServer.ts',
+  'pages/PayrollPage.tsx',
 ]
 
 /** Float rounding / parsing patterns that must not touch money. */
 const FORBIDDEN = [/Math\.round\(/, /Math\.(floor|ceil|trunc)\([^)]*\*\s*100\b/, /\.toFixed\(/, /parseFloat\(/, /\*\s*100\)\s*\/\s*100/]
 
 // Float rounding patterns outside MONEY_PATH on 2026-11-15 (some are percentages, not money). Shrink only.
-const FLOAT_MONEY_BASELINE = 183
+const FLOAT_MONEY_BASELINE = 175
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
