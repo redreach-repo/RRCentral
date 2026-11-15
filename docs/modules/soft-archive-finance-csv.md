@@ -2,7 +2,7 @@
 
 Status: built and tested (draft)  
 Owner: Cursor  
-PR: (pending)  
+PR: #451  
 Stubbed / unverified: ledger CoA tax mapping; WPS/SIF draft (unchanged)
 
 **Batch:** after #450  
