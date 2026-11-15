@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Target } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
@@ -22,7 +22,8 @@ import {
   listPlanningScenarios,
   type PlanningScenario,
 } from '../lib/planningScenariosStore'
-import { exportListCsv } from '../lib/listIo'
+import { PLANNING_GOALS_CSV_COLUMNS, PLANNING_SCENARIOS_CSV_COLUMNS } from '../lib/planningCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -50,6 +51,10 @@ export default function PlanningGoalsPage() {
   const [scenarioName, setScenarioName] = useState('')
   const [scenarioAssumptions, setScenarioAssumptions] = useState('{"revenue_uplift_pct":0}')
   const [loading, setLoading] = useState(true)
+  const [importingGoals, setImportingGoals] = useState(false)
+  const [importingScenarios, setImportingScenarios] = useState(false)
+  const goalsImportRef = useRef<HTMLInputElement>(null)
+  const scenariosImportRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -93,6 +98,105 @@ export default function PlanningGoalsPage() {
     }
   }
 
+  async function importGoalsCsv(file: File) {
+    setImportingGoals(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, csvRows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of PLANNING_GOALS_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, PLANNING_GOALS_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid goal rows', 'error')
+        return
+      }
+      const metricKeys = new Set<string>(GOAL_METRICS.map((m) => m.key))
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        const metric = metricKeys.has(row.metric_key) ? row.metric_key : 'revenue_aed'
+        const periodYyyyMm = /^\d{4}-\d{2}$/.test(row.period_yyyy_mm)
+          ? row.period_yyyy_mm
+          : currentPeriodYyyyMm()
+        await createPlanningGoal({
+          name: row.name,
+          metricKey: metric,
+          targetValue: Number(row.target_value) || 0,
+          periodYyyyMm,
+          notes: row.notes || '',
+          status: row.status || 'active',
+        })
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} goal(s)${skipNote}`, 'success')
+      await load()
+    } catch (err) {
+      showToast(errorMessage(err, 'Goals CSV import failed'), 'error')
+    } finally {
+      setImportingGoals(false)
+      if (goalsImportRef.current) goalsImportRef.current.value = ''
+    }
+  }
+
+  async function importScenariosCsv(file: File) {
+    setImportingScenarios(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, csvRows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of PLANNING_SCENARIOS_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, PLANNING_SCENARIOS_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid scenario rows', 'error')
+        return
+      }
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        let assumptions: Record<string, unknown> = { revenue_uplift_pct: 0 }
+        if (row.assumptions_json) {
+          try {
+            const parsed = JSON.parse(row.assumptions_json) as unknown
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+              assumptions = parsed as Record<string, unknown>
+            } else {
+              skipped += 1
+              continue
+            }
+          } catch {
+            skipped += 1
+            continue
+          }
+        }
+        await createPlanningScenario({
+          name: row.name,
+          description: row.description || '',
+          assumptions,
+        })
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} scenario(s)${skipNote}`, 'success')
+      await load()
+    } catch (err) {
+      showToast(errorMessage(err, 'Scenarios CSV import failed'), 'error')
+    } finally {
+      setImportingScenarios(false)
+      if (scenariosImportRef.current) scenariosImportRef.current.value = ''
+    }
+  }
+
   return (
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
@@ -107,6 +211,35 @@ export default function PlanningGoalsPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={goalsImportRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importGoalsCsv(file)
+            }}
+          />
+          <input
+            ref={scenariosImportRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importScenariosCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importingGoals}
+            onClick={() => goalsImportRef.current?.click()}
+          >
+            {importingGoals ? 'Importing…' : 'Import goals CSV'}
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}
@@ -128,6 +261,15 @@ export default function PlanningGoalsPage() {
             }}
           >
             Export goals CSV
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importingScenarios}
+            onClick={() => scenariosImportRef.current?.click()}
+          >
+            {importingScenarios ? 'Importing…' : 'Import scenarios CSV'}
           </button>
           <button
             type="button"
