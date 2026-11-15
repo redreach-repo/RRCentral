@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { addMonths, format, parseISO } from 'date-fns'
 import { AlertTriangle, CalendarClock, Clock, FileText, Pencil, Play, Plus, Sparkles, Square, Trash2 } from 'lucide-react'
@@ -71,7 +71,7 @@ import { parseTimeEntryForm } from '../../lib/schemas/timeEntry'
 import { parseUsageMonthForm } from '../../lib/schemas/usageMonth'
 import { parseUsageSourceForm } from '../../lib/schemas/usageSource'
 import { formatAED } from '../../lib/money'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import { FORGOTTEN_TIMER_HOURS, elapsedHours, elapsedLabel, hoursLabel, timerHours } from '../../lib/timeTracking'
 import type {
   Account,
@@ -122,6 +122,50 @@ const rowStyle: CSSProperties = {
   fontSize: 13,
 }
 const mutedNote: CSSProperties = { color: colors.muted, fontSize: 13, margin: 0, lineHeight: 1.5 }
+
+const HOURS_CSV_HEADERS = ['date', 'hours', 'category', 'user_email', 'note'] as const
+const REQUIREMENT_CSV_HEADERS = [
+  'title',
+  'detail',
+  'status',
+  'source',
+  'is_change_request',
+  'created_by',
+  'created_at',
+] as const
+
+const TIME_CATEGORY_VALUES = new Set(TIME_CATEGORIES.map((c) => c.value))
+const TIME_CATEGORY_BY_LABEL = new Map(TIME_CATEGORIES.map((c) => [c.label.toLowerCase(), c.value]))
+const REQUIREMENT_STATUS_VALUES = new Set(REQUIREMENT_STATUSES.map((s) => s.value))
+const REQUIREMENT_STATUS_BY_LABEL = new Map(REQUIREMENT_STATUSES.map((s) => [s.label.toLowerCase(), s.value]))
+
+function hoursMatchKey(date: string, hours: number, category: string, note: string): string {
+  return `${date}|${hours}|${category}|${note.trim().toLowerCase()}`
+}
+
+function requirementMatchKey(title: string): string {
+  return title.trim().toLowerCase()
+}
+
+function parseYesNo(raw: string): boolean {
+  const v = raw.trim().toLowerCase()
+  if (!v) return false
+  return !(v === 'no' || v === 'false' || v === '0' || v === 'off' || v === 'n')
+}
+
+function resolveTimeCategory(raw: string): TimeCategory | '' {
+  const value = raw.trim()
+  if (!value) return ''
+  if (TIME_CATEGORY_VALUES.has(value as TimeCategory)) return value as TimeCategory
+  return TIME_CATEGORY_BY_LABEL.get(value.toLowerCase()) || ''
+}
+
+function resolveRequirementStatus(raw: string): RequirementStatus | '' {
+  const value = raw.trim()
+  if (!value) return 'open'
+  if (REQUIREMENT_STATUS_VALUES.has(value as RequirementStatus)) return value as RequirementStatus
+  return REQUIREMENT_STATUS_BY_LABEL.get(value.toLowerCase()) || ''
+}
 
 function day(value: string | null | undefined): string {
   if (!value) return 'Not set'
@@ -210,6 +254,10 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
     }
   }, [callNotesSeed])
   const [assistUsd, setAssistUsd] = useState(0)
+  const [importingHours, setImportingHours] = useState(false)
+  const [importingRequirements, setImportingRequirements] = useState(false)
+  const hoursImportRef = useRef<HTMLInputElement>(null)
+  const requirementsImportRef = useRef<HTMLInputElement>(null)
 
   const canContracts = can(userRole, 'delivery.contracts')
   const compact = useCompactCrm()
@@ -579,6 +627,137 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
     }, 'Could not update the requirement')
   }
 
+  async function importHoursCsv(file: File) {
+    if (!(editable && userRole !== 'viewer')) return
+    setImportingHours(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const seen = new Set(entries.map((t) => hoursMatchKey(t.date, t.hours, t.category, t.note || '')))
+      let added = 0
+      let skipped = 0
+      for (const row of objects) {
+        const date = String(row.date || '').trim()
+        const hoursRaw = String(row.hours ?? '').trim()
+        const category = resolveTimeCategory(String(row.category || ''))
+        const note = String(row.note ?? '')
+        const hours = Number(hoursRaw)
+        if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !category || !Number.isFinite(hours) || hours <= 0 || hours > 24) {
+          skipped += 1
+          continue
+        }
+        const key = hoursMatchKey(date, hours, category, note)
+        if (seen.has(key)) {
+          skipped += 1
+          continue
+        }
+        await addTimeEntry(account.id, { date, hours, category, note }, author)
+        seen.add(key)
+        added += 1
+      }
+      if (!added) {
+        showToast(skipped ? 'No new hours rows to import in CSV' : 'No hours rows in CSV', 'error')
+        return
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${added} hours row(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Hours CSV import failed'), 'error')
+    } finally {
+      setImportingHours(false)
+      if (hoursImportRef.current) hoursImportRef.current.value = ''
+    }
+  }
+
+  async function importRequirementsCsv(file: File) {
+    if (!(editable && userRole !== 'viewer')) return
+    setImportingRequirements(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const byKey = new Map(requirements.map((r) => [requirementMatchKey(r.title), r] as const))
+      const seen = new Set(byKey.keys())
+      let added = 0
+      let updated = 0
+      let skipped = 0
+      for (const row of objects) {
+        const title = String(row.title || '').trim()
+        const status = resolveRequirementStatus(String(row.status || ''))
+        if (!title || !status) {
+          skipped += 1
+          continue
+        }
+        const detail = String(row.detail ?? '')
+        const source = String(row.source ?? '')
+        const isChange = parseYesNo(String(row.is_change_request ?? '')) || signedOff
+        const key = requirementMatchKey(title)
+        const existing = byKey.get(key)
+        if (existing) {
+          const next = {
+            title: existing.title,
+            detail,
+            status,
+            source: source || existing.source,
+            is_change_request: existing.is_change_request || isChange,
+          }
+          if (
+            next.detail === existing.detail &&
+            next.status === existing.status &&
+            next.source === existing.source &&
+            next.is_change_request === existing.is_change_request
+          ) {
+            skipped += 1
+            continue
+          }
+          await saveRequirement(account.id, next, author.email, existing.id)
+          updated += 1
+          continue
+        }
+        if (seen.has(key)) {
+          skipped += 1
+          continue
+        }
+        await saveRequirement(
+          account.id,
+          {
+            title,
+            detail,
+            status,
+            source: source || 'csv import',
+            is_change_request: isChange,
+          },
+          String(row.created_by || '').trim() || author.email,
+        )
+        seen.add(key)
+        added += 1
+      }
+      if (!added && !updated) {
+        showToast(skipped ? 'No matching requirement rows in CSV' : 'No requirement rows in CSV', 'error')
+        return
+      }
+      const parts = [added ? `${added} added` : '', updated ? `${updated} updated` : ''].filter(Boolean)
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported requirements (${parts.join(', ')})${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Requirements CSV import failed'), 'error')
+    } finally {
+      setImportingRequirements(false)
+      if (requirementsImportRef.current) requirementsImportRef.current.value = ''
+    }
+  }
+
   if (loading) return <div style={{ ...cardStyle, color: colors.muted, marginTop: 16 }}>Loading delivery…</div>
 
   const canLog = editable && userRole !== 'viewer'
@@ -760,28 +939,52 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
         <section style={cardStyle} id="log-hours">
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Hours this month</h2>
-            {entries.length ? (
-              <button
-                type="button"
-                style={smallBtn}
-                onClick={() => {
-                  exportListCsv(
-                    `delivery-hours-${account.name || account.id}.csv`,
-                    ['date', 'hours', 'category', 'user_email', 'note'],
-                    entries.map((t) => ({
-                      date: t.date,
-                      hours: t.hours,
-                      category: t.category,
-                      user_email: t.user_email,
-                      note: t.note || '',
-                    })),
-                  )
-                  showToast('Hours CSV downloaded', 'success')
-                }}
-              >
-                Export CSV
-              </button>
-            ) : null}
+            <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              {canLog ? (
+                <>
+                  <input
+                    ref={hoursImportRef}
+                    type="file"
+                    accept=".csv,text/csv"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) void importHoursCsv(file)
+                    }}
+                  />
+                  <button
+                    type="button"
+                    style={smallBtn}
+                    disabled={importingHours || busy}
+                    onClick={() => hoursImportRef.current?.click()}
+                  >
+                    {importingHours ? 'Importing…' : 'Import CSV'}
+                  </button>
+                </>
+              ) : null}
+              {entries.length ? (
+                <button
+                  type="button"
+                  style={smallBtn}
+                  onClick={() => {
+                    exportListCsv(
+                      `delivery-hours-${account.name || account.id}.csv`,
+                      [...HOURS_CSV_HEADERS],
+                      entries.map((t) => ({
+                        date: t.date,
+                        hours: t.hours,
+                        category: t.category,
+                        user_email: t.user_email,
+                        note: t.note || '',
+                      })),
+                    )
+                    showToast('Hours CSV downloaded', 'success')
+                  }}
+                >
+                  Export CSV
+                </button>
+              ) : null}
+            </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6, marginTop: 8 }}>
             <span>
@@ -1118,6 +1321,28 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
             <span style={{ fontSize: 12, color: signedOff ? colors.warn : colors.muted2 }}>
               {signedOff ? 'Signed off. New items count as change requests.' : 'Not signed off yet'}
             </span>
+            {canLog ? (
+              <>
+                <input
+                  ref={requirementsImportRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) void importRequirementsCsv(file)
+                  }}
+                />
+                <button
+                  type="button"
+                  style={smallBtn}
+                  disabled={importingRequirements || busy}
+                  onClick={() => requirementsImportRef.current?.click()}
+                >
+                  {importingRequirements ? 'Importing…' : 'Import CSV'}
+                </button>
+              </>
+            ) : null}
             {requirements.length ? (
               <button
                 type="button"
@@ -1125,7 +1350,7 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
                 onClick={() => {
                   exportListCsv(
                     `delivery-requirements-${account.name || account.id}.csv`,
-                    ['title', 'detail', 'status', 'source', 'is_change_request', 'created_by', 'created_at'],
+                    [...REQUIREMENT_CSV_HEADERS],
                     requirements.map((r) => ({
                       title: r.title,
                       detail: r.detail,
