@@ -19,6 +19,7 @@ import {
   type QuoteAcceptance,
 } from '../../lib/quoteAcceptStore'
 import type { Quotation } from '../../lib/types'
+import { exportListCsv } from '../../lib/listIo'
 import { buttonPrimaryStyle, buttonSecondaryStyle, colors, inputStyle, labelStyle } from '../../lib/uiStyles'
 
 const when = (iso: string | null) => (iso ? format(parseISO(iso), 'd MMM yyyy, HH:mm') : '')
@@ -135,26 +136,64 @@ export default function QuoteAcceptLinksModal({
           ) : null}
 
           {rows.length ? (
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
-              {rows.map((r) => {
-                const state = acceptLinkState(r)
-                return (
-                  <li key={r.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, alignItems: 'center' }}>
-                    <span>
-                      <strong>{ACCEPT_STATE_LABELS[state]}</strong>
-                      {r.label ? `, ${r.label}` : ''}, made {when(r.created_at)}
-                      {state === 'active' && r.expires_at ? `, works until ${when(r.expires_at)}` : ''}
-                      {r.last_opened_at ? `, last opened ${when(r.last_opened_at)}` : ', not opened yet'}
-                    </span>
-                    {state === 'active' ? (
-                      <button type="button" style={buttonSecondaryStyle} onClick={() => void turnOff(r.id)}>
-                        Turn off
-                      </button>
-                    ) : null}
-                  </li>
-                )
-              })}
-            </ul>
+            <>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                <button
+                  type="button"
+                  style={buttonSecondaryStyle}
+                  onClick={() => {
+                    exportListCsv(
+                      `quote-accept-links-${quote.reference_number}.csv`,
+                      [
+                        'state',
+                        'label',
+                        'created_by',
+                        'created_at',
+                        'expires_at',
+                        'revoked_at',
+                        'last_opened_at',
+                        'accepted_at',
+                        'accepted_name',
+                      ],
+                      rows.map((r) => ({
+                        state: ACCEPT_STATE_LABELS[acceptLinkState(r)],
+                        label: r.label,
+                        created_by: r.created_by,
+                        created_at: r.created_at,
+                        expires_at: r.expires_at || '',
+                        revoked_at: r.revoked_at || '',
+                        last_opened_at: r.last_opened_at || '',
+                        accepted_at: r.accepted_at || '',
+                        accepted_name: r.accepted_name || '',
+                      })),
+                    )
+                    showToast('Accept links CSV downloaded', 'success')
+                  }}
+                >
+                  Export CSV
+                </button>
+              </div>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
+                {rows.map((r) => {
+                  const state = acceptLinkState(r)
+                  return (
+                    <li key={r.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, alignItems: 'center' }}>
+                      <span>
+                        <strong>{ACCEPT_STATE_LABELS[state]}</strong>
+                        {r.label ? `, ${r.label}` : ''}, made {when(r.created_at)}
+                        {state === 'active' && r.expires_at ? `, works until ${when(r.expires_at)}` : ''}
+                        {r.last_opened_at ? `, last opened ${when(r.last_opened_at)}` : ', not opened yet'}
+                      </span>
+                      {state === 'active' ? (
+                        <button type="button" style={buttonSecondaryStyle} onClick={() => void turnOff(r.id)}>
+                          Turn off
+                        </button>
+                      ) : null}
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
           ) : null}
         </>
       )}
