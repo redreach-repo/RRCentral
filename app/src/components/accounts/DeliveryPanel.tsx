@@ -71,6 +71,7 @@ import { parseTimeEntryForm } from '../../lib/schemas/timeEntry'
 import { parseUsageMonthForm } from '../../lib/schemas/usageMonth'
 import { parseUsageSourceForm } from '../../lib/schemas/usageSource'
 import { formatAED } from '../../lib/money'
+import { exportListCsv } from '../../lib/listIo'
 import { FORGOTTEN_TIMER_HOURS, elapsedHours, elapsedLabel, hoursLabel, timerHours } from '../../lib/timeTracking'
 import type {
   Account,
@@ -757,8 +758,32 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
         </section>
 
         <section style={cardStyle} id="log-hours">
-          <h2 style={sectionTitleStyle}>Hours this month</h2>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Hours this month</h2>
+            {entries.length ? (
+              <button
+                type="button"
+                style={smallBtn}
+                onClick={() => {
+                  exportListCsv(
+                    `delivery-hours-${account.name || account.id}.csv`,
+                    ['date', 'hours', 'category', 'user_email', 'note'],
+                    entries.map((t) => ({
+                      date: t.date,
+                      hours: t.hours,
+                      category: t.category,
+                      user_email: t.user_email,
+                      note: t.note || '',
+                    })),
+                  )
+                  showToast('Hours CSV downloaded', 'success')
+                }}
+              >
+                Export CSV
+              </button>
+            ) : null}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6, marginTop: 8 }}>
             <span>
               <strong>{monthHours}h</strong> of {pkg ? `${pkg.target_hours}h target` : 'no target yet'}
             </span>
@@ -1093,6 +1118,30 @@ export default function DeliveryPanel({ account, editable, userRole, team, autho
             <span style={{ fontSize: 12, color: signedOff ? colors.warn : colors.muted2 }}>
               {signedOff ? 'Signed off. New items count as change requests.' : 'Not signed off yet'}
             </span>
+            {requirements.length ? (
+              <button
+                type="button"
+                style={smallBtn}
+                onClick={() => {
+                  exportListCsv(
+                    `delivery-requirements-${account.name || account.id}.csv`,
+                    ['title', 'detail', 'status', 'source', 'is_change_request', 'created_by', 'created_at'],
+                    requirements.map((r) => ({
+                      title: r.title,
+                      detail: r.detail,
+                      status: r.status,
+                      source: r.source,
+                      is_change_request: r.is_change_request ? 'yes' : 'no',
+                      created_by: r.created_by,
+                      created_at: r.created_at,
+                    })),
+                  )
+                  showToast('Requirements CSV downloaded', 'success')
+                }}
+              >
+                Export CSV
+              </button>
+            ) : null}
             {canLog ? (
               <button type="button" style={smallBtn} onClick={() => setCallNotesOpen(true)}>
                 <Sparkles size={12} /> From call notes
