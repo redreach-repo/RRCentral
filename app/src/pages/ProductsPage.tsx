@@ -16,8 +16,9 @@ import { fetchLiveTenants, listChurchProfiles, saveChurchProfile, type LiveResul
 import { errorMessage } from '../lib/errors'
 import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import { PRODUCTS_CSV_COLUMNS } from '../lib/productsCsv'
+import { parseChurchDetailsForm } from '../lib/schemas/churchDetails'
 import { PRODUCT } from '../lib/product'
-import type { Account, WorshipBillingStatus, WorshipChurchProfile, WorshipTenant } from '../lib/types'
+import type { Account, WorshipChurchProfile, WorshipTenant } from '../lib/types'
 import {
   buttonSecondaryStyle,
   cardStyle,
@@ -182,122 +183,68 @@ export default function ProductsPage() {
       }
 
       const churchAccounts = accounts.filter((a) => a.type === 'worship_church')
-      const bySlug = new Map(
-        profiles.filter((p) => p.tenant_slug).map((p) => [p.tenant_slug.toLowerCase(), p]),
-      )
       const byName = new Map(churchAccounts.map((a) => [a.name.trim().toLowerCase(), a]))
-      const accountById = new Map(churchAccounts.map((a) => [a.id, a]))
       const profileByAccountId = new Map(profiles.map((p) => [p.account_id, p]))
-      const knownRefs = accounts.map((a) => a.reference)
       const churchStatuses = accountTypeInfo('worship_church').statuses
       let saved = 0
       let skipped = errors.length
 
       for (const row of ok) {
         const name = row.name.trim()
-        const slug = row.tenant_slug.trim().toLowerCase()
-        if (slug && !/^[a-z0-9-]+$/.test(slug)) {
+        const account = byName.get(name.toLowerCase())
+        if (!account) {
           skipped += 1
           continue
         }
-        const billingRaw = row.billing_status.trim() as WorshipBillingStatus
-        const billing_status: WorshipBillingStatus = BILLING_STATUSES.some((s) => s.value === billingRaw)
-          ? billingRaw
-          : ''
+        const existing = profileByAccountId.get(account.id) ?? null
+        const billingToken = row.billing_status.trim().toLowerCase()
+        const billingMatch = BILLING_STATUSES.find(
+          (s) => s.value === billingToken || s.label.toLowerCase() === billingToken,
+        )
+        const billing_status = billingMatch?.value || existing?.billing_status || ''
         const renewalRaw = row.renewal_date.trim()
         const renewal_date =
-          /^\d{4}-\d{2}-\d{2}$/.test(renewalRaw) && !Number.isNaN(Date.parse(renewalRaw))
-            ? renewalRaw
-            : null
+          renewalRaw === ''
+            ? existing?.renewal_date ?? null
+            : /^\d{4}-\d{2}-\d{2}$/.test(renewalRaw) && !Number.isNaN(Date.parse(renewalRaw))
+              ? renewalRaw
+              : existing?.renewal_date ?? null
         const status =
-          row.status && churchStatuses.includes(row.status) ? row.status : churchStatuses[0]
+          row.status && churchStatuses.includes(row.status) ? row.status : account.status
 
-        let account: Account | undefined
-        let existingProfile: WorshipChurchProfile | null = null
-        if (slug) {
-          const profile = bySlug.get(slug)
-          if (profile) {
-            existingProfile = profile
-            account = accountById.get(profile.account_id)
-          }
-        }
-        if (!account) {
-          account = byName.get(name.toLowerCase())
-          if (account) existingProfile = profileByAccountId.get(account.id) ?? null
+        const parsed = parseChurchDetailsForm({
+          tenant_slug: row.tenant_slug || existing?.tenant_slug || '',
+          plan: row.plan || existing?.plan || '',
+          modules: (existing?.modules ?? []).join(', '),
+          whatsapp_month: existing?.whatsapp_month ?? '',
+          whatsapp_conversations:
+            existing?.whatsapp_conversations == null ? '' : String(existing.whatsapp_conversations),
+          billing_status,
+          renewal_date,
+          admin_url: existing?.admin_url ?? '',
+          notes: existing?.notes ?? '',
+        })
+        if (!parsed.ok) {
+          skipped += 1
+          continue
         }
 
-        if (account) {
-          const patch: { name?: string; status?: string } = {}
-          if (name && name !== account.name) patch.name = name
-          if (status !== account.status) patch.status = status
-          if (Object.keys(patch).length) await updateAccount(account.id, patch)
-          await saveChurchProfile(
-            account.id,
-            {
-              tenant_slug: slug || existingProfile?.tenant_slug || '',
-              plan: row.plan || existingProfile?.plan || '',
-              modules: existingProfile?.modules ?? [],
-              whatsapp_month: existingProfile?.whatsapp_month ?? '',
-              whatsapp_conversations: existingProfile?.whatsapp_conversations ?? null,
-              billing_status: billing_status || existingProfile?.billing_status || '',
-              renewal_date: renewal_date ?? existingProfile?.renewal_date ?? null,
-              admin_url: existingProfile?.admin_url ?? '',
-              notes: existingProfile?.notes ?? '',
-            },
-            existingProfile,
-            author,
-          )
-          if (slug) bySlug.set(slug, { ...(existingProfile || { id: '', account_id: account.id }), tenant_slug: slug } as WorshipChurchProfile)
-          byName.set(name.toLowerCase(), { ...account, name, status })
-        } else {
-          const created = await createAccount(
-            {
-              type: 'worship_church',
-              name,
-              industry: '',
-              country: '',
-              city: '',
-              website: '',
-              status,
-              owner_user_id: null,
-              source: 'csv_import',
-              notes: '',
-            },
-            author.email,
-            knownRefs,
-          )
-          knownRefs.push(created.reference)
-          await saveChurchProfile(
-            created.id,
-            {
-              tenant_slug: slug,
-              plan: row.plan || '',
-              modules: [],
-              whatsapp_month: '',
-              whatsapp_conversations: null,
-              billing_status,
-              renewal_date,
-              admin_url: '',
-              notes: '',
-            },
-            null,
-            author,
-          )
-          byName.set(name.toLowerCase(), created)
-          accountById.set(created.id, created)
-          if (slug) {
-            bySlug.set(slug, {
-              id: '',
-              account_id: created.id,
-              tenant_slug: slug,
-            } as WorshipChurchProfile)
-          }
-        }
+        if (status !== account.status) await updateAccount(account.id, { status })
+        await saveChurchProfile(account.id, parsed.data, existing, author)
+        profileByAccountId.set(account.id, {
+          ...(existing || { id: '', account_id: account.id, created_at: '', updated_at: '', updated_by: '' }),
+          ...parsed.data,
+        } as WorshipChurchProfile)
+        byName.set(name.toLowerCase(), { ...account, status })
         saved += 1
       }
 
+      if (!saved && skipped) {
+        showToast('No matching church profiles in CSV', 'error')
+        return
+      }
       const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
-      showToast(`Imported ${saved} church(es)${skipNote}`, 'success')
+      showToast(`Updated ${saved} church profile(s)${skipNote}`, 'success')
       await load()
     } catch (e) {
       showToast(errorMessage(e, 'Churches CSV import failed'), 'error')
