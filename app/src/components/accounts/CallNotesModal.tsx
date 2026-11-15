@@ -4,8 +4,10 @@ import Modal from '../Modal'
 import type { ProposedRequirement } from '../../lib/aiAssist'
 import { runAi } from '../../lib/aiAssistStore'
 import { errorMessage } from '../../lib/errors'
+import { exportListCsv } from '../../lib/listIo'
 import { parseCallNotesForm } from '../../lib/schemas/callNotes'
 import { buttonPrimaryStyle, buttonSecondaryStyle, colors, inputStyle, labelStyle } from '../../lib/uiStyles'
+import { useToast } from '../../contexts/ToastContext'
 
 /**
  * Paste notes from a call; AI help suggests requirements; the team ticks the
@@ -31,6 +33,7 @@ export default function CallNotesModal({
   onClose: () => void
   onAdd: (items: ProposedRequirement[]) => Promise<void>
 }) {
+  const { showToast } = useToast()
   const [notes, setNotes] = useState('')
   const [found, setFound] = useState<ProposedRequirement[] | null>(null)
   const [picked, setPicked] = useState<Set<number>>(new Set())
@@ -125,10 +128,31 @@ export default function CallNotesModal({
         </>
       ) : (
         <>
-          <p style={{ margin: '0 0 10px', color: colors.muted, fontSize: 13 }}>
-            Untick anything that is wrong.{' '}
-            {asChangeRequests ? 'Requirements are signed off, so these are added as change requests.' : ''}
-          </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
+            <p style={{ margin: 0, color: colors.muted, fontSize: 13 }}>
+              Untick anything that is wrong.{' '}
+              {asChangeRequests ? 'Requirements are signed off, so these are added as change requests.' : ''}
+            </p>
+            <button
+              type="button"
+              style={buttonSecondaryStyle}
+              onClick={() => {
+                exportListCsv(
+                  `call-notes-requirements-${accountName || accountId}.csv`,
+                  ['title', 'detail', 'picked', 'as_change_request'],
+                  found.map((r, i) => ({
+                    title: r.title,
+                    detail: r.detail,
+                    picked: picked.has(i) ? 'yes' : 'no',
+                    as_change_request: asChangeRequests ? 'yes' : 'no',
+                  })),
+                )
+                showToast('Call-notes requirements CSV downloaded', 'success')
+              }}
+            >
+              Export CSV
+            </button>
+          </div>
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
             {found.map((r, i) => (
               <li key={`${r.title}-${i}`}>
