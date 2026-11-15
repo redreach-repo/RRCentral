@@ -13,6 +13,13 @@ export const GUIDE_ADMIN_SECTIONS: GuideAdminSection[] = [
     linkKey: 'guide.admin.settings.link',
   },
   {
+    id: 'workflows',
+    titleKey: 'guide.admin.workflows.title',
+    bodyKey: 'guide.admin.workflows.body',
+    to: '/settings#workflows',
+    linkKey: 'guide.admin.workflows.link',
+  },
+  {
     id: 'moduleFlags',
     titleKey: 'guide.admin.moduleFlags.title',
     bodyKey: 'guide.admin.moduleFlags.body',
