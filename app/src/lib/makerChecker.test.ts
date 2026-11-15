@@ -3,6 +3,7 @@ import {
   approvalNeedsChecker,
   canDecideApproval,
   gateMoneyAction,
+  moneyActionRowStatus,
   nextApprovalStatus,
   summarizeApproval,
 } from './makerChecker'
@@ -61,5 +62,24 @@ describe('summarizeApproval', () => {
     expect(summarizeApproval({ objectType: 'expense', action: 'pay', amountAed: 120 })).toBe(
       'pay expense · AED 120.00',
     )
+  })
+})
+
+describe('moneyActionRowStatus', () => {
+  it('uses Pending Approval when checker is required', () => {
+    expect(
+      moneyActionRowStatus({
+        proceed: false,
+        needsApproval: true,
+        approvedStatus: 'Refunded',
+      }),
+    ).toBe('Pending Approval')
+    expect(
+      moneyActionRowStatus({
+        proceed: true,
+        needsApproval: false,
+        approvedStatus: 'Open',
+      }),
+    ).toBe('Open')
   })
 })

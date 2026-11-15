@@ -688,7 +688,31 @@ export async function decideApproval(
   if (status === 'rejected' && row.object_type === 'payroll_run') {
     await setPayrollRunStatus(String(row.object_id), 'draft')
   }
-  // expense approvals are advisory locks for pay flows — no row status column yet
+
+  const objectId = String(row.object_id)
+  const now = new Date().toISOString()
+  if (row.object_type === 'customer_refund') {
+    if (status === 'approved') {
+      await db
+        .from('customer_refunds')
+        .update({
+          status: 'Refunded',
+          approved_by: decidedBy || null,
+          approved_at: now,
+        })
+        .eq('id', objectId)
+    } else if (status === 'rejected' || status === 'canceled') {
+      await db.from('customer_refunds').update({ status: 'Canceled' }).eq('id', objectId)
+    }
+  }
+  if (row.object_type === 'supplier_commitment') {
+    if (status === 'approved') {
+      await db.from('supplier_commitments').update({ status: 'Open' }).eq('id', objectId)
+    } else if (status === 'rejected' || status === 'canceled') {
+      await db.from('supplier_commitments').update({ status: 'Canceled' }).eq('id', objectId)
+    }
+  }
+  // expense approvals remain advisory — expenses have no Pending Approval column yet
 }
 
 /** Latest approval status for an object (pending preferred over older terminals). */
