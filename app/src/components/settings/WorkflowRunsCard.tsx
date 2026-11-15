@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useI18n } from '../../contexts/I18nContext'
 import { useToast } from '../../contexts/ToastContext'
@@ -11,7 +11,7 @@ import {
   summarizeRun,
   type WorkflowRun,
 } from '../../lib/workflowRunner'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -45,6 +45,8 @@ export default function WorkflowRunsCard() {
   const [recent, setRecent] = useState<WorkflowRun[]>([])
   const [loading, setLoading] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -85,11 +87,76 @@ export default function WorkflowRunsCard() {
     }
   }
 
+  async function importApprovalsCsv(file: File) {
+    if (!manage) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const pendingById = new Map(pending.map((r) => [r.id, r]))
+      let done = 0
+      let skipped = 0
+      for (const row of objects) {
+        const id = String(row.id || row.run_id || '').trim()
+        const decision = String(row.decision || row.action || row.status || '').trim().toLowerCase()
+        const approve =
+          decision === 'approve' || decision === 'approved' || decision === 'yes' || decision === '1'
+        const reject =
+          decision === 'reject' || decision === 'rejected' || decision === 'no' || decision === '0'
+        const run = pendingById.get(id)
+        if (!run || (!approve && !reject)) {
+          skipped += 1
+          continue
+        }
+        await resolveWorkflowApproval({
+          runId: run.id,
+          approve,
+          userRole,
+          actorEmail: user?.email || '',
+        })
+        done += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Processed ${done} workflow approval(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Workflow runs CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <div id="workflow-runs" style={{ ...cardStyle, marginBottom: 20, scrollMarginTop: 72 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.settings.section.workflowRuns')}</h2>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importApprovalsCsv(file)
+            }}
+          />
+          {manage ? (
+            <button
+              type="button"
+              style={buttonSecondaryStyle}
+              disabled={importing || !pending.length}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
+          ) : null}
           <button
             type="button"
             style={buttonSecondaryStyle}
@@ -98,9 +165,10 @@ export default function WorkflowRunsCard() {
               const rows = [...pending, ...recent]
               exportListCsv(
                 'workflow-runs.csv',
-                ['id', 'status', 'definition', 'pipeline', 'stage', 'record_label', 'created_at', 'summary'],
+                ['id', 'decision', 'status', 'definition', 'pipeline', 'stage', 'record_label', 'created_at', 'summary'],
                 rows.map((run) => ({
                   id: run.id,
+                  decision: '',
                   status: run.status,
                   definition: run.definition?.name || run.definition_id,
                   pipeline: String(run.context.pipeline_key || ''),
