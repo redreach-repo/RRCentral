@@ -10,7 +10,14 @@ import {
 describe('BUILTIN_INDUSTRY_PACKS', () => {
   it('includes core verticals', () => {
     expect(BUILTIN_INDUSTRY_PACKS.map((p) => p.pack_key)).toEqual(
-      expect.arrayContaining(['uae_services', 'church_saas', 'trading_import', 'events_tours']),
+      expect.arrayContaining([
+        'uae_services',
+        'church_saas',
+        'trading_import',
+        'events_tours',
+        'engineering',
+        'construction',
+      ]),
     )
   })
 })

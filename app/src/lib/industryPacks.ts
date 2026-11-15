@@ -62,6 +62,20 @@ export const BUILTIN_INDUSTRY_PACKS: IndustryPack[] = [
     version: '0.1.0',
     manifest: { modules: ['sales', 'delivery'], objects: ['deal'] },
   },
+  {
+    pack_key: 'engineering',
+    name: 'Engineering',
+    description: 'Master Spec §11.3 starter: projects, claims, document registers (full pack later).',
+    version: '0.1.0',
+    manifest: { modules: ['sales', 'delivery', 'ops', 'finance'], objects: ['deal', 'project'] },
+  },
+  {
+    pack_key: 'construction',
+    name: 'Construction',
+    description: 'Master Spec §11.4 starter: sites, workforce, materials (full pack later).',
+    version: '0.1.0',
+    manifest: { modules: ['sales', 'delivery', 'ops', 'finance', 'hr'], objects: ['deal', 'project'] },
+  },
 ]
 
 export function packModuleHints(pack: IndustryPack): string {

@@ -19,6 +19,7 @@ import {
 } from '../lib/brandKit'
 import { listBrandKitsForCompany, listCompanyBusinessUnits, type BusinessUnitRow } from '../lib/brandKitStore'
 import { REDREACH_COMPANY_ID, REDREACH_TENANT_ID } from '../modules/registry'
+import { applyTenantWebManifest, identityFromBrandKit } from '../lib/tenantAppIdentity'
 
 export type TenantCompany = {
   id: string
@@ -263,6 +264,18 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     () => companies.find((c) => c.id === activeCompanyId) || companies[0] || null,
     [companies, activeCompanyId],
   )
+
+  // Spec §5.6: after sign-in, the installable web app carries the company's name/colours.
+  useEffect(() => {
+    if (!user || !hasAccess) return
+    const identity = identityFromBrandKit({
+      tenantId: tenantId || REDREACH_TENANT_ID,
+      companyId: activeCompany?.id ?? null,
+      companyName: activeCompany?.name || activeCompany?.legal_name || null,
+      kit: brandKit,
+    })
+    applyTenantWebManifest(identity)
+  }, [user, hasAccess, tenantId, brandKit, activeCompany])
 
   const activeBusinessUnit = useMemo(
     () => businessUnits.find((u) => u.id === activeBusinessUnitId) || null,

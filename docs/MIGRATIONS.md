@@ -124,6 +124,14 @@ No database migrations. Documentation and `brand-assets/` only.
 - `alter table public.hr_employees drop column if exists labour_card_no, drop column if exists bank_routing_code;`
 
 
+## Industry packs Eng/Construction — `20261224120000_industry_packs_eng_construction.sql`
+
+**What**
+- Seeds `engineering`, `construction`, `trading_import`, `events_tours` into `industry_packs` (idempotent)
+
+**Rollback**
+- `delete from industry_packs where pack_key in ('engineering','construction','trading_import','events_tours');` (only if unused by `tenant_industry_packs`)
+
 ## Public API webhook retries — `20261217170000_public_api_webhook_retries.sql`
 
 **What**
