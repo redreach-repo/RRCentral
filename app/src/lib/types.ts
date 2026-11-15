@@ -1218,6 +1218,7 @@ export interface BuildTask {
   owner_user_id?: string | null
   due_days?: number | null
   due_date?: string | null
+  deleted_at?: string | null
 }
 
 export type RequirementStatus = 'open' | 'agreed' | 'built' | 'changed'

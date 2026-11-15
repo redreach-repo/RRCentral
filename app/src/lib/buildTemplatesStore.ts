@@ -123,8 +123,21 @@ export async function deleteTemplateItem(id: string): Promise<void> {
   check(await db.from('build_template_items').delete().eq('id', id))
 }
 
-export async function listBuildTasks(accountId: string): Promise<BuildTask[]> {
-  return rows<BuildTask>(db.from('build_tasks').select('*').eq('account_id', accountId).order('sort'))
+export async function listBuildTasks(
+  accountId: string,
+  opts?: { includeDeleted?: boolean },
+): Promise<BuildTask[]> {
+  let q = db.from('build_tasks').select('*').eq('account_id', accountId).order('sort')
+  if (!opts?.includeDeleted) q = q.is('deleted_at', null)
+  try {
+    return await rows<BuildTask>(q)
+  } catch (e) {
+    // Pre-migration DBs may lack deleted_at.
+    if (String((e as { message?: string })?.message || '').toLowerCase().includes('deleted_at')) {
+      return rows<BuildTask>(db.from('build_tasks').select('*').eq('account_id', accountId).order('sort'))
+    }
+    throw e
+  }
 }
 
 export async function addBuildTask(
@@ -156,8 +169,21 @@ export async function setBuildTaskDone(id: string, done: boolean, by: string): P
   )
 }
 
+/** Soft-archive preferred; falls back to hard delete if deleted_at is unavailable. */
 export async function deleteBuildTask(id: string): Promise<void> {
-  check(await db.from('build_tasks').delete().eq('id', id))
+  try {
+    await softDeleteBuildTask(id)
+  } catch {
+    check(await db.from('build_tasks').delete().eq('id', id))
+  }
+}
+
+export async function softDeleteBuildTask(id: string): Promise<void> {
+  check(await db.from('build_tasks').update({ deleted_at: new Date().toISOString() }).eq('id', id))
+}
+
+export async function restoreBuildTask(id: string): Promise<void> {
+  check(await db.from('build_tasks').update({ deleted_at: null }).eq('id', id))
 }
 
 /**
