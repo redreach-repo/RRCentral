@@ -8,6 +8,7 @@ import { useSupportConfig } from './useSupportConfig'
 import { TICKET_STATUSES, isOpenTicket, optionLabel, sortQueue } from '../../lib/support'
 import { createTicket, listTickets, slaPackageFor } from '../../lib/supportStore'
 import { errorMessage } from '../../lib/errors'
+import { exportListCsv } from '../../lib/listIo'
 import type { Account, AccountContact, AppUser, Ticket } from '../../lib/types'
 import { buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
 
@@ -69,11 +70,40 @@ export default function AccountTicketsCard({ account, contacts, team, editable, 
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>
           {isCtrm ? 'Client issues' : 'Support tickets'} {openCount ? <span style={{ color: colors.muted, fontWeight: 400 }}>({openCount} open)</span> : null}
         </h2>
-        {editable ? (
-          <button type="button" style={{ ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }} onClick={() => setOpen(true)}>
-            <Plus size={14} /> {isCtrm ? 'Log an issue' : 'New ticket'}
-          </button>
-        ) : null}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {tickets.length ? (
+            <button
+              type="button"
+              style={{ ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }}
+              onClick={() => {
+                exportListCsv(
+                  `account-tickets-${account.id.slice(0, 8)}.csv`,
+                  ['subject', 'status', 'priority', 'channel', 'requester_email', 'sla_hours', 'sla_due_at', 'first_response_at', 'resolved_at', 'created_at'],
+                  tickets.map((t) => ({
+                    subject: t.subject || '',
+                    status: t.status,
+                    priority: t.priority,
+                    channel: t.channel,
+                    requester_email: t.requester_email || '',
+                    sla_hours: t.sla_hours,
+                    sla_due_at: t.sla_due_at || '',
+                    first_response_at: t.first_response_at || '',
+                    resolved_at: t.resolved_at || '',
+                    created_at: t.created_at || '',
+                  })),
+                )
+                showToast('Tickets CSV downloaded', 'success')
+              }}
+            >
+              Export CSV
+            </button>
+          ) : null}
+          {editable ? (
+            <button type="button" style={{ ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }} onClick={() => setOpen(true)}>
+              <Plus size={14} /> {isCtrm ? 'Log an issue' : 'New ticket'}
+            </button>
+          ) : null}
+        </div>
       </div>
       {shown.length === 0 ? (
         <p style={{ color: colors.muted, fontSize: 13, margin: '10px 0 0' }}>
