@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { addDays, format } from 'date-fns'
 import Modal from './Modal'
 import { NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
+import { exportListCsv } from '../lib/listIo'
 import { parseCrmLogTouchForm } from '../lib/schemas/crmLogTouch'
 import type { CrmEntry } from '../lib/types'
 import {
@@ -167,6 +168,27 @@ export default function CrmLogTouchModal({
         </label>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={busy}
+            onClick={() => {
+              exportListCsv(
+                'crm-log-touch.csv',
+                ['field', 'value'],
+                [
+                  { field: 'company', value: entry?.company_name || '' },
+                  { field: 'note', value: text },
+                  { field: 'stage', value: stage },
+                  { field: 'next_action', value: nextAction },
+                  { field: 'follow_up_date', value: clearDate ? '' : followDate },
+                  { field: 'clear_follow_up', value: clearDate ? 'yes' : 'no' },
+                ],
+              )
+            }}
+          >
+            Export CSV
+          </button>
           <button type="button" style={buttonSecondaryStyle} onClick={onClose} disabled={busy}>
             Cancel
           </button>
