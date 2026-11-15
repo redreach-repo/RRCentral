@@ -51,6 +51,8 @@ describe('noNextStep', () => {
       ['ctrm:d1', 'No next action', ''],
     ])
     expect(rows[0].owner_user_id).toBe('u1')
+    expect(rows.find((r) => r.key === 'sales:s1')).toMatchObject({ next_action: 'Call', next_action_date: null })
+    expect(rows.find((r) => r.key === 'ctrm:d1')).toMatchObject({ next_action: '', next_action_date: '2026-11-01' })
   })
 })
 

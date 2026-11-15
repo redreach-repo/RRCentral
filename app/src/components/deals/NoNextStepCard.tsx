@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Signpost } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -9,48 +9,40 @@ import { db } from '../../lib/db'
 import { noNextStep, type NoNextStepRow } from '../../lib/dealRules'
 import { errorMessage } from '../../lib/errors'
 import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
+import { patchMyDeal } from '../../lib/myDealsStore'
+import {
+  NO_NEXT_STEP_CSV_HEADERS,
+  NO_NEXT_STEP_PIPELINE_LABELS,
+  buildNoNextStepCsvPatch,
+  noNextStepToDealStub,
+  takeMatchingNoNextStep,
+} from '../../lib/noNextStepCsv'
 import { can } from '../../lib/permissions'
 import { listSalesDeals } from '../../lib/salesPipelineStore'
 import type { CrmEntry } from '../../lib/types'
 import { buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
 
-const EXPORT_COLUMNS = ['name', 'pipeline', 'stage', 'missing', 'owner', 'link'] as const
-
-const PIPELINE: Record<NoNextStepRow['pipeline'], string> = { crm: 'CRM', sales: 'AI CRM sales', ctrm: 'CTRM Next' }
-
-const PIPELINE_BY_LABEL = new Map(
-  (Object.entries(PIPELINE) as [NoNextStepRow['pipeline'], string][]).map(([k, label]) => [label.toLowerCase(), k]),
-)
-
-function matchPipeline(raw: string): NoNextStepRow['pipeline'] | null {
-  const v = raw.trim().toLowerCase()
-  if (!v) return null
-  if (v === 'crm' || v === 'sales' || v === 'ctrm') return v
-  return PIPELINE_BY_LABEL.get(v) ?? null
-}
-
-function rowMatchKey(name: string, pipeline: string, link: string): string {
-  return `${name.trim().toLowerCase()}|${pipeline.trim().toLowerCase()}|${link.trim().toLowerCase()}`
-}
-
 /**
  * Open deals with no next action or no date for it, across the CRM, AI CRM
  * sales and CTRM Next. Moves now need a next step, so this lists older deals
  * and new leads until someone gives them one. Starts on the person's own deals
- * plus the ones nobody owns.
+ * plus the ones nobody owns. Import CSV updates next_action via patchMyDeal.
  */
 export default function NoNextStepCard() {
-  const { userRole, appUserId } = useAuth()
+  const { user, userRole, appUserId } = useAuth()
   const { showToast } = useToast()
   const [rows, setRows] = useState<NoNextStepRow[] | null>(null)
   const [mineOnly, setMineOnly] = useState(true)
   const [importing, setImporting] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
+  const author = useMemo(
+    () => ({ appUserId: appUserId || null, email: user?.email || '' }),
+    [appUserId, user?.email],
+  )
 
-  useEffect(() => {
-    let alive = true
+  const load = useCallback(async () => {
     const withCrm = can(userRole, 'legacy.access')
-    Promise.all([
+    const [users, accounts, salesDeals, ctrmDeals, crm] = await Promise.all([
       listTeam(),
       listAccounts().then((r) => r.rows),
       listSalesDeals().then((r) => r.rows),
@@ -62,29 +54,31 @@ export default function NoNextStepCard() {
             .then((res: { data: unknown }) => (res.data || []) as CrmEntry[])
         : Promise.resolve([] as CrmEntry[]),
     ])
-      .then(([users, accounts, salesDeals, ctrmDeals, crm]) => {
-        if (!alive) return
-        setRows(
-          noNextStep({
-            users,
-            accountNames: new Map(accounts.map((a) => [a.id, a.name])),
-            crm,
-            salesDeals,
-            ctrmDeals,
-          }),
-        )
-      })
-      .catch(() => alive && setRows([]))
+    setRows(
+      noNextStep({
+        users,
+        accountNames: new Map(accounts.map((a) => [a.id, a.name])),
+        crm,
+        salesDeals,
+        ctrmDeals,
+      }),
+    )
+  }, [userRole])
+
+  useEffect(() => {
+    let alive = true
+    void load().catch(() => {
+      if (alive) setRows([])
+    })
     return () => {
       alive = false
     }
-  }, [userRole])
+  }, [load])
 
   const shown = useMemo(
     () => (rows || []).filter((r) => !mineOnly || !r.owner_user_id || r.owner_user_id === appUserId),
     [rows, mineOnly, appUserId],
   )
-  if (!rows || rows.length === 0) return null
 
   async function importNoNextStepCsv(file: File) {
     setImporting(true)
@@ -96,63 +90,34 @@ export default function NoNextStepCard() {
         return
       }
       const objects = csvRowsToObjects(headers, csvRows)
-      const existing = rows ?? []
-      const byKey = new Map(
-        existing.map((r) => [rowMatchKey(r.name, PIPELINE[r.pipeline], r.link || ''), r] as const),
-      )
-      const next: NoNextStepRow[] = []
-      const seen = new Set<string>()
-      let matched = 0
-      let softLoaded = 0
+      const remaining = [...(rows ?? [])]
+      let saved = 0
       let skipped = 0
-
-      objects.forEach((row, idx) => {
-        const name = String(row.name || '').trim()
-        const pipelineRaw = String(row.pipeline || '').trim()
-        const link = String(row.link || '').trim()
-        const pipeline = matchPipeline(pipelineRaw)
-        if (!name || !pipeline) {
+      for (const row of objects) {
+        const gap = takeMatchingNoNextStep(remaining, row)
+        if (!gap) {
           skipped += 1
-          return
+          continue
         }
-        const key = rowMatchKey(name, PIPELINE[pipeline], link)
-        if (seen.has(key)) {
+        const patch = buildNoNextStepCsvPatch(row, gap)
+        if (!patch) {
           skipped += 1
-          return
+          continue
         }
-        seen.add(key)
-        const existingRow = byKey.get(key) || byKey.get(rowMatchKey(name, pipeline, link))
-        if (existingRow) {
-          next.push(existingRow)
-          matched += 1
-          return
+        try {
+          await patchMyDeal(noNextStepToDealStub(gap), patch, author)
+          saved += 1
+        } catch {
+          skipped += 1
         }
-        next.push({
-          key: `import-${idx}`,
-          pipeline,
-          name,
-          stage: String(row.stage || '').trim(),
-          missing: String(row.missing || '').trim() || 'No next action or date',
-          link: link || '/app',
-          owner_user_id: null,
-          owner_label: String(row.owner || '').trim(),
-          next_action: '',
-          next_action_date: null,
-        })
-        softLoaded += 1
-      })
-
-      if (!next.length) {
-        showToast('No matching no-next-step rows in CSV', 'error')
+      }
+      if (!saved) {
+        showToast(skipped ? 'No matching no-next-step rows in CSV' : 'CSV has no data rows', 'error')
         return
       }
-      setRows(next)
-      const parts = [
-        matched ? `${matched} matched` : '',
-        softLoaded ? `${softLoaded} soft-loaded` : '',
-      ].filter(Boolean)
       const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
-      showToast(`Imported ${next.length} no-next-step item(s) (${parts.join(', ')})${skipNote}`, 'success')
+      showToast(`Updated next step on ${saved} deal(s)${skipNote}`, 'success')
+      await load()
     } catch (e) {
       showToast(errorMessage(e, 'No-next-step CSV import failed'), 'error')
     } finally {
@@ -160,6 +125,8 @@ export default function NoNextStepCard() {
       if (importInputRef.current) importInputRef.current.value = ''
     }
   }
+
+  if (!rows || rows.length === 0) return null
 
   return (
     <section style={{ ...cardStyle, marginBottom: 16 }} aria-label="No next step">
@@ -181,7 +148,7 @@ export default function NoNextStepCard() {
           <button
             type="button"
             style={buttonSecondaryStyle}
-            disabled={importing}
+            disabled={importing || !rows.length}
             onClick={() => importInputRef.current?.click()}
           >
             {importing ? 'Importing…' : 'Import CSV'}
@@ -193,14 +160,16 @@ export default function NoNextStepCard() {
             onClick={() => {
               exportListCsv(
                 'no-next-step.csv',
-                [...EXPORT_COLUMNS],
+                [...NO_NEXT_STEP_CSV_HEADERS],
                 shown.map((r) => ({
                   name: r.name,
-                  pipeline: PIPELINE[r.pipeline],
+                  pipeline: NO_NEXT_STEP_PIPELINE_LABELS[r.pipeline],
                   stage: r.stage,
                   missing: r.missing,
                   owner: r.owner_label || '',
                   link: r.link,
+                  next_action: r.next_action || '',
+                  next_action_date: r.next_action_date || '',
                 })),
               )
               showToast('No-next-step CSV downloaded', 'success')
@@ -214,7 +183,8 @@ export default function NoNextStepCard() {
         </div>
       </div>
       <p style={{ color: colors.muted, fontSize: 12, margin: '6px 0 10px' }}>
-        Open deals with no next action or no date for it. Open one and add what happens next.
+        Open deals with no next action or no date for it. Fill next_action (and date) in the CSV, or open one and add what
+        happens next.
       </p>
       {shown.length === 0 ? (
         <p style={{ color: colors.muted, fontSize: 13, margin: 0 }}>Every one of your open deals has a next step.</p>
@@ -226,7 +196,7 @@ export default function NoNextStepCard() {
                 {r.name}
               </Link>{' '}
               <span style={{ color: colors.muted2, fontSize: 12 }}>
-                {PIPELINE[r.pipeline]}, {r.missing.toLowerCase()}
+                {NO_NEXT_STEP_PIPELINE_LABELS[r.pipeline]}, {r.missing.toLowerCase()}
                 {r.owner_label ? `, ${r.owner_label}` : ', no owner'}
               </span>
             </li>
