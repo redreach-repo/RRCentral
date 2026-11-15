@@ -45,6 +45,7 @@ import {
   listCompanyDocuments,
   saveCompanyDocument,
 } from '../lib/companyDocs'
+import { exportListCsv } from '../lib/listIo'
 import { can, ROLE_DESCRIPTIONS, ROLE_LABELS, USER_ROLES } from '../lib/permissions'
 import {
   listNumberingSequences,
@@ -1073,9 +1074,33 @@ export default function SettingsPage() {
               then paste the share link here. Central stores links only — not the files.
             </p>
           </div>
-          <button type="button" style={buttonPrimaryStyle} onClick={openCompanyDocCreate}>
-            <Plus size={16} /> Add document
-          </button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              style={buttonSecondaryStyle}
+              disabled={!companyDocs.length}
+              onClick={() => {
+                exportListCsv(
+                  'company-documents.csv',
+                  ['category', 'title', 'file_name', 'expires_on', 'drive_url', 'notes'],
+                  companyDocs.map((doc) => ({
+                    category: companyDocCategoryLabel(doc.category),
+                    title: doc.title || '',
+                    file_name: doc.file_name || '',
+                    expires_on: doc.expires_on ? String(doc.expires_on).slice(0, 10) : '',
+                    drive_url: doc.drive_url || '',
+                    notes: doc.notes || '',
+                  })),
+                )
+                showToast('Company documents CSV downloaded', 'success')
+              }}
+            >
+              <Download size={16} /> Export CSV
+            </button>
+            <button type="button" style={buttonPrimaryStyle} onClick={openCompanyDocCreate}>
+              <Plus size={16} /> Add document
+            </button>
+          </div>
         </div>
         {companyDocsMissing ? (
           <p style={{ color: colors.muted, fontSize: 13, lineHeight: 1.5 }}>
