@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { BellRing, ChevronDown, ChevronUp, Mail, MessageCircle, Pencil } from 'lucide-react'
@@ -15,10 +15,19 @@ import { reminderRecipient } from '../../lib/paymentReminder'
 import { buildWhatsAppUrl } from '../../lib/whatsapp'
 import { isZohoMailEnabled } from '../../lib/zoho'
 import type { AccountContact, CrmContact, InvoiceReminder } from '../../lib/types'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import { buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
 
 const smallBtn = { ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }
+const EXPORT_HEADERS = ['reference', 'client', 'balance', 'due_date', 'days_late', 'stage'] as const
+const KNOWN_STAGES = new Set([3, 7, 14])
+const KNOWN_CHANNELS = new Set<InvoiceReminder['channel']>(['email', 'whatsapp', 'other'])
+
+function parseReminderChannel(raw: string): InvoiceReminder['channel'] {
+  const v = raw.trim().toLowerCase()
+  if (KNOWN_CHANNELS.has(v as InvoiceReminder['channel'])) return v as InvoiceReminder['channel']
+  return 'other'
+}
 
 function asCrmContacts(list: AccountContact[]): CrmContact[] {
   return [...list]
@@ -43,6 +52,8 @@ export default function PaymentRemindersCard() {
   const [emailFor, setEmailFor] = useState<ReminderRow | null>(null)
   const [busy, setBusy] = useState('')
   const [open, setOpen] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const company = settings.companyName || 'Red Reach Middle East FZE'
 
   const load = useCallback(async () => {
@@ -138,6 +149,57 @@ export default function PaymentRemindersCard() {
 
   const emailDraft = emailFor ? message(emailFor) : null
 
+  async function importRemindersCsv(file: File) {
+    if (!rows?.length) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const dueByRef = new Map(rows.map((r) => [r.invoice.reference_number.trim().toLowerCase(), r] as const))
+      let saved = 0
+      let skipped = 0
+      for (const row of objects) {
+        const reference = String(row.reference || '').trim()
+        const stageRaw = String(row.stage || '').trim()
+        const stage = Number(stageRaw)
+        if (!reference || !KNOWN_STAGES.has(stage)) {
+          skipped += 1
+          continue
+        }
+        const due = dueByRef.get(reference.toLowerCase())
+        if (!due || due.due.stage !== stage) {
+          skipped += 1
+          continue
+        }
+        const channel = parseReminderChannel(String(row.channel || ''))
+        await recordReminder(due.invoice.id, due.due.stage, channel, user?.email || '')
+        if (due.invoice.account_id) {
+          const how = channel === 'email' ? 'by email' : channel === 'whatsapp' ? 'on WhatsApp' : 'another way'
+          await logAccountEvent(
+            due.invoice.account_id,
+            `${due.due.stage} day payment reminder for ${due.invoice.reference_number} (${formatAED(due.balance)} owing) sent ${how} by ${user?.email || 'a team member'}`,
+            { appUserId, email: user?.email || '' },
+          )
+        }
+        dueByRef.delete(reference.toLowerCase())
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} payment reminder(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Payment reminders CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   if (!rows || rows.length === 0) return null
 
   return (
@@ -177,7 +239,28 @@ export default function PaymentRemindersCard() {
 
       {open ? (
         <>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) void importRemindersCsv(file)
+              }}
+            />
+            <button
+              type="button"
+              style={smallBtn}
+              disabled={importing}
+              onClick={(e) => {
+                e.stopPropagation()
+                importInputRef.current?.click()
+              }}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
             <button
               type="button"
               style={smallBtn}
@@ -185,7 +268,7 @@ export default function PaymentRemindersCard() {
                 e.stopPropagation()
                 exportListCsv(
                   'payment-reminders-due.csv',
-                  ['reference', 'client', 'balance', 'due_date', 'days_late', 'stage'],
+                  [...EXPORT_HEADERS],
                   rows.map((row) => ({
                     reference: row.invoice.reference_number,
                     client: row.invoice.client || '',
