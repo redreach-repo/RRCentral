@@ -61,4 +61,11 @@ export const GUIDE_FINANCE_SECTIONS: GuideFinanceSection[] = [
     to: '/payroll',
     linkKey: 'guide.finance.payroll.link',
   },
+  {
+    id: 'planning',
+    titleKey: 'guide.finance.planning.title',
+    bodyKey: 'guide.finance.planning.body',
+    to: '/planning-goals',
+    linkKey: 'guide.finance.planning.link',
+  },
 ]

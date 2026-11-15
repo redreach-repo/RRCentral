@@ -104,6 +104,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.pack.billing': 'Billing and money',
     'guide.pack.delivery': 'Delivery and care',
     'guide.pack.ops': 'Operations',
+    'guide.pack.marketing': 'Marketing',
     'guide.pack.finance': 'Finance and insight',
     'guide.pack.hr': 'People and HR',
     'guide.pack.admin': 'Admin and platform',
@@ -279,6 +280,18 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.finance.payroll.body':
       'Draft payroll runs from HR, export WPS CSV/SIF drafts, and send large runs through Approvals. SIF is not bank-certified.',
     'guide.finance.payroll.link': 'Open Payroll',
+    'guide.finance.planning.title': 'Planning goals',
+    'guide.finance.planning.body':
+      'Track annual and quarterly targets, export scenario CSV, and keep assumptions honest before you commit the plan.',
+    'guide.finance.planning.link': 'Open Planning',
+    'guide.marketing.campaigns.title': 'Campaigns',
+    'guide.marketing.campaigns.body':
+      'Draft email, social, ads, or event campaigns with budget and dates. Import or export the list as CSV when you need a bulk start.',
+    'guide.marketing.campaigns.link': 'Open Marketing',
+    'guide.marketing.segments.title': 'Segments',
+    'guide.marketing.segments.body':
+      'Name consent-aware audience segments on the same Marketing page so campaigns stay tied to who can be contacted.',
+    'guide.marketing.segments.link': 'Open segments',
     'page.dashboard.title': 'Dashboard',
     'page.dashboard.loading': 'Loading metrics…',
     'page.dashboard.heroToday': 'Today',
@@ -1152,6 +1165,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.pack.billing': 'الفوترة والمال',
     'guide.pack.delivery': 'التسليم والرعاية',
     'guide.pack.ops': 'العمليات',
+    'guide.pack.marketing': 'التسويق',
     'guide.pack.finance': 'المالية والرؤية',
     'guide.pack.hr': 'الأفراد والموارد البشرية',
     'guide.pack.admin': 'الإدارة والمنصة',
@@ -1327,6 +1341,18 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.finance.payroll.body':
       'مسودات رواتب من الموارد البشرية، تصدير CSV/SIF لـ WPS، وإرسال الجولات الكبيرة عبر الموافقات. SIF غير معتمد بنكياً.',
     'guide.finance.payroll.link': 'فتح الرواتب',
+    'guide.finance.planning.title': 'أهداف التخطيط',
+    'guide.finance.planning.body':
+      'تتبع الأهداف السنوية والربع سنوية، صدّر سيناريوهات CSV، وحافظ على صدق الافتراضات قبل اعتماد الخطة.',
+    'guide.finance.planning.link': 'فتح التخطيط',
+    'guide.marketing.campaigns.title': 'الحملات',
+    'guide.marketing.campaigns.body':
+      'صغ حملات البريد أو التواصل أو الإعلانات أو الفعاليات مع الميزانية والتواريخ. استورد أو صدّر القائمة كـ CSV عند الحاجة لبداية جماعية.',
+    'guide.marketing.campaigns.link': 'فتح التسويق',
+    'guide.marketing.segments.title': 'الشرائح',
+    'guide.marketing.segments.body':
+      'سمِّ شرائح الجمهور الواعية بالموافقة في صفحة التسويق نفسها حتى تبقى الحملات مرتبطة بمن يمكن التواصل معه.',
+    'guide.marketing.segments.link': 'فتح الشرائح',
     'page.dashboard.title': 'لوحة التحكم',
     'page.dashboard.loading': 'جارٍ تحميل المقاييس…',
     'page.dashboard.heroToday': 'اليوم',
