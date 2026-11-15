@@ -1,8 +1,10 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { addDays, format } from 'date-fns'
 import Modal from './Modal'
+import { useToast } from '../contexts/ToastContext'
 import { NEXT_ACTIONS, PIPELINE_STAGES } from '../lib/config'
-import { exportListCsv } from '../lib/listIo'
+import { errorMessage } from '../lib/errors'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { parseCrmLogTouchForm } from '../lib/schemas/crmLogTouch'
 import type { CrmEntry } from '../lib/types'
 import {
@@ -13,6 +15,13 @@ import {
   inputStyle,
   labelStyle,
 } from '../lib/uiStyles'
+
+const EXPORT_COLUMNS = ['field', 'value'] as const
+
+function parseYesNo(raw: string): boolean {
+  const v = raw.trim().toLowerCase()
+  return v === 'yes' || v === 'true' || v === '1' || v === 'y'
+}
 
 export type LogTouchPayload = {
   text: string
@@ -40,11 +49,14 @@ export default function CrmLogTouchModal({
   onClose,
   onSave,
 }: Props) {
+  const { showToast } = useToast()
   const [text, setText] = useState('')
   const [followDate, setFollowDate] = useState('')
   const [stage, setStage] = useState('')
   const [nextAction, setNextAction] = useState('')
   const [clearDate, setClearDate] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!open || !entry) return
@@ -55,6 +67,105 @@ export default function CrmLogTouchModal({
     setClearDate(false)
   }, [open, entry])
 
+  async function importLogTouchCsv(file: File) {
+    setImporting(true)
+    try {
+      const textCsv = await file.text()
+      const { headers, rows: csvRows } = parseCsv(textCsv)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      if (!objects.length) {
+        showToast('No log-touch draft rows in CSV', 'error')
+        return
+      }
+
+      const headerSet = new Set(headers.map((h) => h.trim().toLowerCase()))
+      const isFieldValue = headerSet.has('field') && headerSet.has('value')
+
+      let nextText = text
+      let nextStage = stage
+      let nextActionVal = nextAction
+      let nextFollow = followDate
+      let nextClear = clearDate
+      let applied = 0
+
+      const applyField = (fieldRaw: string, value: string) => {
+        const field = fieldRaw.trim().toLowerCase()
+        if (!field || field === 'company') return
+        if (field === 'note' || field === 'text') {
+          nextText = value
+          applied += 1
+        } else if (field === 'stage' || field === 'pipeline_stage') {
+          if (!value || stages.includes(value)) {
+            nextStage = value || nextStage
+            applied += 1
+          }
+        } else if (field === 'next_action') {
+          if (
+            !value ||
+            (NEXT_ACTIONS as readonly string[]).includes(value) ||
+            value === nextActionVal
+          ) {
+            nextActionVal = value
+            applied += 1
+          } else {
+            nextActionVal = value
+            applied += 1
+          }
+        } else if (field === 'follow_up_date') {
+          if (!value || /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+            nextFollow = value
+            applied += 1
+          }
+        } else if (field === 'clear_follow_up' || field === 'cleardate') {
+          nextClear = parseYesNo(value)
+          applied += 1
+        }
+      }
+
+      if (isFieldValue) {
+        for (const row of objects) {
+          applyField(String(row.field || row.key || ''), String(row.value ?? '').trim())
+        }
+      } else {
+        const row =
+          objects.find(
+            (r) =>
+              String(r.note || r.text || r.stage || r.pipeline_stage || r.next_action || '').trim(),
+          ) || objects[0]
+        if (row) {
+          if (row.note != null || row.text != null) applyField('note', String(row.note ?? row.text ?? '').trim())
+          if (row.stage != null || row.pipeline_stage != null)
+            applyField('stage', String(row.stage ?? row.pipeline_stage ?? '').trim())
+          if (row.next_action != null) applyField('next_action', String(row.next_action ?? '').trim())
+          if (row.follow_up_date != null) applyField('follow_up_date', String(row.follow_up_date ?? '').trim())
+          if (row.clear_follow_up != null || row.clearDate != null)
+            applyField('clear_follow_up', String(row.clear_follow_up ?? row.clearDate ?? '').trim())
+        }
+      }
+
+      if (!applied) {
+        showToast('No log-touch draft fields to import in CSV', 'error')
+        return
+      }
+
+      setText(nextText)
+      setStage(nextStage)
+      setNextAction(nextActionVal)
+      setFollowDate(nextFollow)
+      setClearDate(nextClear)
+      showToast(`Imported ${applied} log-touch draft field(s)`, 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Log-touch CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     const parsed = parseCrmLogTouchForm({
@@ -64,7 +175,10 @@ export default function CrmLogTouchModal({
       pipeline_stage: stage,
       next_action: nextAction,
     })
-    if (!parsed.ok) return
+    if (!parsed.ok) {
+      showToast(parsed.error, 'error')
+      return
+    }
     await onSave(parsed.data)
   }
 
@@ -168,14 +282,32 @@ export default function CrmLogTouchModal({
         </label>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importLogTouchCsv(file)
+            }}
+          />
           <button
             type="button"
             style={buttonSecondaryStyle}
-            disabled={busy}
+            disabled={busy || importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={busy || importing}
             onClick={() => {
               exportListCsv(
                 'crm-log-touch.csv',
-                ['field', 'value'],
+                [...EXPORT_COLUMNS],
                 [
                   { field: 'company', value: entry?.company_name || '' },
                   { field: 'note', value: text },
@@ -185,14 +317,15 @@ export default function CrmLogTouchModal({
                   { field: 'clear_follow_up', value: clearDate ? 'yes' : 'no' },
                 ],
               )
+              showToast('Log-touch draft CSV downloaded', 'success')
             }}
           >
             Export CSV
           </button>
-          <button type="button" style={buttonSecondaryStyle} onClick={onClose} disabled={busy}>
+          <button type="button" style={buttonSecondaryStyle} onClick={onClose} disabled={busy || importing}>
             Cancel
           </button>
-          <button type="submit" style={buttonPrimaryStyle} disabled={busy || !text.trim()}>
+          <button type="submit" style={buttonPrimaryStyle} disabled={busy || importing || !text.trim()}>
             {busy ? 'Saving…' : 'Save touch'}
           </button>
         </div>
