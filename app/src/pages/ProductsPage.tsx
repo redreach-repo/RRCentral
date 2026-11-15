@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import ChurchActionButtons from '../components/worshiphub/ChurchActionButtons'
 import ChurchFacts from '../components/worshiphub/ChurchFacts'
 import { visibleAccounts } from '../lib/accounts'
@@ -13,13 +14,16 @@ import { createAccount, listAccounts } from '../lib/accountsStore'
 import { billingLabel, churchView, hasBillingIssue, joinRequests, renewalSoon } from '../lib/worshiphub'
 import { fetchLiveTenants, listChurchProfiles, saveChurchProfile, type LiveResult } from '../lib/worshiphubStore'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import { PRODUCT } from '../lib/product'
 import type { Account, WorshipChurchProfile, WorshipTenant } from '../lib/types'
 import {
   buttonSecondaryStyle,
   cardStyle,
   colors,
+  inputStyle,
   sectionTitleStyle,
+  selectStyle,
 } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
@@ -33,7 +37,10 @@ export default function ProductsPage() {
   const [live, setLive] = useState<LiveResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState('')
+  const [search, setSearch] = useState('')
+  const [focus, setFocus] = useState<'all' | 'billing' | 'no_slug'>('all')
   const author = useMemo(() => ({ appUserId, email: user?.email || '' }), [appUserId, user?.email])
+  const productsViewFilters = useMemo(() => ({ q: search, focus }), [search, focus])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -65,6 +72,22 @@ export default function ProductsPage() {
         .sort((a, b) => a.name.localeCompare(b.name)),
     [accounts, userRole, appUserId],
   )
+  const filteredChurches = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return churches.filter((a) => {
+      const profile = profiles.find((p) => p.account_id === a.id) ?? null
+      const tenant = profile?.tenant_slug ? (live?.connected ? live.tenants.find((t) => t.slug === profile.tenant_slug) : null) : null
+      const view = churchView(profile, tenant ?? null)
+      if (focus === 'billing' && !(hasBillingIssue(view.billingStatus) || renewalSoon(view.renewalDate))) return false
+      if (focus === 'no_slug' && profile?.tenant_slug) return false
+      if (!q) return true
+      return (
+        a.name.toLowerCase().includes(q) ||
+        (profile?.tenant_slug || '').toLowerCase().includes(q) ||
+        (view.plan || '').toLowerCase().includes(q)
+      )
+    })
+  }, [churches, profiles, live, search, focus])
   const profileByAccount = useMemo(() => new Map(profiles.map((p) => [p.account_id, p])), [profiles])
   const tenantBySlug = useMemo(
     () => new Map((live?.connected ? live.tenants : []).map((t) => [t.slug, t])),
@@ -148,6 +171,35 @@ export default function ProductsPage() {
           <button
             type="button"
             className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!filteredChurches.length}
+            onClick={() => {
+              exportListCsv(
+                'worshiphub-churches.csv',
+                ['name', 'tenant_slug', 'plan', 'billing_status', 'renewal_date', 'source', 'status'],
+                filteredChurches.map((a) => {
+                  const profile = profileByAccount.get(a.id) ?? null
+                  const tenant = profile?.tenant_slug ? (tenantBySlug.get(profile.tenant_slug) ?? null) : null
+                  const view = churchView(profile, tenant)
+                  return {
+                    name: a.name,
+                    tenant_slug: profile?.tenant_slug || '',
+                    plan: view.plan || '',
+                    billing_status: view.billingStatus || '',
+                    renewal_date: view.renewalDate || '',
+                    source: view.source,
+                    status: a.status,
+                  }
+                }),
+              )
+              showToast('Churches CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
             style={{ background: 'rgba(255,255,255,0.08)' }}
             onClick={() => void refreshLive()}
             disabled={!live}
@@ -159,6 +211,37 @@ export default function ProductsPage() {
           </Link>
         </div>
       </header>
+
+      <SavedViewsBar
+        moduleId="products_worshiphub"
+        filters={productsViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => {
+          setSearch(String(f.q || ''))
+          const next = String(f.focus || 'all')
+          setFocus(next === 'billing' || next === 'no_slug' ? next : 'all')
+        }}
+        onToast={showToast}
+        filtersEqual={(a, b) =>
+          String(a.q || '') === String(b.q || '') && String(a.focus || 'all') === String(b.focus || 'all')
+        }
+      />
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+        <input
+          style={{ ...inputStyle, maxWidth: 280 }}
+          placeholder="Search churches…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <select style={{ ...selectStyle, maxWidth: 200 }} value={focus} onChange={(e) => setFocus(e.target.value as typeof focus)}>
+          <option value="all">All churches</option>
+          <option value="billing">Billing / renewal flags</option>
+          <option value="no_slug">Missing WorshipHub slug</option>
+        </select>
+      </div>
 
       {connectionProblem ? (
         <section style={{ ...cardStyle, marginBottom: 16 }} aria-label="WorshipHub connection">
@@ -259,9 +342,15 @@ export default function ProductsPage() {
           title="No WorshipHub churches yet"
           subtitle="Add each church as an account, then add its WorshipHub slug so its plan and usage show here."
         />
+      ) : filteredChurches.length === 0 ? (
+        <EmptyState
+          icon={<Church size={22} />}
+          title="No churches match"
+          subtitle="Clear search or change the focus filter."
+        />
       ) : (
         <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))' }}>
-          {churches.map((a) => {
+          {filteredChurches.map((a) => {
             const profile = profileByAccount.get(a.id) ?? null
             const tenant = profile?.tenant_slug ? (tenantBySlug.get(profile.tenant_slug) ?? null) : null
             const view = churchView(profile, tenant)
