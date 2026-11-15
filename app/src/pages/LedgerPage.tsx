@@ -115,28 +115,53 @@ export default function LedgerPage() {
             accountant before filing.
           </p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-          disabled={!journals.length}
-          onClick={() => {
-            exportListCsv(
-              'gl-journals.csv',
-              ['journal_number', 'entry_date', 'memo', 'status', 'posted_at'],
-              journals.map((j) => ({
-                journal_number: j.journal_number,
-                entry_date: j.entry_date,
-                memo: j.memo,
-                status: j.status,
-                posted_at: j.posted_at || '',
-              })),
-            )
-            showToast('Journals CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!journals.length}
+            onClick={() => {
+              exportListCsv(
+                'gl-journals.csv',
+                ['journal_number', 'entry_date', 'memo', 'status', 'posted_at'],
+                journals.map((j) => ({
+                  journal_number: j.journal_number,
+                  entry_date: j.entry_date,
+                  memo: j.memo,
+                  status: j.status,
+                  posted_at: j.posted_at || '',
+                })),
+              )
+              showToast('Journals CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!accounts.length}
+            onClick={() => {
+              exportListCsv(
+                'gl-chart-of-accounts.csv',
+                ['code', 'name', 'account_type', 'is_postable', 'is_active', 'notes'],
+                accounts.map((a) => ({
+                  code: a.code,
+                  name: a.name,
+                  account_type: a.account_type,
+                  is_postable: a.is_postable,
+                  is_active: a.is_active,
+                  notes: a.notes || '',
+                })),
+              )
+              showToast('Chart of accounts CSV downloaded', 'success')
+            }}
+          >
+            Export CoA CSV
+          </button>
+        </div>
       </header>
 
       {loading ? (
@@ -247,10 +272,51 @@ export default function LedgerPage() {
             )}
             {selected ? (
               <div style={{ marginTop: 12 }}>
-                <h3 style={{ fontSize: 14 }}>
-                  {selected.journal_number} — {selected.memo || 'No memo'}
-                </h3>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                  }}
+                >
+                  <h3 style={{ fontSize: 14, margin: 0 }}>
+                    {selected.journal_number} — {selected.memo || 'No memo'}
+                  </h3>
+                  <button
+                    type="button"
+                    style={buttonSecondaryStyle}
+                    disabled={!lines.length}
+                    onClick={() => {
+                      exportListCsv(
+                        `gl-journal-lines-${selected.journal_number || selected.id.slice(0, 8)}.csv`,
+                        [
+                          'journal_number',
+                          'line_no',
+                          'account_code',
+                          'account_name',
+                          'memo',
+                          'debit',
+                          'credit',
+                        ],
+                        lines.map((l) => ({
+                          journal_number: selected.journal_number,
+                          line_no: l.line_no,
+                          account_code: l.gl_accounts?.code || '',
+                          account_name: l.gl_accounts?.name || '',
+                          memo: l.memo || '',
+                          debit: Number(l.debit),
+                          credit: Number(l.credit),
+                        })),
+                      )
+                      showToast('Journal lines CSV downloaded', 'success')
+                    }}
+                  >
+                    Export lines CSV
+                  </button>
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginTop: 8 }}>
                   <thead>
                     <tr>
                       <th align="left">Account</th>

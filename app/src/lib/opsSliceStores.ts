@@ -226,6 +226,7 @@ export type DeliveryProject = {
   retention_pct: number
   billed_to_date_aed: number
   wip_aed: number
+  deleted_at?: string | null
 }
 
 export type ProjectCostLine = {
@@ -237,22 +238,45 @@ export type ProjectCostLine = {
   amount_aed: number
 }
 
-export async function listDeliveryProjects(): Promise<DeliveryProject[]> {
+export async function listDeliveryProjects(opts?: {
+  includeDeleted?: boolean
+}): Promise<DeliveryProject[]> {
   if (!isSupabaseConfigured()) return []
   const { data, error } = await db
     .from('delivery_projects')
-    .select('id, code, name, status, account_id, budget_aed, notes, retention_pct, billed_to_date_aed, wip_aed')
+    .select(
+      'id, code, name, status, account_id, budget_aed, notes, retention_pct, billed_to_date_aed, wip_aed, deleted_at',
+    )
     .order('created_at', { ascending: false })
   if (error) {
     if (isMissingRelationError(error)) return []
     throw error
   }
-  return (data || []).map((r: DeliveryProject) => ({
+  const mapped = (data || []).map((r: DeliveryProject) => ({
     ...r,
     retention_pct: Number(r.retention_pct) || 0,
     billed_to_date_aed: Number(r.billed_to_date_aed) || 0,
     wip_aed: Number(r.wip_aed) || 0,
   }))
+  return opts?.includeDeleted
+    ? (mapped as DeliveryProject[])
+    : (withoutSoftDeleted(mapped) as DeliveryProject[])
+}
+
+export async function softDeleteDeliveryProject(projectId: string): Promise<void> {
+  const { error } = await db
+    .from('delivery_projects')
+    .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', projectId)
+  if (error) throw error
+}
+
+export async function restoreDeliveryProject(projectId: string): Promise<void> {
+  const { error } = await db
+    .from('delivery_projects')
+    .update({ deleted_at: null, updated_at: new Date().toISOString() })
+    .eq('id', projectId)
+  if (error) throw error
 }
 
 export async function createDeliveryProject(input: {

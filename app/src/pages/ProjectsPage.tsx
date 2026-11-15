@@ -13,6 +13,8 @@ import {
   listProjectCosts,
   markProjectMilestoneBilled,
   refreshProjectWip,
+  restoreDeliveryProject,
+  softDeleteDeliveryProject,
   updateProjectBilling,
   type DeliveryProject,
   type ProjectBillingSchedule,
@@ -41,21 +43,29 @@ export default function ProjectsPage() {
   const [milePct, setMilePct] = useState('25')
   const [mileAmount, setMileAmount] = useState('')
   const [loading, setLoading] = useState(true)
+  const [showArchived, setShowArchived] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setRows(await listDeliveryProjects())
+      setRows(await listDeliveryProjects({ includeDeleted: showArchived }))
     } catch (e) {
       showToast(errorMessage(e, 'Could not load projects'), 'error')
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [showToast, showArchived])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  async function reloadSelected(projectId: string) {
+    const next = (await listDeliveryProjects({ includeDeleted: showArchived })).find(
+      (p) => p.id === projectId,
+    )
+    if (next) await openProject(next)
+  }
 
   async function openProject(p: DeliveryProject) {
     setSelected(p)
@@ -84,30 +94,40 @@ export default function ProjectsPage() {
             Track delivery projects, cost lines, WIP and retention (Unverified stub — not full job-cost accounting).
           </p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-          disabled={!rows.length}
-          onClick={() => {
-            exportListCsv(
-              'projects.csv',
-              ['code', 'name', 'status', 'budget_aed', 'retention_pct', 'billed_to_date_aed', 'wip_aed'],
-              rows.map((r) => ({
-                code: r.code,
-                name: r.name,
-                status: r.status,
-                budget_aed: r.budget_aed ?? '',
-                retention_pct: r.retention_pct,
-                billed_to_date_aed: r.billed_to_date_aed,
-                wip_aed: r.wip_aed,
-              })),
-            )
-            showToast('Projects CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!rows.length}
+            onClick={() => {
+              exportListCsv(
+                'projects.csv',
+                ['code', 'name', 'status', 'budget_aed', 'retention_pct', 'billed_to_date_aed', 'wip_aed'],
+                rows.map((r) => ({
+                  code: r.code,
+                  name: r.name,
+                  status: r.status,
+                  budget_aed: r.budget_aed ?? '',
+                  retention_pct: r.retention_pct,
+                  billed_to_date_aed: r.billed_to_date_aed,
+                  wip_aed: r.wip_aed,
+                })),
+              )
+              showToast('Projects CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
+          </button>
+        </div>
       </header>
 
       {loading ? (
@@ -165,13 +185,41 @@ export default function ProjectsPage() {
               <EmptyState title="No projects" subtitle="Create one above after applying the project accounting migration." />
             ) : (
               <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
-                {rows.map((p) => (
-                  <li key={p.id}>
-                    <button type="button" style={buttonSecondaryStyle} onClick={() => void openProject(p)}>
-                      {p.code || p.id.slice(0, 8)} · {p.name} · {p.status}
-                    </button>
-                  </li>
-                ))}
+                {rows.map((p) => {
+                  const archived = Boolean(p.deleted_at)
+                  return (
+                    <li key={p.id} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <button type="button" style={buttonSecondaryStyle} onClick={() => void openProject(p)}>
+                        {p.code || p.id.slice(0, 8)} · {p.name} · {p.status}
+                        {archived ? ' · archived' : ''}
+                      </button>
+                      <button
+                        type="button"
+                        style={buttonSecondaryStyle}
+                        onClick={() => {
+                          if (
+                            !window.confirm(
+                              archived ? `Restore ${p.code || p.name}?` : `Archive ${p.code || p.name}?`,
+                            )
+                          ) {
+                            return
+                          }
+                          void (archived
+                            ? restoreDeliveryProject(p.id)
+                            : softDeleteDeliveryProject(p.id))
+                            .then(() => {
+                              showToast(archived ? 'Project restored' : 'Project archived', 'success')
+                              if (selected?.id === p.id) setSelected(null)
+                              return load()
+                            })
+                            .catch((err) => showToast(errorMessage(err, 'Archive failed'), 'error'))
+                        }}
+                      >
+                        {archived ? 'Restore' : 'Archive'}
+                      </button>
+                    </li>
+                  )
+                })}
               </ul>
             )}
             {selected ? (
@@ -206,8 +254,7 @@ export default function ProjectsPage() {
                         .then(async () => {
                           showToast('Billing / WIP updated', 'success')
                           await load()
-                          const next = (await listDeliveryProjects()).find((p) => p.id === selected.id)
-                          if (next) await openProject(next)
+                          await reloadSelected(selected.id)
                         })
                         .catch((err) => showToast(errorMessage(err, 'WIP update failed'), 'error'))
                     }}
@@ -223,8 +270,7 @@ export default function ProjectsPage() {
                       .then(async () => {
                         showToast('WIP refreshed', 'success')
                         await load()
-                        const next = (await listDeliveryProjects()).find((p) => p.id === selected.id)
-                        if (next) await openProject(next)
+                        await reloadSelected(selected.id)
                       })
                       .catch((err) => showToast(errorMessage(err, 'Refresh failed'), 'error'))
                   }}
@@ -312,8 +358,7 @@ export default function ProjectsPage() {
                               .then(async () => {
                                 showToast('Milestone billed', 'success')
                                 await load()
-                                const next = (await listDeliveryProjects()).find((p) => p.id === selected.id)
-                                if (next) await openProject(next)
+                                await reloadSelected(selected.id)
                               })
                               .catch((err) => showToast(errorMessage(err, 'Mark billed failed'), 'error'))
                           }}

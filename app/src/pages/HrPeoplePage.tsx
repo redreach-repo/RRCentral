@@ -6,6 +6,8 @@ import { errorMessage } from '../lib/errors'
 import {
   createHrEmployee,
   listHrEmployees,
+  restoreHrEmployee,
+  softDeleteHrEmployee,
   updateHrEmployee,
   type HrEmployee,
 } from '../lib/featureSliceStores'
@@ -50,12 +52,17 @@ export default function HrPeoplePage() {
   const [reportsToId, setReportsToId] = useState('')
   const [loading, setLoading] = useState(true)
   const [importing, setImporting] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [filtered, all] = await Promise.all([listHrEmployees(filter), listHrEmployees('all')])
+      const listOpts = { includeDeleted: showArchived }
+      const [filtered, all] = await Promise.all([
+        listHrEmployees(filter, listOpts),
+        listHrEmployees('all', listOpts),
+      ])
       setRows(filtered)
       setDirectory(all)
     } catch (e) {
@@ -63,7 +70,7 @@ export default function HrPeoplePage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast, filter])
+  }, [showToast, filter, showArchived])
 
   useEffect(() => {
     void load()
@@ -280,6 +287,14 @@ export default function HrPeoplePage() {
           >
             Export CSV
           </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
+          </button>
         </div>
       </header>
 
@@ -397,6 +412,7 @@ export default function HrPeoplePage() {
               yearsOfService: years,
               dailyWageAed: dailyWageFromBasicMonthly(r.basic_salary_aed),
             })
+            const archived = Boolean(r.deleted_at)
             return (
               <article key={r.id} style={cardStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
@@ -404,6 +420,9 @@ export default function HrPeoplePage() {
                     <strong>
                       {r.full_name}{' '}
                       <span style={{ color: colors.muted, fontWeight: 400, fontSize: 13 }}>{r.employee_code}</span>
+                      {archived ? (
+                        <span style={{ color: colors.muted, fontWeight: 400, fontSize: 13 }}> · archived</span>
+                      ) : null}
                     </strong>
                     <div style={{ color: colors.muted, fontSize: 13, marginTop: 4 }}>
                       {[r.job_title, r.department, r.email, r.employment_status].filter(Boolean).join(' · ')}
@@ -438,6 +457,28 @@ export default function HrPeoplePage() {
                         </option>
                       ))}
                     </select>
+                    <button
+                      type="button"
+                      style={buttonSecondaryStyle}
+                      onClick={() => {
+                        if (
+                          !window.confirm(
+                            archived ? `Restore ${r.full_name}?` : `Archive ${r.full_name}?`,
+                          )
+                        ) {
+                          return
+                        }
+                        void (archived ? restoreHrEmployee(r.id) : softDeleteHrEmployee(r.id))
+                          .then(() => {
+                            showToast(archived ? 'Person restored' : 'Person archived', 'success')
+                            if (editing?.id === r.id) resetForm()
+                            return load()
+                          })
+                          .catch((err) => showToast(errorMessage(err, 'Archive failed'), 'error'))
+                      }}
+                    >
+                      {archived ? 'Restore' : 'Archive'}
+                    </button>
                   </div>
                 </div>
               </article>

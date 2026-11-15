@@ -4,6 +4,7 @@
  */
 import { db } from './db'
 import { isMissingRelationError } from './errors'
+import { withoutSoftDeleted } from './softDelete'
 import { isSupabaseConfigured } from './supabaseConfig'
 import {
   applyPackFlagsToMap,
@@ -53,6 +54,7 @@ export type HrEmployee = {
   bank_routing_code: string
   notes: string
   reports_to_id: string | null
+  deleted_at?: string | null
 }
 
 export type PayrollRun = {
@@ -157,13 +159,17 @@ async function emptyOnMissing<T>(run: () => Promise<T>, fallback: T): Promise<T>
 // HR
 //------------------------------------------------------------
 
-export async function listHrEmployees(status?: string): Promise<HrEmployee[]> {
+export async function listHrEmployees(
+  status?: string,
+  opts?: { includeDeleted?: boolean },
+): Promise<HrEmployee[]> {
   return emptyOnMissing(async () => {
     let q = db.from('hr_employees').select('*').order('full_name')
     if (status && status !== 'all') q = q.eq('employment_status', status)
     const { data, error } = await q
     if (error) throw error
-    return (data || []).map(normalizeHr)
+    const mapped = (data || []).map(normalizeHr)
+    return opts?.includeDeleted ? mapped : withoutSoftDeleted(mapped)
   }, [])
 }
 
@@ -184,7 +190,24 @@ function normalizeHr(row: Record<string, unknown>): HrEmployee {
     bank_routing_code: String(row.bank_routing_code || ''),
     notes: String(row.notes || ''),
     reports_to_id: (row.reports_to_id as string | null) ?? null,
+    deleted_at: (row.deleted_at as string | null) ?? null,
   }
+}
+
+export async function softDeleteHrEmployee(id: string): Promise<void> {
+  const { error } = await db
+    .from('hr_employees')
+    .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function restoreHrEmployee(id: string): Promise<void> {
+  const { error } = await db
+    .from('hr_employees')
+    .update({ deleted_at: null, updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
 }
 
 export async function createHrEmployee(input: {
