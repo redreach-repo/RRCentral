@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Briefcase } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
@@ -20,7 +20,8 @@ import {
   type ProjectBillingSchedule,
   type ProjectCostLine,
 } from '../lib/opsSliceStores'
-import { exportListCsv } from '../lib/listIo'
+import { PROJECTS_CSV_COLUMNS } from '../lib/projectsCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle, selectStyle } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
@@ -44,6 +45,8 @@ export default function ProjectsPage() {
   const [mileAmount, setMileAmount] = useState('')
   const [loading, setLoading] = useState(true)
   const [showArchived, setShowArchived] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -81,6 +84,57 @@ export default function ProjectsPage() {
   const spent = projectCostTotal(costs)
   const health = selected ? projectHealth(selected.budget_aed, spent) : 'unbudgeted'
 
+  async function importProjectsCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, csvRows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of PROJECTS_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, PROJECTS_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid project rows', 'error')
+        return
+      }
+      const existingCodes = new Set(
+        rows.map((r) => (r.code || '').trim().toUpperCase()).filter(Boolean),
+      )
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        const codeVal = (row.code || '').trim()
+        const codeKey = codeVal.toUpperCase()
+        if (codeKey && existingCodes.has(codeKey)) {
+          skipped += 1
+          continue
+        }
+        const budgetRaw = row.budget_aed.trim()
+        const budgetAed = budgetRaw === '' ? null : Number(budgetRaw)
+        await createDeliveryProject({
+          code: codeVal,
+          name: row.name,
+          budgetAed: budgetAed != null && Number.isFinite(budgetAed) ? budgetAed : null,
+          retentionPct: Number(row.retention_pct) || 0,
+        })
+        if (codeKey) existingCodes.add(codeKey)
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} project(s)${skipNote}`, 'success')
+      await load()
+    } catch (err) {
+      showToast(errorMessage(err, 'Projects CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
@@ -95,6 +149,25 @@ export default function ProjectsPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importProjectsCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}
