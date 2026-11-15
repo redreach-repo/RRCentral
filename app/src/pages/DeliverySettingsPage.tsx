@@ -16,10 +16,12 @@ import { DEFAULT_DELIVERY_RATES, DELIVERY_RATE_KEYS, type DeliveryRates, ratesFr
 import { listPackages, updatePackage } from '../lib/deliveryStore'
 import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import { parseDeliveryPackageForm, parseDeliveryRatesForm } from '../lib/schemas/deliverySettings'
 import type { DeliveryPackage } from '../lib/types'
 import {
   buttonPrimaryStyle,
+  buttonSecondaryStyle,
   cardStyle,
   colors,
   fieldStyle,
@@ -173,6 +175,71 @@ export default function DeliverySettingsPage() {
           <p className={docsStyles.kicker}>{t('page.delivery.kicker')}</p>
           <h1 className={docsStyles.title}>{t('page.packages.title')}</h1>
           <p className={docsStyles.subtitle}>{t('page.packages.subtitle')}</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={!packages.length}
+            onClick={() => {
+              exportListCsv(
+                'delivery-packages.csv',
+                [
+                  'code',
+                  'name',
+                  'support_response',
+                  'monthly_fee_a',
+                  'setup_fee_b',
+                  'monthly_fee_b',
+                  'target_hours',
+                  'build_hours_target',
+                  'included_whatsapp',
+                  'support_response_days',
+                  'ai_cap_usd',
+                  'included_lead_credits_usd',
+                  'tool_cost_aed',
+                  'active',
+                ],
+                packages.map((p) => ({
+                  code: p.code,
+                  name: p.name,
+                  support_response: p.support_response,
+                  monthly_fee_a: p.monthly_fee_a,
+                  setup_fee_b: p.setup_fee_b,
+                  monthly_fee_b: p.monthly_fee_b,
+                  target_hours: p.target_hours,
+                  build_hours_target: p.build_hours_target,
+                  included_whatsapp: p.included_whatsapp,
+                  support_response_days: p.support_response_days,
+                  ai_cap_usd: p.ai_cap_usd ?? '',
+                  included_lead_credits_usd: p.included_lead_credits_usd ?? '',
+                  tool_cost_aed: p.tool_cost_aed,
+                  active: p.active ? 'yes' : 'no',
+                })),
+              )
+              showToast('Packages CSV downloaded', 'success')
+            }}
+          >
+            Export packages CSV
+          </button>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            onClick={() => {
+              exportListCsv(
+                'delivery-rates.csv',
+                RATE_FIELDS.map((f) => f.key),
+                [
+                  Object.fromEntries(
+                    RATE_FIELDS.map((f) => [f.key, rateDraft[f.key] ?? String(DEFAULT_DELIVERY_RATES[f.key])]),
+                  ),
+                ],
+              )
+              showToast('Rates CSV downloaded', 'success')
+            }}
+          >
+            Export rates CSV
+          </button>
         </div>
       </header>
 
