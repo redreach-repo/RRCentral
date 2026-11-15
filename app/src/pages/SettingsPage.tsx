@@ -43,6 +43,7 @@ import {
   companyDocCategoryLabel,
   deleteCompanyDocument,
   listCompanyDocuments,
+  restoreCompanyDocument,
   saveCompanyDocument,
 } from '../lib/companyDocs'
 import { exportListCsv } from '../lib/listIo'
@@ -250,6 +251,7 @@ export default function SettingsPage() {
     expires_on: '',
   })
   const [deleteCompanyDoc, setDeleteCompanyDoc] = useState<CompanyDocument | null>(null)
+  const [showArchivedCompanyDocs, setShowArchivedCompanyDocs] = useState(false)
   const [userActionsId, setUserActionsId] = useState<string | null>(null)
   const [docActionsId, setDocActionsId] = useState<string | null>(null)
   const [numberingRows, setNumberingRows] = useState<NumberingSequence[]>([])
@@ -321,13 +323,15 @@ export default function SettingsPage() {
 
   const loadCompanyDocs = useCallback(async () => {
     try {
-      const { rows, missingTable } = await listCompanyDocuments()
+      const { rows, missingTable } = await listCompanyDocuments({
+        includeDeleted: showArchivedCompanyDocs,
+      })
       setCompanyDocs(rows)
       setCompanyDocsMissing(missingTable)
     } catch (e) {
       showToast(errorMessage(e, 'Could not load company documents'), 'error')
     }
-  }, [showToast])
+  }, [showToast, showArchivedCompanyDocs])
 
   const loadNumbering = useCallback(async () => {
     setNumberingLoading(true)
@@ -492,14 +496,20 @@ export default function SettingsPage() {
 
   async function confirmDeleteCompanyDoc() {
     if (!deleteCompanyDoc) return
+    const archived = Boolean(deleteCompanyDoc.deleted_at)
     setBusy(true)
     try {
-      await deleteCompanyDocument(deleteCompanyDoc.id)
-      showToast('Document removed', 'success')
+      if (archived) {
+        await restoreCompanyDocument(deleteCompanyDoc.id)
+        showToast('Document restored', 'success')
+      } else {
+        await deleteCompanyDocument(deleteCompanyDoc.id)
+        showToast('Document archived', 'success')
+      }
       setDeleteCompanyDoc(null)
       await loadCompanyDocs()
     } catch (e) {
-      showToast(errorMessage(e, 'Delete failed'), 'error')
+      showToast(errorMessage(e, archived ? 'Restore failed' : 'Archive failed'), 'error')
     } finally {
       setBusy(false)
     }
@@ -1078,11 +1088,18 @@ export default function SettingsPage() {
             <button
               type="button"
               style={buttonSecondaryStyle}
+              onClick={() => setShowArchivedCompanyDocs((v) => !v)}
+            >
+              {showArchivedCompanyDocs ? 'Hide archived' : 'Show archived'}
+            </button>
+            <button
+              type="button"
+              style={buttonSecondaryStyle}
               disabled={!companyDocs.length}
               onClick={() => {
                 exportListCsv(
                   'company-documents.csv',
-                  ['category', 'title', 'file_name', 'expires_on', 'drive_url', 'notes'],
+                  ['category', 'title', 'file_name', 'expires_on', 'drive_url', 'notes', 'archived'],
                   companyDocs.map((doc) => ({
                     category: companyDocCategoryLabel(doc.category),
                     title: doc.title || '',
@@ -1090,6 +1107,7 @@ export default function SettingsPage() {
                     expires_on: doc.expires_on ? String(doc.expires_on).slice(0, 10) : '',
                     drive_url: doc.drive_url || '',
                     notes: doc.notes || '',
+                    archived: doc.deleted_at ? 'yes' : 'no',
                   })),
                 )
                 showToast('Company documents CSV downloaded', 'success')
@@ -1126,9 +1144,14 @@ export default function SettingsPage() {
               </thead>
               <tbody>
                 {companyDocs.map((doc) => (
-                  <tr key={doc.id}>
+                  <tr key={doc.id} style={doc.deleted_at ? { opacity: 0.65 } : undefined}>
                     <td style={tdStyle}>{companyDocCategoryLabel(doc.category)}</td>
-                    <td style={tdStyle}>{doc.title || '—'}</td>
+                    <td style={tdStyle}>
+                      {doc.title || '—'}
+                      {doc.deleted_at ? (
+                        <span style={{ marginLeft: 6, fontSize: 11, color: colors.muted2 }}>archived</span>
+                      ) : null}
+                    </td>
                     <td style={tdStyle}>
                       {doc.expires_on ? String(doc.expires_on).slice(0, 10) : '—'}
                     </td>
@@ -1150,8 +1173,13 @@ export default function SettingsPage() {
                       <SimpleRowActions
                         expanded={docActionsId === doc.id}
                         onToggle={() => setDocActionsId((id) => (id === doc.id ? null : doc.id))}
-                        onEdit={() => openCompanyDocEdit(doc)}
-                        onDelete={() => setDeleteCompanyDoc(doc)}
+                        onEdit={() => {
+                          if (!doc.deleted_at) openCompanyDocEdit(doc)
+                          else setDeleteCompanyDoc(doc)
+                        }}
+                        editLabel={doc.deleted_at ? 'Restore' : 'Edit'}
+                        onDelete={doc.deleted_at ? undefined : () => setDeleteCompanyDoc(doc)}
+                        deleteLabel="Archive"
                       />
                     </td>
                   </tr>
@@ -1894,13 +1922,22 @@ export default function SettingsPage() {
 
       <Modal
         open={!!deleteCompanyDoc}
-        title="Remove document?"
+        title={deleteCompanyDoc?.deleted_at ? 'Restore document?' : 'Archive document?'}
         onClose={() => setDeleteCompanyDoc(null)}
         width={400}
       >
         <p style={{ color: colors.muted, fontSize: 14 }}>
-          Remove <strong style={{ color: colors.text }}>{deleteCompanyDoc?.title || 'this document'}</strong>{' '}
-          from Central? The file on Google Drive is not deleted.
+          {deleteCompanyDoc?.deleted_at ? (
+            <>
+              Restore <strong style={{ color: colors.text }}>{deleteCompanyDoc?.title || 'this document'}</strong> to
+              the active company papers list?
+            </>
+          ) : (
+            <>
+              Archive <strong style={{ color: colors.text }}>{deleteCompanyDoc?.title || 'this document'}</strong>{' '}
+              from Central? The file on Google Drive is not deleted. Use Show archived to restore later.
+            </>
+          )}
         </p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
           <button type="button" style={buttonSecondaryStyle} onClick={() => setDeleteCompanyDoc(null)}>
@@ -1908,11 +1945,11 @@ export default function SettingsPage() {
           </button>
           <button
             type="button"
-            style={buttonDangerStyle}
+            style={deleteCompanyDoc?.deleted_at ? buttonSecondaryStyle : buttonDangerStyle}
             disabled={busy}
             onClick={() => void confirmDeleteCompanyDoc()}
           >
-            Remove
+            {deleteCompanyDoc?.deleted_at ? 'Restore' : 'Archive'}
           </button>
         </div>
       </Modal>

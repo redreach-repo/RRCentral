@@ -29,18 +29,36 @@ function isHttpUrl(raw: string): boolean {
   }
 }
 
-export async function listCompanyDocuments(): Promise<{
+export async function listCompanyDocuments(opts?: {
+  includeDeleted?: boolean
+}): Promise<{
   rows: CompanyDocument[]
   missingTable: boolean
 }> {
-  const { data, error } = await db
+  let q = db
     .from('company_documents')
     .select('*')
     .order('category', { ascending: true })
     .order('uploaded_at', { ascending: false })
+  if (!opts?.includeDeleted) q = q.is('deleted_at', null)
+
+  const { data, error } = await q
 
   if (error) {
     if (isMissingRelationError(error)) return { rows: [], missingTable: true }
+    // Pre-migration DBs may lack deleted_at.
+    if (String(error.message || '').toLowerCase().includes('deleted_at')) {
+      const fallback = await db
+        .from('company_documents')
+        .select('*')
+        .order('category', { ascending: true })
+        .order('uploaded_at', { ascending: false })
+      if (fallback.error) {
+        if (isMissingRelationError(fallback.error)) return { rows: [], missingTable: true }
+        throw fallback.error
+      }
+      return { rows: (fallback.data || []) as CompanyDocument[], missingTable: false }
+    }
     throw error
   }
   return { rows: (data || []) as CompanyDocument[], missingTable: false }
@@ -107,7 +125,25 @@ export async function saveCompanyDocument(
   return data as CompanyDocument
 }
 
+/** Soft-archive preferred; falls back to hard delete if deleted_at is unavailable. */
 export async function deleteCompanyDocument(id: string): Promise<void> {
-  const { error } = await db.from('company_documents').delete().eq('id', id)
+  try {
+    await softDeleteCompanyDocument(id)
+  } catch (e) {
+    const { error } = await db.from('company_documents').delete().eq('id', id)
+    if (error) throw e
+  }
+}
+
+export async function softDeleteCompanyDocument(id: string): Promise<void> {
+  const { error } = await db
+    .from('company_documents')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function restoreCompanyDocument(id: string): Promise<void> {
+  const { error } = await db.from('company_documents').update({ deleted_at: null }).eq('id', id)
   if (error) throw error
 }
