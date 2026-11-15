@@ -2,7 +2,7 @@
 
 Status: built and tested (draft)  
 Owner: Cursor  
-PR: (pending)  
+PR: #450  
 Stubbed / unverified: none in this batch (DSR prune remains destructive by design)
 
 **Batch:** after #449  
