@@ -1167,7 +1167,7 @@ export default function SettingsPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr>
-                  {['Type', 'Division', 'Prefix', 'Year', 'Last', 'Next', ''].map((h) => (
+                  {['Type', 'Division', 'Prefix', 'Pad', 'Year', 'Last', 'Next', ''].map((h) => (
                     <th
                       key={h || 'actions'}
                       style={{
@@ -1196,6 +1196,9 @@ export default function SettingsPage() {
                       {row.prefix}
                     </td>
                     <td style={{ padding: '8px 10px', borderBottom: `1px solid ${colors.border}` }}>
+                      {row.pad}
+                    </td>
+                    <td style={{ padding: '8px 10px', borderBottom: `1px solid ${colors.border}` }}>
                       {row.year_yy}
                     </td>
                     <td style={{ padding: '8px 10px', borderBottom: `1px solid ${colors.border}` }}>
@@ -1211,24 +1214,52 @@ export default function SettingsPage() {
                       {previewNextReference(row)}
                     </td>
                     <td style={{ padding: '8px 10px', borderBottom: `1px solid ${colors.border}` }}>
-                      {can(userRole, 'settings.manage') &&
-                      (row.doc_type === 'purchase_order' || row.doc_type === 'expense') ? (
-                        <button
-                          type="button"
-                          style={buttonSecondaryStyle}
-                          onClick={() => {
-                            const next = window.prompt('Prefix (2–8 chars)', row.prefix)
-                            if (next == null) return
-                            void updateNumberingSequence(row.id, { prefix: next })
-                              .then(() => {
-                                showToast('Prefix updated', 'success')
-                                return loadNumbering()
-                              })
-                              .catch((e) => showToast(errorMessage(e, 'Could not update prefix'), 'error'))
-                          }}
-                        >
-                          Edit prefix
-                        </button>
+                      {can(userRole, 'settings.manage') ? (
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {row.doc_type === 'purchase_order' || row.doc_type === 'expense' ? (
+                            <button
+                              type="button"
+                              style={buttonSecondaryStyle}
+                              onClick={() => {
+                                const next = window.prompt('Prefix (2–8 chars)', row.prefix)
+                                if (next == null) return
+                                void updateNumberingSequence(row.id, { prefix: next })
+                                  .then(() => {
+                                    showToast('Prefix updated', 'success')
+                                    return loadNumbering()
+                                  })
+                                  .catch((e) =>
+                                    showToast(errorMessage(e, 'Could not update prefix'), 'error'),
+                                  )
+                              }}
+                            >
+                              Edit prefix
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            style={buttonSecondaryStyle}
+                            onClick={() => {
+                              const next = window.prompt('Pad width (2–6)', String(row.pad || 3))
+                              if (next == null) return
+                              const pad = Number(next)
+                              if (!Number.isFinite(pad)) {
+                                showToast('Pad must be a number from 2 to 6', 'error')
+                                return
+                              }
+                              void updateNumberingSequence(row.id, { pad })
+                                .then(() => {
+                                  showToast('Pad updated', 'success')
+                                  return loadNumbering()
+                                })
+                                .catch((e) =>
+                                  showToast(errorMessage(e, 'Could not update pad'), 'error'),
+                                )
+                            }}
+                          >
+                            Edit pad
+                          </button>
+                        </div>
                       ) : null}
                     </td>
                   </tr>

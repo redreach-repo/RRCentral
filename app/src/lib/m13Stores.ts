@@ -75,3 +75,33 @@ export async function anonymizeContact(contactId: string): Promise<void> {
   const { error } = await db.rpc('rr_dsr_anonymize_contact', { p_contact: contactId })
   if (error) throw error
 }
+
+export type RetentionRunRow = {
+  id: string
+  ran_by: string | null
+  app_errors_deleted: number
+  audit_deleted: number
+  detail: string
+  created_at: string
+}
+
+export async function listRetentionRuns(): Promise<RetentionRunRow[]> {
+  if (!isSupabaseConfigured()) return []
+  const { data, error } = await db
+    .from('retention_runs')
+    .select('id, ran_by, app_errors_deleted, audit_deleted, detail, created_at')
+    .order('created_at', { ascending: false })
+    .limit(20)
+  if (error) {
+    if (isMissingRelationError(error)) return []
+    throw error
+  }
+  return ((data || []) as RetentionRunRow[]).map((r) => ({
+    id: String(r.id),
+    ran_by: r.ran_by || null,
+    app_errors_deleted: Number(r.app_errors_deleted) || 0,
+    audit_deleted: Number(r.audit_deleted) || 0,
+    detail: String(r.detail || ''),
+    created_at: String(r.created_at || ''),
+  }))
+}

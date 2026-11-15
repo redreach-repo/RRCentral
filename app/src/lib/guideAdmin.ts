@@ -40,4 +40,11 @@ export const GUIDE_ADMIN_SECTIONS: GuideAdminSection[] = [
     to: '/app-errors',
     linkKey: 'guide.admin.appErrors.link',
   },
+  {
+    id: 'dsr',
+    titleKey: 'guide.admin.dsr.title',
+    bodyKey: 'guide.admin.dsr.body',
+    to: '/dsr',
+    linkKey: 'guide.admin.dsr.link',
+  },
 ]

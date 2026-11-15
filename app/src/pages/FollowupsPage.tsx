@@ -45,6 +45,7 @@ import {
 import docsStyles from '../styles/docsList.module.css'
 import { logActivity } from '../lib/activity'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 
 function daysLabel(dateStr: string, today: Date): string {
   const d = startOfDay(parseISO(dateStr.slice(0, 10)))
@@ -475,9 +476,48 @@ export default function FollowupsPage() {
             {t('page.followups.subtitleTrail')}
           </p>
         </div>
-        <button type="button" className={docsStyles.newBtn} style={{ background: 'rgba(255,255,255,0.08)' }} onClick={() => setCalendarSettingsOpen(true)}>
-          <Settings size={16} /> {t('page.followups.calendar')}
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!entries.length}
+            onClick={() => {
+              exportListCsv(
+                'follow-ups.csv',
+                [
+                  'company_name',
+                  'pipeline_stage',
+                  'follow_up_date',
+                  'next_action',
+                  'owner',
+                  'quote_ref',
+                  'primary_contact',
+                ],
+                entries.map((e) => ({
+                  company_name: e.company_name,
+                  pipeline_stage: e.pipeline_stage,
+                  follow_up_date: e.follow_up_date || '',
+                  next_action: e.next_action,
+                  owner: e.owner,
+                  quote_ref: e.quote_ref,
+                  primary_contact: e.primary_contact,
+                })),
+              )
+              showToast('Follow-ups CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'rgba(255,255,255,0.08)' }}
+            onClick={() => setCalendarSettingsOpen(true)}
+          >
+            <Settings size={16} /> {t('page.followups.calendar')}
+          </button>
+        </div>
       </header>
 
       {error ? (

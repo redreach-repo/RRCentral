@@ -11,6 +11,7 @@ import {
   type ApprovalRequest,
 } from '../lib/featureSliceStores'
 import { DEFAULT_APPROVAL_THRESHOLD_AED } from '../lib/makerChecker'
+import { exportListCsv } from '../lib/listIo'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle, selectStyle } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
@@ -78,6 +79,42 @@ export default function ApprovalsPage() {
             automatically. Maker cannot approve their own request.
           </p>
         </div>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+          disabled={!rows.length}
+          onClick={() => {
+            exportListCsv(
+              'approvals.csv',
+              [
+                'status',
+                'object_type',
+                'object_id',
+                'action',
+                'amount_aed',
+                'summary',
+                'decision_note',
+                'created_at',
+                'decided_at',
+              ],
+              rows.map((r) => ({
+                status: r.status,
+                object_type: r.object_type,
+                object_id: r.object_id,
+                action: r.action,
+                amount_aed: r.amount_aed ?? '',
+                summary: r.summary,
+                decision_note: r.decision_note,
+                created_at: r.created_at,
+                decided_at: r.decided_at || '',
+              })),
+            )
+            showToast('Approvals CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
       </header>
 
       <div style={{ ...cardStyle, marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'end' }}>

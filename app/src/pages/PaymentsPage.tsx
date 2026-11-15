@@ -46,6 +46,7 @@ import {
 import docsStyles from '../styles/docsList.module.css'
 import { PAYMENT_METHODS } from '../lib/config'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import { ensureMoneyApproval } from '../lib/featureSliceStores'
 import {
   DEFAULT_APPROVAL_THRESHOLD_AED,
@@ -421,6 +422,40 @@ export default function PaymentsPage() {
           <p className={docsStyles.subtitle}>{t('page.payments.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!payments.length}
+            onClick={() => {
+              exportListCsv(
+                'customer-payments.csv',
+                [
+                  'client',
+                  'quote_ref',
+                  'payment_date',
+                  'amount_received',
+                  'currency',
+                  'payment_type',
+                  'status',
+                  'transaction_ref',
+                ],
+                payments.map((p) => ({
+                  client: p.client,
+                  quote_ref: p.quote_ref,
+                  payment_date: p.payment_date,
+                  amount_received: p.amount_received,
+                  currency: p.currency,
+                  payment_type: p.payment_type,
+                  status: p.status,
+                  transaction_ref: p.transaction_ref,
+                })),
+              )
+              showToast('Payments CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}

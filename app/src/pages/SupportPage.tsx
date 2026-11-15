@@ -21,10 +21,18 @@ import {
   optionLabel,
   sortQueue,
 } from '../lib/support'
-import { createTicket, listTickets, slaPackageFor } from '../lib/supportStore'
-import { errorMessage } from '../lib/errors'
-import type { Account, AccountContact, AppUser, Ticket } from '../lib/types'
 import {
+  createTicket,
+  listTickets,
+  restoreTicket,
+  slaPackageFor,
+  softDeleteTicket,
+  type TicketRow,
+} from '../lib/supportStore'
+import { errorMessage } from '../lib/errors'
+import type { Account, AccountContact, AppUser } from '../lib/types'
+import {
+  buttonSecondaryStyle,
   cardStyle,
   colors,
   selectStyle,
@@ -50,13 +58,14 @@ export default function SupportPage() {
   const compact = useCompactCrm()
   const [searchParams, setSearchParams] = useSearchParams()
   const { calendar, policies } = useSupportConfig()
-  const [tickets, setTickets] = useState<Ticket[]>([])
+  const [tickets, setTickets] = useState<TicketRow[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [contacts, setContacts] = useState<AccountContact[]>([])
   const [team, setTeam] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
   const [now, setNow] = useState(() => new Date())
 
   const status = searchParams.get('status') || 'open'
@@ -68,7 +77,7 @@ export default function SupportPage() {
     setLoading(true)
     try {
       const [list, { rows }, people, allContacts] = await Promise.all([
-        listTickets(),
+        listTickets(undefined, { includeDeleted: showArchived }),
         listAccounts(),
         listTeam(),
         listContacts(),
@@ -82,7 +91,7 @@ export default function SupportPage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [showToast, showArchived])
 
   useEffect(() => {
     void load()
@@ -186,16 +195,26 @@ export default function SupportPage() {
           <h1 className={docsStyles.title}>{t('page.support.title')}</h1>
           <p className={docsStyles.subtitle}>{t('page.support.subtitle')}</p>
         </div>
-        {canWrite ? (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
             type="button"
             className={docsStyles.newBtn}
-            onClick={() => setModalOpen(true)}
-            disabled={!writableAccounts.length}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            onClick={() => setShowArchived((v) => !v)}
           >
-            <Plus size={16} /> {t('page.support.new')}
+            {showArchived ? 'Hide archived' : 'Show archived'}
           </button>
-        ) : null}
+          {canWrite ? (
+            <button
+              type="button"
+              className={docsStyles.newBtn}
+              onClick={() => setModalOpen(true)}
+              disabled={!writableAccounts.length}
+            >
+              <Plus size={16} /> {t('page.support.new')}
+            </button>
+          ) : null}
+        </div>
       </header>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
@@ -341,15 +360,24 @@ export default function SupportPage() {
                   <th style={thStyle}>Status</th>
                   <th style={thStyle}>Priority</th>
                   <th style={thStyle}>Assigned to</th>
+                  {canWrite ? <th style={thStyle}>Archive</th> : null}
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((t) => {
                   const acc = t.account_id ? accountById.get(t.account_id) : undefined
+                  const archived = Boolean(t.deleted_at)
                   return (
                     <tr key={t.id} onClick={() => navigate(`/support/${t.id}`)} style={{ cursor: 'pointer' }}>
                       <td style={tdStyle}>
-                        <div style={{ fontWeight: 600 }}>{t.subject || '(no subject)'}</div>
+                        <div style={{ fontWeight: 600 }}>
+                          {t.subject || '(no subject)'}
+                          {archived ? (
+                            <span style={{ marginLeft: 6, fontSize: 11, color: colors.muted }}>
+                              (archived)
+                            </span>
+                          ) : null}
+                        </div>
                         <div style={{ fontSize: 11, color: colors.muted2 }}>
                           {acc ? `${acc.name}, ${accountTypeLabel(acc.type)}` : `Unknown sender ${t.requester_phone ? `+${t.requester_phone} on WhatsApp` : t.requester_email}`}
                         </div>
@@ -364,6 +392,28 @@ export default function SupportPage() {
                         {optionLabel(TICKET_PRIORITIES, t.priority)}
                       </td>
                       <td style={tdStyle}>{personName(t.assignee_user_id)}</td>
+                      {canWrite ? (
+                        <td style={tdStyle} onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            style={buttonSecondaryStyle}
+                            onClick={() => {
+                              void (async () => {
+                                try {
+                                  if (archived) await restoreTicket(t.id)
+                                  else await softDeleteTicket(t.id)
+                                  showToast(archived ? 'Ticket restored' : 'Ticket archived', 'success')
+                                  await load()
+                                } catch (err) {
+                                  showToast(errorMessage(err, 'Could not update ticket'), 'error')
+                                }
+                              })()
+                            }}
+                          >
+                            {archived ? 'Restore' : 'Archive'}
+                          </button>
+                        </td>
+                      ) : null}
                     </tr>
                   )
                 })}
