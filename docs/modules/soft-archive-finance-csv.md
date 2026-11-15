@@ -11,6 +11,8 @@ Stubbed / unverified: ledger CoA tax mapping; WPS/SIF draft (unchanged)
 ## What shipped
 
 - Expenses / Vendors / Catalog products: Show archived + Archive/Restore
+- Account contacts soft-archive + Show archived; PO Show archived + Restore
+- Settings numbering: Edit prefix for all sequence types (not only PO/expense)
 - CSV export: Ledger journals, Payroll runs, HR leave, App errors
 - Guide finance: Ledger, Approvals, Payroll (EN + AR)
 

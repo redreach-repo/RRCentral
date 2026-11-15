@@ -14,6 +14,7 @@
 - [x] Catalog products soft-archive UI
 - [x] CSV: ledger, payroll, HR leave, app errors
 - [x] Guide finance deepen (ledger / approvals / payroll)
+- [x] Contacts soft-archive + PO restore + Settings prefix for all
 - [ ] M14 / live ESP / Tax / CASA / QTSP (Not done)
 
 ## Quality gates

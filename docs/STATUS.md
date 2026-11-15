@@ -12,6 +12,7 @@
 | Expenses / Vendors / Catalog show-archived + restore | **Pass** |
 | CSV: ledger / payroll / HR leave / app errors | **Pass** |
 | Guide finance deepen (ledger / approvals / payroll) | **Pass** |
+| Contacts soft-archive + PO restore + Settings prefix all | **Pass** |
 | M14 / live ESP / Tax / CASA / QTSP | **Not done** |
 
 ## Test results

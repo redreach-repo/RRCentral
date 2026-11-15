@@ -86,7 +86,11 @@ export type PurchaseOrderLine = {
   landed_unit_cost: number
 }
 
-export async function listPurchaseOrders(): Promise<PurchaseOrder[]> {
+export type PurchaseOrderRow = PurchaseOrder & { deleted_at?: string | null }
+
+export async function listPurchaseOrders(opts?: {
+  includeDeleted?: boolean
+}): Promise<PurchaseOrderRow[]> {
   if (!isSupabaseConfigured()) return []
   const { data, error } = await db
     .from('purchase_orders')
@@ -99,12 +103,14 @@ export async function listPurchaseOrders(): Promise<PurchaseOrder[]> {
     if (isMissingRelationError(error)) return []
     throw error
   }
-  const mapped = (data || []).map((r: PurchaseOrder & { deleted_at?: string | null }) => ({
+  const mapped = (data || []).map((r: PurchaseOrderRow) => ({
     ...r,
     landed_cost_aed: Number(r.landed_cost_aed) || 0,
     warehouse_id: r.warehouse_id || null,
   }))
-  return withoutSoftDeleted(mapped) as PurchaseOrder[]
+  return opts?.includeDeleted
+    ? (mapped as PurchaseOrderRow[])
+    : (withoutSoftDeleted(mapped) as PurchaseOrderRow[])
 }
 
 export async function createPurchaseOrder(input: {
@@ -188,6 +194,14 @@ export async function softDeletePurchaseOrder(poId: string): Promise<void> {
   const { error } = await db
     .from('purchase_orders')
     .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', poId)
+  if (error) throw error
+}
+
+export async function restorePurchaseOrder(poId: string): Promise<void> {
+  const { error } = await db
+    .from('purchase_orders')
+    .update({ deleted_at: null, updated_at: new Date().toISOString() })
     .eq('id', poId)
   if (error) throw error
 }
