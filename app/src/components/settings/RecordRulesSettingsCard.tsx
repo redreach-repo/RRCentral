@@ -5,6 +5,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { errorMessage } from '../../lib/errors'
 import { can } from '../../lib/permissions'
 import { createRecordRule, listRecordRules, type RecordRuleRow } from '../../lib/recordRulesStore'
+import { exportListCsv } from '../../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -77,8 +78,30 @@ export default function RecordRulesSettingsCard() {
 
   return (
     <section id="record-rules" style={{ ...cardStyle, marginBottom: 16, scrollMarginTop: 72 }}>
-      <h2 style={sectionTitleStyle}>Record rules (stub)</h2>
-      <p style={{ color: colors.muted, fontSize: 13, margin: '0 0 12px', lineHeight: 1.5 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'start' }}>
+        <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Record rules (stub)</h2>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={!rows.length}
+          onClick={() => {
+            exportListCsv(
+              'record-rules.csv',
+              ['name', 'object_type', 'scope', 'active'],
+              rows.map((r) => ({
+                name: r.name,
+                object_type: r.object_type,
+                scope: r.scope,
+                active: r.active ? 'yes' : 'no',
+              })),
+            )
+            showToast('Record rules CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
+      </div>
+      <p style={{ color: colors.muted, fontSize: 13, margin: '12px 0 12px', lineHeight: 1.5 }}>
         Visibility scopes evaluated in the app only — RLS is not rewritten yet. Admin viewers bypass
         owner/team filters.
       </p>
