@@ -46,6 +46,11 @@ describe('module registry', () => {
       'finance',
       'delivery',
       'clients',
+      'hr',
+      'payroll',
+      'marketing',
+      'saasBilling',
+      'industryPacks',
     ])
     for (const row of SETTINGS_MODULE_FLAGS) {
       expect(APP_MODULES.some((m) => m.flag === row.flag)).toBe(true)

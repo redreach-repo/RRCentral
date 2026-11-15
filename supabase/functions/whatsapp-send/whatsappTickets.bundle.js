@@ -18,6 +18,8 @@ var PRODUCT = {
   endorsement: "by Red Reach",
   tagline: "CRM, quoting, delivery and finance for growing teams",
   description: "HighMast \u2014 CRM, quoting, delivery and finance by Red Reach",
+  /** Tenant document and email footers. */
+  poweredBy: "Powered by HighMast",
   colors: {
     red: "#C8321A",
     orange: "#E8872A",
