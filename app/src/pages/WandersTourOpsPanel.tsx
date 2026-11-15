@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   departureProfitSnapshot,
   ensureTourOpsSeeded,
@@ -42,8 +42,19 @@ import {
   thStyle,
 } from '../lib/uiStyles'
 import { errorMessage } from '../lib/errors'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { parseTourOpsLinkForm } from '../lib/schemas/tourOpsLink'
+
+function parseYesNo(raw: string, defaultValue: boolean): boolean {
+  const v = raw.trim().toLowerCase()
+  if (!v) return defaultValue
+  return !(v === 'no' || v === 'false' || v === '0' || v === 'off' || v === 'n')
+}
+
+function numOr(raw: string, fallback: number): number {
+  const n = Number(String(raw).trim())
+  return Number.isFinite(n) ? n : fallback
+}
 
 type OpsTab = 'packages' | 'partners' | 'costs' | 'prices' | 'departures' | 'bookings'
 
@@ -60,6 +71,8 @@ export default function WandersTourOpsPanel({ deals }: { deals: WandersDeal[] })
   const [bookings, setBookings] = useState<CustomerBooking[]>([])
   const [packageId, setPackageId] = useState<string>(SEED_IDS.packagePhilippines)
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -149,6 +162,198 @@ export default function WandersTourOpsPanel({ deals }: { deals: WandersDeal[] })
       showToast(errorMessage(e, 'Save failed'), 'error')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function importTourOpsCsv(file: File) {
+    if (tab === 'packages' || tab === 'partners') {
+      showToast('Import CSV updates costs, prices, departures, or bookings — switch tab first', 'error')
+      if (importInputRef.current) importInputRef.current.value = ''
+      return
+    }
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      if (!objects.length) {
+        showToast('No tour ops rows in CSV', 'error')
+        return
+      }
+
+      let saved = 0
+      let skipped = 0
+
+      if (tab === 'costs') {
+        const next = [...components]
+        for (const row of objects) {
+          const category = String(row.category || '').trim()
+          const description = String(row.description || '').trim()
+          const meal_tier = String(row.meal_tier || '').trim()
+          const match = next.find(
+            (c) =>
+              c.category === category &&
+              c.description === description &&
+              (c.meal_tier || '') === meal_tier,
+          )
+          if (!match) {
+            skipped += 1
+            continue
+          }
+          const updated: PackageCostComponent = {
+            ...match,
+            amount: Object.prototype.hasOwnProperty.call(row, 'amount')
+              ? numOr(String(row.amount ?? ''), match.amount)
+              : match.amount,
+            currency: Object.prototype.hasOwnProperty.call(row, 'currency')
+              ? String(row.currency ?? '').trim() || match.currency
+              : match.currency,
+            per_person: Object.prototype.hasOwnProperty.call(row, 'per_person')
+              ? parseYesNo(String(row.per_person ?? ''), match.per_person)
+              : match.per_person,
+            notes: Object.prototype.hasOwnProperty.call(row, 'notes')
+              ? String(row.notes ?? '').trim()
+              : match.notes,
+          }
+          const persisted = await saveCostComponent(updated)
+          const idx = next.findIndex((c) => c.id === persisted.id)
+          if (idx >= 0) next[idx] = persisted
+          saved += 1
+        }
+        setComponents(next)
+      } else if (tab === 'prices') {
+        const next = [...prices]
+        for (const row of objects) {
+          const label = String(row.label || '').trim()
+          const meal_tier = String(row.meal_tier || '').trim()
+          const match = next.find(
+            (p) => p.label === label && (!meal_tier || p.meal_tier === meal_tier),
+          )
+          if (!match) {
+            skipped += 1
+            continue
+          }
+          const updated: PackageSellingPrice = {
+            ...match,
+            selling_amount: Object.prototype.hasOwnProperty.call(row, 'selling_amount')
+              ? numOr(String(row.selling_amount ?? ''), match.selling_amount)
+              : match.selling_amount,
+            selling_currency: Object.prototype.hasOwnProperty.call(row, 'selling_currency')
+              ? String(row.selling_currency ?? '').trim() || match.selling_currency
+              : match.selling_currency,
+            cost_amount: Object.prototype.hasOwnProperty.call(row, 'cost_amount')
+              ? numOr(String(row.cost_amount ?? ''), match.cost_amount)
+              : match.cost_amount,
+            cost_currency: Object.prototype.hasOwnProperty.call(row, 'cost_currency')
+              ? String(row.cost_currency ?? '').trim() || match.cost_currency
+              : match.cost_currency,
+            status: Object.prototype.hasOwnProperty.call(row, 'status')
+              ? String(row.status ?? '').trim() || match.status
+              : match.status,
+          }
+          const persisted = await saveSellingPrice(updated)
+          const idx = next.findIndex((p) => p.id === persisted.id)
+          if (idx >= 0) next[idx] = persisted
+          saved += 1
+        }
+        setPrices(next)
+      } else if (tab === 'departures') {
+        const next = [...departures]
+        for (const row of objects) {
+          const label = String(row.label || '').trim()
+          const match = next.find((d) => d.label === label)
+          if (!match) {
+            skipped += 1
+            continue
+          }
+          const updated: ScheduledDeparture = {
+            ...match,
+            departure_date: Object.prototype.hasOwnProperty.call(row, 'departure_date')
+              ? String(row.departure_date ?? '').trim() || null
+              : match.departure_date,
+            return_date: Object.prototype.hasOwnProperty.call(row, 'return_date')
+              ? String(row.return_date ?? '').trim() || null
+              : match.return_date,
+            capacity: Object.prototype.hasOwnProperty.call(row, 'capacity')
+              ? numOr(String(row.capacity ?? ''), match.capacity)
+              : match.capacity,
+            booked_pax: Object.prototype.hasOwnProperty.call(row, 'booked_pax')
+              ? numOr(String(row.booked_pax ?? ''), match.booked_pax)
+              : match.booked_pax,
+            status: Object.prototype.hasOwnProperty.call(row, 'status')
+              ? String(row.status ?? '').trim() || match.status
+              : match.status,
+            min_group_met: Object.prototype.hasOwnProperty.call(row, 'min_group_met')
+              ? parseYesNo(String(row.min_group_met ?? ''), match.min_group_met)
+              : match.min_group_met,
+            booking_deadline: Object.prototype.hasOwnProperty.call(row, 'booking_deadline')
+              ? String(row.booking_deadline ?? '').trim() || null
+              : match.booking_deadline,
+          }
+          const persisted = await saveDeparture(updated)
+          const idx = next.findIndex((d) => d.id === persisted.id)
+          if (idx >= 0) next[idx] = persisted
+          saved += 1
+        }
+        setDepartures(next)
+      } else {
+        const next = [...bookings]
+        for (const row of objects) {
+          const client_name = String(row.client_name || '').trim()
+          const lead_contact = String(row.lead_contact || '').trim()
+          const match = next.find(
+            (b) =>
+              b.client_name === client_name &&
+              (!lead_contact || b.lead_contact === lead_contact),
+          )
+          if (!match) {
+            skipped += 1
+            continue
+          }
+          const updated: CustomerBooking = {
+            ...match,
+            pax_count: Object.prototype.hasOwnProperty.call(row, 'pax_count')
+              ? numOr(String(row.pax_count ?? ''), match.pax_count)
+              : match.pax_count,
+            meal_tier: Object.prototype.hasOwnProperty.call(row, 'meal_tier')
+              ? String(row.meal_tier ?? '').trim() || match.meal_tier
+              : match.meal_tier,
+            selling_amount: Object.prototype.hasOwnProperty.call(row, 'selling_amount')
+              ? numOr(String(row.selling_amount ?? ''), match.selling_amount)
+              : match.selling_amount,
+            selling_currency: Object.prototype.hasOwnProperty.call(row, 'selling_currency')
+              ? String(row.selling_currency ?? '').trim() || match.selling_currency
+              : match.selling_currency,
+            deposit_status: Object.prototype.hasOwnProperty.call(row, 'deposit_status')
+              ? String(row.deposit_status ?? '').trim() || match.deposit_status
+              : match.deposit_status,
+            payment_status: Object.prototype.hasOwnProperty.call(row, 'payment_status')
+              ? String(row.payment_status ?? '').trim() || match.payment_status
+              : match.payment_status,
+          }
+          const persisted = await saveCustomerBooking(updated)
+          const idx = next.findIndex((b) => b.id === persisted.id)
+          if (idx >= 0) next[idx] = persisted
+          saved += 1
+        }
+        setBookings(next)
+      }
+
+      if (!saved) {
+        showToast('No matching tour ops rows to update in CSV', 'error')
+        return
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} tour ops row(s)${skipNote}`, 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'Tour ops CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
     }
   }
 
@@ -273,9 +478,28 @@ export default function WandersTourOpsPanel({ deals }: { deals: WandersDeal[] })
             {label}
           </button>
         ))}
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".csv,text/csv"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) void importTourOpsCsv(file)
+          }}
+        />
         <button
           type="button"
           style={buttonSecondaryStyle}
+          disabled={importing || saving}
+          onClick={() => importInputRef.current?.click()}
+        >
+          {importing ? 'Importing…' : 'Import CSV'}
+        </button>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={importing}
           onClick={() => {
             if (tab === 'packages') {
               exportListCsv(
