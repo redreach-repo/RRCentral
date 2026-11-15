@@ -129,7 +129,12 @@ export async function deleteAccount(id: string): Promise<void> {
   }
 }
 
-export async function listContacts(accountId?: string): Promise<AccountContact[]> {
+export type ContactRow = AccountContact & { deleted_at?: string | null }
+
+export async function listContacts(
+  accountId?: string,
+  opts?: { includeDeleted?: boolean },
+): Promise<ContactRow[]> {
   let q = db.from('account_contacts').select('*')
   if (accountId) q = q.eq('account_id', accountId)
   const { data, error } = await q
@@ -137,7 +142,8 @@ export async function listContacts(accountId?: string): Promise<AccountContact[]
     if (isMissingRelationError(error)) return []
     throw error
   }
-  return (data || []) as AccountContact[]
+  const rows = (data || []) as ContactRow[]
+  return opts?.includeDeleted ? rows : (withoutSoftDeleted(rows) as ContactRow[])
 }
 
 /** Save a contact. Marking one primary clears the flag on the others. */
@@ -167,8 +173,26 @@ export async function saveContact(
   if (error) throw error
 }
 
+/** Soft-delete preferred; falls back to hard delete if deleted_at is unavailable. */
 export async function deleteContact(id: string): Promise<void> {
-  const { error } = await db.from('account_contacts').delete().eq('id', id)
+  try {
+    await softDeleteContact(id)
+  } catch {
+    const { error } = await db.from('account_contacts').delete().eq('id', id)
+    if (error) throw error
+  }
+}
+
+export async function softDeleteContact(id: string): Promise<void> {
+  const { error } = await db
+    .from('account_contacts')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function restoreContact(id: string): Promise<void> {
+  const { error } = await db.from('account_contacts').update({ deleted_at: null }).eq('id', id)
   if (error) throw error
 }
 

@@ -40,4 +40,25 @@ export const GUIDE_FINANCE_SECTIONS: GuideFinanceSection[] = [
     to: '/duplicates',
     linkKey: 'guide.finance.duplicates.link',
   },
+  {
+    id: 'ledger',
+    titleKey: 'guide.finance.ledger.title',
+    bodyKey: 'guide.finance.ledger.body',
+    to: '/ledger',
+    linkKey: 'guide.finance.ledger.link',
+  },
+  {
+    id: 'approvals',
+    titleKey: 'guide.finance.approvals.title',
+    bodyKey: 'guide.finance.approvals.body',
+    to: '/approvals',
+    linkKey: 'guide.finance.approvals.link',
+  },
+  {
+    id: 'payroll',
+    titleKey: 'guide.finance.payroll.title',
+    bodyKey: 'guide.finance.payroll.body',
+    to: '/payroll',
+    linkKey: 'guide.finance.payroll.link',
+  },
 ]

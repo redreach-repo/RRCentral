@@ -251,6 +251,18 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.finance.duplicates.body':
       'Find likely duplicate companies or contacts before they split history across two records.',
     'guide.finance.duplicates.link': 'Open Duplicates',
+    'guide.finance.ledger.title': 'Ledger',
+    'guide.finance.ledger.body':
+      'Double-entry journals and the starter chart of accounts. Tax mapping stays Unverified until your accountant signs off.',
+    'guide.finance.ledger.link': 'Open Ledger',
+    'guide.finance.approvals.title': 'Approvals',
+    'guide.finance.approvals.body':
+      'Maker-checker queue for large expenses, refunds, payroll, and supplier commitments. The requester cannot approve their own row.',
+    'guide.finance.approvals.link': 'Open Approvals',
+    'guide.finance.payroll.title': 'Payroll',
+    'guide.finance.payroll.body':
+      'Draft payroll runs from HR, export WPS CSV/SIF drafts, and send large runs through Approvals. SIF is not bank-certified.',
+    'guide.finance.payroll.link': 'Open Payroll',
     'page.dashboard.title': 'Dashboard',
     'page.dashboard.loading': 'Loading metrics…',
     'page.dashboard.heroToday': 'Today',
@@ -1271,6 +1283,18 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'guide.finance.duplicates.body':
       'اعثر على الشركات أو جهات الاتصال المكررة المحتملة قبل أن يتشتت التاريخ على سجلين.',
     'guide.finance.duplicates.link': 'فتح المكررات',
+    'guide.finance.ledger.title': 'دفتر الأستاذ',
+    'guide.finance.ledger.body':
+      'قيود مزدوجة وجدول حسابات ابتدائي. ربط الضرائب يبقى غير موثّق حتى يوافق المحاسب.',
+    'guide.finance.ledger.link': 'فتح دفتر الأستاذ',
+    'guide.finance.approvals.title': 'الموافقات',
+    'guide.finance.approvals.body':
+      'طابور صانع-فاحص للمصروفات الكبيرة والمردودات والرواتب والتزامات الموردين. لا يوافق الطالب على صفه.',
+    'guide.finance.approvals.link': 'فتح الموافقات',
+    'guide.finance.payroll.title': 'الرواتب',
+    'guide.finance.payroll.body':
+      'مسودات رواتب من الموارد البشرية، تصدير CSV/SIF لـ WPS، وإرسال الجولات الكبيرة عبر الموافقات. SIF غير معتمد بنكياً.',
+    'guide.finance.payroll.link': 'فتح الرواتب',
     'page.dashboard.title': 'لوحة التحكم',
     'page.dashboard.loading': 'جارٍ تحميل المقاييس…',
     'page.dashboard.heroToday': 'اليوم',

@@ -50,9 +50,11 @@ import {
   listTeam,
   logAccountEvent,
   restoreAccount,
+  restoreContact,
   saveContact,
   setDocumentAccount,
   updateAccount,
+  type ContactRow,
 } from '../lib/accountsStore'
 import { canViewField } from '../lib/fieldPermissions'
 import { can } from '../lib/permissions'
@@ -63,7 +65,6 @@ import type {
   Account,
   AccountActivity,
   AccountActivityKind,
-  AccountContact,
   AppUser,
 } from '../lib/types'
 import {
@@ -170,7 +171,8 @@ export default function AccountDetailPage() {
   const [account, setAccount] = useState<Account | null>(null)
   // Bumped when Make contract adds a contract, so the delivery panel reloads.
   const [deliveryKey, setDeliveryKey] = useState(0)
-  const [contacts, setContacts] = useState<AccountContact[]>([])
+  const [contacts, setContacts] = useState<ContactRow[]>([])
+  const [showArchivedContacts, setShowArchivedContacts] = useState(false)
   const [timeline, setTimeline] = useState<AccountActivity[]>([])
   const [team, setTeam] = useState<AppUser[]>([])
   const [invoices, setInvoices] = useState<MoneyDoc[]>([])
@@ -195,7 +197,11 @@ export default function AccountDetailPage() {
       const acc = await getAccount(id)
       setAccount(acc)
       if (!acc) return
-      const [c, t, people] = await Promise.all([listContacts(id), listActivities(id), listTeam()])
+      const [c, t, people] = await Promise.all([
+        listContacts(id, { includeDeleted: showArchivedContacts }),
+        listActivities(id),
+        listTeam(),
+      ])
       setContacts(c)
       setTimeline(t)
       setTeam(people)
@@ -212,7 +218,7 @@ export default function AccountDetailPage() {
     } finally {
       setLoading(false)
     }
-  }, [id, seesMoney, showToast])
+  }, [id, seesMoney, showToast, showArchivedContacts])
 
   useEffect(() => {
     void load()
@@ -293,7 +299,10 @@ export default function AccountDetailPage() {
         contactModal.id,
       )
       if (!contactModal.id) await logAccountEvent(account.id, `Contact added: ${parsed.data.name}`, author)
-      const [c, t] = await Promise.all([listContacts(account.id), listActivities(account.id)])
+      const [c, t] = await Promise.all([
+        listContacts(account.id, { includeDeleted: showArchivedContacts }),
+        listActivities(account.id),
+      ])
       try {
         await syncAccountContactsToCrm(account, c)
       } catch {
@@ -309,14 +318,29 @@ export default function AccountDetailPage() {
     }
   }
 
-  async function handleDeleteContact(c: AccountContact) {
-    if (!account || !window.confirm(`Remove ${c.name} from this account?`)) return
+  async function handleDeleteContact(c: ContactRow) {
+    const archived = Boolean(c.deleted_at)
+    if (
+      !account ||
+      !window.confirm(
+        archived ? `Restore ${c.name} to this account?` : `Archive ${c.name} on this account?`,
+      )
+    ) {
+      return
+    }
     try {
-      await deleteContact(c.id)
-      await logAccountEvent(account.id, `Contact removed: ${c.name}`, author)
+      if (archived) {
+        await restoreContact(c.id)
+        await logAccountEvent(account.id, `Contact restored: ${c.name}`, author)
+        showToast(`${c.name} restored`, 'success')
+      } else {
+        await deleteContact(c.id)
+        await logAccountEvent(account.id, `Contact archived: ${c.name}`, author)
+        showToast(`${c.name} archived`, 'success')
+      }
       await load()
     } catch (e) {
-      showToast(errorMessage(e, 'Could not remove the contact'), 'error')
+      showToast(errorMessage(e, 'Could not update the contact'), 'error')
     }
   }
 
@@ -372,7 +396,7 @@ export default function AccountDetailPage() {
     )
   }
 
-  const sortedContacts = sortContacts(contacts)
+  const sortedContacts = sortContacts(contacts) as ContactRow[]
   const items = sortTimeline(timeline)
 
   const isAi = account.type === 'ai_crm_client'
@@ -559,8 +583,16 @@ export default function AccountDetailPage() {
       <>
       <div style={dualPanelGridStyle}>
         <section style={cardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.accountDetail.contacts')}</h2>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              style={smallBtn}
+              onClick={() => setShowArchivedContacts((v) => !v)}
+            >
+              {showArchivedContacts ? 'Hide archived' : 'Show archived'}
+            </button>
             {editable ? (
               <button
                 type="button"
@@ -572,6 +604,7 @@ export default function AccountDetailPage() {
                 <Plus size={13} /> {t('page.accountDetail.add')}
               </button>
             ) : null}
+            </div>
           </div>
           {sortedContacts.length === 0 ? (
             <p style={{ color: colors.muted, fontSize: 13, marginBottom: 0 }}>
@@ -597,6 +630,11 @@ export default function AccountDetailPage() {
                         <Star size={12} style={{ marginLeft: 6, color: colors.warn, verticalAlign: -1 }} />
                       ) : null}
                       {c.role ? <span style={{ color: colors.muted2, fontWeight: 400 }}>, {c.role}</span> : null}
+                      {c.deleted_at ? (
+                        <span style={{ marginLeft: 6, fontSize: 11, color: colors.muted, fontWeight: 400 }}>
+                          (archived)
+                        </span>
+                      ) : null}
                     </div>
                     {c.email ? (
                       <a href={`mailto:${c.email}`} style={{ color: colors.muted, overflowWrap: 'anywhere' }}>
@@ -633,7 +671,7 @@ export default function AccountDetailPage() {
                         })
                       }
                       onDelete={() => void handleDeleteContact(c)}
-                      deleteLabel="Remove"
+                      deleteLabel={c.deleted_at ? 'Restore' : 'Archive'}
                     />
                   ) : null}
                 </li>

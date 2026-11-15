@@ -1216,26 +1216,24 @@ export default function SettingsPage() {
                     <td style={{ padding: '8px 10px', borderBottom: `1px solid ${colors.border}` }}>
                       {can(userRole, 'settings.manage') ? (
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                          {row.doc_type === 'purchase_order' || row.doc_type === 'expense' ? (
-                            <button
-                              type="button"
-                              style={buttonSecondaryStyle}
-                              onClick={() => {
-                                const next = window.prompt('Prefix (2–8 chars)', row.prefix)
-                                if (next == null) return
-                                void updateNumberingSequence(row.id, { prefix: next })
-                                  .then(() => {
-                                    showToast('Prefix updated', 'success')
-                                    return loadNumbering()
-                                  })
-                                  .catch((e) =>
-                                    showToast(errorMessage(e, 'Could not update prefix'), 'error'),
-                                  )
-                              }}
-                            >
-                              Edit prefix
-                            </button>
-                          ) : null}
+                          <button
+                            type="button"
+                            style={buttonSecondaryStyle}
+                            onClick={() => {
+                              const next = window.prompt('Prefix (2–8 chars)', row.prefix)
+                              if (next == null) return
+                              void updateNumberingSequence(row.id, { prefix: next })
+                                .then(() => {
+                                  showToast('Prefix updated', 'success')
+                                  return loadNumbering()
+                                })
+                                .catch((e) =>
+                                  showToast(errorMessage(e, 'Could not update prefix'), 'error'),
+                                )
+                            }}
+                          >
+                            Edit prefix
+                          </button>
                           <button
                             type="button"
                             style={buttonSecondaryStyle}

@@ -22,6 +22,7 @@ import {
   type WpsLine,
 } from '../lib/wpsGratuity'
 import { logPayrollExport } from '../lib/opsSliceStores'
+import { exportListCsv } from '../lib/listIo'
 import { buttonPrimaryStyle, buttonSecondaryStyle, cardStyle, colors, inputStyle, labelStyle } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
@@ -225,6 +226,27 @@ export default function PayrollPage() {
             scaffold — not bank-certified and not legal advice.
           </p>
         </div>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+          disabled={!rows.length}
+          onClick={() => {
+            exportListCsv(
+              'payroll-runs.csv',
+              ['period_yyyy_mm', 'status', 'currency', 'notes'],
+              rows.map((r) => ({
+                period_yyyy_mm: r.period_yyyy_mm,
+                status: r.status,
+                currency: r.currency,
+                notes: r.notes,
+              })),
+            )
+            showToast('Payroll runs CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
       </header>
 
       <form
