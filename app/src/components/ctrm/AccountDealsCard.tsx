@@ -8,6 +8,7 @@ import DealFormModal, { type DealFormValues } from './DealFormModal'
 import { companyTypeLabel, isOverdue, isStale, regionLabel, stageLabel } from '../../lib/ctrm'
 import { listCommissions, listDeals, saveDealForm } from '../../lib/ctrmStore'
 import { errorMessage } from '../../lib/errors'
+import { exportListCsv } from '../../lib/listIo'
 import type { Account, AccountContact, AppUser, CtrmCommission, CtrmDeal } from '../../lib/types'
 import { buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
 
@@ -62,7 +63,33 @@ export default function AccountDealsCard({ account, contacts, team, editable, sh
     <section style={{ ...cardStyle, marginTop: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>CTRM Next deal</h2>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {deals.length ? (
+            <button
+              type="button"
+              style={{ ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12 }}
+              onClick={() => {
+                exportListCsv(
+                  `ctrm-deals-${account.id.slice(0, 8)}.csv`,
+                  ['stage', 'region', 'company_type', 'source', 'next_action', 'next_action_date', 'last_touch_at', 'lost_reason', 'notes'],
+                  deals.map((d) => ({
+                    stage: stageLabel(d.stage),
+                    region: regionLabel(d.region),
+                    company_type: companyTypeLabel(d.company_type),
+                    source: d.source || '',
+                    next_action: d.next_action || '',
+                    next_action_date: d.next_action_date || '',
+                    last_touch_at: d.last_touch_at || '',
+                    lost_reason: d.stage === 'lost' ? lostText(d.lost_reason_code || '', d.lost_reason) : '',
+                    notes: d.notes || '',
+                  })),
+                )
+                showToast('CTRM deals CSV downloaded', 'success')
+              }}
+            >
+              Export CSV
+            </button>
+          ) : null}
           <Link to="/deals?pipeline=ctrm&view=board" style={{ color: colors.muted, fontSize: 12 }}>
             Open Pipeline
           </Link>
