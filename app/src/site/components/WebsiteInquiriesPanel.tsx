@@ -8,6 +8,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { btnGhost, btnPrimary, colors } from '../../lib/pageStyles'
 import { resolveSalesOwnerName } from '../../lib/crmWorkQueue'
 import { errorMessage } from '../../lib/errors'
+import { exportListCsv } from '../../lib/listIo'
 
 export default function WebsiteInquiriesPanel({
   onConverted,
@@ -91,9 +92,33 @@ export default function WebsiteInquiriesPanel({
         marginBottom: 16,
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 10, alignItems: 'center' }}>
         <strong>Website enquiries</strong>
-        <span style={{ color: colors.muted2, fontSize: 12 }}>{rows.length} new</span>
+        <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span style={{ color: colors.muted2, fontSize: 12 }}>{rows.length} new</span>
+          <button
+            type="button"
+            style={btnGhost}
+            onClick={() => {
+              exportListCsv(
+                'website-enquiries.csv',
+                ['name', 'email', 'phone', 'vertical', 'message', 'status', 'created_at'],
+                rows.map((r) => ({
+                  name: r.name,
+                  email: r.email,
+                  phone: r.phone,
+                  vertical: verticalBrandForInquiry(r.vertical),
+                  message: r.message,
+                  status: r.status,
+                  created_at: r.created_at,
+                })),
+              )
+              showToast('Website enquiries CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </span>
       </div>
       <div style={{ display: 'grid', gap: 10 }}>
         {rows.map((row) => (
