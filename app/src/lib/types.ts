@@ -142,6 +142,7 @@ export interface CustomerDocument {
   storage_provider: string
   uploaded_by: string
   uploaded_at: string
+  deleted_at?: string | null
 }
 
 /** Red Reach company papers (trade license, VAT cert, etc.) — Google Drive links. */

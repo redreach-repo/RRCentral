@@ -118,6 +118,8 @@ export type CustomerFolderItem = {
   driveUrl?: string
   documentId?: string
   relatedRef?: string
+  /** Soft-unlinked Drive document (deleted_at set). */
+  archived?: boolean
 }
 
 export type CustomerFolder = {
@@ -460,6 +462,7 @@ export function buildCustomerFolder(opts: {
       driveUrl: doc.drive_url,
       documentId: doc.id,
       relatedRef: doc.related_ref || undefined,
+      archived: Boolean(doc.deleted_at),
     })
   }
 
@@ -490,14 +493,24 @@ export function buildCustomerFolder(opts: {
   return { company, crm: opts.crm, items, bySection, byCategory }
 }
 
-export async function loadCustomerDocuments(company: string): Promise<CustomerDocument[]> {
+export async function loadCustomerDocuments(
+  company: string,
+  opts?: { includeDeleted?: boolean },
+): Promise<CustomerDocument[]> {
   const name = company.trim()
   if (!name) return []
-  const { data, error } = await db
-    .from('customer_documents')
-    .select('*')
-    .order('uploaded_at', { ascending: false })
-  if (error) throw error
+  let q = db.from('customer_documents').select('*').order('uploaded_at', { ascending: false })
+  if (!opts?.includeDeleted) q = q.is('deleted_at', null)
+  const { data, error } = await q
+  if (error) {
+    // Pre-migration DBs may lack deleted_at — fall back to unfiltered select.
+    if (String(error.message || '').toLowerCase().includes('deleted_at')) {
+      const fallback = await db.from('customer_documents').select('*').order('uploaded_at', { ascending: false })
+      if (fallback.error) throw fallback.error
+      return filterByCompany((fallback.data || []) as CustomerDocument[], name)
+    }
+    throw error
+  }
   return filterByCompany((data || []) as CustomerDocument[], name)
 }
 
@@ -521,7 +534,10 @@ async function loadRowsMatchingCompany<T extends { client?: string }>(
   return filterByCompany((loose.data || []) as T[], name)
 }
 
-export async function loadCustomerFolder(company: string): Promise<CustomerFolder> {
+export async function loadCustomerFolder(
+  company: string,
+  opts?: { includeDeletedDocs?: boolean },
+): Promise<CustomerFolder> {
   const name = company.trim()
   if (!name) {
     return buildCustomerFolder({
@@ -558,7 +574,7 @@ export async function loadCustomerFolder(company: string): Promise<CustomerFolde
       if (isMissingRelationError(err)) return [] as DeliveryNote[]
       throw err
     }),
-    loadCustomerDocuments(name)
+    loadCustomerDocuments(name, { includeDeleted: opts?.includeDeletedDocs })
       .then(
         (documents) => ({ documents, missing: false as const }),
         (err: unknown) => {
@@ -663,8 +679,26 @@ export async function saveCustomerDriveLink(opts: {
   return match
 }
 
+/** Soft-unlink preferred; falls back to hard delete if deleted_at is unavailable. */
 export async function deleteCustomerDocument(id: string): Promise<void> {
-  const { error } = await db.from('customer_documents').delete().eq('id', id)
+  try {
+    await softDeleteCustomerDocument(id)
+  } catch (e) {
+    const { error } = await db.from('customer_documents').delete().eq('id', id)
+    if (error) throw e
+  }
+}
+
+export async function softDeleteCustomerDocument(id: string): Promise<void> {
+  const { error } = await db
+    .from('customer_documents')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function restoreCustomerDocument(id: string): Promise<void> {
+  const { error } = await db.from('customer_documents').update({ deleted_at: null }).eq('id', id)
   if (error) throw error
 }
 
