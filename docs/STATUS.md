@@ -1,48 +1,43 @@
 # HighMast / RR Central status
 
 **Last updated:** 15 November 2026 (Asia/Dubai)  
-**Spec:** Master Specification **v2.1** (`MASTER_SPEC.md`, `docs/SPEC_POINTER.md`)  
-**Batch:** M0 through M3a (`docs/RUN_PLAN.md`)  
-**Branch:** `cursor/batch-m0-m3a-d3d5`
+**Spec:** Master Specification **v2.1** (`MASTER_SPEC.md`)  
+**Batch:** M4 through M7 (`docs/RUN_PLAN.md`)  
+**Branch:** `cursor/batch-m4-m7-d3d5`
 
 ## Milestone verdict (this batch)
 
-| Milestone | Accept when | Result |
-|-----------|-------------|--------|
-| **M0** | Audit + gap plan + RLS + plan docs | **Pass** (SVG assets still external) |
-| **M1** | Tenancy + PRODUCT + isolation tests | **Pass** with Not done: per-host PWA, MFA/SSO, full FLE |
-| **M2** | Fields / stages / approval without deploy | **Pass** with Not done: dashboard builder, full terminology UI |
-| **M3** | One pipeline hub; §B.3 intact; no silent DROP | **Pass** (destructive merge deferred) |
-| **M3a** | Demo isolation + seed + presenter tools | **Pass code-side**; **Not done:** Alfred demo project, deploy workflow, self-serve limits |
+| Milestone | Result |
+|-----------|--------|
+| **M4** | **Pass** existing providers; IMAP stays unavailable; Gmail Phase B Not done (CASA) |
+| **M5** | **Pass** deepen (doc-type e-sign matrix); QTSP vendor Not done |
+| **M6** | **Pass** leave requests + Leave page; attendance later Not done |
+| **M7** | **Pass** CoA + journals + Ledger page; auto-post / VAT return Not done |
 
 ## Shipped this batch
 
-- `MASTER_SPEC.md`, `docs/RUN_PLAN.md`, `docs/DECISIONS.md`, `docs/QUESTIONS.md`
-- AUDIT / GAP / M3A / demo-isolation refreshed for v2.1
-- Demo guided tour + role switcher (`DemoPresenterChrome`)
-- Expanded Falcon Bay seed + `demo_reset.sql`
+- Accounting ledger migration + `/ledger` + unit/SQL tests
+- HR leave migration + `/hr/leave`
+- E-sign doc-type required vs available levels
+- Compliance note for Unverified starter CoA
 
 ## Not done (with reason)
 
-1. Bank-certified WPS + counsel review — external legal/bank  
-2. Official Boost/Care/Trading SVG masters — waiting on zip  
-3. **Demo Supabase project + `DEMO_*` secrets + Pages workflow** — Alfred  
-4. Self-serve demo rate limits / expiry / name blocklist — open §19  
-5. Per-host PWA manifests / `tenant_app_identities` — M11  
-6. MFA passkeys / SSO — later M1 remainder  
-7. CRM table DROP / forced route merge — needs dedicated cutover PR  
-8. Dashboard builder + full terminology UI — later customization polish  
+1. Gmail Phase B inbox — CASA / restricted verification  
+2. IMAP live adapter — deferred  
+3. TDRA QTSP paid vendor — Alfred  
+4. Auto-post invoices/expenses to GL — later deepen  
+5. VAT return engine — compliance  
+6. Prior external blocks: WPS counsel, SVG zip, demo Supabase, MFA/SSO  
 
-## Test results (this batch)
+## Test results
 
 - Typecheck: pass  
 - Lint: pass (existing warnings only)  
-- Vitest: **1311** passed / 242 files  
+- Vitest: **1320** passed / 244 files  
+- SQL `run.sh`: pass (incl. `accounting_ledger_test`, `hr_leave_test`)
 
 ```bash
 cd app && npm run typecheck && npm run lint && npx vitest run
+sudo -u postgres bash -c 'cd /workspace/supabase && bash tests/run.sh'
 ```
-
-## Still externally blocked (unchanged)
-
-CASA · paid QTSP · WPS counsel · SVG zip · native app store accounts (v6) · §19 residency lock

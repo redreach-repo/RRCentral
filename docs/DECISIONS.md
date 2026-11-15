@@ -39,3 +39,15 @@ Autonomous picks for open Master Spec §19 items during batch **M0–M3a**. Each
 - **What:** Seed renames default tenant to “Falcon Bay Trading (demo)”, `is_demo=true`, fictional `.example` accounts; demo brand kit colours use HighMast tokens without Red Reach logos.
 - **Why:** Spec forbids real client brands in demo; one coherent story for the guided tour.
 - **Change later:** Theme studio / brand kit assets when demo SVG pack exists.
+
+## D7 — Starter CoA without claiming tax compliance (M7)
+
+- **What:** Ship a 10-account UAE SME starter chart including “VAT payable”; mark Unverified in UI + COMPLIANCE_NOTES; no VAT return generator.
+- **Why:** Unblocks double-entry without inventing FTA-certified mappings.
+- **Change later:** Accountant-mapped tenant CoA packs; optional auto-post from invoices.
+
+## D8 — Leave requests before full HR suite (M6)
+
+- **What:** `hr_leave_requests` + manager approve path only; no attendance clock or org chart yet.
+- **Why:** Highest-value HR deepen that reuses `hr_employees` without inventing labour-law attendance rules.
+- **Change later:** Attendance / contracts HR pack after counsel input.

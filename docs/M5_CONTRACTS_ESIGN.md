@@ -22,6 +22,7 @@
 - `getQtspProvider` / `createQtspSigningSession` refuse to run without a configured TDRA-licensed QTSP
 - Settings key `esignQtspProvider` reserved; options are “none” or “pending vendor”
 - **No** QES/AdES claim on the canvas path; **no** paid vendor wired yet
+- Doc-type matrix (`requiredEsignLevelForDocType` / `availableEsignLevelForDocType`): employment may **require** QES in policy, but available level stays assent until QTSP is connected
 
 ## Later
 

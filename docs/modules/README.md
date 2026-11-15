@@ -10,3 +10,5 @@ Stubbed / unverified: <plain list>
 ```
 
 Then: what it does, roles, tables, setup steps for Alfred (SQL via the copy page, secrets, the "Deploy Edge Functions" button with Function = other), and anything that needs his verification.
+
+Recent Cursor modules: `accounting-ledger.md`, `hr-leave.md`, `demo-isolation.md`, `public-api.md`, …

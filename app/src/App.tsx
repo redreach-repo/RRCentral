@@ -10,6 +10,8 @@ import { I18nProvider } from './contexts/I18nContext'
 import GuidePage from './pages/GuidePage'
 import AboutProductPage from './pages/AboutProductPage'
 import HrPeoplePage from './pages/HrPeoplePage'
+import HrLeavePage from './pages/HrLeavePage'
+import LedgerPage from './pages/LedgerPage'
 import PayrollPage from './pages/PayrollPage'
 import MarketingPage from './pages/MarketingPage'
 import SaasBillingPage from './pages/SaasBillingPage'
@@ -159,6 +161,8 @@ export default function App() {
               <Route path="guide" element={<GuidePage />} />
               <Route path="about-product" element={<AboutProductPage />} />
               <Route path="hr/people" element={<HrPeoplePage />} />
+              <Route path="hr/leave" element={<HrLeavePage />} />
+              <Route path="ledger" element={<LedgerPage />} />
               <Route path="payroll" element={<PayrollPage />} />
               <Route path="marketing" element={<MarketingPage />} />
               <Route path="saas-billing" element={<SaasBillingPage />} />
