@@ -18,6 +18,7 @@ import {
 } from '../lib/planningGoalsStore'
 import {
   createPlanningScenario,
+  deactivatePlanningScenario,
   listPlanningScenarios,
   type PlanningScenario,
 } from '../lib/planningScenariosStore'
@@ -47,6 +48,7 @@ export default function PlanningGoalsPage() {
   const [target, setTarget] = useState('')
   const [period, setPeriod] = useState(currentPeriodYyyyMm())
   const [scenarioName, setScenarioName] = useState('')
+  const [scenarioAssumptions, setScenarioAssumptions] = useState('{"revenue_uplift_pct":0}')
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -206,15 +208,35 @@ export default function PlanningGoalsPage() {
                 value={scenarioName}
                 onChange={(e) => setScenarioName(e.target.value)}
               />
+              <input
+                style={{ ...inputStyle, maxWidth: 280, fontFamily: 'monospace', fontSize: 12 }}
+                placeholder='Assumptions JSON e.g. {"revenue_uplift_pct":5}'
+                value={scenarioAssumptions}
+                onChange={(e) => setScenarioAssumptions(e.target.value)}
+              />
               <button
                 type="button"
                 style={buttonSecondaryStyle}
                 disabled={!scenarioName.trim()}
                 onClick={() => {
-                  void createPlanningScenario({ name: scenarioName })
+                  let assumptions: Record<string, unknown> = { revenue_uplift_pct: 0 }
+                  try {
+                    const parsed = JSON.parse(scenarioAssumptions || '{}')
+                    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                      assumptions = parsed as Record<string, unknown>
+                    } else {
+                      showToast('Assumptions must be a JSON object', 'error')
+                      return
+                    }
+                  } catch {
+                    showToast('Assumptions JSON is invalid', 'error')
+                    return
+                  }
+                  void createPlanningScenario({ name: scenarioName, assumptions })
                     .then(() => {
                       showToast('Scenario saved', 'success')
                       setScenarioName('')
+                      setScenarioAssumptions('{"revenue_uplift_pct":0}')
                       return load()
                     })
                     .catch((err) => showToast(errorMessage(err, 'Could not save scenario'), 'error'))
@@ -228,9 +250,39 @@ export default function PlanningGoalsPage() {
             ) : (
               <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
                 {scenarios.map((s) => (
-                  <li key={s.id} style={{ fontSize: 13 }}>
-                    <strong>{s.name}</strong>
-                    {s.description ? ` · ${s.description}` : ''}
+                  <li
+                    key={s.id}
+                    style={{
+                      fontSize: 13,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                      alignItems: 'flex-start',
+                      borderTop: `1px solid ${colors.border}`,
+                      paddingTop: 6,
+                    }}
+                  >
+                    <div>
+                      <strong>{s.name}</strong>
+                      {s.description ? ` · ${s.description}` : ''}
+                      <div style={{ color: colors.muted, fontSize: 12, fontFamily: 'monospace' }}>
+                        {JSON.stringify(s.assumptions_json ?? {})}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      style={{ ...buttonSecondaryStyle, padding: '2px 8px', fontSize: 12 }}
+                      onClick={() => {
+                        void deactivatePlanningScenario(s.id)
+                          .then(() => {
+                            showToast('Scenario deactivated', 'success')
+                            return load()
+                          })
+                          .catch((err) => showToast(errorMessage(err, 'Could not deactivate'), 'error'))
+                      }}
+                    >
+                      Deactivate
+                    </button>
                   </li>
                 ))}
               </ul>

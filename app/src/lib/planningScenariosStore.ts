@@ -37,3 +37,21 @@ export async function createPlanningScenario(input: {
   })
   if (error) throw error
 }
+
+export async function updatePlanningScenario(
+  id: string,
+  patch: { name?: string; description?: string; assumptions?: Record<string, unknown> },
+): Promise<void> {
+  const row: Record<string, unknown> = {}
+  if (patch.name !== undefined) row.name = patch.name.trim()
+  if (patch.description !== undefined) row.description = patch.description.trim()
+  if (patch.assumptions !== undefined) row.assumptions_json = patch.assumptions
+  if (!Object.keys(row).length) return
+  const { error } = await db.from('planning_scenarios').update(row).eq('id', id)
+  if (error) throw error
+}
+
+export async function deactivatePlanningScenario(id: string): Promise<void> {
+  const { error } = await db.from('planning_scenarios').update({ active: false }).eq('id', id)
+  if (error) throw error
+}
