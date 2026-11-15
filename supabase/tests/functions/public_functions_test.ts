@@ -25,6 +25,8 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "fireflies-fetch": { kind: "signed in user (JWT read in code) who can write the account", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_can_write_account/ },
   "invoice-pay-link": { kind: "signed in team member (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_staff/ },
   "stripe-invoice-webhook": { kind: "Stripe signature", pattern: /if \(!webhookSecret[\s\S]*constructEventAsync\(raw, signature, webhookSecret/ },
+  "saas-checkout": { kind: "signed in admin (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_admin/ },
+  "saas-billing-webhook": { kind: "Stripe signature", pattern: /if \(!webhookSecret[\s\S]*constructEventAsync\(raw, signature, webhookSecret/ },
   "create-checkout-session": { kind: "allowed origin and public key", pattern: /allowedOrigins\(\)\.includes\(origin\)[\s\S]*shopKeyOk\(/ },
   "support-email-in": { kind: "shared secret", pattern: /if \(!expected\)[\s\S]*provided !== expected/ },
   "teetribe-order-sync": { kind: "shared secret", pattern: /if \(!expected \|\| provided !== expected\)/ },
@@ -356,6 +358,25 @@ Deno.test({ name: "stripe-invoice-webhook only believes Stripe's signature", ...
   } finally {
     Deno.env.set("RR_STRIPE_WEBHOOK_SECRET", ENV.RR_STRIPE_WEBHOOK_SECRET)
   }
+} })
+
+Deno.test({ name: "saas-billing-webhook only believes Stripe's signature", ...opts, fn: async () => {
+  const fn = "saas-billing-webhook"
+  const raw = JSON.stringify({ id: "evt_saas", type: "checkout.session.completed", data: { object: { metadata: { source: "highmast-saas" } } } })
+  assertEquals(await call(fn, post(fn, raw)), 401)
+  assertEquals(await call(fn, post(fn, raw, { "stripe-signature": "t=1,v1=forged" })), 401)
+  Deno.env.delete("RR_STRIPE_WEBHOOK_SECRET")
+  try {
+    assertEquals(await call(fn, post(fn, raw, { "stripe-signature": "t=1,v1=forged" })), 500)
+  } finally {
+    Deno.env.set("RR_STRIPE_WEBHOOK_SECRET", ENV.RR_STRIPE_WEBHOOK_SECRET)
+  }
+} })
+
+Deno.test({ name: "saas-checkout needs a signed in admin", ...opts, fn: async () => {
+  const fn = "saas-checkout"
+  assertEquals(await call(fn, post(fn, { action: "checkout", plan_key: "starter" })), 401)
+  assertEquals(await call(fn, post(fn, { action: "checkout", plan_key: "starter" }, { Authorization: "Bearer someone" })), 401)
 } })
 
 Deno.test({ name: "google-drive needs a sign in, and Google's answer needs a signed state", ...opts, fn: async () => {

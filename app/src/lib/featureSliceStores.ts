@@ -77,6 +77,8 @@ export type TenantSubscription = {
   status: string
   seats: number
   current_period_end: string | null
+  stripe_customer_id: string
+  stripe_subscription_id: string
 }
 
 export type ApprovalRequest = {

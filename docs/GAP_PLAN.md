@@ -52,7 +52,7 @@ Status key: **exists** · **partial** · **missing**
 | 6.10 Marketing | partial | M10 first slice: `marketing_campaigns` + Campaigns page |
 | 6.11 Documents and knowledge | partial | Drive + customer_documents; not full DMS → expand with M5/M11 |
 | 6.12 Planning and reports | partial | Reports/MRR/insights; no goals/scenarios builder → M12-ish / planning |
-| 6.13 Tenant billing | partial | M11 first slice: `tenant_subscriptions` + plan catalog; Stripe SaaS checkout next |
+| 6.13 Tenant billing | partial | M11: `tenant_subscriptions` + plan catalog + Stripe Checkout/portal (`saas-checkout`); Tax registration later |
 | 6.14 Demo / showcase | missing | M3a after CRM rebuild |
 
 ---
