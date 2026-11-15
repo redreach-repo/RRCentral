@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import SavedViewsBar from '../components/SavedViewsBar'
 import { accountFills, findAccountDuplicates, findContactDuplicates, mergeSummary, suggestKeep, type DuplicateKind, type DuplicatePair } from '../lib/duplicates'
+import { DUPLICATES_CSV_COLUMNS, DUPLICATES_CSV_HEADERS, parseDuplicateCsvAction } from '../lib/duplicatesCsv'
 import { accountWeights, dismissPair, loadDuplicateData, mergePair, type DuplicateData } from '../lib/duplicatesStore'
 import { errorMessage } from '../lib/errors'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import { roleAtLeast } from '../lib/permissions'
 import type { Account, AccountContact } from '../lib/types'
 import { buttonDangerStyle, buttonSecondaryStyle, cardStyle, colors } from '../lib/uiStyles'
@@ -30,6 +31,8 @@ export default function DuplicatesPage() {
   const [data, setData] = useState<DuplicateData | null>(null)
   const [kind, setKind] = useState<DuplicateKind>('account')
   const [open, setOpen] = useState<DuplicatePair | null>(null)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const duplicatesViewFilters = useMemo(() => ({ kind }), [kind])
 
   const load = useCallback(async () => {
@@ -81,6 +84,66 @@ export default function DuplicatesPage() {
     }
   }
 
+  async function importDuplicatesCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of DUPLICATES_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, DUPLICATES_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid duplicate rows', 'error')
+        return
+      }
+      const planned: Array<{ kind: DuplicateKind; keep_id: string; dup_id: string; action: 'merge' | 'dismiss' }> = []
+      for (const row of ok) {
+        const action = parseDuplicateCsvAction(row.action)
+        const rowKind: DuplicateKind | null = row.kind === 'contact' ? 'contact' : row.kind === 'account' ? 'account' : null
+        if (!action || !rowKind || !row.keep_id || !row.dup_id || row.keep_id === row.dup_id) continue
+        planned.push({ kind: rowKind, keep_id: row.keep_id, dup_id: row.dup_id, action })
+      }
+      const merges = planned.filter((r) => r.action === 'merge')
+      if (merges.length && !window.confirm(`Merge ${merges.length} duplicate pair(s) from CSV? This cannot be undone.`)) {
+        return
+      }
+      let merged = 0
+      let dismissed = 0
+      let skipped = errors.length + (ok.length - planned.length)
+      for (const row of planned) {
+        try {
+          if (row.action === 'merge') {
+            await mergePair(row.kind, row.keep_id, row.dup_id)
+            merged += 1
+          } else {
+            await dismissPair(row.kind, row.keep_id, row.dup_id, user?.email || '')
+            dismissed += 1
+          }
+        } catch {
+          skipped += 1
+        }
+      }
+      const parts = [
+        merged ? `${merged} merged` : '',
+        dismissed ? `${dismissed} dismissed` : '',
+        skipped ? `${skipped} skipped` : '',
+      ].filter(Boolean)
+      showToast(parts.length ? `Duplicates CSV: ${parts.join(' · ')}` : 'No duplicate actions in CSV', 'success')
+      setOpen(null)
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Duplicates CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   const label = (p: DuplicatePair, id: string) => {
     if (p.kind === 'account') return accounts.get(id)?.name || 'Account'
     const c = contacts.get(id)
@@ -95,29 +158,51 @@ export default function DuplicatesPage() {
           <h1 className={docsStyles.title}>{t('page.duplicates.title')}</h1>
           <p className={docsStyles.subtitle}>{t('page.duplicates.subtitle')}</p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-          disabled={!list.length}
-          onClick={() => {
-            exportListCsv(
-              `duplicates-${kind}.csv`,
-              ['kind', 'keep_id', 'dup_id', 'keep_label', 'dup_label', 'reasons'],
-              list.map((p) => ({
-                kind: p.kind,
-                keep_id: p.a,
-                dup_id: p.b,
-                keep_label: label(p, p.a),
-                dup_label: label(p, p.b),
-                reasons: p.reasons.join('; '),
-              })),
-            )
-            showToast('Duplicates CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importDuplicatesCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!list.length}
+            onClick={() => {
+              exportListCsv(
+                `duplicates-${kind}.csv`,
+                DUPLICATES_CSV_HEADERS,
+                list.map((p) => ({
+                  kind: p.kind,
+                  keep_id: p.a,
+                  dup_id: p.b,
+                  keep_label: label(p, p.a),
+                  dup_label: label(p, p.b),
+                  reasons: p.reasons.join('; '),
+                  action: '',
+                })),
+              )
+              showToast('Duplicates CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </header>
       <SavedViewsBar
         moduleId="duplicates"
