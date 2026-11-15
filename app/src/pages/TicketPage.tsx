@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { ArrowLeft, LifeBuoy, Lock, MessageCircle, Sparkles } from 'lucide-react'
@@ -17,7 +17,7 @@ import CtrmIssueBox from '../components/support/CtrmIssueBox'
 import { NO_TRADE_DATA_NOTE, isCtrmIssue } from '../lib/ctrmIssues'
 import { DELIVERY_LABELS, serviceWindow, type DeliveryStatus } from '../lib/whatsappTickets'
 import { errorMessage } from '../lib/errors'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { parseTicketReplyForm } from '../lib/schemas/ticketReply'
 import { parseTicketSummaryForm } from '../lib/schemas/ticketSummary'
 import { signOffFor, type AiThreadMessage } from '../lib/aiAssist'
@@ -48,6 +48,15 @@ const aiButton: CSSProperties = {
   gap: 6,
 }
 
+const MESSAGE_EXPORT_COLUMNS = [
+  'created_at',
+  'author',
+  'author_kind',
+  'internal_note',
+  'body',
+  'delivery_status',
+] as const
+
 export default function TicketPage() {
   const { id = '' } = useParams<{ id: string }>()
   const { t } = useI18n()
@@ -66,6 +75,8 @@ export default function TicketPage() {
   const [busy, setBusy] = useState(false)
   const [aiBusy, setAiBusy] = useState<'' | 'summary' | 'reply'>('')
   const [summary, setSummary] = useState('')
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const { settings } = useSettings()
 
   const author = useMemo(() => ({ appUserId, email: user?.email || '' }), [appUserId, user?.email])
@@ -139,6 +150,41 @@ export default function TicketPage() {
       showToast(errorMessage(e, 'Could not update the ticket'), 'error')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function importMessagesCsv(file: File) {
+    if (!ticket || !editable) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows)
+      let saved = 0
+      let skipped = 0
+      for (const row of objects) {
+        const body = String(row.body || '').trim()
+        if (!body) {
+          skipped += 1
+          continue
+        }
+        const noteRaw = String(row.internal_note || '').trim().toLowerCase()
+        const isInternal = noteRaw === 'yes' || noteRaw === 'true' || noteRaw === '1'
+        await addTicketMessage(ticket, body, isInternal, author)
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} message(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Ticket messages CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
     }
   }
 
@@ -401,6 +447,26 @@ export default function TicketPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
           <h2 style={{ ...sectionTitleStyle, margin: 0 }}>{t('page.ticket.conversation')}</h2>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) void importMessagesCsv(file)
+              }}
+            />
+            {editable ? (
+              <button
+                type="button"
+                style={aiButton}
+                disabled={importing || busy}
+                onClick={() => importInputRef.current?.click()}
+              >
+                {importing ? 'Importing…' : 'Import CSV'}
+              </button>
+            ) : null}
             {messages.length ? (
               <button
                 type="button"
@@ -408,7 +474,7 @@ export default function TicketPage() {
                 onClick={() => {
                   exportListCsv(
                     `ticket-${(ticket?.subject || id).replace(/\s+/g, '-').slice(0, 40).toLowerCase() || id}-messages.csv`,
-                    ['created_at', 'author', 'author_kind', 'internal_note', 'body', 'delivery_status'],
+                    [...MESSAGE_EXPORT_COLUMNS],
                     messages.map((m) => ({
                       created_at: m.created_at,
                       author: m.author_label,
