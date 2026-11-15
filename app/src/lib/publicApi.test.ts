@@ -78,9 +78,11 @@ describe('webhook retries', () => {
 })
 
 describe('DEFAULT_API_KEY_SCOPES', () => {
-  it('includes invoices and quotations but not writes by default', () => {
+  it('includes invoices, quotations, contacts, and tickets but not writes by default', () => {
     expect(DEFAULT_API_KEY_SCOPES).toContain('read:invoices')
     expect(DEFAULT_API_KEY_SCOPES).toContain('read:quotations')
+    expect(DEFAULT_API_KEY_SCOPES).toContain('read:contacts')
+    expect(DEFAULT_API_KEY_SCOPES).toContain('read:tickets')
     expect(DEFAULT_API_KEY_SCOPES).not.toContain('write:accounts')
   })
 })

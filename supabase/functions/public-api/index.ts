@@ -3,6 +3,7 @@
  * GET  /public-api                 → health
  * GET  /public-api/v1/me           → key metadata (x-api-key)
  * GET/POST /v1/accounts · PATCH /v1/accounts/:id
+ * GET /v1/contacts · GET /v1/tickets
  * GET/POST /v1/invoices · PATCH /v1/invoices/:id
  * GET/POST /v1/quotations · PATCH /v1/quotations/:id
  *
@@ -328,13 +329,15 @@ Deno.serve(withErrorLog("public-api", async (req) => {
       ok: true,
       product: "HighMast",
       api: "public-api",
-      version: "0.6.0",
+      version: "0.7.0",
       routes: [
         "GET /",
         "GET /v1/me",
         "GET /v1/accounts",
         "POST /v1/accounts",
         "PATCH /v1/accounts/:id",
+        "GET /v1/contacts",
+        "GET /v1/tickets",
         "GET /v1/invoices",
         "POST /v1/invoices",
         "PATCH /v1/invoices/:id",
@@ -424,6 +427,22 @@ Deno.serve(withErrorLog("public-api", async (req) => {
 
   if (req.method === "GET" && path === "/v1/accounts") {
     return await listResource("read:accounts", "accounts", "id, name, type, status, reference")
+  }
+
+  if (req.method === "GET" && path === "/v1/contacts") {
+    return await listResource(
+      "read:contacts",
+      "account_contacts",
+      "id, account_id, name, role, email, phone, whatsapp, is_primary, marketing_opt_in, created_at",
+    )
+  }
+
+  if (req.method === "GET" && path === "/v1/tickets") {
+    return await listResource(
+      "read:tickets",
+      "tickets",
+      "id, account_id, subject, status, priority, channel, requester_email, assignee_user_id, created_at, updated_at",
+    )
   }
 
   if (req.method === "POST" && path === "/v1/accounts") {

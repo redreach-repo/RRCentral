@@ -33,7 +33,11 @@ export type AccountInput = Pick<
 export type ContactInput = Pick<
   AccountContact,
   'name' | 'role' | 'email' | 'phone' | 'whatsapp' | 'is_primary'
->
+> & {
+  marketing_opt_in?: boolean
+  marketing_opt_in_at?: string | null
+  marketing_opt_in_source?: string
+}
 
 /** Rows plus whether the accounts migration has been applied to this database. */
 export async function listAccounts(opts?: {

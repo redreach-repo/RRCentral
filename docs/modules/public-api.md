@@ -7,7 +7,7 @@
 - Edge Function `public-api` (`verify_jwt = false`)
 - Caller sends `x-api-key: hm_…` (plaintext shown once at create time; only SHA-256 hash stored)
 - Scopes on `api_keys.scopes` (JSON array). Wildcard `*` allowed.
-- Default scopes (read-only): `read:accounts`, `read:invoices`, `read:quotations`
+- Default scopes (read-only): `read:accounts`, `read:contacts`, `read:invoices`, `read:quotations`, `read:tickets`
 - Opt-in write scopes: `write:accounts`, `write:invoices`, `write:quotations` (checkboxes on `/public-api`)
 
 ## Routes
@@ -19,6 +19,8 @@
 | GET | `/v1/accounts` | `read:accounts` | Tenant-scoped; `?limit=&cursor=` |
 | POST | `/v1/accounts` | `write:accounts` | Create account; emits `account.created` |
 | PATCH | `/v1/accounts/:id` | `write:accounts` | Update; emits `account.updated` |
+| GET | `/v1/contacts` | `read:contacts` | Tenant-scoped `account_contacts`; includes `marketing_opt_in` |
+| GET | `/v1/tickets` | `read:tickets` | Tenant-scoped support tickets |
 | GET | `/v1/invoices` | `read:invoices` | Tenant-scoped; cursor pagination |
 | POST | `/v1/invoices` | `write:invoices` | Create draft invoice; emits `invoice.created` |
 | PATCH | `/v1/invoices/:id` | `write:invoices` | Update; emits `invoice.updated` |

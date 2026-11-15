@@ -122,8 +122,9 @@ export default function PublicApiPage() {
           <p className={docsStyles.kicker}>Public API</p>
           <h1 className={docsStyles.title}>API and webhooks</h1>
           <p className={docsStyles.subtitle}>
-            Hashed API keys (`x-api-key`) and partner webhooks. Reads: `/v1/accounts|invoices|quotations`. Writes
-            (opt-in scopes): accounts, invoices, quotations. Failed deliveries are retried by Edge `webhook-retry`.
+            Hashed API keys (`x-api-key`) and partner webhooks. Reads:
+            `/v1/accounts|contacts|invoices|quotations|tickets`. Writes (opt-in scopes): accounts, invoices,
+            quotations. Failed deliveries are retried by Edge `webhook-retry`.
             {publicApiConfigured() ? '' : ' Supabase is not configured in this environment.'}
           </p>
         </div>
