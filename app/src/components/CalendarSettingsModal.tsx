@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Loader2, RefreshCw } from 'lucide-react'
 import Modal from './Modal'
@@ -6,7 +6,7 @@ import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { errorMessage } from '../lib/errors'
 import { parseCalendarSettingsForm } from '../lib/schemas/calendarSettings'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import {
   isZohoConfigured,
   listZohoCalendars,
@@ -23,10 +23,37 @@ import {
   labelStyle,
 } from '../lib/uiStyles'
 
+const CALENDAR_SETTINGS_CSV_COLUMNS = [
+  'kind',
+  'uid',
+  'name',
+  'is_default',
+  'sync_enabled',
+  'domain',
+  'selected_uid',
+] as const
+
 type Props = {
   open: boolean
   onClose: () => void
   onSaved?: () => void
+}
+
+function pickSettingsRow(
+  objects: Array<Record<string, string>>,
+): Record<string, string> | null {
+  if (!objects.length) return null
+  const settingsRow = objects.find((r) => String(r.kind || '').trim().toLowerCase() === 'settings')
+  if (settingsRow) return settingsRow
+  return (
+    objects.find(
+      (r) =>
+        String(r.sync_enabled || '').trim() ||
+        String(r.domain || '').trim() ||
+        String(r.selected_uid || '').trim() ||
+        String(r.uid || '').trim(),
+    ) || objects[0]
+  )
 }
 
 export default function CalendarSettingsModal({ open, onClose, onSaved }: Props) {
@@ -41,6 +68,8 @@ export default function CalendarSettingsModal({ open, onClose, onSaved }: Props)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState('')
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const configured = isZohoConfigured(settings)
 
@@ -129,6 +158,70 @@ export default function CalendarSettingsModal({ open, onClose, onSaved }: Props)
     }
   }
 
+  async function importSettingsCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, rows)
+      const row = pickSettingsRow(objects)
+      if (!row) {
+        showToast('No calendar settings rows in CSV', 'error')
+        return
+      }
+
+      const kind = String(row.kind || '').trim().toLowerCase()
+      const nextEnabledRaw = String(row.sync_enabled ?? '').trim()
+      const nextDomainRaw = String(row.domain ?? '').trim()
+      const selectedUid = String(row.selected_uid ?? '').trim()
+      const uid = String(row.uid ?? '').trim()
+      const nextUid =
+        selectedUid || (kind === 'settings' ? uid : '') || (kind === '' ? uid : '') || calendarUid
+
+      if (!nextEnabledRaw && !nextDomainRaw && !selectedUid && !(kind === 'settings' && uid)) {
+        showToast('CSV had no matching calendar settings fields', 'error')
+        return
+      }
+
+      const nextEnabled = nextEnabledRaw
+        ? nextEnabledRaw.toLowerCase() === 'yes'
+          ? 'yes'
+          : 'no'
+        : enabled
+      const nextDomain = nextDomainRaw || domain
+
+      const parsed = parseCalendarSettingsForm({
+        enabled: nextEnabled,
+        domain: nextDomain,
+        calendarUid: nextUid,
+      })
+      if (!parsed.ok) {
+        showToast(parsed.error, 'error')
+        return
+      }
+
+      setEnabled(parsed.data.enabled)
+      setDomain(parsed.data.domain)
+      setCalendarUid(parsed.data.calendarUid)
+
+      await updateSetting('zohoCalendarEnabled', parsed.data.enabled)
+      await updateSetting('zohoCalendarDomain', parsed.data.domain)
+      await updateSetting('zohoCalendarUid', parsed.data.calendarUid)
+
+      showToast('Calendar settings imported', 'success')
+      onSaved?.()
+    } catch (e) {
+      showToast(errorMessage(e, 'Calendar settings CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <Modal open={open} title="Calendar settings" onClose={onClose} width={560}>
       <p style={{ color: colors.muted, fontSize: 13, marginTop: 0, lineHeight: 1.45 }}>
@@ -168,6 +261,24 @@ export default function CalendarSettingsModal({ open, onClose, onSaved }: Props)
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <label style={{ ...labelStyle, marginBottom: 0 }}>Which calendar</label>
             <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) void importSettingsCsv(file)
+                }}
+              />
+              <button
+                type="button"
+                style={{ ...buttonSecondaryStyle, padding: '4px 8px', fontSize: 12 }}
+                disabled={importing}
+                onClick={() => importInputRef.current?.click()}
+              >
+                {importing ? 'Importing…' : 'Import CSV'}
+              </button>
               <button
                 type="button"
                 style={{ ...buttonSecondaryStyle, padding: '4px 8px', fontSize: 12 }}
@@ -197,7 +308,7 @@ export default function CalendarSettingsModal({ open, onClose, onSaved }: Props)
                         ]
                   exportListCsv(
                     'calendar-settings.csv',
-                    ['kind', 'uid', 'name', 'is_default', 'sync_enabled', 'domain', 'selected_uid'],
+                    [...CALENDAR_SETTINGS_CSV_COLUMNS],
                     rows,
                   )
                   showToast('Calendar settings CSV downloaded', 'success')
