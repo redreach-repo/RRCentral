@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { HardHat } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import { errorMessage } from '../lib/errors'
 import { listHrEmployees, type HrEmployee } from '../lib/featureSliceStores'
 import { assignmentWindow, siteLabel, SITE_STATUSES } from '../lib/constructionSites'
+import { CONSTRUCTION_SITES_CSV_COLUMNS } from '../lib/constructionSitesCsv'
 import {
   assignSiteWorkforce,
   createConstructionSite,
@@ -13,7 +14,7 @@ import {
   type ConstructionSite,
   type SiteWorkforceAssignment,
 } from '../lib/constructionSitesStore'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -38,6 +39,8 @@ export default function ConstructionSitesPage() {
   const [employeeId, setEmployeeId] = useState('')
   const [roleLabel, setRoleLabel] = useState('')
   const [loading, setLoading] = useState(true)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -80,6 +83,54 @@ export default function ConstructionSitesPage() {
     }
   }
 
+  async function importSitesCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of CONSTRUCTION_SITES_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, CONSTRUCTION_SITES_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid site rows', 'error')
+        return
+      }
+      const statusSet = new Set<string>(SITE_STATUSES)
+      const existingCodes = new Set(sites.map((s) => s.code.toUpperCase()))
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        const codeVal = (row.code || '').trim().toUpperCase()
+        if (codeVal && existingCodes.has(codeVal)) {
+          skipped += 1
+          continue
+        }
+        const status = statusSet.has(row.status) ? row.status : 'active'
+        await createConstructionSite({
+          code: codeVal,
+          name: row.name,
+          location: row.location || '',
+          status,
+        })
+        if (codeVal) existingCodes.add(codeVal)
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} site(s)${skipNote}`, 'success')
+      await load()
+    } catch (err) {
+      showToast(errorMessage(err, 'Sites CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
@@ -93,27 +144,48 @@ export default function ConstructionSitesPage() {
             Site register and workforce assignments. Not payroll or labour certification.
           </p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-          disabled={!sites.length}
-          onClick={() => {
-            exportListCsv(
-              'construction-sites.csv',
-              ['code', 'name', 'location', 'status'],
-              sites.map((s) => ({
-                code: s.code,
-                name: s.name,
-                location: s.location,
-                status: s.status,
-              })),
-            )
-            showToast('Sites CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importSitesCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!sites.length}
+            onClick={() => {
+              exportListCsv(
+                'construction-sites.csv',
+                ['code', 'name', 'location', 'status'],
+                sites.map((s) => ({
+                  code: s.code,
+                  name: s.name,
+                  location: s.location,
+                  status: s.status,
+                })),
+              )
+              showToast('Sites CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </header>
 
       {loading ? (

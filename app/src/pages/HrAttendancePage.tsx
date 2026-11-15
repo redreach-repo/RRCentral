@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Clock } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
@@ -10,8 +10,9 @@ import {
   defaultHoursForStatus,
   type AttendanceStatus,
 } from '../lib/hrAttendance'
+import { HR_ATTENDANCE_CSV_COLUMNS } from '../lib/hrAttendanceCsv'
 import { listHrAttendanceDays, upsertHrAttendanceDay, type HrAttendanceDay } from '../lib/hrAttendanceStore'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
   cardStyle,
@@ -36,6 +37,8 @@ export default function HrAttendancePage() {
   const [filterPerson, setFilterPerson] = useState('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -85,6 +88,59 @@ export default function HrAttendancePage() {
     }
   }
 
+  async function importAttendanceCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, csvRows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of HR_ATTENDANCE_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, HR_ATTENDANCE_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid attendance rows', 'error')
+        return
+      }
+      const byCode = new Map(
+        people
+          .filter((p) => p.employee_code)
+          .map((p) => [p.employee_code.toLowerCase(), p] as const),
+      )
+      const statusSet = new Set<string>(ATTENDANCE_STATUSES)
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        const person = byCode.get(row.employee_code.toLowerCase())
+        if (!person || !/^\d{4}-\d{2}-\d{2}$/.test(row.work_date.slice(0, 10))) {
+          skipped += 1
+          continue
+        }
+        const dayStatus = statusSet.has(row.status) ? row.status : 'present'
+        const dayHours = row.hours ? Number(row.hours) : defaultHoursForStatus(dayStatus)
+        await upsertHrAttendanceDay({
+          employeeId: person.id,
+          workDate: row.work_date.slice(0, 10),
+          status: dayStatus,
+          hours: Number.isFinite(dayHours) ? dayHours : defaultHoursForStatus(dayStatus),
+          notes: row.notes || '',
+        })
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} attendance day(s)${skipNote}`, 'success')
+      await load()
+    } catch (err) {
+      showToast(errorMessage(err, 'Attendance CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   return (
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
@@ -98,28 +154,49 @@ export default function HrAttendancePage() {
             Day-level present/absent stub. Not labour-law or WPS attendance.
           </p>
         </div>
-        <button
-          type="button"
-          className={docsStyles.newBtn}
-          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-          disabled={!filteredRows.length}
-          onClick={() => {
-            exportListCsv(
-              'hr-attendance.csv',
-              ['work_date', 'employee', 'status', 'hours', 'notes'],
-              filteredRows.map((r) => ({
-                work_date: r.work_date,
-                employee: r.hr_employees?.full_name || r.employee_id,
-                status: r.status,
-                hours: r.hours,
-                notes: r.notes,
-              })),
-            )
-            showToast('Attendance CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importAttendanceCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing || !people.length}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={!filteredRows.length}
+            onClick={() => {
+              exportListCsv(
+                'hr-attendance.csv',
+                ['employee_code', 'work_date', 'status', 'hours', 'notes'],
+                filteredRows.map((r) => ({
+                  employee_code: r.hr_employees?.employee_code || '',
+                  work_date: r.work_date,
+                  status: r.status,
+                  hours: r.hours,
+                  notes: r.notes,
+                })),
+              )
+              showToast('Attendance CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </header>
 
       {loading ? (
