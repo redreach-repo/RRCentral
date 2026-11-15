@@ -229,7 +229,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         const buPick = storedBu && units.some((u) => u.id === storedBu) ? storedBu : null
         setActiveBusinessUnitIdState(buPick)
 
-        const tenantKits = (tenantKitResult.data || []).map((row) => coerceBrandKit(row as BrandKit))
+        const tenantKits = ((tenantKitResult.data || []) as BrandKit[]).map((row) => coerceBrandKit(row))
         const merged = [...tenantKits, ...companyKits]
         setKitCache(merged.length ? merged : [REDREACH_DEFAULT_BRAND])
         applyResolved(merged, activeCompanyId, buPick)

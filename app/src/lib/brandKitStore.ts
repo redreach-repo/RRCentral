@@ -34,7 +34,7 @@ export async function listBrandKitsForCompany(companyId: string): Promise<BrandK
     .select(BRAND_KIT_COLUMNS)
     .eq('company_id', companyId)
   if (error) throw error
-  return (data || []).map((row) => coerceBrandKit(row as BrandKit))
+  return ((data || []) as BrandKit[]).map((row) => coerceBrandKit(row))
 }
 
 export async function saveBrandKit(input: {
