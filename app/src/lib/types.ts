@@ -466,6 +466,7 @@ export interface QuoteTemplate {
   description: string
   items_json: unknown
   created_at: string
+  deleted_at?: string | null
 }
 
 export interface IncomeEntry {
