@@ -4,6 +4,8 @@ import { BILLING_STATUSES } from '../../lib/worshiphub'
 import { parseChurchDetailsForm } from '../../lib/schemas/churchDetails'
 import type { ChurchDetailsInput } from '../../lib/worshiphubStore'
 import type { WorshipBillingStatus, WorshipChurchProfile } from '../../lib/types'
+import { exportListCsv } from '../../lib/listIo'
+import { useToast } from '../../contexts/ToastContext'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -29,6 +31,7 @@ type Draft = Omit<ChurchDetailsInput, 'modules' | 'whatsapp_conversations'> & {
 }
 
 export default function ChurchDetailsModal({ open, onClose, profile, saving, onSave }: Props) {
+  const { showToast } = useToast()
   const [d, setD] = useState<Draft | null>(null)
   const [error, setError] = useState('')
 
@@ -184,7 +187,44 @@ export default function ChurchDetailsModal({ open, onClose, profile, saving, onS
           </div>
         </div>
         {error ? <p style={{ color: colors.danger, margin: '0 0 10px', fontSize: 13 }}>{error}</p> : null}
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            onClick={() => {
+              if (!d) return
+              exportListCsv(
+                `church-details-${d.tenant_slug || 'profile'}.csv`,
+                [
+                  'tenant_slug',
+                  'plan',
+                  'modules',
+                  'whatsapp_month',
+                  'whatsapp_conversations',
+                  'billing_status',
+                  'renewal_date',
+                  'admin_url',
+                  'notes',
+                ],
+                [
+                  {
+                    tenant_slug: d.tenant_slug,
+                    plan: d.plan,
+                    modules: d.modules,
+                    whatsapp_month: d.whatsapp_month,
+                    whatsapp_conversations: d.whatsapp_conversations,
+                    billing_status: d.billing_status,
+                    renewal_date: d.renewal_date || '',
+                    admin_url: d.admin_url,
+                    notes: d.notes,
+                  },
+                ],
+              )
+              showToast('Church details CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
           <button type="button" style={buttonSecondaryStyle} onClick={onClose}>
             Cancel
           </button>
