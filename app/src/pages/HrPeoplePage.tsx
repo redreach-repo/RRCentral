@@ -3,6 +3,7 @@ import { Users } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
+import HrProtectedPanel from '../components/sensitive/HrProtectedPanel'
 import SavedViewsBar from '../components/SavedViewsBar'
 import { errorMessage } from '../lib/errors'
 import {
@@ -385,6 +386,11 @@ export default function HrPeoplePage() {
             IBAN (WPS draft)
             <input style={inputStyle} value={iban} onChange={(e) => setIban(e.target.value)} placeholder="AE…" />
           </label>
+          {editing ? (
+            <div style={{ gridColumn: '1 / -1' }}>
+              <HrProtectedPanel employeeId={editing.id} />
+            </div>
+          ) : null}
           <label style={labelStyle}>
             Labour / MoL number
             <input style={inputStyle} value={labourCard} onChange={(e) => setLabourCard(e.target.value)} />
