@@ -339,6 +339,7 @@ export type ClientPurchaseOrder = {
   currency: string
   amount: number
   notes: string
+  invoice_id?: string | null
   accounts?: { name: string } | null
 }
 
@@ -346,7 +347,9 @@ export async function listClientPurchaseOrders(): Promise<ClientPurchaseOrder[]>
   if (!isSupabaseConfigured()) return []
   const { data, error } = await db
     .from('client_purchase_orders')
-    .select('id, account_id, po_number, status, issued_on, currency, amount, notes, accounts(name)')
+    .select(
+      'id, account_id, po_number, status, issued_on, currency, amount, notes, invoice_id, accounts(name)',
+    )
     .order('issued_on', { ascending: false })
     .limit(100)
   if (error) {
@@ -354,6 +357,22 @@ export async function listClientPurchaseOrders(): Promise<ClientPurchaseOrder[]>
     throw error
   }
   return (data || []) as ClientPurchaseOrder[]
+}
+
+export async function linkClientPoInvoice(
+  id: string,
+  invoiceId: string,
+  status: string,
+): Promise<void> {
+  const { error } = await db
+    .from('client_purchase_orders')
+    .update({
+      invoice_id: invoiceId,
+      status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+  if (error) throw error
 }
 
 export async function createClientPurchaseOrder(input: {

@@ -37,7 +37,7 @@ Status key: **exists** · **partial** · **missing**
 | In-app guide `/guide` | partial | CRM + billing + delivery + ops + finance + admin packs live (`GUIDE_PACKS`); more packs / AR polish later |
 | Sign-up + provisioner §6.13.1–2 | partial | M11: `/workspace-setup` + `business_type_packs` + idempotent Edge scaffold; auth user create later |
 | Engineering pack §11.3 | partial | Templates on activate (fields/pipelines); shared foundation M12a later |
-| Construction pack §11.4 | partial | Templates on activate; workforce/site objects M12b later |
+| Construction pack §11.4 | partial | Templates on activate + sites/workforce stub |
 | Trading pack §11.2 light | partial | landed cost + credit soft warn on save; warehouse stub (stock still rolls up) |
 | Languages §5.5 (v3) | partial | EN+AR only; all new strings must stay key-based for v3 |
 | Country packs §12 | partial | AE/IN/CA catalog + activate shipped (Unverified); residency §19 |
@@ -52,14 +52,14 @@ Status key: **exists** · **partial** · **missing**
 | 6.2 CRM and sales | partial | Strong ops CRM; three pipelines; Pipeline-first soft-retire (M3 slice 4); schema merge later (ask) |
 | 6.3 Email and calendar | partial | Zoho + Gmail Phase A + M365 Phase A/B (incl. inbox); Gmail inbox still CASA-gated; IMAP deferred |
 | 6.4 Contracts and e-sign | partial | NDA `/sign` + clauses + obligations board + spawn-on-sign; QTSP → M5 later |
-| 6.5 HR | partial | People + leave + reports_to stub; attendance later |
+| 6.5 HR | partial | People + leave + reports_to + attendance day stub |
 | 6.6 Payroll | partial | M8: runs + WPS/gratuity draft + `payroll_exports` audit (not legal advice / not bank-certified) |
 | 6.7 Accounting (ledger) | partial | CoA + journals + invoice/expense→draft auto-post + VAT return stub UI; posted auto + FTA later |
 | 6.8 Inventory and purchasing | partial | M9: POs + receive→stock + landed cost + warehouse stub stamp |
 | 6.9 Delivery (projects/support) | partial | M9b: projects + WIP/retention + billing schedules; full job-cost later |
 | 6.10 Marketing | partial | M10: campaigns + consent + dry-run send; live ESP later |
 | 6.11 Documents and knowledge | partial | Drive + customer_documents; not full DMS → expand with M5/M11 |
-| 6.12 Planning and reports | partial | Reports/MRR/insights; no goals/scenarios builder → M12-ish / planning |
+| 6.12 Planning and reports | partial | Reports/MRR/insights + goals stub; scenarios later |
 | 6.13 Tenant billing | partial | M11: Checkout/portal + Tax stub flag (off); live Tax registration later |
 | 6.14 Demo / showcase | partial | Code-side isolation + seed/tour/role switcher; Alfred still provisions demo project |
 
@@ -75,7 +75,7 @@ Status key: **exists** · **partial** · **missing**
 | Field-level encryption (salary, IBAN, tokens) | missing | M1 for tokens; M6/M8 for HR fields |
 | Append-only audit | partial | `audit_log` exists; CI asserts authenticated cannot INSERT/UPDATE/DELETE (REVOKE); prune stays security definer |
 | Sentry / structured logs | partial | Built behind DSN (off until Alfred); App errors + structured Edge logs |
-| Soft delete / retention tooling | partial | M13: DSR log + prune wrapper + contact anonymize; broader soft-delete later |
+| Soft delete / retention tooling | partial | M13: DSR + accounts/contacts/vendors/products soft-delete; more tables later |
 | Demo isolation + outbound block | partial | Browser + Edge guards + seed; demo cloud project + deploy workflow still Alfred |
 
 ---
@@ -86,9 +86,9 @@ Status key: **exists** · **partial** · **missing**
 |-------------|--------|------|
 | UAE VAT codes / TRN / e-invoice ready model | partial | VAT on docs; no CoA tax engine → M7 + COMPLIANCE_NOTES |
 | WPS / gratuity | partial | M8 draft CSV + SIF + export audit; **verify law + bank** before live use |
-| Client PO tracker | partial | M9a table + UI; invoice auto-match later |
+| Client PO tracker | partial | M9a table + UI + soft invoice amount match |
 | Arabic bilingual PDFs | partial | Bilingual document toggle shipped; native review later |
-| Import/export every list | partial | M13 `listIo` CSV framework + Accounts export; more lists later |
+| Import/export every list | partial | M13 `listIo` + Accounts/ops/HR/client POs/goals CSV; more lists later |
 | Keep RR Central workflows | exists | Must not break §B.3 during M1–M3 |
 
 ---
@@ -98,7 +98,7 @@ Status key: **exists** · **partial** · **missing**
 | Gap | Spec handling |
 |-----|---------------|
 | Dual CRM | M3 |
-| Shallow inventory | M9 (PO receive shipped; warehouse later) |
+| Shallow inventory | M9 (PO receive + warehouse stub stamp; per-WH stock later) |
 | Domains tracker | Stay custom object; optional registrar later |
 | HubSpot one-way | Optional connector once CRM is hub (§14) |
 | Fireflies manual | M10 webhook ingest |

@@ -84,12 +84,11 @@ export default function CatalogPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const { data, error } = await db
-        .from('products')
-        .select('*')
-        .order('name')
+      const { data, error } = await db.from('products').select('*').order('name')
       if (error) throw error
-      setProducts((data || []) as Product[])
+      setProducts(
+        ((data || []) as (Product & { deleted_at?: string | null })[]).filter((p) => !p.deleted_at),
+      )
     } catch (e) {
       showToast(errorMessage(e, 'Failed to load catalog'), 'error')
     } finally {
@@ -187,9 +186,15 @@ export default function CatalogPage() {
     if (!deleteTarget) return
     setSaving(true)
     try {
-      const { error } = await db.from('products').delete().eq('id', deleteTarget.id)
-      if (error) throw error
-      showToast('Product deleted', 'success')
+      let { error } = await db
+        .from('products')
+        .update({ deleted_at: new Date().toISOString(), active: false })
+        .eq('id', deleteTarget.id)
+      if (error) {
+        const hard = await db.from('products').delete().eq('id', deleteTarget.id)
+        if (hard.error) throw hard.error
+      }
+      showToast('Product archived', 'success')
       setDeleteTarget(null)
       await load()
     } catch (e) {

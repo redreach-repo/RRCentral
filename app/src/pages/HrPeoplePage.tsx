@@ -14,6 +14,7 @@ import {
   draftGratuityAccrualAed,
   yearsOfServiceFromStart,
 } from '../lib/wpsGratuity'
+import { exportListCsv } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -152,6 +153,30 @@ export default function HrPeoplePage() {
             Directory, pay components, and draft gratuity preview. Not legal advice.
           </p>
         </div>
+        <button
+          type="button"
+          className={docsStyles.newBtn}
+          style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+          disabled={!rows.length}
+          onClick={() => {
+            exportListCsv(
+              'hr-people.csv',
+              ['employee_code', 'full_name', 'email', 'job_title', 'department', 'employment_status', 'reports_to_id'],
+              rows.map((r) => ({
+                employee_code: r.employee_code,
+                full_name: r.full_name,
+                email: r.email,
+                job_title: r.job_title,
+                department: r.department,
+                employment_status: r.employment_status,
+                reports_to_id: r.reports_to_id || '',
+              })),
+            )
+            showToast('People CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
       </header>
 
       <div style={{ marginBottom: 12, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
