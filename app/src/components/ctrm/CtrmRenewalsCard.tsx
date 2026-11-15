@@ -1,17 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { CalendarClock } from 'lucide-react'
-import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
 import { listAccounts } from '../../lib/accountsStore'
-import { isUrgentRenewal, renewalText, upcomingRenewals, type RenewalInfo } from '../../lib/ctrmRenewals'
-import { listTerms, saveTerms } from '../../lib/ctrmTermsStore'
+import { isUrgentRenewal, renewalText, upcomingRenewals, type RenewalInfo, type RenewalStage } from '../../lib/ctrmRenewals'
+import { listTerms } from '../../lib/ctrmTermsStore'
 import { errorMessage } from '../../lib/errors'
 import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
-import { roleAtLeast } from '../../lib/permissions'
-import { parseCtrmTermsForm } from '../../lib/schemas/ctrmTerms'
-import type { Account, CtrmClientTerms } from '../../lib/types'
 import { buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
 
 type RenewalRow = RenewalInfo & { name: string }
@@ -20,42 +15,58 @@ const EXPORT_COLUMNS = ['account', 'renewal_date', 'days', 'stage', 'notice_by',
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
 
-function matchAccount(accounts: Account[], name: string): Account | undefined {
-  const key = name.trim().toLowerCase()
-  if (!key) return undefined
-  return accounts.find((a) => a.name.trim().toLowerCase() === key)
+function accountKey(name: string): string {
+  return name.trim().toLowerCase()
 }
 
-function noticeDaysFromCsv(row: Record<string, string>, renewal: string, existing: CtrmClientTerms | null): string {
-  const explicit = String(row.notice_days ?? '').trim()
-  if (explicit !== '') return explicit
-  const noticeBy = String(row.notice_by || '').trim()
-  if (DATE.test(renewal) && DATE.test(noticeBy)) {
-    return String(Math.max(0, differenceInCalendarDays(parseISO(renewal), parseISO(noticeBy))))
+function parseStage(raw: string): RenewalStage | null {
+  const v = raw.trim().toLowerCase()
+  if (v === 'passed') return 'passed'
+  if (v === '90' || v === '60' || v === '30') return Number(v) as RenewalStage
+  return null
+}
+
+function parseOptionalInt(raw: string): number | null {
+  const v = String(raw || '').trim()
+  if (v === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) ? Math.trunc(n) : null
+}
+
+function softRowFromCsv(row: Record<string, string>, idx: number): RenewalRow | null {
+  const name = String(row.account || '').trim()
+  const renewal = String(row.renewal_date || '').trim()
+  if (!name || !DATE.test(renewal)) return null
+  const days = parseOptionalInt(String(row.days || ''))
+  if (days === null) return null
+  const noticeByRaw = String(row.notice_by || '').trim()
+  const noticeBy = DATE.test(noticeByRaw) ? noticeByRaw : null
+  return {
+    accountId: `import-${idx}`,
+    name,
+    renewal,
+    days,
+    stage: parseStage(String(row.stage || '')),
+    noticeBy,
+    noticeDaysLeft: parseOptionalInt(String(row.notice_days_left || '')),
   }
-  return String(existing?.notice_days ?? 0)
 }
 
 /** Dashboard: CTRM Next clients renewing in the next 90 days (or just passed). Hidden when there are none. */
 export default function CtrmRenewalsCard() {
-  const { user, appUserId, userRole } = useAuth()
   const { showToast } = useToast()
-  const canImport = roleAtLeast(userRole, 'sales')
   const [rows, setRows] = useState<RenewalRow[]>([])
   const [importing, setImporting] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
 
-  const load = useCallback(async (): Promise<RenewalRow[]> => {
-    const [terms, accounts] = await Promise.all([listTerms(), listAccounts()])
-    const names = new Map(accounts.rows.map((a) => [a.id, a.name]))
-    return upcomingRenewals(terms).map((r) => ({ ...r, name: names.get(r.accountId) ?? 'CTRM Next client' }))
-  }, [])
-
   useEffect(() => {
     let alive = true
-    load()
-      .then((next) => {
-        if (alive) setRows(next)
+    Promise.all([listTerms(), listAccounts()])
+      .then(([terms, accounts]) => {
+        const names = new Map(accounts.rows.map((a) => [a.id, a.name]))
+        if (alive) {
+          setRows(upcomingRenewals(terms).map((r) => ({ ...r, name: names.get(r.accountId) ?? 'CTRM Next client' })))
+        }
       })
       .catch(() => {
         if (alive) setRows([])
@@ -63,10 +74,9 @@ export default function CtrmRenewalsCard() {
     return () => {
       alive = false
     }
-  }, [load])
+  }, [])
 
   async function importRenewalsCsv(file: File) {
-    if (!canImport) return
     setImporting(true)
     try {
       const text = await file.text()
@@ -76,70 +86,48 @@ export default function CtrmRenewalsCard() {
         return
       }
       const objects = csvRowsToObjects(headers, csvRows)
-      if (!objects.length) {
-        showToast('No renewals rows in CSV', 'error')
-        return
-      }
-
-      const [accounts, terms] = await Promise.all([listAccounts(), listTerms()])
-      const termsByAccount = new Map(terms.map((t) => [t.account_id, t]))
-      const author = { appUserId, email: user?.email || '' }
-      let upserted = 0
+      const byAccount = new Map(rows.map((r) => [accountKey(r.name), r] as const))
+      const next: RenewalRow[] = []
+      const seen = new Set<string>()
+      let matched = 0
+      let softLoaded = 0
       let skipped = 0
 
-      for (const row of objects) {
-        const accountName = String(row.account || '').trim()
-        const renewalDate = String(row.renewal_date || '').trim()
-        if (!accountName || !DATE.test(renewalDate)) {
+      objects.forEach((row, idx) => {
+        const name = String(row.account || '').trim()
+        if (!name) {
           skipped += 1
-          continue
+          return
         }
-        const account = matchAccount(accounts.rows, accountName)
-        if (!account) {
+        const key = accountKey(name)
+        if (seen.has(key)) {
           skipped += 1
-          continue
+          return
         }
-        const existing = termsByAccount.get(account.id) ?? null
-        const parsed = parseCtrmTermsForm({
-          contract_start: existing?.contract_start ?? null,
-          renewal_date: renewalDate,
-          notice: noticeDaysFromCsv(row, renewalDate, existing),
-        })
-        if (!parsed.ok) {
+        seen.add(key)
+        const existing = byAccount.get(key)
+        if (existing) {
+          next.push(existing)
+          matched += 1
+          return
+        }
+        const soft = softRowFromCsv(row, idx)
+        if (!soft) {
           skipped += 1
-          continue
+          return
         }
-        const same =
-          existing &&
-          (existing.renewal_date || null) === parsed.data.renewal_date &&
-          existing.notice_days === parsed.data.notice_days
-        if (same) {
-          skipped += 1
-          continue
-        }
-        await saveTerms(account.id, existing, parsed.data, author)
-        termsByAccount.set(account.id, {
-          ...(existing || {
-            id: '',
-            account_id: account.id,
-            contract_start: parsed.data.contract_start,
-            updated_by: author.email,
-            created_at: '',
-            updated_at: '',
-          }),
-          renewal_date: parsed.data.renewal_date,
-          notice_days: parsed.data.notice_days,
-        })
-        upserted += 1
-      }
+        next.push(soft)
+        softLoaded += 1
+      })
 
-      if (!upserted) {
-        showToast(skipped ? `No renewals updated · ${skipped} row(s) skipped` : 'No renewals updated', 'error')
+      if (!next.length) {
+        showToast('No matching CTRM renewals in CSV', 'error')
         return
       }
-      setRows(await load())
+      setRows(next)
+      const parts = [matched ? `${matched} matched` : '', softLoaded ? `${softLoaded} soft-loaded` : ''].filter(Boolean)
       const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
-      showToast(`Upserted ${upserted} CTRM renewal(s)${skipNote}`, 'success')
+      showToast(`Imported ${next.length} CTRM renewal(s) (${parts.join(', ')})${skipNote}`, 'success')
     } catch (e) {
       showToast(errorMessage(e, 'CTRM renewals CSV import failed'), 'error')
     } finally {
@@ -156,28 +144,24 @@ export default function CtrmRenewalsCard() {
           <CalendarClock size={18} /> CTRM Next renewals
         </h2>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {canImport ? (
-            <>
-              <input
-                ref={importInputRef}
-                type="file"
-                accept=".csv,text/csv"
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) void importRenewalsCsv(file)
-                }}
-              />
-              <button
-                type="button"
-                style={buttonSecondaryStyle}
-                disabled={importing}
-                onClick={() => importInputRef.current?.click()}
-              >
-                {importing ? 'Importing…' : 'Import CSV'}
-              </button>
-            </>
-          ) : null}
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importRenewalsCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
           <button
             type="button"
             style={buttonSecondaryStyle}
@@ -205,10 +189,14 @@ export default function CtrmRenewalsCard() {
       <ul style={{ margin: '10px 0 0', paddingLeft: 18, fontSize: 13, lineHeight: 1.55 }}>
         {rows.map((r) => (
           <li key={r.accountId} style={{ marginBottom: 6, color: colors.muted }}>
-            <Link to={`/accounts/${r.accountId}`} style={{ color: isUrgentRenewal(r) ? colors.danger : colors.text, fontWeight: 600 }}>
-              {r.name}
-            </Link>{' '}
-            · {r.stage === 'passed' ? 'renewal passed' : `${r.stage} day reminder`} · {renewalText(r)}
+            {r.accountId.startsWith('import-') ? (
+              <span style={{ color: isUrgentRenewal(r) ? colors.danger : colors.text, fontWeight: 600 }}>{r.name}</span>
+            ) : (
+              <Link to={`/accounts/${r.accountId}`} style={{ color: isUrgentRenewal(r) ? colors.danger : colors.text, fontWeight: 600 }}>
+                {r.name}
+              </Link>
+            )}{' '}
+            · {r.stage === 'passed' ? 'renewal passed' : r.stage ? `${r.stage} day reminder` : 'renewal'} · {renewalText(r)}
           </li>
         ))}
       </ul>
