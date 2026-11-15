@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { BellRing, Church, ExternalLink, Plus, RefreshCw } from 'lucide-react'
@@ -9,12 +9,14 @@ import EmptyState from '../components/EmptyState'
 import SavedViewsBar from '../components/SavedViewsBar'
 import ChurchActionButtons from '../components/worshiphub/ChurchActionButtons'
 import ChurchFacts from '../components/worshiphub/ChurchFacts'
-import { visibleAccounts } from '../lib/accounts'
-import { createAccount, listAccounts } from '../lib/accountsStore'
-import { billingLabel, churchView, hasBillingIssue, joinRequests, renewalSoon } from '../lib/worshiphub'
+import { accountTypeInfo, visibleAccounts } from '../lib/accounts'
+import { createAccount, listAccounts, updateAccount } from '../lib/accountsStore'
+import { billingLabel, BILLING_STATUSES, churchView, hasBillingIssue, joinRequests, renewalSoon } from '../lib/worshiphub'
 import { fetchLiveTenants, listChurchProfiles, saveChurchProfile, type LiveResult } from '../lib/worshiphubStore'
 import { errorMessage } from '../lib/errors'
-import { exportListCsv } from '../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
+import { PRODUCTS_CSV_COLUMNS } from '../lib/productsCsv'
+import { parseChurchDetailsForm } from '../lib/schemas/churchDetails'
 import { PRODUCT } from '../lib/product'
 import type { Account, WorshipChurchProfile, WorshipTenant } from '../lib/types'
 import {
@@ -37,6 +39,8 @@ export default function ProductsPage() {
   const [live, setLive] = useState<LiveResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState('')
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const [search, setSearch] = useState('')
   const [focus, setFocus] = useState<'all' | 'billing' | 'no_slug'>('all')
   const author = useMemo(() => ({ appUserId, email: user?.email || '' }), [appUserId, user?.email])
@@ -152,6 +156,104 @@ export default function ProductsPage() {
     }
   }
 
+  async function importProductsCsv(file: File) {
+    if (!canAdd) {
+      showToast('You cannot import churches', 'error')
+      return
+    }
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of PRODUCTS_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, PRODUCTS_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid church rows', 'error')
+        return
+      }
+
+      const churchAccounts = accounts.filter((a) => a.type === 'worship_church')
+      const byName = new Map(churchAccounts.map((a) => [a.name.trim().toLowerCase(), a]))
+      const profileByAccountId = new Map(profiles.map((p) => [p.account_id, p]))
+      const churchStatuses = accountTypeInfo('worship_church').statuses
+      let saved = 0
+      let skipped = errors.length
+
+      for (const row of ok) {
+        const name = row.name.trim()
+        const account = byName.get(name.toLowerCase())
+        if (!account) {
+          skipped += 1
+          continue
+        }
+        const existing = profileByAccountId.get(account.id) ?? null
+        const billingToken = row.billing_status.trim().toLowerCase()
+        const billingMatch = BILLING_STATUSES.find(
+          (s) => s.value === billingToken || s.label.toLowerCase() === billingToken,
+        )
+        const billing_status = billingMatch?.value || existing?.billing_status || ''
+        const renewalRaw = row.renewal_date.trim()
+        const renewal_date =
+          renewalRaw === ''
+            ? existing?.renewal_date ?? null
+            : /^\d{4}-\d{2}-\d{2}$/.test(renewalRaw) && !Number.isNaN(Date.parse(renewalRaw))
+              ? renewalRaw
+              : existing?.renewal_date ?? null
+        const status =
+          row.status && churchStatuses.includes(row.status) ? row.status : account.status
+
+        const parsed = parseChurchDetailsForm({
+          tenant_slug: row.tenant_slug || existing?.tenant_slug || '',
+          plan: row.plan || existing?.plan || '',
+          modules: (existing?.modules ?? []).join(', '),
+          whatsapp_month: existing?.whatsapp_month ?? '',
+          whatsapp_conversations:
+            existing?.whatsapp_conversations == null ? '' : String(existing.whatsapp_conversations),
+          billing_status,
+          renewal_date,
+          admin_url: existing?.admin_url ?? '',
+          notes: existing?.notes ?? '',
+        })
+        if (!parsed.ok) {
+          skipped += 1
+          continue
+        }
+
+        if (status !== account.status) await updateAccount(account.id, { status })
+        await saveChurchProfile(account.id, parsed.data, existing, author)
+        profileByAccountId.set(account.id, {
+          ...(existing || { id: '', account_id: account.id, created_at: '', updated_at: '', updated_by: '' }),
+          ...parsed.data,
+        } as WorshipChurchProfile)
+        byName.set(name.toLowerCase(), { ...account, status })
+        saved += 1
+      }
+
+      if (!saved && skipped) {
+        showToast('No matching church profiles in CSV', 'error')
+        return
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Updated ${saved} church profile(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Churches CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   // Each visit fetches fresh numbers from WorshipHub; the page only speaks up
   // when that fails, so a working connection shows nothing.
   const connectionProblem =
@@ -168,6 +270,25 @@ export default function ProductsPage() {
           <p className={docsStyles.subtitle}>{t('page.worshipHub.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importProductsCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing || !canAdd}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}
