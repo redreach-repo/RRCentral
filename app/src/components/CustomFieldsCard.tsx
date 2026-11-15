@@ -9,6 +9,7 @@ import {
   type CustomFieldDefinition,
 } from '../lib/customFields'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import {
   buttonPrimaryStyle,
   buttonSecondaryStyle,
@@ -119,32 +120,54 @@ export default function CustomFieldsCard({
 
   return (
     <section style={wrapStyle}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0, fontSize: framed ? undefined : 14 }}>{title}</h2>
-        {editable ? (
-          editing ? (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                type="button"
-                style={buttonSecondaryStyle}
-                disabled={saving}
-                onClick={() => {
-                  setDraft(values)
-                  setEditing(false)
-                }}
-              >
-                Cancel
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            onClick={() => {
+              exportListCsv(
+                `custom-fields-${objectType}-${recordId.slice(0, 8)}.csv`,
+                ['key', 'label', 'field_type', 'required', 'value'],
+                defs.map((d) => ({
+                  key: d.field_key,
+                  label: d.label,
+                  field_type: d.field_type,
+                  required: d.required ? 'yes' : 'no',
+                  value: displayFieldValue(d, editing ? draft[d.id] : values[d.id]),
+                })),
+              )
+              onToast('Custom fields CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+          {editable ? (
+            editing ? (
+              <>
+                <button
+                  type="button"
+                  style={buttonSecondaryStyle}
+                  disabled={saving}
+                  onClick={() => {
+                    setDraft(values)
+                    setEditing(false)
+                  }}
+                >
+                  Cancel
+                </button>
+                <button type="button" style={buttonPrimaryStyle} disabled={saving} onClick={() => void save()}>
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+              </>
+            ) : (
+              <button type="button" style={buttonSecondaryStyle} onClick={() => setEditing(true)}>
+                Edit
               </button>
-              <button type="button" style={buttonPrimaryStyle} disabled={saving} onClick={() => void save()}>
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-            </div>
-          ) : (
-            <button type="button" style={buttonSecondaryStyle} onClick={() => setEditing(true)}>
-              Edit
-            </button>
-          )
-        ) : null}
+            )
+          ) : null}
+        </div>
       </div>
 
       {editing ? (
