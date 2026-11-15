@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Shield } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import { errorMessage } from '../lib/errors'
-import { dsrTypeLabel } from '../lib/dsr/dsr'
-import { exportListCsv } from '../lib/listIo'
+import { dsrTypeLabel, type DsrRequestType } from '../lib/dsr/dsr'
+import { DSR_CSV_COLUMNS } from '../lib/dsrCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import {
   createDsrRequest,
   listDsrRequests,
@@ -35,6 +36,8 @@ export default function DsrPage() {
   const [name, setName] = useState('')
   const [detail, setDetail] = useState('')
   const [type, setType] = useState<'access' | 'erasure' | 'export'>('access')
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -75,6 +78,53 @@ export default function DsrPage() {
     }
   }
 
+  async function importDsrCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, csvRows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of DSR_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, DSR_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid DSR rows', 'error')
+        return
+      }
+      const types = new Set<string>(['access', 'erasure', 'export'])
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        const requestType = types.has(row.request_type)
+          ? (row.request_type as DsrRequestType)
+          : null
+        if (!requestType || !row.subject_email.includes('@')) {
+          skipped += 1
+          continue
+        }
+        await createDsrRequest({
+          requestType,
+          subjectEmail: row.subject_email,
+          subjectName: row.subject_name || '',
+          detail: row.detail || '',
+        })
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} DSR request(s)${skipNote}`, 'success')
+      await load()
+    } catch (err) {
+      showToast(errorMessage(err, 'DSR CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   async function onPrune() {
     if (
       !window.confirm(
@@ -104,6 +154,25 @@ export default function DsrPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) void importDsrCsv(f)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}
