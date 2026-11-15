@@ -1,14 +1,33 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { db } from '../../lib/db'
-import { buildCrmLeadFromInquiry } from '../../lib/websiteLeads'
+import {
+  buildCrmLeadFromInquiry,
+  buildWebsiteInquiry,
+  validateWebsiteInquiry,
+  verticalBrandForInquiry,
+} from '../../lib/websiteLeads'
 import type { WebsiteInquiry } from '../../lib/types'
-import { verticalBrandForInquiry } from '../../lib/websiteLeads'
+import { VERTICALS } from '../data/verticals'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
 import { btnGhost, btnPrimary, colors } from '../../lib/pageStyles'
 import { resolveSalesOwnerName } from '../../lib/crmWorkQueue'
 import { errorMessage } from '../../lib/errors'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
+
+function resolveVertical(raw: string): string {
+  const token = raw.trim()
+  if (!token) return 'general'
+  const lower = token.toLowerCase()
+  if (lower === 'general' || lower === 'general enquiry') return 'general'
+  const match = VERTICALS.find(
+    (v) =>
+      v.slug === lower ||
+      v.brand.toLowerCase() === lower ||
+      v.brand.toLowerCase() === token.toLowerCase(),
+  )
+  return match?.slug || token
+}
 
 export default function WebsiteInquiriesPanel({
   onConverted,
@@ -19,7 +38,10 @@ export default function WebsiteInquiriesPanel({
   const { showToast } = useToast()
   const [rows, setRows] = useState<WebsiteInquiry[]>([])
   const [busy, setBusy] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
   const [ownerName, setOwnerName] = useState('')
+  const [loaded, setLoaded] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     try {
@@ -36,6 +58,8 @@ export default function WebsiteInquiriesPanel({
       setOwnerName(resolveSalesOwnerName(user?.email, users))
     } catch {
       setRows([])
+    } finally {
+      setLoaded(true)
     }
   }, [user?.email])
 
@@ -80,7 +104,102 @@ export default function WebsiteInquiriesPanel({
     }
   }
 
-  if (!rows.length) return null
+  async function importInquiriesCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      if (!objects.length) {
+        showToast('No website enquiry rows in CSV', 'error')
+        return
+      }
+
+      const existingEmails = new Set(rows.map((r) => r.email.trim().toLowerCase()).filter(Boolean))
+      let saved = 0
+      let skipped = 0
+
+      for (const row of objects) {
+        const name = String(row.name || '').trim()
+        const email = String(row.email || '').trim()
+        const phone = String(row.phone || '').trim()
+        const vertical = resolveVertical(String(row.vertical || ''))
+        const message = String(row.message || '').trim()
+        const statusRaw = String(row.status || 'new').trim().toLowerCase() || 'new'
+
+        const check = validateWebsiteInquiry({ name, email, phone, vertical, message })
+        if (!check.ok) {
+          skipped += 1
+          continue
+        }
+
+        const emailKey = email.toLowerCase()
+        if (existingEmails.has(emailKey) && statusRaw === 'new') {
+          skipped += 1
+          continue
+        }
+
+        if (statusRaw === 'closed' || statusRaw === 'converted') {
+          const { data: existing } = await db
+            .from('website_inquiries')
+            .select('*')
+            .eq('email', email)
+            .eq('status', 'new')
+            .limit(1)
+          const hit = ((existing as WebsiteInquiry[]) || [])[0]
+          if (hit) {
+            const { error } = await db
+              .from('website_inquiries')
+              .update({ status: statusRaw === 'converted' ? 'converted' : 'closed' })
+              .eq('id', hit.id)
+            if (error) {
+              skipped += 1
+              continue
+            }
+            saved += 1
+            continue
+          }
+        }
+
+        const inquiry = buildWebsiteInquiry({ name, email, phone, vertical, message })
+        if (statusRaw === 'closed' || statusRaw === 'converted') {
+          inquiry.status = statusRaw === 'converted' ? 'converted' : 'closed'
+        }
+        const createdAt = String(row.created_at || '').trim()
+        if (createdAt) inquiry.created_at = createdAt
+
+        const { error } = await db.from('website_inquiries').insert(inquiry)
+        if (error) {
+          skipped += 1
+          continue
+        }
+        if (inquiry.status === 'new') existingEmails.add(emailKey)
+        saved += 1
+      }
+
+      if (!saved) {
+        showToast('No website enquiry rows imported from CSV', 'error')
+        return
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} website enquiry(ies)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Website enquiries CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
+  if (!loaded) return null
+  if (!rows.length && !importing) {
+    // Still show a slim bar so Import CSV remains reachable when the queue is empty.
+  }
 
   return (
     <section
@@ -94,11 +213,30 @@ export default function WebsiteInquiriesPanel({
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 10, alignItems: 'center' }}>
         <strong>Website enquiries</strong>
-        <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <span style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ color: colors.muted2, fontSize: 12 }}>{rows.length} new</span>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importInquiriesCsv(file)
+            }}
+          />
           <button
             type="button"
             style={btnGhost}
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button
+            type="button"
+            style={btnGhost}
+            disabled={importing || !rows.length}
             onClick={() => {
               exportListCsv(
                 'website-enquiries.csv',
@@ -120,50 +258,54 @@ export default function WebsiteInquiriesPanel({
           </button>
         </span>
       </div>
-      <div style={{ display: 'grid', gap: 10 }}>
-        {rows.map((row) => (
-          <div
-            key={row.id}
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              gap: 12,
-              alignItems: 'flex-start',
-              borderTop: `1px solid ${colors.border}`,
-              paddingTop: 10,
-              flexWrap: 'wrap',
-            }}
-          >
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div>
-                {row.name} · {verticalBrandForInquiry(row.vertical)}
+      {rows.length === 0 ? (
+        <div style={{ color: colors.muted2, fontSize: 13 }}>No new website enquiries.</div>
+      ) : (
+        <div style={{ display: 'grid', gap: 10 }}>
+          {rows.map((row) => (
+            <div
+              key={row.id}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 12,
+                alignItems: 'flex-start',
+                borderTop: `1px solid ${colors.border}`,
+                paddingTop: 10,
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div>
+                  {row.name} · {verticalBrandForInquiry(row.vertical)}
+                </div>
+                <div style={{ color: colors.muted, fontSize: 13 }}>
+                  {row.email} {row.phone ? `· ${row.phone}` : ''}
+                </div>
+                <div style={{ color: colors.muted2, fontSize: 13, marginTop: 4 }}>{row.message}</div>
               </div>
-              <div style={{ color: colors.muted, fontSize: 13 }}>
-                {row.email} {row.phone ? `· ${row.phone}` : ''}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  style={btnGhost}
+                  disabled={busy === row.id || importing}
+                  onClick={() => void dismiss(row)}
+                >
+                  Dismiss
+                </button>
+                <button
+                  type="button"
+                  style={btnPrimary}
+                  disabled={busy === row.id || importing}
+                  onClick={() => void convert(row)}
+                >
+                  {busy === row.id ? 'Adding…' : 'Add to CRM'}
+                </button>
               </div>
-              <div style={{ color: colors.muted2, fontSize: 13, marginTop: 4 }}>{row.message}</div>
             </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                style={btnGhost}
-                disabled={busy === row.id}
-                onClick={() => void dismiss(row)}
-              >
-                Dismiss
-              </button>
-              <button
-                type="button"
-                style={btnPrimary}
-                disabled={busy === row.id}
-                onClick={() => void convert(row)}
-              >
-                {busy === row.id ? 'Adding…' : 'Add to CRM'}
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </section>
   )
 }
