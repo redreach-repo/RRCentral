@@ -3,6 +3,7 @@ import { NO_TRADE_DATA_NOTE } from '../../lib/ctrmIssues'
 import Modal from '../Modal'
 import { useToast } from '../../contexts/ToastContext'
 import { accountTypeLabel } from '../../lib/accounts'
+import { exportListCsv } from '../../lib/listIo'
 import { parseTicketForm } from '../../lib/schemas/ticket'
 import { TICKET_CHANNELS, TICKET_PRIORITIES } from '../../lib/support'
 import type { Account, AccountContact, AppUser, TicketChannel, TicketPriority } from '../../lib/types'
@@ -219,7 +220,32 @@ export default function TicketFormModal({
             </select>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            style={buttonSecondaryStyle}
+            onClick={() => {
+              const account = accounts.find((a) => a.id === accountId)
+              const contact = accountContacts.find((c) => c.id === contactId)
+              const assigneeUser = team.find((u) => u.id === assignee)
+              exportListCsv(
+                'ticket-form-draft.csv',
+                ['field', 'value'],
+                [
+                  { field: 'account', value: account?.name || accountId },
+                  { field: 'contact', value: contact?.name || contactId || '' },
+                  { field: 'subject', value: subject },
+                  { field: 'details', value: details },
+                  { field: 'channel', value: channel },
+                  { field: 'priority', value: priority },
+                  { field: 'assignee', value: assigneeUser?.name || assigneeUser?.email || assignee || '' },
+                ],
+              )
+              showToast('Ticket draft CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
           <button type="button" style={buttonSecondaryStyle} onClick={onClose}>
             Cancel
           </button>
