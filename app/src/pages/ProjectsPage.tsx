@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Briefcase } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import { errorMessage } from '../lib/errors'
 import { computeWipAed, projectCostTotal, projectHealth } from '../lib/projectAccounting'
 import {
@@ -27,6 +29,7 @@ import docsStyles from '../styles/docsList.module.css'
 
 /** M9b: project headers + cost lines. */
 export default function ProjectsPage() {
+  const { appUserId } = useAuth()
   const { showToast } = useToast()
   const [rows, setRows] = useState<DeliveryProject[]>([])
   const [selected, setSelected] = useState<DeliveryProject | null>(null)
@@ -47,6 +50,10 @@ export default function ProjectsPage() {
   const [showArchived, setShowArchived] = useState(false)
   const [importing, setImporting] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
+  const projectsViewFilters = useMemo(
+    () => ({ archived: showArchived ? '1' : '0' }),
+    [showArchived],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -202,6 +209,17 @@ export default function ProjectsPage() {
           </button>
         </div>
       </header>
+
+      <SavedViewsBar
+        moduleId="projects"
+        filters={projectsViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => setShowArchived(String(f.archived || '0') === '1')}
+        onToast={showToast}
+        filtersEqual={(a, b) => String(a.archived || '0') === String(b.archived || '0')}
+      />
 
       {loading ? (
         <p>Loading…</p>

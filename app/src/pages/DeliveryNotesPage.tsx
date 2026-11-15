@@ -19,6 +19,7 @@ import EditorSectionTabs, {
 import LinkDriveFileModal from '../components/LinkDriveFileModal'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import { logActivity } from '../lib/activity'
 import {
   canCreateDeliveryNoteFromQuote,
@@ -89,7 +90,7 @@ type StatusTab = 'All' | 'Draft' | 'Issued' | 'Delivered'
 
 export default function DeliveryNotesPage() {
   const { t } = useI18n()
-  const { user } = useAuth()
+  const { user, appUserId } = useAuth()
   const { settings } = useSettings()
   const { showToast } = useToast()
   const navigate = useNavigate()
@@ -103,6 +104,10 @@ export default function DeliveryNotesPage() {
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState<StatusTab>('All')
   const [showArchived, setShowArchived] = useState(false)
+  const dnViewFilters = useMemo(
+    () => ({ tab, archived: showArchived ? '1' : '0' }),
+    [tab, showArchived],
+  )
   const [importing, setImporting] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
   const [actionsOpenId, setActionsOpenId] = useState<string | null>(null)
@@ -467,6 +472,25 @@ export default function DeliveryNotesPage() {
           </button>
         </div>
       </header>
+
+      <SavedViewsBar
+        moduleId="delivery_notes"
+        filters={dnViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => {
+          const next = String(f.tab || 'All') as StatusTab
+          const allowed: StatusTab[] = ['All', 'Draft', 'Issued', 'Delivered']
+          setTab(allowed.includes(next) ? next : 'All')
+          setShowArchived(String(f.archived || '0') === '1')
+        }}
+        onToast={showToast}
+        filtersEqual={(a, b) =>
+          String(a.tab || 'All') === String(b.tab || 'All') &&
+          String(a.archived || '0') === String(b.archived || '0')
+        }
+      />
 
       <div className={docsStyles.controls}>
         <div className={docsStyles.tabs}>
