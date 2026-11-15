@@ -26,6 +26,7 @@ import {
   loadSignedDeliveryNoteAttachments,
 } from '../lib/signedDeliveryNotes'
 import { errorMessage } from '../lib/errors'
+import { exportListCsv } from '../lib/listIo'
 import { PRODUCT } from '../lib/product'
 import { buildWhatsAppUrl } from '../lib/whatsapp'
 import { resolveLogoUrl } from '../lib/brand'
@@ -1263,6 +1264,51 @@ export default function DocumentPage() {
           <input type="checkbox" checked={bilingual} onChange={(e) => setBilingual(e.target.checked)} />
           {t('page.document.bilingual')}
         </label>
+        <ToolbarBtn
+          onClick={() => {
+            if (!items.length) {
+              showToast('No line items to export', 'info')
+              return
+            }
+            const ref =
+              (doc && 'reference_number' in doc && doc.reference_number) ||
+              (doc && 'reference' in doc && (doc as { reference?: string }).reference) ||
+              id
+            exportListCsv(
+              `${docType}-${String(ref).replace(/\s+/g, '-')}-lines.csv`,
+              [
+                'line_no',
+                'description',
+                'sku',
+                'qty',
+                'unit_price',
+                'unit_cost',
+                'vat_rate',
+                'amount',
+                'vat_amount',
+                'line_total',
+                'remarks',
+              ],
+              items.map((it) => ({
+                line_no: it.line_no,
+                description: it.description,
+                sku: it.sku || '',
+                qty: it.qty,
+                unit_price: it.unit_price,
+                unit_cost: it.unit_cost,
+                vat_rate: it.vat_rate,
+                amount: it.amount,
+                vat_amount: it.vat_amount,
+                line_total: it.line_total,
+                remarks: it.remarks || '',
+              })),
+            )
+            showToast('Line items CSV downloaded', 'success')
+          }}
+          disabled={!items.length}
+        >
+          <Download size={14} /> Export CSV
+        </ToolbarBtn>
         <ToolbarBtn onClick={() => void downloadPdf()} disabled={pdfBusy}>
           <Download size={14} />{' '}
           {pdfBusy ? t('page.document.preparing') : t('page.document.download')}
