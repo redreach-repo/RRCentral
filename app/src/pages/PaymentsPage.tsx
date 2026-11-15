@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import { Banknote, Plus, RefreshCw } from 'lucide-react'
@@ -46,7 +46,8 @@ import {
 import docsStyles from '../styles/docsList.module.css'
 import { PAYMENT_METHODS } from '../lib/config'
 import { errorMessage } from '../lib/errors'
-import { exportListCsv } from '../lib/listIo'
+import { PAYMENTS_CSV_COLUMNS } from '../lib/paymentsCsv'
+import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import { ensureMoneyApproval } from '../lib/featureSliceStores'
 import {
   DEFAULT_APPROVAL_THRESHOLD_AED,
@@ -110,6 +111,8 @@ export default function PaymentsPage() {
   const [suppliers, setSuppliers] = useState<SupplierCommitment[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [loading, setLoading] = useState(true)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const [payOpen, setPayOpen] = useState(false)
   const [refundOpen, setRefundOpen] = useState(false)
   const [supplierOpen, setSupplierOpen] = useState(false)
@@ -184,6 +187,86 @@ export default function PaymentsPage() {
   useEffect(() => {
     void loadLedger(selectedId)
   }, [selectedId, loadLedger])
+
+  async function importPaymentsCsv(file: File) {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      const objects = csvRowsToObjects(headers, rows).map((row) => {
+        const normalized: Record<string, string> = {}
+        for (const c of PAYMENTS_CSV_COLUMNS) {
+          normalized[c.key] = String(row[c.label] ?? row[c.key] ?? '').trim()
+        }
+        return normalized
+      })
+      const { ok, errors } = parseListIoRows(objects, PAYMENTS_CSV_COLUMNS)
+      if (!ok.length && errors.length) {
+        showToast(errors[0] || 'No valid payment rows', 'error')
+        return
+      }
+      let saved = 0
+      let skipped = errors.length
+      for (const row of ok) {
+        const quote =
+          quotes.find(
+            (q) =>
+              q.reference_number === row.quote_ref ||
+              q.quote_id === row.quote_ref ||
+              q.id === row.quote_ref,
+          ) || null
+        if (!quote) {
+          skipped += 1
+          continue
+        }
+        const amount = Number(row.amount_received) || 0
+        if (!(amount > 0)) {
+          skipped += 1
+          continue
+        }
+        const payment_type = (PAYMENT_TYPES as readonly string[]).includes(row.payment_type)
+          ? row.payment_type
+          : 'Deposit'
+        const status = (PAYMENT_STATUSES as readonly string[]).includes(row.status)
+          ? row.status
+          : 'Pending'
+        const payment_method = (PAYMENT_METHODS as readonly string[]).includes(row.payment_method)
+          ? row.payment_method
+          : PAYMENT_METHODS[0]
+        await saveCustomerPayment({
+          booking_id: quote.id,
+          quote_ref: quote.reference_number || quote.quote_id || row.quote_ref,
+          invoice_ref: '',
+          client: row.client || quote.client || '',
+          payment_date: row.payment_date,
+          amount_received: amount,
+          currency: (row.currency || quote.payment_currency || quote.quotation_currency || BASE_CURRENCY).toUpperCase(),
+          fx_rate: Number(quote.fx_rate) || 1,
+          fx_rate_date: row.payment_date,
+          fx_rate_approved_by: user?.email || '',
+          payment_method,
+          bank_provider: '',
+          processing_fee: 0,
+          conversion_fee: 0,
+          payment_type,
+          transaction_ref: row.transaction_ref || '',
+          proof_url: '',
+          status,
+          notes: 'Imported from CSV',
+          created_by: user?.email || '',
+        })
+        saved += 1
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} payment(s)${skipNote}`, 'success')
+      if (selectedId) await loadLedger(selectedId)
+    } catch (e) {
+      showToast(errorMessage(e, 'Payment CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
 
   const snapshot = useMemo(() => {
     if (!selected) return null
@@ -422,6 +505,25 @@ export default function PaymentsPage() {
           <p className={docsStyles.subtitle}>{t('page.payments.subtitle')}</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importPaymentsCsv(file)
+            }}
+          />
+          <button
+            type="button"
+            className={docsStyles.newBtn}
+            style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+            disabled={importing || !quotes.length}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
           <button
             type="button"
             className={docsStyles.newBtn}
@@ -439,6 +541,7 @@ export default function PaymentsPage() {
                   'payment_type',
                   'status',
                   'transaction_ref',
+                  'payment_method',
                 ],
                 payments.map((p) => ({
                   client: p.client,
@@ -449,6 +552,7 @@ export default function PaymentsPage() {
                   payment_type: p.payment_type,
                   status: p.status,
                   transaction_ref: p.transaction_ref,
+                  payment_method: p.payment_method,
                 })),
               )
               showToast('Payments CSV downloaded', 'success')
