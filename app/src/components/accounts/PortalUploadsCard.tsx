@@ -1,16 +1,35 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { Download, ExternalLink } from 'lucide-react'
 import { useToast } from '../../contexts/ToastContext'
 import { sizeLabel } from '../../lib/clientPortal'
 import { downloadPortalUpload, listPortalUploads, markPortalUploadFiled } from '../../lib/clientPortalStore'
 import { errorMessage } from '../../lib/errors'
-import { exportListCsv } from '../../lib/listIo'
+import { csvRowsToObjects, exportListCsv, parseCsv } from '../../lib/listIo'
 import type { Account, PortalUpload } from '../../lib/types'
 import { buttonSecondaryStyle, cardStyle, colors, sectionTitleStyle } from '../../lib/uiStyles'
 
 const smallBtn = { ...buttonSecondaryStyle, padding: '6px 10px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }
 const row = { display: 'flex', flexWrap: 'wrap' as const, gap: 8, alignItems: 'center' }
+
+const UPLOAD_CSV_HEADERS = [
+  'filename',
+  'status',
+  'size_bytes',
+  'content_type',
+  'note',
+  'drive_url',
+  'error',
+  'created_at',
+] as const
+
+function parseUploadStatus(raw: string): 'received' | 'filed' | null {
+  const v = raw.trim().toLowerCase()
+  if (!v) return null
+  if (v === 'filed' || v === 'file') return 'filed'
+  if (v === 'received' || v === 'waiting') return 'received'
+  return null
+}
 
 /**
  * Files the client sent from the portal. Most go straight to their Google
@@ -22,6 +41,8 @@ export default function PortalUploadsCard({ account, editable }: { account: Acco
   const [rows, setRows] = useState<PortalUpload[]>([])
   const [missingTable, setMissingTable] = useState(false)
   const [busy, setBusy] = useState('')
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     try {
@@ -62,6 +83,76 @@ export default function PortalUploadsCard({ account, editable }: { account: Acco
     }
   }
 
+  async function importUploadsCsv(file: File) {
+    if (!editable || missingTable) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const { headers, rows: csvRows } = parseCsv(text)
+      if (!headers.length) {
+        showToast('CSV has no header row', 'error')
+        return
+      }
+      const objects = csvRowsToObjects(headers, csvRows)
+      const waitingByName = new Map<string, PortalUpload[]>()
+      for (const u of rows) {
+        if (u.status !== 'received') continue
+        const key = (u.filename || '').trim().toLowerCase()
+        if (!key) continue
+        const list = waitingByName.get(key) || []
+        list.push(u)
+        waitingByName.set(key, list)
+      }
+      let saved = 0
+      let skipped = 0
+      for (const csvRow of objects) {
+        const filename = String(csvRow.filename || '').trim()
+        if (!filename) {
+          skipped += 1
+          continue
+        }
+        const desired = parseUploadStatus(String(csvRow.status || ''))
+        if (desired !== 'filed') {
+          skipped += 1
+          continue
+        }
+        const key = filename.toLowerCase()
+        const candidates = waitingByName.get(key) || []
+        if (!candidates.length) {
+          skipped += 1
+          continue
+        }
+        const createdAt = String(csvRow.created_at || '').trim()
+        let matchIdx = 0
+        if (createdAt) {
+          const byCreated = candidates.findIndex((u) => (u.created_at || '') === createdAt)
+          if (byCreated >= 0) matchIdx = byCreated
+        }
+        const [match] = candidates.splice(matchIdx, 1)
+        if (!match) {
+          skipped += 1
+          continue
+        }
+        if (!candidates.length) waitingByName.delete(key)
+        else waitingByName.set(key, candidates)
+        await markPortalUploadFiled(match.id, String(csvRow.drive_url || '').trim())
+        saved += 1
+      }
+      if (!saved && skipped) {
+        showToast('No matching portal upload rows in CSV', 'error')
+        return
+      }
+      const skipNote = skipped ? ` · ${skipped} row(s) skipped` : ''
+      showToast(`Imported ${saved} portal upload row(s)${skipNote}`, 'success')
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Portal uploads CSV import failed'), 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   if (missingTable || rows.length === 0) return null
   const waiting = rows.filter((r) => r.status === 'received').length
 
@@ -69,29 +160,51 @@ export default function PortalUploadsCard({ account, editable }: { account: Acco
     <section style={{ ...cardStyle, marginTop: 16 }} aria-label="Files from the client">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Files from the client</h2>
-        <button
-          type="button"
-          style={smallBtn}
-          onClick={() => {
-            exportListCsv(
-              `portal-uploads-${account.id.slice(0, 8)}.csv`,
-              ['filename', 'status', 'size_bytes', 'content_type', 'note', 'drive_url', 'error', 'created_at'],
-              rows.map((u) => ({
-                filename: u.filename,
-                status: u.status,
-                size_bytes: u.size_bytes,
-                content_type: u.content_type || '',
-                note: u.note || '',
-                drive_url: u.drive_url || '',
-                error: u.error || '',
-                created_at: u.created_at || '',
-              })),
-            )
-            showToast('Portal uploads CSV downloaded', 'success')
-          }}
-        >
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void importUploadsCsv(file)
+            }}
+          />
+          {editable ? (
+            <button
+              type="button"
+              style={smallBtn}
+              disabled={importing}
+              onClick={() => importInputRef.current?.click()}
+            >
+              {importing ? 'Importing…' : 'Import CSV'}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            style={smallBtn}
+            onClick={() => {
+              exportListCsv(
+                `portal-uploads-${account.id.slice(0, 8)}.csv`,
+                [...UPLOAD_CSV_HEADERS],
+                rows.map((u) => ({
+                  filename: u.filename,
+                  status: u.status,
+                  size_bytes: u.size_bytes,
+                  content_type: u.content_type || '',
+                  note: u.note || '',
+                  drive_url: u.drive_url || '',
+                  error: u.error || '',
+                  created_at: u.created_at || '',
+                })),
+              )
+              showToast('Portal uploads CSV downloaded', 'success')
+            }}
+          >
+            Export CSV
+          </button>
+        </div>
       </div>
       <p style={{ color: colors.muted, fontSize: 13, margin: '8px 0 12px' }}>
         {waiting
