@@ -10,6 +10,7 @@ import {
   suggestedDocumentTitle,
   type RelatedRefOption,
 } from '../lib/customerFiles'
+import { exportListCsv } from '../lib/listIo'
 import { parseLinkDriveFileForm } from '../lib/schemas/linkDriveFile'
 import {
   buttonPrimaryStyle,
@@ -295,7 +296,30 @@ export default function LinkDriveFileModal({
           />
         </div>
       ) : null}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          style={buttonSecondaryStyle}
+          disabled={saving}
+          onClick={() => {
+            exportListCsv(
+              `link-drive-${company.replace(/\s+/g, '-').toLowerCase() || 'draft'}.csv`,
+              ['field', 'value'],
+              [
+                { field: 'company', value: company },
+                { field: 'mode', value: mode },
+                { field: 'category', value: resolvedCategory },
+                { field: 'title', value: docTitle },
+                { field: 'drive_url', value: driveUrl },
+                { field: 'related_ref', value: relatedRef },
+                { field: 'notes', value: notes },
+              ],
+            )
+            showToast('Drive link draft CSV downloaded', 'success')
+          }}
+        >
+          Export CSV
+        </button>
         <button type="button" style={buttonSecondaryStyle} onClick={onClose} disabled={saving}>
           Cancel
         </button>
