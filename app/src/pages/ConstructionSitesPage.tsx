@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { HardHat } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import { errorMessage } from '../lib/errors'
 import { listHrEmployees, type HrEmployee } from '../lib/featureSliceStores'
 import { assignmentWindow, siteLabel, SITE_STATUSES } from '../lib/constructionSites'
@@ -28,6 +30,7 @@ import docsStyles from '../styles/docsList.module.css'
 
 /** M12b construction pack: sites + workforce assignments. */
 export default function ConstructionSitesPage() {
+  const { appUserId } = useAuth()
   const { showToast } = useToast()
   const [sites, setSites] = useState<ConstructionSite[]>([])
   const [people, setPeople] = useState<HrEmployee[]>([])
@@ -41,6 +44,12 @@ export default function ConstructionSitesPage() {
   const [loading, setLoading] = useState(true)
   const [importing, setImporting] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
+  const [statusFilter, setStatusFilter] = useState('all')
+  const sitesViewFilters = useMemo(() => ({ status: statusFilter }), [statusFilter])
+  const visibleSites = useMemo(
+    () => (statusFilter === 'all' ? sites : sites.filter((s) => s.status === statusFilter)),
+    [sites, statusFilter],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -168,12 +177,12 @@ export default function ConstructionSitesPage() {
             type="button"
             className={docsStyles.newBtn}
             style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
-            disabled={!sites.length}
+            disabled={!visibleSites.length}
             onClick={() => {
               exportListCsv(
                 'construction-sites.csv',
                 ['code', 'name', 'location', 'status'],
-                sites.map((s) => ({
+                visibleSites.map((s) => ({
                   code: s.code,
                   name: s.name,
                   location: s.location,
@@ -187,6 +196,31 @@ export default function ConstructionSitesPage() {
           </button>
         </div>
       </header>
+
+      <SavedViewsBar
+        moduleId="construction_sites"
+        filters={sitesViewFilters}
+        ownerUserId={appUserId}
+        canWrite
+        applyDefaultOnLoad={false}
+        onApply={(f) => setStatusFilter(String(f.status || 'all'))}
+        onToast={showToast}
+        filtersEqual={(a, b) => String(a.status || 'all') === String(b.status || 'all')}
+      />
+
+      <div style={{ marginBottom: 12 }}>
+        <label style={labelStyle}>
+          Status
+          <select style={selectStyle} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="all">All</option>
+            {SITE_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       {loading ? (
         <p>Loading…</p>

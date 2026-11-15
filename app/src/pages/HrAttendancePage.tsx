@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Clock } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
+import SavedViewsBar from '../components/SavedViewsBar'
 import { errorMessage } from '../lib/errors'
 import { listHrEmployees, type HrEmployee } from '../lib/featureSliceStores'
 import {
@@ -25,6 +27,7 @@ import docsStyles from '../styles/docsList.module.css'
 
 /** M12b: attendance day stub (not WPS / labour certified). */
 export default function HrAttendancePage() {
+  const { appUserId } = useAuth()
   const { showToast } = useToast()
   const [people, setPeople] = useState<HrEmployee[]>([])
   const [rows, setRows] = useState<HrAttendanceDay[]>([])
@@ -39,6 +42,10 @@ export default function HrAttendancePage() {
   const [toDate, setToDate] = useState('')
   const [importing, setImporting] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
+  const attendanceViewFilters = useMemo(
+    () => ({ person: filterPerson, from: fromDate, to: toDate }),
+    [filterPerson, fromDate, toDate],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -261,6 +268,25 @@ export default function HrAttendancePage() {
               Save day
             </button>
           </form>
+
+          <SavedViewsBar
+            moduleId="hr_attendance"
+            filters={attendanceViewFilters}
+            ownerUserId={appUserId}
+            canWrite
+            applyDefaultOnLoad={false}
+            onApply={(f) => {
+              setFilterPerson(String(f.person || 'all'))
+              setFromDate(String(f.from || ''))
+              setToDate(String(f.to || ''))
+            }}
+            onToast={showToast}
+            filtersEqual={(a, b) =>
+              String(a.person || 'all') === String(b.person || 'all') &&
+              String(a.from || '') === String(b.from || '') &&
+              String(a.to || '') === String(b.to || '')
+            }
+          />
 
           <section style={cardStyle}>
             <h2 style={{ marginTop: 0, fontSize: 16 }}>Recent</h2>
