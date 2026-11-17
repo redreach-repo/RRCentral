@@ -5,7 +5,11 @@ import EmptyState from '../components/EmptyState'
 import { db } from '../lib/db'
 import { errorMessage } from '../lib/errors'
 import {
+  CLIENT_PO_DEPARTMENTS,
+  clientPoDepartmentLabel,
+  clientPoInvoicePool,
   clientPoIsOpen,
+  clientPoPartyName,
   clientPoRemaining,
   clientPoStatusAfterMatch,
   clientPoStatusAfterReceipt,
@@ -32,7 +36,7 @@ import {
 } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
-type AccountOpt = { id: string; name: string }
+type ClientOpt = { id: string; company_name: string; account_id?: string | null }
 type InvoiceOpt = {
   id: string
   reference_number: string
@@ -46,9 +50,10 @@ type InvoiceOpt = {
 export default function ClientPosPage() {
   const { showToast } = useToast()
   const [rows, setRows] = useState<ClientPurchaseOrder[]>([])
-  const [accounts, setAccounts] = useState<AccountOpt[]>([])
+  const [clients, setClients] = useState<ClientOpt[]>([])
   const [invoices, setInvoices] = useState<InvoiceOpt[]>([])
-  const [accountId, setAccountId] = useState('')
+  const [clientId, setClientId] = useState('')
+  const [divisionCode, setDivisionCode] = useState('')
   const [poNumber, setPoNumber] = useState('')
   const [amount, setAmount] = useState('')
   const [notes, setNotes] = useState('')
@@ -57,9 +62,10 @@ export default function ClientPosPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [pos, accts, inv] = await Promise.all([
+      const [pos, cl, inv] = await Promise.all([
         listClientPurchaseOrders(),
-        db.from('accounts').select('id, name').order('name').limit(200),
+        // Company wide client list, the same one Quotations and Invoices use (every department).
+        db.from('clients').select('id, company_name, account_id').order('company_name'),
         db
           .from('invoices')
           .select('id, reference_number, amount, status, account_id, client')
@@ -67,26 +73,21 @@ export default function ClientPosPage() {
           .limit(300),
       ])
       setRows(pos)
-      const list = (accts.data || []) as AccountOpt[]
-      setAccounts(list)
+      setClients((cl.data || []) as ClientOpt[])
       setInvoices((inv.data || []) as InvoiceOpt[])
-      if (!accountId && list[0]) setAccountId(list[0].id)
     } catch (e) {
       showToast(errorMessage(e, 'Could not load client POs'), 'error')
     } finally {
       setLoading(false)
     }
-  }, [showToast, accountId])
+  }, [showToast])
 
   useEffect(() => {
     void load()
   }, [load])
 
   async function matchInvoice(r: ClientPurchaseOrder) {
-    const accountInvoices = invoices.filter(
-      (i) => i.account_id === r.account_id || (!i.account_id && Boolean(r.accounts?.name)),
-    )
-    const pool = accountInvoices.length ? accountInvoices : invoices
+    const pool = clientPoInvoicePool({ account_id: r.account_id, partyName: clientPoPartyName(r) }, invoices)
     const match = suggestClientPoInvoiceMatch({ amount: Number(r.amount) }, pool)
     if (!match) {
       showToast('No close invoice amount match', 'info')
@@ -106,13 +107,14 @@ export default function ClientPosPage() {
     <div className={docsStyles.page}>
       <header className={docsStyles.hero}>
         <div>
-          <p className={docsStyles.kicker}>Sales · M9a</p>
+          <p className={docsStyles.kicker}>Documents · all departments</p>
           <h1 className={docsStyles.title}>
             <FileText size={22} style={{ verticalAlign: 'middle', marginRight: 8 }} />
             Client POs
           </h1>
           <p className={docsStyles.subtitle}>
-            Track customer purchase order numbers against accounts. Soft-match invoices by amount.
+            Track customer purchase order numbers for any client in any department. Soft-match invoices by
+            amount.
           </p>
         </div>
         <button
@@ -123,10 +125,11 @@ export default function ClientPosPage() {
           onClick={() => {
             exportListCsv(
               'client-pos.csv',
-              ['po_number', 'account', 'amount', 'currency', 'status', 'invoice_id'],
+              ['po_number', 'client', 'department', 'amount', 'currency', 'status', 'invoice_id'],
               rows.map((r) => ({
                 po_number: r.po_number,
-                account: r.accounts?.name || r.account_id,
+                client: clientPoPartyName(r),
+                department: clientPoDepartmentLabel(r.division_code),
                 amount: r.amount,
                 currency: r.currency,
                 status: r.status,
@@ -148,8 +151,15 @@ export default function ClientPosPage() {
             style={cardStyle}
             onSubmit={(e) => {
               e.preventDefault()
+              const client = clients.find((c) => c.id === clientId)
+              if (!client) {
+                showToast('Pick a client', 'error')
+                return
+              }
               void createClientPurchaseOrder({
-                accountId,
+                clientId: client.id,
+                accountId: client.account_id ?? null,
+                divisionCode: divisionCode || null,
                 poNumber,
                 amount: Number(amount) || 0,
                 currency: 'AED',
@@ -161,19 +171,32 @@ export default function ClientPosPage() {
                   setPoNumber('')
                   setAmount('')
                   setNotes('')
+                  setClientId('')
                   return load()
                 })
                 .catch((err) => showToast(errorMessage(err, 'Save failed'), 'error'))
             }}
           >
             <h2 style={{ marginTop: 0, fontSize: 16 }}>New client PO</h2>
-            <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '2fr 1fr 1fr' }}>
+            <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
               <label style={labelStyle}>
-                Account
-                <select style={selectStyle} value={accountId} onChange={(e) => setAccountId(e.target.value)} required>
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
+                Client
+                <select style={selectStyle} value={clientId} onChange={(e) => setClientId(e.target.value)} required>
+                  <option value="">Pick a client…</option>
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.company_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label style={labelStyle}>
+                Department
+                <select style={selectStyle} value={divisionCode} onChange={(e) => setDivisionCode(e.target.value)}>
+                  <option value="">Any department</option>
+                  {CLIENT_PO_DEPARTMENTS.map((d) => (
+                    <option key={d.code} value={d.code}>
+                      {d.label}
                     </option>
                   ))}
                 </select>
@@ -213,7 +236,7 @@ export default function ClientPosPage() {
                   const suggestion = clientPoIsOpen(r.status)
                     ? suggestClientPoInvoiceMatch(
                         { amount: Number(r.amount) },
-                        invoices.filter((i) => i.account_id === r.account_id || !i.account_id),
+                        clientPoInvoicePool({ account_id: r.account_id, partyName: clientPoPartyName(r) }, invoices),
                       )
                     : null
                   return (
@@ -221,11 +244,16 @@ export default function ClientPosPage() {
                       <div style={{ fontSize: 13 }}>
                         {clientPoSummary({
                           poNumber: r.po_number,
-                          accountName: r.accounts?.name || r.account_id,
+                          accountName: clientPoPartyName(r),
                           amount: Number(r.amount),
                           currency: r.currency,
                           status: r.status,
                         })}
+                        {r.division_code ? (
+                          <div style={{ color: colors.muted, fontSize: 12 }}>
+                            {clientPoDepartmentLabel(r.division_code)}
+                          </div>
+                        ) : null}
                         {r.invoice_id ? (
                           <div style={{ color: colors.muted, fontSize: 12 }}>Linked invoice id {r.invoice_id}</div>
                         ) : null}

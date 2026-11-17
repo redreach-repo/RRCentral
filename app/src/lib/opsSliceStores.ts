@@ -413,7 +413,12 @@ export async function markProjectMilestoneBilled(scheduleId: string): Promise<vo
 
 export type ClientPurchaseOrder = {
   id: string
-  account_id: string
+  /** Client from the company wide list (any department). */
+  client_id?: string | null
+  /** Older rows: CRM account. */
+  account_id: string | null
+  /** Optional department code (01 to 09). */
+  division_code?: string | null
   po_number: string
   status: string
   issued_on: string | null
@@ -423,6 +428,7 @@ export type ClientPurchaseOrder = {
   invoice_id?: string | null
   received_amount?: number
   accounts?: { name: string } | null
+  clients?: { company_name: string } | null
 }
 
 export async function listClientPurchaseOrders(): Promise<ClientPurchaseOrder[]> {
@@ -430,7 +436,7 @@ export async function listClientPurchaseOrders(): Promise<ClientPurchaseOrder[]>
   const { data, error } = await db
     .from('client_purchase_orders')
     .select(
-      'id, account_id, po_number, status, issued_on, currency, amount, notes, invoice_id, received_amount, accounts(name)',
+      'id, client_id, account_id, division_code, po_number, status, issued_on, currency, amount, notes, invoice_id, received_amount, accounts(name), clients(company_name)',
     )
     .order('issued_on', { ascending: false })
     .limit(100)
@@ -473,7 +479,10 @@ export async function linkClientPoInvoice(
 }
 
 export async function createClientPurchaseOrder(input: {
-  accountId: string
+  clientId: string
+  /** The client's linked account, when it has one. */
+  accountId: string | null
+  divisionCode: string | null
   poNumber: string
   amount: number
   currency: string
@@ -481,7 +490,9 @@ export async function createClientPurchaseOrder(input: {
   notes: string
 }): Promise<void> {
   const { error } = await db.from('client_purchase_orders').insert({
-    account_id: input.accountId,
+    client_id: input.clientId,
+    account_id: input.accountId || null,
+    division_code: input.divisionCode || null,
     po_number: input.poNumber.trim(),
     amount: input.amount,
     currency: input.currency || 'AED',
