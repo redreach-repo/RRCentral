@@ -122,3 +122,41 @@ export function clientPoDepartmentLabel(code: string | null | undefined): string
   if (!code) return ''
   return CLIENT_PO_DEPARTMENTS.find((d) => d.code === code)?.label ?? code
 }
+
+/** Status tab label for a PO status (open → Open). */
+export function clientPoStatusLabel(status: string): string {
+  const s = String(status || '').trim()
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Open'
+}
+
+/**
+ * List filter for the Client POs page: vertical ('' = every vertical, 'none' = untagged),
+ * status tab ('All', 'Open' = open or partial, or an exact status) and free text search
+ * over the PO number and client name.
+ */
+export function filterClientPos<
+  R extends {
+    po_number: string
+    status: string
+    division_code?: string | null
+    clients?: { company_name?: string | null } | null
+    accounts?: { name?: string | null } | null
+    client_id?: string | null
+    account_id?: string | null
+  },
+>(rows: R[], opts: { department: string; status: string; search: string }): R[] {
+  const q = opts.search.trim().toLowerCase()
+  return rows.filter((r) => {
+    if (opts.department === 'none' && r.division_code) return false
+    if (opts.department && opts.department !== 'none' && r.division_code !== opts.department) return false
+    if (opts.status === 'Open' && !clientPoIsOpen(r.status)) return false
+    if (opts.status && opts.status !== 'All' && opts.status !== 'Open') {
+      if (clientPoStatusLabel(r.status) !== opts.status) return false
+    }
+    if (q) {
+      const hay = `${r.po_number} ${clientPoPartyName(r)}`.toLowerCase()
+      if (!hay.includes(q)) return false
+    }
+    return true
+  })
+}

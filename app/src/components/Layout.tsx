@@ -27,6 +27,7 @@ import {
   Moon,
   Sun,
   Monitor,
+  ClipboardList,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
@@ -87,6 +88,7 @@ const phoneShortcuts: NavItem[] = [
   { to: '/customer-files', label: 'Drive', icon: FolderOpen },
   { to: '/accounts', label: 'Accounts', icon: Contact, forStaff: true },
   { to: '/invoices', label: 'Invoices', icon: Receipt },
+  { to: '/client-pos', label: 'Client POs', icon: ClipboardList },
   { to: '/delivery-notes', label: 'Delivery notes', icon: Truck },
   { to: '/expenses', label: 'Expenses', icon: Wallet },
   { to: '/vendors', label: 'Vendors', icon: Building2 },
@@ -207,6 +209,7 @@ export default function Layout() {
       '/ctrm',
       '/quotations',
       '/invoices',
+      '/client-pos',
       '/delivery-notes',
       '/follow-ups',
       '/customer-files',

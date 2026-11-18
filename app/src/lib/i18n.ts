@@ -22,6 +22,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'shell.jumpToPlaceholder': 'Jump to a page…',
     'nav.module.overview': 'Overview',
     'nav.module.sales': 'Sales',
+    'nav.module.documents': 'Documents',
     'nav.module.clients': 'Clients',
     'nav.module.delivery': 'Delivery',
     'nav.module.ops': 'Operations',
@@ -359,7 +360,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.about.yourCompany': 'your company',
     'page.about.openGuide': 'Open the in-app guide',
     'page.about.openAbout': 'About HighMast',
-    'page.docs.kicker': 'Sales documents',
+    'page.docs.kicker': 'Documents · all verticals',
     'page.quotations.title': 'Quotations',
     'page.quotations.subtitle':
       'Create, revise, and track quotations. Click Actions on a row to reveal every option.',
@@ -635,7 +636,9 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.settings.moduleFlags.bodyMid': 'JSON in settings (for example',
     'page.settings.moduleFlags.overview': 'Overview (Dashboard, Guide)',
     'page.settings.moduleFlags.sales':
-      'Sales (Pipeline, My Day, Follow-ups, quotes, invoices, Drive)',
+      'Sales (Quick add, Pipeline, My Day, Follow-ups, AI CRM and CTRM detail)',
+    'page.settings.moduleFlags.documents':
+      'Documents (Quotations, Invoices, Client POs, Delivery notes, Drive) for every vertical',
     'page.settings.moduleFlags.ops':
       'Operations (Wanders, Catalog, Inventory, Templates, Domains)',
     'page.settings.moduleFlags.finance':
@@ -1083,6 +1086,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'shell.jumpToPlaceholder': 'الانتقال إلى صفحة…',
     'nav.module.overview': 'نظرة عامة',
     'nav.module.sales': 'المبيعات',
+    'nav.module.documents': 'المستندات',
     'nav.module.clients': 'العملاء',
     'nav.module.delivery': 'التسليم',
     'nav.module.ops': 'العمليات',
@@ -1420,7 +1424,7 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.about.yourCompany': 'شركتك',
     'page.about.openGuide': 'افتح الدليل داخل التطبيق',
     'page.about.openAbout': 'حول HighMast',
-    'page.docs.kicker': 'مستندات المبيعات',
+    'page.docs.kicker': 'المستندات · كل القطاعات',
     'page.quotations.title': 'عروض الأسعار',
     'page.quotations.subtitle':
       'أنشئ وعدّل وتتبع عروض الأسعار. انقر الإجراءات على صف لإظهار كل خيار.',
@@ -1695,7 +1699,9 @@ const STRINGS: Record<Locale, Record<string, string>> = {
     'page.settings.moduleFlags.bodyMid': 'JSON في الإعدادات (مثلاً',
     'page.settings.moduleFlags.overview': 'النظرة العامة (لوحة التحكم، الدليل)',
     'page.settings.moduleFlags.sales':
-      'المبيعات (خط الأنابيب، يومي، المتابعات، العروض، الفواتير، Drive)',
+      'المبيعات (إضافة سريعة، خط الأنابيب، يومي، المتابعات، تفاصيل AI CRM و CTRM)',
+    'page.settings.moduleFlags.documents':
+      'المستندات (العروض، الفواتير، أوامر شراء العملاء، إشعارات التسليم، Drive) لكل القطاعات',
     'page.settings.moduleFlags.ops':
       'العمليات (Wanders، الكتالوج، المخزون، القوالب، النطاقات)',
     'page.settings.moduleFlags.finance':

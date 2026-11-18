@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   CLIENT_PO_DEPARTMENTS,
   clientPoDepartmentLabel,
+  clientPoStatusLabel,
+  filterClientPos,
   clientPoInvoicePool,
   clientPoPartyName,
   clientPoRemaining,
@@ -71,5 +73,33 @@ describe('client PO departments', () => {
     expect(clientPoDepartmentLabel('01')).toBe('01 RR Threads')
     expect(clientPoDepartmentLabel('07')).toBe('07 AI CRM')
     expect(clientPoDepartmentLabel(null)).toBe('')
+  })
+})
+
+describe('client PO list filter', () => {
+  const rows = [
+    { po_number: 'PO-1', status: 'open', division_code: '01', clients: { company_name: 'Uniform Buyer' } },
+    { po_number: 'PO-2', status: 'partial', division_code: '06', clients: { company_name: 'Steel Trader' } },
+    { po_number: 'PO-3', status: 'fulfilled', division_code: '07', accounts: { name: 'ICOC Dubai' } },
+    { po_number: 'PO-4', status: 'canceled', division_code: null, clients: { company_name: 'Walk-in' } },
+  ]
+  const ids = (opts: { department: string; status: string; search: string }) =>
+    filterClientPos(rows, opts).map((r) => r.po_number)
+
+  it('shows every vertical by default', () => {
+    expect(ids({ department: '', status: 'All', search: '' })).toEqual(['PO-1', 'PO-2', 'PO-3', 'PO-4'])
+  })
+
+  it('filters by vertical, including untagged', () => {
+    expect(ids({ department: '06', status: 'All', search: '' })).toEqual(['PO-2'])
+    expect(ids({ department: 'none', status: 'All', search: '' })).toEqual(['PO-4'])
+  })
+
+  it('filters by status tab and search', () => {
+    expect(ids({ department: '', status: 'Open', search: '' })).toEqual(['PO-1', 'PO-2'])
+    expect(ids({ department: '', status: 'Fulfilled', search: '' })).toEqual(['PO-3'])
+    expect(ids({ department: '', status: 'All', search: 'icoc' })).toEqual(['PO-3'])
+    expect(ids({ department: '', status: 'All', search: 'po-2' })).toEqual(['PO-2'])
+    expect(clientPoStatusLabel('canceled')).toBe('Canceled')
   })
 })

@@ -46,6 +46,10 @@ export const SETTINGS_MODULE_FLAGS: { flag: string; labelKey: string }[] = [
     labelKey: 'page.settings.moduleFlags.sales',
   },
   {
+    flag: 'documents',
+    labelKey: 'page.settings.moduleFlags.documents',
+  },
+  {
     flag: 'ops',
     labelKey: 'page.settings.moduleFlags.ops',
   },
