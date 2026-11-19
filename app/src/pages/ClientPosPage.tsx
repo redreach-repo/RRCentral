@@ -8,6 +8,8 @@ import StatusPill from '../components/StatusPill'
 import { db } from '../lib/db'
 import { errorMessage } from '../lib/errors'
 import { formatPoMoney } from '../lib/clientPoReader'
+import { poLineBalances, type PoDrawdown } from '../lib/clientPoBalance'
+import { loadPoDrawdowns } from '../lib/clientPoDrawdownStore'
 import { CLIENT_PO_SETUP_OFF, getClientPoSetup, type ClientPoSetup } from '../lib/clientPoFile'
 import {
   CLIENT_PO_DEPARTMENTS,
@@ -47,6 +49,17 @@ const STATUS_TABS = ['All', 'Open', 'Fulfilled', 'Canceled'] as const
 const smallBtn = { ...buttonSecondaryStyle, padding: '4px 10px', fontSize: 12 }
 
 /** M9a: customer purchase orders for every vertical, laid out like Invoices and Quotations. */
+/** "3 lines · 50 of 90 left" from the PO lines and what invoices took. */
+function poLeftSummary(r: ClientPurchaseOrder, drawdowns: PoDrawdown[]): string {
+  const lines = r.line_items || []
+  const count = `${lines.length} ${lines.length === 1 ? 'line' : 'lines'}`
+  const b = poLineBalances(lines, drawdowns.filter((d) => d.po_id === r.id))
+  const requested = b.reduce((s, x) => s + x.requested, 0)
+  if (!requested) return count
+  const left = b.reduce((s, x) => s + Math.max(0, x.balance), 0)
+  return `${count} · ${left} of ${requested} left`
+}
+
 export default function ClientPosPage() {
   const { showToast } = useToast()
   const [rows, setRows] = useState<ClientPurchaseOrder[]>([])
@@ -62,6 +75,7 @@ export default function ClientPosPage() {
   const [editing, setEditing] = useState<ClientPurchaseOrder | null>(null)
   const [detailsReady, setDetailsReady] = useState(false)
   const [setup, setSetup] = useState<ClientPoSetup>(CLIENT_PO_SETUP_OFF)
+  const [drawdowns, setDrawdowns] = useState<PoDrawdown[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -78,6 +92,13 @@ export default function ClientPosPage() {
       ])
       setRows(pos.rows)
       setDetailsReady(pos.detailsReady)
+      // What invoices have taken from each PO's lines (best effort: needs client-po-drawdowns.sql).
+      const withLines = pos.rows.filter((r) => r.line_items?.length).map((r) => r.id)
+      if (withLines.length) {
+        loadPoDrawdowns(withLines)
+          .then((d) => setDrawdowns(d.rows))
+          .catch(() => setDrawdowns([]))
+      }
       setClients((cl.data || []) as ClientPoClientOpt[])
       setInvoices((inv.data || []) as InvoiceOpt[])
     } catch (e) {
@@ -95,6 +116,8 @@ export default function ClientPosPage() {
   useEffect(() => {
     void getClientPoSetup().then(setSetup)
   }, [])
+
+  const poLeftLabel = (r: ClientPurchaseOrder) => poLeftSummary(r, drawdowns)
 
   const filtered = useMemo(
     () => filterClientPos(rows, { department, status: statusTab, search }),
@@ -297,7 +320,7 @@ export default function ClientPosPage() {
                         ) : null}
                         {r.line_items?.length ? (
                           <div className={docsStyles.meta}>
-                            {r.line_items.length} {r.line_items.length === 1 ? 'line' : 'lines'}
+                            {poLeftLabel(r)}
                           </div>
                         ) : null}
                         {r.invoice_id ? (

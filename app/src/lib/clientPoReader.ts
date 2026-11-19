@@ -61,6 +61,10 @@ export function poFileProblem(contentType: string, bytes: number): string | null
 }
 
 export type PoLineItem = {
+  /** Stable id, so invoices keep pointing at the same line (set when saved, not by the AI). */
+  id?: string
+  /** Which of the client's staff the line is for, e.g. "Driver" (matches Uniform sizes job titles). */
+  staff_group?: string
   description: string
   quantity: number | null
   unit: string
