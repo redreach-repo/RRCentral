@@ -8,6 +8,7 @@ import { BUILTIN_COUNTRY_PACKS, type CountryPack } from './countryPacks'
 import { allocateReference } from './numbering'
 import { nextPoNumber } from './purchasing'
 import { withoutSoftDeleted } from './softDelete'
+import type { PoLineItem } from './clientPoReader'
 
 export async function listCountryPacks(): Promise<CountryPack[]> {
   if (!isSupabaseConfigured()) return BUILTIN_COUNTRY_PACKS
@@ -429,6 +430,62 @@ export type ClientPurchaseOrder = {
   received_amount?: number
   accounts?: { name: string } | null
   clients?: { company_name: string } | null
+} & Partial<ClientPoDetails>
+
+/** What was on the PO itself (supabase/migrations/20261320160000_client_po_file_and_details.sql). */
+export type ClientPoDetails = {
+  file_name: string
+  file_url: string
+  drive_file_id: string
+  line_items: PoLineItem[]
+  subtotal: number | null
+  vat_rate: number | null
+  vat_amount: number | null
+  contact_name: string
+  delivery_date: string | null
+  delivery_address: string
+  delivery_terms: string
+  payment_terms: string
+  details_read_at: string | null
+}
+
+const CLIENT_PO_BASE_COLUMNS =
+  'id, client_id, account_id, division_code, po_number, status, issued_on, currency, amount, notes, invoice_id, received_amount, accounts(name), clients(company_name)'
+const CLIENT_PO_DETAIL_COLUMNS =
+  'file_name, file_url, drive_file_id, line_items, subtotal, vat_rate, vat_amount, contact_name, delivery_date, delivery_address, delivery_terms, payment_terms, details_read_at'
+
+/** Postgres "column does not exist": the PO details SQL has not been run yet. */
+function isMissingColumnError(error: { code?: string; message?: string } | null): boolean {
+  return Boolean(error && (error.code === '42703' || /column .* does not exist/i.test(error.message || '')))
+}
+
+/**
+ * Client POs with the details read off each PO. detailsReady is false while
+ * the PO details SQL is not on the database yet; the list still loads.
+ */
+export async function listClientPurchaseOrdersWithDetails(): Promise<{
+  rows: ClientPurchaseOrder[]
+  detailsReady: boolean
+}> {
+  if (!isSupabaseConfigured()) return { rows: [], detailsReady: false }
+  const { data, error } = await db
+    .from('client_purchase_orders')
+    .select(`${CLIENT_PO_BASE_COLUMNS}, ${CLIENT_PO_DETAIL_COLUMNS}`)
+    .order('issued_on', { ascending: false })
+    .limit(100)
+  if (error && isMissingColumnError(error)) {
+    return { rows: await listClientPurchaseOrders(), detailsReady: false }
+  }
+  if (error) {
+    if (isMissingRelationError(error)) return { rows: [], detailsReady: false }
+    throw error
+  }
+  const rows = ((data || []) as ClientPurchaseOrder[]).map((r) => ({
+    ...r,
+    received_amount: Number(r.received_amount) || 0,
+    line_items: Array.isArray(r.line_items) ? r.line_items : [],
+  }))
+  return { rows, detailsReady: true }
 }
 
 export async function listClientPurchaseOrders(): Promise<ClientPurchaseOrder[]> {
@@ -488,6 +545,8 @@ export async function createClientPurchaseOrder(input: {
   currency: string
   issuedOn: string
   notes: string
+  /** The file and what was on the PO; only sent once the PO details SQL is on the database. */
+  details?: Partial<ClientPoDetails>
 }): Promise<void> {
   const { error } = await db.from('client_purchase_orders').insert({
     client_id: input.clientId,
@@ -499,7 +558,41 @@ export async function createClientPurchaseOrder(input: {
     issued_on: input.issuedOn || null,
     notes: input.notes.trim(),
     status: 'open',
+    ...(input.details || {}),
   })
+  if (error) throw error
+}
+
+/** Saves corrections to a PO (header fields and the details read off it). */
+export async function updateClientPurchaseOrder(
+  id: string,
+  input: {
+    clientId: string
+    accountId: string | null
+    divisionCode: string | null
+    poNumber: string
+    amount: number
+    currency: string
+    issuedOn: string
+    notes: string
+    details?: Partial<ClientPoDetails>
+  },
+): Promise<void> {
+  const { error } = await db
+    .from('client_purchase_orders')
+    .update({
+      client_id: input.clientId,
+      account_id: input.accountId || null,
+      division_code: input.divisionCode || null,
+      po_number: input.poNumber.trim(),
+      amount: input.amount,
+      currency: input.currency || 'AED',
+      issued_on: input.issuedOn || null,
+      notes: input.notes.trim(),
+      ...(input.details || {}),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
   if (error) throw error
 }
 
