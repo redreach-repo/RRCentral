@@ -86,3 +86,43 @@ export async function deleteUniformIssue(id: string): Promise<void> {
   const { error } = await db.from('client_uniform_issues').delete().eq('id', id)
   if (error) throw error
 }
+
+const BLANK_PERSON = {
+  full_name: '',
+  employee_code: '',
+  department: '',
+  job_title: '',
+  shirt_size: '',
+  trouser_size: '',
+  jacket_size: '',
+  shoe_size: '',
+  cap_size: '',
+  other_sizes: '',
+  notes: '',
+}
+
+/** Save the New and Update lines of an upload. Returns how many were added and updated. */
+export async function importUniformStaff(
+  lines: { status: string; clientId?: string; existingId?: string; payload: Record<string, string> }[],
+): Promise<{ added: number; updated: number }> {
+  const inserts = lines
+    .filter((l) => l.status === 'new' && l.clientId)
+    // Every row carries every column, so a bulk insert never sends null for a blank cell.
+    .map((l) => ({ ...BLANK_PERSON, client_id: l.clientId as string, ...l.payload }))
+  for (let i = 0; i < inserts.length; i += 200) {
+    const { error } = await db.from('client_uniform_staff').insert(inserts.slice(i, i + 200))
+    if (error) throw error
+  }
+  const updates = lines.filter((l) => l.status === 'update' && l.existingId)
+  const now = new Date().toISOString()
+  for (let i = 0; i < updates.length; i += 10) {
+    const results = await Promise.all(
+      updates
+        .slice(i, i + 10)
+        .map((l) => db.from('client_uniform_staff').update({ ...l.payload, updated_at: now }).eq('id', l.existingId as string)),
+    )
+    const failed = results.find((r) => r.error)
+    if (failed?.error) throw failed.error
+  }
+  return { added: inserts.length, updated: updates.length }
+}
