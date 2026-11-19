@@ -54,7 +54,8 @@ describe('module registry', () => {
       'industryPacks',
     ])
     for (const row of SETTINGS_MODULE_FLAGS) {
-      expect(APP_MODULES.some((m) => m.flag === row.flag)).toBe(true)
+      // A flag can switch off a whole group or single links inside one.
+      expect(APP_MODULES.some((m) => m.flag === row.flag || m.items.some((i) => i.flag === row.flag))).toBe(true)
     }
   })
 })

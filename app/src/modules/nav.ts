@@ -86,6 +86,7 @@ const CORE_MODULES: ModuleManifest[] = [
       { to: '/follow-ups', label: 'Follow-ups', icon: CalendarClock, section: 'Work' },
       { to: '/sales', label: 'AI CRM detail', icon: TrendingUp, minRole: 'sales', section: 'Work' },
       { to: '/ctrm', label: 'CTRM detail', icon: Handshake, minRole: 'sales', section: 'Work' },
+      { to: '/marketing', label: 'Campaigns', icon: Megaphone, minRole: 'manager', section: 'Marketing', flag: 'marketing' },
     ],
   },
   {
@@ -128,13 +129,13 @@ const CORE_MODULES: ModuleManifest[] = [
     /** Soft-hide via app_settings.moduleFlags JSON, e.g. {"delivery":false}. */
     flag: 'delivery',
     items: [
-      { to: '/products', label: 'WorshipHub', icon: WorshipHubIcon, forStaff: true },
-      { to: '/delivery-settings', label: 'Packages', icon: Package, minRole: 'manager' },
-      { to: '/build-templates', label: 'Build templates', icon: ClipboardList, forStaff: true },
-      { to: '/agreement-template', label: 'Agreement', icon: ScrollText, forStaff: true },
-      { to: '/nda-template', label: 'NDA template', icon: FileSignature, forStaff: true },
-      { to: '/clause-library', label: 'Clause library', icon: ScrollText, forStaff: true },
-      { to: '/obligations', label: 'Obligations', icon: ClipboardList, forStaff: true },
+      { to: '/products', label: 'WorshipHub', icon: WorshipHubIcon, forStaff: true, section: 'Client delivery' },
+      { to: '/delivery-settings', label: 'Packages', icon: Package, minRole: 'manager', section: 'Client delivery' },
+      { to: '/build-templates', label: 'Build templates', icon: ClipboardList, forStaff: true, section: 'Templates and contracts' },
+      { to: '/agreement-template', label: 'Agreement', icon: ScrollText, forStaff: true, section: 'Templates and contracts' },
+      { to: '/nda-template', label: 'NDA template', icon: FileSignature, forStaff: true, section: 'Templates and contracts' },
+      { to: '/clause-library', label: 'Clause library', icon: ScrollText, forStaff: true, section: 'Templates and contracts' },
+      { to: '/obligations', label: 'Obligations', icon: ClipboardList, forStaff: true, section: 'Templates and contracts' },
     ],
   },
   {
@@ -175,44 +176,13 @@ const CORE_MODULES: ModuleManifest[] = [
   },
   {
     id: 'hr',
-    label: 'HR',
+    label: 'HR and payroll',
     icon: Users,
-    flag: 'hr',
     items: [
-      { to: '/hr/people', label: 'People', icon: Users, minRole: 'manager' },
-      { to: '/hr/leave', label: 'Leave', icon: CalendarDays, minRole: 'manager' },
-      { to: '/hr/attendance', label: 'Attendance', icon: Clock, minRole: 'manager' },
-    ],
-  },
-  {
-    id: 'payroll',
-    label: 'Payroll',
-    icon: Wallet,
-    flag: 'payroll',
-    items: [{ to: '/payroll', label: 'Payroll runs', icon: Wallet, minRole: 'manager' }],
-  },
-  {
-    id: 'marketing',
-    label: 'Marketing',
-    icon: Megaphone,
-    flag: 'marketing',
-    items: [{ to: '/marketing', label: 'Campaigns', icon: Megaphone, minRole: 'manager' }],
-  },
-  {
-    id: 'saasBilling',
-    label: 'SaaS billing',
-    icon: CreditCard,
-    flag: 'saasBilling',
-    items: [{ to: '/saas-billing', label: 'HighMast plan', icon: CreditCard, minRole: 'admin' }],
-  },
-  {
-    id: 'industryPacks',
-    label: 'Industry packs',
-    icon: Layers,
-    flag: 'industryPacks',
-    items: [
-      { to: '/industry-packs', label: 'Packs', icon: Layers, minRole: 'admin' },
-      { to: '/country-packs', label: 'Country packs', icon: Globe, minRole: 'admin' },
+      { to: '/hr/people', label: 'People', icon: Users, minRole: 'manager', flag: 'hr' },
+      { to: '/hr/leave', label: 'Leave', icon: CalendarDays, minRole: 'manager', flag: 'hr' },
+      { to: '/hr/attendance', label: 'Attendance', icon: Clock, minRole: 'manager', flag: 'hr' },
+      { to: '/payroll', label: 'Payroll runs', icon: Wallet, minRole: 'manager', flag: 'payroll' },
     ],
   },
   {
@@ -235,6 +205,9 @@ const CORE_MODULES: ModuleManifest[] = [
       { to: '/dsr', label: 'Data requests', icon: ShieldCheck, minRole: 'admin' },
       { to: '/app-errors', label: 'App errors', icon: Bug, minRole: 'admin' },
       { to: '/system-check', label: 'System check', icon: Activity, minRole: 'admin' },
+      { to: '/saas-billing', label: 'HighMast plan', icon: CreditCard, minRole: 'admin', flag: 'saasBilling' },
+      { to: '/industry-packs', label: 'Industry packs', icon: Layers, minRole: 'admin', flag: 'industryPacks' },
+      { to: '/country-packs', label: 'Country packs', icon: Globe, minRole: 'admin', flag: 'industryPacks' },
     ],
   },
 ]
@@ -318,7 +291,9 @@ export function visibleAppModules(
   return modulesEnabled(modules, resolvedFlags)
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => navItemVisible(item, userRole, settings)),
+      items: group.items.filter(
+        (item) => (!item.flag || resolvedFlags[item.flag] !== false) && navItemVisible(item, userRole, settings),
+      ),
     }))
     .filter((group) => group.items.length > 0)
 }
