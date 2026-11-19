@@ -7,6 +7,7 @@ import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import SavedViewsBar from '../components/SavedViewsBar'
+import DatabaseSetupCard from '../components/system/DatabaseSetupCard'
 import { can } from '../lib/permissions'
 import { errorMessage } from '../lib/errors'
 import { isAuditAvailable } from '../lib/auditLog'
@@ -284,6 +285,10 @@ export default function SystemCheckPage() {
           ) : null}
         </div>
       </header>
+
+      <DatabaseSetupCard />
+
+      <h2 style={{ margin: '8px 0 12px', fontSize: 17 }}>Server functions and secrets</h2>
 
       <SavedViewsBar
         moduleId="system_check"
