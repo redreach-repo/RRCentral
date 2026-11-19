@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { FileUp, Loader2, Plus, Trash2 } from 'lucide-react'
 import Modal from '../Modal'
 import { useToast } from '../../contexts/ToastContext'
@@ -29,11 +29,23 @@ import {
   type ClientPoDetails,
   type ClientPurchaseOrder,
 } from '../../lib/opsSliceStores'
+import { isCancelledStatus, poLineBalances, staffGroups, withLineIds, type PoDrawdown } from '../../lib/clientPoBalance'
+import { loadPoDrawdowns } from '../../lib/clientPoDrawdownStore'
+import { loadClientUniforms, type UniformLoad } from '../../lib/clientUniforms/clientUniformsStore'
+import ClientPoStaffPanel from './ClientPoStaffPanel'
 import { buttonPrimaryStyle, buttonSecondaryStyle, colors, inputStyle, labelStyle, selectStyle } from '../../lib/uiStyles'
 
 export type ClientPoClientOpt = { id: string; company_name: string; account_id?: string | null; trn?: string | null }
 
-type LineDraft = { description: string; quantity: string; unit: string; unit_price: string; amount: string }
+type LineDraft = {
+  id: string
+  staff_group: string
+  description: string
+  quantity: string
+  unit: string
+  unit_price: string
+  amount: string
+}
 
 const CURRENCIES = ['AED', 'USD', 'EUR', 'GBP', 'SAR', 'OMR', 'QAR', 'KWD', 'BHD', 'INR']
 
@@ -59,6 +71,8 @@ function toStr(n: number | null | undefined): string {
 
 function lineToDraft(l: PoLineItem): LineDraft {
   return {
+    id: l.id || withLineIds([l])[0].id,
+    staff_group: l.staff_group || '',
     description: l.description || '',
     quantity: toStr(l.quantity),
     unit: l.unit || '',
@@ -69,6 +83,8 @@ function lineToDraft(l: PoLineItem): LineDraft {
 
 function draftToLine(d: LineDraft): PoLineItem {
   return {
+    id: d.id,
+    ...(d.staff_group.trim() ? { staff_group: d.staff_group.trim() } : {}),
     description: d.description.trim(),
     quantity: poNumber(d.quantity),
     unit: d.unit.trim(),
@@ -77,7 +93,9 @@ function draftToLine(d: LineDraft): PoLineItem {
   }
 }
 
-const EMPTY_LINE: LineDraft = { description: '', quantity: '', unit: '', unit_price: '', amount: '' }
+function emptyLine(): LineDraft {
+  return lineToDraft({ description: '', quantity: null, unit: '', unit_price: null, amount: null })
+}
 
 /**
  * New or existing client PO. Upload the PO file and it is read to fill in the
@@ -123,6 +141,32 @@ export default function ClientPoEditor(props: {
   const [fileProblem, setFileProblem] = useState('')
   const [driveError, setDriveError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [drawdowns, setDrawdowns] = useState<PoDrawdown[]>([])
+  const [drawdownsReady, setDrawdownsReady] = useState(false)
+  const [uniforms, setUniforms] = useState<UniformLoad>({ staff: [], issues: [], missingTable: false })
+
+  // What invoices have taken from this PO, and the client's uniform staff (both best effort).
+  useEffect(() => {
+    if (!open) return
+    let alive = true
+    setDrawdowns([])
+    setDrawdownsReady(false)
+    if (editing?.id) {
+      loadPoDrawdowns([editing.id])
+        .then((res) => {
+          if (!alive) return
+          setDrawdowns(res.rows)
+          setDrawdownsReady(res.ready)
+        })
+        .catch(() => {})
+    }
+    loadClientUniforms()
+      .then((res) => alive && setUniforms(res))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [open, editing?.id])
 
   useEffect(() => {
     if (!open) return
@@ -155,6 +199,14 @@ export default function ClientPoEditor(props: {
   }, [open, editing?.id])
 
   const currentLines = lines.map(draftToLine)
+  const balanceById = useMemo(() => {
+    if (!editing || !drawdownsReady) return null
+    return new Map(poLineBalances(currentLines, drawdowns).map((b) => [b.line.id, b]))
+    // currentLines is rebuilt each render; lines is its source.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing, drawdownsReady, drawdowns, lines])
+  const clientStaff = useMemo(() => uniforms.staff.filter((st) => st.client_id === clientId), [uniforms.staff, clientId])
+  const groupOptions = useMemo(() => staffGroups(clientStaff), [clientStaff])
   const warnings = poTotalsWarnings({
     total: poNumber(amount),
     subtotal: poNumber(subtotal),
@@ -398,12 +450,21 @@ export default function ClientPoEditor(props: {
                         <th style={{ padding: '4px 6px', width: 70 }}>Unit</th>
                         <th style={{ padding: '4px 6px', width: 100 }}>Unit price</th>
                         <th style={{ padding: '4px 6px', width: 110 }}>Amount</th>
+                        <th style={{ padding: '4px 6px', width: 130 }}>For staff</th>
+                        {balanceById ? (
+                          <>
+                            <th style={{ padding: '4px 6px', width: 70, textAlign: 'right' }}>Invoiced</th>
+                            <th style={{ padding: '4px 6px', width: 60, textAlign: 'right' }}>Left</th>
+                          </>
+                        ) : null}
                         <th style={{ width: 32 }} />
                       </tr>
                     </thead>
                     <tbody>
-                      {lines.map((l, i) => (
-                        <tr key={i}>
+                      {lines.map((l, i) => {
+                        const bal = balanceById?.get(l.id)
+                        return (
+                        <tr key={l.id}>
                           <td style={{ padding: 3 }}>
                             <input aria-label={`Line ${i + 1} description`} style={{ ...cellInput, width: '100%' }} value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} />
                           </td>
@@ -420,6 +481,26 @@ export default function ClientPoEditor(props: {
                             <input aria-label={`Line ${i + 1} amount`} style={{ ...cellInput, width: '100%' }} inputMode="decimal" value={l.amount} onChange={(e) => setLine(i, { amount: e.target.value })} />
                           </td>
                           <td style={{ padding: 3 }}>
+                            <input
+                              aria-label={`Line ${i + 1} for which staff`}
+                              list="client-po-staff-groups"
+                              placeholder="e.g. Driver"
+                              style={{ ...cellInput, width: '100%' }}
+                              value={l.staff_group}
+                              onChange={(e) => setLine(i, { staff_group: e.target.value })}
+                            />
+                          </td>
+                          {balanceById ? (
+                            <>
+                              <td style={{ padding: '3px 6px', textAlign: 'right' }} title={bal?.takenBy.map((t) => `${t.reference}: ${t.quantity}`).join('\n') || ''}>
+                                {bal ? bal.invoiced : 0}
+                              </td>
+                              <td style={{ padding: '3px 6px', textAlign: 'right', fontWeight: 600, color: bal && bal.balance < 0 ? colors.danger : undefined }}>
+                                {bal ? bal.balance : poNumber(l.quantity) ?? '—'}
+                              </td>
+                            </>
+                          ) : null}
+                          <td style={{ padding: 3 }}>
                             <button
                               type="button"
                               aria-label={`Remove line ${i + 1}`}
@@ -430,18 +511,32 @@ export default function ClientPoEditor(props: {
                             </button>
                           </td>
                         </tr>
-                      ))}
+                        )
+                      })}
                     </tbody>
                   </table>
+                  <datalist id="client-po-staff-groups">
+                    {groupOptions.map((g) => (
+                      <option key={g} value={g} />
+                    ))}
+                  </datalist>
+                </div>
+              ) : null}
+              {balanceById && drawdowns.length ? (
+                <div style={{ fontSize: 12, color: colors.muted }}>
+                  Invoiced against this PO:{' '}
+                  {[...new Map(drawdowns.filter((d) => !isCancelledStatus(d.invoices?.status)).map((d) => [d.invoice_id, d.invoices?.reference_number || 'invoice'])).values()].join(', ')}
                 </div>
               ) : null}
               <div>
-                <button type="button" style={{ ...buttonSecondaryStyle, padding: '4px 10px', fontSize: 12 }} onClick={() => setLines((ls) => [...ls, { ...EMPTY_LINE }])}>
+                <button type="button" style={{ ...buttonSecondaryStyle, padding: '4px 10px', fontSize: 12 }} onClick={() => setLines((ls) => [...ls, emptyLine()])}>
                   <Plus size={13} style={{ verticalAlign: '-2px', marginRight: 4 }} />
                   Add line
                 </button>
               </div>
             </div>
+
+            <ClientPoStaffPanel lines={currentLines} staff={clientStaff} issues={uniforms.issues} missingTable={uniforms.missingTable} hasClient={Boolean(clientId)} />
 
             <div style={gridStyle}>
               <label style={labelStyle}>

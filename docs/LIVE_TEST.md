@@ -615,3 +615,19 @@ RR Central / Customers / <client>) and the line count. **Details** reopens it fo
 **If it fails.** The form names each missing step: the SQL ("Saving the PO file and its line items needs…"), the
 deploy ("PO upload is not switched on yet"), `ANTHROPIC_API_KEY` or Google Drive. A Drive error on save keeps the
 form open with "Save without the file". System check lists `client-po-file`.
+
+## 35. Client PO balance per line, from invoices
+
+**Trigger.** Run `client-po-drawdowns.sql` (after `client-po-file-and-details.sql`). Open a client PO with lines, e.g.
+30 driver uniforms, 20 pump operator uniforms, 40 helper uniforms; put "Driver" in **For staff** on the driver line.
+Make an invoice for that client, open **Lines**, pick the PO under **Bill against a client PO**, enter 10 / 10 / 20 in
+**This invoice**, press **Add these as invoice lines** and save.
+
+**You should see.** Reopening the PO shows Invoiced 10 / 10 / 20 and Left 20 / 10 / 20, the invoice number under the
+lines, status Partial, and in the Client POs list "3 lines · 50 of 90 left". A second invoice for the rest makes it
+Fulfilled. Cancelling an invoice gives its quantities back. Entering more than is left shows a red warning. Under
+**Uniform sizes for this PO** the driver line lists the client's drivers from Clients → Uniform sizes with shirt,
+trouser, jacket, shoe and cap size counts and what has been issued to them.
+
+**If it fails.** "Taking quantities off a PO needs … client-po-drawdowns.sql" means the SQL was not run. No PO in the
+picker: the invoice's client name must match the PO's client exactly, and the PO needs lines with quantities.

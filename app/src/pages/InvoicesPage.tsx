@@ -77,6 +77,9 @@ import {
   thStyle,
 } from '../lib/uiStyles'
 import { errorMessage } from '../lib/errors'
+import InvoicePoPanel, { type InvoicePoTake } from '../components/invoices/InvoicePoPanel'
+import { drawdownRows, withLineIds } from '../lib/clientPoBalance'
+import { loadInvoiceDrawdowns, refreshPoStatusFromLines, replaceInvoiceDrawdowns } from '../lib/clientPoDrawdownStore'
 import { parseInvoicePaymentForm } from '../lib/schemas/invoicePayment'
 
 interface InvoiceForm {
@@ -167,6 +170,9 @@ export default function InvoicesPage() {
   const [editorOpen, setEditorOpen] = useState(false)
   const [editorSection, setEditorSection] = useState<EditorSection>('basics')
   const [editing, setEditing] = useState<Invoice | null>(null)
+  // What this invoice takes from a client PO (null = no PO); poTakeTouched = save it.
+  const [poTake, setPoTake] = useState<InvoicePoTake | null>(null)
+  const [poTakeTouched, setPoTakeTouched] = useState(false)
   const [form, setForm] = useState<InvoiceForm>(emptyForm())
   const billTo = useClientBillTo(clients)
   const [saving, setSaving] = useState(false)
@@ -274,6 +280,8 @@ export default function InvoicesPage() {
 
   function openCreate() {
     setEditing(null)
+    setPoTake(null)
+    setPoTakeTouched(false)
     setDivisionCode('01')
     billTo.reset()
     setForm(
@@ -289,6 +297,9 @@ export default function InvoicesPage() {
 
   async function openEdit(inv: Invoice) {
     setEditing(inv)
+    setPoTake(null)
+    setPoTakeTouched(false)
+    void loadPoTakeFor(inv.id)
     try {
       const items = await loadLineItems('Invoice', inv.reference_number)
       const div = DIVISIONS.find((d) => d.brand === inv.vertical)
@@ -312,6 +323,35 @@ export default function InvoicesPage() {
       setEditorSection('basics'); setEditorOpen(true)
     } catch (e) {
       showToast(errorMessage(e, 'Failed to load line items'), 'error')
+    }
+  }
+
+  /** Reopens what an invoice took from a client PO (best effort: the PO tables may not be set up yet). */
+  async function loadPoTakeFor(invoiceId: string) {
+    try {
+      const rows = await loadInvoiceDrawdowns(invoiceId)
+      if (!rows.length) return
+      const poId = rows[0].po_id
+      const { data } = await db.from('client_purchase_orders').select('id, po_number, line_items').eq('id', poId).maybeSingle()
+      if (!data) return
+      const po = data as { id: string; po_number: string; line_items: InvoicePoTake['lines'] }
+      const take: Record<string, number> = {}
+      for (const r of rows) if (r.po_id === poId) take[r.po_line_id] = Number(r.quantity) || 0
+      setPoTake({ poId, poNumber: po.po_number, lines: withLineIds(po.line_items || []), take })
+    } catch {
+      /* advisory: the invoice still opens */
+    }
+  }
+
+  /** Saves what this invoice takes from the client PO and updates the PO's status. */
+  async function savePoTake(invoiceId: string) {
+    if (!poTakeTouched || !invoiceId) return
+    try {
+      const rows = poTake ? drawdownRows(poTake.poId, invoiceId, poTake.lines, poTake.take, who) : []
+      await replaceInvoiceDrawdowns(invoiceId, rows)
+      if (poTake) await refreshPoStatusFromLines(poTake.poId, poTake.lines)
+    } catch (e) {
+      showToast(errorMessage(e, 'Invoice saved, but the client PO quantities were not'), 'error')
     }
   }
 
@@ -447,6 +487,7 @@ export default function InvoicesPage() {
           /* best-effort — ledger migration may be absent */
         }
       }
+      await savePoTake(invoiceId)
       await logActivity('save_invoice', 'invoice', reference, `${payload.client} · ${status}`, who)
       await saveBillToForClient(payload.client)
       showToast('Invoice saved', 'success')
@@ -1049,6 +1090,22 @@ export default function InvoicesPage() {
         </div>
 
         <div style={editorPanelStyle(editorSection === 'lines')}>
+        <InvoicePoPanel
+          client={form.client}
+          invoiceId={editing?.id || null}
+          value={poTake}
+          onChange={(v) => {
+            setPoTake(v)
+            setPoTakeTouched(true)
+          }}
+          onAddLines={(lines) =>
+            setForm((f) => {
+              // Replace a single empty starter row rather than leaving it above the PO lines.
+              const kept = f.items.filter((it) => it.description.trim() || Number(it.unit_price) > 0)
+              return { ...f, items: [...kept, ...lines.map((l) => newDraftLine(l))] }
+            })
+          }
+        />
         <div style={{ display: 'flex', justifyContent: 'space-between', margin: '12px 0 8px' }}>
           <strong>Line items</strong>
           <button
