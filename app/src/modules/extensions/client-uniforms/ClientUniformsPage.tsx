@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
-import { Plus, Shirt } from 'lucide-react'
+import { Plus, Shirt, Upload } from 'lucide-react'
 import { useAuth } from '../../../contexts/AuthContext'
 import { useToast } from '../../../contexts/ToastContext'
 import EmptyState from '../../../components/EmptyState'
@@ -35,6 +35,7 @@ import {
 } from '../../../lib/clientUniforms/clientUniformsStore'
 import { buttonPrimaryStyle, buttonSecondaryStyle, inputStyle, labelStyle, selectStyle } from '../../../lib/uiStyles'
 import docsStyles from '../../../styles/docsList.module.css'
+import UniformImportModal from './UniformImportModal'
 
 type ClientOpt = { id: string; company_name: string }
 
@@ -94,6 +95,7 @@ export default function ClientUniformsPage() {
   const [issueNotes, setIssueNotes] = useState('')
 
   const [historyFor, setHistoryFor] = useState<UniformStaff | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
@@ -234,6 +236,17 @@ export default function ClientUniformsPage() {
             Export CSV
           </button>
           {canEdit ? (
+            <button
+              type="button"
+              className={docsStyles.newBtn}
+              style={{ background: 'transparent', color: 'inherit', border: '1px solid var(--border)' }}
+              onClick={() => setImportOpen(true)}
+              disabled={missingTable}
+            >
+              <Upload size={16} /> Upload Excel
+            </button>
+          ) : null}
+          {canEdit ? (
             <button type="button" className={docsStyles.newBtn} onClick={openNewPerson} disabled={missingTable}>
               <Plus size={16} /> Add person
             </button>
@@ -283,7 +296,11 @@ export default function ClientUniformsPage() {
           <EmptyState
             icon={<Shirt size={22} />}
             title="No one here yet"
-            subtitle={staff.length ? 'Nothing matches these filters.' : 'Add the first client staff member and their sizes.'}
+            subtitle={
+              staff.length
+                ? 'Nothing matches these filters.'
+                : 'Add the first client staff member and their sizes, or upload them from Excel.'
+            }
             actionLabel={canEdit ? 'Add person' : undefined}
             onAction={canEdit ? openNewPerson : undefined}
           />
@@ -500,6 +517,20 @@ export default function ClientUniformsPage() {
           </div>
         </form>
       </Modal>
+
+      {importOpen ? (
+        <UniformImportModal
+          open
+          onClose={() => setImportOpen(false)}
+          onDone={() => {
+            setImportOpen(false)
+            void load()
+          }}
+          clients={clients}
+          existing={staff}
+          initialClientId={clientFilter}
+        />
+      ) : null}
 
       <Modal
         open={historyFor != null}
