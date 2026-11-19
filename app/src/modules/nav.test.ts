@@ -4,9 +4,10 @@ import { APP_MODULES, moduleIdForPath, titleForPath, visibleAppModules } from '.
 
 describe('APP_MODULES', () => {
   it('lists the core shell sections in order (gap plan extension groups follow)', () => {
-    expect(APP_MODULES.slice(0, 12).map((m) => m.id)).toEqual([
+    expect(APP_MODULES.slice(0, 13).map((m) => m.id)).toEqual([
       'overview',
       'sales',
+      'documents',
       'clients',
       'delivery',
       'ops',
@@ -26,6 +27,41 @@ describe('APP_MODULES', () => {
     const work = (sales?.items || []).filter((i) => i.section === 'Work').map((i) => i.to)
     expect(work.indexOf('/deals')).toBeLessThan(work.indexOf('/crm'))
     expect(work.indexOf('/crm')).toBeLessThan(work.indexOf('/sales'))
+  })
+})
+
+describe('Documents section (every vertical)', () => {
+  it('has its own section, outside Sales', () => {
+    const docs = APP_MODULES.find((m) => m.id === 'documents')
+    expect(docs?.items.map((i) => i.to)).toEqual([
+      '/quotations',
+      '/invoices',
+      '/client-pos',
+      '/delivery-notes',
+      '/customer-files',
+    ])
+    const sales = APP_MODULES.find((m) => m.id === 'sales')
+    expect(sales?.items.some((i) => i.to === '/client-pos' || i.to === '/invoices')).toBe(false)
+    expect(moduleIdForPath('/client-pos')).toBe('documents')
+    expect(moduleIdForPath('/invoices/abc')).toBe('documents')
+  })
+
+  it('shows Client POs to admin, manager and sales, not to staff or viewer roles', () => {
+    const has = (role: Parameters<typeof visibleAppModules>[0]) =>
+      visibleAppModules(role, {})
+        .find((m) => m.id === 'documents')
+        ?.items.some((i) => i.to === '/client-pos') ?? false
+    expect(has('admin')).toBe(true)
+    expect(has('manager')).toBe(true)
+    expect(has('sales')).toBe(true)
+    expect(has('staff')).toBe(false)
+  })
+
+  it('stays visible when Sales is switched off, and hides with its own flag', () => {
+    const noSales = visibleAppModules('manager', { moduleFlags: '{"sales":false}' })
+    expect(noSales.map((m) => m.id)).toContain('documents')
+    const noDocs = visibleAppModules('manager', { moduleFlags: '{"documents":false}' })
+    expect(noDocs.map((m) => m.id)).not.toContain('documents')
   })
 })
 

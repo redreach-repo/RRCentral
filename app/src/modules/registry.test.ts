@@ -42,6 +42,7 @@ describe('module registry', () => {
     expect(SETTINGS_MODULE_FLAGS.map((row) => row.flag)).toEqual([
       'overview',
       'sales',
+      'documents',
       'ops',
       'finance',
       'delivery',

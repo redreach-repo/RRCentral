@@ -21,6 +21,7 @@ import {
   FileBarChart,
   FileSignature,
   FileText,
+  Files,
   FolderOpen,
   Gauge,
   Globe,
@@ -85,11 +86,24 @@ const CORE_MODULES: ModuleManifest[] = [
       { to: '/follow-ups', label: 'Follow-ups', icon: CalendarClock, section: 'Work' },
       { to: '/sales', label: 'AI CRM detail', icon: TrendingUp, minRole: 'sales', section: 'Work' },
       { to: '/ctrm', label: 'CTRM detail', icon: Handshake, minRole: 'sales', section: 'Work' },
-      { to: '/quotations', label: 'Quotations', icon: FileText, section: 'Documents' },
-      { to: '/invoices', label: 'Invoices', icon: Receipt, section: 'Documents' },
-      { to: '/delivery-notes', label: 'Delivery notes', icon: Truck, section: 'Documents' },
-      { to: '/client-pos', label: 'Client POs', icon: ClipboardList, section: 'Documents' },
-      { to: '/customer-files', label: 'Google Drive', icon: FolderOpen, section: 'Documents' },
+    ],
+  },
+  {
+    /**
+     * Company wide documents for every vertical (01 RR Threads to 09 CTRM Next).
+     * Kept out of Sales so they do not read as part of the AI CRM / CTRM pipeline.
+     */
+    id: 'documents',
+    label: 'Documents',
+    icon: Files,
+    /** Soft-hide via app_settings.moduleFlags JSON, e.g. {"documents":false}. */
+    flag: 'documents',
+    items: [
+      { to: '/quotations', label: 'Quotations', icon: FileText },
+      { to: '/invoices', label: 'Invoices', icon: Receipt },
+      { to: '/client-pos', label: 'Client POs', icon: ClipboardList },
+      { to: '/delivery-notes', label: 'Delivery notes', icon: Truck },
+      { to: '/customer-files', label: 'Google Drive', icon: FolderOpen },
     ],
   },
   {
