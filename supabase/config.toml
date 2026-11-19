@@ -40,6 +40,10 @@ verify_jwt = false
 [functions.ai-assist]
 verify_jwt = false
 
+# Reads uploaded client POs with AI and files them in Google Drive; checks the user in code.
+[functions.client-po-file]
+verify_jwt = false
+
 [functions.whatsapp-in]
 verify_jwt = false
 

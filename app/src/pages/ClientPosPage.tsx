@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
-import { ClipboardList, Plus } from 'lucide-react'
+import { ClipboardList, FileText, Plus } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
-import Modal from '../components/Modal'
+import ClientPoEditor, { type ClientPoClientOpt } from '../components/documents/ClientPoEditor'
 import StatusPill from '../components/StatusPill'
 import { db } from '../lib/db'
 import { errorMessage } from '../lib/errors'
-import { formatAED } from '../lib/money'
+import { formatPoMoney } from '../lib/clientPoReader'
+import { CLIENT_PO_SETUP_OFF, getClientPoSetup, type ClientPoSetup } from '../lib/clientPoFile'
 import {
   CLIENT_PO_DEPARTMENTS,
   clientPoDepartmentLabel,
@@ -22,18 +23,16 @@ import {
   suggestClientPoInvoiceMatch,
 } from '../lib/clientPurchaseOrders'
 import {
-  createClientPurchaseOrder,
   linkClientPoInvoice,
-  listClientPurchaseOrders,
+  listClientPurchaseOrdersWithDetails,
   recordClientPoReceipt,
   setClientPoStatus,
   type ClientPurchaseOrder,
 } from '../lib/opsSliceStores'
 import { exportListCsv } from '../lib/listIo'
-import { buttonPrimaryStyle, buttonSecondaryStyle, inputStyle, labelStyle, selectStyle } from '../lib/uiStyles'
+import { buttonSecondaryStyle, colors } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
-type ClientOpt = { id: string; company_name: string; account_id?: string | null }
 type InvoiceOpt = {
   id: string
   reference_number: string
@@ -51,7 +50,7 @@ const smallBtn = { ...buttonSecondaryStyle, padding: '4px 10px', fontSize: 12 }
 export default function ClientPosPage() {
   const { showToast } = useToast()
   const [rows, setRows] = useState<ClientPurchaseOrder[]>([])
-  const [clients, setClients] = useState<ClientOpt[]>([])
+  const [clients, setClients] = useState<ClientPoClientOpt[]>([])
   const [invoices, setInvoices] = useState<InvoiceOpt[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -60,29 +59,26 @@ export default function ClientPosPage() {
   const [search, setSearch] = useState('')
 
   const [editorOpen, setEditorOpen] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [clientId, setClientId] = useState('')
-  const [divisionCode, setDivisionCode] = useState('')
-  const [poNumber, setPoNumber] = useState('')
-  const [amount, setAmount] = useState('')
-  const [issuedOn, setIssuedOn] = useState('')
-  const [notes, setNotes] = useState('')
+  const [editing, setEditing] = useState<ClientPurchaseOrder | null>(null)
+  const [detailsReady, setDetailsReady] = useState(false)
+  const [setup, setSetup] = useState<ClientPoSetup>(CLIENT_PO_SETUP_OFF)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const [pos, cl, inv] = await Promise.all([
-        listClientPurchaseOrders(),
+        listClientPurchaseOrdersWithDetails(),
         // Company wide client list, the same one Quotations and Invoices use (every vertical).
-        db.from('clients').select('id, company_name, account_id').order('company_name'),
+        db.from('clients').select('id, company_name, account_id, trn').order('company_name'),
         db
           .from('invoices')
           .select('id, reference_number, amount, status, account_id, client')
           .order('created_at', { ascending: false })
           .limit(300),
       ])
-      setRows(pos)
-      setClients((cl.data || []) as ClientOpt[])
+      setRows(pos.rows)
+      setDetailsReady(pos.detailsReady)
+      setClients((cl.data || []) as ClientPoClientOpt[])
       setInvoices((inv.data || []) as InvoiceOpt[])
     } catch (e) {
       showToast(errorMessage(e, 'Could not load client POs'), 'error')
@@ -95,51 +91,24 @@ export default function ClientPosPage() {
     void load()
   }, [load])
 
+  // What is set up for upload (AI reading, Google Drive), so the form can say what is missing.
+  useEffect(() => {
+    void getClientPoSetup().then(setSetup)
+  }, [])
+
   const filtered = useMemo(
     () => filterClientPos(rows, { department, status: statusTab, search }),
     [rows, department, statusTab, search],
   )
 
   function openCreate() {
-    setClientId('')
-    setDivisionCode(department && department !== 'none' ? department : '')
-    setPoNumber('')
-    setAmount('')
-    setIssuedOn(new Date().toISOString().slice(0, 10))
-    setNotes('')
+    setEditing(null)
     setEditorOpen(true)
   }
 
-  async function save() {
-    const client = clients.find((c) => c.id === clientId)
-    if (!client) {
-      showToast('Pick a client', 'error')
-      return
-    }
-    if (!poNumber.trim()) {
-      showToast('Enter the PO number', 'error')
-      return
-    }
-    setSaving(true)
-    try {
-      await createClientPurchaseOrder({
-        clientId: client.id,
-        accountId: client.account_id ?? null,
-        divisionCode: divisionCode || null,
-        poNumber,
-        amount: Number(amount) || 0,
-        currency: 'AED',
-        issuedOn,
-        notes,
-      })
-      showToast('Client PO saved', 'success')
-      setEditorOpen(false)
-      await load()
-    } catch (err) {
-      showToast(errorMessage(err, 'Save failed'), 'error')
-    } finally {
-      setSaving(false)
-    }
+  function openEdit(r: ClientPurchaseOrder) {
+    setEditing(r)
+    setEditorOpen(true)
   }
 
   async function matchInvoice(r: ClientPurchaseOrder) {
@@ -188,8 +157,8 @@ export default function ClientPosPage() {
           <p className={docsStyles.kicker}>Documents · all verticals</p>
           <h1 className={docsStyles.title}>Client POs</h1>
           <p className={docsStyles.subtitle}>
-            Purchase orders received from clients in every vertical. Match them to invoices and track what has
-            been received.
+            Purchase orders received from clients in every vertical. Upload the PO and it is read for you and
+            kept in the client's Google Drive folder. Match them to invoices and track what has been received.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -201,7 +170,7 @@ export default function ClientPosPage() {
             onClick={() => {
               exportListCsv(
                 'client-pos.csv',
-                ['po_number', 'client', 'vertical', 'issued_on', 'amount', 'received', 'currency', 'status', 'invoice_id'],
+                ['po_number', 'client', 'vertical', 'issued_on', 'amount', 'received', 'currency', 'status', 'invoice_id', 'vat_amount', 'payment_terms', 'delivery_date', 'lines', 'file_url'],
                 filtered.map((r) => ({
                   po_number: r.po_number,
                   client: clientPoPartyName(r),
@@ -212,6 +181,11 @@ export default function ClientPosPage() {
                   currency: r.currency,
                   status: r.status,
                   invoice_id: r.invoice_id || '',
+                  vat_amount: r.vat_amount ?? '',
+                  payment_terms: r.payment_terms || '',
+                  delivery_date: r.delivery_date || '',
+                  lines: r.line_items?.length || 0,
+                  file_url: r.file_url || '',
                 })),
               )
               showToast('Client PO CSV downloaded', 'success')
@@ -310,6 +284,22 @@ export default function ClientPosPage() {
                     <tr key={r.id}>
                       <td className={docsStyles.colRef}>
                         <div className={docsStyles.ref}>{r.po_number}</div>
+                        {r.file_url ? (
+                          <a
+                            href={r.file_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={docsStyles.meta}
+                            style={{ color: colors.accent, display: 'inline-flex', gap: 4, alignItems: 'center' }}
+                          >
+                            <FileText size={12} /> PO file
+                          </a>
+                        ) : null}
+                        {r.line_items?.length ? (
+                          <div className={docsStyles.meta}>
+                            {r.line_items.length} {r.line_items.length === 1 ? 'line' : 'lines'}
+                          </div>
+                        ) : null}
                         {r.invoice_id ? (
                           <div className={docsStyles.meta}>Invoice {linked?.reference_number || 'linked'}</div>
                         ) : suggestion ? (
@@ -326,12 +316,12 @@ export default function ClientPosPage() {
                       <td className={docsStyles.colDate}>
                         {r.issued_on ? format(new Date(r.issued_on), 'dd MMM yyyy') : '—'}
                       </td>
-                      <td className={`${docsStyles.colAmount} ${docsStyles.amount}`}>{formatAED(Number(r.amount))}</td>
+                      <td className={`${docsStyles.colAmount} ${docsStyles.amount}`}>{formatPoMoney(Number(r.amount), r.currency)}</td>
                       <td className={docsStyles.colAmount}>
-                        {formatAED(Number(r.received_amount || 0))}
+                        {formatPoMoney(Number(r.received_amount || 0), r.currency)}
                         {open ? (
                           <div className={docsStyles.meta}>
-                            {formatAED(clientPoRemaining(Number(r.amount), Number(r.received_amount || 0)))} left
+                            {formatPoMoney(clientPoRemaining(Number(r.amount), Number(r.received_amount || 0)), r.currency)} left
                           </div>
                         ) : null}
                       </td>
@@ -340,6 +330,9 @@ export default function ClientPosPage() {
                       </td>
                       <td className={`${docsStyles.colActions} ${docsStyles.actionsCell}`}>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          <button type="button" style={smallBtn} onClick={() => openEdit(r)}>
+                            {r.file_url || !detailsReady ? 'Details' : 'Details / add file'}
+                          </button>
                           {open && !r.invoice_id ? (
                             <button type="button" style={smallBtn} onClick={() => void matchInvoice(r)}>
                               Match invoice
@@ -366,71 +359,19 @@ export default function ClientPosPage() {
         </div>
       )}
 
-      <Modal open={editorOpen} title="New client PO" onClose={() => setEditorOpen(false)} width={640}>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            void save()
-          }}
-          style={{ display: 'grid', gap: 12 }}
-        >
-          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))' }}>
-            <label style={labelStyle}>
-              Client *
-              <select style={selectStyle} value={clientId} onChange={(e) => setClientId(e.target.value)} required>
-                <option value="">Pick a client…</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.company_name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label style={labelStyle}>
-              Vertical
-              <select style={selectStyle} value={divisionCode} onChange={(e) => setDivisionCode(e.target.value)}>
-                <option value="">Not set</option>
-                {CLIENT_PO_DEPARTMENTS.map((d) => (
-                  <option key={d.code} value={d.code}>
-                    {d.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label style={labelStyle}>
-              PO number *
-              <input style={inputStyle} value={poNumber} onChange={(e) => setPoNumber(e.target.value)} required />
-            </label>
-            <label style={labelStyle}>
-              Amount (AED)
-              <input
-                style={inputStyle}
-                type="number"
-                min={0}
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-            </label>
-            <label style={labelStyle}>
-              PO date
-              <input style={inputStyle} type="date" value={issuedOn} onChange={(e) => setIssuedOn(e.target.value)} />
-            </label>
-          </div>
-          <label style={labelStyle}>
-            Notes
-            <input style={inputStyle} value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </label>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button type="button" style={buttonSecondaryStyle} onClick={() => setEditorOpen(false)}>
-              Cancel
-            </button>
-            <button type="submit" style={buttonPrimaryStyle} disabled={saving}>
-              {saving ? 'Saving…' : 'Save PO'}
-            </button>
-          </div>
-        </form>
-      </Modal>
+      <ClientPoEditor
+        open={editorOpen}
+        editing={editing}
+        defaultDivision={department && department !== 'none' ? department : ''}
+        clients={clients}
+        setup={setup}
+        detailsReady={detailsReady}
+        onClose={() => setEditorOpen(false)}
+        onSaved={() => {
+          setEditorOpen(false)
+          void load()
+        }}
+      />
     </div>
   )
 }

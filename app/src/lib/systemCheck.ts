@@ -27,6 +27,7 @@ export const SYSTEM_FUNCTIONS: SystemFunction[] = [
   { name: 'worshiphub-manage', feature: 'WorshipHub review buttons', liveTest: '8' },
   { name: 'zoho-proxy', feature: 'Zoho Mail and Books', liveTest: '9' },
   { name: 'google-drive', feature: 'Google Drive client folders and filing', liveTest: '31' },
+  { name: 'client-po-file', feature: 'Client PO upload: read with AI and file in Google Drive', liveTest: '34' },
   { name: 'hubspot-sync', feature: 'Accounts, contacts and deals to HubSpot', liveTest: '32' },
   { name: 'manage-auth-user', feature: 'Set team login passwords', liveTest: '9' },
   { name: 'create-checkout-session', feature: 'Shop checkout (Stripe)', liveTest: '9' },

@@ -599,3 +599,19 @@ digest clears them. Failed stays at 0 unless a dead-lettered row needs attention
 Pending stuck high means the schedule SQL or secret does not match. Failed > 0: open `event_outbox` (status
 `failed`) and check `last_error`.
 
+
+## 34. Client PO upload: read with AI, file in Google Drive
+
+**Trigger.** Run `client-po-file-and-details.sql` (migration `20261320160000_client_po_file_and_details.sql`), add
+`ANTHROPIC_API_KEY`, connect Google Drive (test 31), deploy `client-po-file`. As admin, manager or sales open
+**Documents → Client POs → New client PO** and upload a real client PO (PDF or a phone photo saved as JPG).
+
+**You should see.** "Reading the PO…" for up to a minute, then the form filled in: PO number, date, currency, the lines
+with quantities and prices, subtotal, VAT, total, contact, delivery and payment terms, and the client picked when they
+are in the client list (by TRN or name). Any sum that does not add up is listed under "Check these sums". Correct
+anything, press **Save PO**: the toast says "file in Google Drive", the row shows **PO file** (opens the PDF in
+RR Central / Customers / <client>) and the line count. **Details** reopens it for corrections.
+
+**If it fails.** The form names each missing step: the SQL ("Saving the PO file and its line items needs…"), the
+deploy ("PO upload is not switched on yet"), `ANTHROPIC_API_KEY` or Google Drive. A Drive error on save keeps the
+form open with "Save without the file". System check lists `client-po-file`.
