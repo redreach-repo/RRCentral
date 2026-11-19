@@ -3,7 +3,8 @@
 --   1. Every public table has row level security on.
 --   2. Every table with tenant_id has a restrictive tenant isolation policy.
 --   3. The only policies open to anonymous visitors are the allow-listed ones.
---   4. Sensitive tables (HR, payroll, audit, field access log) have no
+--   4. Sensitive tables (HR, payroll, audit, field access log, API keys,
+--      webhooks) have no
 --      permissive policy for all staff, sales or viewers.
 --   5. Live role check on sensitive tables with a real row.
 begin;
@@ -45,7 +46,8 @@ begin
     and p.permissive = 'PERMISSIVE'
     and p.tablename in (
       'hr_employees', 'payroll_runs', 'payroll_lines', 'hr_attendance_days',
-      'hr_leave_requests', 'payroll_exports', 'audit_log', 'fle_access_log'
+      'hr_leave_requests', 'payroll_exports', 'audit_log', 'fle_access_log',
+      'api_keys', 'webhook_endpoints'
     )
     and (
       coalesce(p.qual, '') ~ 'rr_is_staff\(|rr_is_member\(|''viewer''|''sales''|^true$'
