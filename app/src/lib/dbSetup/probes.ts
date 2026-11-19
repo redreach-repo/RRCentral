@@ -90,7 +90,7 @@ export const DB_SETUP_PROBES: DbSetupProbe[] = [
   { migration: '20261214100000_contract_obligations', label: 'contract obligations', table: 'contract_obligations' },
   { migration: '20261215100000_pipeline_deals_v', label: 'pipeline deals v', table: 'pipeline_deals_v' },
   { migration: '20261216120000_event_outbox_claim', label: 'event outbox claim' },
-  { migration: '20261217120000_feature_slices_m6_m12', label: 'feature slices m6 m12', table: 'hr_employees', hold: 'Wait: on its own it lets sales staff see salaries and IBANs. Run only after the HR and payroll permission fix.' },
+  { migration: '20261217120000_feature_slices_m6_m12', label: 'feature slices m6 m12', table: 'hr_employees', hold: 'On its own it lets sales staff see salaries and IBANs. Run 20261321090000_hr_payroll_manager_only.sql straight after it.' },
   { migration: '20261217140000_feature_slices_deepen', label: 'feature slices deepen', table: 'hr_employees', column: 'iban' },
   { migration: '20261217160000_wps_sif_draft_fields', label: 'wps sif draft fields', table: 'hr_employees', column: 'labour_card_no' },
   { migration: '20261217170000_public_api_webhook_retries', label: 'public api webhook retries', table: 'webhook_delivery_attempts' },
@@ -153,4 +153,5 @@ export const DB_SETUP_PROBES: DbSetupProbe[] = [
   { migration: '20261320150000_client_uniform_sizes', label: 'client uniform sizes', table: 'client_uniform_staff' },
   { migration: '20261320160000_client_po_file_and_details', label: 'client po file and details', table: 'client_purchase_orders', column: 'file_name' },
   { migration: '20261320170000_client_po_drawdowns', label: 'client po drawdowns', table: 'client_po_drawdowns' },
+  { migration: '20261321090000_hr_payroll_manager_only', label: 'hr payroll manager only' },
 ]
