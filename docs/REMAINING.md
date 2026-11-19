@@ -24,6 +24,6 @@ Done and tested: see `docs/RUN_STATE.md`.
 3. **Edge Functions still read OAuth tokens from `app_settings.value`.** They must switch to `rr_app_secret(key)` before `fle.enforce.settings` is turned on (Gmail, M365, Google Drive, Zoho functions).
 4. **HR people page and CSV export still read plain salary / IBAN columns.** Turning on `fle.enforce.hr` needs those to read through `rr_hr_masked` / `rr_fle_reveal`. Masked exports are A2 (field permissions).
 5. **Payroll line amounts stay readable in their plain columns** (an encrypted copy is kept in `pay_enc`). Blanking them needs the payroll page to read through server functions; A2 field permissions decide who sees them.
-6. **HR / payroll table permissions (#419 was closed).** Sales can still read and write `hr_employees` and `payroll_lines` directly on main. The new server functions check roles, but direct table access is A2's record and field rules.
+6. **HR / payroll table permissions.** Fixed by `20261321090000_hr_payroll_manager_only.sql` (manager and admin only on `hr_employees`, `payroll_runs`, `payroll_lines`, `hr_attendance_days`). The new server functions check roles, but direct table access is A2's record and field rules.
 7. **Journal drafts are still created from the browser** (posting is enforced in the database; drafts are checked when posted).
 8. **Not run on Supabase itself.** Everything is tested on local Postgres 16 with a Vault stub.
