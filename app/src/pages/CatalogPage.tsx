@@ -255,7 +255,7 @@ export default function CatalogPage() {
       .update({ active: !p.active, updated_at: new Date().toISOString() })
       .eq('id', p.id)
     if (error) {
-      showToast(error.message, 'error')
+      showToast(errorMessage(error), 'error')
       return
     }
     await load()
