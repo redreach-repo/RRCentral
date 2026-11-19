@@ -1,0 +1,54 @@
+# Housekeeping: delete branches that are already merged into main.
+# Run by hand from Actions. "Only list" (the default) deletes nothing.
+# Never touches main, build/*, branches with an open PR, or anything with a
+# commit in the last 2 days. Each deleted branch is printed with its last
+# commit, so it can be restored with: git push origin <sha>:refs/heads/<name>
+name: Delete merged branches
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'What to do'
+        type: choice
+        options:
+          - Only list
+          - Delete
+        default: Only list
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Find and delete merged branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+          open_heads=$(gh pr list --state open --limit 500 --json headRefName --jq '.[].headRefName')
+          cutoff=$(date -d '2 days ago' +%s)
+          count=0
+          for ref in $(git branch -r --merged origin/main --format='%(refname:short)'); do
+            b="${ref#origin/}"
+            case "$b" in
+              main|HEAD|origin|build/*) continue ;;
+            esac
+            if grep -qxF "$b" <<< "$open_heads"; then continue; fi
+            sha=$(git rev-parse "$ref")
+            if [ "$(git log -1 --format=%ct "$ref")" -ge "$cutoff" ]; then continue; fi
+            echo "$b $sha"
+            count=$((count + 1))
+            if [ "$MODE" = "Delete" ]; then
+              git push origin --delete "$b" >/dev/null 2>&1 || echo "  could not delete $b"
+            fi
+          done
+          if [ "$MODE" = "Delete" ]; then echo "$count merged branch(es) deleted"; else echo "$count merged branch(es) listed, nothing deleted"; fi
