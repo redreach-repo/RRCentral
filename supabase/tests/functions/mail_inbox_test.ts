@@ -2,7 +2,10 @@
 import { assert, assertEquals, assertNotEquals, assertRejects } from "jsr:@std/assert@1"
 import { openToken, sealToken, tokenKeyProblem } from "../../functions/mail-inbox/tokenBox.ts"
 import {
+  canSendWith,
   clampLimit,
+  cleanSubject,
+  composeHtml,
   clampStart,
   cleanSearch,
   folderKind,
@@ -11,7 +14,11 @@ import {
   mailboxBelongsTo,
   normalizeFolders,
   normalizeMessage,
+  parseRecipients,
   plain,
+  sendMode,
+  textToHtml,
+  underSendLimit,
   stripActiveContent,
   zohoAccountsOrigin,
   zohoConsentUrl,
@@ -117,11 +124,11 @@ Deno.test("only Zoho sign in servers are trusted, and the mail server follows th
   assertEquals(zohoMailOrigin("https://accounts.zoho.in"), "https://mail.zoho.in")
 })
 
-Deno.test("the consent link asks for read only mail and lasting access", () => {
+Deno.test("the consent link asks to read and send mail, with lasting access", () => {
   const url = new URL(zohoConsentUrl({ accountsOrigin: "https://accounts.zoho.com", clientId: "id", redirectUri: "https://x.supabase.co/functions/v1/mail-inbox", state: "s.t", loginHint: "a@redreach.ae" }))
   assertEquals(url.pathname, "/oauth/v2/auth")
   assertEquals(url.searchParams.get("access_type"), "offline")
-  assertEquals(url.searchParams.get("scope"), "ZohoMail.accounts.READ,ZohoMail.folders.READ,ZohoMail.messages.READ")
+  assertEquals(url.searchParams.get("scope"), "ZohoMail.accounts.READ,ZohoMail.folders.READ,ZohoMail.messages.READ,ZohoMail.messages.CREATE")
   assertEquals(url.searchParams.get("login_hint"), "a@redreach.ae")
 })
 
@@ -140,4 +147,62 @@ Deno.test("emails link only to clients, CRM entries, quotations and invoices", (
   assertEquals(linkTargetTable("app_users"), null)
   assertEquals(linkTargetTable("toString"), null)
   assertEquals(linkTargetTable(undefined), null)
+})
+
+Deno.test("send: only connections given the send scope can send", () => {
+  assert(!canSendWith("ZohoMail.accounts.READ,ZohoMail.folders.READ,ZohoMail.messages.READ"))
+  assert(canSendWith("ZohoMail.accounts.READ,ZohoMail.messages.CREATE"))
+  assert(canSendWith("zohomail.messages.all"))
+  assert(!canSendWith(""))
+  assert(!canSendWith(null))
+})
+
+Deno.test("send: modes are an allow-list", () => {
+  assertEquals(sendMode("reply"), "reply")
+  assertEquals(sendMode("replyAll"), "replyAll")
+  assertEquals(sendMode("forward"), "forward")
+  assertEquals(sendMode("new"), "new")
+  assertEquals(sendMode("delete"), null)
+  assertEquals(sendMode(undefined), null)
+})
+
+Deno.test("send: recipients become bare addresses, duplicates dropped, junk reported", () => {
+  assertEquals(parseRecipients('"Sara K" <Sara@Client.ae>, ops@client.ae; sara@client.ae\nbob@x.com').list, [
+    "sara@client.ae",
+    "ops@client.ae",
+    "bob@x.com",
+  ])
+  assertEquals(parseRecipients("").list, [])
+  const r = parseRecipients("good@x.com, not an address, a@b, evil@x.com\r\nBcc: z@z.com")
+  // Each line is its own address, so a smuggled "Bcc:" line is refused rather than becoming a header.
+  assertEquals(r.list, ["good@x.com", "evil@x.com"])
+  assertEquals(r.bad, ["not an address", "a@b", "Bcc: z@z.com"])
+})
+
+Deno.test("send: subject is one line", () => {
+  assertEquals(cleanSubject("Re: Quote\r\nBcc: x@y.com"), "Re: Quote Bcc: x@y.com")
+  assertEquals(cleanSubject("a".repeat(400)).length, 300)
+})
+
+Deno.test("send: typed text is escaped, not run as HTML", () => {
+  assertEquals(textToHtml("Hi <b>Sara</b>\n\nThanks & bye"), "<div>Hi &lt;b&gt;Sara&lt;/b&gt;</div><div>&nbsp;</div><div>Thanks &amp; bye</div>")
+})
+
+Deno.test("send: a reply quotes the original below what was typed, a new email does not", () => {
+  const quoted = { from: "sara@client.ae", to: "me@redreach.ae", cc: "", date: "Fri, 20 Nov 2026 10:00:00 GMT", subject: "Quote", html: "<p>Original</p>" }
+  const reply = composeHtml("Thanks", "reply", quoted)
+  assert(reply.indexOf("Thanks") < reply.indexOf("<blockquote"))
+  assert(reply.includes("sara@client.ae wrote:"))
+  assert(reply.includes("<p>Original</p>"))
+  const fwd = composeHtml("FYI", "forward", quoted)
+  assert(fwd.includes("Forwarded message"))
+  assert(!fwd.includes("<blockquote"))
+  assertEquals(composeHtml("Hello", "new", quoted).includes("Original"), false)
+})
+
+Deno.test("send: at most 20 sends in 10 minutes", () => {
+  const now = 1_000_000_000
+  assert(underSendLimit([], now))
+  assert(!underSendLimit(Array(20).fill(now - 1000), now))
+  assert(underSendLimit(Array(20).fill(now - 11 * 60_000), now))
 })

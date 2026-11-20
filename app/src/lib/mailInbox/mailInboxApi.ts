@@ -4,9 +4,12 @@
  * folders, email lists and email content.
  */
 import { getSupabaseClient, isSupabaseConfigured } from '../supabaseConfig'
-import type { MailFolder, MailListItem, MailMessageFull } from './mailInbox'
+import type { ComposeDraft, MailFolder, MailListItem, MailMessageFull } from './mailInbox'
 
-export class MailSetupError extends Error {}
+export class MailSetupError extends Error {
+  /** Zoho has not yet been asked for the send permission: the person reconnects once. */
+  needsSendScope = false
+}
 
 async function callMail<T>(body: Record<string, unknown>): Promise<T> {
   if (!isSupabaseConfigured()) throw new MailSetupError('Mail needs the cloud database (Supabase), not local mode.')
@@ -19,7 +22,11 @@ async function callMail<T>(body: Record<string, unknown>): Promise<T> {
     if (status === 404 || (!msg && /Failed to send a request/i.test(error.message))) {
       throw new MailSetupError('The mail service is not deployed yet. An admin deploys mail-inbox from Actions, Deploy Edge Functions.')
     }
-    if ((detail as { setup?: boolean } | null)?.setup) throw new MailSetupError(msg || 'Zoho Mail is not connected')
+    if ((detail as { setup?: boolean } | null)?.setup) {
+      const err = new MailSetupError(msg || 'Zoho Mail is not connected')
+      err.needsSendScope = Boolean((detail as { needsSendScope?: boolean }).needsSendScope)
+      throw err
+    }
     throw new Error(msg || error.message || 'The mail service did not answer')
   }
   const res = data as T & { error?: string }
@@ -33,11 +40,13 @@ export type MailStatus = {
   /** This person has connected their own mailbox. */
   connected: boolean
   address: string
+  /** The connection includes Zoho's send permission (connected after sending was added). */
+  canSend: boolean
 }
 
 export async function getMailStatus(): Promise<MailStatus> {
   const res = await callMail<MailStatus>({ action: 'status' })
-  return { ready: Boolean(res.ready), connected: Boolean(res.connected), address: String(res.address || '') }
+  return { ready: Boolean(res.ready), connected: Boolean(res.connected), address: String(res.address || ''), canSend: Boolean(res.canSend) }
 }
 
 /** Zoho's consent page for this person's own mailbox; Zoho sends them back to `returnTo`. */
@@ -65,4 +74,22 @@ export async function searchMail(q: string, opts: { start?: number; limit?: numb
 
 export async function getMailMessage(folderId: string, messageId: string): Promise<MailMessageFull> {
   return (await callMail<{ message: MailMessageFull }>({ action: 'message', folderId, messageId })).message
+}
+
+/**
+ * Sends from the person's own address. Call it ONLY from the Send button: the
+ * server sends straight away. Reply, reply all and forward quote the original.
+ */
+export async function sendMail(draft: ComposeDraft, original?: { folderId: string; messageId: string }): Promise<{ messageId: string }> {
+  const res = await callMail<{ ok: boolean; messageId?: string }>({
+    action: 'send',
+    mode: draft.mode,
+    to: draft.to,
+    cc: draft.cc,
+    bcc: draft.bcc,
+    subject: draft.subject,
+    text: draft.text,
+    ...(draft.mode !== 'new' && original ? { folderId: original.folderId, messageId: original.messageId } : {}),
+  })
+  return { messageId: String(res.messageId || '') }
 }

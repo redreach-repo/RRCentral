@@ -149,8 +149,16 @@ export function zohoMailOrigin(accountsOrigin: string): string {
   return accountsOrigin.replace("://accounts.", "://mail.")
 }
 
-/** Read only for now: list folders and read mail. Sending comes in a later step (reconnect then). */
-export const ZOHO_MAIL_SCOPES = "ZohoMail.accounts.READ,ZohoMail.folders.READ,ZohoMail.messages.READ"
+/**
+ * Read folders and mail, and send (messages.CREATE). People who connected
+ * before sending existed have only the READ scopes and reconnect once.
+ */
+export const ZOHO_MAIL_SCOPES = "ZohoMail.accounts.READ,ZohoMail.folders.READ,ZohoMail.messages.READ,ZohoMail.messages.CREATE"
+
+/** True when the saved connection was given the send scope. */
+export function canSendWith(scopes: unknown): boolean {
+  return String(scopes ?? "").split(/[\s,]+/).some((s) => s.toLowerCase() === "zohomail.messages.create" || s.toLowerCase() === "zohomail.messages.all")
+}
 
 export function zohoConsentUrl(opts: { accountsOrigin: string; clientId: string; redirectUri: string; state: string; loginHint?: string }): string {
   const q = new URLSearchParams({
@@ -197,4 +205,87 @@ const LINK_TABLES: Record<string, string> = {
 
 export function linkTargetTable(type: unknown): string | null {
   return typeof type === "string" && Object.hasOwn(LINK_TABLES, type) ? LINK_TABLES[type] : null
+}
+
+export type SendMode = "new" | "reply" | "replyAll" | "forward"
+
+export function sendMode(raw: unknown): SendMode | null {
+  return raw === "new" || raw === "reply" || raw === "replyAll" || raw === "forward" ? raw : null
+}
+
+const ADDRESS = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i
+
+export const MAX_RECIPIENTS = 50
+
+/**
+ * "Name <a@b.com>, c@d.com" -> ["a@b.com", "c@d.com"]. Bare addresses only
+ * go to Zoho. Returns the parts that are not addresses in `bad`.
+ */
+export function parseRecipients(raw: unknown): { list: string[]; bad: string[] } {
+  const list: string[] = []
+  const bad: string[] = []
+  const seen = new Set<string>()
+  for (const part of String(raw ?? "").slice(0, 10_000).split(/[,;\n]+/)) {
+    const t = part.trim()
+    if (!t) continue
+    const inAngle = t.match(/<([^<>]+)>\s*$/)
+    const addr = (inAngle ? inAngle[1] : t).trim().toLowerCase()
+    if (!ADDRESS.test(addr) || addr.length > 254) {
+      bad.push(t.slice(0, 80))
+      continue
+    }
+    if (!seen.has(addr)) {
+      seen.add(addr)
+      list.push(addr)
+    }
+  }
+  return { list, bad }
+}
+
+/** One line, no header tricks, at most 300 characters. */
+export function cleanSubject(raw: unknown): string {
+  return String(raw ?? "").replace(/[\r\n\t\0]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 300)
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string)
+}
+
+/** What the person typed (plain text) as simple HTML: escaped, line breaks kept. */
+export function textToHtml(text: string): string {
+  return escapeHtml(String(text ?? "").replace(/\r\n?/g, "\n"))
+    .split("\n")
+    .map((line) => line || "&nbsp;")
+    .map((line) => `<div>${line}</div>`)
+    .join("")
+}
+
+export type Quoted = { from: string; to: string; cc: string; date: string; subject: string; html: string }
+
+/**
+ * The email body sent to Zoho: what the person typed, then for a reply or
+ * forward the original email below it (already cleaned with stripActiveContent).
+ */
+export function composeHtml(text: string, mode: SendMode, quoted?: Quoted | null): string {
+  const mine = `<div style="font-family:Arial,sans-serif;font-size:14px">${textToHtml(text)}</div>`
+  if (!quoted || mode === "new") return mine
+  const head = mode === "forward"
+    ? [
+      "---------- Forwarded message ----------",
+      `From: ${quoted.from}`,
+      `Date: ${quoted.date}`,
+      `Subject: ${quoted.subject}`,
+      `To: ${quoted.to}`,
+      ...(quoted.cc ? [`Cc: ${quoted.cc}`] : []),
+    ].map((l) => `<div>${escapeHtml(l)}</div>`).join("")
+    : `<div>${escapeHtml(`On ${quoted.date}, ${quoted.from} wrote:`)}</div>`
+  const body = mode === "forward"
+    ? `<div>${quoted.html}</div>`
+    : `<blockquote style="margin:0 0 0 .8ex;border-left:1px solid #ccc;padding-left:1ex">${quoted.html}</blockquote>`
+  return `${mine}<br><div style="font-family:Arial,sans-serif;font-size:13px;color:#444">${head}</div><br>${body}`
+}
+
+/** Limit of 20 sends per person per 10 minutes, so a mistake cannot become a flood. */
+export function underSendLimit(history: number[], now: number, max = 20, windowMs = 10 * 60_000): boolean {
+  return history.filter((t) => now - t < windowMs).length < max
 }

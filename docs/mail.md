@@ -7,9 +7,17 @@ email. Emails to or from a contact in the CRM show the company as a tag that ope
 **Per person only (Alfred, 20 Nov 2026).** Nobody can open another person's mailbox, admins
 included. There is no shared company mailbox on this page.
 
-**Nothing is sent from this page yet.** Nothing is sent, moved, deleted or marked as read in
-your mailbox. Reply and compose, and attachments, follow in later steps (plan: https://claude.ai/artifact/RjkwrePUggkPB1qq5LcuC4). Sending will ask
-everyone to reconnect once, to add the send permission.
+**Sending only when you press Send.** Press **New email**, or **Reply**, **Reply all** or
+**Forward** on an open email. A window opens with To, Cc, Bcc, Subject and your message; the
+email goes only when you press **Send** (Enter in a field never sends, and **Discard** throws the
+draft away). It is sent from your own mailbox address and appears in your Zoho Sent folder.
+Replies stay in the same thread in Zoho and quote the original below your text; a forward
+includes the original. Nothing is moved, deleted or marked as read. Attachments come in a later
+step (plan: https://claude.ai/artifact/RjkwrePUggkPB1qq5LcuC4).
+
+**Reconnect once to send.** Anyone who connected before sending was added has only read
+permission. The first time they press New email, Reply or Forward, Mail asks them to press
+**Allow sending** and agree in Zoho; their mail stays connected meanwhile.
 
 ## Linking an email to a record
 
@@ -43,6 +51,10 @@ Hide the whole module with `app_settings.moduleFlags` `{"mail":false}`.
   security on and no policies, so no signed in user can read it; only the function can, with
   the service role. The Zoho access token never reaches the browser.
 - **Disconnect** removes the row and revokes the key at Zoho.
+- **Sending** happens only through the `send` action, from your own address (the page cannot
+  choose another sender). Addresses are checked, at most 50 recipients per email, and at most 20
+  emails per person in 10 minutes, so a mistake cannot become a flood. What you type is sent as
+  plain text (escaped), so nothing you paste runs as code in the recipient's mail.
 - Email content is cleaned on the server (scripts, frames, forms and inline handlers removed)
   and shown in a sandboxed frame with scripts off and a strict content policy. Pictures from the
   internet load only after **Show images**, so senders cannot track when an email was opened.

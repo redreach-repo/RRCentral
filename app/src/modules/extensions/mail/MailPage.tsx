@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Building2, Image as ImageIcon, Inbox, Link2, Mail, Paperclip, RefreshCw, Search, Unlink, X } from 'lucide-react'
+import { ArrowLeft, Building2, Forward, Image as ImageIcon, Inbox, Link2, Mail, Paperclip, PenSquare, RefreshCw, Reply, ReplyAll, Search, Unlink, X } from 'lucide-react'
+import ComposeModal from './ComposeModal'
 import LinkEmailModal from './LinkEmailModal'
 import { useAuth } from '../../../contexts/AuthContext'
 import EmptyState from '../../../components/EmptyState'
@@ -14,6 +15,9 @@ import {
   hasRemoteImages,
   mailWhen,
   matchMailToCrm,
+  startDraft,
+  type ComposeDraft,
+  type ComposeMode,
   type MailFolder,
   type MailListItem,
   type MailMessageFull,
@@ -55,7 +59,7 @@ const smallBtn = { ...buttonSecondaryStyle, padding: '5px 10px', fontSize: 12, d
 
 type Setup =
   | { state: 'loading' }
-  | { state: 'ready'; address: string }
+  | { state: 'ready'; address: string; canSend: boolean }
   | { state: 'connect' }
   | { state: 'off'; reason: string }
 
@@ -97,6 +101,8 @@ export default function MailPage() {
   const [linkNames, setLinkNames] = useState<Map<string, string>>(new Map())
   const [linksError, setLinksError] = useState('')
   const [linking, setLinking] = useState(false)
+  const [compose, setCompose] = useState<ComposeDraft | null>(null)
+  const [needSend, setNeedSend] = useState(false)
   const pendingOpen = useRef<{ folderId: string; messageId: string } | null>(null)
   const listSeq = useRef(0)
   const readSeq = useRef(0)
@@ -156,7 +162,7 @@ export default function MailPage() {
         if (gone) return
         setFolders(fs)
         setFolderId((fs.find((f) => f.kind === 'inbox') || fs[0])?.folderId || '')
-        setSetup({ state: 'ready', address: st.address })
+        setSetup({ state: 'ready', address: st.address, canSend: st.canSend })
       } catch (e) {
         if (gone) return
         if (e instanceof MailSetupError && /connect your mailbox|connect your zoho/i.test(e.message)) {
@@ -187,6 +193,17 @@ export default function MailPage() {
       setNotice({ ok: false, text: errorMessage(e, 'Could not start the Zoho sign in') })
       setBusy(false)
     }
+  }
+
+  /** Opens the compose window. Nothing is sent until Send is pressed there. */
+  function startCompose(mode: ComposeMode) {
+    if (setup.state !== 'ready') return
+    if (!setup.canSend) {
+      setNeedSend(true)
+      return
+    }
+    setNeedSend(false)
+    setCompose(startDraft(mode, mode === 'new' ? null : full, [myEmail, setup.address]))
   }
 
   async function disconnect() {
@@ -365,6 +382,9 @@ export default function MailPage() {
         </div>
         {setup.state === 'ready' && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" style={{ ...smallBtn, ...buttonPrimaryStyle, padding: '5px 12px', fontSize: 12 }} onClick={() => startCompose('new')}>
+              <PenSquare size={14} /> New email
+            </button>
             <button type="button" style={smallBtn} onClick={() => void load(false)} disabled={loading}>
               <RefreshCw size={14} /> Refresh
             </button>
@@ -392,11 +412,29 @@ export default function MailPage() {
         </p>
       )}
 
+      {needSend && setup.state === 'ready' && (
+        <div role="status" style={{ border: `1px solid ${colors.border}`, borderRadius: 10, padding: 14, background: colors.card, display: 'grid', gap: 8, maxWidth: 620, marginBottom: 12 }}>
+          <strong>Allow sending from RR Central</strong>
+          <span className={s.muted}>
+            You connected your mailbox before sending was added, so Zoho has only allowed reading. Sign in to Zoho once more and
+            agree to sending. Emails are only ever sent when you press Send.
+          </span>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" style={{ ...buttonPrimaryStyle, display: 'inline-flex', alignItems: 'center', gap: 8 }} onClick={() => void connect()} disabled={busy}>
+              <Link2 size={16} /> {busy ? 'Opening Zoho…' : 'Allow sending'}
+            </button>
+            <button type="button" style={buttonSecondaryStyle} onClick={() => setNeedSend(false)}>
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
+
       {setup.state === 'connect' && (
         <div style={{ border: `1px solid ${colors.border}`, borderRadius: 10, padding: 20, background: colors.card, display: 'grid', gap: 10, maxWidth: 560 }}>
           <strong>Connect your Zoho mailbox</strong>
           <span className={s.muted}>
-            Sign in to Zoho with your own work address. RR Central can then read your mail (not send it yet). Your key is
+            Sign in to Zoho with your own work address. RR Central can then show your mail and send replies when you press Send. Your key is
             stored encrypted and nobody else in RR Central, admins included, can open your mailbox. You can disconnect at any time.
           </span>
           <div>
@@ -562,6 +600,19 @@ export default function MailPage() {
                     </button>
                   )}
                 </div>
+                {full && (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} aria-label="Answer">
+                    <button type="button" style={smallBtn} onClick={() => startCompose('reply')}>
+                      <Reply size={14} /> Reply
+                    </button>
+                    <button type="button" style={smallBtn} onClick={() => startCompose('replyAll')}>
+                      <ReplyAll size={14} /> Reply all
+                    </button>
+                    <button type="button" style={smallBtn} onClick={() => startCompose('forward')}>
+                      <Forward size={14} /> Forward
+                    </button>
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }} aria-label="Linked records">
                   <span className={s.muted}>Linked to:</span>
                   {links.length === 0 && !linksError && <span className={s.muted}>nothing yet</span>}
@@ -608,6 +659,22 @@ export default function MailPage() {
             )}
           </section>
         </div>
+      )}
+      {setup.state === 'ready' && (
+        <ComposeModal
+          draft={compose}
+          original={full ? { folderId: full.folderId, messageId: full.messageId, subject: full.subject } : null}
+          fromAddress={setup.address || myEmail}
+          onClose={() => setCompose(null)}
+          onSent={(text) => {
+            setCompose(null)
+            setNotice({ ok: true, text })
+          }}
+          onNeedsSendScope={() => {
+            setCompose(null)
+            setNeedSend(true)
+          }}
+        />
       )}
       {full && (
         <LinkEmailModal
