@@ -130,3 +130,59 @@ export function stripActiveContent(html: string): string {
     .replace(/(href|src|action|formaction|xlink:href)\s*=\s*("|')\s*(javascript|vbscript|data:text\/html)[^"']*\2/gi, "$1=$2#$2")
     .slice(0, 2_000_000)
 }
+
+const ZOHO_ACCOUNTS_HOST = /^accounts\.zoho\.(com|eu|in|com\.au|jp|com\.cn|sa|ca|uk)$/i
+
+/** Zoho sign in server for a region, e.g. https://accounts.zoho.eu. Null when not a Zoho one. */
+export function zohoAccountsOrigin(raw: unknown): string | null {
+  try {
+    const url = new URL(String(raw || ""))
+    if (url.protocol !== "https:" || !ZOHO_ACCOUNTS_HOST.test(url.hostname)) return null
+    return url.origin
+  } catch {
+    return null
+  }
+}
+
+/** The Mail API server in the same region: accounts.zoho.eu -> mail.zoho.eu. */
+export function zohoMailOrigin(accountsOrigin: string): string {
+  return accountsOrigin.replace("://accounts.", "://mail.")
+}
+
+/** Read only for now: list folders and read mail. Sending comes in a later step (reconnect then). */
+export const ZOHO_MAIL_SCOPES = "ZohoMail.accounts.READ,ZohoMail.folders.READ,ZohoMail.messages.READ"
+
+export function zohoConsentUrl(opts: { accountsOrigin: string; clientId: string; redirectUri: string; state: string; loginHint?: string }): string {
+  const q = new URLSearchParams({
+    response_type: "code",
+    client_id: opts.clientId,
+    scope: ZOHO_MAIL_SCOPES,
+    redirect_uri: opts.redirectUri,
+    access_type: "offline",
+    prompt: "consent",
+    state: opts.state,
+  })
+  if (opts.loginHint) q.set("login_hint", opts.loginHint)
+  return `${opts.accountsOrigin}/oauth/v2/auth?${q}`
+}
+
+/**
+ * Per person only: the Zoho mailbox must belong to the person signed in to
+ * RR Central (their login address is one of the mailbox's addresses).
+ */
+export function mailboxBelongsTo(
+  userEmail: string,
+  account: { primaryEmailAddress?: unknown; mailboxAddress?: unknown; emailAddress?: unknown },
+): boolean {
+  const me = userEmail.trim().toLowerCase()
+  if (!me) return false
+  const addresses = new Set<string>()
+  for (const v of [account.primaryEmailAddress, account.mailboxAddress]) if (typeof v === "string") addresses.add(v.trim().toLowerCase())
+  if (Array.isArray(account.emailAddress)) {
+    for (const e of account.emailAddress) {
+      const mail = typeof e === "string" ? e : (e as { mailId?: unknown })?.mailId
+      if (typeof mail === "string") addresses.add(mail.trim().toLowerCase())
+    }
+  }
+  return addresses.has(me)
+}

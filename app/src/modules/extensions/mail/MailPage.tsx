@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { ArrowLeft, Building2, Image as ImageIcon, Inbox, Mail, Paperclip, RefreshCw, Search, X } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { ArrowLeft, Building2, Image as ImageIcon, Inbox, Link2, Mail, Paperclip, RefreshCw, Search, Unlink, X } from 'lucide-react'
 import { useAuth } from '../../../contexts/AuthContext'
 import EmptyState from '../../../components/EmptyState'
 import { db } from '../../../lib/db'
@@ -20,13 +20,16 @@ import {
 } from '../../../lib/mailInbox/mailInbox'
 import {
   MailSetupError,
+  disconnectMail,
   getMailMessage,
   getMailStatus,
   listMail,
   listMailFolders,
   searchMail,
+  startMailConnect,
 } from '../../../lib/mailInbox/mailInboxApi'
 import {
+  buttonPrimaryStyle,
   buttonSecondaryStyle,
   colors,
   inputStyle,
@@ -39,13 +42,30 @@ import s from './Mail.module.css'
 const PAGE = 30
 const smallBtn = { ...buttonSecondaryStyle, padding: '5px 10px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }
 
-type Setup = { state: 'loading' } | { state: 'ready'; address: string } | { state: 'off'; reason: string }
+type Setup =
+  | { state: 'loading' }
+  | { state: 'ready'; address: string }
+  | { state: 'connect' }
+  | { state: 'off'; reason: string }
+
+/** This page's address without Zoho's answer in it, for Zoho to send the person back to. */
+function returnUrl(): string {
+  const url = new URL(window.location.href)
+  url.searchParams.delete('mail')
+  url.searchParams.delete('reason')
+  return url.toString()
+}
 
 export default function MailPage() {
   const { userRole: role } = useAuth()
   const allowed = (MAIL_ROLES as readonly string[]).includes(role)
 
+  const [params, setParams] = useSearchParams()
   const [setup, setSetup] = useState<Setup>({ state: 'loading' })
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [confirmOff, setConfirmOff] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [folders, setFolders] = useState<MailFolder[]>([])
   const [folderId, setFolderId] = useState('')
   const [unreadOnly, setUnreadOnly] = useState(false)
@@ -68,16 +88,39 @@ export default function MailPage() {
   const isSent = !activeSearch && folder?.kind === 'sent'
   const rows = useMemo(() => matchMailToCrm(items, crm), [items, crm])
 
-  // Mailbox status and folders, then CRM companies for matching.
+  // Zoho sends the person back here with ?mail=connected or ?mail=error&reason=…
+  useEffect(() => {
+    const result = params.get('mail')
+    if (!result) return
+    setNotice(
+      result === 'connected'
+        ? { ok: true, text: 'Your mailbox is connected.' }
+        : { ok: false, text: params.get('reason') || 'Your mailbox could not be connected.' },
+    )
+    const next = new URLSearchParams(params)
+    next.delete('mail')
+    next.delete('reason')
+    setParams(next, { replace: true })
+  }, [params, setParams])
+
+  // Your mailbox status and folders, then CRM companies for matching.
   useEffect(() => {
     if (!allowed) return
     let gone = false
+    setSetup({ state: 'loading' })
     ;(async () => {
       try {
         const st = await getMailStatus()
         if (gone) return
+        if (!st.ready) {
+          setSetup({
+            state: 'off',
+            reason: 'An admin adds the Zoho app and the mail key in Supabase first (ZOHO_MAIL_CLIENT_ID, ZOHO_MAIL_CLIENT_SECRET, MAIL_TOKEN_KEY).',
+          })
+          return
+        }
         if (!st.connected) {
-          setSetup({ state: 'off', reason: 'Zoho Mail is not connected. An admin turns it on in Settings, Zoho (Mail: yes).' })
+          setSetup({ state: 'connect' })
           return
         }
         const fs = await listMailFolders()
@@ -87,7 +130,12 @@ export default function MailPage() {
         setSetup({ state: 'ready', address: st.address })
       } catch (e) {
         if (gone) return
-        setSetup({ state: 'off', reason: e instanceof MailSetupError ? e.message : errorMessage(e, 'Could not open the mailbox') })
+        if (e instanceof MailSetupError && /connect your mailbox|connect your zoho/i.test(e.message)) {
+          setNotice({ ok: false, text: e.message })
+          setSetup({ state: 'connect' })
+          return
+        }
+        setSetup({ state: 'off', reason: e instanceof MailSetupError ? e.message : errorMessage(e, 'Could not open your mailbox') })
       }
     })()
     db.from('crm')
@@ -99,7 +147,35 @@ export default function MailPage() {
     return () => {
       gone = true
     }
-  }, [allowed])
+  }, [allowed, reloadKey])
+
+  async function connect() {
+    setBusy(true)
+    setNotice(null)
+    try {
+      window.location.assign(await startMailConnect(returnUrl()))
+    } catch (e) {
+      setNotice({ ok: false, text: errorMessage(e, 'Could not start the Zoho sign in') })
+      setBusy(false)
+    }
+  }
+
+  async function disconnect() {
+    setBusy(true)
+    try {
+      await disconnectMail()
+      setOpen(null)
+      setItems([])
+      setFolders([])
+      setConfirmOff(false)
+      setNotice({ ok: true, text: 'Your mailbox is disconnected and its key removed.' })
+      setReloadKey((k) => k + 1)
+    } catch (e) {
+      setNotice({ ok: false, text: errorMessage(e, 'Could not disconnect') })
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const load = useCallback(
     async (append: boolean) => {
@@ -192,17 +268,54 @@ export default function MailPage() {
           <h1 style={pageTitleStyle}>Mail</h1>
           <p style={{ ...pageSubtitleStyle, margin: '0 0 16px' }}>
             {setup.state === 'ready' && setup.address ? `${setup.address} · ` : ''}
-            Company Zoho mailbox. Emails from clients in the CRM are tagged with the company.
+            Your own Zoho mailbox. Only you can see it. Emails from clients in the CRM are tagged with the company.
           </p>
         </div>
         {setup.state === 'ready' && (
-          <button type="button" style={smallBtn} onClick={() => void load(false)} disabled={loading}>
-            <RefreshCw size={14} /> Refresh
-          </button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" style={smallBtn} onClick={() => void load(false)} disabled={loading}>
+              <RefreshCw size={14} /> Refresh
+            </button>
+            {!confirmOff ? (
+              <button type="button" style={smallBtn} onClick={() => setConfirmOff(true)} disabled={busy}>
+                <Unlink size={14} /> Disconnect
+              </button>
+            ) : (
+              <>
+                <button type="button" style={{ ...smallBtn, color: colors.danger }} onClick={() => void disconnect()} disabled={busy}>
+                  Yes, disconnect
+                </button>
+                <button type="button" style={smallBtn} onClick={() => setConfirmOff(false)} disabled={busy}>
+                  Keep it
+                </button>
+              </>
+            )}
+          </div>
         )}
       </div>
 
-      {setup.state === 'loading' && <p className={s.muted}>Opening the mailbox…</p>}
+      {notice && (
+        <p role={notice.ok ? 'status' : 'alert'} style={{ color: notice.ok ? colors.success : colors.danger, fontSize: 13, margin: '0 0 12px' }}>
+          {notice.text}
+        </p>
+      )}
+
+      {setup.state === 'connect' && (
+        <div style={{ border: `1px solid ${colors.border}`, borderRadius: 10, padding: 20, background: colors.card, display: 'grid', gap: 10, maxWidth: 560 }}>
+          <strong>Connect your Zoho mailbox</strong>
+          <span className={s.muted}>
+            Sign in to Zoho with your own work address. RR Central can then read your mail (not send it yet). Your key is
+            stored encrypted and nobody else in RR Central, admins included, can open your mailbox. You can disconnect at any time.
+          </span>
+          <div>
+            <button type="button" style={{ ...buttonPrimaryStyle, display: 'inline-flex', alignItems: 'center', gap: 8 }} onClick={() => void connect()} disabled={busy}>
+              <Link2 size={16} /> {busy ? 'Opening Zoho…' : 'Connect my mailbox'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {setup.state === 'loading' && <p className={s.muted}>Opening your mailbox…</p>}
 
       {setup.state === 'off' && (
         <div role="status" style={{ border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, background: colors.card, display: 'grid', gap: 6 }}>

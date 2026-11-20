@@ -5,8 +5,9 @@ import type { ExtensionModule } from '../types'
 const MailPage = lazy(() => import('./MailPage'))
 
 /**
- * Mail: the company Zoho mailbox inside RR Central (read only for now).
+ * Mail: each person's own Zoho mailbox inside RR Central (read only for now).
  * Admin, manager and sales, the same people the mail-inbox function lets in.
+ * Nobody can open another person's mailbox.
  * Hide with app_settings.moduleFlags {"mail":false}.
  */
 const mod: ExtensionModule = {

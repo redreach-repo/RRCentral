@@ -23,7 +23,7 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "whatsapp-in": { kind: "Meta signature", pattern: /if \(!appSecret\)[\s\S]*validSignature\(raw, req\.headers\.get\("x-hub-signature-256"\)/ },
   "whatsapp-send": { kind: "signed in user (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)/ },
   "fireflies-fetch": { kind: "signed in user (JWT read in code) who can write the account", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_can_write_account/ },
-  "mail-inbox": { kind: "signed in admin, manager or sales (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_staff[\s\S]*Your role cannot open the company mailbox/ },
+  "mail-inbox": { kind: "signed state from Zoho, signed in admin, manager or sales (JWT read in code) for the rest", pattern: /readState\(app\.clientSecret[\s\S]*if \(!state\)[\s\S]*mailboxBelongsTo\(email[\s\S]*auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_staff[\s\S]*Your role cannot use Mail/ },
   "client-po-file": { kind: "signed in admin, manager or sales (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_staff[\s\S]*Your role cannot add client POs/ },
   "invoice-pay-link": { kind: "signed in team member (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_staff/ },
   "stripe-invoice-webhook": { kind: "Stripe signature", pattern: /if \(!webhookSecret[\s\S]*constructEventAsync\(raw, signature, webhookSecret/ },
@@ -105,6 +105,9 @@ const ENV: Record<string, string> = {
   HUBSPOT_CRON_SECRET: "hubspot-secret-for-tests",
   OUTBOX_CRON_SECRET: "outbox-secret-for-tests",
   HUBSPOT_ACCESS_TOKEN: "hubspot-token-for-tests",
+  ZOHO_MAIL_CLIENT_ID: "zoho-client-for-tests",
+  ZOHO_MAIL_CLIENT_SECRET: "zoho-secret-for-tests",
+  MAIL_TOKEN_KEY: "mail-token-key-for-tests-0123456789abcdef",
 }
 
 async function load(fn: string): Promise<Handler> {
@@ -170,6 +173,9 @@ Deno.test({ name: "mail-inbox refuses anyone not signed in, before touching the 
   assertEquals(await call("mail-inbox", post("mail-inbox", { action: "message", folderId: "1", messageId: "2" })), 401)
   assertEquals(await call("mail-inbox", post("mail-inbox", { action: "list", folderId: "1" }, { Authorization: "Bearer someone" })), 401)
   assertEquals(await call("mail-inbox", post("mail-inbox", { action: "status" }, { Origin: "https://evil.example" })), 403)
+  // Zoho's answer without a valid signed state saves nothing.
+  assertEquals(await call("mail-inbox", new Request(URL_BASE + "mail-inbox?code=abc")), 400)
+  assertEquals(await call("mail-inbox", new Request(URL_BASE + "mail-inbox?code=abc&state=forged.sig")), 400)
 } })
 
 Deno.test({ name: "watchdog refuses a signed in user who is not a manager or admin", ...opts, fn: async () => {

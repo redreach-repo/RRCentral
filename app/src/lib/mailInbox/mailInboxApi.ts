@@ -1,6 +1,7 @@
 /**
- * Calls the mail-inbox Edge Function. The Zoho keys and access token stay on
- * the server; this only ever receives folders, email lists and email content.
+ * Calls the mail-inbox Edge Function for the signed in person's OWN mailbox.
+ * The Zoho keys and access token stay on the server; this only ever receives
+ * folders, email lists and email content.
  */
 import { getSupabaseClient, isSupabaseConfigured } from '../supabaseConfig'
 import type { MailFolder, MailListItem, MailMessageFull } from './mailInbox'
@@ -26,9 +27,28 @@ async function callMail<T>(body: Record<string, unknown>): Promise<T> {
   return res
 }
 
-export async function getMailStatus(): Promise<{ connected: boolean; address: string }> {
-  const res = await callMail<{ connected: boolean; address: string }>({ action: 'status' })
-  return { connected: Boolean(res.connected), address: String(res.address || '') }
+export type MailStatus = {
+  /** The admin has added the Zoho app and the token key in Supabase. */
+  ready: boolean
+  /** This person has connected their own mailbox. */
+  connected: boolean
+  address: string
+}
+
+export async function getMailStatus(): Promise<MailStatus> {
+  const res = await callMail<MailStatus>({ action: 'status' })
+  return { ready: Boolean(res.ready), connected: Boolean(res.connected), address: String(res.address || '') }
+}
+
+/** Zoho's consent page for this person's own mailbox; Zoho sends them back to `returnTo`. */
+export async function startMailConnect(returnTo: string): Promise<string> {
+  const res = await callMail<{ url: string }>({ action: 'connect', return_to: returnTo })
+  if (!/^https:\/\/accounts\.zoho\./.test(res.url || '')) throw new Error('Zoho did not give a sign in link')
+  return res.url
+}
+
+export async function disconnectMail(): Promise<void> {
+  await callMail<{ ok: boolean }>({ action: 'disconnect' })
 }
 
 export async function listMailFolders(): Promise<MailFolder[]> {
