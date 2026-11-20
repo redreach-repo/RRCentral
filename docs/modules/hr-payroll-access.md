@@ -12,3 +12,8 @@ Migration `20261321090000_hr_payroll_manager_only.sql`, test `supabase/tests/mod
 Only permissions change; no rows are touched. Always own company only.
 
 On live: run it straight after `20261217120000_feature_slices_m6_m12.sql`, and again if that file or `20260926090000_security_rls.sql` is ever run again (both put the broad policies back). The System check page marks 20261217120000 with this reminder.
+
+## Guard tests
+
+- `supabase/tests/modules/role_access_guard_test.sql` checks the whole database on every CI run: row level security on every table, tenant isolation on every tenant table, nothing open to anonymous visitors except the website form and business type packs, and no "all staff / sales / viewer" policy on HR, payroll, audit or field access log tables. It then reads a real HR row and the audit log as each role.
+- `app/src/modules/navRoleAccess.test.ts` checks the sidebar per role: HR, payroll, ledger, approvals and MRR for managers and admins only; settings, audit log, API, app errors, system check, data requests, theme studio and plan for admins only.
