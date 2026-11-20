@@ -7,6 +7,7 @@ import {
   cleanSearch,
   folderKind,
   isZohoId,
+  linkTargetTable,
   mailboxBelongsTo,
   normalizeFolders,
   normalizeMessage,
@@ -129,4 +130,14 @@ Deno.test("a mailbox is only accepted when it is the person's own", () => {
   assert(mailboxBelongsTo("sam@redreach.ae", { primaryEmailAddress: "info@redreach.ae", emailAddress: [{ mailId: "sam@redreach.ae" }] }))
   assert(!mailboxBelongsTo("sam@redreach.ae", { primaryEmailAddress: "alfred@redreach.ae" }))
   assert(!mailboxBelongsTo("", { primaryEmailAddress: "" }))
+})
+
+Deno.test("emails link only to clients, CRM entries, quotations and invoices", () => {
+  assertEquals(linkTargetTable("account"), "accounts")
+  assertEquals(linkTargetTable("crm"), "crm")
+  assertEquals(linkTargetTable("quotation"), "quotations")
+  assertEquals(linkTargetTable("invoice"), "invoices")
+  assertEquals(linkTargetTable("app_users"), null)
+  assertEquals(linkTargetTable("toString"), null)
+  assertEquals(linkTargetTable(undefined), null)
 })

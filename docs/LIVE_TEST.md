@@ -647,3 +647,17 @@ as a different address than your RR Central login ends with "That Zoho mailbox i
 **If it fails.** "An admin adds the Zoho app and the mail key" means a secret is missing (System check shows which).
 "Has the mail_accounts SQL been run?" means step 3 was skipped. A Zoho page saying the redirect URI is invalid means
 the Authorized Redirect URI in the Zoho app does not match the function URL exactly.
+
+## 37. Link an email to a client, quotation or invoice
+
+**Trigger.** Run `mail-links.sql` and deploy `mail-inbox` again. In **Mail**, open an email from a client and press
+**Link to…**. Pick the suggested client, then link the same email to a quotation by searching its number.
+
+**You should see.** Chips "Client: …" and "Quotation: …" under the email. On the client's page, **Emails** lists it
+with subject, sender, date and "in your mailbox"; clicking it opens the email in Mail. Signed in as a colleague, the
+same row shows "in <your address>'s mailbox" and cannot be opened. Sales can remove their own chip (×) but not one a
+colleague added; a manager can remove any.
+
+**If it fails.** "Linking emails is not set up yet" means the SQL was not run. "That email was not found in your
+mailbox" means the email was moved or deleted in Zoho.
+
