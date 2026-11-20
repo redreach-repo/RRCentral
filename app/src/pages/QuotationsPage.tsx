@@ -1593,7 +1593,10 @@ export default function QuotationsPage() {
       ) : (
         <div className={qStyles.tableShell}>
           <div className={qStyles.tableWrap}>
-            <table className={qStyles.table}>
+            <table
+              className={qStyles.table}
+              style={customDefs.length ? { minWidth: 860 + customDefs.length * 130 } : undefined}
+            >
               <thead>
                 <tr>
                   <th className={qStyles.colRef}>Reference</th>
@@ -1603,7 +1606,9 @@ export default function QuotationsPage() {
                   <th className={qStyles.colAmount}>Amount</th>
                   <th className={qStyles.colStatus}>Status</th>
                   {customDefs.map((d) => (
-                    <th key={d.id}>{d.label || d.field_key}</th>
+                    <th key={d.id} className={qStyles.colCustom} title={d.label || d.field_key}>
+                      {d.label || d.field_key}
+                    </th>
                   ))}
                   <th className={qStyles.colActions} style={{ textAlign: 'right' }}>
                     Actions
@@ -1631,6 +1636,11 @@ export default function QuotationsPage() {
                     <td className={qStyles.colStatus}>
                       <StatusPill status={q.status} />
                     </td>
+                    {customDefs.map((d) => (
+                      <td key={d.id} className={`${qStyles.colCustom} ${qStyles.customCell}`}>
+                        {displayFieldValue(d, customValues[q.id]?.[d.id]) || '—'}
+                      </td>
+                    ))}
                     <td className={`${qStyles.colActions} ${qStyles.actionsCell}`}>
                       {renderQuoteActions(q)}
                     </td>
