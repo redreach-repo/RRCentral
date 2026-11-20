@@ -152,7 +152,10 @@ comment on table public.mcp_keys is
 -- Called by the highmast-mcp function with the public (anon) key and the
 -- SHA-256 hash of the caller's key. Returns one row when the key may be used.
 -- `allowed` is false when the key went over 60 calls in this minute.
-create or replace function public.rr_mcp_resolve_key(p_key_hash text)
+-- Dropped first: 20261324090000_highmast_mcp_admin.sql adds a scope column to
+-- the result, and a re-run of this file must still apply (re-run that file after).
+drop function if exists public.rr_mcp_resolve_key(text);
+create function public.rr_mcp_resolve_key(p_key_hash text)
 returns table (
   key_id uuid,
   key_name text,

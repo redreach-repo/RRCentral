@@ -4,8 +4,11 @@ import { db, currentAuthMode } from './db'
 export type AuditEntry = {
   id: number
   table_name: string
-  /** MCP_CALL: a tool call from the AI connector (highmast-mcp), table 'mcp_tool_call'. */
-  operation: 'INSERT' | 'UPDATE' | 'DELETE' | 'MCP_CALL'
+  /**
+   * MCP_CALL: a tool call from the AI connector (highmast-mcp), table 'mcp_tool_call'.
+   * MCP_WRITE: a change made by an admin AI key, with the record before (old_data) and after (new_data.after).
+   */
+  operation: 'INSERT' | 'UPDATE' | 'DELETE' | 'MCP_CALL' | 'MCP_WRITE'
   row_id: string
   actor_email: string
   changed_fields: string[]

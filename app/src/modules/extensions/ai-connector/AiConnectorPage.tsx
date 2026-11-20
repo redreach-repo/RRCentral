@@ -4,11 +4,12 @@ import { useAuth } from '../../../contexts/AuthContext'
 import { useToast } from '../../../contexts/ToastContext'
 import EmptyState from '../../../components/EmptyState'
 import { errorMessage } from '../../../lib/errors'
-import { MCP_DEFAULT_ROLE, MCP_RATE_LIMIT_PER_MINUTE } from '../../../lib/highmastMcp'
+import { MCP_DEFAULT_ROLE, MCP_RATE_LIMIT_PER_MINUTE, type McpKeyScope } from '../../../lib/highmastMcp'
 import {
   createMcpKey,
   listMcpKeys,
   listMcpMembers,
+  mcpAdminKeysReady,
   mcpServerUrl,
   revokeMcpKey,
   type McpKeyRow,
@@ -39,6 +40,9 @@ export default function AiConnectorPage() {
   const [members, setMembers] = useState<McpMember[]>([])
   const [name, setName] = useState('Grok Bot')
   const [memberId, setMemberId] = useState('')
+  const [scope, setScope] = useState<McpKeyScope>('standard')
+  const [adminReady, setAdminReady] = useState(false)
+  const [allMembers, setAllMembers] = useState<McpMember[]>([])
   const [shownKey, setShownKey] = useState('')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -47,16 +51,26 @@ export default function AiConnectorPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [k, m] = await Promise.all([listMcpKeys(), listMcpMembers()])
+      const [k, m, admins, ready] = await Promise.all([
+        listMcpKeys(),
+        listMcpMembers(scope, user?.email || ''),
+        listMcpMembers('admin', ''),
+        mcpAdminKeysReady(),
+      ])
       setKeys(k)
       setMembers(m)
-      setMemberId((cur) => cur || m.find((x) => x.role === MCP_DEFAULT_ROLE)?.id || m[0]?.id || '')
+      setAdminReady(ready)
+      // Names for the key list: every member a key may act as.
+      setAllMembers([...(await listMcpMembers('standard')), ...admins])
+      setMemberId((cur) =>
+        m.some((x) => x.id === cur) ? cur : m.find((x) => x.role === MCP_DEFAULT_ROLE)?.id || m[0]?.id || '',
+      )
     } catch (e) {
       showToast(errorMessage(e, 'Could not load AI connector keys'), 'error')
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [showToast, scope, user?.email])
 
   useEffect(() => {
     if (userRole === 'admin') void load()
@@ -71,8 +85,8 @@ export default function AiConnectorPage() {
   }
 
   const nameOf = (id: string) => {
-    const m = members.find((x) => x.id === id)
-    return m ? `${m.name || m.email}` : 'a member who is no longer sales, staff or viewer'
+    const m = allMembers.find((x) => x.id === id)
+    return m ? `${m.name || m.email}` : 'a member whose role or status changed'
   }
 
   async function copy(text: string, what: string) {
@@ -93,7 +107,7 @@ export default function AiConnectorPage() {
     }
     setBusy(true)
     try {
-      const created = await createMcpKey(name, member, user?.email || '')
+      const created = await createMcpKey(name, member, user?.email || '', scope)
       setShownKey(created.key)
       showToast('Key created. Copy it now: it is shown only once.', 'success')
       await load()
@@ -121,10 +135,11 @@ export default function AiConnectorPage() {
     <div style={pageStyle}>
       <h1 style={pageTitleStyle}>AI connector</h1>
       <p style={pageSubtitleStyle}>
-        Keys for AI assistants such as Grok Bot to use HighMast as a connector (MCP). Each key acts as one team member with the role
-        sales, staff or viewer, so it sees only what that person sees. It cannot delete anything, cannot touch HR, payroll, settings or
-        users, and quotes, invoices and payments stay read only. {MCP_RATE_LIMIT_PER_MINUTE} calls a minute per key; every call is in the
-        Audit log.
+        Keys for AI assistants such as Grok Bot to use HighMast as a connector (MCP). A standard key acts as one team member with the
+        role sales, staff or viewer, so it sees only what that person sees: it cannot delete anything, cannot touch HR, payroll,
+        settings or users, and quotes, invoices and payments stay read only. An admin key acts as a dedicated AI Assistant admin
+        member and can work in every area (see the warning when you pick it). {MCP_RATE_LIMIT_PER_MINUTE} calls a minute per key;
+        every call is in the Audit log.
       </p>
 
       <section style={{ ...cardStyle, marginBottom: 16 }}>
@@ -170,9 +185,37 @@ export default function AiConnectorPage() {
               <input style={inputStyle} value={name} maxLength={80} onChange={(e) => setName(e.target.value)} required />
             </label>
             <label style={labelStyle}>
+              Access
+              <select
+                style={inputStyle}
+                value={scope}
+                onChange={(e) => {
+                  setScope(e.target.value as McpKeyScope)
+                  setMemberId('')
+                }}
+              >
+                <option value="standard">Standard: sales, staff or viewer tools (no deletes, no HR, money read only)</option>
+                <option value="admin" disabled={!adminReady}>
+                  {adminReady ? 'Admin: every area, HR and payroll included' : 'Admin (run the HighMast MCP admin SQL first)'}
+                </option>
+              </select>
+            </label>
+            {scope === 'admin' && (
+              <p style={{ color: colors.warn, fontSize: 13, margin: 0 }}>
+                An admin key can read and change every area, including salaries, IBANs and payroll drafts. Whatever the AI reads is
+                sent to that AI's company. It cannot hard delete, change sent invoices or recorded payments, approve leave or approve
+                and pay payroll, and every change is in the Audit log with before and after. Pick a dedicated admin member such as
+                "AI Assistant" (ai-assistant@redreach.ae), never yourself.
+              </p>
+            )}
+            <label style={labelStyle}>
               Acts as
               <select style={inputStyle} value={memberId} onChange={(e) => setMemberId(e.target.value)} required>
-                {members.length === 0 && <option value="">No active sales, staff or viewer members</option>}
+                {members.length === 0 && (
+                  <option value="">
+                    {scope === 'admin' ? 'No other active admin member: add "AI Assistant" first' : 'No active sales, staff or viewer members'}
+                  </option>
+                )}
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
                     {(m.name || m.email) + ` (${m.role}, ${m.email})`}
@@ -181,8 +224,9 @@ export default function AiConnectorPage() {
               </select>
             </label>
             <p style={{ color: colors.muted, fontSize: 13, margin: 0 }}>
-              Tip: add a team member such as grokbot@redreach.ae with the role sales under Settings, Users, and pick it here, so the
-              AI's changes show under its own name. Admin and manager members cannot be picked.
+              {scope === 'admin'
+                ? "Tip: add a team member named AI Assistant (e.g. ai-assistant@redreach.ae) with the role admin under Settings, Users, and pick it here, so every change shows under that name."
+                : "Tip: add a team member such as grokbot@redreach.ae with the role sales under Settings, Users, and pick it here, so the AI's changes show under its own name. Admin and manager members cannot be picked."}
             </p>
             <div>
               <button type="submit" style={buttonPrimaryStyle} disabled={busy || loading || !memberId}>
@@ -206,6 +250,7 @@ export default function AiConnectorPage() {
                       <th>Key starts</th>
                       <th>Acts as</th>
                       <th>Role</th>
+                      <th>Access</th>
                       <th>Created</th>
                       <th>Last used</th>
                       <th>Status</th>
@@ -221,6 +266,7 @@ export default function AiConnectorPage() {
                         </td>
                         <td>{nameOf(k.acts_as_user_id)}</td>
                         <td>{k.role}</td>
+                        <td>{k.scope === 'admin' ? 'Admin' : 'Standard'}</td>
                         <td>{when(k.created_at)}</td>
                         <td>{when(k.last_used_at)}</td>
                         <td style={{ color: k.revoked_at ? colors.danger : colors.success }}>

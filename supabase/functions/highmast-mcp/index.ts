@@ -22,6 +22,7 @@ import { withErrorLog } from "../_shared/functionHealth.ts"
 import { memberClient, resolveKey } from "./auth.ts"
 import { bearerToken, isMcpKeyShape } from "./highmastMcp.bundle.js"
 import { registerTools } from "./tools.ts"
+import { registerAdminTools } from "./tools_admin.ts"
 
 export const SERVER_NAME = "highmast"
 export const SERVER_VERSION = "1.0.0"
@@ -74,11 +75,19 @@ async function handler(req: Request): Promise<Response> {
       instructions:
         "HighMast is Red Reach's company system (CRM, deals, support, quotes and invoices). " +
         `You act as ${who.key.memberName} (${who.key.role}) through the key "${who.key.keyName}". ` +
-        "Read tools are safe. Write tools only add leads and notes, set follow-ups and move deals forward; " +
-        "nothing can be deleted and quotes, invoices and payments are read only. Lists are paginated (limit up to 50, use next_offset).",
+        (who.key.scope === "admin"
+          ? "This is an ADMIN key: you can read and change every area, HR and payroll included. Deletes are soft (restore_record undoes them). " +
+            "Sent invoices and recorded payments never change: correct them with create_credit_note or reverse_payment. " +
+            "Payroll runs stay draft and leave is never approved by you. Users and settings are read only or hidden. " +
+            "Every change is in the audit log with before and after. Confirm with the person before money or HR changes. "
+          : "Read tools are safe. Write tools only add leads and notes, set follow-ups and move deals forward; " +
+            "nothing can be deleted and quotes, invoices and payments are read only. ") +
+        "Lists are paginated (limit up to 50, use next_offset).",
     },
   )
-  registerTools(server, { db, key: who.key, now: () => new Date() })
+  const ctx = { db, key: who.key, now: () => new Date() }
+  registerTools(server, ctx)
+  registerAdminTools(server, ctx)
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true })
   await server.connect(transport)
   try {

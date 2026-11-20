@@ -675,3 +675,21 @@ next call answer 401.
 **If it fails.** 503 "not set up yet" means `MCP_JWT_SECRET` is missing. 503 "Has the HighMast MCP SQL been run?" means
 step 1 was skipped. 401 with a fresh key means the member it acts as is switched off, changed role, or has no
 confirmed login. Every tool answering "Not allowed" usually means `MCP_JWT_SECRET` is not the project's JWT secret.
+
+## 39. AI connector admin key (every area, for the AI Assistant)
+
+**Trigger.** After section 38 works: run `supabase-sql/highmast-mcp-admin.sql` (copy of
+`supabase/migrations/20261324090000_highmast_mcp_admin.sql`), redeploy `highmast-mcp`, add a team member
+"AI Assistant" (`ai-assistant@redreach.ae`, role admin) and confirm its login, then Admin > **AI connector** > Access
+**Admin** > Acts as AI Assistant > Create key. Put the key in the AI assistant.
+
+**You should see.** `tools/list` returns 59 tools (14 + 45 admin). Ask it to create a test account, a Draft quote with
+two lines (VAT 5%, AED), finalize it (RR-01-YYNNN number), mark it sent, convert it to an invoice, record a part payment,
+then delete the test account and restore it. Admin > Audit log shows each change as "AI change" by
+`ai-assistant@redreach.ae (AI key: ...)` with the record before and after. Asking it to edit the sent invoice, change
+the payment, approve leave or approve a payroll run is refused with a reason. Afterwards: void the test invoice and
+quote by hand (or delete the test account) so they do not reach reports.
+
+**If it fails.** Only 14 tools: the key is Standard, or the admin SQL was not run before the key was made. 401: the AI
+Assistant member is not active, not admin, or its login is not confirmed. "This needs an AI connector key with the
+admin scope": the SQL ran but the function was not redeployed.

@@ -16,7 +16,9 @@ import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2"
 export type McpKey = {
   keyId: string
   keyName: string
-  role: "sales" | "staff" | "viewer"
+  role: "sales" | "staff" | "viewer" | "admin"
+  /** "admin" keys get the admin tools (tools_admin.ts) and act as the AI Assistant admin member. */
+  scope: "standard" | "admin"
   memberId: string
   memberName: string
   memberEmail: string
@@ -71,6 +73,7 @@ type ResolveRow = {
   key_id: string
   key_name: string
   role: McpKey["role"]
+  scope?: McpKey["scope"]
   member_id: string
   member_name: string
   member_email: string
@@ -114,6 +117,7 @@ export async function resolveKey(rawKey: string, fetcher: typeof fetch = fetch):
       keyId: row.key_id,
       keyName: row.key_name,
       role: row.role,
+      scope: row.scope === "admin" && row.role === "admin" ? "admin" : "standard",
       memberId: row.member_id,
       memberName: row.member_name || row.member_email,
       memberEmail: row.member_email,

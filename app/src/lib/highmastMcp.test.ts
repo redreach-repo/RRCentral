@@ -171,3 +171,41 @@ describe('audit', () => {
     expect(out.c).toBe('[object]')
   })
 })
+
+describe('admin scope rules', () => {
+  it('admin tools are separate from the standard ones and none approves, pays out or touches secrets', async () => {
+    const { MCP_ADMIN_TOOLS, adminToolNameProblem } = await import('./highmastMcp')
+    for (const t of MCP_ADMIN_TOOLS) {
+      expect(adminToolNameProblem(t)).toBeNull()
+      expect((MCP_TOOLS as readonly string[]).includes(t)).toBe(false)
+    }
+    expect(new Set(MCP_ADMIN_TOOLS).size).toBe(MCP_ADMIN_TOOLS.length)
+    expect(adminToolNameProblem('approve_payroll_run')).toMatch(/approve/)
+    expect(adminToolNameProblem('update_settings')).toMatch(/settings/)
+    // Standard keys still never get admin roles.
+    expect(MCP_KEY_ROLES).not.toContain('admin')
+  })
+
+  it('works out VAT like the app: 5% by default, rounded to fils', async () => {
+    const { expenseAmounts, vatRateFromPercent } = await import('./highmastMcp')
+    expect(vatRateFromPercent(undefined)).toBe(0.05)
+    expect(vatRateFromPercent(0)).toBe(0)
+    expect(() => vatRateFromPercent(101)).toThrow()
+    expect(expenseAmounts(200)).toEqual({ amount_ex_vat: 200, vat_amount: 10, amount: 210 })
+    expect(expenseAmounts(33.335)).toEqual({ amount_ex_vat: 33.34, vat_amount: 1.67, amount: 35.01 })
+    expect(expenseAmounts(100, 0)).toEqual({ amount_ex_vat: 100, vat_amount: 0, amount: 100 })
+  })
+
+  it('maps division codes to the brand the app stores', async () => {
+    const { divisionVertical } = await import('./highmastMcp')
+    expect(divisionVertical('01')).toBe('RR Threads')
+    expect(divisionVertical('2')).toBe('RR Wanders')
+    expect(divisionVertical(null)).toBe('RR Threads')
+  })
+
+  it('never writes salary, IBAN or ID numbers into the call log', () => {
+    expect(auditArgs({ iban: 'AE07', basic_salary_aed: 9000, job_title: 'Designer', passport_no: 'X1' })).toEqual({
+      iban: '[hidden]', basic_salary_aed: '[hidden]', job_title: 'Designer', passport_no: '[hidden]',
+    })
+  })
+})

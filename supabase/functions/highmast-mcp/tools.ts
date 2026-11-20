@@ -36,10 +36,6 @@ import {
 
 // The bundle is plain JavaScript; these are the types from app/src/lib/highmastMcp.ts.
 type McpPipeline = "company" | "ai_crm" | "ctrm_next"
-type McpToolName =
-  | "search_accounts" | "get_account" | "list_deals" | "get_deal" | "list_follow_ups_due" | "list_tickets"
-  | "get_ticket" | "list_quotes" | "list_invoices" | "dashboard_summary"
-  | "create_lead" | "add_timeline_note" | "move_deal_stage" | "create_follow_up"
 type PipelineInfo = { table: string; stageColumn: string; pipelineKey: string; label: string }
 const MCP_PIPELINES = PIPELINES as Record<McpPipeline, PipelineInfo>
 const MCP_PIPELINE_NAMES = PIPELINE_NAMES as McpPipeline[]
@@ -47,6 +43,7 @@ const MCP_STALE_DAYS = STALE_DAYS as Record<McpPipeline, number>
 const LEAD_ACCOUNT_TYPE = LEAD_TYPES as Record<"ai_crm" | "ctrm_next", string>
 
 export type ToolContext = { db: SupabaseClient; key: McpKey; now: () => Date }
+export type { Row }
 
 type Row = Record<string, unknown>
 type DbResult = { data: unknown; error: { message?: string; code?: string } | null }
@@ -63,13 +60,19 @@ function pick(row: Row | null | undefined, fields: string[]): Row {
   return out
 }
 
-function check(res: DbResult, what: string): unknown {
+// Database errors that are about the input or the rules, so the AI can act on the message.
+const RULE_ERRORS = new Set(["23514", "P0001", "P0002", "22023", "23502", "23503", "23505", "22P02", "22007", "22008", "22003"])
+
+export function check(res: DbResult, what: string): unknown {
   if (res.error) {
     const code = res.error.code || ""
-    if (code === "42501" || /row-level security|permission denied/i.test(res.error.message || "")) {
+    const message = res.error.message || ""
+    if (code === "42501" || /row-level security|permission denied/i.test(message)) {
+      // Our own rules (raised with 42501) explain themselves; plain RLS refusals do not.
+      if (code === "42501" && message && !/row-level security|permission denied/i.test(message)) throw new ToolError(message)
       throw new ToolError(`Not allowed for this key's role: ${what}.`)
     }
-    if (code === "23514" || code === "P0001") throw new ToolError(res.error.message || `Could not ${what}.`)
+    if (RULE_ERRORS.has(code)) throw new ToolError(message || `Could not ${what}.`)
     throw new Error(`Could not ${what}: ${res.error.message || code}`)
   }
   return res.data
@@ -192,8 +195,8 @@ async function addCrmUpdate(ctx: ToolContext, crm: Row, text: string): Promise<s
 
 // ---- Tools ------------------------------------------------------------------
 
-type ToolDef = {
-  name: McpToolName
+export type ToolDef = {
+  name: string
   title: string
   description: string
   input: z.ZodRawShape
