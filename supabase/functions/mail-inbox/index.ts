@@ -9,8 +9,10 @@
 //   POST { action: "list", folderId, start?, limit?, unread? }  -> { messages }
 //   POST { action: "search", q, start?, limit? }               -> { messages }
 //   POST { action: "message", folderId, messageId }            -> { message }
+//   POST { action: "link", folderId, messageId, targetType, targetId }  -> { link }
+//        (targetType: account | crm | quotation | invoice; header only, the body stays in the mailbox)
 //
-// Read only: nothing is sent, moved, deleted or marked as read here.
+// Nothing is sent, moved, deleted or marked as read in the mailbox here.
 // Each person's Zoho refresh token is stored encrypted in mail_accounts
 // (service role only, no policies) and the access token never leaves this
 // function. The browser only ever gets mail content.
@@ -32,6 +34,7 @@ import {
   clampStart,
   cleanSearch,
   isZohoId,
+  linkTargetTable,
   mailboxBelongsTo,
   normalizeFolders,
   normalizeMessage,
@@ -90,6 +93,8 @@ function page(status: number, text: string): Response {
     { status, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } },
   )
 }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 class MailError extends Error {
   constructor(public status: number, message: string, public setup = false) {
@@ -396,6 +401,45 @@ Deno.serve(withErrorLog("mail-inbox", async (req) => {
       const head = normalizeMessage({ ...d, messageId: body.messageId, folderId: body.folderId })
       const html = String(((content && typeof content === "object" ? content : {}) as { content?: unknown }).content || "")
       return json({ message: { ...head, ccAddress: plain(d.ccAddress, 1000), html: stripActiveContent(html) } })
+    }
+
+    if (action === "link") {
+      if (!isZohoId(body.folderId) || !isZohoId(body.messageId)) return json({ error: "Pick an email" }, 400)
+      const table = linkTargetTable(body.targetType)
+      const targetId = String(body.targetId || "")
+      if (!table || !UUID.test(targetId)) return json({ error: "Pick what to link the email to" }, 400)
+      const { data: target, error: targetError } = await sb.from(table).select("id").eq("id", targetId).maybeSingle()
+      if (targetError || !target) return json({ error: "That record was not found" }, 404)
+      // The header comes from the person's own mailbox, so only an email they have can be linked.
+      const box = await myBox(sb, app, email)
+      const details = await zohoGet(email, box, `/folders/${body.folderId}/messages/${body.messageId}/details`)
+      const head = normalizeMessage({ ...((details && typeof details === "object" ? details : {}) as Record<string, unknown>), messageId: body.messageId, folderId: body.folderId })
+      if (!head) return json({ error: "That email was not found in your mailbox" }, 404)
+      const row = {
+        target_type: String(body.targetType),
+        target_id: targetId,
+        mailbox_owner: email,
+        message_id: head.messageId,
+        folder_id: head.folderId,
+        subject: head.subject.slice(0, 300),
+        from_address: head.fromAddress.slice(0, 300),
+        to_address: head.toAddress.slice(0, 1000),
+        sent_at: head.receivedTime ? new Date(head.receivedTime).toISOString() : null,
+        has_attachment: head.hasAttachment,
+        linked_by: email,
+      }
+      const { data: saved, error } = await sb
+        .from("mail_links")
+        .upsert(row, { onConflict: "mailbox_owner,message_id,target_type,target_id", ignoreDuplicates: false })
+        .select("id, target_type, target_id")
+        .single()
+      if (error) {
+        if (/mail_links/.test(error.message || "")) {
+          return json({ error: "Linking emails is not set up yet. An admin runs the mail_links SQL.", setup: true }, 409)
+        }
+        throw new Error(error.message)
+      }
+      return json({ link: saved })
     }
 
     return json({ error: "Unknown action" }, 400)

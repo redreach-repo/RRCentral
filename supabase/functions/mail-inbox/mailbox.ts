@@ -186,3 +186,15 @@ export function mailboxBelongsTo(
   }
   return addresses.has(me)
 }
+
+/** Where a linked email can be filed, and the table that record lives in. */
+const LINK_TABLES: Record<string, string> = {
+  account: "accounts",
+  crm: "crm",
+  quotation: "quotations",
+  invoice: "invoices",
+}
+
+export function linkTargetTable(type: unknown): string | null {
+  return typeof type === "string" && Object.hasOwn(LINK_TABLES, type) ? LINK_TABLES[type] : null
+}

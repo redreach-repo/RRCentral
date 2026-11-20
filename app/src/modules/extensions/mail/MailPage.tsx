@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Building2, Image as ImageIcon, Inbox, Link2, Mail, Paperclip, RefreshCw, Search, Unlink, X } from 'lucide-react'
+import LinkEmailModal from './LinkEmailModal'
 import { useAuth } from '../../../contexts/AuthContext'
 import EmptyState from '../../../components/EmptyState'
 import { db } from '../../../lib/db'
@@ -37,6 +38,16 @@ import {
   pageSubtitleStyle,
   pageTitleStyle,
 } from '../../../lib/uiStyles'
+import {
+  MailLinksMissing,
+  linkTypeLabel,
+  linksForMessage,
+  targetHref,
+  targetLabels,
+  unlinkMail,
+  type LinkTarget,
+  type MailLink,
+} from '../../../lib/mailInbox/mailLinks'
 import s from './Mail.module.css'
 
 const PAGE = 30
@@ -57,7 +68,8 @@ function returnUrl(): string {
 }
 
 export default function MailPage() {
-  const { userRole: role } = useAuth()
+  const { userRole: role, user } = useAuth()
+  const myEmail = (user?.email || '').toLowerCase()
   const allowed = (MAIL_ROLES as readonly string[]).includes(role)
 
   const [params, setParams] = useSearchParams()
@@ -81,12 +93,29 @@ export default function MailPage() {
   const [reading, setReading] = useState(false)
   const [readError, setReadError] = useState('')
   const [showImages, setShowImages] = useState(false)
+  const [links, setLinks] = useState<MailLink[]>([])
+  const [linkNames, setLinkNames] = useState<Map<string, string>>(new Map())
+  const [linksError, setLinksError] = useState('')
+  const [linking, setLinking] = useState(false)
+  const pendingOpen = useRef<{ folderId: string; messageId: string } | null>(null)
   const listSeq = useRef(0)
   const readSeq = useRef(0)
 
   const folder = folders.find((f) => f.folderId === folderId)
   const isSent = !activeSearch && folder?.kind === 'sent'
   const rows = useMemo(() => matchMailToCrm(items, crm), [items, crm])
+
+  // Opened from a record's email history: /mail?folder=…&message=…
+  useEffect(() => {
+    const f = params.get('folder') || ''
+    const m = params.get('message') || ''
+    if (!/^\d{1,30}$/.test(f) || !/^\d{1,30}$/.test(m)) return
+    pendingOpen.current = { folderId: f, messageId: m }
+    const next = new URLSearchParams(params)
+    next.delete('folder')
+    next.delete('message')
+    setParams(next, { replace: true })
+  }, [params, setParams])
 
   // Zoho sends the person back here with ?mail=connected or ?mail=error&reason=…
   useEffect(() => {
@@ -203,6 +232,28 @@ export default function MailPage() {
     [setup.state, activeSearch, folderId, unreadOnly, items.length],
   )
 
+  // An email asked for in the address opens once the mailbox is ready.
+  useEffect(() => {
+    const want = pendingOpen.current
+    if (setup.state !== 'ready' || !want) return
+    pendingOpen.current = null
+    void openMessage({
+      messageId: want.messageId,
+      folderId: want.folderId,
+      threadId: '',
+      subject: '',
+      fromAddress: '',
+      sender: '',
+      toAddress: '',
+      summary: '',
+      receivedTime: 0,
+      unread: false,
+      hasAttachment: false,
+      crm: null,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setup.state])
+
   // Reload the list when the folder, filter or search changes (not when items change).
   const loadRef = useRef(load)
   loadRef.current = load
@@ -210,12 +261,39 @@ export default function MailPage() {
     void loadRef.current(false)
   }, [setup.state, folderId, unreadOnly, activeSearch])
 
+  const loadLinks = useCallback(
+    async (messageId: string) => {
+      setLinksError('')
+      try {
+        const found = await linksForMessage(myEmail, messageId)
+        setLinks(found)
+        setLinkNames(await targetLabels(found))
+      } catch (e) {
+        setLinks([])
+        setLinksError(e instanceof MailLinksMissing ? e.message : errorMessage(e, 'Could not load links'))
+      }
+    },
+    [myEmail],
+  )
+
+  async function unlink(l: MailLink) {
+    try {
+      await unlinkMail(l.id)
+      if (open) await loadLinks(open.messageId)
+    } catch (e) {
+      setLinksError(errorMessage(e, 'Could not unlink'))
+    }
+  }
+
   async function openMessage(row: MailRow) {
     const seq = ++readSeq.current
     setOpen(row)
     setFull(null)
     setReadError('')
     setShowImages(false)
+    setLinks([])
+    setLinksError('')
+    void loadLinks(row.messageId)
     if (!row.folderId) {
       setReadError('This email has no folder, so it cannot be opened here.')
       return
@@ -259,7 +337,21 @@ export default function MailPage() {
 
   const frameDoc = full ? emailFrameDoc(full.html, { showImages }) : ''
   const remote = full ? hasRemoteImages(full.html) : false
-  const matched = open ? rows.find((r) => r.messageId === open.messageId)?.crm ?? open.crm : null
+  const matched = full
+    ? matchMailToCrm([full], crm)[0]?.crm ?? null
+    : open
+      ? rows.find((r) => r.messageId === open.messageId)?.crm ?? open.crm
+      : null
+  const matchedCrm = matched?.crmId ? crm.find((c) => c.id === matched.crmId) : undefined
+  const suggestions: LinkTarget[] = matchedCrm
+    ? [
+        ...(matchedCrm.account_id
+          ? [{ type: 'account' as const, id: matchedCrm.account_id, label: matchedCrm.company_name, detail: 'Matched client' }]
+          : []),
+        { type: 'crm' as const, id: matchedCrm.id, label: matchedCrm.company_name, detail: matchedCrm.pipeline_stage || 'CRM' },
+      ]
+    : []
+  const linkedKeys = new Set(links.map((l) => `${l.target_type}:${l.target_id}`))
 
   return (
     <div style={pageStyle}>
@@ -450,7 +542,7 @@ export default function MailPage() {
                     </span>
                   )}
                   <span className={s.muted}>
-                    {open.receivedTime ? new Date(open.receivedTime).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : ''}
+                    {(full?.receivedTime || open.receivedTime) ? new Date(full?.receivedTime || open.receivedTime).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : ''}
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -469,6 +561,31 @@ export default function MailPage() {
                       <ImageIcon size={14} /> Show images
                     </button>
                   )}
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }} aria-label="Linked records">
+                  <span className={s.muted}>Linked to:</span>
+                  {links.length === 0 && !linksError && <span className={s.muted}>nothing yet</span>}
+                  {links.map((l) => (
+                    <span key={l.id} className={s.chip} style={{ background: 'color-mix(in srgb, var(--primary) 12%, transparent)' }}>
+                      <Link to={targetHref(l)} style={{ color: 'inherit', textDecoration: 'none' }}>
+                        {linkTypeLabel(l.target_type)}: {linkNames.get(`${l.target_type}:${l.target_id}`) || '…'}
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => void unlink(l)}
+                        aria-label={`Unlink from ${linkNames.get(`${l.target_type}:${l.target_id}`) || 'record'}`}
+                        style={{ border: 0, background: 'transparent', color: 'inherit', cursor: 'pointer', padding: 0, display: 'inline-flex' }}
+                      >
+                        <X size={11} />
+                      </button>
+                    </span>
+                  ))}
+                  {full && !linksError && (
+                    <button type="button" style={smallBtn} onClick={() => setLinking(true)}>
+                      <Link2 size={14} /> Link to…
+                    </button>
+                  )}
+                  {linksError && <span style={{ color: colors.danger, fontSize: 12 }}>{linksError}</span>}
                 </div>
                 {reading && <p className={s.muted}>Opening…</p>}
                 {readError && (
@@ -491,6 +608,21 @@ export default function MailPage() {
             )}
           </section>
         </div>
+      )}
+      {full && (
+        <LinkEmailModal
+          open={linking}
+          onClose={() => setLinking(false)}
+          onLinked={() => {
+            setLinking(false)
+            void loadLinks(full.messageId)
+          }}
+          folderId={full.folderId}
+          messageId={full.messageId}
+          subject={full.subject}
+          suggestions={suggestions}
+          linked={linkedKeys}
+        />
       )}
     </div>
   )

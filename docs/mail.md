@@ -7,10 +7,26 @@ email. Emails to or from a contact in the CRM show the company as a tag that ope
 **Per person only (Alfred, 20 Nov 2026).** Nobody can open another person's mailbox, admins
 included. There is no shared company mailbox on this page.
 
-**Read only for now.** Nothing is sent, moved, deleted or marked as read from this page.
-Linking emails to quotations, invoices and deals, reply and compose, and attachments follow in
-later steps (plan: https://claude.ai/artifact/RjkwrePUggkPB1qq5LcuC4). Sending will ask
+**Nothing is sent from this page yet.** Nothing is sent, moved, deleted or marked as read in
+your mailbox. Reply and compose, and attachments, follow in later steps (plan: https://claude.ai/artifact/RjkwrePUggkPB1qq5LcuC4). Sending will ask
 everyone to reconnect once, to add the send permission.
+
+## Linking an email to a record
+
+Open an email and press **Link to…**. Pick a client, a CRM company or deal, a quotation or an
+invoice (the client and CRM company matched from the email address are offered first). The
+email then shows under **Emails** on the client's page (emails linked to the client or to its
+CRM company), and as a chip on the email. Click the × on a chip to unlink.
+
+- Only the email's header goes on the record: subject, sender, recipients, date, and whether it
+  has attachments. The body stays in your mailbox, so only you can open it; colleagues see
+  "in <your address>'s mailbox".
+- Links are written by the `mail-inbox` function, which reads the header from your own mailbox,
+  so nobody can invent a link for an email they do not have.
+- Admin, manager and sales see the email history (like clients and quotations). Whoever linked
+  an email can unlink it; managers and admins can unlink any.
+- SQL: `supabase/migrations/20261322100000_mail_links.sql` (safe to run twice). Until it is run
+  the Emails card stays hidden and **Link to…** says it is not set up.
 
 ## Who can open it
 
