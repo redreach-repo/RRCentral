@@ -199,6 +199,19 @@
 .colActions {
   width: 22%;
 }
+/* Extra columns from custom fields (e.g. on Quotations). Header text wraps
+   instead of spilling into the next column. */
+.table th.colCustom {
+  width: 11%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+.customCell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+}
 
 .rowExpanded td {
   vertical-align: top;
