@@ -647,3 +647,18 @@ as a different address than your RR Central login ends with "That Zoho mailbox i
 **If it fails.** "An admin adds the Zoho app and the mail key" means a secret is missing (System check shows which).
 "Has the mail_accounts SQL been run?" means step 3 was skipped. A Zoho page saying the redirect URI is invalid means
 the Authorized Redirect URI in the Zoho app does not match the function URL exactly.
+
+## 37. AI connector (HighMast MCP server for Grok Bot)
+
+**Trigger.** Do the setup in `supabase/functions/highmast-mcp/README.md` (SQL, `MCP_JWT_SECRET`, deploy
+`highmast-mcp`, a sales member for the AI). Admin > **AI connector** > create a key. Run the two curl commands
+from the README, or connect with MCP Inspector.
+
+**You should see.** `tools/list` returns 14 tools. `dashboard_summary` returns overdue invoices, stale deals and
+tickets near their reply target. `list_deals` with `{"pipeline":"company"}` lists open CRM leads. Admin > Audit log
+shows each call as "AI tool call" with the key name. `move_deal_stage` to `Won` is refused. Revoking the key makes the
+next call answer 401.
+
+**If it fails.** 503 "not set up yet" means `MCP_JWT_SECRET` is missing. 503 "Has the HighMast MCP SQL been run?" means
+step 1 was skipped. 401 with a fresh key means the member it acts as is switched off, changed role, or has no
+confirmed login. Every tool answering "Not allowed" usually means `MCP_JWT_SECRET` is not the project's JWT secret.

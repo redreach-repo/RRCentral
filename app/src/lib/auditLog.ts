@@ -4,7 +4,8 @@ import { db, currentAuthMode } from './db'
 export type AuditEntry = {
   id: number
   table_name: string
-  operation: 'INSERT' | 'UPDATE' | 'DELETE'
+  /** MCP_CALL: a tool call from the AI connector (highmast-mcp), table 'mcp_tool_call'. */
+  operation: 'INSERT' | 'UPDATE' | 'DELETE' | 'MCP_CALL'
   row_id: string
   actor_email: string
   changed_fields: string[]
@@ -70,6 +71,7 @@ export const AUDIT_TABLE_LABELS: Record<string, string> = {
   ticket_messages: 'Ticket messages',
   ctrm_deals: 'CTRM deals',
   ctrm_deal_stage_changes: 'CTRM stage changes',
+  mcp_tool_call: 'AI connector calls',
   ctrm_deal_commissions: 'CTRM commission',
   worship_church_profiles: 'WorshipHub churches',
   worshiphub_review: 'WorshipHub review actions',
