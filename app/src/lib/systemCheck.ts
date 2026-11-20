@@ -26,6 +26,7 @@ export const SYSTEM_FUNCTIONS: SystemFunction[] = [
   { name: 'worshiphub-read', feature: 'WorshipHub churches list', liveTest: '8' },
   { name: 'worshiphub-manage', feature: 'WorshipHub review buttons', liveTest: '8' },
   { name: 'zoho-proxy', feature: 'Zoho Mail and Books', liveTest: '9' },
+  { name: 'mail-inbox', feature: 'Mail page: read the company Zoho mailbox', liveTest: '36' },
   { name: 'google-drive', feature: 'Google Drive client folders and filing', liveTest: '31' },
   { name: 'client-po-file', feature: 'Client PO upload: read with AI and file in Google Drive', liveTest: '34' },
   { name: 'hubspot-sync', feature: 'Accounts, contacts and deals to HubSpot', liveTest: '32' },

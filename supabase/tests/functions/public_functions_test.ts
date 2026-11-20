@@ -23,6 +23,7 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "whatsapp-in": { kind: "Meta signature", pattern: /if \(!appSecret\)[\s\S]*validSignature\(raw, req\.headers\.get\("x-hub-signature-256"\)/ },
   "whatsapp-send": { kind: "signed in user (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)/ },
   "fireflies-fetch": { kind: "signed in user (JWT read in code) who can write the account", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_can_write_account/ },
+  "mail-inbox": { kind: "signed in admin, manager or sales (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_staff[\s\S]*Your role cannot open the company mailbox/ },
   "client-po-file": { kind: "signed in admin, manager or sales (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_staff[\s\S]*Your role cannot add client POs/ },
   "invoice-pay-link": { kind: "signed in team member (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_staff/ },
   "stripe-invoice-webhook": { kind: "Stripe signature", pattern: /if \(!webhookSecret[\s\S]*constructEventAsync\(raw, signature, webhookSecret/ },
@@ -162,6 +163,13 @@ Deno.test({ name: "client-po-file refuses anyone not signed in, before reading o
   assertEquals(await call("client-po-file", post("client-po-file", { action: "read", filename: "po.pdf", content_base64: "JVBERi0=", content_type: "application/pdf" })), 401)
   assertEquals(await call("client-po-file", post("client-po-file", { action: "file" }, { Authorization: "Bearer someone" })), 401)
   assertEquals(await call("client-po-file", post("client-po-file", { action: "status" }, { Origin: "https://evil.example" })), 403)
+} })
+
+Deno.test({ name: "mail-inbox refuses anyone not signed in, before touching the mailbox", ...opts, fn: async () => {
+  assertEquals(await call("mail-inbox", post("mail-inbox", { action: "status" })), 401)
+  assertEquals(await call("mail-inbox", post("mail-inbox", { action: "message", folderId: "1", messageId: "2" })), 401)
+  assertEquals(await call("mail-inbox", post("mail-inbox", { action: "list", folderId: "1" }, { Authorization: "Bearer someone" })), 401)
+  assertEquals(await call("mail-inbox", post("mail-inbox", { action: "status" }, { Origin: "https://evil.example" })), 403)
 } })
 
 Deno.test({ name: "watchdog refuses a signed in user who is not a manager or admin", ...opts, fn: async () => {

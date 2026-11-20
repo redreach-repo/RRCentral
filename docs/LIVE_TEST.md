@@ -631,3 +631,17 @@ trouser, jacket, shoe and cap size counts and what has been issued to them.
 
 **If it fails.** "Taking quantities off a PO needs … client-po-drawdowns.sql" means the SQL was not run. No PO in the
 picker: the invoice's client name must match the PO's client exactly, and the PO needs lines with quantities.
+
+## 36. Mail page (company Zoho mailbox, read only)
+
+**Trigger.** Deploy `mail-inbox` (Actions → Deploy Edge Functions). Sign in as admin, manager or sales and open
+**Mail** in the sidebar.
+
+**You should see.** The mailbox address at the top, the Zoho folders on the left with unread counts, the Inbox
+newest first. Emails from a CRM contact carry the company tag. Clicking an email shows From, To, Cc, date and the
+body; **Show images** appears when it has pictures from the internet. Search finds mail across folders. Signed in
+as a viewer, Mail is not in the sidebar and /mail says it is for admin, manager and sales.
+
+**If it fails.** "The mail service is not deployed yet" means step one was skipped. "Zoho Mail is not connected"
+means Settings → Zoho → Mail is not yes. "Zoho refused the mail key" means reconnect Zoho with the Mail read scopes.
+
