@@ -25,6 +25,7 @@ import SessionsCard from '../components/ctrm/SessionsCard'
 import CtrmTermsCard from '../components/ctrm/CtrmTermsCard'
 import AccountSalesDealCard from '../components/sales/AccountSalesDealCard'
 import AccountCrmCard from '../components/crm/AccountCrmCard'
+import EmailHistoryCard from '../components/mail/EmailHistoryCard'
 import { syncAccountContactsToCrm } from '../lib/crmAccountLink'
 import ChurchProductCard from '../components/worshiphub/ChurchProductCard'
 import { db } from '../lib/db'
@@ -870,6 +871,7 @@ export default function AccountDetailPage() {
       </div>
 
       <AccountCrmCard account={account} />
+      <EmailHistoryCard account={account} />
       </>
       ) : null}
 
