@@ -631,3 +631,19 @@ trouser, jacket, shoe and cap size counts and what has been issued to them.
 
 **If it fails.** "Taking quantities off a PO needs … client-po-drawdowns.sql" means the SQL was not run. No PO in the
 picker: the invoice's client name must match the PO's client exactly, and the PO needs lines with quantities.
+
+## 36. Mail page (each person's own Zoho mailbox, read only)
+
+**Trigger.** Do the setup in `docs/mail.md` (Zoho app, three secrets, `mail_accounts` SQL, deploy `mail-inbox`).
+Sign in as admin, manager or sales, open **Mail** and press **Connect my mailbox**, then sign in to Zoho as yourself.
+
+**You should see.** Back on Mail with "Your mailbox is connected", your address at the top, your Zoho folders with
+unread counts and your Inbox newest first. Emails from a CRM contact carry the company tag. Clicking an email shows
+From, To, Cc, date and the body; **Show images** appears when it has pictures from the internet. Search finds mail
+across your folders. A second person signed in sees only their own mailbox, or the Connect button. Signing in to Zoho
+as a different address than your RR Central login ends with "That Zoho mailbox is not …" and nothing is saved.
+**Disconnect** brings back the Connect button. As a viewer, Mail is not in the sidebar.
+
+**If it fails.** "An admin adds the Zoho app and the mail key" means a secret is missing (System check shows which).
+"Has the mail_accounts SQL been run?" means step 3 was skipped. A Zoho page saying the redirect URI is invalid means
+the Authorized Redirect URI in the Zoho app does not match the function URL exactly.

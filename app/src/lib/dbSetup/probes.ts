@@ -154,4 +154,5 @@ export const DB_SETUP_PROBES: DbSetupProbe[] = [
   { migration: '20261320160000_client_po_file_and_details', label: 'client po file and details', table: 'client_purchase_orders', column: 'file_name' },
   { migration: '20261320170000_client_po_drawdowns', label: 'client po drawdowns', table: 'client_po_drawdowns' },
   { migration: '20261321090000_hr_payroll_manager_only', label: 'hr payroll manager only' },
+  { migration: '20261322090000_mail_accounts', label: 'mail accounts', table: 'mail_accounts' },
 ]

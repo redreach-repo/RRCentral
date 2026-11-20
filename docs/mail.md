@@ -1,0 +1,52 @@
+# Mail (each person's own Zoho mailbox inside RR Central)
+
+Sidebar → **Mail**. Each person connects their **own** Zoho mailbox once, then sees Inbox, Sent
+and their other Zoho folders, search across their mail, an "Unread only" filter and the full
+email. Emails to or from a contact in the CRM show the company as a tag that opens the CRM record.
+
+**Per person only (Alfred, 20 Nov 2026).** Nobody can open another person's mailbox, admins
+included. There is no shared company mailbox on this page.
+
+**Read only for now.** Nothing is sent, moved, deleted or marked as read from this page.
+Linking emails to quotations, invoices and deals, reply and compose, and attachments follow in
+later steps (plan: https://claude.ai/artifact/RjkwrePUggkPB1qq5LcuC4). Sending will ask
+everyone to reconnect once, to add the send permission.
+
+## Who can open it
+
+Admin, manager and sales. Staff (assigned accounts only) and viewers do not see the menu item,
+and the `mail-inbox` function refuses them as well (it checks `rr_is_staff`).
+Hide the whole module with `app_settings.moduleFlags` `{"mail":false}`.
+
+## How it is safe
+
+- **Your mailbox only.** When someone connects, the function checks that the Zoho mailbox's
+  address is their RR Central login. Otherwise the key is thrown away and nothing is saved.
+- **Keys encrypted.** Each person's Zoho refresh token is encrypted (AES-256-GCM) with the
+  `MAIL_TOKEN_KEY` secret before it is saved in `mail_accounts`. That table has row level
+  security on and no policies, so no signed in user can read it; only the function can, with
+  the service role. The Zoho access token never reaches the browser.
+- **Disconnect** removes the row and revokes the key at Zoho.
+- Email content is cleaned on the server (scripts, frames, forms and inline handlers removed)
+  and shown in a sandboxed frame with scripts off and a strict content policy. Pictures from the
+  internet load only after **Show images**, so senders cannot track when an email was opened.
+
+## Setup (once, by an admin)
+
+1. **Zoho app.** At https://api-console.zoho.com click **Add Client → Server-based Applications**.
+   - Client Name: `RR Central Mail`
+   - Homepage URL: `https://redreach-repo.github.io/RRCentral/`
+   - Authorized Redirect URI: `https://<project-ref>.supabase.co/functions/v1/mail-inbox`
+   Copy the **Client ID** and **Client Secret**. (Use the console for your Zoho region, e.g.
+   api-console.zoho.eu, if the company's Zoho account is not on zoho.com.)
+2. **Supabase secrets** (Edge Functions → Secrets):
+   - `ZOHO_MAIL_CLIENT_ID` = the Client ID
+   - `ZOHO_MAIL_CLIENT_SECRET` = the Client Secret
+   - `MAIL_TOKEN_KEY` = a long random value, at least 32 characters. Keep it; if it changes,
+     everyone has to connect their mailbox again.
+   - Only if the company's Zoho is not on zoho.com: `ZOHO_ACCOUNTS_DOMAIN` = e.g. `https://accounts.zoho.eu`
+3. **SQL**: run `supabase/migrations/20261322090000_mail_accounts.sql` (safe to run twice).
+4. **Deploy**: GitHub → Actions → **Deploy Edge Functions** → Function `mail-inbox` → Run workflow.
+5. Each person opens **Mail** and presses **Connect my mailbox**.
+
+System check lists `mail-inbox`: red until deployed and until the three secrets are set.
