@@ -29,7 +29,16 @@ import {
   type ClientPoDetails,
   type ClientPurchaseOrder,
 } from '../../lib/opsSliceStores'
-import { isCancelledStatus, poLineBalances, staffGroups, withLineIds, type PoDrawdown } from '../../lib/clientPoBalance'
+import {
+  ALL_STAFF_GROUP,
+  isCancelledStatus,
+  lineAmount,
+  poIssuedByLine,
+  poLineBalances,
+  staffGroups,
+  withLineIds,
+  type PoDrawdown,
+} from '../../lib/clientPoBalance'
 import { loadPoDrawdowns } from '../../lib/clientPoDrawdownStore'
 import { loadClientUniforms, type UniformLoad } from '../../lib/clientUniforms/clientUniformsStore'
 import ClientPoStaffPanel from './ClientPoStaffPanel'
@@ -144,6 +153,7 @@ export default function ClientPoEditor(props: {
   const [drawdowns, setDrawdowns] = useState<PoDrawdown[]>([])
   const [drawdownsReady, setDrawdownsReady] = useState(false)
   const [uniforms, setUniforms] = useState<UniformLoad>({ staff: [], issues: [], missingTable: false })
+  const [uniformsTick, setUniformsTick] = useState(0)
 
   // What invoices have taken from this PO, and the client's uniform staff (both best effort).
   useEffect(() => {
@@ -160,13 +170,21 @@ export default function ClientPoEditor(props: {
         })
         .catch(() => {})
     }
+    return () => {
+      alive = false
+    }
+  }, [open, editing?.id])
+
+  useEffect(() => {
+    if (!open) return
+    let alive = true
     loadClientUniforms()
       .then((res) => alive && setUniforms(res))
       .catch(() => {})
     return () => {
       alive = false
     }
-  }, [open, editing?.id])
+  }, [open, uniformsTick])
 
   useEffect(() => {
     if (!open) return
@@ -206,7 +224,21 @@ export default function ClientPoEditor(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing, drawdownsReady, drawdowns, lines])
   const clientStaff = useMemo(() => uniforms.staff.filter((st) => st.client_id === clientId), [uniforms.staff, clientId])
-  const groupOptions = useMemo(() => staffGroups(clientStaff), [clientStaff])
+  const groupOptions = useMemo(() => [ALL_STAFF_GROUP, ...staffGroups(clientStaff)], [clientStaff])
+  const clientName = clients.find((c) => c.id === clientId)?.company_name || ''
+  const savedLineIds = useMemo(
+    () => new Set((editing?.line_items || []).map((l) => l.id).filter((id): id is string => Boolean(id))),
+    [editing],
+  )
+  const poLinked = uniforms.poLinked !== false && !uniforms.missingTable
+  const issuedByLine = useMemo(
+    () => (editing?.id && poLinked ? poIssuedByLine(uniforms.issues, editing.id) : null),
+    [editing?.id, poLinked, uniforms.issues],
+  )
+  const invoicedByLine = useMemo(
+    () => (balanceById ? new Map([...balanceById.entries()].map(([id, b]) => [id, b.invoiced])) : null),
+    [balanceById],
+  )
   const warnings = poTotalsWarnings({
     total: poNumber(amount),
     subtotal: poNumber(subtotal),
@@ -274,7 +306,19 @@ export default function ClientPoEditor(props: {
   }
 
   function setLine(i: number, patch: Partial<LineDraft>) {
-    setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)))
+    setLines((ls) =>
+      ls.map((l, j) => {
+        if (j !== i) return l
+        const next = { ...l, ...patch }
+        // Keep Amount = Qty x Unit price while it is blank or still the worked out figure.
+        if ('quantity' in patch || 'unit_price' in patch) {
+          const before = lineAmount(poNumber(l.quantity), poNumber(l.unit_price))
+          const after = lineAmount(poNumber(next.quantity), poNumber(next.unit_price))
+          if (after != null && (!l.amount.trim() || (before != null && poNumber(l.amount) === before))) next.amount = String(after)
+        }
+        return next
+      }),
+    )
   }
 
   async function save(withoutFile = false) {
@@ -451,6 +495,7 @@ export default function ClientPoEditor(props: {
                         <th style={{ padding: '4px 6px', width: 100 }}>Unit price</th>
                         <th style={{ padding: '4px 6px', width: 110 }}>Amount</th>
                         <th style={{ padding: '4px 6px', width: 130 }}>For staff</th>
+                        {issuedByLine ? <th style={{ padding: '4px 6px', width: 60, textAlign: 'right' }}>Issued</th> : null}
                         {balanceById ? (
                           <>
                             <th style={{ padding: '4px 6px', width: 70, textAlign: 'right' }}>Invoiced</th>
@@ -484,12 +529,15 @@ export default function ClientPoEditor(props: {
                             <input
                               aria-label={`Line ${i + 1} for which staff`}
                               list="client-po-staff-groups"
-                              placeholder="e.g. Driver"
+                              placeholder="All staff / Driver"
                               style={{ ...cellInput, width: '100%' }}
                               value={l.staff_group}
                               onChange={(e) => setLine(i, { staff_group: e.target.value })}
                             />
                           </td>
+                          {issuedByLine ? (
+                            <td style={{ padding: '3px 6px', textAlign: 'right' }}>{issuedByLine.get(l.id)?.items || 0}</td>
+                          ) : null}
                           {balanceById ? (
                             <>
                               <td style={{ padding: '3px 6px', textAlign: 'right' }} title={bal?.takenBy.map((t) => `${t.reference}: ${t.quantity}`).join('\n') || ''}>
@@ -521,7 +569,12 @@ export default function ClientPoEditor(props: {
                     ))}
                   </datalist>
                 </div>
-              ) : null}
+              ) : (
+                <div style={{ fontSize: 13, color: colors.muted }}>
+                  No lines yet. Add one line per item on the PO with the quantity the client asked for, e.g. "Coverall, navy",
+                  90 pcs at 45.00, for All staff (or a job title such as Driver). Uploading the PO file fills them in too.
+                </div>
+              )}
               {balanceById && drawdowns.length ? (
                 <div style={{ fontSize: 12, color: colors.muted }}>
                   Invoiced against this PO:{' '}
@@ -536,7 +589,20 @@ export default function ClientPoEditor(props: {
               </div>
             </div>
 
-            <ClientPoStaffPanel lines={currentLines} staff={clientStaff} issues={uniforms.issues} missingTable={uniforms.missingTable} hasClient={Boolean(clientId)} />
+            <ClientPoStaffPanel
+              lines={currentLines}
+              staff={clientStaff}
+              allStaff={uniforms.staff}
+              issues={uniforms.issues}
+              missingTable={uniforms.missingTable}
+              poLinked={uniforms.poLinked !== false}
+              clientId={clientId}
+              clientName={clientName}
+              poId={editing && editing.client_id === clientId ? editing.id : null}
+              savedLineIds={savedLineIds}
+              invoicedByLine={invoicedByLine}
+              onIssued={() => setUniformsTick((t) => t + 1)}
+            />
 
             <div style={gridStyle}>
               <label style={labelStyle}>

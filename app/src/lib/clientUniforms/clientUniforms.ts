@@ -32,6 +32,9 @@ export type UniformIssue = {
   quantity: number
   issued_on: string
   notes: string
+  /** Client PO this was issued against (needs client-po-uniform-issues.sql). */
+  po_id?: string | null
+  po_line_id?: string | null
 }
 
 /** The sizes we keep for everyone, in the order they show on screen. */
