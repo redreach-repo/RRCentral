@@ -321,7 +321,7 @@ export default function SettingsPage() {
   const loadUsers = useCallback(async () => {
     const { data, error } = await db.from('app_users').select('*').order('name')
     if (error) {
-      showToast(error.message, 'error')
+      showToast(errorMessage(error), 'error')
       return
     }
     setUsers((data || []) as AppUser[])
