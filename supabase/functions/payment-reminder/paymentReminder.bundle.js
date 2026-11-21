@@ -1771,6 +1771,15 @@ function isCancelledInvoice(inv) {
   return String(inv.status || "").trim().toLowerCase() === "cancelled";
 }
 
+// src/lib/templates.ts
+function applyMessageTemplate(template, vars) {
+  return String(template || "").replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_m, key) => {
+    const v = vars[key];
+    if (v == null) return "";
+    return String(v);
+  });
+}
+
 // src/lib/contractBilling.ts
 var REMINDER_STAGES = [3, 7, 14];
 function paymentTermDays(terms) {
@@ -1799,6 +1808,24 @@ function dueReminder(inv, balance, sentStages, today = /* @__PURE__ */ new Date(
 }
 function reminderMessage(input) {
   const due = format(parseISO(input.dueDate), "d MMMM yyyy");
+  const subjectTpl = input.template?.subject?.trim() || "";
+  const bodyTpl = input.template?.body?.trim() ? input.template.body : "";
+  const vars = {
+    contact: input.contactName || "team",
+    ref: input.reference,
+    balance: input.balanceText,
+    dueDate: due,
+    daysLate: input.daysLate,
+    stage: input.stage,
+    company: input.companyName
+  };
+  const built = builtInReminder(input, due);
+  return {
+    subject: subjectTpl ? applyMessageTemplate(subjectTpl, vars) : built.subject,
+    body: bodyTpl ? applyMessageTemplate(bodyTpl, vars) : built.body
+  };
+}
+function builtInReminder(input, due) {
   const hello = `Dear ${input.contactName || "team"},`;
   const sign = `Best regards,
 ${input.companyName}`;

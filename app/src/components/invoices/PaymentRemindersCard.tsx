@@ -85,6 +85,7 @@ export default function PaymentRemindersCard() {
       dueDate: row.due.dueDate,
       daysLate: row.due.daysLate,
       companyName: company,
+      template: { subject: settings.emailReminderSubject, body: settings.emailReminderBody },
     })
   }
 

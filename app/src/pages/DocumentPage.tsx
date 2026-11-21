@@ -94,6 +94,8 @@ import { reportPdfRender } from '../lib/pdfRenderSession'
 import { quotePdfNumber } from '../lib/highmastMcp'
 import {
   applyMessageTemplate,
+  DEFAULT_EMAIL_INVOICE_BODY,
+  DEFAULT_EMAIL_INVOICE_SUBJECT,
   DEFAULT_EMAIL_QUOTE_BODY,
   DEFAULT_EMAIL_QUOTE_SUBJECT,
   DEFAULT_WHATSAPP_QUOTE,
@@ -1759,11 +1761,15 @@ export default function DocumentPage({ renderMode = false }: { renderMode?: bool
             : emailContacts
         }
         defaultSubject={applyMessageTemplate(
-          settings.emailQuoteSubject || DEFAULT_EMAIL_QUOTE_SUBJECT,
+          docType === 'invoice'
+            ? settings.emailInvoiceSubject || DEFAULT_EMAIL_INVOICE_SUBJECT
+            : settings.emailQuoteSubject || DEFAULT_EMAIL_QUOTE_SUBJECT,
           emailVars,
         )}
         defaultBody={applyMessageTemplate(
-          settings.emailQuoteBody || DEFAULT_EMAIL_QUOTE_BODY,
+          docType === 'invoice'
+            ? settings.emailInvoiceBody || DEFAULT_EMAIL_INVOICE_BODY
+            : settings.emailQuoteBody || DEFAULT_EMAIL_QUOTE_BODY,
           emailVars,
         )}
         zohoEnabled={isZohoMailEnabled(settings)}

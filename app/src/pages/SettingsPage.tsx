@@ -180,6 +180,10 @@ const WANDERS_KEYS = [
 const MESSAGE_KEYS = [
   { key: 'emailQuoteSubject', label: 'Quote email subject' },
   { key: 'emailQuoteBody', label: 'Quote email body' },
+  { key: 'emailInvoiceSubject', label: 'Invoice email subject' },
+  { key: 'emailInvoiceBody', label: 'Invoice email body' },
+  { key: 'emailReminderSubject', label: 'Payment reminder email subject (blank = built-in 3, 7 and 14 day wording)' },
+  { key: 'emailReminderBody', label: 'Payment reminder email body (blank = built-in wording). Tokens: {{contact}} {{ref}} {{balance}} {{dueDate}} {{daysLate}} {{company}}' },
   { key: 'emailCrmSubject', label: 'CRM email subject' },
   { key: 'emailCrmBody', label: 'CRM email body' },
   { key: 'whatsappQuoteMessage', label: 'Quote WhatsApp message' },

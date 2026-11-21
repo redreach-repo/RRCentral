@@ -117,7 +117,7 @@ Deno.serve(withErrorLog("payment-reminder", async (req) => {
   const [{ data: payments }, { data: sent }, { data: settingRows }] = await Promise.all([
     sb.from("payment_log").select("amount").eq("invoice_ref", invoice.reference_number),
     sb.from("invoice_reminders").select("stage").eq("invoice_id", invoice.id),
-    sb.from("app_settings").select("key, value").in("key", ["companyName", "whatsappCountryCode"]),
+    sb.from("app_settings").select("key, value").in("key", ["companyName", "whatsappCountryCode", "emailReminderSubject", "emailReminderBody"]),
   ])
   const paid = (payments || []).reduce((s: number, p: { amount: number }) => s + (Number(p.amount) || 0), 0)
   const balance = Math.max(0, Math.round((Number(invoice.amount) - paid) * 100) / 100)
@@ -171,6 +171,7 @@ Deno.serve(withErrorLog("payment-reminder", async (req) => {
     dueDate: due.dueDate,
     daysLate: due.daysLate,
     companyName: company,
+    template: { subject: settings.emailReminderSubject, body: settings.emailReminderBody },
   }
   let failure: string | null = null
   try {
