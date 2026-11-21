@@ -129,6 +129,8 @@ export default function App() {
             <Route path="/portal" element={<ClientPortalPage />} />
             <Route path="/accept" element={<QuoteAcceptPage />} />
             <Route path="/sign" element={<LegalSignPage />} />
+            {/* AI connector PDF renderer only: signs in with a 2 minute read-only render login from the link. */}
+            <Route path="/render-pdf/:type/:id" element={<DocumentPage renderMode />} />
             <Route
               path="/ctrm/summary"
               element={

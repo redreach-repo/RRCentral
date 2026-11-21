@@ -7,6 +7,14 @@ verify_jwt = false
 [functions.zoho-proxy]
 verify_jwt = false
 
+[functions.mail-inbox]
+verify_jwt = false
+
+# AI connector (MCP) for Grok Bot and other assistants: checks its own hashed
+# Bearer key (rr_mcp_resolve_key) before any tool runs.
+[functions.highmast-mcp]
+verify_jwt = false
+
 [functions.google-drive]
 verify_jwt = false
 

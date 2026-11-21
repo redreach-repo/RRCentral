@@ -19,7 +19,16 @@ Please find attached our {{titleLower}} {{ref}}.
 
 Amount: {{amount}}{{validUntilLine}}
 
-The PDF has been downloaded to your device — please attach it to this email if it is not already included.
+Best regards,
+{{company}}`
+
+export const DEFAULT_EMAIL_INVOICE_SUBJECT = '{{title}} {{ref}} — {{company}}'
+
+export const DEFAULT_EMAIL_INVOICE_BODY = `Dear {{contact}},
+
+Please find attached our {{titleLower}} {{ref}}.
+
+Amount due: {{amount}}
 
 Best regards,
 {{company}}`

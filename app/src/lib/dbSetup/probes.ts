@@ -155,4 +155,10 @@ export const DB_SETUP_PROBES: DbSetupProbe[] = [
   { migration: '20261320170000_client_po_drawdowns', label: 'client po drawdowns', table: 'client_po_drawdowns' },
   { migration: '20261321090000_hr_payroll_manager_only', label: 'hr payroll manager only' },
   { migration: '20261321100000_api_keys_webhooks_approvals_access', label: 'api keys webhooks approvals access' },
+  { migration: '20261322090000_mail_accounts', label: 'mail accounts', table: 'mail_accounts' },
+  { migration: '20261322100000_mail_links', label: 'mail links', table: 'mail_links' },
+  { migration: '20261323090000_highmast_mcp', label: 'AI connector (MCP) keys', table: 'mcp_keys' },
+  { migration: '20261324090000_highmast_mcp_admin', label: 'AI connector admin keys', table: 'mcp_keys', column: 'scope' },
+  { migration: '20261325090000_highmast_mcp_departments', label: 'AI connector keys by department', table: 'mcp_keys', column: 'departments' },
+  { migration: '20261326090000_generated_pdfs', label: 'AI connector quote and invoice PDFs' },
 ]

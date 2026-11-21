@@ -89,18 +89,28 @@ import { findCrmByCompany, syncCrmFromQuote } from '../lib/crmSync'
 import { ensureCompanyFromDocument } from '../lib/ensureCompanyFromDocument'
 import { loadCustomerDocuments, uploadPdfToCustomerDrive } from '../lib/customerFiles'
 import { useAuth } from '../contexts/AuthContext'
+import { saveGeneratedPdf, trySaveGeneratedPdf } from '../lib/generatedPdfs'
+import { reportPdfRender } from '../lib/pdfRenderSession'
+import { quotePdfNumber } from '../lib/highmastMcp'
 import {
   applyMessageTemplate,
+  DEFAULT_EMAIL_INVOICE_BODY,
+  DEFAULT_EMAIL_INVOICE_SUBJECT,
   DEFAULT_EMAIL_QUOTE_BODY,
   DEFAULT_EMAIL_QUOTE_SUBJECT,
   DEFAULT_WHATSAPP_QUOTE,
 } from '../lib/templates'
 
-export default function DocumentPage() {
+/**
+ * renderMode: the AI connector's PDF renderer (/render-pdf/...). Same page and
+ * same Download PDF code; it makes the PDF once, saves it to the private
+ * generated-pdfs bucket and reports back through window.__HM_PDF_DONE.
+ */
+export default function DocumentPage({ renderMode = false }: { renderMode?: boolean } = {}) {
   const { type = 'quote', id = '' } = useParams<{ type: string; id: string }>()
   const docType: PrintableDocType = parseDocumentType(type)
   const { t } = useI18n()
-  const { settings } = useSettings()
+  const { settings, loading: settingsLoading } = useSettings()
   const { showToast } = useToast()
   const { user, userRole } = useAuth()
   const navigate = useNavigate()
@@ -527,15 +537,31 @@ export default function DocumentPage() {
     }
   }
 
+  /** Where this document's Download PDF copy is kept (generated-pdfs bucket). */
+  function pdfCopyTarget(): { kind: PrintableDocType; number: string } | null {
+    if (docType === 'quote' && quote) return { kind: 'quote', number: quotePdfNumber(quote) }
+    if (docType === 'invoice' && invoice) return { kind: 'invoice', number: String(invoice.reference_number || '') }
+    if (docType === 'delivery-note' && deliveryNote) return { kind: 'delivery-note', number: String(deliveryNote.reference_number || '') }
+    return null
+  }
+
+  /** The Download PDF file. The AI connector's renderer uses this same function (renderMode). */
+  function makeDownloadPdf(sheet: HTMLElement) {
+    return elementToPdfBlob(sheet, {
+      filenameHint: `${title.toLowerCase()}-${displayRef}`,
+      fitToPage,
+    })
+  }
+
   async function downloadPdf() {
     if (!sheetRef.current) return
     setPdfBusy(true)
     try {
-      const { blob, filename } = await elementToPdfBlob(sheetRef.current, {
-        filenameHint: `${title.toLowerCase()}-${displayRef}`,
-        fitToPage,
-      })
+      const { blob, filename } = await makeDownloadPdf(sheetRef.current)
       downloadBlob(blob, filename)
+      // Keep this exact file for the AI connector's get_*_pdf tools (private bucket, never blocks the download).
+      const copy = pdfCopyTarget()
+      if (copy) void trySaveGeneratedPdf(copy.kind, copy.number, blob)
       showToast(
         pageLayout === 'split'
           ? 'PDF downloaded (2 pages)'
@@ -658,26 +684,19 @@ export default function DocumentPage() {
     }
   }
 
-  async function prepareEmail() {
-    if (!sheetRef.current) {
-      setEmailOpen(true)
-      return
-    }
-    setPdfBusy(true)
-    try {
-      const { blob, filename } = await elementToPdfBlob(sheetRef.current, {
-        filenameHint: `${title.toLowerCase()}-${displayRef}`,
-        fitToPage,
-      })
-      downloadBlob(blob, filename)
-      showToast('PDF downloaded — attach it to the email if needed', 'success')
-      setEmailOpen(true)
-    } catch (e) {
-      showToast(errorMessage(e, 'PDF failed'), 'error')
-      setEmailOpen(true)
-    } finally {
-      setPdfBusy(false)
-    }
+  // The email window makes the PDF itself: attached when sent from the person's
+  // own mailbox, or a Download button when it falls back to Zoho settings / mail app.
+  function prepareEmail() {
+    setEmailOpen(true)
+  }
+
+  async function makeEmailPdf(): Promise<{ blob: Blob; filename: string }> {
+    if (!sheetRef.current) throw new Error('The document is still loading')
+    const { blob, filename } = await elementToPdfBlob(sheetRef.current, {
+      filenameHint: `${title.toLowerCase()}-${displayRef}`,
+      fitToPage,
+    })
+    return { blob, filename }
   }
 
   async function shareWhatsApp() {
@@ -781,6 +800,30 @@ export default function DocumentPage() {
     validUntil: validUntil ? format(new Date(validUntil), 'dd MMM yyyy') : '',
     validUntilLine: validUntil && docType === 'quote' ? `\nValid until: ${format(new Date(validUntil), 'dd MMM yyyy')}` : '',
   }
+
+  // Render mode: once the document and letterhead settings are loaded, make the PDF once.
+  const renderStarted = useRef(false)
+  useEffect(() => {
+    if (!renderMode || loading || settingsLoading || renderStarted.current) return
+    renderStarted.current = true
+    void (async () => {
+      try {
+        if (error || !doc) throw new Error(error || 'Document not found')
+        const target = pdfCopyTarget()
+        if (!target || !target.number) throw new Error('This document has no number a PDF can be filed under')
+        if (typeof document !== 'undefined' && document.fonts?.ready) await document.fonts.ready
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+        if (!sheetRef.current) throw new Error('The document sheet did not draw')
+        const { blob } = await makeDownloadPdf(sheetRef.current)
+        const saved = await saveGeneratedPdf(target.kind, target.number, blob)
+        if (!saved) throw new Error('PDF storage is not set up')
+        reportPdfRender({ ok: true, ...saved })
+      } catch (e) {
+        reportPdfRender({ ok: false, error: errorMessage(e, 'PDF failed') })
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [renderMode, loading, settingsLoading, error, doc])
 
   if (loading) {
     return (
@@ -1460,7 +1503,7 @@ export default function DocumentPage() {
           <CloudUpload size={14} />{' '}
           {pdfBusy ? t('page.document.saving') : t('page.document.saveToDrive')}
         </ToolbarBtn>
-        <ToolbarBtn onClick={() => void prepareEmail()} disabled={pdfBusy}>
+        <ToolbarBtn onClick={prepareEmail} disabled={pdfBusy}>
           <Mail size={14} /> {t('page.document.emailPdf')}
         </ToolbarBtn>
         <ToolbarBtn onClick={() => void shareWhatsApp()} accent>
@@ -1718,16 +1761,29 @@ export default function DocumentPage() {
             : emailContacts
         }
         defaultSubject={applyMessageTemplate(
-          settings.emailQuoteSubject || DEFAULT_EMAIL_QUOTE_SUBJECT,
+          docType === 'invoice'
+            ? settings.emailInvoiceSubject || DEFAULT_EMAIL_INVOICE_SUBJECT
+            : settings.emailQuoteSubject || DEFAULT_EMAIL_QUOTE_SUBJECT,
           emailVars,
         )}
         defaultBody={applyMessageTemplate(
-          settings.emailQuoteBody || DEFAULT_EMAIL_QUOTE_BODY,
+          docType === 'invoice'
+            ? settings.emailInvoiceBody || DEFAULT_EMAIL_INVOICE_BODY
+            : settings.emailQuoteBody || DEFAULT_EMAIL_QUOTE_BODY,
           emailVars,
         )}
         zohoEnabled={isZohoMailEnabled(settings)}
         onClose={() => setEmailOpen(false)}
         onSent={() => void onEmailSent()}
+        attachPdf={makeEmailPdf}
+        attachLabel={`${title} ${displayRef}.pdf`}
+        linkTo={
+          docType === 'quote' && quote?.id
+            ? { targetType: 'quotation', targetId: quote.id }
+            : docType === 'invoice' && invoice?.id
+              ? { targetType: 'invoice', targetId: invoice.id }
+              : undefined
+        }
       />
 
       <LinkDriveFileModal

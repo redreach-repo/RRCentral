@@ -23,6 +23,7 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "whatsapp-in": { kind: "Meta signature", pattern: /if \(!appSecret\)[\s\S]*validSignature\(raw, req\.headers\.get\("x-hub-signature-256"\)/ },
   "whatsapp-send": { kind: "signed in user (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)/ },
   "fireflies-fetch": { kind: "signed in user (JWT read in code) who can write the account", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_can_write_account/ },
+  "mail-inbox": { kind: "signed state from Zoho, signed in admin, manager or sales (JWT read in code) for the rest", pattern: /readState\(app\.clientSecret[\s\S]*if \(!state\)[\s\S]*mailboxBelongsTo\(email[\s\S]*auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_staff[\s\S]*Your role cannot use Mail/ },
   "client-po-file": { kind: "signed in admin, manager or sales (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_staff[\s\S]*Your role cannot add client POs/ },
   "invoice-pay-link": { kind: "signed in team member (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_staff/ },
   "stripe-invoice-webhook": { kind: "Stripe signature", pattern: /if \(!webhookSecret[\s\S]*constructEventAsync\(raw, signature, webhookSecret/ },
@@ -46,6 +47,7 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "webhook-retry": { kind: "cron secret", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret/ },
   "hm-ai-gateway": { kind: "signed in staff JWT", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_staff/ },
   "fireflies-webhook": { kind: "shared secret", pattern: /FIREFLIES_WEBHOOK_SECRET[\s\S]*x-fireflies-secret[\s\S]*provided !== expected/ },
+  "highmast-mcp": { kind: "hashed AI connector key (Authorization: Bearer hmk_...)", pattern: /bearerToken\(req\.headers\.get\("Authorization"\)\)[\s\S]*isMcpKeyShape\(apiKey\)[\s\S]*resolveKey\(apiKey\)[\s\S]*if \(!who\.ok\)/ },
   "hm-provision-workspace": { kind: "provision secret or admin JWT", pattern: /WORKSPACE_PROVISION_SECRET[\s\S]*x-provision-secret[\s\S]*rr_is_admin/ },
 }
 
@@ -104,6 +106,10 @@ const ENV: Record<string, string> = {
   HUBSPOT_CRON_SECRET: "hubspot-secret-for-tests",
   OUTBOX_CRON_SECRET: "outbox-secret-for-tests",
   HUBSPOT_ACCESS_TOKEN: "hubspot-token-for-tests",
+  ZOHO_MAIL_CLIENT_ID: "zoho-client-for-tests",
+  ZOHO_MAIL_CLIENT_SECRET: "zoho-secret-for-tests",
+  MAIL_TOKEN_KEY: "mail-token-key-for-tests-0123456789abcdef",
+  MCP_JWT_SECRET: "mcp-jwt-secret-for-tests-0123456789abcdef",
 }
 
 async function load(fn: string): Promise<Handler> {
@@ -157,11 +163,27 @@ for (const fn of ["usage-import", "daily-digest", "contract-invoices", "watchdog
   } })
 }
 
+Deno.test({ name: "highmast-mcp refuses anyone without a key, before any tool runs", ...opts, fn: async () => {
+  assertEquals(await call("highmast-mcp", post("highmast-mcp", { jsonrpc: "2.0", id: 1, method: "tools/list" })), 401)
+  assertEquals(await call("highmast-mcp", post("highmast-mcp", { jsonrpc: "2.0", id: 1, method: "tools/list" }, { Authorization: "Bearer someone" })), 401)
+  assertEquals(await call("highmast-mcp", post("highmast-mcp", { jsonrpc: "2.0", id: 1, method: "tools/list" }, { Authorization: "Bearer hm_partner_key" })), 401)
+} })
+
 Deno.test({ name: "client-po-file refuses anyone not signed in, before reading or filing", ...opts, fn: async () => {
   assertEquals(await call("client-po-file", post("client-po-file", { action: "status" })), 401)
   assertEquals(await call("client-po-file", post("client-po-file", { action: "read", filename: "po.pdf", content_base64: "JVBERi0=", content_type: "application/pdf" })), 401)
   assertEquals(await call("client-po-file", post("client-po-file", { action: "file" }, { Authorization: "Bearer someone" })), 401)
   assertEquals(await call("client-po-file", post("client-po-file", { action: "status" }, { Origin: "https://evil.example" })), 403)
+} })
+
+Deno.test({ name: "mail-inbox refuses anyone not signed in, before touching the mailbox", ...opts, fn: async () => {
+  assertEquals(await call("mail-inbox", post("mail-inbox", { action: "status" })), 401)
+  assertEquals(await call("mail-inbox", post("mail-inbox", { action: "message", folderId: "1", messageId: "2" })), 401)
+  assertEquals(await call("mail-inbox", post("mail-inbox", { action: "list", folderId: "1" }, { Authorization: "Bearer someone" })), 401)
+  assertEquals(await call("mail-inbox", post("mail-inbox", { action: "status" }, { Origin: "https://evil.example" })), 403)
+  // Zoho's answer without a valid signed state saves nothing.
+  assertEquals(await call("mail-inbox", new Request(URL_BASE + "mail-inbox?code=abc")), 400)
+  assertEquals(await call("mail-inbox", new Request(URL_BASE + "mail-inbox?code=abc&state=forged.sig")), 400)
 } })
 
 Deno.test({ name: "watchdog refuses a signed in user who is not a manager or admin", ...opts, fn: async () => {

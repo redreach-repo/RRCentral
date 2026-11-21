@@ -1639,6 +1639,94 @@ end $$;
 set role anon;
 select pg_temp.expect(pg_temp.fails('select 1 from drive_connection'), 'anon cannot read the Google Drive connection');
 reset role;
+
+------------------------------------------------------------ Mail: each person's own Zoho mailbox (keys encrypted, service role only)
+insert into mail_accounts (user_email, account_email, zoho_account_id, refresh_token_enc)
+values ('sales@redreach.ae', 'sales@redreach.ae', '123', 'v1:aXY=:Y3Q=')
+  on conflict (user_email) do nothing;
+select pg_temp.expect(pg_temp.fails($q$insert into mail_accounts (user_email, refresh_token_enc) values ('plain@redreach.ae', 'not-encrypted')$q$), 'a mailbox key cannot be stored unencrypted');
+select pg_temp.expect(pg_temp.fails($q$insert into mail_accounts (user_email, refresh_token_enc) values ('Upper@RedReach.ae', 'v1:a:b')$q$), 'mailbox logins are stored in lower case');
+select pg_temp.expect(pg_temp.fails($q$insert into mail_accounts (user_email, refresh_token_enc) values ('sales@redreach.ae', 'v1:a:b')$q$), 'one mailbox per person');
+
+do $$
+declare
+  who text[];
+begin
+  foreach who slice 1 in array array[
+    ['00000000-0000-0000-0000-00000000000a', 'admin'],
+    ['00000000-0000-0000-0000-000000000013', 'manager'],
+    ['00000000-0000-0000-0000-00000000000b', 'sales'],
+    ['00000000-0000-0000-0000-000000000011', 'staff (VA)'],
+    ['00000000-0000-0000-0000-000000000012', 'viewer'],
+    ['00000000-0000-0000-0000-00000000000c', 'someone not on the team']
+  ] loop
+    perform set_config('request.jwt.claim.sub', who[1], true);
+    execute 'set local role authenticated';
+    perform pg_temp.expect(pg_temp.fails('select refresh_token_enc from mail_accounts'), format('%s cannot read any mailbox key, even their own', who[2]));
+    perform pg_temp.expect(pg_temp.fails('select user_email from mail_accounts'), format('%s cannot list who connected a mailbox', who[2]));
+    perform pg_temp.expect(pg_temp.fails($q$insert into mail_accounts (user_email, refresh_token_enc) values ('x@redreach.ae', 'v1:a:b')$q$), format('%s cannot add a mailbox connection', who[2]));
+    perform pg_temp.expect(pg_temp.fails($q$update mail_accounts set zoho_account_id = '9'$q$), format('%s cannot change a mailbox connection', who[2]));
+    perform pg_temp.expect(pg_temp.fails('delete from mail_accounts'), format('%s cannot remove a mailbox connection', who[2]));
+    execute 'reset role';
+  end loop;
+end $$;
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from mail_accounts'), 'anon cannot read mailbox connections');
+reset role;
+
+------------------------------------------------------------ Mail: emails linked to clients, CRM, quotations, invoices (header only)
+insert into mail_links (id, target_type, target_id, mailbox_owner, message_id, subject, linked_by)
+values
+  ('00000000-0000-0000-0000-0000000a1101', 'crm', gen_random_uuid(), 'sales@redreach.ae', '111', 'PO for uniforms', 'sales@redreach.ae'),
+  ('00000000-0000-0000-0000-0000000a1102', 'invoice', gen_random_uuid(), 'alfred@redreach.ae', '222', 'Invoice query', 'alfred@redreach.ae')
+  on conflict do nothing;
+select pg_temp.expect(pg_temp.fails($q$insert into mail_links (target_type, target_id, mailbox_owner, message_id, linked_by) values ('app_users', gen_random_uuid(), 'a@redreach.ae', '1', 'a@redreach.ae')$q$), 'an email links only to a client, CRM entry, quotation or invoice');
+select pg_temp.expect(pg_temp.fails($q$insert into mail_links (target_type, target_id, mailbox_owner, message_id, linked_by) values ('crm', gen_random_uuid(), 'a@redreach.ae', '../1', 'a@redreach.ae')$q$), 'a linked email id is a Zoho number');
+
+do $$
+declare
+  who text[];
+  n int;
+begin
+  foreach who slice 1 in array array[
+    ['00000000-0000-0000-0000-00000000000a', 'admin', '2'],
+    ['00000000-0000-0000-0000-000000000013', 'manager', '2'],
+    ['00000000-0000-0000-0000-00000000000b', 'sales', '2'],
+    ['00000000-0000-0000-0000-000000000011', 'staff (VA)', '0'],
+    ['00000000-0000-0000-0000-000000000012', 'viewer', '0'],
+    ['00000000-0000-0000-0000-00000000000c', 'someone not on the team', '0']
+  ] loop
+    perform set_config('request.jwt.claim.sub', who[1], true);
+    execute 'set local role authenticated';
+    select count(*) into n from mail_links where id in ('00000000-0000-0000-0000-0000000a1101', '00000000-0000-0000-0000-0000000a1102');
+    perform pg_temp.expect(n = who[3]::int, format('%s sees %s linked emails', who[2], who[3]));
+    perform pg_temp.expect(pg_temp.fails($q$insert into mail_links (target_type, target_id, mailbox_owner, message_id, linked_by) values ('crm', gen_random_uuid(), 'x@redreach.ae', '9', 'x@redreach.ae')$q$), format('%s cannot write a link directly (only the mail function can)', who[2]));
+    perform pg_temp.expect(pg_temp.fails($q$update mail_links set subject = 'changed'$q$), format('%s cannot change a linked email', who[2]));
+    execute 'reset role';
+  end loop;
+end $$;
+
+-- Sales can unlink only what they linked; a manager can unlink anything.
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+delete from mail_links where id = '00000000-0000-0000-0000-0000000a1102';
+reset role;
+select pg_temp.expect(exists (select 1 from mail_links where id = '00000000-0000-0000-0000-0000000a1102'), 'sales cannot unlink an email someone else linked');
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+delete from mail_links where id = '00000000-0000-0000-0000-0000000a1101';
+reset role;
+select pg_temp.expect(not exists (select 1 from mail_links where id = '00000000-0000-0000-0000-0000000a1101'), 'sales unlinks an email they linked');
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000013';
+delete from mail_links where id = '00000000-0000-0000-0000-0000000a1102';
+reset role;
+select pg_temp.expect(not exists (select 1 from mail_links where id = '00000000-0000-0000-0000-0000000a1102'), 'a manager unlinks any email');
+
+set role anon;
+select pg_temp.expect(pg_temp.fails('select 1 from mail_links'), 'anon cannot read linked emails');
+reset role;
 select pg_temp.expect((select refresh_token from drive_connection) = 'google-refresh-token', 'the Google Drive connection is untouched');
 
 ------------------------------------------------------------ HubSpot sync (RR Central -> HubSpot)

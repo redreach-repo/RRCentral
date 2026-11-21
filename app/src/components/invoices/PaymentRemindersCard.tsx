@@ -85,6 +85,7 @@ export default function PaymentRemindersCard() {
       dueDate: row.due.dueDate,
       daysLate: row.due.daysLate,
       companyName: company,
+      template: { subject: settings.emailReminderSubject, body: settings.emailReminderBody },
     })
   }
 
@@ -361,6 +362,7 @@ export default function PaymentRemindersCard() {
         onSent={async () => {
           if (emailFor) await markSent(emailFor, 'email')
         }}
+        linkTo={emailFor?.invoice.id ? { targetType: 'invoice', targetId: emailFor.invoice.id } : undefined}
       />
     </section>
   )

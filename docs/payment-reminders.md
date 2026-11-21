@@ -50,3 +50,13 @@ payment reminders" should say OK.
    (default `rr_payment_reminder`) and `PAYMENT_REMINDER_WHATSAPP_LANGUAGE` (default `en`).
 
 No SQL is needed: `invoice_reminders` already exists.
+
+## Your own wording
+
+Settings, Message templates has **Payment reminder email subject** and **body**. Leave them blank
+to keep the built-in 3, 7 and 14 day wording. When filled, they are used for every stage, by the
+Invoices page and by one tap sends (`payment-reminder`). Tokens: `{{contact}}`, `{{ref}}`,
+`{{balance}}`, `{{dueDate}}`, `{{daysLate}}`, `{{stage}}`, `{{company}}`.
+
+Invoices also have their own **Invoice email subject** and **body** (used by Email PDF on an
+invoice); quotations keep the quote ones.
