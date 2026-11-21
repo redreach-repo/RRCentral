@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { pdfRenderToken } from './pdfRenderSession'
 
 const LS_URL = 'rrcentral_supabase_url'
 const LS_KEY = 'rrcentral_supabase_anon_key'
@@ -94,7 +95,14 @@ export function getSupabaseClient(): SupabaseClient {
   const key = cfg.anonKey || 'placeholder-key'
   const stamp = `${cfg.source}|${url}|${key.slice(0, 12)}`
   if (!client || clientKey !== stamp) {
-    client = createClient(url, key)
+    // PDF render page only (AI connector): act as the render login, never store a session.
+    const render = pdfRenderToken()
+    client = render
+      ? createClient(url, key, {
+          auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'hm-pdf-render' },
+          global: { headers: { Authorization: `Bearer ${render}` } },
+        })
+      : createClient(url, key)
     clientKey = stamp
   }
   return client

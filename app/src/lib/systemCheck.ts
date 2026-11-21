@@ -37,6 +37,7 @@ export const SYSTEM_FUNCTIONS: SystemFunction[] = [
   { name: 'watchdog', feature: 'Daily watchdog list', liveTest: '11' },
   { name: 'event-outbox', feature: 'Domain event outbox worker', liveTest: '33' },
   { name: 'public-api', feature: 'Partner REST API (API keys)', liveTest: '—' },
+  { name: 'highmast-mcp', feature: 'AI connector (MCP) for Grok Bot, Claude, ChatGPT and other assistants (keys by department: live tests 39-40)', liveTest: '38' },
   { name: 'webhook-retry', feature: 'Partner webhook retry worker', liveTest: '—' },
   { name: 'payment-reminder', feature: 'One tap payment reminders', liveTest: '12' },
   { name: 'lead-intake', feature: 'Website and WhatsApp leads', liveTest: '15' },

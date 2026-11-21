@@ -30,6 +30,8 @@
 //   (src/lib/invoicePayLink.ts), so the link and the payment agree.
 // * client-po-file gets the PO reader rules (src/lib/clientPoReader.ts), so the
 //   file checks and the clean up of what was read match the app.
+// * highmast-mcp gets the AI connector rules (src/lib/highmastMcp.ts), so stage
+//   moves, overdue invoices, stale deals and reply times match the app.
 //
 //   npm run build:support-fn              # regenerate
 //   npm run build:support-fn -- --check   # CI: fail if a bundle is stale
@@ -62,6 +64,7 @@ const bundles = [
   { entry: 'src/lib/saasCheckout.ts', out: '../supabase/functions/saas-checkout/saasCheckout.bundle.js' },
   { entry: 'src/lib/saasCheckout.ts', out: '../supabase/functions/saas-billing-webhook/saasCheckout.bundle.js' },
   { entry: 'src/lib/clientPoReader.ts', out: '../supabase/functions/client-po-file/clientPoReader.bundle.js' },
+  { entry: 'src/lib/highmastMcp.ts', out: '../supabase/functions/highmast-mcp/highmastMcp.bundle.js' },
 ]
 
 let stale = false

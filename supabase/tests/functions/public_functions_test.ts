@@ -47,6 +47,7 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "webhook-retry": { kind: "cron secret", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret/ },
   "hm-ai-gateway": { kind: "signed in staff JWT", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_staff/ },
   "fireflies-webhook": { kind: "shared secret", pattern: /FIREFLIES_WEBHOOK_SECRET[\s\S]*x-fireflies-secret[\s\S]*provided !== expected/ },
+  "highmast-mcp": { kind: "hashed AI connector key (Authorization: Bearer hmk_...)", pattern: /bearerToken\(req\.headers\.get\("Authorization"\)\)[\s\S]*isMcpKeyShape\(apiKey\)[\s\S]*resolveKey\(apiKey\)[\s\S]*if \(!who\.ok\)/ },
   "hm-provision-workspace": { kind: "provision secret or admin JWT", pattern: /WORKSPACE_PROVISION_SECRET[\s\S]*x-provision-secret[\s\S]*rr_is_admin/ },
 }
 
@@ -108,6 +109,7 @@ const ENV: Record<string, string> = {
   ZOHO_MAIL_CLIENT_ID: "zoho-client-for-tests",
   ZOHO_MAIL_CLIENT_SECRET: "zoho-secret-for-tests",
   MAIL_TOKEN_KEY: "mail-token-key-for-tests-0123456789abcdef",
+  MCP_JWT_SECRET: "mcp-jwt-secret-for-tests-0123456789abcdef",
 }
 
 async function load(fn: string): Promise<Handler> {
@@ -160,6 +162,12 @@ for (const fn of ["usage-import", "daily-digest", "contract-invoices", "watchdog
     assertEquals(await call(fn, post(fn, {}, { "x-cron-secret": "wrong" })), 401)
   } })
 }
+
+Deno.test({ name: "highmast-mcp refuses anyone without a key, before any tool runs", ...opts, fn: async () => {
+  assertEquals(await call("highmast-mcp", post("highmast-mcp", { jsonrpc: "2.0", id: 1, method: "tools/list" })), 401)
+  assertEquals(await call("highmast-mcp", post("highmast-mcp", { jsonrpc: "2.0", id: 1, method: "tools/list" }, { Authorization: "Bearer someone" })), 401)
+  assertEquals(await call("highmast-mcp", post("highmast-mcp", { jsonrpc: "2.0", id: 1, method: "tools/list" }, { Authorization: "Bearer hm_partner_key" })), 401)
+} })
 
 Deno.test({ name: "client-po-file refuses anyone not signed in, before reading or filing", ...opts, fn: async () => {
   assertEquals(await call("client-po-file", post("client-po-file", { action: "status" })), 401)

@@ -6,7 +6,7 @@ import { visibleAppModules } from './nav'
 const ROLES: UserRole[] = ['admin', 'manager', 'sales', 'staff', 'viewer']
 
 const MANAGER_UP = ['/hr/people', '/hr/leave', '/hr/attendance', '/payroll', '/ledger', '/approvals', '/mrr']
-const ADMIN_ONLY = ['/settings', '/audit-log', '/public-api', '/app-errors', '/system-check', '/dsr', '/theme-studio', '/saas-billing']
+const ADMIN_ONLY = ['/settings', '/audit-log', '/public-api', '/ai-connector', '/app-errors', '/system-check', '/dsr', '/theme-studio', '/saas-billing']
 
 function visiblePaths(role: UserRole): Set<string> {
   return new Set(visibleAppModules(role, {}).flatMap((m) => m.items.map((i) => i.to)))

@@ -661,7 +661,75 @@ colleague added; a manager can remove any.
 **If it fails.** "Linking emails is not set up yet" means the SQL was not run. "That email was not found in your
 mailbox" means the email was moved or deleted in Zoho.
 
-## 38. Reply, forward and send a new email from Mail
+## 38. AI connector (HighMast MCP server for Grok Bot)
+
+**Trigger.** Do the setup in `supabase/functions/highmast-mcp/README.md` (SQL, `MCP_JWT_SECRET`, deploy
+`highmast-mcp`, a sales member for the AI). Admin > **AI connector** > create a key. Run the two curl commands
+from the README, or connect with MCP Inspector.
+
+**You should see.** `tools/list` returns 14 tools. `dashboard_summary` returns overdue invoices, stale deals and
+tickets near their reply target. `list_deals` with `{"pipeline":"company"}` lists open CRM leads. Admin > Audit log
+shows each call as "AI tool call" with the key name. `move_deal_stage` to `Won` is refused. Revoking the key makes the
+next call answer 401.
+
+**If it fails.** 503 "not set up yet" means `MCP_JWT_SECRET` is missing. 503 "Has the HighMast MCP SQL been run?" means
+step 1 was skipped. 401 with a fresh key means the member it acts as is switched off, changed role, or has no
+confirmed login. Every tool answering "Not allowed" usually means `MCP_JWT_SECRET` is not the project's JWT secret.
+
+## 39. AI connector admin key (every area, for the AI Assistant)
+
+**Trigger.** After section 38 works: run `supabase-sql/highmast-mcp-admin.sql` (copy of
+`supabase/migrations/20261324090000_highmast_mcp_admin.sql`), redeploy `highmast-mcp`, add a team member
+"AI Assistant" (`ai-assistant@redreach.ae`, role admin) and confirm its login, then Admin > **AI connector** > Access
+**Admin** > Acts as AI Assistant > Create key. Put the key in the AI assistant.
+
+**You should see.** `tools/list` returns 59 tools (14 + 45 admin). Ask it to create a test account, a Draft quote with
+two lines (VAT 5%, AED), finalize it (RR-01-YYNNN number), mark it sent, convert it to an invoice, record a part payment,
+then delete the test account and restore it. Admin > Audit log shows each change as "AI change" by
+`ai-assistant@redreach.ae (AI key: ...)` with the record before and after. Asking it to edit the sent invoice, change
+the payment, approve leave or approve a payroll run is refused with a reason. Afterwards: void the test invoice and
+quote by hand (or delete the test account) so they do not reach reports.
+
+**If it fails.** Only 14 tools: the key is Standard, or the admin SQL was not run before the key was made. 401: the AI
+Assistant member is not active, not admin, or its login is not confirmed. "This needs an AI connector key with the
+admin scope": the SQL ran but the function was not redeployed.
+
+## 40. AI connector keys by department (Grok Bot on Sales, Claude on HR ...)
+
+**Trigger.** After section 38: run `supabase-sql/highmast-mcp-departments.sql` (the admin migration of section 39 and
+`supabase/migrations/20261325090000_highmast_mcp_departments.sql` in one file), redeploy `highmast-mcp`, then Admin > **AI connector**:
+make one key with Assistant **Grok Bot**, Access **Departments**, Sales ticked, and another with Assistant **Claude** and
+HR ticked, both acting as the AI Assistant admin member.
+
+**You should see.** The page says how many tools each choice gives, and the key list shows each key's assistant and
+departments. In Grok, `tools/list` has the sales tools (accounts, deals, quotes) but no record_payment, update_employee or
+payroll tools; asking it to list employees fails or finds nothing. In Claude, the HR tools are there, but quotes and
+accounts are not. Admin > Audit log shows each change as "AI change" by `ai-assistant@redreach.ae (AI key: <name>, Grok Bot)`
+or `(..., Claude)`. A key with Admin ticked gets all 59 tools.
+
+**If it fails.** "Departments (run the AI connector departments SQL first)" greyed out: the SQL was not run. A key sees
+every tool: the function was not redeployed. "This key's departments (...) do not cover ...": working as meant; use a key
+for that department.
+
+## 41. AI connector quote and invoice PDFs (get_quote_pdf, get_invoice_pdf)
+
+**Trigger.** Run `supabase-sql/generated-pdfs.sql`, redeploy `highmast-mcp`, wait for GitHub Pages to publish, set up
+the Vercel renderer (`services/render-pdf/README.md`) and add the Supabase secret `RENDER_PDF_URL`. Then in HighMast open
+quote RR-01-26007 and click **Download PDF**. In Grok (a key with Sales or Finance), ask for the PDF of RR-01-26007.
+
+**You should see.** The tool answers with `file_name` RR-01-26007.pdf, a `signed_url`, `size_bytes`, `generated_at` (now)
+and `source` "rendered now with the app's Download PDF". The link opens the same PDF as your download: logo, company
+details, TRN, lines, VAT, totals, terms, bank details and signature block. After an hour the link stops working.
+Supabase > Storage shows the bucket `generated-pdfs` as private. Admin > Audit log has an "MCP call" row for the tool.
+The quote's status is unchanged and nothing was emailed. A deleted quote gives "is deleted"; an unknown number gives
+"No quote ...". A key with only HR does not list the PDF tools.
+
+**If it fails.** "The generated-pdfs bucket is not set up yet": the SQL was not run. A `warning` saying the renderer
+could not make the PDF: check the Vercel function's logs and that `RENDER_PDF_URL` is the full `/api/render` address;
+the answer still carries the copy from the last Download PDF. "No PDF ... has been made yet" with no renderer set up:
+click Download PDF in HighMast once.
+
+## 42. Reply, forward and send a new email from Mail
 
 **Trigger.** Deploy `mail-inbox` again. In **Mail**, open an email sent to you and press **Reply**. If you see "Allow
 sending", press it and agree in Zoho (once per person). Type a line, press Enter in the To field (nothing should be

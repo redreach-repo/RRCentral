@@ -19,6 +19,7 @@ on:
         type: choice
         default: worshiphub-read
         options:
+          - all-on-system-check
           - worshiphub-read
           - worshiphub-manage
           - usage-import
@@ -48,6 +49,7 @@ on:
           - client-updates
           - client-po-file
           - mail-inbox
+          - highmast-mcp
           - other
       other_function:
         description: "Only when Function is 'other': the folder name under supabase/functions (gap plan modules, docs/MODULE_BUILD_PLAN.md)"
@@ -85,4 +87,33 @@ jobs:
           version: latest
       - name: Deploy
         # --yes: newer CLI prompts for confirmation; Actions has no TTY.
-        run: supabase functions deploy "$FUNCTION" --project-ref "$SUPABASE_PROJECT_REF" --yes
+        # all-on-system-check: every function listed on the System check page
+        # (app/src/lib/systemCheck.ts), one after another. A failure on one
+        # does not stop the rest; the run fails at the end and names them.
+        run: |
+          if [ "$FUNCTION" != "all-on-system-check" ]; then
+            supabase functions deploy "$FUNCTION" --project-ref "$SUPABASE_PROJECT_REF" --yes
+            exit 0
+          fi
+          names=$(grep -oP "^  \{ name: '\K[a-z0-9-]+" app/src/lib/systemCheck.ts)
+          if [ -z "$names" ]; then
+            echo "::error::No functions found in app/src/lib/systemCheck.ts"
+            exit 1
+          fi
+          failed=""
+          for name in $names; do
+            if [ ! -d "supabase/functions/$name" ]; then
+              echo "::warning::$name is on System check but has no folder, skipped"
+              continue
+            fi
+            echo "::group::Deploy $name"
+            if ! supabase functions deploy "$name" --project-ref "$SUPABASE_PROJECT_REF" --yes; then
+              failed="$failed $name"
+            fi
+            echo "::endgroup::"
+          done
+          if [ -n "$failed" ]; then
+            echo "::error::These did not deploy:$failed"
+            exit 1
+          fi
+          echo "All functions on System check deployed."
