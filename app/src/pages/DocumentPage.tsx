@@ -1949,7 +1949,8 @@ function ToolbarBtn({
         fontWeight: 600,
         cursor: disabled ? 'wait' : 'pointer',
         background: accent ? '#25D366' : '#fff',
-        color: accent ? '#fff' : '#111',
+        // Dark green text on WhatsApp green: white there fails contrast.
+        color: accent ? '#063d1d' : '#111',
         display: 'inline-flex',
         alignItems: 'center',
         gap: 6,

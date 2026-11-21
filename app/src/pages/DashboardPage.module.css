@@ -72,12 +72,12 @@
 
 .heroPrimary {
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
   border: 1px solid transparent;
 }
 
 .heroPrimary:hover {
-  background: #f06a14;
+  background: color-mix(in srgb, var(--primary) 88%, black);
 }
 
 .heroSecondary {

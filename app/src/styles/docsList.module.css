@@ -56,8 +56,8 @@
   padding: 0 16px;
   border: none;
   border-radius: 8px;
-  background: var(--q-accent);
-  color: var(--text);
+  background: var(--primary);
+  color: var(--on-primary);
   font-size: 13px;
   font-weight: 650;
   cursor: pointer;
