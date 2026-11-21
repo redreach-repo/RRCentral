@@ -79,6 +79,13 @@ export default function Modal({ open, title, onClose, children, width = 520 }: M
   const titleId = useId()
   const panelRef = useRef<HTMLDivElement>(null)
   const previouslyFocused = useRef<HTMLElement | null>(null)
+  // Keep the latest onClose in a ref so the open effect below runs only when
+  // the modal opens or closes. Callers often pass an inline arrow, which is a
+  // new function on every render; if it were an effect dependency, every
+  // keystroke in a field would re-run the effect and move focus back to the
+  // first focusable element (the X close button).
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
 
   useEffect(() => {
     if (!open) return
@@ -87,7 +94,7 @@ export default function Modal({ open, title, onClose, children, width = 520 }: M
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
-        onClose()
+        onCloseRef.current()
         return
       }
       if (panel) trapTabKey(e, panel)
@@ -104,7 +111,7 @@ export default function Modal({ open, title, onClose, children, width = 520 }: M
       document.body.style.overflow = prev
       previouslyFocused.current?.focus?.()
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open || typeof document === 'undefined') return null
 
