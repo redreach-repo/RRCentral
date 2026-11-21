@@ -76,8 +76,8 @@
 
 .primary {
   border: none;
-  background: var(--accent);
-  color: #fff;
+  background: var(--primary);
+  color: var(--on-primary);
 }
 
 .primary:disabled {
