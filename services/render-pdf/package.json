@@ -1,0 +1,14 @@
+{
+  "name": "highmast-render-pdf",
+  "private": true,
+  "description": "Makes HighMast quote, invoice and delivery note PDFs for the AI connector, with the app's own Download PDF code (headless browser).",
+  "type": "module",
+  "engines": { "node": "22.x" },
+  "scripts": {
+    "test": "node --test lib/request.test.js"
+  },
+  "dependencies": {
+    "@sparticuz/chromium": "153.0.0",
+    "puppeteer-core": "25.11.0"
+  }
+}

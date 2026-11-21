@@ -89,6 +89,9 @@ import { findCrmByCompany, syncCrmFromQuote } from '../lib/crmSync'
 import { ensureCompanyFromDocument } from '../lib/ensureCompanyFromDocument'
 import { loadCustomerDocuments, uploadPdfToCustomerDrive } from '../lib/customerFiles'
 import { useAuth } from '../contexts/AuthContext'
+import { saveGeneratedPdf, trySaveGeneratedPdf } from '../lib/generatedPdfs'
+import { reportPdfRender } from '../lib/pdfRenderSession'
+import { quotePdfNumber } from '../lib/highmastMcp'
 import {
   applyMessageTemplate,
   DEFAULT_EMAIL_QUOTE_BODY,
@@ -96,11 +99,16 @@ import {
   DEFAULT_WHATSAPP_QUOTE,
 } from '../lib/templates'
 
-export default function DocumentPage() {
+/**
+ * renderMode: the AI connector's PDF renderer (/render-pdf/...). Same page and
+ * same Download PDF code; it makes the PDF once, saves it to the private
+ * generated-pdfs bucket and reports back through window.__HM_PDF_DONE.
+ */
+export default function DocumentPage({ renderMode = false }: { renderMode?: boolean } = {}) {
   const { type = 'quote', id = '' } = useParams<{ type: string; id: string }>()
   const docType: PrintableDocType = parseDocumentType(type)
   const { t } = useI18n()
-  const { settings } = useSettings()
+  const { settings, loading: settingsLoading } = useSettings()
   const { showToast } = useToast()
   const { user, userRole } = useAuth()
   const navigate = useNavigate()
@@ -527,15 +535,31 @@ export default function DocumentPage() {
     }
   }
 
+  /** Where this document's Download PDF copy is kept (generated-pdfs bucket). */
+  function pdfCopyTarget(): { kind: PrintableDocType; number: string } | null {
+    if (docType === 'quote' && quote) return { kind: 'quote', number: quotePdfNumber(quote) }
+    if (docType === 'invoice' && invoice) return { kind: 'invoice', number: String(invoice.reference_number || '') }
+    if (docType === 'delivery-note' && deliveryNote) return { kind: 'delivery-note', number: String(deliveryNote.reference_number || '') }
+    return null
+  }
+
+  /** The Download PDF file. The AI connector's renderer uses this same function (renderMode). */
+  function makeDownloadPdf(sheet: HTMLElement) {
+    return elementToPdfBlob(sheet, {
+      filenameHint: `${title.toLowerCase()}-${displayRef}`,
+      fitToPage,
+    })
+  }
+
   async function downloadPdf() {
     if (!sheetRef.current) return
     setPdfBusy(true)
     try {
-      const { blob, filename } = await elementToPdfBlob(sheetRef.current, {
-        filenameHint: `${title.toLowerCase()}-${displayRef}`,
-        fitToPage,
-      })
+      const { blob, filename } = await makeDownloadPdf(sheetRef.current)
       downloadBlob(blob, filename)
+      // Keep this exact file for the AI connector's get_*_pdf tools (private bucket, never blocks the download).
+      const copy = pdfCopyTarget()
+      if (copy) void trySaveGeneratedPdf(copy.kind, copy.number, blob)
       showToast(
         pageLayout === 'split'
           ? 'PDF downloaded (2 pages)'
@@ -781,6 +805,30 @@ export default function DocumentPage() {
     validUntil: validUntil ? format(new Date(validUntil), 'dd MMM yyyy') : '',
     validUntilLine: validUntil && docType === 'quote' ? `\nValid until: ${format(new Date(validUntil), 'dd MMM yyyy')}` : '',
   }
+
+  // Render mode: once the document and letterhead settings are loaded, make the PDF once.
+  const renderStarted = useRef(false)
+  useEffect(() => {
+    if (!renderMode || loading || settingsLoading || renderStarted.current) return
+    renderStarted.current = true
+    void (async () => {
+      try {
+        if (error || !doc) throw new Error(error || 'Document not found')
+        const target = pdfCopyTarget()
+        if (!target || !target.number) throw new Error('This document has no number a PDF can be filed under')
+        if (typeof document !== 'undefined' && document.fonts?.ready) await document.fonts.ready
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+        if (!sheetRef.current) throw new Error('The document sheet did not draw')
+        const { blob } = await makeDownloadPdf(sheetRef.current)
+        const saved = await saveGeneratedPdf(target.kind, target.number, blob)
+        if (!saved) throw new Error('PDF storage is not set up')
+        reportPdfRender({ ok: true, ...saved })
+      } catch (e) {
+        reportPdfRender({ ok: false, error: errorMessage(e, 'PDF failed') })
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [renderMode, loading, settingsLoading, error, doc])
 
   if (loading) {
     return (

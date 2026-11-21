@@ -208,7 +208,14 @@ export const MCP_TOOL_DEPARTMENTS: Record<string, McpDepartment[]> = {
   get_payroll_run: ['payroll'],
   // Admin
   list_users: [],
+  // PDFs (read only; the document's own rules decide what a key can see)
+  get_quote_pdf: ['sales', 'finance'],
+  get_invoice_pdf: ['finance', 'sales'],
+  get_delivery_note_pdf: ['operations'],
 }
+
+/** Read-only PDF tools, offered to standard keys and to keys whose departments see the document. */
+export const MCP_PDF_TOOLS = ['get_quote_pdf', 'get_invoice_pdf', 'get_delivery_note_pdf'] as const
 
 /** Clean list of departments: known values only, no repeats, in the standard order. */
 export function normalizeDepartments(list: readonly string[] | null | undefined): McpDepartment[] {
@@ -226,7 +233,7 @@ export function toolAllowedForDepartments(tool: string, departments: readonly st
 
 /** The tools (standard and admin) a key with these departments gets. */
 export function toolsForDepartments(departments: readonly string[]): string[] {
-  return [...MCP_TOOLS, ...MCP_ADMIN_TOOLS].filter((t) => toolAllowedForDepartments(t, departments))
+  return [...MCP_TOOLS, ...MCP_ADMIN_TOOLS, ...MCP_PDF_TOOLS].filter((t) => toolAllowedForDepartments(t, departments))
 }
 
 /** Short text for a key's departments, e.g. "Sales, Finance". */
@@ -496,4 +503,28 @@ export function auditArgs(args: unknown): Record<string, unknown> {
     else out[k] = '[object]'
   }
   return out
+}
+
+// ---- Generated PDFs (get_quote_pdf, get_invoice_pdf, get_delivery_note_pdf) ----
+
+/** Private Storage bucket for the PDFs the app's Download PDF makes. */
+export const GENERATED_PDF_BUCKET = 'generated-pdfs'
+export type GeneratedPdfKind = 'quote' | 'invoice' | 'delivery-note'
+const PDF_FOLDER: Record<GeneratedPdfKind, string> = { quote: 'quotes', invoice: 'invoices', 'delivery-note': 'delivery-notes' }
+/** Signed links to a generated PDF last this long (1 hour). */
+export const GENERATED_PDF_LINK_SECONDS = 3600
+
+/**
+ * Where a document's PDF lives: quotes/RR-01-26007.pdf. Null when the number
+ * has characters a file name should not (the database refuses those too).
+ */
+export function generatedPdfPath(kind: GeneratedPdfKind, number: string | null | undefined): string | null {
+  const n = String(number || '').trim()
+  if (!/^[A-Za-z0-9._-]{1,80}$/.test(n) || n.startsWith('.')) return null
+  return `${PDF_FOLDER[kind]}/${n}.pdf`
+}
+
+/** The number a quote's PDF is filed under: its RR reference, or its draft id before that. */
+export function quotePdfNumber(q: { reference_number?: string | null; quote_id?: string | null }): string {
+  return String(q.reference_number || q.quote_id || '').trim()
 }

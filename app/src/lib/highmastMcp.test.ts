@@ -213,7 +213,7 @@ describe('admin scope rules', () => {
 describe('departments', () => {
   it('maps every tool to departments, and only admin gets the user list', async () => {
     const m = await import('./highmastMcp')
-    const all = [...m.MCP_TOOLS, ...m.MCP_ADMIN_TOOLS]
+    const all = [...m.MCP_TOOLS, ...m.MCP_ADMIN_TOOLS, ...m.MCP_PDF_TOOLS]
     expect(Object.keys(m.MCP_TOOL_DEPARTMENTS).sort()).toEqual([...all].sort())
     for (const depts of Object.values(m.MCP_TOOL_DEPARTMENTS)) {
       for (const d of depts) expect(m.MCP_DEPARTMENT_VALUES).toContain(d)
@@ -248,5 +248,28 @@ describe('departments', () => {
     expect(m.normalizeDepartments(['Finance', 'sales', 'sales', 'nope'])).toEqual(['sales', 'finance'])
     expect(m.departmentsLabel(['finance', 'sales'])).toBe('Sales, Finance')
     expect(m.assistantLabel('grok')).toBe('Grok Bot')
+  })
+})
+
+describe('generated PDFs', () => {
+  it('files each document under its number in its own folder', async () => {
+    const m = await import('./highmastMcp')
+    expect(m.generatedPdfPath('quote', 'RR-01-26007')).toBe('quotes/RR-01-26007.pdf')
+    expect(m.generatedPdfPath('invoice', 'RR-01-26007-CN1')).toBe('invoices/RR-01-26007-CN1.pdf')
+    expect(m.generatedPdfPath('delivery-note', 'DN-01-26001')).toBe('delivery-notes/DN-01-26001.pdf')
+    expect(m.generatedPdfPath('quote', '../secret')).toBeNull()
+    expect(m.generatedPdfPath('quote', 'a/b')).toBeNull()
+    expect(m.generatedPdfPath('quote', '')).toBeNull()
+    expect(m.quotePdfNumber({ reference_number: '', quote_id: 'Q-123' })).toBe('Q-123')
+    expect(m.quotePdfNumber({ reference_number: 'RR-01-26007', quote_id: 'Q-123' })).toBe('RR-01-26007')
+    expect(m.GENERATED_PDF_LINK_SECONDS).toBe(3600)
+  })
+
+  it('gives the PDF tools to the departments that see those documents', async () => {
+    const m = await import('./highmastMcp')
+    expect(m.toolsForDepartments(['sales'])).toContain('get_quote_pdf')
+    expect(m.toolsForDepartments(['finance'])).toContain('get_invoice_pdf')
+    expect(m.toolsForDepartments(['operations'])).toContain('get_delivery_note_pdf')
+    expect(m.toolsForDepartments(['hr'])).not.toContain('get_quote_pdf')
   })
 })

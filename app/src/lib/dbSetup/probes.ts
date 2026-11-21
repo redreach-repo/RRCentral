@@ -159,4 +159,5 @@ export const DB_SETUP_PROBES: DbSetupProbe[] = [
   { migration: '20261323090000_highmast_mcp', label: 'AI connector (MCP) keys', table: 'mcp_keys' },
   { migration: '20261324090000_highmast_mcp_admin', label: 'AI connector admin keys', table: 'mcp_keys', column: 'scope' },
   { migration: '20261325090000_highmast_mcp_departments', label: 'AI connector keys by department', table: 'mcp_keys', column: 'departments' },
+  { migration: '20261326090000_generated_pdfs', label: 'AI connector quote and invoice PDFs' },
 ]

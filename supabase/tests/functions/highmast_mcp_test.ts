@@ -21,7 +21,9 @@ const EXPECTED_TOOLS = [
   "add_timeline_note", "create_follow_up", "create_lead", "dashboard_summary", "get_account", "get_deal",
   "get_ticket", "list_deals", "list_follow_ups_due", "list_invoices", "list_quotes", "list_tickets",
   "move_deal_stage", "search_accounts",
-]
+  // Read-only PDF tools (tools_pdf.ts): every key, limited by what its member can see.
+  "get_delivery_note_pdf", "get_invoice_pdf", "get_quote_pdf",
+].sort()
 
 Deno.test("the code never deletes, never uses the service key, never names HR, payroll, settings or keys tables", async () => {
   for (const file of ["index.ts", "auth.ts", "tools.ts"]) {
@@ -60,6 +62,8 @@ const calls: Call[] = []
 let resolveRows: unknown[] = []
 // What rr_mcp_reach answers for a key with departments (null = the function is not there yet).
 let reachBody: unknown = null
+// What the Vercel PDF renderer answers (services/render-pdf).
+let renderAnswer: () => Response = () => json({ ok: true, path: "quotes/RR-01-26007.pdf", size_bytes: 48213 })
 
 const MEMBER = {
   key_id: "11111111-1111-4111-8111-111111111111",
@@ -88,6 +92,22 @@ async function fakeFetch(input: Request | URL | string, init?: RequestInit): Pro
   if (url.pathname === "/rest/v1/crm") {
     return json([{ id: "44444444-4444-4444-8444-444444444444", company_name: "Acme LLC", pipeline_stage: "Lead", owner: "Sara", updated_at: "2026-11-01T00:00:00Z" }])
   }
+  if (url.pathname === "/rest/v1/quotations" && url.searchParams.get("reference_number") === "eq.RR-01-26007") {
+    return json([{ id: "66666666-6666-4666-8666-666666666666", quote_id: "Q-1", reference_number: "RR-01-26007", status: "Sent", updated_at: "2026-11-01T00:00:00Z", deleted_at: null }])
+  }
+  if (url.pathname === "/rest/v1/quotations" && url.searchParams.get("reference_number") === "eq.RR-01-26008") {
+    return json([{ id: "77777777-7777-4777-8777-777777777777", quote_id: "Q-2", reference_number: "RR-01-26008", status: "Draft", deleted_at: "2026-11-02T00:00:00Z" }])
+  }
+  if (url.pathname === "/storage/v1/object/list/generated-pdfs") {
+    const body = JSON.parse(calls[calls.length - 1].body || "{}")
+    return json(body.search === "RR-01-26007.pdf"
+      ? [{ name: "RR-01-26007.pdf", updated_at: "2026-11-05T10:00:00Z", metadata: { size: 48213 } }]
+      : [])
+  }
+  if (url.pathname.startsWith("/storage/v1/object/sign/generated-pdfs/")) {
+    return json({ signedURL: "/object/sign/generated-pdfs/quotes/RR-01-26007.pdf?token=t" })
+  }
+  if (url.host === "render.test") return renderAnswer()
   if (url.pathname.startsWith("/rest/v1/")) return json([])
   return json({}, 404)
 }
@@ -377,4 +397,76 @@ Deno.test({ name: "an admin write goes through rr_mcp_save as the AI Assistant, 
   assertEquals(log.p_args.iban, "[hidden]")
   assertEquals(log.p_args.basic_salary_aed, "[hidden]")
   assert(calls.every((c) => c.method !== "DELETE" && c.method !== "PATCH"), "no direct table writes")
+}) })
+
+Deno.test({ name: "get_quote_pdf returns a 1 hour signed link to the saved Download PDF, and refuses deleted or unknown quotes", ...opts, fn: () => withFakeDb(async () => {
+  const h = await load()
+  resolveRows = [MEMBER]
+  const names = (await (await h(rpc("tools/list", {}, 30))).json()).result.tools.map((t: { name: string }) => t.name)
+  for (const n of ["get_quote_pdf", "get_invoice_pdf", "get_delivery_note_pdf"]) assert(names.includes(n), `standard key has ${n}`)
+  const call = async (args: Record<string, unknown>, id: number) => {
+    const body = await (await h(rpc("tools/call", { name: "get_quote_pdf", arguments: args }, id))).json()
+    return { isError: !!body.result?.isError, out: JSON.parse(body.result.content[0].text) }
+  }
+  const ok = await call({ quote_number: "RR-01-26007" }, 31)
+  assertFalse(ok.isError, JSON.stringify(ok.out))
+  assertEquals(ok.out.file_name, "RR-01-26007.pdf")
+  assertEquals(ok.out.size_bytes, 48213)
+  assertEquals(ok.out.generated_at, "2026-11-05T10:00:00Z")
+  assertEquals(ok.out.expires_in_seconds, 3600)
+  assertMatch(ok.out.signed_url, /^http:\/\/db\.test\/storage\/v1\/object\/sign\/generated-pdfs\/quotes\/RR-01-26007\.pdf\?token=/)
+  const sign = calls.find((c) => c.url.pathname.startsWith("/storage/v1/object/sign/"))!
+  assertEquals(JSON.parse(sign.body).expiresIn, 3600)
+  const claims = decodeJwt((sign.headers.get("Authorization") || "").replace(/^Bearer /, ""))
+  assertEquals(claims.hm_mcp_key, MEMBER.key_id, "the link is made as the key's member, never the service key")
+  assert(calls.every((c) => !["DELETE", "PATCH", "PUT"].includes(c.method)), "nothing is changed")
+  assertFalse(calls.some((c) => /\/rest\/v1\/(quotations|invoices)/.test(c.url.pathname) && c.method !== "GET"), "the quote is only read")
+  assert(calls.some((c) => c.url.pathname === "/rest/v1/rpc/rr_mcp_log_call"), "the call is audited")
+
+  const deleted = await call({ quote_number: "RR-01-26008" }, 32)
+  assert(deleted.isError)
+  assertMatch(deleted.out.error, /is deleted/)
+  const missing = await call({ quote_number: "RR-01-26999" }, 33)
+  assert(missing.isError)
+  assertMatch(missing.out.error, /No quote RR-01-26999/)
+  const none = await call({}, 34)
+  assert(none.isError)
+  assertMatch(none.out.error, /quote_id or quote_number/)
+}) })
+
+Deno.test({ name: "with the renderer set up, get_quote_pdf has the app render a fresh PDF with a 2 minute read-only render login", ...opts, fn: () => withFakeDb(async () => {
+  const h = await load()
+  const pdf = await import(new URL(FN + "tools_pdf.ts", ROOT).href)
+  pdf.setPdfRenderer(pdf.httpRenderer("https://render.test/api/render", { jwtSecret: ENV.MCP_JWT_SECRET, anonKey: ENV.SUPABASE_ANON_KEY }))
+  try {
+    resolveRows = [MEMBER]
+    const call = async (id: number) => {
+      const body = await (await h(rpc("tools/call", { name: "get_quote_pdf", arguments: { quote_number: "RR-01-26007" } }, id))).json()
+      return { isError: !!body.result?.isError, out: JSON.parse(body.result.content[0].text) }
+    }
+    const ok = await call(41)
+    assertFalse(ok.isError, JSON.stringify(ok.out))
+    assertMatch(ok.out.source, /rendered now/)
+    assertEquals(ok.out.warning, undefined)
+    const r = calls.find((c) => c.url.host === "render.test")!
+    const sent = JSON.parse(r.body)
+    assertEquals(sent.kind, "quote")
+    assertEquals(sent.id, "66666666-6666-4666-8666-666666666666")
+    assertEquals(sent.apikey, ENV.SUPABASE_ANON_KEY)
+    const claims = decodeJwt(sent.token)
+    assertEquals(claims.hm_pdf_render, "quote:66666666-6666-4666-8666-666666666666")
+    assertEquals(claims.hm_mcp_key, MEMBER.key_id, "the render login is still the key's AI session")
+    assertEquals(Number(claims.exp) - Number(claims.iat), 120)
+    assertFalse(JSON.stringify(sent).includes(ENV.MCP_JWT_SECRET), "the signing secret never leaves")
+
+    // Renderer down: the saved copy comes back, with a clear warning.
+    renderAnswer = () => json({ ok: false, error: "Render failed: timeout" }, 502)
+    const fallback = await call(42)
+    assertFalse(fallback.isError)
+    assertMatch(fallback.out.source, /saved by the app/)
+    assertMatch(fallback.out.warning, /could not make the PDF: Render failed: timeout.*copy saved at the last Download PDF/)
+  } finally {
+    pdf.setPdfRenderer(null)
+    renderAnswer = () => json({ ok: true, path: "quotes/RR-01-26007.pdf", size_bytes: 48213 })
+  }
 }) })
