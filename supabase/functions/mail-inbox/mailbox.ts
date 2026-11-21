@@ -57,15 +57,29 @@ export function cleanSearch(raw: unknown): string {
 export function folderKind(name: string, type?: string): MailFolderKind {
   const t = String(type || "").toLowerCase()
   const n = name.trim().toLowerCase()
-  if (t === "inbox" || n === "inbox") return "inbox"
-  if (t === "sent" || /^sent\b|sent\s*(mail|items)/.test(n)) return "sent"
-  if (t === "drafts" || n === "drafts") return "drafts"
-  if (t === "spam" || n === "spam" || n === "junk") return "spam"
-  if (t === "trash" || n === "trash" || n === "deleted items") return "trash"
+  // The name wins over Zoho's folderType: folders copied in from other mail
+  // apps (e.g. "Deleted Messages") can come back typed as Inbox.
+  if (n === "inbox") return "inbox"
+  if (/^sent\b|sent\s*(mail|items|messages)/.test(n)) return "sent"
+  if (n === "drafts") return "drafts"
+  if (n === "spam" || n === "junk" || /^junk\s*(e-?mail|mail)$/.test(n)) return "spam"
+  if (n === "trash" || n === "deleted items" || n === "deleted messages" || n === "bin") return "trash"
+  if (t === "inbox") return "inbox"
+  if (t === "sent") return "sent"
+  if (t === "drafts") return "drafts"
+  if (t === "spam") return "spam"
+  if (t === "trash") return "trash"
   return "other"
 }
 
 const KIND_ORDER: MailFolderKind[] = ["inbox", "sent", "drafts", "other", "spam", "trash"]
+
+/** The real Inbox before any other folder Zoho also types as Inbox. */
+function exactFirst(a: MailFolder, b: MailFolder): number {
+  const ea = a.kind === "inbox" && a.name.trim().toLowerCase() === "inbox" ? 0 : 1
+  const eb = b.kind === "inbox" && b.name.trim().toLowerCase() === "inbox" ? 0 : 1
+  return ea - eb
+}
 
 export function normalizeFolders(rows: Record<string, unknown>[]): MailFolder[] {
   const out: MailFolder[] = []
@@ -80,7 +94,9 @@ export function normalizeFolders(rows: Record<string, unknown>[]): MailFolder[] 
       unread: Math.max(0, Number(r.unreadCount ?? r.unreadMessageCount ?? 0) || 0),
     })
   }
-  return out.sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || a.name.localeCompare(b.name))
+  return out.sort((a, b) =>
+    KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || exactFirst(a, b) || a.name.localeCompare(b.name)
+  )
 }
 
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", "#39": "'" }

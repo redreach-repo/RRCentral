@@ -61,6 +61,19 @@ Deno.test("folders are typed and sorted inbox first", () => {
   assertEquals(out[0].unread, 4)
 })
 
+Deno.test("Inbox opens first even when another folder is typed as Inbox", () => {
+  assertEquals(folderKind("Deleted Messages", "Inbox"), "trash")
+  assertEquals(folderKind("Sent Messages", "Inbox"), "sent")
+  assertEquals(folderKind("Junk E-mail"), "spam")
+  const out = normalizeFolders([
+    { folderId: "4", folderName: "Archive", folderType: "Inbox" },
+    { folderId: "3", folderName: "Deleted Messages", folderType: "Inbox" },
+    { folderId: "1", folderName: "Inbox", folderType: "Inbox" },
+  ])
+  assertEquals(out[0].name, "Inbox")
+  assertEquals(out[out.length - 1].name, "Deleted Messages")
+})
+
 Deno.test("headers come out as plain text and keep bare addresses", () => {
   assertEquals(plain("&quot;Sam&quot; &lt;sam@x.com&gt;", 100), '"Sam" <sam@x.com>')
   assertEquals(plain('"Sam" <sam@x.com>', 100), '"Sam" <sam@x.com>')
