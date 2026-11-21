@@ -27,6 +27,11 @@ export default function CommandPalette({ open, onClose }: Props) {
   const all = useMemo(() => commandPaletteItems(userRole, settings, t), [userRole, settings, t])
   const items = useMemo(() => filterCommandPaletteItems(all, query), [all, query])
 
+  // Latest onClose in a ref so a new inline callback from the parent does not
+  // re-run the open effect (which resets the search and refocuses the input).
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
   useEffect(() => {
     if (!open) return
     previouslyFocused.current = document.activeElement as HTMLElement | null
@@ -36,7 +41,7 @@ export default function CommandPalette({ open, onClose }: Props) {
     const onDocKey = (e: globalThis.KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
-        onClose()
+        onCloseRef.current()
         return
       }
       if (panelRef.current) trapTabKey(e, panelRef.current)
@@ -47,7 +52,7 @@ export default function CommandPalette({ open, onClose }: Props) {
       document.removeEventListener('keydown', onDocKey)
       previouslyFocused.current?.focus?.()
     }
-  }, [open, onClose])
+  }, [open])
 
   useEffect(() => {
     setActive(0)
