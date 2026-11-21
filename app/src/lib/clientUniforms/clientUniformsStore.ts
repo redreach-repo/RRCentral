@@ -1,24 +1,38 @@
 /** RR Threads client uniform sizes: Supabase reads and writes. */
 import { db } from '../db'
-import { isMissingRelationError } from '../errors'
+import { isMissingRelationError, isUndefinedColumnError } from '../errors'
 import { isSupabaseConfigured } from '../supabaseConfig'
 import type { UniformIssue, UniformStaff } from './clientUniforms'
 
-export type UniformLoad = { staff: UniformStaff[]; issues: UniformIssue[]; missingTable: boolean }
+export type UniformLoad = {
+  staff: UniformStaff[]
+  issues: UniformIssue[]
+  missingTable: boolean
+  /** False until client-po-uniform-issues.sql has run (issues cannot be tied to a PO yet). */
+  poLinked?: boolean
+}
+
+const ISSUE_COLUMNS = 'id, staff_id, item, size, quantity, issued_on, notes'
+
+function loadIssues(columns: string) {
+  return db.from('client_uniform_issues').select(columns).order('issued_on', { ascending: false }).limit(5000)
+}
 
 const STAFF_COLUMNS =
   'id, client_id, full_name, employee_code, department, job_title, shirt_size, trouser_size, jacket_size, shoe_size, cap_size, other_sizes, active, notes, clients(company_name)'
 
 export async function loadClientUniforms(): Promise<UniformLoad> {
   if (!isSupabaseConfigured()) return { staff: [], issues: [], missingTable: false }
-  const [staff, issues] = await Promise.all([
+  const [staff, linked] = await Promise.all([
     db.from('client_uniform_staff').select(STAFF_COLUMNS).order('full_name').limit(2000),
-    db
-      .from('client_uniform_issues')
-      .select('id, staff_id, item, size, quantity, issued_on, notes')
-      .order('issued_on', { ascending: false })
-      .limit(5000),
+    loadIssues(`${ISSUE_COLUMNS}, po_id, po_line_id`),
   ])
+  let issues = linked
+  let poLinked = true
+  if (linked.error && isUndefinedColumnError(linked.error)) {
+    poLinked = false
+    issues = await loadIssues(ISSUE_COLUMNS)
+  }
   if (staff.error || issues.error) {
     const err = staff.error || issues.error
     if (isMissingRelationError(err)) return { staff: [], issues: [], missingTable: true }
@@ -26,8 +40,9 @@ export async function loadClientUniforms(): Promise<UniformLoad> {
   }
   return {
     staff: (staff.data || []) as unknown as UniformStaff[],
-    issues: ((issues.data || []) as UniformIssue[]).map((i) => ({ ...i, quantity: Number(i.quantity) || 0 })),
+    issues: ((issues.data || []) as unknown as UniformIssue[]).map((i) => ({ ...i, quantity: Number(i.quantity) || 0 })),
     missingTable: false,
+    poLinked,
   }
 }
 
@@ -80,6 +95,37 @@ export async function addUniformIssue(input: {
     notes: input.notes.trim(),
   })
   if (error) throw error
+}
+
+/** Uniforms issued against one client PO. ready is false until client-po-uniform-issues.sql has run. */
+export async function loadPoUniformIssues(poId: string): Promise<{ rows: UniformIssue[]; ready: boolean }> {
+  if (!isSupabaseConfigured() || !poId) return { rows: [], ready: false }
+  const { data, error } = await db
+    .from('client_uniform_issues')
+    .select(`${ISSUE_COLUMNS}, po_id, po_line_id`)
+    .eq('po_id', poId)
+    .limit(5000)
+  if (error) {
+    if (isMissingRelationError(error) || isUndefinedColumnError(error)) return { rows: [], ready: false }
+    throw error
+  }
+  return {
+    rows: ((data || []) as unknown as UniformIssue[]).map((i) => ({ ...i, quantity: Number(i.quantity) || 0 })),
+    ready: true,
+  }
+}
+
+/** Log uniforms handed out against a client PO line (one row per person). */
+export async function addPoUniformIssues(
+  rows: { staff_id: string; item: string; size: string; quantity: number; issued_on: string; po_id: string; po_line_id: string; notes?: string }[],
+): Promise<void> {
+  const clean = rows
+    .filter((r) => r.staff_id && Number(r.quantity) > 0)
+    .map((r) => ({ ...r, item: r.item.trim() || 'Uniform', size: r.size.trim(), quantity: Math.round(Number(r.quantity)), notes: (r.notes || '').trim() }))
+  for (let i = 0; i < clean.length; i += 200) {
+    const { error } = await db.from('client_uniform_issues').insert(clean.slice(i, i + 200))
+    if (error) throw error
+  }
 }
 
 export async function deleteUniformIssue(id: string): Promise<void> {

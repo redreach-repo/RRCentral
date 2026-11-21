@@ -3,12 +3,16 @@ import { ClipboardList, Plus } from 'lucide-react'
 import { clientPoPartyName } from '../../lib/clientPurchaseOrders'
 import {
   invoiceLineFromPo,
+  issuedNotInvoiced,
   overDrawWarnings,
+  poIssuedByLine,
   poLineBalances,
   withLineIds,
   type PoDrawdown,
 } from '../../lib/clientPoBalance'
 import { loadPoDrawdowns } from '../../lib/clientPoDrawdownStore'
+import { loadPoUniformIssues } from '../../lib/clientUniforms/clientUniformsStore'
+import type { UniformIssue } from '../../lib/clientUniforms/clientUniforms'
 import type { PoLineItem } from '../../lib/clientPoReader'
 import { listClientPurchaseOrdersWithDetails, type ClientPurchaseOrder } from '../../lib/opsSliceStores'
 import { errorMessage } from '../../lib/errors'
@@ -56,6 +60,8 @@ export default function InvoicePoPanel(props: {
   const [drawdowns, setDrawdowns] = useState<PoDrawdown[]>([])
   const [ready, setReady] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [issues, setIssues] = useState<UniformIssue[]>([])
+  const [issuesReady, setIssuesReady] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -88,6 +94,15 @@ export default function InvoicePoPanel(props: {
         setDrawdowns(res.rows)
       })
       .catch((e) => alive && setLoadError(errorMessage(e, 'Could not load what was invoiced')))
+    setIssues([])
+    setIssuesReady(false)
+    loadPoUniformIssues(value.poId)
+      .then((res) => {
+        if (!alive) return
+        setIssues(res.rows)
+        setIssuesReady(res.ready)
+      })
+      .catch(() => {})
     return () => {
       alive = false
     }
@@ -98,6 +113,12 @@ export default function InvoicePoPanel(props: {
     [value, drawdowns, invoiceId],
   )
   const warnings = value ? overDrawWarnings(balances, value.take) : []
+  const issuedByLine = useMemo(
+    () => (value && issuesReady ? poIssuedByLine(issues, value.poId) : null),
+    [value, issuesReady, issues],
+  )
+  const waiting = issuedByLine ? issuedNotInvoiced(balances, issuedByLine) : {}
+  const waitingTotal = Object.values(waiting).reduce((s, n) => s + n, 0)
 
   if (!client.trim()) return null
   if (!value && !forClient.length) {
@@ -151,6 +172,7 @@ export default function InvoicePoPanel(props: {
                 <tr>
                   <th style={th}>PO line</th>
                   <th style={{ ...th, textAlign: 'right' }}>Ordered</th>
+                  {issuedByLine ? <th style={{ ...th, textAlign: 'right' }}>Issued</th> : null}
                   <th style={{ ...th, textAlign: 'right' }}>Invoiced before</th>
                   <th style={{ ...th, textAlign: 'right' }}>Left</th>
                   <th style={{ ...th, textAlign: 'right', width: 110 }}>This invoice</th>
@@ -168,6 +190,7 @@ export default function InvoicePoPanel(props: {
                       <td style={num}>
                         {b.requested} {b.line.unit}
                       </td>
+                      {issuedByLine ? <td style={num}>{issuedByLine.get(b.line.id)?.items || 0}</td> : null}
                       <td style={num}>{b.invoiced}</td>
                       <td style={{ ...num, fontWeight: 600, color: b.balance - take < 0 ? colors.danger : undefined }}>
                         {b.balance - take}
@@ -200,6 +223,17 @@ export default function InvoicePoPanel(props: {
             </ul>
           ) : null}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {issuedByLine ? (
+              <button
+                type="button"
+                style={buttonSecondaryStyle}
+                disabled={waitingTotal <= 0}
+                title="Puts what was issued to the client's staff on this PO, less what earlier invoices billed, into This invoice"
+                onClick={() => onChange({ ...value, take: waiting })}
+              >
+                Fill with issued{waitingTotal > 0 ? ` (${waitingTotal})` : ': nothing waiting'}
+              </button>
+            ) : null}
             <button
               type="button"
               style={buttonSecondaryStyle}

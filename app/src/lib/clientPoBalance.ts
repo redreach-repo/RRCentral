@@ -168,3 +168,110 @@ export function issuedToGroup(issues: UniformIssue[], staffIds: string[]): { ite
     last: mine.reduce((m, i) => (i.issued_on > m ? i.issued_on : m), ''),
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Uniforms issued against a PO line (client_uniform_issues.po_id)     */
+/* ------------------------------------------------------------------ */
+
+/** Staff group that means "every active person of this client". */
+export const ALL_STAFF_GROUP = 'All staff'
+
+export function isAllStaffGroup(group: string | null | undefined): boolean {
+  return /^(all( staff)?|everyone|all employees?)$/i.test(String(group || '').trim())
+}
+
+/** The PO line's staff: everyone for "All staff", else the matching job title / department. */
+export function staffForLine<S extends Pick<UniformStaff, 'job_title' | 'department' | 'active'>>(staff: S[], group: string | undefined): S[] {
+  if (isAllStaffGroup(group)) return staff.filter((s) => s.active !== false)
+  return staffForGroup(staff, group)
+}
+
+type PoIssue = Pick<UniformIssue, 'staff_id' | 'quantity'> & { po_id?: string | null; po_line_id?: string | null }
+
+/** Per PO line: how many items were issued against it and to how many people. */
+export function poIssuedByLine(issues: PoIssue[], poId: string): Map<string, { items: number; people: number }> {
+  const out = new Map<string, { items: number; people: Set<string> }>()
+  for (const i of issues) {
+    if (i.po_id !== poId || !i.po_line_id) continue
+    const cur = out.get(i.po_line_id) || { items: 0, people: new Set<string>() }
+    cur.items += qty(i.quantity)
+    cur.people.add(i.staff_id)
+    out.set(i.po_line_id, cur)
+  }
+  return new Map([...out.entries()].map(([k, v]) => [k, { items: q2(v.items), people: v.people.size }]))
+}
+
+/** Per person: how many items of one PO line they have been issued. */
+export function issuedPerPerson(issues: PoIssue[], poId: string, lineId: string): Map<string, number> {
+  const out = new Map<string, number>()
+  for (const i of issues) {
+    if (i.po_id !== poId || i.po_line_id !== lineId) continue
+    out.set(i.staff_id, q2((out.get(i.staff_id) || 0) + qty(i.quantity)))
+  }
+  return out
+}
+
+/**
+ * What an invoice should bill per PO line: issued so far minus invoiced so far
+ * (never below zero). Lines with nothing waiting are left out.
+ */
+export function issuedNotInvoiced(balances: PoLineBalance[], issuedByLine: Map<string, { items: number }>): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const b of balances) {
+    const issued = issuedByLine.get(b.line.id)?.items || 0
+    const waiting = q2(issued - b.invoiced)
+    if (waiting > 0) out[b.line.id] = waiting
+  }
+  return out
+}
+
+/** The uniform item a PO line is for ("Coverall - navy, 2 pairs" -> "Coverall"), else its description. */
+export function itemForLine(description: string | null | undefined, items: readonly string[]): string {
+  const d = String(description || '').trim()
+  const hit = [...items].sort((a, b) => b.length - a.length).find((it) => new RegExp(`\\b${it.replace(/[-]/g, '[- ]?')}s?\\b`, 'i').test(d))
+  return hit || d.slice(0, 60) || 'Uniform'
+}
+
+/** Line amount from quantity x unit price (2 decimals), or null when either is missing. */
+export function lineAmount(quantity: number | null | undefined, unitPrice: number | null | undefined): number | null {
+  const qn = Number(quantity)
+  const pn = Number(unitPrice)
+  if (quantity == null || unitPrice == null || !Number.isFinite(qn) || !Number.isFinite(pn)) return null
+  return Math.round(qn * pn * 100) / 100 // money-guard: line total shown for checking, saved as typed
+}
+
+function nameKey(s: string | null | undefined): string {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/\b(llc|l\.l\.c|fze|fzco|fz llc|co|company|est|establishment|trading|group|the)\b/g, ' ')
+    .replace(/[^a-z0-9؀-ۿ]+/g, ' ')
+    .trim()
+    .split(' ')
+    .slice(0, 2)
+    .join(' ')
+}
+
+/**
+ * When the PO's client has no staff on file: other client records with staff
+ * whose names look like the same company (e.g. "Sharjah Ready Mix" vs
+ * "Sharjah Ready Mix Concrete LLC"), so the user can see the staff were saved
+ * under a duplicate client.
+ */
+export function lookalikeClientsWithStaff(
+  clientId: string,
+  clientName: string,
+  staff: Pick<UniformStaff, 'client_id' | 'active' | 'clients'>[],
+): { clientId: string; name: string; people: number }[] {
+  const key = nameKey(clientName)
+  if (!key) return []
+  const out = new Map<string, { clientId: string; name: string; people: number }>()
+  for (const s of staff) {
+    if (s.client_id === clientId || s.active === false) continue
+    const name = String(s.clients?.company_name || '')
+    if (nameKey(name) !== key) continue
+    const cur = out.get(s.client_id) || { clientId: s.client_id, name, people: 0 }
+    cur.people += 1
+    out.set(s.client_id, cur)
+  }
+  return [...out.values()].sort((a, b) => b.people - a.people)
+}
