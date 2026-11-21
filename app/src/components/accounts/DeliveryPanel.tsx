@@ -118,7 +118,7 @@ const rowStyle: CSSProperties = {
   justifyContent: 'space-between',
   gap: 8,
   padding: '8px 0',
-  borderTop: '1px solid rgba(255,255,255,0.06)',
+  borderTop: '1px solid var(--border)',
   fontSize: 13,
 }
 const mutedNote: CSSProperties = { color: colors.muted, fontSize: 13, margin: 0, lineHeight: 1.5 }
@@ -181,7 +181,7 @@ function Bar({ value, max, warn }: { value: number; max: number; warn?: boolean 
   const over = max > 0 && value > max
   return (
     <div
-      style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}
+      style={{ height: 8, borderRadius: 999, background: 'color-mix(in srgb, var(--text) 8%, transparent)', overflow: 'hidden' }}
       role="progressbar"
       aria-valuenow={value}
       aria-valuemax={max}

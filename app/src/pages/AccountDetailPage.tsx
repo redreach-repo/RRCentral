@@ -142,8 +142,8 @@ const tabBarStyle: CSSProperties = {
   padding: 4,
   marginBottom: 16,
   borderRadius: 14,
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'color-mix(in srgb, var(--text) 4%, transparent)',
+  border: '1px solid var(--border)',
   overflowX: 'auto',
   maxWidth: '100%',
 }
@@ -153,7 +153,7 @@ function tabBtnStyle(active: boolean): CSSProperties {
     appearance: 'none',
     border: 'none',
     background: active ? 'rgba(232,93,4,0.2)' : 'transparent',
-    color: active ? '#ffb56a' : 'rgba(242,244,247,0.62)',
+    color: active ? '#ffb56a' : 'var(--text-muted)',
     fontSize: 13,
     fontWeight: 600,
     padding: '8px 14px',
@@ -726,7 +726,7 @@ export default function AccountDetailPage() {
                   key={c.id}
                   style={{
                     padding: '10px 0',
-                    borderTop: `1px solid rgba(255,255,255,0.06)`,
+                    borderTop: `1px solid var(--border)`,
                     display: 'flex',
                     justifyContent: 'space-between',
                     gap: 8,
@@ -849,7 +849,7 @@ export default function AccountDetailPage() {
               {items.map((a) => (
                 <li
                   key={a.id}
-                  style={{ padding: '10px 0', borderTop: `1px solid rgba(255,255,255,0.06)`, fontSize: 13 }}
+                  style={{ padding: '10px 0', borderTop: `1px solid var(--border)`, fontSize: 13 }}
                 >
                   <div style={{ color: colors.muted2, fontSize: 11, marginBottom: 3 }}>
                     {activityKindLabel(a.kind)} by {teamName(a.user_id, a.user_email)}, {when(a.created_at)}
@@ -1106,7 +1106,7 @@ function MoneyList({
                 justifyContent: 'space-between',
                 gap: 8,
                 padding: '8px 0',
-                borderTop: `1px solid rgba(255,255,255,0.06)`,
+                borderTop: `1px solid var(--border)`,
                 fontSize: 13,
               }}
             >

@@ -195,7 +195,7 @@ export default function PasskeyStubCard() {
           {stubs.map((s) => (
             <li
               key={s.id}
-              style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: '1px solid rgba(255,255,255,0.06)' }}
+              style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: '1px solid var(--border)' }}
             >
               <span>{s.nickname}</span>
               <span style={{ color: colors.muted2 }}>{s.created_at ? new Date(s.created_at).toLocaleString() : ''}</span>

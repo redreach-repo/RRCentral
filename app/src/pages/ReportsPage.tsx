@@ -1660,7 +1660,7 @@ function Bar({ label, value, max, color }: { label: string; value: number; max: 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 110px', gap: 8, alignItems: 'center' }}>
       <span style={{ fontSize: 12, color: colors.muted }}>{label}</span>
-      <div style={{ height: 10, background: 'rgba(255,255,255,0.06)', borderRadius: 999, overflow: 'hidden' }}>
+      <div style={{ height: 10, background: 'color-mix(in srgb, var(--text) 6%, transparent)', borderRadius: 999, overflow: 'hidden' }}>
         <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 999 }} />
       </div>
       <span style={{ fontSize: 12, textAlign: 'right' }}>{formatAED(value)}</span>

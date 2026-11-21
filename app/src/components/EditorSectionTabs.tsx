@@ -25,7 +25,7 @@ function tabStyle(active: boolean): CSSProperties {
     appearance: 'none',
     background: active ? 'rgba(232,93,4,0.12)' : 'transparent',
     border: `1px solid ${active ? 'rgba(232,93,4,0.5)' : 'transparent'}`,
-    color: active ? '#fff' : 'rgba(255,255,255,0.55)',
+    color: active ? 'var(--text)' : 'var(--text-muted)',
     borderRadius: 8,
     padding: '8px 6px',
     font: 'inherit',

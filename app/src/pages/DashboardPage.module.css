@@ -13,7 +13,7 @@
   border-radius: 12px;
   border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
   padding: clamp(20px, 2.5vw, 28px);
-  background: rgba(255, 255, 255, 0.025);
+  background: color-mix(in srgb, var(--text) 2.5%, transparent);
   animation: fadeUp 0.35s ease both;
 }
 
@@ -22,7 +22,7 @@
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-muted);
   margin: 0 0 10px;
 }
 
@@ -32,7 +32,7 @@
   font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 1.15;
-  color: #fff;
+  color: var(--text);
 }
 
 .heroTitle em {
@@ -45,7 +45,7 @@
   max-width: 42ch;
   font-size: 14px;
   line-height: 1.5;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-muted);
 }
 
 .heroActions {
@@ -82,13 +82,13 @@
 
 .heroSecondary {
   background: transparent;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text);
   border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
 }
 
 .heroSecondary:hover {
   border-color: rgba(232, 93, 4, 0.4);
-  color: #fff;
+  color: var(--text);
 }
 
 .heroStats {
@@ -97,7 +97,7 @@
   gap: 18px 28px;
   margin-top: 22px;
   padding-top: 18px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border);
 }
 
 .heroStat {
@@ -108,7 +108,7 @@
   font-size: 1.35rem;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: #fff;
+  color: var(--text);
 }
 
 .heroStatValueWarn {
@@ -121,7 +121,7 @@
 
 .heroStatLabel {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-muted);
   margin-top: 2px;
 }
 
@@ -147,7 +147,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-muted);
 }
 
 .sectionLink {
@@ -172,19 +172,19 @@
   position: relative;
   padding: 18px 18px 16px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--text) 3.5%, transparent);
   min-width: 0;
   transition: border-color 0.18s ease;
 }
 
 .moneyCard:hover {
-  border-color: rgba(255, 255, 255, 0.16);
+  border-color: var(--border-strong);
 }
 
 .moneyLabel {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
   margin-bottom: 6px;
 }
 
@@ -198,7 +198,7 @@
 
 .moneyHint {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--text-muted);
   margin-top: 6px;
 }
 
@@ -215,8 +215,8 @@
   color: inherit;
   padding: 14px 16px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
   transition:
     border-color 0.18s ease,
     transform 0.18s ease;
@@ -235,7 +235,7 @@
 
 .pulseLabel {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-muted);
   margin-top: 2px;
 }
 
@@ -249,10 +249,10 @@
 .stageChip {
   text-decoration: none;
   color: inherit;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border);
   border-radius: 999px;
   padding: 8px 14px;
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--text) 3%, transparent);
   display: inline-flex;
   align-items: baseline;
   gap: 8px;
@@ -268,7 +268,7 @@
 
 .stageLabel {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
 }
 
 .stageCount {
@@ -279,8 +279,8 @@
 /* —— Surface panels —— */
 .surface {
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--text) 3.5%, transparent);
   padding: 18px;
 }
 
@@ -301,8 +301,8 @@
   margin: 0;
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--text) 3.5%, transparent);
   color: inherit;
   font: inherit;
   text-align: left;
@@ -311,8 +311,8 @@
 }
 
 .attentionToggle:hover {
-  background: rgba(255, 255, 255, 0.055);
-  border-color: rgba(255, 255, 255, 0.16);
+  background: color-mix(in srgb, var(--text) 5.5%, transparent);
+  border-color: var(--border-strong);
 }
 
 .attentionToggleCopy {
@@ -324,7 +324,7 @@
 
 .attentionHint {
   font-size: 12px;
-  color: rgba(242, 244, 247, 0.5);
+  color: var(--text-muted);
 }
 
 .attentionStack {
@@ -359,7 +359,7 @@
   gap: 10px;
   align-items: center;
   padding: 10px 4px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--border);
   font-size: 13px;
   text-decoration: none;
   color: inherit;
@@ -370,11 +370,11 @@
 }
 
 .docRow:hover {
-  color: #fff;
+  color: var(--text);
 }
 
 .docMuted {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -390,7 +390,7 @@
   border-radius: 12px;
   border: 1px solid rgba(232, 93, 4, 0.35);
   background: rgba(232, 93, 4, 0.08);
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.45;
 }
@@ -403,7 +403,7 @@
 .footNote {
   margin: 10px 0 0;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-muted);
   line-height: 1.45;
 }
 

@@ -16,7 +16,7 @@ export default function DealProgressStrip({ steps }: { steps: DealStep[] }) {
       {steps.map((step, i) => (
         <div key={step.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {i > 0 ? (
-            <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 12 }} aria-hidden>
+            <span style={{ color: 'var(--text-muted)', fontSize: 12 }} aria-hidden>
               →
             </span>
           ) : null}

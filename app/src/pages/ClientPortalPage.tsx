@@ -467,7 +467,7 @@ function Section({ title, action, children }: { title: string; action?: ReactNod
 function Bar({ percent }: { percent: number }) {
   const shown = Math.max(0, Math.min(100, percent))
   return (
-    <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+    <div style={{ height: 8, borderRadius: 999, background: 'color-mix(in srgb, var(--text) 10%, transparent)', overflow: 'hidden' }}>
       <div style={{ width: `${shown}%`, height: '100%', background: percent > 100 ? colors.warn : colors.accent }} />
     </div>
   )

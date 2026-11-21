@@ -212,7 +212,7 @@ export default function TwoStepCard() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 padding: '6px 0',
-                borderTop: '1px solid rgba(255,255,255,0.06)',
+                borderTop: '1px solid var(--border)',
               }}
             >
               <span>

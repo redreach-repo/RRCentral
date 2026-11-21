@@ -10,12 +10,13 @@ import type { PageId } from './a11y.spec'
  */
 export const KNOWN_VIOLATIONS: Record<PageId, Record<'light' | 'dark', Record<string, number>>> = {
   'sign-in': { light: {}, dark: {} },
-  // Light: sidebar labels near white on paper; hero button white on orange; company select has no name.
-  home: { light: { 'color-contrast': 30, 'select-name': 1 }, dark: { 'color-contrast': 5, 'select-name': 1 } },
-  // Sidebar section labels and labels; date filter inputs have no label.
-  list: { light: { 'color-contrast': 28, 'label': 2 }, dark: { 'color-contrast': 3, 'label': 2 } },
-  // Sidebar, inline field labels not tied to inputs (label, select-name).
-  form: { light: { 'color-contrast': 28, 'label': 3, 'select-name': 3 }, dark: { 'color-contrast': 4, 'label': 3, 'select-name': 3 } },
-  // WhatsApp button white on green, old orange #e85d04 button, grey Drive note on white.
-  pdf: { light: { 'color-contrast': 3 }, dark: { 'color-contrast': 3 } },
+  // Light mode reads the tokens since the light mode pass (21 Nov). Left: company select has no name.
+  // Dark: two links in plain brand red, too dark on dark.
+  home: { light: { 'select-name': 1 }, dark: { 'color-contrast': 2, 'select-name': 1 } },
+  // Date filter inputs have no label. Dark: the orange New button with white text.
+  list: { light: { 'label': 2 }, dark: { 'color-contrast': 1, 'label': 2 } },
+  // Inline field labels not tied to inputs (label, select-name). Dark: orange New button, a total in brand red.
+  form: { light: { 'label': 3, 'select-name': 3 }, dark: { 'color-contrast': 2, 'label': 3, 'select-name': 3 } },
+  // WhatsApp button white on green, grey Drive note on white.
+  pdf: { light: { 'color-contrast': 2 }, dark: { 'color-contrast': 2 } },
 }

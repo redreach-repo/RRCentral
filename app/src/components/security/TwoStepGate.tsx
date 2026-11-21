@@ -19,18 +19,18 @@ const screen: CSSProperties = {
   display: 'grid',
   placeItems: 'center',
   background: 'var(--bg)',
-  color: 'rgba(255,255,255,0.9)',
+  color: 'var(--text)',
   fontFamily: "'DM Sans', sans-serif",
   padding: 16,
 }
 const box: CSSProperties = { maxWidth: 420, width: '100%', display: 'grid', gap: 14 }
-const muted: CSSProperties = { color: 'rgba(255,255,255,0.65)', lineHeight: 1.5, margin: 0, fontSize: 14 }
+const muted: CSSProperties = { color: 'var(--text-muted)', lineHeight: 1.5, margin: 0, fontSize: 14 }
 const input: CSSProperties = {
   padding: '12px 14px',
   borderRadius: 8,
-  border: '1px solid rgba(255,255,255,0.2)',
-  background: 'rgba(255,255,255,0.06)',
-  color: '#fff',
+  border: '1px solid var(--border-strong)',
+  background: 'color-mix(in srgb, var(--text) 6%, transparent)',
+  color: 'var(--text)',
   fontSize: 22,
   letterSpacing: 6,
   textAlign: 'center',
@@ -47,7 +47,7 @@ const primary: CSSProperties = {
 const plain: CSSProperties = {
   padding: '8px 14px',
   borderRadius: 8,
-  border: '1px solid rgba(255,255,255,0.2)',
+  border: '1px solid var(--border-strong)',
   background: 'transparent',
   color: 'inherit',
   cursor: 'pointer',

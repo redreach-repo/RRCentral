@@ -15,7 +15,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
           display: 'grid',
           placeItems: 'center',
           background: 'var(--bg)',
-          color: 'rgba(255,255,255,0.6)',
+          color: 'var(--text-muted)',
           fontFamily: "'DM Sans', sans-serif",
         }}
       >
@@ -37,14 +37,14 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
           display: 'grid',
           placeItems: 'center',
           background: 'var(--bg)',
-          color: 'rgba(255,255,255,0.85)',
+          color: 'var(--text)',
           fontFamily: "'DM Sans', sans-serif",
           padding: 16,
         }}
       >
         <div style={{ maxWidth: 420, textAlign: 'center' }}>
           <h1 style={{ fontSize: 22, marginBottom: 12 }}>No access to {PRODUCT.name}</h1>
-          <p style={{ color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, marginBottom: 20 }}>
+          <p style={{ color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 20 }}>
             {user.email} is signed in but is not on the {PRODUCT.name} team list. Ask an admin to add
             you under Settings → Users, then sign in again.
           </p>
@@ -54,7 +54,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
             style={{
               padding: '10px 18px',
               borderRadius: 8,
-              border: '1px solid rgba(255,255,255,0.2)',
+              border: '1px solid var(--border-strong)',
               background: 'transparent',
               color: 'inherit',
               cursor: 'pointer',

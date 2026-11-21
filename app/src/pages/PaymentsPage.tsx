@@ -591,7 +591,7 @@ export default function PaymentsPage() {
           <button
             type="button"
             className={docsStyles.newBtn}
-            style={{ background: 'rgba(255,255,255,0.08)' }}
+            style={{ background: 'color-mix(in srgb, var(--text) 8%, transparent)' }}
             disabled={!selected}
             onClick={() => {
               setRequestForm({
@@ -609,7 +609,7 @@ export default function PaymentsPage() {
           <button
             type="button"
             className={docsStyles.newBtn}
-            style={{ background: 'rgba(255,255,255,0.08)' }}
+            style={{ background: 'color-mix(in srgb, var(--text) 8%, transparent)' }}
             disabled={!selected}
             onClick={() => {
               setSupplierForm({
