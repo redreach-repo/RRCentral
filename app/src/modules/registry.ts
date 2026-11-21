@@ -17,6 +17,8 @@ export type ModuleNavItem = {
   minRole?: UserRole
   roles?: UserRole[]
   forStaff?: boolean
+  /** Feature flag key for this link only; when false, the link is hidden. */
+  flag?: string
 }
 
 export type ModuleManifest = {

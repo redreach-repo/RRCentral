@@ -4,7 +4,7 @@ import { APP_MODULES, moduleIdForPath, titleForPath, visibleAppModules } from '.
 
 describe('APP_MODULES', () => {
   it('lists the core shell sections in order (gap plan extension groups follow)', () => {
-    expect(APP_MODULES.slice(0, 13).map((m) => m.id)).toEqual([
+    expect(APP_MODULES.slice(0, 9).map((m) => m.id)).toEqual([
       'overview',
       'sales',
       'documents',
@@ -13,10 +13,6 @@ describe('APP_MODULES', () => {
       'ops',
       'finance',
       'hr',
-      'payroll',
-      'marketing',
-      'saasBilling',
-      'industryPacks',
       'admin',
     ])
   })
@@ -128,5 +124,35 @@ describe('visibleAppModules', () => {
     expect(work).not.toContain('/sales')
     expect(work).not.toContain('/ctrm')
     expect(work).toContain('/deals')
+  })
+})
+
+describe('sidebar tidy (fewer groups, same switches)', () => {
+  const paths = (flags: Record<string, boolean>) =>
+    visibleAppModules('admin', {}, flags).flatMap((m) => m.items.map((i) => i.to))
+
+  it('keeps HR and payroll in one group, each with its own switch', () => {
+    const hr = APP_MODULES.find((m) => m.id === 'hr')
+    expect(hr?.items.map((i) => i.to)).toEqual(['/hr/people', '/hr/leave', '/hr/attendance', '/payroll'])
+    expect(paths({ payroll: false })).not.toContain('/payroll')
+    expect(paths({ payroll: false })).toContain('/hr/people')
+    expect(paths({ hr: false })).toContain('/payroll')
+    expect(paths({ hr: false, payroll: false }).some((p) => p.startsWith('/hr') || p === '/payroll')).toBe(false)
+  })
+
+  it('still hides marketing, plan and packs with their switches', () => {
+    expect(paths({})).toEqual(expect.arrayContaining(['/marketing', '/saas-billing', '/industry-packs', '/country-packs']))
+    const off = paths({ marketing: false, saasBilling: false, industryPacks: false })
+    expect(off).not.toContain('/marketing')
+    expect(off).not.toContain('/saas-billing')
+    expect(off).not.toContain('/industry-packs')
+  })
+
+  it('has no group with a single link', () => {
+    for (const group of APP_MODULES) {
+      // Overview and Mail are top-level on purpose.
+      if (group.id === 'overview' || group.id === 'mail') continue
+      expect(group.items.length, group.id).toBeGreaterThan(1)
+    }
   })
 })
