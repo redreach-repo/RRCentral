@@ -143,3 +143,27 @@ describe('payment reminders', () => {
     expect(final.body).not.toContain('—')
   })
 })
+
+describe('reminderMessage with a template from Settings', () => {
+  const base = {
+    stage: 7 as const,
+    contactName: 'Sam',
+    reference: 'RR-01-26003',
+    balanceText: 'AED 1,050.00',
+    dueDate: '2026-11-01',
+    daysLate: 7,
+    companyName: 'Red Reach',
+  }
+  it('fills the tokens', () => {
+    const m = reminderMessage({
+      ...base,
+      template: { subject: 'Reminder {{ref}}', body: 'Hi {{contact}}, {{balance}} was due {{dueDate}} ({{daysLate}} days). {{company}}' },
+    })
+    expect(m.subject).toBe('Reminder RR-01-26003')
+    expect(m.body).toBe('Hi Sam, AED 1,050.00 was due 1 November 2026 (7 days). Red Reach')
+  })
+  it('keeps the built-in wording when the template is blank', () => {
+    expect(reminderMessage({ ...base, template: { subject: '  ', body: '' } })).toEqual(reminderMessage(base))
+    expect(reminderMessage(base).subject).toBe('Invoice RR-01-26003 is now 7 days overdue')
+  })
+})

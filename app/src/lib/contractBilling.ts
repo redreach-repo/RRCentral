@@ -1,6 +1,7 @@
 import { addDays, differenceInCalendarDays, format, parseISO, subMonths } from 'date-fns'
 import { calculateOverage, effectiveMonthlyFee, monthKey, monthLabel, type DeliveryRates } from './delivery'
 import { isCancelledInvoice } from './finance'
+import { applyMessageTemplate } from './templates'
 import type { Contract, DeliveryPackage, Invoice, UsageRecord } from './types'
 
 /**
@@ -219,8 +220,32 @@ export function reminderMessage(input: {
   dueDate: string
   daysLate: number
   companyName: string
+  /** Settings, Message templates: Reminder email subject/body. Blank = the built-in 3, 7 and 14 day wording. */
+  template?: { subject?: string; body?: string }
 }): { subject: string; body: string } {
   const due = format(parseISO(input.dueDate), 'd MMMM yyyy')
+  const subjectTpl = input.template?.subject?.trim() || ''
+  const bodyTpl = input.template?.body?.trim() ? input.template.body : ''
+  const vars = {
+    contact: input.contactName || 'team',
+    ref: input.reference,
+    balance: input.balanceText,
+    dueDate: due,
+    daysLate: input.daysLate,
+    stage: input.stage,
+    company: input.companyName,
+  }
+  const built = builtInReminder(input, due)
+  return {
+    subject: subjectTpl ? applyMessageTemplate(subjectTpl, vars) : built.subject,
+    body: bodyTpl ? applyMessageTemplate(bodyTpl, vars) : built.body,
+  }
+}
+
+function builtInReminder(
+  input: { stage: ReminderStage; contactName: string; reference: string; balanceText: string; daysLate: number; companyName: string },
+  due: string,
+): { subject: string; body: string } {
   const hello = `Dear ${input.contactName || 'team'},`
   const sign = `Best regards,\n${input.companyName}`
   if (input.stage === 3) {

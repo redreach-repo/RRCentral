@@ -206,7 +206,7 @@ const DEFAULT_SETTINGS: { key: string; value: string }[] = [
   {
     key: 'emailQuoteBody',
     value:
-      'Dear {{contact}},\n\nPlease find attached our {{titleLower}} {{ref}}.\n\nAmount: {{amount}}{{validUntilLine}}\n\nThe PDF has been downloaded to your device — please attach it to this email if it is not already included.\n\nBest regards,\n{{company}}',
+      'Dear {{contact}},\n\nPlease find attached our {{titleLower}} {{ref}}.\n\nAmount: {{amount}}{{validUntilLine}}\n\nBest regards,\n{{company}}',
   },
   {
     key: 'emailCrmSubject',
