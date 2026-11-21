@@ -1,0 +1,53 @@
+.mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 168px;
+  border-radius: 6px;
+  padding: 0;
+}
+
+/* Dark artwork disappears on the dark sidebar, so give the logo a white chip. */
+:global([data-theme='dark']) .chip {
+  background: #ffffff;
+  padding: 4px 8px;
+}
+
+.logo {
+  display: block;
+  height: 28px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.initials {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+}
