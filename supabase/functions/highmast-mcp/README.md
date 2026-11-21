@@ -95,6 +95,33 @@ and return `items`, `has_more` and `next_offset`.
 | `add_timeline_note(account_id or deal_id, text)` | Note on an account or a deal |
 | `move_deal_stage(deal_id, stage)` | Forward only; never to won, lost or signed |
 | `create_follow_up(deal_id, due_date, note)` | Sets the deal's next follow-up and logs it as a note |
+| `get_quote_pdf` / `get_invoice_pdf` / `get_delivery_note_pdf` | The Download PDF file, as a 1 hour private link (see below) |
+
+## Quote, invoice and delivery note PDFs
+
+`get_quote_pdf`, `get_invoice_pdf` and `get_delivery_note_pdf` (`tools_pdf.ts`) hand out the **same PDF a person gets
+from Download PDF** in HighMast. Read only: nothing changes status, is marked sent or emailed.
+
+* **Input.** `quote_id` or `quote_number` (e.g. `RR-01-26007`), `invoice_id` or `invoice_number` (invoices and
+  credit notes), `delivery_note_id` or `delivery_note_number`. A missing, hidden or soft deleted record gives a clear error.
+* **Output.** `file_name`, `signed_url` (private bucket `generated-pdfs`, link valid 1 hour), `size_bytes`,
+  `generated_at`, `source`, and a `warning` when the copy is older than the document.
+* **Files.** `generated-pdfs/quotes/<number>.pdf`, `invoices/<number>.pdf`, `delivery-notes/<number>.pdf`,
+  overwritten each time. Download PDF in the app also saves its file there.
+* **Fresh PDFs.** With the `RENDER_PDF_URL` secret set, each call has the Vercel renderer (`services/render-pdf`)
+  open `/render-pdf/<type>/<id>` in HighMast in a headless browser. That page is the document page itself and runs
+  the very same Download PDF function, then saves the file. Without the renderer, or if it fails, the tool returns
+  the copy saved at the last Download PDF and says so.
+* **Render login.** The function signs a 2 minute login for the key's member with the claims `hm_mcp_key` and
+  `hm_pdf_render = "<type>:<id>"`. The database (`20261326090000_generated_pdfs.sql`) lets it read only the
+  document page's tables (settings for the letterhead, client, CRM row, lines) and write nothing but the PDF file.
+  The renderer checks the login with `rr_pdf_render_check()` before starting a browser, so it needs no secret.
+* **Departments.** Quote PDFs: Sales and Finance. Invoice PDFs: Finance and Sales. Delivery note PDFs: Operations.
+  Standard keys get all three, limited to what their member can see.
+* **Layout.** The renderer uses the app's default PDF layout (fit to one page, English). A person who picked
+  "2 pages" or Arabic labels in their own browser gets that in their own download.
+
+If you re-run any `highmast-mcp*.sql` file later, re-run `supabase-sql/generated-pdfs.sql` after it.
 
 ## Keys by department (Grok Bot on Sales, Claude on HR ...)
 

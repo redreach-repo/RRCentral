@@ -25,9 +25,20 @@ import { memberClient, resolveKey } from "./auth.ts"
 import { assistantLabel, bearerToken, departmentsLabel, isMcpKeyShape } from "./highmastMcp.bundle.js"
 import { registerTools, type Reach } from "./tools.ts"
 import { registerAdminTools } from "./tools_admin.ts"
+import { httpRenderer, registerPdfTools, setPdfRenderer } from "./tools_pdf.ts"
 
 export const SERVER_NAME = "highmast"
 export const SERVER_VERSION = "1.0.0"
+
+// Fresh PDFs on demand (services/render-pdf on Vercel). Without it the PDF tools
+// return the copy saved at the last Download PDF.
+const RENDER_PDF_URL = (Deno.env.get("RENDER_PDF_URL") || "").trim()
+if (/^https:\/\//.test(RENDER_PDF_URL)) {
+  setPdfRenderer(httpRenderer(RENDER_PDF_URL, {
+    jwtSecret: Deno.env.get("MCP_JWT_SECRET") || "",
+    anonKey: Deno.env.get("SUPABASE_ANON_KEY") || "",
+  }))
+}
 
 const CORS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -111,6 +122,7 @@ async function handler(req: Request): Promise<Response> {
   const ctx = { db, key: who.key, now: () => new Date(), reach }
   registerTools(server, ctx)
   registerAdminTools(server, ctx)
+  registerPdfTools(server, ctx)
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true })
   await server.connect(transport)
   try {

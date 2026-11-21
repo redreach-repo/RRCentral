@@ -2272,8 +2272,13 @@ var MCP_TOOL_DEPARTMENTS = {
   update_payroll_line: ["payroll"],
   get_payroll_run: ["payroll"],
   // Admin
-  list_users: []
+  list_users: [],
+  // PDFs (read only; the document's own rules decide what a key can see)
+  get_quote_pdf: ["sales", "finance"],
+  get_invoice_pdf: ["finance", "sales"],
+  get_delivery_note_pdf: ["operations"]
 };
+var MCP_PDF_TOOLS = ["get_quote_pdf", "get_invoice_pdf", "get_delivery_note_pdf"];
 function normalizeDepartments(list) {
   const set = new Set((list || []).map((d) => String(d).toLowerCase()));
   return MCP_DEPARTMENT_VALUES.filter((d) => set.has(d));
@@ -2285,7 +2290,7 @@ function toolAllowedForDepartments(tool, departments) {
   return depts.some((d) => allowed.includes(d));
 }
 function toolsForDepartments(departments) {
-  return [...MCP_TOOLS, ...MCP_ADMIN_TOOLS].filter((t) => toolAllowedForDepartments(t, departments));
+  return [...MCP_TOOLS, ...MCP_ADMIN_TOOLS, ...MCP_PDF_TOOLS].filter((t) => toolAllowedForDepartments(t, departments));
 }
 function departmentsLabel(departments) {
   const depts = normalizeDepartments(departments);
@@ -2450,11 +2455,24 @@ function auditArgs(args) {
   }
   return out;
 }
+var GENERATED_PDF_BUCKET = "generated-pdfs";
+var PDF_FOLDER = { quote: "quotes", invoice: "invoices", "delivery-note": "delivery-notes" };
+var GENERATED_PDF_LINK_SECONDS = 3600;
+function generatedPdfPath(kind, number) {
+  const n = String(number || "").trim();
+  if (!/^[A-Za-z0-9._-]{1,80}$/.test(n) || n.startsWith(".")) return null;
+  return `${PDF_FOLDER[kind]}/${n}.pdf`;
+}
+function quotePdfNumber(q) {
+  return String(q.reference_number || q.quote_id || "").trim();
+}
 export {
   ACCOUNT_TYPE_VALUES,
   DIVISION_CODES,
   FORBIDDEN_ADMIN_TOOL_WORDS,
   FORBIDDEN_TOOL_WORDS,
+  GENERATED_PDF_BUCKET,
+  GENERATED_PDF_LINK_SECONDS,
   LEAD_ACCOUNT_TYPE,
   MCP_ADMIN_TOOLS,
   MCP_ASSISTANTS,
@@ -2464,6 +2482,7 @@ export {
   MCP_KEY_PREFIX,
   MCP_KEY_ROLES,
   MCP_KEY_SCOPES,
+  MCP_PDF_TOOLS,
   MCP_PIPELINES,
   MCP_PIPELINE_NAMES,
   MCP_RATE_LIMIT_PER_MINUTE,
@@ -2489,6 +2508,7 @@ export {
   departmentsLabel,
   divisionVertical,
   expenseAmounts,
+  generatedPdfPath,
   invoiceDaysOverdue,
   invoiceDueDate,
   isCollectible,
@@ -2505,6 +2525,7 @@ export {
   normalizeDepartments,
   pageFrom,
   pageOf,
+  quotePdfNumber,
   sameCompany,
   slaState,
   stageMoveProblem,

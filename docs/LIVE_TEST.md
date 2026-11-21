@@ -710,3 +710,22 @@ or `(..., Claude)`. A key with Admin ticked gets all 59 tools.
 **If it fails.** "Departments (run the AI connector departments SQL first)" greyed out: the SQL was not run. A key sees
 every tool: the function was not redeployed. "This key's departments (...) do not cover ...": working as meant; use a key
 for that department.
+
+## 41. AI connector quote and invoice PDFs (get_quote_pdf, get_invoice_pdf)
+
+**Trigger.** Run `supabase-sql/generated-pdfs.sql`, redeploy `highmast-mcp`, wait for GitHub Pages to publish, set up
+the Vercel renderer (`services/render-pdf/README.md`) and add the Supabase secret `RENDER_PDF_URL`. Then in HighMast open
+quote RR-01-26007 and click **Download PDF**. In Grok (a key with Sales or Finance), ask for the PDF of RR-01-26007.
+
+**You should see.** The tool answers with `file_name` RR-01-26007.pdf, a `signed_url`, `size_bytes`, `generated_at` (now)
+and `source` "rendered now with the app's Download PDF". The link opens the same PDF as your download: logo, company
+details, TRN, lines, VAT, totals, terms, bank details and signature block. After an hour the link stops working.
+Supabase > Storage shows the bucket `generated-pdfs` as private. Admin > Audit log has an "MCP call" row for the tool.
+The quote's status is unchanged and nothing was emailed. A deleted quote gives "is deleted"; an unknown number gives
+"No quote ...". A key with only HR does not list the PDF tools.
+
+**If it fails.** "The generated-pdfs bucket is not set up yet": the SQL was not run. A `warning` saying the renderer
+could not make the PDF: check the Vercel function's logs and that `RENDER_PDF_URL` is the full `/api/render` address;
+the answer still carries the copy from the last Download PDF. "No PDF ... has been made yet" with no renderer set up:
+click Download PDF in HighMast once.
+
