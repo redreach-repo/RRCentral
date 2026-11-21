@@ -42,22 +42,22 @@ insert into public.app_settings (key, value) values ('mcp.test.setting', 'x') on
 -- Keys
 ------------------------------------------------------------
 select pg_temp.login('admin');
-insert into public.mcp_keys (id, name, key_prefix, key_hash, role, scope, acts_as_user_id, created_by)
-select 'e6900000-0000-4000-8000-000000000001', 'AI Assistant', 'hmk_admn', repeat('9', 64), 'admin', 'admin', u.id, 'mt-admin@redreach.ae'
+insert into public.mcp_keys (id, name, key_prefix, key_hash, role, scope, departments, acts_as_user_id, created_by)
+select 'e6900000-0000-4000-8000-000000000001', 'AI Assistant', 'hmk_admn', repeat('9', 64), 'admin', 'admin', '{admin}', u.id, 'mt-admin@redreach.ae'
 from public.app_users u where u.email = 'ai-assistant@redreach.ae';
 select pg_temp.expect((select count(*) from public.mcp_keys where id = 'e6900000-0000-4000-8000-000000000001') = 1,
   'an admin creates an admin key for the AI Assistant member');
 select pg_temp.expect(pg_temp.fails($q$
-  insert into public.mcp_keys (name, key_hash, role, scope, acts_as_user_id)
-  select 'Me', repeat('8', 64), 'admin', 'admin', u.id from public.app_users u where u.email = 'mt-admin@redreach.ae'$q$),
+  insert into public.mcp_keys (name, key_hash, role, scope, departments, acts_as_user_id)
+  select 'Me', repeat('8', 64), 'admin', 'admin', '{admin}', u.id from public.app_users u where u.email = 'mt-admin@redreach.ae'$q$),
   'an admin key cannot act as the admin creating it');
 select pg_temp.expect(pg_temp.fails($q$
-  insert into public.mcp_keys (name, key_hash, role, scope, acts_as_user_id)
-  select 'Mixed', repeat('7', 64), 'admin', 'standard', u.id from public.app_users u where u.email = 'ai-assistant@redreach.ae'$q$),
+  insert into public.mcp_keys (name, key_hash, role, scope, departments, acts_as_user_id)
+  select 'Mixed', repeat('7', 64), 'admin', 'standard', '{}', u.id from public.app_users u where u.email = 'ai-assistant@redreach.ae'$q$),
   'a standard key cannot act as an admin');
 select pg_temp.expect(pg_temp.fails($q$
-  insert into public.mcp_keys (name, key_hash, role, scope, acts_as_user_id)
-  select 'Mixed', repeat('6', 64), 'sales', 'admin', u.id from public.app_users u where u.email = 'mt-sales@redreach.ae'$q$),
+  insert into public.mcp_keys (name, key_hash, role, scope, departments, acts_as_user_id)
+  select 'Mixed', repeat('6', 64), 'sales', 'admin', '{admin}', u.id from public.app_users u where u.email = 'mt-sales@redreach.ae'$q$),
   'an admin key cannot act as a sales member');
 insert into public.mcp_keys (id, name, key_prefix, key_hash, role, acts_as_user_id, created_by)
 select 'e6900000-0000-4000-8000-000000000002', 'Grok Sales', 'hmk_sale', repeat('5', 64), 'sales', u.id, 'mt-admin@redreach.ae'
@@ -67,8 +67,8 @@ select pg_temp.logout();
 
 select pg_temp.login('manager');
 select pg_temp.expect(pg_temp.fails($q$
-  insert into public.mcp_keys (name, key_hash, role, scope, acts_as_user_id)
-  select 'Mgr', repeat('4', 64), 'admin', 'admin', u.id from public.app_users u where u.email = 'ai-assistant@redreach.ae'$q$),
+  insert into public.mcp_keys (name, key_hash, role, scope, departments, acts_as_user_id)
+  select 'Mgr', repeat('4', 64), 'admin', 'admin', '{admin}', u.id from public.app_users u where u.email = 'ai-assistant@redreach.ae'$q$),
   'a manager cannot make admin keys');
 reset role;
 select pg_temp.logout();

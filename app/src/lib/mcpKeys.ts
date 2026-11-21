@@ -2,12 +2,22 @@
  * AI connector (MCP) keys for the highmast-mcp Edge Function. Admin only (RLS).
  * The key is made in the browser, only its SHA-256 hash is saved, and the key
  * itself is shown once. A standard key acts as one active sales, staff or viewer
- * member; an admin key acts as a dedicated AI Assistant admin member (never the
- * admin creating it) and also gets the admin tools.
+ * member; a key with departments (scope admin) acts as an AI admin member (never
+ * the admin creating it) and only reaches the tools and records of the
+ * departments picked for it (Sales, Finance, HR ...), checked in the database.
+ * Every key can say which assistant it is for (Grok Bot, Claude, ChatGPT).
  */
 import { db } from './db'
 import { isMissingRelationError, isUndefinedColumnError } from './errors'
-import { MCP_KEY_PREFIX, MCP_KEY_ROLES, type McpKeyRole, type McpKeyScope } from './highmastMcp'
+import {
+  MCP_KEY_PREFIX,
+  MCP_KEY_ROLES,
+  normalizeDepartments,
+  type McpAssistant,
+  type McpDepartment,
+  type McpKeyRole,
+  type McpKeyScope,
+} from './highmastMcp'
 import { getSupabaseRuntimeConfig } from './supabaseConfig'
 
 export type McpKeyRow = {
@@ -17,6 +27,9 @@ export type McpKeyRow = {
   role: McpKeyRole | 'admin'
   /** 'admin' keys get the admin tools; missing before the admin SQL was run. */
   scope?: McpKeyScope
+  /** Missing before the departments SQL was run. */
+  assistant?: McpAssistant | null
+  departments?: McpDepartment[]
   acts_as_user_id: string
   created_by: string
   created_at: string
@@ -52,9 +65,12 @@ export function mcpServerUrl(supabaseUrl = getSupabaseRuntimeConfig().url): stri
 /** Null when the SQL has not been run yet. */
 const KEY_COLUMNS = 'id, name, key_prefix, role, acts_as_user_id, created_by, created_at, last_used_at, revoked_at'
 
-/** Null when the SQL has not been run yet. Works before and after the admin SQL (scope column). */
+/** Null when the SQL has not been run yet. Works before and after the admin and departments SQL. */
 export async function listMcpKeys(): Promise<McpKeyRow[] | null> {
-  let res = await db.from('mcp_keys').select(`${KEY_COLUMNS}, scope`).order('created_at', { ascending: false })
+  let res = await db.from('mcp_keys').select(`${KEY_COLUMNS}, scope, assistant, departments`).order('created_at', { ascending: false })
+  if (res.error && isUndefinedColumnError(res.error)) {
+    res = await db.from('mcp_keys').select(`${KEY_COLUMNS}, scope`).order('created_at', { ascending: false })
+  }
   if (res.error && isUndefinedColumnError(res.error)) {
     res = await db.from('mcp_keys').select(KEY_COLUMNS).order('created_at', { ascending: false })
   }
@@ -65,9 +81,9 @@ export async function listMcpKeys(): Promise<McpKeyRow[] | null> {
   return ((res.data || []) as McpKeyRow[]).map((r) => ({ ...r, scope: r.scope || 'standard' }))
 }
 
-/** True when the admin key SQL (scope column) is on the database. */
+/** True when the departments SQL (departments and assistant columns) is on the database. */
 export async function mcpAdminKeysReady(): Promise<boolean> {
-  const { error } = await db.from('mcp_keys').select('scope').limit(1)
+  const { error } = await db.from('mcp_keys').select('scope, departments, assistant').limit(1)
   return !error
 }
 
@@ -95,11 +111,14 @@ export async function createMcpKey(
   member: McpMember,
   createdBy: string,
   scope: McpKeyScope = 'standard',
+  options: { assistant?: McpAssistant | null; departments?: readonly string[] } = {},
 ): Promise<{ key: string; row: McpKeyRow }> {
-  if (scope === 'admin' && member.role !== 'admin') throw new Error('An admin key must act as an admin member (the AI Assistant).')
+  const departments = normalizeDepartments(options.departments)
+  if (scope === 'admin' && !departments.length) throw new Error('Pick at least one department for this key.')
+  if (scope === 'admin' && member.role !== 'admin') throw new Error('A key with departments must act as an AI admin member.')
   if (scope === 'standard' && member.role === 'admin') throw new Error('A standard key cannot act as an admin member.')
   if (scope === 'admin' && member.email.toLowerCase() === createdBy.toLowerCase()) {
-    throw new Error('An admin key acts as its own AI Assistant member, not as you.')
+    throw new Error('A key with departments acts as its own AI member, not as you.')
   }
   const key = generateMcpKey()
   const row: Record<string, unknown> = {
@@ -110,11 +129,15 @@ export async function createMcpKey(
     acts_as_user_id: member.id,
     created_by: createdBy,
   }
-  // Only send scope for admin keys, so standard keys still work before the admin SQL is run.
-  if (scope === 'admin') row.scope = 'admin'
+  // Only send the newer columns when used, so standard keys still work before that SQL is run.
+  if (scope === 'admin') {
+    row.scope = 'admin'
+    row.departments = departments
+  }
+  if (options.assistant) row.assistant = options.assistant
   const { data, error } = await db.from('mcp_keys').insert(row).select(KEY_COLUMNS).single()
   if (error) throw error
-  return { key, row: { ...(data as McpKeyRow), scope } }
+  return { key, row: { ...(data as McpKeyRow), scope, assistant: options.assistant || null, departments: scope === 'admin' ? departments : [] } }
 }
 
 export async function revokeMcpKey(id: string): Promise<void> {

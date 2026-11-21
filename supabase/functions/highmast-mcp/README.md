@@ -96,6 +96,27 @@ and return `items`, `has_more` and `next_offset`.
 | `move_deal_stage(deal_id, stage)` | Forward only; never to won, lost or signed |
 | `create_follow_up(deal_id, due_date, note)` | Sets the deal's next follow-up and logs it as a note |
 
+## Keys by department (Grok Bot on Sales, Claude on HR ...)
+
+Since `20261325090000_highmast_mcp_departments.sql`, each key also says which **assistant** it is for
+(Grok Bot, Claude, ChatGPT or other) and a key with **Access: Departments** gets one or more departments:
+Sales, Marketing, Finance, HR, Payroll, Operations, Support, Documents, or Admin (everything). Different
+assistants can have different departments, and several keys can act as the same AI admin member.
+
+* **Tools.** A key only lists the tools of its departments (`MCP_TOOL_DEPARTMENTS` in
+  `app/src/lib/highmastMcp.ts`); the generic record tools list only the records it reaches.
+* **Data.** Every public table has restrictive `MCP department reach` policies: a key reads and writes
+  only the tables its departments list in `rr_mcp_table_departments()`. Quote and invoice lines follow
+  their document. A table no department lists is for Admin only, so new tables start closed.
+* **Audit.** Each change shows the key and assistant, e.g. `ai-assistant@redreach.ae (AI key: Sales, Grok Bot)`,
+  and `new_data` holds `assistant` and `departments`.
+* Everything below about admin keys still holds for every key with departments.
+
+Setup: run `supabase-sql/highmast-mcp-departments.sql` (the admin and departments migrations in one
+file), redeploy, then create keys on Admin > AI connector. Tests:
+`supabase/tests/modules/highmast_mcp_departments_test.sql` and the "departments" mode of
+`highmast_mcp_admin_db_test.ts` (every tool run with a key holding only its own department).
+
 ## Admin keys (every area)
 
 A key with **Access: Admin** acts as a dedicated **AI Assistant** admin member and

@@ -100,6 +100,142 @@ export function adminToolNameProblem(name: string): string | null {
 export const MCP_KEY_SCOPES = ['standard', 'admin'] as const
 export type McpKeyScope = (typeof MCP_KEY_SCOPES)[number]
 
+/** Which AI assistant a key is for (mcp_keys.assistant). */
+export const MCP_ASSISTANTS = [
+  { value: 'grok', label: 'Grok Bot' },
+  { value: 'claude', label: 'Claude' },
+  { value: 'chatgpt', label: 'ChatGPT' },
+  { value: 'other', label: 'Other' },
+] as const
+export type McpAssistant = (typeof MCP_ASSISTANTS)[number]['value']
+export function assistantLabel(value: string | null | undefined): string {
+  return MCP_ASSISTANTS.find((a) => a.value === value)?.label || ''
+}
+
+/**
+ * Departments a key with departments (scope admin) can be given. Must match
+ * public.rr_mcp_department_list() in 20261325090000_highmast_mcp_departments.sql,
+ * which also decides, table by table, what each department may read and write.
+ */
+export const MCP_DEPARTMENTS = [
+  { value: 'sales', label: 'Sales', hint: 'Accounts, contacts, deals in every pipeline, quotes' },
+  { value: 'marketing', label: 'Marketing', hint: 'Campaigns, segments, website enquiries, accounts and contacts' },
+  { value: 'finance', label: 'Finance', hint: 'Invoices, payments, credit notes, expenses, income, contracts' },
+  { value: 'hr', label: 'HR', hint: 'Employees, leave requests, attendance' },
+  { value: 'payroll', label: 'Payroll', hint: 'Draft payroll runs and lines (never approved or paid)' },
+  { value: 'operations', label: 'Operations', hint: 'Suppliers, purchase orders, products, stock, sites, delivery' },
+  { value: 'support', label: 'Support', hint: 'Tickets and replies' },
+  { value: 'documents', label: 'Documents', hint: 'Client and company documents, attachments' },
+  { value: 'admin', label: 'Admin (everything)', hint: 'Every area above plus the user list' },
+] as const
+export type McpDepartment = (typeof MCP_DEPARTMENTS)[number]['value']
+export const MCP_DEPARTMENT_VALUES = MCP_DEPARTMENTS.map((d) => d.value) as McpDepartment[]
+
+/**
+ * Which departments get each tool. "admin" gets every tool. The generic
+ * record tools (list_records ...) are offered to every department, limited to
+ * the records that department reaches. The database checks every table again.
+ */
+const ALL_DEPTS: McpDepartment[] = ['sales', 'marketing', 'finance', 'hr', 'payroll', 'operations', 'support', 'documents']
+const ACCOUNT_READERS: McpDepartment[] = ['sales', 'marketing', 'finance', 'operations', 'support', 'documents']
+export const MCP_TOOL_DEPARTMENTS: Record<string, McpDepartment[]> = {
+  // The 14 standard tools
+  search_accounts: ACCOUNT_READERS,
+  get_account: ACCOUNT_READERS,
+  list_deals: ['sales'],
+  get_deal: ['sales'],
+  list_follow_ups_due: ['sales'],
+  list_tickets: ['support'],
+  get_ticket: ['support'],
+  list_quotes: ['sales', 'finance'],
+  list_invoices: ['finance', 'sales'],
+  dashboard_summary: ['sales', 'finance'],
+  create_lead: ['sales'],
+  add_timeline_note: ['sales', 'marketing', 'support'],
+  move_deal_stage: ['sales'],
+  create_follow_up: ['sales'],
+  // Any area (narrowed to the department's records)
+  list_records: ALL_DEPTS,
+  get_record: ALL_DEPTS,
+  create_record: ALL_DEPTS,
+  update_record: ALL_DEPTS,
+  delete_record: ALL_DEPTS,
+  restore_record: ALL_DEPTS,
+  // CRM
+  create_account: ['sales', 'marketing'],
+  update_account: ['sales', 'marketing'],
+  create_contact: ['sales', 'marketing'],
+  update_contact: ['sales', 'marketing'],
+  create_deal: ['sales'],
+  update_deal: ['sales'],
+  set_deal_stage: ['sales'],
+  close_deal: ['sales'],
+  // Quotes
+  get_quote: ['sales', 'finance'],
+  create_quote: ['sales'],
+  update_quote: ['sales'],
+  finalize_quote: ['sales'],
+  mark_quote_sent: ['sales'],
+  convert_quote_to_invoice: ['finance'],
+  // Invoices and money
+  get_invoice: ['finance'],
+  create_invoice: ['finance'],
+  update_invoice: ['finance'],
+  finalize_invoice: ['finance'],
+  record_payment: ['finance'],
+  reverse_payment: ['finance'],
+  create_credit_note: ['finance'],
+  create_expense: ['finance'],
+  update_expense: ['finance'],
+  // Support
+  create_ticket: ['support'],
+  update_ticket: ['support'],
+  reply_ticket: ['support'],
+  close_ticket: ['support'],
+  // Documents
+  add_document: ['documents'],
+  // HR
+  list_employees: ['hr', 'payroll'],
+  get_employee: ['hr', 'payroll'],
+  create_employee: ['hr'],
+  update_employee: ['hr'],
+  create_leave_request: ['hr'],
+  update_leave_request: ['hr'],
+  // Payroll (draft only)
+  create_payroll_run: ['payroll'],
+  generate_payroll_lines: ['payroll'],
+  update_payroll_line: ['payroll'],
+  get_payroll_run: ['payroll'],
+  // Admin
+  list_users: [],
+}
+
+/** Clean list of departments: known values only, no repeats, in the standard order. */
+export function normalizeDepartments(list: readonly string[] | null | undefined): McpDepartment[] {
+  const set = new Set((list || []).map((d) => String(d).toLowerCase()))
+  return MCP_DEPARTMENT_VALUES.filter((d) => set.has(d))
+}
+
+/** Does a key with these departments get this tool? Unknown tools: only "admin". */
+export function toolAllowedForDepartments(tool: string, departments: readonly string[]): boolean {
+  const depts = normalizeDepartments(departments)
+  if (depts.includes('admin')) return true
+  const allowed = MCP_TOOL_DEPARTMENTS[tool] || []
+  return depts.some((d) => allowed.includes(d))
+}
+
+/** The tools (standard and admin) a key with these departments gets. */
+export function toolsForDepartments(departments: readonly string[]): string[] {
+  return [...MCP_TOOLS, ...MCP_ADMIN_TOOLS].filter((t) => toolAllowedForDepartments(t, departments))
+}
+
+/** Short text for a key's departments, e.g. "Sales, Finance". */
+export function departmentsLabel(departments: readonly string[] | null | undefined): string {
+  const depts = normalizeDepartments(departments)
+  if (depts.includes('admin')) return 'Admin (everything)'
+  return depts.map((d) => MCP_DEPARTMENTS.find((x) => x.value === d)?.label || d).join(', ')
+}
+
 /** Brand name the app stores in `vertical` for a division code ('01' -> 'RR Threads'). */
 export function divisionVertical(code: string | null | undefined): string {
   const c = String(code || '01').padStart(2, '0')

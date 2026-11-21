@@ -209,3 +209,44 @@ describe('admin scope rules', () => {
     })
   })
 })
+
+describe('departments', () => {
+  it('maps every tool to departments, and only admin gets the user list', async () => {
+    const m = await import('./highmastMcp')
+    const all = [...m.MCP_TOOLS, ...m.MCP_ADMIN_TOOLS]
+    expect(Object.keys(m.MCP_TOOL_DEPARTMENTS).sort()).toEqual([...all].sort())
+    for (const depts of Object.values(m.MCP_TOOL_DEPARTMENTS)) {
+      for (const d of depts) expect(m.MCP_DEPARTMENT_VALUES).toContain(d)
+    }
+    expect(m.toolsForDepartments(['admin'])).toHaveLength(all.length)
+    expect(m.toolsForDepartments(['sales'])).not.toContain('list_users')
+  })
+
+  it('gives each department only its own tools', async () => {
+    const m = await import('./highmastMcp')
+    const sales = m.toolsForDepartments(['sales'])
+    expect(sales).toContain('create_quote')
+    expect(sales).not.toContain('record_payment')
+    expect(sales).not.toContain('update_employee')
+    const hr = m.toolsForDepartments(['hr'])
+    expect(hr).toContain('update_employee')
+    expect(hr).not.toContain('create_payroll_run')
+    expect(hr).not.toContain('create_quote')
+    const payroll = m.toolsForDepartments(['payroll'])
+    expect(payroll).toContain('create_payroll_run')
+    expect(payroll).toContain('get_employee')
+    expect(payroll).not.toContain('update_employee')
+    const finance = m.toolsForDepartments(['finance'])
+    expect(finance).toContain('convert_quote_to_invoice')
+    expect(finance).not.toContain('create_deal')
+    // Two departments add up.
+    const both = m.toolsForDepartments(['support', 'documents'])
+    expect(both).toContain('reply_ticket')
+    expect(both).toContain('add_document')
+    // Unknown departments give nothing extra.
+    expect(m.toolsForDepartments(['legal'])).toEqual([])
+    expect(m.normalizeDepartments(['Finance', 'sales', 'sales', 'nope'])).toEqual(['sales', 'finance'])
+    expect(m.departmentsLabel(['finance', 'sales'])).toBe('Sales, Finance')
+    expect(m.assistantLabel('grok')).toBe('Grok Bot')
+  })
+})

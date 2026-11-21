@@ -2180,6 +2180,118 @@ function adminToolNameProblem(name) {
   return null;
 }
 var MCP_KEY_SCOPES = ["standard", "admin"];
+var MCP_ASSISTANTS = [
+  { value: "grok", label: "Grok Bot" },
+  { value: "claude", label: "Claude" },
+  { value: "chatgpt", label: "ChatGPT" },
+  { value: "other", label: "Other" }
+];
+function assistantLabel(value) {
+  return MCP_ASSISTANTS.find((a) => a.value === value)?.label || "";
+}
+var MCP_DEPARTMENTS = [
+  { value: "sales", label: "Sales", hint: "Accounts, contacts, deals in every pipeline, quotes" },
+  { value: "marketing", label: "Marketing", hint: "Campaigns, segments, website enquiries, accounts and contacts" },
+  { value: "finance", label: "Finance", hint: "Invoices, payments, credit notes, expenses, income, contracts" },
+  { value: "hr", label: "HR", hint: "Employees, leave requests, attendance" },
+  { value: "payroll", label: "Payroll", hint: "Draft payroll runs and lines (never approved or paid)" },
+  { value: "operations", label: "Operations", hint: "Suppliers, purchase orders, products, stock, sites, delivery" },
+  { value: "support", label: "Support", hint: "Tickets and replies" },
+  { value: "documents", label: "Documents", hint: "Client and company documents, attachments" },
+  { value: "admin", label: "Admin (everything)", hint: "Every area above plus the user list" }
+];
+var MCP_DEPARTMENT_VALUES = MCP_DEPARTMENTS.map((d) => d.value);
+var ALL_DEPTS = ["sales", "marketing", "finance", "hr", "payroll", "operations", "support", "documents"];
+var ACCOUNT_READERS = ["sales", "marketing", "finance", "operations", "support", "documents"];
+var MCP_TOOL_DEPARTMENTS = {
+  // The 14 standard tools
+  search_accounts: ACCOUNT_READERS,
+  get_account: ACCOUNT_READERS,
+  list_deals: ["sales"],
+  get_deal: ["sales"],
+  list_follow_ups_due: ["sales"],
+  list_tickets: ["support"],
+  get_ticket: ["support"],
+  list_quotes: ["sales", "finance"],
+  list_invoices: ["finance", "sales"],
+  dashboard_summary: ["sales", "finance"],
+  create_lead: ["sales"],
+  add_timeline_note: ["sales", "marketing", "support"],
+  move_deal_stage: ["sales"],
+  create_follow_up: ["sales"],
+  // Any area (narrowed to the department's records)
+  list_records: ALL_DEPTS,
+  get_record: ALL_DEPTS,
+  create_record: ALL_DEPTS,
+  update_record: ALL_DEPTS,
+  delete_record: ALL_DEPTS,
+  restore_record: ALL_DEPTS,
+  // CRM
+  create_account: ["sales", "marketing"],
+  update_account: ["sales", "marketing"],
+  create_contact: ["sales", "marketing"],
+  update_contact: ["sales", "marketing"],
+  create_deal: ["sales"],
+  update_deal: ["sales"],
+  set_deal_stage: ["sales"],
+  close_deal: ["sales"],
+  // Quotes
+  get_quote: ["sales", "finance"],
+  create_quote: ["sales"],
+  update_quote: ["sales"],
+  finalize_quote: ["sales"],
+  mark_quote_sent: ["sales"],
+  convert_quote_to_invoice: ["finance"],
+  // Invoices and money
+  get_invoice: ["finance"],
+  create_invoice: ["finance"],
+  update_invoice: ["finance"],
+  finalize_invoice: ["finance"],
+  record_payment: ["finance"],
+  reverse_payment: ["finance"],
+  create_credit_note: ["finance"],
+  create_expense: ["finance"],
+  update_expense: ["finance"],
+  // Support
+  create_ticket: ["support"],
+  update_ticket: ["support"],
+  reply_ticket: ["support"],
+  close_ticket: ["support"],
+  // Documents
+  add_document: ["documents"],
+  // HR
+  list_employees: ["hr", "payroll"],
+  get_employee: ["hr", "payroll"],
+  create_employee: ["hr"],
+  update_employee: ["hr"],
+  create_leave_request: ["hr"],
+  update_leave_request: ["hr"],
+  // Payroll (draft only)
+  create_payroll_run: ["payroll"],
+  generate_payroll_lines: ["payroll"],
+  update_payroll_line: ["payroll"],
+  get_payroll_run: ["payroll"],
+  // Admin
+  list_users: []
+};
+function normalizeDepartments(list) {
+  const set = new Set((list || []).map((d) => String(d).toLowerCase()));
+  return MCP_DEPARTMENT_VALUES.filter((d) => set.has(d));
+}
+function toolAllowedForDepartments(tool, departments) {
+  const depts = normalizeDepartments(departments);
+  if (depts.includes("admin")) return true;
+  const allowed = MCP_TOOL_DEPARTMENTS[tool] || [];
+  return depts.some((d) => allowed.includes(d));
+}
+function toolsForDepartments(departments) {
+  return [...MCP_TOOLS, ...MCP_ADMIN_TOOLS].filter((t) => toolAllowedForDepartments(t, departments));
+}
+function departmentsLabel(departments) {
+  const depts = normalizeDepartments(departments);
+  if (depts.includes("admin")) return "Admin (everything)";
+  return depts.map((d) => MCP_DEPARTMENTS.find((x) => x.value === d)?.label || d).join(", ");
+}
 function divisionVertical(code) {
   const c = String(code || "01").padStart(2, "0");
   return DIVISIONS.find((d) => d.code === c)?.brand || "";
@@ -2345,7 +2457,10 @@ export {
   FORBIDDEN_TOOL_WORDS,
   LEAD_ACCOUNT_TYPE,
   MCP_ADMIN_TOOLS,
+  MCP_ASSISTANTS,
   MCP_DEFAULT_ROLE,
+  MCP_DEPARTMENTS,
+  MCP_DEPARTMENT_VALUES,
   MCP_KEY_PREFIX,
   MCP_KEY_ROLES,
   MCP_KEY_SCOPES,
@@ -2355,6 +2470,7 @@ export {
   MCP_READ_TOOLS,
   MCP_STALE_DAYS,
   MCP_TOOLS,
+  MCP_TOOL_DEPARTMENTS,
   MCP_WRITE_TOOLS,
   PAGE_DEFAULT,
   PAGE_MAX,
@@ -2362,6 +2478,7 @@ export {
   UAE_VAT_PERCENT,
   addDaysIso,
   adminToolNameProblem,
+  assistantLabel,
   auditArgs,
   bearerToken,
   canonicalStage,
@@ -2369,6 +2486,7 @@ export {
   companySearchWord,
   daysSince,
   defaultStages,
+  departmentsLabel,
   divisionVertical,
   expenseAmounts,
   invoiceDaysOverdue,
@@ -2384,6 +2502,7 @@ export {
   likeText,
   nextAccountReference,
   normalizeCompany,
+  normalizeDepartments,
   pageFrom,
   pageOf,
   sameCompany,
@@ -2391,6 +2510,8 @@ export {
   stageMoveProblem,
   stagesFor,
   ticketReplyAlert,
+  toolAllowedForDepartments,
   toolNameProblem,
+  toolsForDepartments,
   vatRateFromPercent
 };

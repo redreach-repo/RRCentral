@@ -9,8 +9,10 @@
 // tool runs. Stateless: a fresh server per request, JSON answers, no sessions.
 //
 // Safety, in short (details in README.md next to this file):
-// * each key acts as one sales / staff / viewer team member, so the normal
+// * a standard key acts as one sales / staff / viewer team member, so the normal
 //   row level security rules apply; the service role key is never used for data;
+// * a key with departments (Sales, Finance, HR ...) acts as an AI admin member
+//   but only reaches its departments' tools and tables (checked in the database);
 // * no delete tools, nothing on HR, payroll, secrets, settings or users;
 //   quotes, invoices and payments are read only; the database also blocks
 //   these for AI sessions ("MCP ..." policies);
@@ -20,8 +22,8 @@ import { McpServer } from "npm:@modelcontextprotocol/sdk@1.32.2/server/mcp.js"
 import { WebStandardStreamableHTTPServerTransport } from "npm:@modelcontextprotocol/sdk@1.32.2/server/webStandardStreamableHttp.js"
 import { withErrorLog } from "../_shared/functionHealth.ts"
 import { memberClient, resolveKey } from "./auth.ts"
-import { bearerToken, isMcpKeyShape } from "./highmastMcp.bundle.js"
-import { registerTools } from "./tools.ts"
+import { assistantLabel, bearerToken, departmentsLabel, isMcpKeyShape } from "./highmastMcp.bundle.js"
+import { registerTools, type Reach } from "./tools.ts"
 import { registerAdminTools } from "./tools_admin.ts"
 
 export const SERVER_NAME = "highmast"
@@ -69,14 +71,35 @@ async function handler(req: Request): Promise<Response> {
   }
 
   const db = await memberClient(who.key)
+
+  // Keys with departments: which tables they reach decides which tools and records they see.
+  let reach: Reach | undefined
+  if (who.key.scope === "admin") {
+    const { data, error } = await db.rpc("rr_mcp_reach")
+    if (error) {
+      // Only before the departments SQL is run: the key then reaches every area, as admin keys did.
+      if (!/rr_mcp_reach|function|schema cache/i.test(error.message || "")) {
+        return refuse(503, "Could not check this key's departments. Try again shortly.")
+      }
+    } else {
+      const r = (data || {}) as { departments?: string[]; read?: string[]; write?: string[] }
+      reach = { departments: r.departments || [], read: new Set(r.read || []), write: new Set(r.write || []) }
+    }
+  }
+  const depts = departmentsLabel(who.key.departments)
+  const assistant = assistantLabel(who.key.assistant)
+
   const server = new McpServer(
     { name: SERVER_NAME, version: SERVER_VERSION },
     {
       instructions:
         "HighMast is Red Reach's company system (CRM, deals, support, quotes and invoices). " +
-        `You act as ${who.key.memberName} (${who.key.role}) through the key "${who.key.keyName}". ` +
+        `You act as ${who.key.memberName} (${who.key.role}) through the key "${who.key.keyName}"` +
+        (assistant ? `, set up for ${assistant}. ` : ". ") +
         (who.key.scope === "admin"
-          ? "This is an ADMIN key: you can read and change every area, HR and payroll included. Deletes are soft (restore_record undoes them). " +
+          ? `This key works for these departments only: ${depts || "none"}. You only see their tools and records; ` +
+            "anything else is refused by the database, so tell the person to use a key for that department. " +
+            "Deletes are soft (restore_record undoes them). " +
             "Sent invoices and recorded payments never change: correct them with create_credit_note or reverse_payment. " +
             "Payroll runs stay draft and leave is never approved by you. Users and settings are read only or hidden. " +
             "Every change is in the audit log with before and after. Confirm with the person before money or HR changes. "
@@ -85,7 +108,7 @@ async function handler(req: Request): Promise<Response> {
         "Lists are paginated (limit up to 50, use next_offset).",
     },
   )
-  const ctx = { db, key: who.key, now: () => new Date() }
+  const ctx = { db, key: who.key, now: () => new Date(), reach }
   registerTools(server, ctx)
   registerAdminTools(server, ctx)
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true })

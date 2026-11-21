@@ -4,7 +4,18 @@ import { useAuth } from '../../../contexts/AuthContext'
 import { useToast } from '../../../contexts/ToastContext'
 import EmptyState from '../../../components/EmptyState'
 import { errorMessage } from '../../../lib/errors'
-import { MCP_DEFAULT_ROLE, MCP_RATE_LIMIT_PER_MINUTE, type McpKeyScope } from '../../../lib/highmastMcp'
+import {
+  assistantLabel,
+  departmentsLabel,
+  MCP_ASSISTANTS,
+  MCP_DEFAULT_ROLE,
+  MCP_DEPARTMENTS,
+  MCP_RATE_LIMIT_PER_MINUTE,
+  toolsForDepartments,
+  type McpAssistant,
+  type McpDepartment,
+  type McpKeyScope,
+} from '../../../lib/highmastMcp'
 import {
   createMcpKey,
   listMcpKeys,
@@ -41,6 +52,8 @@ export default function AiConnectorPage() {
   const [name, setName] = useState('Grok Bot')
   const [memberId, setMemberId] = useState('')
   const [scope, setScope] = useState<McpKeyScope>('standard')
+  const [assistant, setAssistant] = useState<McpAssistant>('grok')
+  const [departments, setDepartments] = useState<McpDepartment[]>([])
   const [adminReady, setAdminReady] = useState(false)
   const [allMembers, setAllMembers] = useState<McpMember[]>([])
   const [shownKey, setShownKey] = useState('')
@@ -107,7 +120,11 @@ export default function AiConnectorPage() {
     }
     setBusy(true)
     try {
-      const created = await createMcpKey(name, member, user?.email || '', scope)
+      if (scope === 'admin' && departments.length === 0) {
+        showToast('Tick at least one department for this key.', 'error')
+        return
+      }
+      const created = await createMcpKey(name, member, user?.email || '', scope, { assistant, departments })
       setShownKey(created.key)
       showToast('Key created. Copy it now: it is shown only once.', 'success')
       await load()
@@ -135,11 +152,12 @@ export default function AiConnectorPage() {
     <div style={pageStyle}>
       <h1 style={pageTitleStyle}>AI connector</h1>
       <p style={pageSubtitleStyle}>
-        Keys for AI assistants such as Grok Bot to use HighMast as a connector (MCP). A standard key acts as one team member with the
-        role sales, staff or viewer, so it sees only what that person sees: it cannot delete anything, cannot touch HR, payroll,
-        settings or users, and quotes, invoices and payments stay read only. An admin key acts as a dedicated AI Assistant admin
-        member and can work in every area (see the warning when you pick it). {MCP_RATE_LIMIT_PER_MINUTE} calls a minute per key;
-        every call is in the Audit log.
+        Keys for AI assistants such as Grok Bot, Claude or ChatGPT to use HighMast as a connector (MCP). Give each assistant its own
+        key and pick the departments it works for: a key only sees the tools and records of its departments (Sales, Finance, HR,
+        Payroll, Operations, Support, Marketing, Documents, or Admin for everything), and the database checks every table. A
+        standard key instead acts as one sales, staff or viewer member with the 14 basic tools. No key can hard delete, change sent
+        invoices or recorded payments, approve leave, or approve or pay payroll. {MCP_RATE_LIMIT_PER_MINUTE} calls a minute per key;
+        every call and change is in the Audit log.
       </p>
 
       <section style={{ ...cardStyle, marginBottom: 16 }}>
@@ -185,6 +203,16 @@ export default function AiConnectorPage() {
               <input style={inputStyle} value={name} maxLength={80} onChange={(e) => setName(e.target.value)} required />
             </label>
             <label style={labelStyle}>
+              Assistant
+              <select style={inputStyle} value={assistant} onChange={(e) => setAssistant(e.target.value as McpAssistant)}>
+                {MCP_ASSISTANTS.map((a) => (
+                  <option key={a.value} value={a.value}>
+                    {a.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={labelStyle}>
               Access
               <select
                 style={inputStyle}
@@ -196,16 +224,42 @@ export default function AiConnectorPage() {
               >
                 <option value="standard">Standard: sales, staff or viewer tools (no deletes, no HR, money read only)</option>
                 <option value="admin" disabled={!adminReady}>
-                  {adminReady ? 'Admin: every area, HR and payroll included' : 'Admin (run the HighMast MCP admin SQL first)'}
+                  {adminReady ? 'Departments: pick the departments this key works for' : 'Departments (run the AI connector departments SQL first)'}
                 </option>
               </select>
             </label>
             {scope === 'admin' && (
+              <fieldset style={{ border: `1px solid ${colors.border}`, borderRadius: 8, padding: 12, margin: 0 }}>
+                <legend style={labelStyle}>Departments</legend>
+                <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
+                  {MCP_DEPARTMENTS.map((d) => (
+                    <label key={d.value} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 14 }}>
+                      <input
+                        type="checkbox"
+                        checked={departments.includes(d.value)}
+                        onChange={(e) =>
+                          setDepartments((cur) => (e.target.checked ? [...cur, d.value] : cur.filter((x) => x !== d.value)))
+                        }
+                      />
+                      <span>
+                        <strong>{d.label}</strong>
+                        <br />
+                        <span style={{ color: colors.muted, fontSize: 12 }}>{d.hint}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                <p style={{ color: colors.muted, fontSize: 13, marginBottom: 0 }}>
+                  {departments.length
+                    ? `${assistantLabel(assistant)} will get ${toolsForDepartments(departments).length} tools for ${departmentsLabel(departments)}.`
+                    : 'Tick one or more departments.'}
+                </p>
+              </fieldset>
+            )}
+            {scope === 'admin' && departments.some((d) => d === 'hr' || d === 'payroll' || d === 'admin') && (
               <p style={{ color: colors.warn, fontSize: 13, margin: 0 }}>
-                An admin key can read and change every area, including salaries, IBANs and payroll drafts. Whatever the AI reads is
-                sent to that AI's company. It cannot hard delete, change sent invoices or recorded payments, approve leave or approve
-                and pay payroll, and every change is in the Audit log with before and after. Pick a dedicated admin member such as
-                "AI Assistant" (ai-assistant@redreach.ae), never yourself.
+                This key can read salaries, IBANs and ID numbers. Whatever the AI reads is sent to that AI's company. It still cannot
+                approve leave or approve and pay payroll, and every change is in the Audit log with before and after.
               </p>
             )}
             <label style={labelStyle}>
@@ -213,7 +267,7 @@ export default function AiConnectorPage() {
               <select style={inputStyle} value={memberId} onChange={(e) => setMemberId(e.target.value)} required>
                 {members.length === 0 && (
                   <option value="">
-                    {scope === 'admin' ? 'No other active admin member: add "AI Assistant" first' : 'No active sales, staff or viewer members'}
+                    {scope === 'admin' ? 'No other active admin member: add an AI member such as "AI Assistant" first' : 'No active sales, staff or viewer members'}
                   </option>
                 )}
                 {members.map((m) => (
@@ -225,11 +279,15 @@ export default function AiConnectorPage() {
             </label>
             <p style={{ color: colors.muted, fontSize: 13, margin: 0 }}>
               {scope === 'admin'
-                ? "Tip: add a team member named AI Assistant (e.g. ai-assistant@redreach.ae) with the role admin under Settings, Users, and pick it here, so every change shows under that name."
+                ? "A key with departments acts as an AI admin member, but only reaches the departments ticked above. Add one under Settings, Users (e.g. AI Assistant, ai-assistant@redreach.ae, role admin); several keys can share it, and the Audit log shows each key and assistant. Never pick yourself."
                 : "Tip: add a team member such as grokbot@redreach.ae with the role sales under Settings, Users, and pick it here, so the AI's changes show under its own name. Admin and manager members cannot be picked."}
             </p>
             <div>
-              <button type="submit" style={buttonPrimaryStyle} disabled={busy || loading || !memberId}>
+              <button
+                type="submit"
+                style={buttonPrimaryStyle}
+                disabled={busy || loading || !memberId || (scope === 'admin' && departments.length === 0)}
+              >
                 Create key
               </button>
             </div>
@@ -249,7 +307,7 @@ export default function AiConnectorPage() {
                       <th>Name</th>
                       <th>Key starts</th>
                       <th>Acts as</th>
-                      <th>Role</th>
+                      <th>Assistant</th>
                       <th>Access</th>
                       <th>Created</th>
                       <th>Last used</th>
@@ -265,8 +323,12 @@ export default function AiConnectorPage() {
                           <code>{k.key_prefix}…</code>
                         </td>
                         <td>{nameOf(k.acts_as_user_id)}</td>
-                        <td>{k.role}</td>
-                        <td>{k.scope === 'admin' ? 'Admin' : 'Standard'}</td>
+                        <td>{assistantLabel(k.assistant) || '—'}</td>
+                        <td>
+                          {k.scope === 'admin'
+                            ? departmentsLabel(k.departments?.length ? k.departments : ['admin'])
+                            : `Standard (${k.role})`}
+                        </td>
                         <td>{when(k.created_at)}</td>
                         <td>{when(k.last_used_at)}</td>
                         <td style={{ color: k.revoked_at ? colors.danger : colors.success }}>
