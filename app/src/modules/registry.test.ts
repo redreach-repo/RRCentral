@@ -54,7 +54,10 @@ describe('module registry', () => {
       'industryPacks',
     ])
     for (const row of SETTINGS_MODULE_FLAGS) {
-      expect(APP_MODULES.some((m) => m.flag === row.flag)).toBe(true)
+      expect(
+        APP_MODULES.some((m) => m.flag === row.flag || m.items.some((i) => i.flag === row.flag)),
+        row.flag,
+      ).toBe(true)
     }
   })
 })

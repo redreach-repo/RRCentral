@@ -28,6 +28,10 @@ export function commandPaletteItems(
       })
     }
   }
+  // About lives in the sidebar footer, not in a group, but stays searchable.
+  const about = translateNavLabel(translate, navItemKey('/about-product'), 'About')
+  const home = translateNavLabel(translate, navModuleKey('overview'), 'Home')
+  rows.push({ to: '/about-product', label: about, group: home, keywords: `${about} ${home} about highmast /about-product`.toLowerCase() })
   return rows
 }
 

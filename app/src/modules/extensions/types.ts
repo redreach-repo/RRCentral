@@ -25,6 +25,8 @@ export type ExtensionModule = {
    * module's items to, instead of a sidebar group of its own.
    */
   attachTo?: string
+  /** With attachTo: put this module's links at the top of that group. */
+  attachFirst?: boolean
 }
 
 export type ExtensionStrings = {

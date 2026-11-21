@@ -17,6 +17,8 @@ export type ModuleNavItem = {
   minRole?: UserRole
   roles?: UserRole[]
   forStaff?: boolean
+  /** Settings > Modules switch for this link only; when false, the link is hidden. */
+  flag?: string
 }
 
 export type ModuleManifest = {
@@ -25,6 +27,8 @@ export type ModuleManifest = {
   icon: ModuleIcon
   /** Feature flag key; when false, module is hidden. Default true. */
   flag?: string
+  /** Render the items as plain links at the top, without a group heading. */
+  flat?: boolean
   items: ModuleNavItem[]
 }
 

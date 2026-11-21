@@ -13,7 +13,7 @@ const mod: ExtensionModule = {
     id: 'ai-connector',
     label: 'AI connector',
     icon: Bot,
-    items: [{ to: '/ai-connector', label: 'AI connector', icon: Bot, minRole: 'admin' }],
+    items: [{ to: '/ai-connector', label: 'AI connector', icon: Bot, minRole: 'admin', section: 'System' }],
   },
   routes: [{ path: 'ai-connector', element: <AiConnectorPage /> }],
   attachTo: 'admin',
