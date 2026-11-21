@@ -693,3 +693,20 @@ quote by hand (or delete the test account) so they do not reach reports.
 **If it fails.** Only 14 tools: the key is Standard, or the admin SQL was not run before the key was made. 401: the AI
 Assistant member is not active, not admin, or its login is not confirmed. "This needs an AI connector key with the
 admin scope": the SQL ran but the function was not redeployed.
+
+## 40. AI connector keys by department (Grok Bot on Sales, Claude on HR ...)
+
+**Trigger.** After section 38: run `supabase-sql/highmast-mcp-departments.sql` (the admin migration of section 39 and
+`supabase/migrations/20261325090000_highmast_mcp_departments.sql` in one file), redeploy `highmast-mcp`, then Admin > **AI connector**:
+make one key with Assistant **Grok Bot**, Access **Departments**, Sales ticked, and another with Assistant **Claude** and
+HR ticked, both acting as the AI Assistant admin member.
+
+**You should see.** The page says how many tools each choice gives, and the key list shows each key's assistant and
+departments. In Grok, `tools/list` has the sales tools (accounts, deals, quotes) but no record_payment, update_employee or
+payroll tools; asking it to list employees fails or finds nothing. In Claude, the HR tools are there, but quotes and
+accounts are not. Admin > Audit log shows each change as "AI change" by `ai-assistant@redreach.ae (AI key: <name>, Grok Bot)`
+or `(..., Claude)`. A key with Admin ticked gets all 59 tools.
+
+**If it fails.** "Departments (run the AI connector departments SQL first)" greyed out: the SQL was not run. A key sees
+every tool: the function was not redeployed. "This key's departments (...) do not cover ...": working as meant; use a key
+for that department.

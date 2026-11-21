@@ -12,7 +12,8 @@
 // Without RR_TEST_PG_DB the test is skipped (CI has no database for Deno tests).
 import { assert, assertEquals, assertMatch } from "jsr:@std/assert@1"
 import postgres from "npm:postgres@3.4.5"
-import { ADMIN_TOOLS } from "../../functions/highmast-mcp/tools_admin.ts"
+import { ADMIN_TOOLS, ENTITIES } from "../../functions/highmast-mcp/tools_admin.ts"
+import { MCP_DEPARTMENT_VALUES, MCP_TOOL_DEPARTMENTS } from "../../functions/highmast-mcp/highmastMcp.bundle.js"
 import { runTool, TOOLS, type ToolContext } from "../../functions/highmast-mcp/tools.ts"
 
 const DB = Deno.env.get("RR_TEST_PG_DB") || ""
@@ -114,8 +115,14 @@ class Query implements PromiseLike<Res> {
   }
 }
 
+// "admin": one key with the admin department runs everything.
+// "departments": each tool runs with a key that has only that tool's department,
+// proving every tool works inside its department's reach (and nowhere else).
+for (const mode of ["admin", "departments"] as const)
 Deno.test({
-  name: "every admin tool works end to end on a real database (rolled back)",
+  name: mode === "admin"
+    ? "every admin tool works end to end on a real database (rolled back)"
+    : "every tool works with a key that has only its own department (rolled back)",
   ignore: !DB,
   sanitizeResources: false,
   sanitizeOps: false,
@@ -137,10 +144,22 @@ Deno.test({
           insert into public.app_users (email, name, role, active, tenant_id)
           values ('ai-assistant@redreach.ae', 'AI Assistant', 'admin', true, 'a0000000-0000-4000-8000-000000000001')
           on conflict (email) do update set role = 'admin', active = true;
-          insert into public.mcp_keys (id, name, key_prefix, key_hash, role, scope, acts_as_user_id, created_by)
-          select 'e7900000-0000-4000-8000-000000000001', 'AI Assistant', 'hmk_test', repeat('3', 64), 'admin', 'admin', u.id, 'test'
+          insert into public.mcp_keys (id, name, key_prefix, key_hash, role, scope, departments, acts_as_user_id, created_by)
+          select 'e7900000-0000-4000-8000-000000000001', 'AI Assistant', 'hmk_test', repeat('3', 64), 'admin', 'admin', '{admin}', u.id, 'test'
           from public.app_users u where u.email = 'ai-assistant@redreach.ae' on conflict (id) do nothing;
         `)
+        // One key per department (the "departments" mode switches between them).
+        const deptKeys: Record<string, string> = {}
+        MCP_DEPARTMENT_VALUES.forEach((d: string, i: number) => {
+          deptKeys[d] = `e7900000-0000-4000-8000-0000000000${(16 + i).toString(16)}`
+        })
+        for (const [d, id] of Object.entries(deptKeys)) {
+          await sql.unsafe(`
+            insert into public.mcp_keys (id, name, key_prefix, key_hash, role, scope, assistant, departments, acts_as_user_id, created_by)
+            select '${id}', 'Dept ${d}', 'hmk_dpt', md5('${d}') || md5('${d}x'), 'admin', 'admin', 'grok', '{${d}}', u.id, 'test'
+            from public.app_users u where u.email = 'ai-assistant@redreach.ae' on conflict (id) do nothing;
+          `)
+        }
         const member = (await sql.unsafe(`select id from public.app_users where email = 'ai-assistant@redreach.ae'`))[0].id as string
         // From here on: an AI session with the admin key, exactly as the function's login token gives.
         await sql.unsafe(`
@@ -158,11 +177,47 @@ Deno.test({
           now: () => new Date(),
         } as unknown as ToolContext
 
+        const ADMIN_KEY = "e7900000-0000-4000-8000-000000000001"
+        async function useKey(keyId: string, departments: string[]) {
+          await sql.unsafe(`select set_config('request.jwt.claims', ${lit(JSON.stringify({
+            sub: "00000000-0000-0000-0000-0000000001c1", role: "authenticated", hm_mcp_key: keyId,
+          }))}, true)`)
+          const r = (await sql.unsafe(`select public.rr_mcp_reach() as r`))[0].r as { read: string[]; write: string[] }
+          const c = ctx as unknown as { key: Row; reach?: unknown }
+          c.key = { ...c.key, keyId, departments }
+          c.reach = { departments, read: new Set(r.read), write: new Set(r.write) }
+        }
+        // Reach of every department, from the database.
+        const reachOf: Record<string, { read: string[]; write: string[] }> = {}
+        for (const [d, id] of Object.entries(deptKeys)) {
+          await useKey(id, [d])
+          const c = ctx as unknown as { reach: { read: Set<string>; write: Set<string> } }
+          reachOf[d] = { read: [...c.reach.read], write: [...c.reach.write] }
+        }
+        await useKey(ADMIN_KEY, ["admin"])
+        const GENERIC_WRITE = ["create_record", "update_record", "delete_record", "restore_record"]
+        const ORDER = MCP_DEPARTMENT_VALUES.filter((d: string) => d !== "admin")
+        /** The department a tool runs under in "departments" mode. */
+        function deptFor(name: string, args: Row): string {
+          if (name === "list_records" || name === "get_record" || GENERIC_WRITE.includes(name)) {
+            const table = ENTITIES[String(args.entity)]?.table
+            const write = GENERIC_WRITE.includes(name)
+            return ORDER.find((d: string) => (write ? reachOf[d].write : reachOf[d].read).includes(table)) || "admin"
+          }
+          return ((MCP_TOOL_DEPARTMENTS as Record<string, string[]>)[name] || [])[0] || "admin"
+        }
+        async function keyFor(name: string, args: Row) {
+          if (mode === "admin") return
+          const d = deptFor(name, args)
+          await useKey(d === "admin" ? ADMIN_KEY : deptKeys[d], [d])
+        }
+
         const byName = new Map([...TOOLS, ...ADMIN_TOOLS].map((t) => [t.name, t]))
         async function call(name: string, args: Row): Promise<Row> {
           const def = byName.get(name)
           assert(def, `no tool ${name}`)
           used.add(name)
+          await keyFor(name, args)
           const out = await runTool(def, args, ctx) as { isError?: boolean; content: { text: string }[] }
           const body = JSON.parse(out.content[0].text)
           if (out.isError) throw new Error(`${name} failed: ${body.error}`)
@@ -171,6 +226,7 @@ Deno.test({
         async function refused(name: string, args: Row, pattern: RegExp) {
           const def = byName.get(name)!
           used.add(name)
+          await keyFor(name, args)
           const out = await runTool(def, args, ctx) as { isError?: boolean; content: { text: string }[] }
           assert(out.isError, `${name} should have been refused`)
           assertMatch(JSON.parse(out.content[0].text).error, pattern)
@@ -288,6 +344,27 @@ Deno.test({
 
         // Admin: users read only
         assert(((await call("list_users", { role: "admin" })).items as Row[]).some((u) => u.email === "ai-assistant@redreach.ae"))
+
+        if (mode === "departments") {
+          // Outside its departments a key is refused, by the tool and by the database.
+          await useKey(deptKeys.sales, ["sales"])
+          const deny = async (name: string, args: Row, pattern: RegExp) => {
+            const out = await runTool(byName.get(name)!, args, ctx) as { isError?: boolean; content: { text: string }[] }
+            assert(out.isError, `${name} should be refused for this key`)
+            assertMatch(JSON.parse(out.content[0].text).error, pattern)
+          }
+          await deny("record_payment", { invoice_id: invoiceId, amount: 1, method: "Cash" }, /departments|not visible|No invoice/i)
+          await deny("get_employee", { employee_id: emp.id }, /not visible|No employee/i)
+          await deny("get_record", { entity: "employees", id: emp.id }, /outside this key's departments/)
+          await useKey(deptKeys.hr, ["hr"])
+          await deny("create_quote", { account_id: accountId, lines: [{ description: "x", quantity: 1, unit_price: 1 }] }, /departments|not visible|No account/i)
+          await deny("update_record", { entity: "vendors", id: v.id, data: { notes: "x" } }, /outside this key's departments/)
+          await useKey(deptKeys.payroll, ["payroll"])
+          await deny("update_employee", { employee_id: emp.id, job_title: "x" }, /departments/i)
+          await useKey(ADMIN_KEY, ["admin"]) // the audit log is for the admin department only
+          const who = await sql.unsafe(`select count(*)::int as n from public.audit_log where operation = 'MCP_WRITE' and actor_email like '%Dept %Grok Bot)'`)
+          assert(who[0].n >= 30, "writes are marked with each department key and Grok Bot")
+        }
 
         // Every admin tool ran.
         const missing = ADMIN_TOOLS.map((x) => x.name).filter((n) => !used.has(n))

@@ -11,7 +11,7 @@
 // Each call is also logged as an "AI tool call" by runTool, like every tool.
 import type { McpServer } from "npm:@modelcontextprotocol/sdk@1.32.2/server/mcp.js"
 import { z } from "npm:zod@3.25.76"
-import { check, runTool, ToolError, type Row, type ToolContext, type ToolDef } from "./tools.ts"
+import { check, runTool, toolOffered, ToolError, type Row, type ToolContext, type ToolDef } from "./tools.ts"
 import {
   divisionVertical,
   DIVISION_CODES as DIVISION_CODE_LIST,
@@ -176,6 +176,9 @@ export const ENTITIES: Record<string, Entity> = {
   attendance: { table: "hr_attendance_days", label: "Attendance days", area: "HR", search: ["status", "notes"], order: "work_date.desc", write: true, soft: true, fields: { employee_id: "uuid", work_date: "date", status: ["present", "absent", "half", "leave", "holiday"], hours: "number", notes: "long" }, required: ["employee_id", "work_date"] },
   payroll_runs: { table: "payroll_runs", label: "Payroll runs (the AI keeps them draft)", area: "Payroll", search: ["period_yyyy_mm", "status", "notes"], order: "period_yyyy_mm.desc", write: false, soft: false, fields: {} },
   payroll_lines: { table: "payroll_lines", label: "Payroll lines (use update_payroll_line)", area: "Payroll", search: [], order: "created_at", write: false, soft: false, fields: {}, hide: ["pay_enc"] },
+  marketing_campaigns: { table: "marketing_campaigns", label: "Marketing campaigns", area: "Marketing", search: ["name", "notes"], order: "created_at.desc", write: true, soft: false, fields: { name: "text", channel: ["email", "social", "ads", "event", "other"], status: ["draft", "scheduled", "active", "paused", "done"], starts_on: "date", ends_on: "date", budget_aed: "money", notes: "long" }, required: ["name", "channel"] },
+  marketing_segments: { table: "marketing_segments", label: "Marketing segments (audiences)", area: "Marketing", search: ["name", "description"], order: "name", write: true, soft: false, fields: { name: "text", description: "long" }, required: ["name"] },
+  website_inquiries: { table: "website_inquiries", label: "Website enquiries (read only)", area: "Marketing", search: ["name", "email", "company", "message"], order: "created_at.desc", write: false, soft: false, fields: {}, hide: ["ip_hash"] },
   users: { table: "app_users", label: "Team members and roles (read only)", area: "Admin", search: ["name", "email", "role"], order: "name", write: false, soft: false, fields: {} },
 }
 const ENTITY_NAMES = Object.keys(ENTITIES) as [string, ...string[]]
@@ -187,6 +190,35 @@ function entity(name: string): Entity {
   const e = ENTITIES[name]
   if (!e) throw new ToolError(`Unknown entity ${name}.`)
   return e
+}
+
+/** Can this key reach the entity? Keys with departments only reach their departments' tables. */
+function reaches(ctx: Pick<ToolContext, "reach">, e: Entity, write: boolean): boolean {
+  if (!ctx.reach) return true
+  const set = write ? ctx.reach.write : ctx.reach.read
+  // Read-only entities (users, ledger ...) are offered to whoever reads them; the write tools then say why not.
+  return set.has(e.table) || (write && !e.write && ctx.reach.read.has(e.table))
+}
+
+/** The entity, if this key's departments cover it. The database checks again. */
+function entityFor(ctx: ToolContext, name: string, write: boolean): Entity {
+  const e = entity(name)
+  if (!reaches(ctx, e, write)) {
+    throw new ToolError(`${e.label} is outside this key's departments (${(ctx.key.departments || []).join(", ") || "none"}).`)
+  }
+  return e
+}
+
+/** Entities a generic tool offers this key. */
+export function entitiesFor(ctx: Pick<ToolContext, "reach">, tool: string): string[] {
+  const write = !["list_records", "get_record"].includes(tool)
+  return ENTITY_NAMES.filter((n) => {
+    const e = ENTITIES[n]
+    if (!reaches(ctx, e, write)) return false
+    if (tool === "create_record" || tool === "update_record") return e.write
+    if (tool === "delete_record" || tool === "restore_record") return e.soft
+    return true
+  })
 }
 
 /** Strict check of a create/update body against the entity's fields. */
@@ -316,7 +348,7 @@ export const ADMIN_TOOLS: ToolDef[] = [
       offset: offsetArg,
     },
     async (a, ctx) => {
-      const e = entity(String(a.entity))
+      const e = entityFor(ctx, String(a.entity), false)
       const limit = Number(a.limit || 20), offset = Number(a.offset || 0)
       const filters = (a.filters || {}) as Row
       for (const k of Object.keys(filters)) if (!/^[a-z][a-z0-9_]{0,62}$/.test(k)) throw new ToolError(`Bad filter column ${k}.`)
@@ -332,14 +364,14 @@ export const ADMIN_TOOLS: ToolDef[] = [
   R("get_record", "Get one record (any area)", "One record of any entity by id, with all its fields.",
     { entity: entityArg, id: uuid },
     async (a, ctx) => {
-      const e = entity(String(a.entity))
+      const e = entityFor(ctx, String(a.entity), false)
       return { entity: a.entity, record: clean(e, await getRow(ctx, e.table, String(a.id), e.label)) }
     }),
   W("create_record", "Create a record (any area)",
     "Create a record in an area that has no special tool (e.g. vendors, products, purchase_orders, delivery_projects, build_tasks, time_entries, contracts, clients, client_purchase_orders, warehouses, construction_sites, attendance). data must use only that entity's fields; the error lists them. Quotes, invoices, payments, expenses and payroll have their own tools.",
     { entity: entityArg, data: z.record(z.unknown()).describe("Field values for the new record.") },
     async (a, ctx) => {
-      const e = entity(String(a.entity))
+      const e = entityFor(ctx, String(a.entity), true)
       const data = validData(e, a.data, true)
       return { created: true, entity: a.entity, record: clean(e, await save(ctx, e.table, null, data, "create_record", { entity: a.entity, data })) }
     }),
@@ -347,7 +379,7 @@ export const ADMIN_TOOLS: ToolDef[] = [
     "Change fields on a record (any entity that allows it). Only the fields you send change. Sent invoices, payments and payroll cannot be changed this way.",
     { entity: entityArg, id: uuid, data: z.record(z.unknown()).describe("Fields to change.") },
     async (a, ctx) => {
-      const e = entity(String(a.entity))
+      const e = entityFor(ctx, String(a.entity), true)
       const data = validData(e, a.data, false)
       return { updated: true, entity: a.entity, record: clean(e, await save(ctx, e.table, String(a.id), data, "update_record", { entity: a.entity, id: a.id, data })) }
     }),
@@ -355,7 +387,7 @@ export const ADMIN_TOOLS: ToolDef[] = [
     "Soft delete: hides the record everywhere in HighMast by setting deleted_at. Nothing is erased; restore_record brings it back. Only entities with soft delete (accounts, contacts, deals, quotes, draft invoices, expenses, tickets, documents, vendors, products, purchase orders, delivery projects, employees, attendance...). Sent invoices and payments cannot be deleted.",
     { entity: entityArg, id: uuid },
     async (a, ctx) => {
-      const e = entity(String(a.entity))
+      const e = entityFor(ctx, String(a.entity), true)
       if (!e.soft) throw new ToolError(`${e.label} cannot be deleted from the AI connector.`)
       const row = await rpc(ctx, "rr_mcp_set_deleted", { p_table: e.table, p_id: a.id, p_deleted: true, p_tool: "delete_record", p_args: a }, "delete the record")
       return { deleted: true, restorable: true, entity: a.entity, record: clean(e, row as Row) }
@@ -363,7 +395,7 @@ export const ADMIN_TOOLS: ToolDef[] = [
   W("restore_record", "Restore a deleted record", "Undo delete_record: the record shows again in HighMast.",
     { entity: entityArg, id: uuid },
     async (a, ctx) => {
-      const e = entity(String(a.entity))
+      const e = entityFor(ctx, String(a.entity), true)
       if (!e.soft) throw new ToolError(`${e.label} has no delete, so nothing to restore.`)
       const row = await rpc(ctx, "rr_mcp_set_deleted", { p_table: e.table, p_id: a.id, p_deleted: false, p_tool: "restore_record", p_args: a }, "restore the record")
       return { restored: true, entity: a.entity, record: clean(e, row as Row) }
@@ -734,15 +766,39 @@ async function addMessage(ctx: ToolContext, ticketId: string, body: string, inte
   }, internal ? "ticket_note" : "reply_ticket", args)
 }
 
-export function registerAdminTools(server: McpServer, ctx: ToolContext) {
-  if (ctx.key.scope !== "admin") return
+const GENERIC_TOOLS = new Set(["list_records", "get_record", "create_record", "update_record", "delete_record", "restore_record"])
+
+/** The input schema a key sees: generic tools list only the entities its departments reach. */
+export function inputFor(def: ToolDef, ctx: Pick<ToolContext, "reach">): z.ZodRawShape | null {
+  if (!GENERIC_TOOLS.has(def.name)) return def.input
+  const names = entitiesFor(ctx, def.name)
+  if (!names.length) return null
+  const arg = z.enum(names as [string, ...string[]]).describe(
+    "Which records. " + names.map((k) => `${k} = ${ENTITIES[k].label} [${ENTITIES[k].area}]`).join("; "),
+  )
+  return { ...def.input, entity: arg }
+}
+
+/** Admin tools this key is offered, with the input schema it sees. */
+export function adminToolsFor(ctx: Pick<ToolContext, "key" | "reach">): { def: ToolDef; input: z.ZodRawShape }[] {
+  if (ctx.key.scope !== "admin") return []
+  const out: { def: ToolDef; input: z.ZodRawShape }[] = []
   for (const def of ADMIN_TOOLS) {
+    if (!toolOffered(def.name, ctx)) continue
+    const input = inputFor(def, ctx)
+    if (input) out.push({ def, input })
+  }
+  return out
+}
+
+export function registerAdminTools(server: McpServer, ctx: ToolContext) {
+  for (const { def, input } of adminToolsFor(ctx)) {
     server.registerTool(
       def.name,
       {
         title: def.title,
         description: def.description,
-        inputSchema: def.input,
+        inputSchema: input,
         annotations: {
           readOnlyHint: def.readOnly,
           // Nothing is ever erased: delete_record is a soft delete that restore_record undoes.

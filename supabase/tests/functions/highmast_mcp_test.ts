@@ -58,6 +58,8 @@ const ENV: Record<string, string> = {
 type Call = { url: URL; method: string; headers: Headers; body: string }
 const calls: Call[] = []
 let resolveRows: unknown[] = []
+// What rr_mcp_reach answers for a key with departments (null = the function is not there yet).
+let reachBody: unknown = null
 
 const MEMBER = {
   key_id: "11111111-1111-4111-8111-111111111111",
@@ -80,6 +82,9 @@ async function fakeFetch(input: Request | URL | string, init?: RequestInit): Pro
   calls.push({ url, method: req.method, headers: req.headers, body: req.method === "GET" ? "" : await req.text() })
   if (url.pathname === "/rest/v1/rpc/rr_mcp_resolve_key") return json(resolveRows)
   if (url.pathname === "/rest/v1/rpc/rr_mcp_log_call") return new Response(null, { status: 204 })
+  if (url.pathname === "/rest/v1/rpc/rr_mcp_reach") {
+    return reachBody ? json(reachBody) : json({ code: "PGRST202", message: "Could not find the function public.rr_mcp_reach in the schema cache" }, 404)
+  }
   if (url.pathname === "/rest/v1/crm") {
     return json([{ id: "44444444-4444-4444-8444-444444444444", company_name: "Acme LLC", pipeline_stage: "Lead", owner: "Sara", updated_at: "2026-11-01T00:00:00Z" }])
   }
@@ -253,7 +258,25 @@ Deno.test({ name: "an unknown tool is refused", ...opts, fn: () => withFakeDb(as
 // ---- Admin scope (tools_admin.ts) --------------------------------------------
 // Every admin tool against a real database: highmast_mcp_admin_db_test.ts.
 
-const ADMIN_MEMBER = { ...MEMBER, key_name: "AI Assistant", role: "admin", scope: "admin", member_name: "AI Assistant", member_email: "ai-assistant@redreach.ae" }
+const ADMIN_MEMBER = {
+  ...MEMBER, key_name: "AI Assistant", role: "admin", scope: "admin", assistant: "claude", departments: ["admin"],
+  member_name: "AI Assistant", member_email: "ai-assistant@redreach.ae",
+}
+
+/** The reach the database gives a key: every table of the listed areas (a stand-in for rr_mcp_table_departments). */
+async function reachFor(departments: string[]) {
+  const { ENTITIES } = await import(new URL(FN + "tools_admin.ts", ROOT).href)
+  const areas: Record<string, string[]> = {
+    sales: ["CRM", "Client accounts", "Quotations"],
+    hr: ["HR"],
+    payroll: ["Payroll"],
+  }
+  const want = new Set(departments.flatMap((d) => areas[d] || []))
+  const tables = Object.values(ENTITIES as Record<string, { table: string; area: string }>)
+    .filter((e) => departments.includes("admin") || want.has(e.area)).map((e) => e.table)
+  if (departments.includes("payroll")) tables.push("hr_employees")
+  return { departments, read: tables, write: tables.filter((t) => !(departments.includes("payroll") && t === "hr_employees")) }
+}
 
 Deno.test("admin tools write only through the audited database functions, never delete, never use the service key", async () => {
   const src = await read(FN + "tools_admin.ts")
@@ -281,6 +304,7 @@ Deno.test({ name: "a standard key never sees the admin tools; an admin key sees 
   const odd = (await (await h(rpc("tools/list", {}, 8))).json()).result.tools.map((t: { name: string }) => t.name).sort()
   assertEquals(odd, EXPECTED_TOOLS, "an admin role without the admin scope gets the standard tools")
   resolveRows = [ADMIN_MEMBER]
+  reachBody = await reachFor(["admin"])
   const tools = (await (await h(rpc("tools/list", {}, 9))).json()).result.tools as { name: string; annotations?: { destructiveHint?: boolean } }[]
   const names = tools.map((t) => t.name)
   for (const n of EXPECTED_TOOLS) assert(names.includes(n), `admin key keeps ${n}`)
@@ -289,6 +313,49 @@ Deno.test({ name: "a standard key never sees the admin tools; an admin key sees 
   }
   assertFalse(names.some((n) => /approve|pay_run|payout|setting|secret|password/.test(n)))
   for (const t of tools) assertEquals(t.annotations?.destructiveHint, false, `${t.name}: nothing is erased`)
+  reachBody = null
+}) })
+
+Deno.test({ name: "a key with departments sees only its departments' tools and records", ...opts, fn: () => withFakeDb(async () => {
+  const h = await load()
+  const { toolsForDepartments } = await import(new URL(FN + "highmastMcp.bundle.js", ROOT).href)
+  type Tool = { name: string; inputSchema: { properties?: Record<string, { enum?: string[] }> } }
+  const list = async (departments: string[], id: number) => {
+    resolveRows = [{ ...ADMIN_MEMBER, key_name: `Key ${departments.join("+")}`, departments }]
+    reachBody = await reachFor(departments)
+    const body = await (await h(rpc("tools/list", {}, id))).json()
+    return body.result.tools as Tool[]
+  }
+  try {
+    const sales = await list(["sales"], 20)
+    const salesNames = sales.map((t) => t.name).sort()
+    assertEquals(salesNames, [...toolsForDepartments(["sales"])].sort(), "sales gets exactly the sales tools")
+    for (const n of ["create_quote", "create_deal", "close_deal", "search_accounts", "list_records"]) assert(salesNames.includes(n), `sales has ${n}`)
+    for (const n of ["record_payment", "update_employee", "create_payroll_run", "reply_ticket", "list_users"]) assertFalse(salesNames.includes(n), `sales has no ${n}`)
+    const entities = sales.find((t) => t.name === "list_records")!.inputSchema.properties!.entity.enum!
+    assert(entities.includes("accounts") && entities.includes("quotes"), "sales lists accounts and quotes")
+    assertFalse(entities.includes("employees") || entities.includes("payroll_runs") || entities.includes("users"), "but not HR, payroll or users")
+
+    const hr = (await list(["hr"], 21)).map((t) => t.name)
+    for (const n of ["list_employees", "update_employee", "create_leave_request"]) assert(hr.includes(n), `hr has ${n}`)
+    for (const n of ["create_quote", "create_payroll_run", "search_accounts", "create_lead"]) assertFalse(hr.includes(n), `hr has no ${n}`)
+
+    const payroll = await list(["payroll"], 22)
+    const payrollNames = payroll.map((t) => t.name)
+    for (const n of ["create_payroll_run", "get_payroll_run", "get_employee"]) assert(payrollNames.includes(n), `payroll has ${n}`)
+    assertFalse(payrollNames.includes("update_employee"), "payroll cannot change employees")
+    const payrollCreate = payroll.find((t) => t.name === "create_record")?.inputSchema.properties?.entity.enum || []
+    assertFalse(payrollCreate.includes("employees"), "nor through create_record")
+
+    // A tool outside the key's departments is refused even if called by name.
+    resolveRows = [{ ...ADMIN_MEMBER, departments: ["hr"] }]
+    reachBody = await reachFor(["hr"])
+    const res = await (await h(rpc("tools/call", { name: "create_quote", arguments: {} }, 23))).json()
+    assert(res.error || res.result?.isError, "create_quote is not there for an HR key")
+    assertFalse(calls.some((c) => c.url.pathname === "/rest/v1/rpc/rr_mcp_quote_save"), "nothing reached the database")
+  } finally {
+    reachBody = null
+  }
 }) })
 
 Deno.test({ name: "an admin write goes through rr_mcp_save as the AI Assistant, and sensitive arguments are hidden in the call log", ...opts, fn: () => withFakeDb(async () => {

@@ -32,6 +32,7 @@ import {
   stageMoveProblem,
   stagesFor,
   ticketReplyAlert,
+  toolAllowedForDepartments,
 } from "./highmastMcp.bundle.js"
 
 // The bundle is plain JavaScript; these are the types from app/src/lib/highmastMcp.ts.
@@ -42,7 +43,15 @@ const MCP_PIPELINE_NAMES = PIPELINE_NAMES as McpPipeline[]
 const MCP_STALE_DAYS = STALE_DAYS as Record<McpPipeline, number>
 const LEAD_ACCOUNT_TYPE = LEAD_TYPES as Record<"ai_crm" | "ctrm_next", string>
 
-export type ToolContext = { db: SupabaseClient; key: McpKey; now: () => Date }
+/** Tables a key with departments may read and write (from public.rr_mcp_reach()). */
+export type Reach = { departments: string[]; read: Set<string>; write: Set<string> }
+export type ToolContext = { db: SupabaseClient; key: McpKey; now: () => Date; reach?: Reach }
+
+/** Is this tool offered to the key? Standard keys: all 14. Keys with departments: their departments' tools. */
+export function toolOffered(name: string, ctx: Pick<ToolContext, "key">): boolean {
+  if (ctx.key.scope !== "admin") return true
+  return toolAllowedForDepartments(name, ctx.key.departments || [])
+}
 export type { Row }
 
 type Row = Record<string, unknown>
@@ -855,6 +864,7 @@ export async function runTool(def: ToolDef, args: Record<string, unknown>, ctx: 
 
 export function registerTools(server: McpServer, ctx: ToolContext) {
   for (const def of TOOLS) {
+    if (!toolOffered(def.name, ctx)) continue
     server.registerTool(
       def.name,
       {

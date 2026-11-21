@@ -19,6 +19,10 @@ export type McpKey = {
   role: "sales" | "staff" | "viewer" | "admin"
   /** "admin" keys get the admin tools (tools_admin.ts) and act as the AI Assistant admin member. */
   scope: "standard" | "admin"
+  /** grok, claude, chatgpt or other (shown in the audit log); null if not set. */
+  assistant: string | null
+  /** Departments of an admin-scope key (sales, finance, hr ... or admin = everything). Empty for standard keys. */
+  departments: string[]
   memberId: string
   memberName: string
   memberEmail: string
@@ -74,6 +78,8 @@ type ResolveRow = {
   key_name: string
   role: McpKey["role"]
   scope?: McpKey["scope"]
+  assistant?: string | null
+  departments?: string[] | null
   member_id: string
   member_name: string
   member_email: string
@@ -118,6 +124,11 @@ export async function resolveKey(rawKey: string, fetcher: typeof fetch = fetch):
       keyName: row.key_name,
       role: row.role,
       scope: row.scope === "admin" && row.role === "admin" ? "admin" : "standard",
+      assistant: row.assistant || null,
+      // Before the departments SQL, admin keys had no departments and reached every area.
+      departments: row.scope === "admin" && row.role === "admin"
+        ? (Array.isArray(row.departments) ? row.departments : ["admin"])
+        : [],
       memberId: row.member_id,
       memberName: row.member_name || row.member_email,
       memberEmail: row.member_email,
