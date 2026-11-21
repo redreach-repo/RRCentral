@@ -193,10 +193,31 @@
   box-shadow: inset 2px 0 0 var(--primary);
 }
 
+.sideTopLinks {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-bottom: 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.topLink {
+  font-size: 13px;
+  font-weight: 600;
+  gap: 9px;
+}
+
 .sideGroup {
   display: flex;
   flex-direction: column;
   gap: 1px;
+}
+
+/* Each group reads as its own block: a hairline between groups. */
+.sideGroup + .sideGroup {
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  padding-top: 2px;
 }
 
 .sideGroupBtn {
@@ -911,3 +932,19 @@
   }
 }
 
+/* Touch screens (iPad, phones): finger-sized group headings and links. */
+@media (pointer: coarse), (max-width: 1024px) {
+  .sideGroupBtn {
+    min-height: 48px;
+    font-size: 14.5px;
+  }
+
+  .navItem {
+    min-height: 44px;
+    font-size: 14px;
+  }
+
+  .panelSectionLabel {
+    margin-top: 12px;
+  }
+}

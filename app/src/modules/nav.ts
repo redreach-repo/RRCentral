@@ -21,13 +21,12 @@ import {
   FileBarChart,
   FileSignature,
   FileText,
-  Files,
   FolderOpen,
   Gauge,
   Globe,
   Handshake,
   HeartPulse,
-  Info,
+  Inbox,
   KeyRound,
   Layers,
   LayoutDashboard,
@@ -60,181 +59,130 @@ import { modulesEnabled, parseModuleFlags, type ModuleManifest, type ModuleNavIt
 import { EXTENSION_MODULES } from './extensions'
 import { mergeExtensionNav } from './extensions/collect'
 
+/**
+ * Sidebar, rebuilt Nov 2026: Home links at the top, then five separate groups.
+ * Every page lives in exactly one group (nav.test.ts checks this).
+ *
+ * The Settings > Modules switches still work page by page: each link carries
+ * the `flag` of the switch that used to hide it (sales, documents, clients,
+ * delivery, ops, finance, hr, payroll, marketing, saasBilling, industryPacks),
+ * and a group with no links left disappears on its own.
+ */
 const CORE_MODULES: ModuleManifest[] = [
   {
     id: 'overview',
-    label: 'Overview',
+    label: 'Home',
     icon: LayoutDashboard,
-    /** Soft-hide via app_settings.moduleFlags JSON, e.g. {"overview":false}. */
-    flag: 'overview',
+    /** Plain links at the top, no group heading. */
+    flat: true,
     items: [
-      { to: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true },
-      { to: '/guide', label: 'Guide', icon: BookOpen },
-      { to: '/about-product', label: 'About', icon: Info },
+      { to: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true, flag: 'overview' },
+      { to: '/guide', label: 'Guide', icon: BookOpen, flag: 'overview' },
+    ],
+  },
+  {
+    /** Mail, calendar and contacts. Mail joins from modules/extensions/mail. */
+    id: 'connect',
+    label: 'Mail, calendar, contacts',
+    icon: Inbox,
+    items: [
+      { to: '/follow-ups', label: 'Calendar and follow-ups', icon: CalendarClock, flag: 'sales' },
+      { to: '/accounts', label: 'Clients and contacts', icon: Contact, forStaff: true, flag: 'clients' },
     ],
   },
   {
     id: 'sales',
     label: 'Sales',
-    icon: Users,
-    /** Soft-hide via app_settings.moduleFlags JSON, e.g. {"sales":false}. */
-    flag: 'sales',
+    icon: TrendingUp,
     items: [
-      { to: '/quick-add', label: 'Quick add', icon: PhoneCall, minRole: 'sales', section: 'Work' },
-      { to: '/deals', label: 'Pipeline', icon: Briefcase, forStaff: true, section: 'Work' },
-      { to: '/crm', label: 'My Day', icon: Users, section: 'Work' },
-      { to: '/follow-ups', label: 'Follow-ups', icon: CalendarClock, section: 'Work' },
-      { to: '/sales', label: 'AI CRM detail', icon: TrendingUp, minRole: 'sales', section: 'Work' },
-      { to: '/ctrm', label: 'CTRM detail', icon: Handshake, minRole: 'sales', section: 'Work' },
-    ],
-  },
-  {
-    /**
-     * Company wide documents for every vertical (01 RR Threads to 09 CTRM Next).
-     * Kept out of Sales so they do not read as part of the AI CRM / CTRM pipeline.
-     */
-    id: 'documents',
-    label: 'Documents',
-    icon: Files,
-    /** Soft-hide via app_settings.moduleFlags JSON, e.g. {"documents":false}. */
-    flag: 'documents',
-    items: [
-      { to: '/quotations', label: 'Quotations', icon: FileText },
-      { to: '/invoices', label: 'Invoices', icon: Receipt },
-      { to: '/client-pos', label: 'Client POs', icon: ClipboardList },
-      { to: '/delivery-notes', label: 'Delivery notes', icon: Truck },
-      { to: '/customer-files', label: 'Google Drive', icon: FolderOpen },
-    ],
-  },
-  {
-    id: 'clients',
-    label: 'Clients',
-    icon: Contact,
-    /** Soft-hide via app_settings.moduleFlags JSON, e.g. {"clients":false}. */
-    flag: 'clients',
-    items: [
-      { to: '/accounts', label: 'Accounts', icon: Contact, forStaff: true },
-      { to: '/support', label: 'Support', icon: LifeBuoy, forStaff: true },
-      { to: '/ctrm-issues', label: 'CTRM issues', icon: MessageSquareWarning, forStaff: true },
-      { to: '/client-health', label: 'Client health', icon: HeartPulse, forStaff: true },
-      { to: '/client-reports', label: 'Monthly reports', icon: FileBarChart, forStaff: true },
-      { to: '/client-updates', label: 'Weekly updates', icon: Send, forStaff: true },
-    ],
-  },
-  {
-    id: 'delivery',
-    label: 'Delivery',
-    icon: Package,
-    /** Soft-hide via app_settings.moduleFlags JSON, e.g. {"delivery":false}. */
-    flag: 'delivery',
-    items: [
-      { to: '/products', label: 'WorshipHub', icon: WorshipHubIcon, forStaff: true },
-      { to: '/delivery-settings', label: 'Packages', icon: Package, minRole: 'manager' },
-      { to: '/build-templates', label: 'Build templates', icon: ClipboardList, forStaff: true },
-      { to: '/agreement-template', label: 'Agreement', icon: ScrollText, forStaff: true },
-      { to: '/nda-template', label: 'NDA template', icon: FileSignature, forStaff: true },
-      { to: '/clause-library', label: 'Clause library', icon: ScrollText, forStaff: true },
-      { to: '/obligations', label: 'Obligations', icon: ClipboardList, forStaff: true },
+      { to: '/quick-add', label: 'Quick add', icon: PhoneCall, minRole: 'sales', section: 'Work', flag: 'sales' },
+      { to: '/deals', label: 'Pipeline', icon: Briefcase, forStaff: true, section: 'Work', flag: 'sales' },
+      { to: '/crm', label: 'My Day', icon: Users, section: 'Work', flag: 'sales' },
+      { to: '/sales', label: 'AI CRM detail', icon: TrendingUp, minRole: 'sales', section: 'Work', flag: 'sales' },
+      { to: '/ctrm', label: 'CTRM detail', icon: Handshake, minRole: 'sales', section: 'Work', flag: 'sales' },
+      { to: '/quotations', label: 'Quotations', icon: FileText, section: 'Quotes and orders', flag: 'documents' },
+      { to: '/client-pos', label: 'Client POs', icon: ClipboardList, section: 'Quotes and orders', flag: 'documents' },
+      { to: '/marketing', label: 'Campaigns', icon: Megaphone, minRole: 'manager', section: 'Marketing', flag: 'marketing' },
     ],
   },
   {
     id: 'ops',
     label: 'Operations',
     icon: Wrench,
-    /** Soft-hide via app_settings.moduleFlags JSON, e.g. {"ops":false}. */
-    flag: 'ops',
     items: [
-      { to: '/app/wanders', label: 'Wanders', icon: Plane },
-      { to: '/catalog', label: 'Catalog', icon: Package },
-      { to: '/inventory', label: 'Inventory', icon: Boxes },
-      { to: '/purchase-orders', label: 'Purchase orders', icon: Truck },
-      { to: '/projects', label: 'Projects', icon: Briefcase, minRole: 'manager' },
-      { to: '/construction-sites', label: 'Sites', icon: HardHat, minRole: 'manager' },
-      { to: '/eng-register', label: 'Eng register', icon: DraftingCompass, minRole: 'manager' },
-      { to: '/templates', label: 'Templates', icon: LayoutTemplate },
-      { to: '/domains', label: 'Domains', icon: Globe },
+      { to: '/support', label: 'Support', icon: LifeBuoy, forStaff: true, section: 'Client care', flag: 'clients' },
+      { to: '/ctrm-issues', label: 'CTRM issues', icon: MessageSquareWarning, forStaff: true, section: 'Client care', flag: 'clients' },
+      { to: '/client-health', label: 'Client health', icon: HeartPulse, forStaff: true, section: 'Client care', flag: 'clients' },
+      { to: '/client-reports', label: 'Monthly reports', icon: FileBarChart, forStaff: true, section: 'Client care', flag: 'clients' },
+      { to: '/client-updates', label: 'Weekly updates', icon: Send, forStaff: true, section: 'Client care', flag: 'clients' },
+      // Uniform sizes joins Client care from modules/extensions/client-uniforms.
+      { to: '/products', label: 'WorshipHub', icon: WorshipHubIcon, forStaff: true, section: 'Delivery', flag: 'delivery' },
+      { to: '/delivery-settings', label: 'Packages', icon: Package, minRole: 'manager', section: 'Delivery', flag: 'delivery' },
+      { to: '/build-templates', label: 'Build templates', icon: ClipboardList, forStaff: true, section: 'Delivery', flag: 'delivery' },
+      { to: '/delivery-notes', label: 'Delivery notes', icon: Truck, section: 'Delivery', flag: 'documents' },
+      { to: '/agreement-template', label: 'Agreement', icon: ScrollText, forStaff: true, section: 'Contracts', flag: 'delivery' },
+      { to: '/nda-template', label: 'NDA template', icon: FileSignature, forStaff: true, section: 'Contracts', flag: 'delivery' },
+      { to: '/clause-library', label: 'Clause library', icon: ScrollText, forStaff: true, section: 'Contracts', flag: 'delivery' },
+      { to: '/obligations', label: 'Obligations', icon: ClipboardList, forStaff: true, section: 'Contracts', flag: 'delivery' },
+      { to: '/projects', label: 'Projects', icon: Briefcase, minRole: 'manager', section: 'Projects', flag: 'ops' },
+      { to: '/construction-sites', label: 'Sites', icon: HardHat, minRole: 'manager', section: 'Projects', flag: 'ops' },
+      { to: '/eng-register', label: 'Eng register', icon: DraftingCompass, minRole: 'manager', section: 'Projects', flag: 'ops' },
+      { to: '/app/wanders', label: 'Wanders', icon: Plane, section: 'Projects', flag: 'ops' },
+      { to: '/catalog', label: 'Catalog', icon: Package, section: 'Stock and buying', flag: 'ops' },
+      { to: '/inventory', label: 'Inventory', icon: Boxes, section: 'Stock and buying', flag: 'ops' },
+      { to: '/purchase-orders', label: 'Purchase orders', icon: Truck, section: 'Stock and buying', flag: 'ops' },
+      { to: '/templates', label: 'Templates', icon: LayoutTemplate, section: 'Web and files', flag: 'ops' },
+      { to: '/domains', label: 'Domains', icon: Globe, section: 'Web and files', flag: 'ops' },
+      { to: '/customer-files', label: 'Google Drive', icon: FolderOpen, section: 'Web and files', flag: 'documents' },
     ],
   },
   {
     id: 'finance',
     label: 'Finance',
     icon: Banknote,
-    /** Soft-hide via app_settings.moduleFlags JSON, e.g. {"finance":false}. */
-    flag: 'finance',
     items: [
-      { to: '/payments', label: 'Payments', icon: Banknote },
-      { to: '/expenses', label: 'Expenses', icon: Wallet },
-      { to: '/vendors', label: 'Vendors', icon: Building2 },
-      { to: '/ledger', label: 'Ledger', icon: BookOpen, minRole: 'manager' },
-      { to: '/reports', label: 'Reports', icon: BarChart3 },
-      { to: '/planning-goals', label: 'Goals', icon: Target, minRole: 'manager' },
-      { to: '/mrr', label: 'MRR', icon: TrendingUp, minRole: 'manager' },
-      { to: '/insights', label: 'Utilisation', icon: Gauge, minRole: 'manager' },
-      { to: '/duplicates', label: 'Duplicates', icon: CopyCheck, minRole: 'manager' },
+      { to: '/invoices', label: 'Invoices', icon: Receipt, section: 'Money in', flag: 'documents' },
+      { to: '/payments', label: 'Payments', icon: Banknote, section: 'Money in', flag: 'finance' },
+      { to: '/expenses', label: 'Expenses', icon: Wallet, section: 'Money out', flag: 'finance' },
+      { to: '/vendors', label: 'Vendors', icon: Building2, section: 'Money out', flag: 'finance' },
+      { to: '/ledger', label: 'Ledger', icon: BookOpen, minRole: 'manager', section: 'Books and reports', flag: 'finance' },
+      { to: '/reports', label: 'Reports', icon: BarChart3, section: 'Books and reports', flag: 'finance' },
+      { to: '/mrr', label: 'MRR', icon: TrendingUp, minRole: 'manager', section: 'Books and reports', flag: 'finance' },
+      { to: '/insights', label: 'Utilisation', icon: Gauge, minRole: 'manager', section: 'Books and reports', flag: 'finance' },
+      { to: '/planning-goals', label: 'Goals', icon: Target, minRole: 'manager', section: 'Books and reports', flag: 'finance' },
     ],
   },
   {
-    id: 'hr',
-    label: 'HR',
-    icon: Users,
-    flag: 'hr',
-    items: [
-      { to: '/hr/people', label: 'People', icon: Users, minRole: 'manager' },
-      { to: '/hr/leave', label: 'Leave', icon: CalendarDays, minRole: 'manager' },
-      { to: '/hr/attendance', label: 'Attendance', icon: Clock, minRole: 'manager' },
-    ],
-  },
-  {
-    id: 'payroll',
-    label: 'Payroll',
-    icon: Wallet,
-    flag: 'payroll',
-    items: [{ to: '/payroll', label: 'Payroll runs', icon: Wallet, minRole: 'manager' }],
-  },
-  {
-    id: 'marketing',
-    label: 'Marketing',
-    icon: Megaphone,
-    flag: 'marketing',
-    items: [{ to: '/marketing', label: 'Campaigns', icon: Megaphone, minRole: 'manager' }],
-  },
-  {
-    id: 'saasBilling',
-    label: 'SaaS billing',
-    icon: CreditCard,
-    flag: 'saasBilling',
-    items: [{ to: '/saas-billing', label: 'HighMast plan', icon: CreditCard, minRole: 'admin' }],
-  },
-  {
-    id: 'industryPacks',
-    label: 'Industry packs',
-    icon: Layers,
-    flag: 'industryPacks',
-    items: [
-      { to: '/industry-packs', label: 'Packs', icon: Layers, minRole: 'admin' },
-      { to: '/country-packs', label: 'Country packs', icon: Globe, minRole: 'admin' },
-    ],
-  },
-  {
+    /** HR, payroll and everything admin. AI connector joins System from its extension. */
     id: 'admin',
-    label: 'Admin',
-    icon: Settings,
+    label: 'HR and admin',
+    icon: Building2,
     items: [
-      { to: '/settings', label: 'Settings', icon: Settings, minRole: 'admin' },
+      { to: '/hr/people', label: 'People', icon: Users, minRole: 'manager', section: 'People', flag: 'hr' },
+      { to: '/hr/leave', label: 'Leave', icon: CalendarDays, minRole: 'manager', section: 'People', flag: 'hr' },
+      { to: '/hr/attendance', label: 'Attendance', icon: Clock, minRole: 'manager', section: 'People', flag: 'hr' },
+      { to: '/payroll', label: 'Payroll runs', icon: Wallet, minRole: 'manager', section: 'People', flag: 'payroll' },
+      { to: '/approvals', label: 'Approvals', icon: ShieldCheck, minRole: 'manager', section: 'Company' },
+      // AI approvals joins Company from modules/extensions/ai-approvals.
+      { to: '/settings', label: 'Settings', icon: Settings, minRole: 'admin', section: 'Company' },
       {
         to: '/settings#account',
         label: 'Account',
         icon: KeyRound,
         roles: ['manager', 'sales', 'staff', 'viewer'],
         forStaff: true,
+        section: 'Company',
       },
-      { to: '/theme-studio', label: 'Theme studio', icon: Palette, minRole: 'admin' },
-      { to: '/approvals', label: 'Approvals', icon: ShieldCheck, minRole: 'manager' },
-      { to: '/public-api', label: 'API and webhooks', icon: KeyRound, minRole: 'admin' },
-      { to: '/audit-log', label: 'Audit log', icon: ShieldCheck, minRole: 'admin' },
-      { to: '/dsr', label: 'Data requests', icon: ShieldCheck, minRole: 'admin' },
-      { to: '/app-errors', label: 'App errors', icon: Bug, minRole: 'admin' },
-      { to: '/system-check', label: 'System check', icon: Activity, minRole: 'admin' },
+      { to: '/theme-studio', label: 'Theme studio', icon: Palette, minRole: 'admin', section: 'Company' },
+      { to: '/saas-billing', label: 'HighMast plan', icon: CreditCard, minRole: 'admin', section: 'Company', flag: 'saasBilling' },
+      { to: '/industry-packs', label: 'Industry packs', icon: Layers, minRole: 'admin', section: 'Company', flag: 'industryPacks' },
+      { to: '/country-packs', label: 'Country packs', icon: Globe, minRole: 'admin', section: 'Company', flag: 'industryPacks' },
+      { to: '/public-api', label: 'API and webhooks', icon: KeyRound, minRole: 'admin', section: 'System' },
+      { to: '/audit-log', label: 'Audit log', icon: ShieldCheck, minRole: 'admin', section: 'System' },
+      { to: '/dsr', label: 'Data requests', icon: ShieldCheck, minRole: 'admin', section: 'System' },
+      { to: '/duplicates', label: 'Duplicates', icon: CopyCheck, minRole: 'manager', section: 'System', flag: 'finance' },
+      { to: '/app-errors', label: 'App errors', icon: Bug, minRole: 'admin', section: 'System' },
+      { to: '/system-check', label: 'System check', icon: Activity, minRole: 'admin', section: 'System' },
     ],
   },
 ]
@@ -250,6 +198,9 @@ const PATH_TITLE_OVERRIDES: { match: (path: string) => boolean; title: string }[
   { match: (p) => p.startsWith('/obligations'), title: 'Obligations board' },
   { match: (p) => p.startsWith('/mrr'), title: 'Monthly recurring revenue' },
   { match: (p) => p.startsWith('/insights'), title: 'Utilisation and profit' },
+  { match: (p) => p.startsWith('/about-product'), title: 'About' },
+  { match: (p) => p.startsWith('/follow-ups'), title: 'Follow-ups' },
+  { match: (p) => p.startsWith('/accounts'), title: 'Accounts' },
 ]
 
 function navItemPath(to: string): string {
@@ -318,7 +269,9 @@ export function visibleAppModules(
   return modulesEnabled(modules, resolvedFlags)
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => navItemVisible(item, userRole, settings)),
+      items: group.items.filter(
+        (item) => (!item.flag || resolvedFlags[item.flag] !== false) && navItemVisible(item, userRole, settings),
+      ),
     }))
     .filter((group) => group.items.length > 0)
 }

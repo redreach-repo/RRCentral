@@ -13,11 +13,11 @@ const mod: ExtensionModule = {
     id: 'clientUniforms',
     label: 'Uniform sizes',
     icon: Shirt,
-    items: [{ to: '/uniform-sizes', label: 'Uniform sizes', icon: Shirt, roles: ['admin', 'manager', 'sales', 'viewer'] }],
+    items: [{ to: '/uniform-sizes', label: 'Uniform sizes', icon: Shirt, roles: ['admin', 'manager', 'sales', 'viewer'], section: 'Client care', flag: 'clients' }],
   },
   routes: [{ path: 'uniform-sizes', element: <ClientUniformsPage /> }],
-  // Listed under Clients rather than as a sidebar group of its own.
-  attachTo: 'clients',
+  // Listed under Operations > Client care rather than as a sidebar group of its own.
+  attachTo: 'ops',
 }
 
 export default mod

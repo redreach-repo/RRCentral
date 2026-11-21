@@ -19,6 +19,9 @@ const mod: ExtensionModule = {
     items: [{ to: '/mail', label: 'Mail', icon: Mail, roles: ['admin', 'manager', 'sales'] }],
   },
   routes: [{ path: 'mail', element: <MailPage /> }],
+  // First link of the sidebar's Mail, calendar and contacts group.
+  attachTo: 'connect',
+  attachFirst: true,
 }
 
 export default mod

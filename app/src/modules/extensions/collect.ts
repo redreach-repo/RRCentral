@@ -3,21 +3,43 @@ import type { ExtensionModule, ExtensionStrings } from './types'
 
 /**
  * Sidebar groups: the core groups, with the items of modules that set
- * `attachTo` appended to that group, then one group per other module.
+ * `attachTo` added to that group, then one group per other module.
+ * An attached item with a `section` goes after the last link of that section
+ * (else at the end), and keeps its module's switch as its own `flag`.
  * An `attachTo` naming no core group gets a group of its own.
  */
 export function mergeExtensionNav(core: ModuleManifest[], exts: ExtensionModule[]): ModuleManifest[] {
   const ids = new Set(core.map((m) => m.id))
   const attached = new Map<string, ModuleManifest['items']>()
+  const first = new Map<string, ModuleManifest['items']>()
   const own: ModuleManifest[] = []
   for (const ext of exts) {
     if (ext.attachTo && ids.has(ext.attachTo)) {
-      attached.set(ext.attachTo, [...(attached.get(ext.attachTo) || []), ...ext.manifest.items])
+      const items = ext.manifest.items.map((item) =>
+        item.flag || !ext.manifest.flag ? item : { ...item, flag: ext.manifest.flag },
+      )
+      const into = ext.attachFirst ? first : attached
+      into.set(ext.attachTo, [...(into.get(ext.attachTo) || []), ...items])
     } else {
       own.push(ext.manifest)
     }
   }
-  return [...core.map((m) => (attached.has(m.id) ? { ...m, items: [...m.items, ...attached.get(m.id)!] } : m)), ...own]
+  return [
+    ...core.map((m) => {
+      const extra = attached.get(m.id) || []
+      const top = first.get(m.id) || []
+      if (!extra.length && !top.length) return m
+      const items = [...top, ...m.items]
+      for (const item of extra) {
+        let at = -1
+        if (item.section) items.forEach((it, i) => (it.section === item.section ? (at = i) : undefined))
+        if (at === -1) items.push(item)
+        else items.splice(at + 1, 0, item)
+      }
+      return { ...m, items }
+    }),
+    ...own,
+  ]
 }
 
 /** Sort by folder path so the sidebar order is stable, and refuse clashes. */

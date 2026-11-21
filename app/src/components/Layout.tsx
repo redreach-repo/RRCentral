@@ -1,33 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
-  Banknote,
-  BarChart3,
   Bell,
-  Briefcase,
-  Building2,
   CalendarClock,
   Contact,
   FileText,
-  FolderOpen,
   LayoutDashboard,
   LifeBuoy,
   Menu,
   MoreHorizontal,
-  Package,
-  Receipt,
   Search,
   Timer,
-  Truck,
   Users,
-  Wallet,
   X,
   LogOut,
   ChevronDown,
   Moon,
   Sun,
   Monitor,
-  ClipboardList,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
@@ -49,11 +39,9 @@ import {
   APP_MODULES,
   itemMatchesPath,
   moduleIdForPath,
-  navItemVisible,
   titleForPath,
   visibleAppModules,
 } from '../modules/nav'
-import type { ModuleNavItem } from '../modules/registry'
 import CompanyMark from './CompanyMark'
 import { DEFAULT_LOGO_URL } from '../lib/brand'
 import CommandPalette from './CommandPalette'
@@ -65,8 +53,6 @@ import styles from './Layout.module.css'
 
 const highmastAssets = productAssetUrls(import.meta.env.BASE_URL)
 const THEME_CYCLE: ThemeMode[] = ['system', 'light', 'dark']
-
-type NavItem = ModuleNavItem
 
 const NAV_SECTION_KEY = 'rrcentral_nav_section'
 
@@ -81,21 +67,6 @@ const staffPhoneNav: typeof phonePrimaryNav = [
   { to: '/app', label: 'Home', icon: LayoutDashboard, end: true },
   { to: '/accounts', label: 'Accounts', icon: Contact },
   { to: '/support', label: 'Support', icon: LifeBuoy },
-]
-
-/** Phone drawer shortcuts — destinations not already on the primary bottom tabs. */
-const phoneShortcuts: NavItem[] = [
-  { to: '/deals', label: 'Pipeline', icon: Briefcase, forStaff: true },
-  { to: '/customer-files', label: 'Drive', icon: FolderOpen },
-  { to: '/accounts', label: 'Accounts', icon: Contact, forStaff: true },
-  { to: '/invoices', label: 'Invoices', icon: Receipt },
-  { to: '/client-pos', label: 'Client POs', icon: ClipboardList },
-  { to: '/delivery-notes', label: 'Delivery notes', icon: Truck },
-  { to: '/expenses', label: 'Expenses', icon: Wallet },
-  { to: '/vendors', label: 'Vendors', icon: Building2 },
-  { to: '/payments', label: 'Payments', icon: Banknote },
-  { to: '/catalog', label: 'Catalog', icon: Package },
-  { to: '/reports', label: 'Reports', icon: BarChart3 },
 ]
 
 function isPhonePrimaryActive(pathname: string, to: string, end?: boolean): boolean {
@@ -163,11 +134,12 @@ export default function Layout() {
   )
 
   const pathSection = moduleIdForPath(location.pathname)
-  const [expandedIds, setExpandedIds] = useState<string[]>(() => {
+  // One group open at a time, so the sidebar never turns into a long list.
+  const [openGroupId, setOpenGroupId] = useState<string | null>(() => {
     const fromPath = moduleIdForPath(location.pathname)
+    if (APP_MODULES.some((g) => g.id === fromPath && !g.flat)) return fromPath
     const saved = readSavedSection()
-    const seed = saved && APP_MODULES.some((g) => g.id === saved) ? saved : fromPath
-    return Array.from(new Set([fromPath, seed].filter(Boolean)))
+    return saved && APP_MODULES.some((g) => g.id === saved && !g.flat) ? saved : null
   })
 
   useEffect(() => {
@@ -182,16 +154,14 @@ export default function Layout() {
   }, [])
 
   useEffect(() => {
+    if (!APP_MODULES.some((g) => g.id === pathSection && !g.flat)) return
     writeSavedSection(pathSection)
-    setExpandedIds((prev) => (prev.includes(pathSection) ? prev : [...prev, pathSection]))
+    setOpenGroupId(pathSection)
   }, [pathSection])
 
   function toggleSection(id: string) {
-    setExpandedIds((prev) => {
-      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-      writeSavedSection(id)
-      return next.length ? next : [id]
-    })
+    setOpenGroupId((prev) => (prev === id ? null : id))
+    writeSavedSection(id)
   }
 
   function openReminders() {
@@ -247,13 +217,6 @@ export default function Layout() {
     isPhonePrimaryActive(location.pathname, item.to, item.end),
   )
 
-  const visiblePhoneShortcuts = useMemo(() => {
-    const primaryPaths = new Set(phoneNav.map((item) => item.to))
-    return phoneShortcuts
-      .filter((item) => navItemVisible(item, userRole, settings))
-      .filter((item) => !primaryPaths.has(item.to))
-  }, [phoneNav, userRole, settings])
-
   return (
     <div className={`${styles.shell} ${phoneShell ? styles.shellPhone : ''}`}>
       <a href="#main-content" className="rr-skip-link">
@@ -297,46 +260,42 @@ export default function Layout() {
         </div>
 
         <nav className={styles.sideNav} aria-label={t('shell.mainNav')}>
-          {phoneShell && visiblePhoneShortcuts.length > 0 ? (
-            <div className={styles.phoneShortcuts}>
-              <div className={styles.phoneShortcutsLabel}>{t('shell.shortcuts')}</div>
-              <div className={styles.phoneShortcutsGrid}>
-                {visiblePhoneShortcuts.map((item) => {
-                  const ItemIcon = item.icon
-                  const itemLabel = translateNavLabel(t, navItemKey(item.to), item.label)
-                  return (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      end={item.end}
-                      className={({ isActive }) =>
-                        `${styles.phoneShortcut} ${isActive ? styles.phoneShortcutActive : ''}`
-                      }
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      <ItemIcon size={16} strokeWidth={1.75} />
-                      <span>{itemLabel}</span>
-                    </NavLink>
-                  )
-                })}
-              </div>
-            </div>
-          ) : null}
           {visibleGroups.map((group) => {
+            if (group.flat) {
+              return (
+                <div key={group.id} className={styles.sideTopLinks}>
+                  {group.items.map((item) => {
+                    const ItemIcon = item.icon
+                    return (
+                      <NavLink
+                        key={`${item.to}-${item.label}`}
+                        to={item.to}
+                        end={item.end}
+                        className={({ isActive }) =>
+                          `${styles.navItem} ${styles.topLink} ${isActive ? styles.navItemActive : ''}`
+                        }
+                        onClick={() => setSidebarOpen(false)}
+                      >
+                        <ItemIcon size={17} strokeWidth={1.75} />
+                        <span>{translateNavLabel(t, navItemKey(item.to), item.label)}</span>
+                      </NavLink>
+                    )
+                  })}
+                </div>
+              )
+            }
             const Icon = group.icon
-            const open = expandedIds.includes(group.id)
+            const open = openGroupId === group.id
             const groupActive = group.items.some((item) => itemMatchesPath(location.pathname, item))
             const groupLabel = translateNavLabel(t, navModuleKey(group.id), group.label)
-            const hasDue =
-              group.id === 'sales' &&
-              group.items.some((i) => i.to === '/follow-ups') &&
-              reminders.due > 0
+            const hasDue = !open && group.items.some((i) => i.to === '/follow-ups') && reminders.due > 0
             return (
               <div key={group.id} className={styles.sideGroup}>
                 <button
                   type="button"
                   className={`${styles.sideGroupBtn} ${groupActive ? styles.sideGroupBtnActive : ''} ${open ? styles.sideGroupBtnOpen : ''}`}
                   aria-expanded={open}
+                  aria-controls={`side-group-${group.id}`}
                   onClick={() => toggleSection(group.id)}
                 >
                   <Icon size={17} strokeWidth={groupActive ? 2.1 : 1.75} />
@@ -353,7 +312,7 @@ export default function Layout() {
                   />
                 </button>
                 {open ? (
-                  <div className={styles.sideItems}>
+                  <div className={styles.sideItems} id={`side-group-${group.id}`}>
                     {group.items.map((item, idx, items) => {
                       const ItemIcon = item.icon
                       const prevSection = idx > 0 ? items[idx - 1]?.section : undefined
