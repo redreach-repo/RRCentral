@@ -44,7 +44,7 @@ export default function Toast({ message, type, onClose }: ToastProps) {
     background: 'var(--surface, #141518)',
     border: `1px solid ${t.border}`,
     boxShadow: 'var(--shadow)',
-    color: '#fff',
+    color: 'var(--text)',
     pointerEvents: 'auto',
     animation: 'rrToastIn 180ms ease-out',
   }
@@ -69,7 +69,7 @@ export default function Toast({ message, type, onClose }: ToastProps) {
         style={{
           background: 'transparent',
           border: 'none',
-          color: 'rgba(255,255,255,0.5)',
+          color: 'var(--text-muted)',
           cursor: 'pointer',
           padding: 2,
           display: 'inline-flex',

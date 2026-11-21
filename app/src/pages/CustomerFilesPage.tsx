@@ -418,7 +418,7 @@ export default function CustomerFilesPage() {
               target="_blank"
               rel="noreferrer"
               className={docsStyles.newBtn}
-              style={{ textDecoration: 'none', background: 'rgba(255,255,255,0.08)' }}
+              style={{ textDecoration: 'none', background: 'color-mix(in srgb, var(--text) 8%, transparent)' }}
             >
               <ExternalLink size={16} /> {t('page.customerFiles.openDrive')}
             </a>
@@ -548,7 +548,7 @@ export default function CustomerFilesPage() {
               <header
                 style={{
                   ...cardStyle,
-                  background: 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(232,93,4,0.12) 100%)',
+                  background: 'linear-gradient(135deg, color-mix(in srgb, var(--text) 6%, transparent) 0%, rgba(232,93,4,0.12) 100%)',
                   borderColor: 'color-mix(in srgb, var(--primary) 40%, transparent)',
                 }}
               >

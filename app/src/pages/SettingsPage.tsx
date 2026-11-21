@@ -1002,9 +1002,9 @@ export default function SettingsPage() {
             onClick={() => jumpToSection(item.id)}
             style={{
               appearance: 'none',
-              border: '1px solid rgba(255,255,255,0.12)',
-              background: 'rgba(255,255,255,0.04)',
-              color: 'rgba(242,244,247,0.78)',
+              border: '1px solid var(--border-strong)',
+              background: 'color-mix(in srgb, var(--text) 4%, transparent)',
+              color: 'var(--text-muted)',
               fontSize: 12,
               fontWeight: 600,
               padding: '6px 10px',

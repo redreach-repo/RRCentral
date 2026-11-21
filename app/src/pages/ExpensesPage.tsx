@@ -751,7 +751,7 @@ export default function ExpensesPage() {
           <button
             type="button"
             className={docsStyles.newBtn}
-            style={{ background: 'rgba(255,255,255,0.08)' }}
+            style={{ background: 'color-mix(in srgb, var(--text) 8%, transparent)' }}
             onClick={() => void syncRecurring().then(() => load())}
           >
             {t('page.expenses.syncMonthly')}
@@ -759,7 +759,7 @@ export default function ExpensesPage() {
           <button
             type="button"
             className={docsStyles.newBtn}
-            style={{ background: 'rgba(255,255,255,0.08)' }}
+            style={{ background: 'color-mix(in srgb, var(--text) 8%, transparent)' }}
             onClick={openCreateSupplierInvoice}
           >
             <FileUp size={16} /> Supplier invoice

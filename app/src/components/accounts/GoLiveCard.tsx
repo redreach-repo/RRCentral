@@ -308,7 +308,7 @@ export default function GoLiveCard({
       </div>
 
       {steps.length ? (
-        <div style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.1)', overflow: 'hidden', margin: '10px 0 4px' }}>
+        <div style={{ height: 6, borderRadius: 999, background: 'color-mix(in srgb, var(--text) 10%, transparent)', overflow: 'hidden', margin: '10px 0 4px' }}>
           <div style={{ width: `${progress.percent}%`, height: '100%', background: progress.overdue ? colors.warn : colors.accent }} />
         </div>
       ) : null}
@@ -345,7 +345,7 @@ export default function GoLiveCard({
             return (
               <li
                 key={t.id}
-                style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 0', borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 13 }}
+                style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 0', borderTop: '1px solid var(--border)', fontSize: 13 }}
               >
                 <input
                   type="checkbox"

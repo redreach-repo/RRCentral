@@ -91,7 +91,7 @@ export const input: CSSProperties = {
   padding: '9px 12px',
   borderRadius: 8,
   border: `1px solid ${colors.border}`,
-  background: 'rgba(0,0,0,0.25)',
+  background: 'var(--surface-2)',
   color: colors.text,
   fontSize: 13,
   outline: 'none',
@@ -132,14 +132,14 @@ export const th: CSSProperties = {
   whiteSpace: 'nowrap',
   position: 'sticky',
   top: 0,
-  background: 'rgba(18, 20, 23, 0.94)',
+  background: 'var(--bg)',
   backdropFilter: 'blur(8px)',
   zIndex: 1,
 }
 
 export const td: CSSProperties = {
   padding: '12px 14px',
-  borderBottom: `1px solid rgba(255,255,255,0.06)`,
+  borderBottom: `1px solid var(--border)`,
   color: colors.text,
   verticalAlign: 'middle',
 }

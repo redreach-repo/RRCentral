@@ -106,7 +106,7 @@ export const buttonDangerStyle: CSSProperties = {
 
 export const inputStyle: CSSProperties = {
   width: '100%',
-  background: 'rgba(0,0,0,0.28)',
+  background: 'var(--surface-2)',
   border: `1px solid ${colors.border}`,
   borderRadius: 8,
   padding: '9px 12px',
@@ -156,14 +156,14 @@ export const thStyle: CSSProperties = {
   whiteSpace: 'nowrap',
   position: 'sticky',
   top: 0,
-  background: 'rgba(11, 12, 14, 0.94)',
+  background: 'var(--bg)',
   backdropFilter: 'blur(8px)',
   zIndex: 1,
 }
 
 export const tdStyle: CSSProperties = {
   padding: '12px 14px',
-  borderBottom: `1px solid rgba(255,255,255,0.05)`,
+  borderBottom: `1px solid var(--border)`,
   color: colors.text,
   verticalAlign: 'middle',
 }

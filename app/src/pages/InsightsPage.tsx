@@ -54,7 +54,7 @@ type Data = {
   assist: AiUsageRow[]
 }
 
-const barTrack: CSSProperties = { height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }
+const barTrack: CSSProperties = { height: 8, borderRadius: 999, background: 'color-mix(in srgb, var(--text) 8%, transparent)', overflow: 'hidden' }
 
 function TrendIcon({ t }: { t: ClientTrend }) {
   if (t.direction === 'up') return <TrendingUp size={16} color={colors.success} aria-label="Margin rising" />

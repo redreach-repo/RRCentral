@@ -667,7 +667,7 @@ export default function FollowupsPage() {
           <button
             type="button"
             className={docsStyles.newBtn}
-            style={{ background: 'rgba(255,255,255,0.08)' }}
+            style={{ background: 'color-mix(in srgb, var(--text) 8%, transparent)' }}
             onClick={() => setCalendarSettingsOpen(true)}
           >
             <Settings size={16} /> {t('page.followups.calendar')}

@@ -9,7 +9,7 @@
 .card {
   border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--text) 3%, transparent);
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -41,7 +41,7 @@
 
 .cardMeta {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
   line-height: 1.4;
   word-break: break-word;
 }
@@ -62,7 +62,7 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-muted);
   margin-bottom: 4px;
 }
 
@@ -126,7 +126,7 @@
 .boardStageChip {
   background: transparent;
   border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--text-muted);
   border-radius: 8px;
   padding: 7px 11px;
   font: inherit;
@@ -139,7 +139,7 @@
 .boardStageChipActive {
   color: var(--text, #f4f5f7);
   border-color: var(--border-strong, rgba(255, 255, 255, 0.12));
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
   box-shadow: inset 0 -2px 0 var(--accent);
 }
 
@@ -186,10 +186,10 @@
 }
 
 .lineCard {
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 12px;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--surface-2);
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
@@ -341,7 +341,7 @@
 
 .dueTileActive {
   border-color: var(--border-strong, rgba(255, 255, 255, 0.12));
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
   box-shadow: inset 2px 0 0 var(--accent);
 }
 
@@ -360,7 +360,7 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-muted);
 }
 
 .viewToggle {
@@ -374,7 +374,7 @@
 .viewToggle button {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-muted);
   padding: 7px 11px;
   font: inherit;
   font-size: 12px;
@@ -386,7 +386,7 @@
 }
 
 .viewToggle button[aria-pressed='true'] {
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
   color: var(--text, #f4f5f7);
 }
 
@@ -395,7 +395,7 @@
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 4px;
   margin-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border);
   padding-bottom: 10px;
 }
 
@@ -407,10 +407,10 @@
   width: 100%;
   margin: 0 0 10px;
   padding: 8px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.03);
-  color: rgba(255, 255, 255, 0.7);
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+  color: var(--text-muted);
   font: inherit;
   font-size: 12px;
   font-weight: 600;
@@ -419,8 +419,8 @@
 }
 
 .sheetDetailsToggle:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #fff;
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  color: var(--text);
 }
 
 .sheetMoneyList {
@@ -443,19 +443,19 @@
 
 .sheetMoneyRow:hover {
   border-color: var(--border-strong, rgba(255, 255, 255, 0.12));
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--text) 3%, transparent);
 }
 
 .sheetMoneyMeta {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-muted);
   margin-top: 2px;
 }
 
 .sheetTab {
   background: transparent;
   border: 1px solid transparent;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-muted);
   border-radius: 8px;
   padding: 8px 6px;
   font: inherit;
@@ -469,7 +469,7 @@
 .sheetTabActive {
   color: var(--text, #f4f5f7);
   border-color: transparent;
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
   box-shadow: inset 0 -2px 0 var(--accent);
 }
 
@@ -487,7 +487,7 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-muted);
 }
 
 .sheetSection {
@@ -496,13 +496,13 @@
 
 .sheetSection + .sheetSection {
   padding-top: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border);
 }
 
 .sheetMeta {
   margin: 0 0 10px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-muted);
   line-height: 1.4;
 }
 
@@ -525,7 +525,7 @@
 .boardCol {
   flex: 0 0 min(280px, 84vw);
   max-width: 300px;
-  background: rgba(255, 255, 255, 0.02);
+  background: color-mix(in srgb, var(--text) 2%, transparent);
   border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
   border-radius: 10px;
   min-height: 160px;
@@ -559,7 +559,7 @@
 .boardCount {
   font-size: 11px;
   font-weight: 650;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-muted);
   background: transparent;
   border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
   border-radius: 999px;
@@ -577,14 +577,14 @@
 
 .boardEmpty {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--text-muted);
   padding: 16px 8px;
   text-align: center;
 }
 
 .boardCard {
   border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-  border-left: 2px solid rgba(255, 255, 255, 0.2);
+  border-left: 2px solid var(--border-strong);
   border-radius: 8px;
   background: transparent;
   padding: 10px;
@@ -598,10 +598,10 @@
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--surface-2);
   border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
   border-radius: 8px;
-  color: #fff;
+  color: var(--text);
   font: inherit;
   font-size: 12px;
   padding: 5px 8px;

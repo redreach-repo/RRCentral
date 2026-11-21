@@ -2142,7 +2142,7 @@ export default function CrmPage() {
                           border: `1px solid ${colors.border}`,
                           borderRadius: 10,
                           padding: 12,
-                          background: 'rgba(0,0,0,0.2)',
+                          background: 'var(--surface-2)',
                         }}
                       >
                         <div

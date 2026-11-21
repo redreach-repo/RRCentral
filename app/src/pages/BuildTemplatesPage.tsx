@@ -47,7 +47,7 @@ const rowStyle: CSSProperties = {
   alignItems: 'flex-start',
   gap: 8,
   padding: '8px 0',
-  borderTop: '1px solid rgba(255,255,255,0.06)',
+  borderTop: '1px solid var(--border)',
   fontSize: 13,
 }
 

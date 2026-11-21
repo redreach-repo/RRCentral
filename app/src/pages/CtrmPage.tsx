@@ -529,7 +529,7 @@ export default function CtrmPage() {
           <Link
             to="/ctrm/summary"
             className={docsStyles.newBtn}
-            style={{ textDecoration: 'none', background: 'rgba(255,255,255,0.08)' }}
+            style={{ textDecoration: 'none', background: 'color-mix(in srgb, var(--text) 8%, transparent)' }}
           >
             {t('page.ctrmDetail.weeklySummary')}
           </Link>

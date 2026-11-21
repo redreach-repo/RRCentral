@@ -39,7 +39,7 @@
 .toggle {
   border: 1px solid rgba(232, 93, 4, 0.45);
   background: rgba(232, 93, 4, 0.14);
-  color: #fff;
+  color: var(--text);
 }
 
 .toggle:hover {
@@ -47,26 +47,26 @@
 }
 
 .toggleActive {
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--border-strong);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text);
 }
 
 .toggleActive:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--text) 12%, transparent);
 }
 
 .btn,
 .btnLink {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border-strong);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  color: var(--text);
 }
 
 .btn:hover,
 .btnLink:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--text);
 }
 
 .btn:disabled {

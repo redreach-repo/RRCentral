@@ -134,7 +134,7 @@ export default function AppErrorsPage() {
           <button
             type="button"
             className={docsStyles.newBtn}
-            style={{ background: 'rgba(255,255,255,0.08)' }}
+            style={{ background: 'color-mix(in srgb, var(--text) 8%, transparent)' }}
             disabled={loading}
             onClick={() => void load()}
           >
