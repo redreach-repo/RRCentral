@@ -76,12 +76,23 @@ export async function getMailMessage(folderId: string, messageId: string): Promi
   return (await callMail<{ message: MailMessageFull }>({ action: 'message', folderId, messageId })).message
 }
 
+/** A PDF the page attaches to an email it sends from the person's own mailbox. */
+export type MailAttachment = { name: string; base64: string }
+/** Files the sent email under a record's email history. */
+export type MailLinkTarget = { targetType: 'account' | 'crm' | 'quotation' | 'invoice'; targetId: string }
+
 /**
  * Sends from the person's own address. Call it ONLY from the Send button: the
  * server sends straight away. Reply, reply all and forward quote the original.
+ * `attachments` are PDFs only (at most 3, 10 MB). `linkTo` files the sent email
+ * under that record; `linked` says whether that worked (the email is sent either way).
  */
-export async function sendMail(draft: ComposeDraft, original?: { folderId: string; messageId: string }): Promise<{ messageId: string }> {
-  const res = await callMail<{ ok: boolean; messageId?: string }>({
+export async function sendMail(
+  draft: ComposeDraft,
+  original?: { folderId: string; messageId: string },
+  extras: { attachments?: MailAttachment[]; linkTo?: MailLinkTarget } = {},
+): Promise<{ messageId: string; linked: boolean }> {
+  const res = await callMail<{ ok: boolean; messageId?: string; linked?: boolean }>({
     action: 'send',
     mode: draft.mode,
     to: draft.to,
@@ -90,6 +101,16 @@ export async function sendMail(draft: ComposeDraft, original?: { folderId: strin
     subject: draft.subject,
     text: draft.text,
     ...(draft.mode !== 'new' && original ? { folderId: original.folderId, messageId: original.messageId } : {}),
+    ...(extras.attachments?.length ? { attachments: extras.attachments } : {}),
+    ...(extras.linkTo ? { linkTo: extras.linkTo } : {}),
   })
-  return { messageId: String(res.messageId || '') }
+  return { messageId: String(res.messageId || ''), linked: Boolean(res.linked) }
+}
+
+/** Blob -> base64 without the data: prefix, for sendMail attachments. */
+export async function blobToBase64(blob: Blob): Promise<string> {
+  const buf = new Uint8Array(await blob.arrayBuffer())
+  let bin = ''
+  for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000))
+  return btoa(bin)
 }

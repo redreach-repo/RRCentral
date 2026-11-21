@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Mail } from 'lucide-react'
+import { Download, Mail, Paperclip } from 'lucide-react'
 import type { CrmContact } from '../lib/types'
 import { contactEmails, primaryContact } from '../lib/contacts'
 import { useSettings } from '../contexts/SettingsContext'
 import { useToast } from '../contexts/ToastContext'
 import { getMailProvider } from '../lib/mailCalendar'
 import { openMailto } from '../lib/zoho'
+import { downloadBlob } from '../lib/documents'
+import { blobToBase64, getMailStatus, sendMail, type MailLinkTarget } from '../lib/mailInbox/mailInboxApi'
+import { isSupabaseConfigured } from '../lib/supabaseConfig'
 import Modal from './Modal'
 import {
   buttonPrimaryStyle,
@@ -39,7 +42,16 @@ type Props = {
   onClose: () => void
   /** Called after a successful send (Zoho) or mailto open. */
   onSent?: () => void | Promise<void>
+  /** Makes the PDF to attach (quote, invoice). Sent attached from the person's own mailbox when it is connected. */
+  attachPdf?: () => Promise<{ blob: Blob; filename: string }>
+  /** Label for the attachment before it is made, e.g. "Quotation RR-01-26003.pdf". */
+  attachLabel?: string
+  /** Files the sent email in this record's email history (own mailbox only). */
+  linkTo?: MailLinkTarget
 }
+
+/** The signed in person's own mailbox (Mail page), when it can send. */
+type OwnBox = { address: string; canSend: boolean } | null
 
 export default function EmailComposeModal({
   open,
@@ -50,6 +62,9 @@ export default function EmailComposeModal({
   zohoEnabled,
   onClose,
   onSent,
+  attachPdf,
+  attachLabel,
+  linkTo,
 }: Props) {
   const { settings } = useSettings()
   const { showToast } = useToast()
@@ -60,6 +75,41 @@ export default function EmailComposeModal({
   const [sending, setSending] = useState(false)
   const [importing, setImporting] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
+  const [ownBox, setOwnBox] = useState<OwnBox>(null)
+  const [attach, setAttach] = useState(true)
+  const [pdfBusy, setPdfBusy] = useState(false)
+  const useOwn = Boolean(ownBox?.canSend)
+
+  // Prefer the person's own mailbox (Mail page) when it is connected with send permission.
+  useEffect(() => {
+    if (!open || !isSupabaseConfigured()) return
+    let live = true
+    setAttach(true)
+    getMailStatus()
+      .then((st) => {
+        if (live) setOwnBox(st.connected ? { address: st.address || '', canSend: Boolean(st.canSend) } : null)
+      })
+      .catch(() => {
+        if (live) setOwnBox(null)
+      })
+    return () => {
+      live = false
+    }
+  }, [open])
+
+  async function downloadPdf() {
+    if (!attachPdf) return
+    setPdfBusy(true)
+    try {
+      const { blob, filename } = await attachPdf()
+      downloadBlob(blob, filename)
+      showToast('PDF downloaded. Attach it to the email.', 'success')
+    } catch (e) {
+      showToast(errorMessage(e, 'PDF failed'), 'error')
+    } finally {
+      setPdfBusy(false)
+    }
+  }
 
   useEffect(() => {
     if (!open) return
@@ -144,7 +194,26 @@ export default function EmailComposeModal({
     }
     setSending(true)
     try {
-      if (zohoEnabled) {
+      if (useOwn) {
+        const attachments = []
+        if (attachPdf && attach) {
+          const { blob, filename } = await attachPdf()
+          attachments.push({ name: filename, base64: await blobToBase64(blob) })
+        }
+        const res = await sendMail(
+          { mode: 'new', to: parsed.data.to, cc: '', bcc: '', subject: parsed.data.subject, text: parsed.data.body },
+          undefined,
+          { attachments, linkTo },
+        )
+        showToast(
+          `Email sent from ${ownBox?.address || 'your mailbox'}${attachments.length ? ' with the PDF attached' : ''}${
+            linkTo && res.linked ? ', and saved in this record’s emails' : ''
+          }`,
+          'success',
+        )
+        await onSent?.()
+        onClose()
+      } else if (zohoEnabled) {
         await getMailProvider(settings).sendMail(settings, parsed.data)
         showToast('Email sent via Zoho Mail', 'success')
         await onSent?.()
@@ -201,6 +270,9 @@ export default function EmailComposeModal({
           </p>
         ) : null}
       </div>
+      {useOwn ? (
+        <p style={{ margin: '0 0 10px', fontSize: 12, color: colors.muted2 }}>From: {ownBox?.address}</p>
+      ) : null}
       <div style={fieldStyle}>
         <label style={labelStyle}>Subject</label>
         <input style={inputStyle} value={subject} onChange={(e) => setSubject(e.target.value)} />
@@ -213,6 +285,20 @@ export default function EmailComposeModal({
           onChange={(e) => setBody(e.target.value)}
         />
       </div>
+      {attachPdf ? (
+        <div style={{ ...fieldStyle, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {useOwn ? (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+              <input type="checkbox" checked={attach} onChange={(e) => setAttach(e.target.checked)} disabled={sending} />
+              <Paperclip size={14} /> Attach {attachLabel || 'the PDF'}
+            </label>
+          ) : (
+            <button type="button" style={buttonSecondaryStyle} onClick={() => void downloadPdf()} disabled={pdfBusy || sending}>
+              <Download size={14} /> {pdfBusy ? 'Making PDF…' : 'Download PDF to attach'}
+            </button>
+          )}
+        </div>
+      ) : null}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
         <input
           ref={importInputRef}
@@ -286,13 +372,17 @@ export default function EmailComposeModal({
           disabled={sending || importing}
         >
           <Mail size={14} />
-          {sending ? 'Sending…' : zohoEnabled ? 'Send via Zoho' : 'Open mail app'}
+          {sending ? 'Sending…' : useOwn ? 'Send' : zohoEnabled ? 'Send via Zoho' : 'Open mail app'}
         </button>
       </div>
       <p style={{ margin: '12px 0 0', fontSize: 12, color: colors.muted2 }}>
-        {zohoEnabled
-          ? 'Sends through Zoho Mail using credentials in Settings.'
-          : 'Zoho Mail is off — opens your default mail client instead. Enable Zoho in Settings to send in-app.'}
+        {useOwn
+          ? 'Sends from your own mailbox (Mail page) only when you press Send. It also shows in your Sent folder.'
+          : ownBox && !ownBox.canSend
+            ? 'To send from your own mailbox, open Mail and press Allow sending once.'
+            : zohoEnabled
+              ? 'Sends through Zoho Mail using credentials in Settings.'
+              : 'Zoho Mail is off — opens your default mail client instead. Enable Zoho in Settings to send in-app.'}
       </p>
     </Modal>
   )

@@ -8,6 +8,7 @@ import {
   composeHtml,
   clampStart,
   cleanSearch,
+  cleanAttachments,
   folderKind,
   isZohoId,
   linkTargetTable,
@@ -19,6 +20,7 @@ import {
   sendMode,
   textToHtml,
   underSendLimit,
+  uploadedAttachment,
   stripActiveContent,
   zohoAccountsOrigin,
   zohoConsentUrl,
@@ -218,4 +220,29 @@ Deno.test("send: at most 20 sends in 10 minutes", () => {
   assert(underSendLimit([], now))
   assert(!underSendLimit(Array(20).fill(now - 1000), now))
   assert(underSendLimit(Array(20).fill(now - 11 * 60_000), now))
+})
+
+const pdfB64 = btoa("%PDF-1.4 test")
+
+Deno.test("attach: only PDFs, at most 3, names made safe", () => {
+  assertEquals(cleanAttachments(undefined), { list: [] })
+  const ok = cleanAttachments([{ name: "../Quote RR-01/26003.pdf", base64: pdfB64 }])
+  if (!("list" in ok)) throw new Error("expected a list")
+  assertEquals(ok.list[0].name, "Quote RR-01-26003.pdf")
+  assertEquals(ok.list[0].bytes[0], 0x25)
+  const dataUrl = cleanAttachments([{ name: "x", base64: `data:application/pdf;base64,${pdfB64}` }])
+  assertEquals("list" in dataUrl && dataUrl.list[0].name, "x.pdf")
+  assertEquals(cleanAttachments([{ name: "a.exe", base64: btoa("MZ....") }]), { error: "Only PDF files can be attached here" })
+  assertEquals(cleanAttachments([{ name: "a", base64: "not base64!" }]), { error: "An attachment could not be read" })
+  const four = Array.from({ length: 4 }, () => ({ name: "a", base64: pdfB64 }))
+  assertEquals(cleanAttachments(four), { error: "At most 3 attachments per email" })
+  assertEquals(cleanAttachments("x"), { error: "Attachments must be a list" })
+})
+
+Deno.test("attach: Zoho's upload answer becomes the send call's attachment", () => {
+  const one = { storeName: "s", attachmentPath: "/p", attachmentName: "q.pdf" }
+  assertEquals(uploadedAttachment([one]), one)
+  assertEquals(uploadedAttachment(one), one)
+  assertEquals(uploadedAttachment({ storeName: "s" }), null)
+  assertEquals(uploadedAttachment(null), null)
 })
