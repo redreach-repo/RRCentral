@@ -54,7 +54,8 @@ import {
   visibleAppModules,
 } from '../modules/nav'
 import type { ModuleNavItem } from '../modules/registry'
-import BrandLogo from './BrandLogo'
+import CompanyMark from './CompanyMark'
+import { DEFAULT_LOGO_URL } from '../lib/brand'
 import CommandPalette from './CommandPalette'
 import DemoPresenterChrome from './DemoPresenterChrome'
 import ErrorBoundary from './ErrorBoundary'
@@ -140,6 +141,11 @@ export default function Layout() {
     settings.companyName ||
     settings.brand ||
     PRODUCT.name
+  // Only the default company uses the logo from Settings (or the Red Reach
+  // logo); other companies have no logo yet, so they get an initials tile.
+  const markName = activeCompany?.name || settings.companyName || settings.brand || PRODUCT.name
+  const markLogo =
+    !activeCompany || activeCompany.is_default ? settings.logoUrl || DEFAULT_LOGO_URL : null
   const [commandOpen, setCommandOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
@@ -279,7 +285,7 @@ export default function Layout() {
 
       <aside className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
         <div className={styles.sideBrand}>
-          <BrandLogo height={28} className={styles.sideLogo} />
+          <CompanyMark name={markName} logoUrl={markLogo} className={styles.sideLogo} />
           <button
             type="button"
             className={styles.closeBtn}
