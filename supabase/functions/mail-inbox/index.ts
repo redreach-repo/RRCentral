@@ -1,7 +1,7 @@
 // Mail page: each person reads their OWN Zoho mailbox inside RR Central.
 // Nobody, not even an admin, can open another person's mailbox through here.
 //
-//   POST { action: "status" }                                  -> { ready, connected, address }
+//   POST { action: "status" }                                  -> { ready, connected, address, canSend }
 //   POST { action: "connect", return_to }                      -> { url }   (Zoho consent page)
 //   GET  ?code=…&state=…&accounts-server=…                     Zoho's answer (signed state)
 //   POST { action: "disconnect" }                              -> { ok }
@@ -11,8 +11,11 @@
 //   POST { action: "message", folderId, messageId }            -> { message }
 //   POST { action: "link", folderId, messageId, targetType, targetId }  -> { link }
 //        (targetType: account | crm | quotation | invoice; header only, the body stays in the mailbox)
+//   POST { action: "send", mode, folderId?, messageId?, to, cc?, bcc?, subject, text }  -> { ok, messageId }
+//        (mode: new | reply | replyAll | forward; only from the Send button, from the person's own address)
 //
-// Nothing is sent, moved, deleted or marked as read in the mailbox here.
+// Nothing is moved, deleted or marked as read in the mailbox here. Email is
+// sent only by "send", which the page calls only when the person presses Send.
 // Each person's Zoho refresh token is stored encrypted in mail_accounts
 // (service role only, no policies) and the access token never leaves this
 // function. The browser only ever gets mail content.
@@ -30,7 +33,10 @@ import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2"
 import { withErrorLog } from "../_shared/functionHealth.ts"
 import { readState, signState } from "../_shared/googleDrive.ts"
 import {
+  canSendWith,
   clampLimit,
+  cleanSubject,
+  composeHtml,
   clampStart,
   cleanSearch,
   isZohoId,
@@ -38,8 +44,12 @@ import {
   mailboxBelongsTo,
   normalizeFolders,
   normalizeMessage,
+  parseRecipients,
   plain,
+  MAX_RECIPIENTS,
+  sendMode,
   stripActiveContent,
+  underSendLimit,
   zohoAccountsOrigin,
   zohoConsentUrl,
   zohoMailOrigin,
@@ -123,9 +133,10 @@ type Row = {
   accounts_domain: string
   mail_domain: string
   refresh_token_enc: string
+  scopes: string
 }
 
-type Box = { mail: string; accountId: string; token: string }
+type Box = { mail: string; accountId: string; token: string; address: string; canSend: boolean }
 
 // Access tokens per person, kept in this instance's memory only, never sent to the browser.
 const tokens = new Map<string, { token: string; expiresAt: number; stamp: string }>()
@@ -155,7 +166,7 @@ async function revoke(accountsOrigin: string, refreshToken: string) {
 async function loadRow(sb: SupabaseClient, email: string): Promise<Row | null> {
   const { data, error } = await sb
     .from("mail_accounts")
-    .select("user_email, account_email, zoho_account_id, accounts_domain, mail_domain, refresh_token_enc")
+    .select("user_email, account_email, zoho_account_id, accounts_domain, mail_domain, refresh_token_enc, scopes")
     .eq("user_email", email)
     .maybeSingle()
   if (error) {
@@ -175,7 +186,7 @@ async function myBox(sb: SupabaseClient, app: App, email: string): Promise<Box> 
   if (!accountsOrigin || !mailOrigin || !isZohoId(row.zoho_account_id)) {
     throw new MailError(409, "Your mailbox connection is incomplete. Disconnect and connect it again.", true)
   }
-  const box = { mail: mailOrigin, accountId: row.zoho_account_id }
+  const box = { mail: mailOrigin, accountId: row.zoho_account_id, address: row.account_email, canSend: canSendWith(row.scopes) }
   const hit = tokens.get(email)
   if (hit && hit.stamp === row.refresh_token_enc && hit.expiresAt > Date.now() + 60_000) return { ...box, token: hit.token }
 
@@ -212,6 +223,25 @@ async function zohoGet(email: string, box: Box, path: string, params?: Record<st
   if (!res.ok) throw new MailError(502, body.status?.description || `Zoho Mail answered ${res.status}`)
   return body.data
 }
+
+async function zohoPost(email: string, box: Box, path: string, payload: Record<string, unknown>): Promise<unknown> {
+  const res = await fetch(`${box.mail}/api/accounts/${encodeURIComponent(box.accountId)}${path}`, {
+    method: "POST",
+    headers: { Authorization: `Zoho-oauthtoken ${box.token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(30_000),
+  })
+  const body = (await res.json().catch(() => ({}))) as { data?: unknown; status?: { description?: string }; data_error?: unknown }
+  if (res.status === 401) {
+    tokens.delete(email)
+    throw new MailError(409, "Zoho refused your mailbox key. Connect your mailbox again.", true)
+  }
+  if (!res.ok) throw new MailError(502, `Zoho did not send the email: ${body.status?.description || `answered ${res.status}`}`)
+  return body.data
+}
+
+// When each person last sent, in this instance's memory, so a mistake cannot become a flood.
+const sends = new Map<string, number[]>()
 
 const rows = (data: unknown) => (Array.isArray(data) ? (data as Record<string, unknown>[]) : [])
 
@@ -334,9 +364,9 @@ Deno.serve(withErrorLog("mail-inbox", async (req) => {
 
   try {
     if (action === "status") {
-      if (!app) return json({ ready: false, connected: false, address: "" })
+      if (!app) return json({ ready: false, connected: false, address: "", canSend: false })
       const row = await loadRow(sb, email)
-      return json({ ready: true, connected: Boolean(row), address: row?.account_email || "" })
+      return json({ ready: true, connected: Boolean(row), address: row?.account_email || "", canSend: Boolean(row && canSendWith(row.scopes)) })
     }
     if (!app) return json({ error: NOT_SET_UP, setup: true }, 409)
 
@@ -440,6 +470,72 @@ Deno.serve(withErrorLog("mail-inbox", async (req) => {
         throw new Error(error.message)
       }
       return json({ link: saved })
+    }
+
+    if (action === "send") {
+      const mode = sendMode(body.mode)
+      if (!mode) return json({ error: "Unknown kind of email" }, 400)
+      const to = parseRecipients(body.to)
+      const cc = parseRecipients(body.cc)
+      const bcc = parseRecipients(body.bcc)
+      const bad = [...to.bad, ...cc.bad, ...bcc.bad]
+      if (bad.length) return json({ error: `Not an email address: ${bad.slice(0, 3).join(", ")}` }, 400)
+      if (!to.list.length) return json({ error: "Add at least one address in To" }, 400)
+      if (to.list.length + cc.list.length + bcc.list.length > MAX_RECIPIENTS) {
+        return json({ error: `At most ${MAX_RECIPIENTS} recipients per email` }, 400)
+      }
+      const subject = cleanSubject(body.subject)
+      const text = String(body.text ?? "")
+      if (text.length > 100_000) return json({ error: "The message is too long" }, 400)
+      if (!subject && !text.trim()) return json({ error: "Write a subject or a message first" }, 400)
+      if (mode !== "new" && (!isZohoId(body.folderId) || !isZohoId(body.messageId))) return json({ error: "Pick the email to answer" }, 400)
+
+      const box = await myBox(sb, app, email)
+      if (!box.canSend) {
+        return json({ error: "Sending needs one more permission from Zoho. Press Allow sending and sign in to Zoho again.", setup: true, needsSendScope: true }, 409)
+      }
+      const now = Date.now()
+      const history = (sends.get(email) || []).filter((t) => now - t < 10 * 60_000)
+      if (!underSendLimit(history, now)) return json({ error: "You have sent 20 emails in 10 minutes. Wait a few minutes and try again." }, 429)
+
+      // A reply or forward quotes the original, read here from the person's own mailbox.
+      let quoted = null
+      if (mode !== "new") {
+        const base = `/folders/${body.folderId}/messages/${body.messageId}`
+        const [details, content] = await Promise.all([zohoGet(email, box, `${base}/details`), zohoGet(email, box, `${base}/content`)])
+        const d = (details && typeof details === "object" ? details : {}) as Record<string, unknown>
+        const head = normalizeMessage({ ...d, messageId: body.messageId, folderId: body.folderId })
+        if (!head) return json({ error: "That email was not found in your mailbox" }, 404)
+        quoted = {
+          from: head.fromAddress,
+          to: head.toAddress,
+          cc: plain(d.ccAddress, 1000),
+          date: head.receivedTime ? new Date(head.receivedTime).toUTCString() : "",
+          subject: head.subject,
+          html: stripActiveContent(String(((content && typeof content === "object" ? content : {}) as { content?: unknown }).content || "")),
+        }
+      }
+      const payload: Record<string, unknown> = {
+        // Always the person's own mailbox address; the page cannot choose another sender.
+        fromAddress: box.address,
+        toAddress: to.list.join(","),
+        subject,
+        content: composeHtml(text, mode, quoted),
+        mailFormat: "html",
+      }
+      if (cc.list.length) payload.ccAddress = cc.list.join(",")
+      if (bcc.list.length) payload.bccAddress = bcc.list.join(",")
+      const isReply = mode === "reply" || mode === "replyAll"
+      const sent = await zohoPost(
+        email,
+        box,
+        isReply ? `/messages/${body.messageId}` : "/messages",
+        isReply ? { ...payload, action: "reply" } : payload,
+      )
+      history.push(now)
+      sends.set(email, history)
+      const id = String(((sent && typeof sent === "object" ? sent : {}) as { messageId?: unknown }).messageId ?? "")
+      return json({ ok: true, messageId: isZohoId(id) ? id : "" })
     }
 
     return json({ error: "Unknown action" }, 400)

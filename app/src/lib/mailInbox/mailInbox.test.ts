@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CrmEntry } from '../types'
-import { counterpart, emailFrameDoc, hasRemoteImages, mailWhen, matchMailToCrm, type MailListItem } from './mailInbox'
+import { counterpart, emailFrameDoc, hasRemoteImages, mailWhen, matchMailToCrm, prefixedSubject, startDraft, type MailListItem } from './mailInbox'
 
 function crm(id: string, company_name: string, email_phone: string): CrmEntry {
   return {
@@ -92,5 +92,43 @@ describe('mail page helpers', () => {
     expect(off).toContain('<p>Hi</p>')
     const on = emailFrameDoc('<p>Hi</p>', { showImages: true })
     expect(on).toContain('img-src data: cid: https: http:')
+  })
+})
+
+describe('reply, reply all and forward', () => {
+  const msg = {
+    fromAddress: '"Sara K" <sara@client.ae>',
+    sender: 'Sara K',
+    toAddress: 'me@redreach.ae, ops@redreach.ae',
+    ccAddress: 'Sara@client.ae, boss@client.ae',
+    subject: 'Quote for uniforms',
+  }
+
+  it('adds Re: or Fwd: once', () => {
+    expect(prefixedSubject('Quote', 'Re')).toBe('Re: Quote')
+    expect(prefixedSubject('RE: Quote', 'Re')).toBe('RE: Quote')
+    expect(prefixedSubject('Fw: Quote', 'Fwd')).toBe('Fw: Quote')
+    expect(prefixedSubject('(no subject)', 'Re')).toBe('Re:')
+  })
+
+  it('reply goes to the sender only', () => {
+    const d = startDraft('reply', msg, ['me@redreach.ae'])
+    expect(d).toMatchObject({ mode: 'reply', to: 'sara@client.ae', cc: '', subject: 'Re: Quote for uniforms', text: '' })
+  })
+
+  it('reply all adds everyone else, never yourself or the sender twice', () => {
+    const d = startDraft('replyAll', msg, ['ME@redreach.ae'])
+    expect(d.to).toBe('sara@client.ae')
+    expect(d.cc).toBe('ops@redreach.ae, boss@client.ae')
+  })
+
+  it('answering your own sent email goes back to its recipients', () => {
+    const d = startDraft('reply', { ...msg, fromAddress: 'me@redreach.ae', toAddress: 'sara@client.ae', ccAddress: '' }, ['me@redreach.ae'])
+    expect(d.to).toBe('sara@client.ae')
+  })
+
+  it('forward starts empty with Fwd:, new starts blank', () => {
+    expect(startDraft('forward', msg, [])).toMatchObject({ to: '', cc: '', subject: 'Fwd: Quote for uniforms' })
+    expect(startDraft('new', msg, [])).toMatchObject({ mode: 'new', to: '', subject: '' })
   })
 })

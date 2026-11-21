@@ -729,3 +729,16 @@ could not make the PDF: check the Vercel function's logs and that `RENDER_PDF_UR
 the answer still carries the copy from the last Download PDF. "No PDF ... has been made yet" with no renderer set up:
 click Download PDF in HighMast once.
 
+## 42. Reply, forward and send a new email from Mail
+
+**Trigger.** Deploy `mail-inbox` again. In **Mail**, open an email sent to you and press **Reply**. If you see "Allow
+sending", press it and agree in Zoho (once per person). Type a line, press Enter in the To field (nothing should be
+sent), then press **Send**. Next press **New email**, send one to yourself, and **Forward** an email to yourself.
+
+**You should see.** "Sent to …" above the list. In Zoho, the reply sits in the same thread with the original quoted
+under your text and comes from your own address; the forward shows "Forwarded message" with the original. Pressing
+Enter alone never sends.
+
+**If it fails.** "Not an email address: …" lists what to fix. "You have sent 20 emails in 10 minutes" is the safety
+limit. "Zoho did not send the email: …" passes on Zoho's own reason (for example a sending limit on the Zoho plan).
+

@@ -105,3 +105,43 @@ export function emailFrameDoc(html: string, opts: { showImages: boolean }): stri
     `</head><body>${body}</body></html>`
   )
 }
+
+export type ComposeMode = 'new' | 'reply' | 'replyAll' | 'forward'
+
+export type ComposeDraft = { mode: ComposeMode; to: string; cc: string; bcc: string; subject: string; text: string }
+
+/** "Re: Quote" stays "Re: Quote"; "Quote" -> "Re: Quote". Same for Fwd. */
+export function prefixedSubject(subject: string, prefix: 'Re' | 'Fwd'): string {
+  const s = subject === '(no subject)' ? '' : subject.trim()
+  const already = prefix === 'Re' ? /^re:/i : /^(fwd?|fw):/i
+  return already.test(s) ? s : `${prefix}: ${s}`.trim()
+}
+
+/**
+ * Starting fields for Reply, Reply all, Forward or a new email. Reply goes to
+ * the sender; Reply all adds everyone else on To and Cc, never yourself.
+ * Answering your own sent email goes back to its recipients.
+ */
+export function startDraft(
+  mode: ComposeMode,
+  msg: Pick<MailMessageFull, 'fromAddress' | 'sender' | 'toAddress' | 'ccAddress' | 'subject'> | null,
+  myAddresses: string[],
+): ComposeDraft {
+  const blank = { mode, to: '', cc: '', bcc: '', subject: '', text: '' }
+  if (!msg || mode === 'new') return { ...blank, mode: 'new' }
+  if (mode === 'forward') return { ...blank, subject: prefixedSubject(msg.subject, 'Fwd') }
+  const mine = new Set(myAddresses.map((a) => a.toLowerCase()).filter(Boolean))
+  const from = extractEmails(msg.fromAddress || msg.sender)
+  const fromMe = from.some((a) => mine.has(a))
+  const toList = extractEmails(msg.toAddress)
+  const ccList = extractEmails(msg.ccAddress || '')
+  const notMe = (a: string) => !mine.has(a)
+  const uniq = (xs: string[]) => [...new Set(xs)]
+  let to = fromMe ? toList.filter(notMe) : from
+  let cc: string[] = []
+  if (mode === 'replyAll') {
+    cc = uniq([...(fromMe ? [] : toList), ...ccList]).filter((a) => notMe(a) && !to.includes(a))
+  }
+  to = uniq(to)
+  return { ...blank, to: to.join(', '), cc: cc.join(', '), subject: prefixedSubject(msg.subject, 'Re') }
+}
