@@ -36,6 +36,21 @@ CRM company), and as a chip on the email. Click the × on a chip to unlink.
 - SQL: `supabase/migrations/20261322100000_mail_links.sql` (safe to run twice). Until it is run
   the Emails card stays hidden and **Link to…** says it is not set up.
 
+## Emailing a quote or invoice with the PDF
+
+On a quotation, invoice or delivery note, **Email PDF** opens the email window. When your own
+mailbox is connected with send permission (Mail page), it shows **From:** your address and
+**Attach Quotation RR-….pdf** (ticked). Press **Send**: the PDF is made in your browser, uploaded
+to Zoho and sent from your own address. A quotation or invoice email is then filed under that
+record's emails automatically, with "has attachment". Payment reminders sent from the
+Invoices page are filed under their invoice the same way.
+
+- PDFs only, at most 3 per email and 10 MB together; the server checks each file starts with `%PDF`.
+- If your mailbox is not connected, the window works as before (company Zoho settings or your
+  mail app) and offers **Download PDF to attach** instead.
+- If filing the email fails, it is still sent; the message just says it was sent.
+- Setup: deploy `mail-inbox`. No SQL.
+
 ## Who can open it
 
 Admin, manager and sales. Staff (assigned accounts only) and viewers do not see the menu item,

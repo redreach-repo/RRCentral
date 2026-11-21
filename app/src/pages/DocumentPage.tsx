@@ -682,26 +682,19 @@ export default function DocumentPage({ renderMode = false }: { renderMode?: bool
     }
   }
 
-  async function prepareEmail() {
-    if (!sheetRef.current) {
-      setEmailOpen(true)
-      return
-    }
-    setPdfBusy(true)
-    try {
-      const { blob, filename } = await elementToPdfBlob(sheetRef.current, {
-        filenameHint: `${title.toLowerCase()}-${displayRef}`,
-        fitToPage,
-      })
-      downloadBlob(blob, filename)
-      showToast('PDF downloaded — attach it to the email if needed', 'success')
-      setEmailOpen(true)
-    } catch (e) {
-      showToast(errorMessage(e, 'PDF failed'), 'error')
-      setEmailOpen(true)
-    } finally {
-      setPdfBusy(false)
-    }
+  // The email window makes the PDF itself: attached when sent from the person's
+  // own mailbox, or a Download button when it falls back to Zoho settings / mail app.
+  function prepareEmail() {
+    setEmailOpen(true)
+  }
+
+  async function makeEmailPdf(): Promise<{ blob: Blob; filename: string }> {
+    if (!sheetRef.current) throw new Error('The document is still loading')
+    const { blob, filename } = await elementToPdfBlob(sheetRef.current, {
+      filenameHint: `${title.toLowerCase()}-${displayRef}`,
+      fitToPage,
+    })
+    return { blob, filename }
   }
 
   async function shareWhatsApp() {
@@ -1508,7 +1501,7 @@ export default function DocumentPage({ renderMode = false }: { renderMode?: bool
           <CloudUpload size={14} />{' '}
           {pdfBusy ? t('page.document.saving') : t('page.document.saveToDrive')}
         </ToolbarBtn>
-        <ToolbarBtn onClick={() => void prepareEmail()} disabled={pdfBusy}>
+        <ToolbarBtn onClick={prepareEmail} disabled={pdfBusy}>
           <Mail size={14} /> {t('page.document.emailPdf')}
         </ToolbarBtn>
         <ToolbarBtn onClick={() => void shareWhatsApp()} accent>
@@ -1776,6 +1769,15 @@ export default function DocumentPage({ renderMode = false }: { renderMode?: bool
         zohoEnabled={isZohoMailEnabled(settings)}
         onClose={() => setEmailOpen(false)}
         onSent={() => void onEmailSent()}
+        attachPdf={makeEmailPdf}
+        attachLabel={`${title} ${displayRef}.pdf`}
+        linkTo={
+          docType === 'quote' && quote?.id
+            ? { targetType: 'quotation', targetId: quote.id }
+            : docType === 'invoice' && invoice?.id
+              ? { targetType: 'invoice', targetId: invoice.id }
+              : undefined
+        }
       />
 
       <LinkDriveFileModal

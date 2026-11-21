@@ -11,8 +11,10 @@
 //   POST { action: "message", folderId, messageId }            -> { message }
 //   POST { action: "link", folderId, messageId, targetType, targetId }  -> { link }
 //        (targetType: account | crm | quotation | invoice; header only, the body stays in the mailbox)
-//   POST { action: "send", mode, folderId?, messageId?, to, cc?, bcc?, subject, text }  -> { ok, messageId }
-//        (mode: new | reply | replyAll | forward; only from the Send button, from the person's own address)
+//   POST { action: "send", mode, folderId?, messageId?, to, cc?, bcc?, subject, text,
+//          attachments?: [{ name, base64 }], linkTo?: { targetType, targetId } }  -> { ok, messageId, linked }
+//        (mode: new | reply | replyAll | forward; only from the Send button, from the person's own address;
+//         attachments: PDFs only, at most 3 and 10 MB; linkTo files the sent email in that record's email history)
 //
 // Nothing is moved, deleted or marked as read in the mailbox here. Email is
 // sent only by "send", which the page calls only when the person presses Send.
@@ -34,6 +36,7 @@ import { withErrorLog } from "../_shared/functionHealth.ts"
 import { readState, signState } from "../_shared/googleDrive.ts"
 import {
   canSendWith,
+  cleanAttachments,
   clampLimit,
   cleanSubject,
   composeHtml,
@@ -50,6 +53,7 @@ import {
   sendMode,
   stripActiveContent,
   underSendLimit,
+  uploadedAttachment,
   zohoAccountsOrigin,
   zohoConsentUrl,
   zohoMailOrigin,
@@ -238,6 +242,27 @@ async function zohoPost(email: string, box: Box, path: string, payload: Record<s
   }
   if (!res.ok) throw new MailError(502, `Zoho did not send the email: ${body.status?.description || `answered ${res.status}`}`)
   return body.data
+}
+
+/** Puts one file in the person's Zoho upload area; the send call then refers to it. */
+async function zohoUpload(email: string, box: Box, name: string, bytes: Uint8Array) {
+  const res = await fetch(
+    `${box.mail}/api/accounts/${encodeURIComponent(box.accountId)}/messages/attachments?${new URLSearchParams({ fileName: name })}`,
+    {
+      method: "POST",
+      headers: { Authorization: `Zoho-oauthtoken ${box.token}`, "Content-Type": "application/octet-stream" },
+      body: new Blob([bytes as BlobPart]),
+      signal: AbortSignal.timeout(60_000),
+    },
+  )
+  const body = (await res.json().catch(() => ({}))) as { data?: unknown; status?: { description?: string } }
+  if (res.status === 401) {
+    tokens.delete(email)
+    throw new MailError(409, "Zoho refused your mailbox key. Connect your mailbox again.", true)
+  }
+  const file = res.ok ? uploadedAttachment(body.data) : null
+  if (!file) throw new MailError(502, `Zoho did not take the attachment: ${body.status?.description || `answered ${res.status}`}`)
+  return file
 }
 
 // When each person last sent, in this instance's memory, so a mistake cannot become a flood.
@@ -489,6 +514,13 @@ Deno.serve(withErrorLog("mail-inbox", async (req) => {
       if (text.length > 100_000) return json({ error: "The message is too long" }, 400)
       if (!subject && !text.trim()) return json({ error: "Write a subject or a message first" }, 400)
       if (mode !== "new" && (!isZohoId(body.folderId) || !isZohoId(body.messageId))) return json({ error: "Pick the email to answer" }, 400)
+      const files = cleanAttachments(body.attachments)
+      if ("error" in files) return json({ error: files.error }, 400)
+      // Optional: file the sent email under a client, CRM entry, quotation or invoice.
+      const link = body.linkTo && typeof body.linkTo === "object" ? (body.linkTo as { targetType?: unknown; targetId?: unknown }) : null
+      const linkTable = link ? linkTargetTable(link.targetType) : null
+      const linkId = String(link?.targetId ?? "")
+      if (link && (!linkTable || !UUID.test(linkId))) return json({ error: "Pick what to file the email under" }, 400)
 
       const box = await myBox(sb, app, email)
       if (!box.canSend) {
@@ -525,6 +557,10 @@ Deno.serve(withErrorLog("mail-inbox", async (req) => {
       }
       if (cc.list.length) payload.ccAddress = cc.list.join(",")
       if (bcc.list.length) payload.bccAddress = bcc.list.join(",")
+      if (files.list.length) {
+        payload.attachments = []
+        for (const f of files.list) (payload.attachments as unknown[]).push(await zohoUpload(email, box, f.name, f.bytes))
+      }
       const isReply = mode === "reply" || mode === "replyAll"
       const sent = await zohoPost(
         email,
@@ -535,7 +571,41 @@ Deno.serve(withErrorLog("mail-inbox", async (req) => {
       history.push(now)
       sends.set(email, history)
       const id = String(((sent && typeof sent === "object" ? sent : {}) as { messageId?: unknown }).messageId ?? "")
-      return json({ ok: true, messageId: isZohoId(id) ? id : "" })
+      const messageId = isZohoId(id) ? id : ""
+      let linked = false
+      if (link && linkTable && messageId) {
+        // The email is already sent: a filing problem is reported as linked: false, never as a failed send.
+        try {
+          const { data: target } = await sb.from(linkTable).select("id").eq("id", linkId).maybeSingle()
+          let sentFolder = ""
+          try {
+            sentFolder = normalizeFolders(rows(await zohoGet(email, box, "/folders"))).find((f) => f.kind === "sent")?.folderId || ""
+          } catch { /* the history row still shows without a folder */ }
+          if (target) {
+            const { error } = await sb.from("mail_links").upsert(
+              {
+                target_type: String(link.targetType),
+                target_id: linkId,
+                mailbox_owner: email,
+                message_id: messageId,
+                folder_id: sentFolder,
+                subject: subject.slice(0, 300),
+                from_address: box.address.slice(0, 300),
+                to_address: to.list.join(", ").slice(0, 1000),
+                sent_at: new Date(now).toISOString(),
+                has_attachment: files.list.length > 0,
+                linked_by: email,
+              },
+              { onConflict: "mailbox_owner,message_id,target_type,target_id", ignoreDuplicates: true },
+            )
+            linked = !error
+            if (error) console.error("mail-inbox link after send failed", error.message)
+          }
+        } catch (e) {
+          console.error("mail-inbox link after send failed", e instanceof Error ? e.message : e)
+        }
+      }
+      return json({ ok: true, messageId, linked })
     }
 
     return json({ error: "Unknown action" }, 400)

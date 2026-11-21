@@ -305,3 +305,60 @@ export function composeHtml(text: string, mode: SendMode, quoted?: Quoted | null
 export function underSendLimit(history: number[], now: number, max = 20, windowMs = 10 * 60_000): boolean {
   return history.filter((t) => now - t < windowMs).length < max
 }
+
+export type OutgoingAttachment = { name: string; bytes: Uint8Array }
+
+export const MAX_ATTACHMENTS = 3
+export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+
+/**
+ * Files the page attaches to an email it sends: PDFs only (quotes, invoices,
+ * statements), at most 3 and 10 MB together. Names become safe file names
+ * ending in .pdf. Returns an error sentence instead when anything is off.
+ */
+export function cleanAttachments(raw: unknown): { list: OutgoingAttachment[] } | { error: string } {
+  if (raw == null) return { list: [] }
+  if (!Array.isArray(raw)) return { error: "Attachments must be a list" }
+  if (raw.length > MAX_ATTACHMENTS) return { error: `At most ${MAX_ATTACHMENTS} attachments per email` }
+  const list: OutgoingAttachment[] = []
+  let total = 0
+  for (const item of raw) {
+    const r = (item && typeof item === "object" ? item : {}) as { name?: unknown; base64?: unknown }
+    const b64 = typeof r.base64 === "string" ? r.base64.replace(/^data:[^,]*,/, "").replace(/\s+/g, "") : ""
+    if (!b64 || !/^[A-Za-z0-9+/]+={0,2}$/.test(b64)) return { error: "An attachment could not be read" }
+    if ((b64.length * 3) / 4 > MAX_ATTACHMENT_BYTES + 4) return { error: "Attachments are larger than 10 MB" }
+    let bytes: Uint8Array
+    try {
+      const bin = atob(b64)
+      bytes = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+    } catch {
+      return { error: "An attachment could not be read" }
+    }
+    // %PDF at the start: only real PDFs go out.
+    if (bytes.length < 5 || bytes[0] !== 0x25 || bytes[1] !== 0x50 || bytes[2] !== 0x44 || bytes[3] !== 0x46) {
+      return { error: "Only PDF files can be attached here" }
+    }
+    total += bytes.length
+    if (total > MAX_ATTACHMENT_BYTES) return { error: "Attachments are larger than 10 MB" }
+    const base = String(r.name ?? "")
+      .replace(/\.pdf$/i, "")
+      .replace(/[^A-Za-z0-9 ._()-]+/g, "-")
+      .replace(/^[.\s-]+/, "")
+      .trim()
+      .slice(0, 80)
+    list.push({ name: `${base || "document"}.pdf`, bytes })
+  }
+  return { list }
+}
+
+/** Zoho's upload answer, an object or a one-item list, as the send call wants it. */
+export function uploadedAttachment(data: unknown): { storeName: string; attachmentPath: string; attachmentName: string } | null {
+  const d = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined
+  if (!d || typeof d !== "object") return null
+  const storeName = String(d.storeName ?? "")
+  const attachmentPath = String(d.attachmentPath ?? "")
+  const attachmentName = String(d.attachmentName ?? "")
+  if (!storeName || !attachmentPath || !attachmentName) return null
+  return { storeName, attachmentPath, attachmentName }
+}
