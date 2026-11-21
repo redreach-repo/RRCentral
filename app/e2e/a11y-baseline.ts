@@ -11,12 +11,11 @@ import type { PageId } from './a11y.spec'
 export const KNOWN_VIOLATIONS: Record<PageId, Record<'light' | 'dark', Record<string, number>>> = {
   'sign-in': { light: {}, dark: {} },
   // Light mode reads the tokens since the light mode pass (21 Nov). Left: company select has no name.
-  // Dark: two links in plain brand red, too dark on dark.
-  home: { light: { 'select-name': 1 }, dark: { 'color-contrast': 2, 'select-name': 1 } },
+  home: { light: { 'select-name': 1 }, dark: { 'select-name': 1 } },
   // Date filter inputs have no label.
   list: { light: { 'label': 2 }, dark: { 'label': 2 } },
-  // Inline field labels not tied to inputs (label, select-name). Dark: a total in brand red.
-  form: { light: { 'label': 3, 'select-name': 3 }, dark: { 'color-contrast': 1, 'label': 3, 'select-name': 3 } },
+  // Inline field labels not tied to inputs (label, select-name).
+  form: { light: { 'label': 3, 'select-name': 3 }, dark: { 'label': 3, 'select-name': 3 } },
   // Grey Drive note on white.
   pdf: { light: { 'color-contrast': 1 }, dark: { 'color-contrast': 1 } },
 }

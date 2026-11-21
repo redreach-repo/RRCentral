@@ -1292,7 +1292,7 @@ export default function SettingsPage() {
                           href={doc.drive_url}
                           target="_blank"
                           rel="noreferrer"
-                          style={{ color: colors.accent }}
+                          style={{ color: colors.accentText }}
                         >
                           Open
                         </a>
@@ -1675,7 +1675,7 @@ export default function SettingsPage() {
             href="https://api-console.zoho.com/"
             target="_blank"
             rel="noreferrer"
-            style={{ color: colors.accent }}
+            style={{ color: colors.accentText }}
           >
             Zoho API Console
           </a>

@@ -206,7 +206,7 @@ export default function SystemCheckPage() {
           <h1 className={docsStyles.title}>{t('page.systemCheck.title')}</h1>
           <p className={docsStyles.subtitle}>
             {t('page.systemCheck.subtitleLead')}{' '}
-            <Link to="/app-errors" style={{ color: colors.accent }}>
+            <Link to="/app-errors" style={{ color: colors.accentText }}>
               {t('page.systemCheck.appErrors')}
             </Link>
             {t('page.systemCheck.subtitleTrail')}

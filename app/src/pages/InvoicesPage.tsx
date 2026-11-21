@@ -879,7 +879,7 @@ export default function InvoicesPage() {
           Showing invoices for {filterAccount?.name ?? 'one account'}.{' '}
           <button
             type="button"
-            style={{ all: 'unset', cursor: 'pointer', color: colors.accent }}
+            style={{ all: 'unset', cursor: 'pointer', color: colors.accentText }}
             onClick={() => {
               const next = new URLSearchParams(window.location.search)
               next.delete('account')
@@ -1292,7 +1292,7 @@ export default function InvoicesPage() {
         <div className={resp.totalsRow}>
           <span>Subtotal: <strong>{formatAED(totals.subtotal)}</strong></span>
           <span>VAT ({vatRateToPercent(formVatRate)}%): <strong>{formatAED(totals.vat)}</strong></span>
-          <span>Total: <strong style={{ color: colors.accent }}>{formatAED(totals.total)}</strong></span>
+          <span>Total: <strong style={{ color: colors.accentText }}>{formatAED(totals.total)}</strong></span>
         </div>
 
         <div style={editorPanelStyle(editorSection === 'notes')}>

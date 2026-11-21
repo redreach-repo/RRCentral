@@ -1187,7 +1187,7 @@ export default function CrmPage() {
             ) : (
               <>
                 {t('page.crm.subtitleLead')}{' '}
-                <Link to="/deals" style={{ color: colors.accent }}>
+                <Link to="/deals" style={{ color: colors.accentText }}>
                   {t('page.dashboard.pipeline')}
                 </Link>
                 .
@@ -1519,7 +1519,7 @@ export default function CrmPage() {
                     <Link
                       to={`/quotations?ref=${encodeURIComponent(row.quote_ref)}`}
                       style={{
-                        color: colors.accent,
+                        color: colors.accentText,
                         textDecoration: 'none',
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -1586,7 +1586,7 @@ export default function CrmPage() {
                       {p?.phone || row.mobile_number || row.office_number ? (
                         <a
                           href={`tel:${(p?.phone || row.mobile_number || row.office_number || '').replace(/\s+/g, '')}`}
-                          style={{ color: colors.accent, textDecoration: 'none' }}
+                          style={{ color: colors.accentText, textDecoration: 'none' }}
                         >
                           {p?.phone || row.mobile_number || row.office_number}
                         </a>
@@ -1656,7 +1656,7 @@ export default function CrmPage() {
                           style={{
                             marginLeft: 6,
                             fontSize: 11,
-                            color: colors.accent,
+                            color: colors.accentText,
                             fontWeight: 600,
                           }}
                         >
@@ -1712,7 +1712,7 @@ export default function CrmPage() {
                         <Link
                           to={`/quotations?ref=${encodeURIComponent(row.quote_ref)}`}
                           style={{
-                            color: colors.accent,
+                            color: colors.accentText,
                             textDecoration: 'none',
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -2017,7 +2017,7 @@ export default function CrmPage() {
                           background: 'none',
                           border: 'none',
                           padding: 0,
-                          color: colors.accent,
+                          color: colors.accentText,
                           cursor: 'pointer',
                           fontSize: 12,
                         }}

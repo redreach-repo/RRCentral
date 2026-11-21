@@ -269,7 +269,7 @@ export default function AiSuggestButton({
       <Modal open={open} title={`Suggest with AI · ${account.name}`} onClose={() => setOpen(false)} width={560}>
         <p style={{ margin: '0 0 12px', fontSize: 13, color: colors.muted, lineHeight: 1.5 }}>
           AI only proposes. Nothing changes on this account until someone approves a suggestion on the{' '}
-          <Link to="/ai-approvals" style={{ color: colors.accent }}>
+          <Link to="/ai-approvals" style={{ color: colors.accentText }}>
             AI approvals
           </Link>{' '}
           queue.

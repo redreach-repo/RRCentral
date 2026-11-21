@@ -373,7 +373,7 @@ export default function ClientPoEditor(props: {
               </button>
               {upload ? <span style={{ fontSize: 13 }}>{upload.filename}</span> : null}
               {!upload && hasFile ? (
-                <a href={editing?.file_url} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: colors.accent }}>
+                <a href={editing?.file_url} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: colors.accentText }}>
                   Open {editing?.file_name || 'the PO file'} in Google Drive
                 </a>
               ) : null}

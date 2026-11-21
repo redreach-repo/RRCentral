@@ -395,7 +395,7 @@ function DraftCard({
           ? [draft.sent_email_to && `Email: ${draft.sent_email_to}`, draft.sent_whatsapp_to && `WhatsApp: ${draft.sent_whatsapp_to}`].filter(Boolean).join(', ')
           : `To ${to.email ? to.email.contact.name || to.email.to : 'nobody by email'}${to.whatsapp ? `, WhatsApp ${to.whatsapp.to}` : ', no WhatsApp number'}`}
         {' · '}
-        <Link to={`/accounts/${draft.account_id}/report?month=${draft.month.slice(0, 7)}`} style={{ color: colors.accent }}>
+        <Link to={`/accounts/${draft.account_id}/report?month=${draft.month.slice(0, 7)}`} style={{ color: colors.accentText }}>
           {t('page.clientReports.fullReport')}
         </Link>
         {draft.ai_cost_usd ? ` · AI draft $${Number(draft.ai_cost_usd).toFixed(4)}` : ''}

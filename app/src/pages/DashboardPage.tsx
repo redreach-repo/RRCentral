@@ -526,7 +526,7 @@ export default function DashboardPage() {
                   </ul>
                 )}
                 <p style={{ margin: '12px 0 0', fontSize: 12 }}>
-                  <Link to="/domains" style={{ color: colors.accent }}>
+                  <Link to="/domains" style={{ color: colors.accentText }}>
                     Manage domains
                   </Link>
                 </p>
@@ -629,7 +629,7 @@ export default function DashboardPage() {
                         <td style={tdStyle}>
                           <Link
                             to={`/crm?owner=${encodeURIComponent(r.owner)}`}
-                            style={{ color: colors.accent, textDecoration: 'none' }}
+                            style={{ color: colors.accentText, textDecoration: 'none' }}
                           >
                             {r.owner}
                           </Link>
@@ -710,7 +710,7 @@ export default function DashboardPage() {
                         <>
                           {' '}
                           ·{' '}
-                          <a href={a.driveUrl} target="_blank" rel="noreferrer" style={{ color: colors.accent }}>
+                          <a href={a.driveUrl} target="_blank" rel="noreferrer" style={{ color: colors.accentText }}>
                             Open
                           </a>
                         </>
@@ -729,7 +729,7 @@ export default function DashboardPage() {
               </p>
               {companyVaultRoot ? (
                 <p style={{ margin: '0 0 10px', fontSize: 13 }}>
-                  <a href={companyVaultRoot} target="_blank" rel="noreferrer" style={{ color: colors.accent }}>
+                  <a href={companyVaultRoot} target="_blank" rel="noreferrer" style={{ color: colors.accentText }}>
                     Open company Google Drive folder
                   </a>
                 </p>
@@ -745,7 +745,7 @@ export default function DashboardPage() {
                   {companyDocs.slice(0, 6).map((d) => (
                     <li key={d.id}>
                       {d.drive_url ? (
-                        <a href={d.drive_url} target="_blank" rel="noreferrer" style={{ color: colors.accent }}>
+                        <a href={d.drive_url} target="_blank" rel="noreferrer" style={{ color: colors.accentText }}>
                           {d.title || d.category}
                         </a>
                       ) : (

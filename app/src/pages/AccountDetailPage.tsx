@@ -394,7 +394,7 @@ export default function AccountDetailPage() {
     return (
       <div style={{ ...cardStyle, color: colors.muted, lineHeight: 1.6 }}>
         {t('page.accountDetail.notFound')}{' '}
-        <Link to="/accounts" style={{ color: colors.accent }}>
+        <Link to="/accounts" style={{ color: colors.accentText }}>
           {t('page.accountDetail.backToAccounts')}
         </Link>
       </div>
@@ -524,7 +524,7 @@ export default function AccountDetailPage() {
                   href={/^https?:\/\//i.test(account.website) ? account.website : `https://${account.website}`}
                   target="_blank"
                   rel="noreferrer"
-                  style={{ color: colors.accent }}
+                  style={{ color: colors.accentText }}
                 >
                   {t('page.accountDetail.website')}{' '}
                   <ExternalLink size={11} style={{ verticalAlign: -1 }} />

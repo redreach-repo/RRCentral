@@ -668,7 +668,7 @@ export default function SupplierInvoiceModal({ quote, vendors, vatRate, who, onC
           <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13 }}>
             {supplierInvoiceAttachments.map((a) => (
               <li key={a.id}>
-                <a href={a.url} target="_blank" rel="noreferrer" style={{ color: colors.accent }}>
+                <a href={a.url} target="_blank" rel="noreferrer" style={{ color: colors.accentText }}>
                   {a.file_name || 'Supplier invoice'}
                 </a>
               </li>

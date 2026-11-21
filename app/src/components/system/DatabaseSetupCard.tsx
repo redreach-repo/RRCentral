@@ -111,7 +111,7 @@ export default function DatabaseSetupCard() {
                     href={migrationUrl(r.probe.migration)}
                     target="_blank"
                     rel="noreferrer"
-                    style={{ fontSize: 12, color: colors.accent, wordBreak: 'break-all' }}
+                    style={{ fontSize: 12, color: colors.accentText, wordBreak: 'break-all' }}
                   >
                     {r.probe.migration}.sql
                   </a>

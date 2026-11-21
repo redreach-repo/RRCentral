@@ -306,7 +306,7 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
         </h2>
         <p style={{ color: colors.muted, fontSize: 13, margin: 0, lineHeight: 1.5 }}>
           Connect Zoho Mail in{' '}
-          <Link to="/settings" style={{ color: colors.accent }}>
+          <Link to="/settings" style={{ color: colors.accentText }}>
             Settings
           </Link>{' '}
           to see inbox and sent mail here, matched to CRM companies.
@@ -440,7 +440,7 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
           <>
             {' '}
             An admin connects <strong>Google Drive</strong> once in{' '}
-            <Link to="/settings" style={{ color: colors.accent }}>
+            <Link to="/settings" style={{ color: colors.accentText }}>
               Settings
             </Link>
             .
@@ -472,7 +472,7 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
             style={{
               ...buttonSecondaryStyle,
               ...(mailbox === id
-                ? { borderColor: colors.accent, color: colors.accent, background: `${colors.accent}18` }
+                ? { borderColor: colors.accent, color: colors.accentText, background: `${colors.accent}18` }
                 : null),
               padding: '6px 10px',
               fontSize: 12,
@@ -498,7 +498,7 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
             style={{
               ...buttonSecondaryStyle,
               ...(filter === id
-                ? { borderColor: colors.accent, color: colors.accent, background: `${colors.accent}18` }
+                ? { borderColor: colors.accent, color: colors.accentText, background: `${colors.accent}18` }
                 : null),
               padding: '6px 10px',
               fontSize: 12,
@@ -530,7 +530,7 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
             <code style={{ color: '#ff9f4a' }}>ZohoMail.accounts.READ</code>
             , then Test connection in Settings.
           </div>
-          <Link to="/settings" style={{ color: colors.accent, display: 'inline-flex', gap: 6, marginTop: 10 }}>
+          <Link to="/settings" style={{ color: colors.accentText, display: 'inline-flex', gap: 6, marginTop: 10 }}>
             <Plug size={14} /> Settings → Zoho
           </Link>
         </div>
@@ -605,7 +605,7 @@ export default function ZohoInboxPanel({ crmEntries }: Props) {
                     {m.crm ? (
                       <Link
                         to={`/crm?edit=${m.crm.crmId}`}
-                        style={{ color: colors.accent, textDecoration: 'none' }}
+                        style={{ color: colors.accentText, textDecoration: 'none' }}
                       >
                         {m.crm.companyName}
                       </Link>
@@ -636,7 +636,7 @@ function InboxCard({ message: m, mailbox }: { message: InboxRow; mailbox: Mailbo
             {m.receivedTime ? ` · ${format(new Date(m.receivedTime), 'dd MMM HH:mm')}` : ''}
           </div>
           {m.crm ? (
-            <Link to={`/crm?edit=${m.crm.crmId}`} style={{ color: colors.accent, fontSize: 12 }}>
+            <Link to={`/crm?edit=${m.crm.crmId}`} style={{ color: colors.accentText, fontSize: 12 }}>
               {m.crm.companyName}
             </Link>
           ) : null}
