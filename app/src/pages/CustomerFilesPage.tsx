@@ -447,7 +447,7 @@ export default function CustomerFilesPage() {
           <strong style={{ color: colors.warn }}>Connect Supabase first</strong>
           <p style={{ margin: '8px 0 0', color: colors.muted, fontSize: 14, lineHeight: 1.5 }}>
             Google Drive needs cloud mode.{' '}
-            <Link to="/settings#connect-supabase" style={{ color: colors.accent }}>
+            <Link to="/settings#connect-supabase" style={{ color: colors.accentText }}>
               Settings → Connect Supabase
             </Link>
             , then connect Google Drive.
@@ -458,7 +458,7 @@ export default function CustomerFilesPage() {
           <strong style={{ color: colors.warn }}>Connect Google Drive</strong>
           <p style={{ margin: '8px 0 0', color: colors.muted, fontSize: 14, lineHeight: 1.5 }}>
             An admin connects Google Drive once in{' '}
-            <Link to="/settings#google-drive" style={{ color: colors.accent }}>
+            <Link to="/settings#google-drive" style={{ color: colors.accentText }}>
               Settings → Google Drive
             </Link>
             . Then {PRODUCT.name} makes a folder per client under <strong>RR Central / Customers</strong>, and Save to
@@ -471,7 +471,7 @@ export default function CustomerFilesPage() {
         <div style={{ ...cardStyle, marginBottom: 16, borderColor: colors.warn }}>
           <strong style={{ color: colors.warn }}>SQL needed</strong>
           <p style={{ margin: '8px 0 0', color: colors.muted, fontSize: 14, lineHeight: 1.5 }}>
-            Run <code style={{ color: colors.accent }}>supabase/migrations/20260924224316_customer_files.sql</code> in
+            Run <code style={{ color: colors.accentText }}>supabase/migrations/20260924224316_customer_files.sql</code> in
             the Supabase SQL editor so customer folders and Google Drive links can be saved.
           </p>
         </div>
@@ -596,7 +596,7 @@ export default function CustomerFilesPage() {
                           appearance: 'none',
                           border: 0,
                           background: 'transparent',
-                          color: colors.accent,
+                          color: colors.accentText,
                           cursor: 'pointer',
                           marginLeft: 6,
                           fontSize: 12,
@@ -748,7 +748,7 @@ export default function CustomerFilesPage() {
                         flexWrap: 'wrap',
                       }}
                     >
-                      <span style={{ color: colors.accent }}>{sectionIcon(cat.id)}</span>
+                      <span style={{ color: colors.accentText }}>{sectionIcon(cat.id)}</span>
                       <div style={{ flex: 1, minWidth: 140 }}>
                         <div style={{ fontWeight: 700, fontSize: 14 }}>{cat.label}</div>
                         <div style={{ fontSize: 12, color: colors.muted2 }}>{cat.hint}</div>
@@ -776,7 +776,7 @@ export default function CustomerFilesPage() {
                                   appearance: 'none',
                                   border: 0,
                                   background: 'transparent',
-                                  color: colors.accent,
+                                  color: colors.accentText,
                                   cursor: 'pointer',
                                   padding: 0,
                                   fontSize: 13,

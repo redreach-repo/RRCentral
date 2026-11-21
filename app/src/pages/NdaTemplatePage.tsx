@@ -344,7 +344,7 @@ export default function NdaTemplatePage() {
           <div style={{ display: 'grid', gap: 6 }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
               <span style={{ fontSize: 12, color: colors.muted }}>{t('page.ndaTemplate.insertClause')}</span>
-              <Link to="/clause-library" style={{ fontSize: 12, color: colors.accent }}>
+              <Link to="/clause-library" style={{ fontSize: 12, color: colors.accentText }}>
                 {t('page.ndaTemplate.manageLibrary')}
               </Link>
             </div>

@@ -233,7 +233,7 @@ export default function CalendarSettingsModal({ open, onClose, onSaved }: Props)
       {!configured ? (
         <p style={{ color: colors.warn, fontSize: 13, lineHeight: 1.45 }}>
           Zoho Client ID / Secret / Refresh Token are missing.{' '}
-          <Link to="/settings" style={{ color: colors.accent }} onClick={onClose}>
+          <Link to="/settings" style={{ color: colors.accentText }} onClick={onClose}>
             Open Settings → Zoho
           </Link>{' '}
           to paste credentials first.

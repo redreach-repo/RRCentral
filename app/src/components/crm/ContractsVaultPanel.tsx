@@ -468,7 +468,7 @@ export default function ContractsVaultPanel({
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <strong style={{ fontSize: 13 }}>Open obligations</strong>
-            <Link to="/obligations" style={{ fontSize: 12, color: colors.accent }}>
+            <Link to="/obligations" style={{ fontSize: 12, color: colors.accentText }}>
               Full board
             </Link>
           </div>

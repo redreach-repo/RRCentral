@@ -313,7 +313,7 @@ export default function ClientPosPage() {
                             target="_blank"
                             rel="noreferrer"
                             className={docsStyles.meta}
-                            style={{ color: colors.accent, display: 'inline-flex', gap: 4, alignItems: 'center' }}
+                            style={{ color: colors.accentText, display: 'inline-flex', gap: 4, alignItems: 'center' }}
                           >
                             <FileText size={12} /> PO file
                           </a>

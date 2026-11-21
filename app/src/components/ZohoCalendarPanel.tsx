@@ -528,7 +528,7 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
                     {row.crmId ? (
                       <Link
                         to={`/crm?edit=${row.crmId}`}
-                        style={{ color: colors.accent, textDecoration: 'none', fontWeight: 600 }}
+                        style={{ color: colors.accentText, textDecoration: 'none', fontWeight: 600 }}
                       >
                         {row.crmName}
                       </Link>
@@ -546,7 +546,7 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
                       <label>Quote</label>
                       <Link
                         to={`/quotations?ref=${encodeURIComponent(row.quoteRef)}`}
-                        style={{ color: colors.accent, textDecoration: 'none' }}
+                        style={{ color: colors.accentText, textDecoration: 'none' }}
                       >
                         {row.quoteRef}
                       </Link>
@@ -611,7 +611,7 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
                         <>
                           <Link
                             to={`/crm?edit=${row.crmId}`}
-                            style={{ color: colors.accent, textDecoration: 'none' }}
+                            style={{ color: colors.accentText, textDecoration: 'none' }}
                           >
                             {row.crmName}
                           </Link>
@@ -622,7 +622,7 @@ export default function ZohoCalendarPanel({ crmEntries }: Props) {
                             <div style={{ fontSize: 11 }}>
                               <Link
                                 to={`/quotations?ref=${encodeURIComponent(row.quoteRef)}`}
-                                style={{ color: colors.accent, textDecoration: 'none' }}
+                                style={{ color: colors.accentText, textDecoration: 'none' }}
                               >
                                 {row.quoteRef}
                               </Link>

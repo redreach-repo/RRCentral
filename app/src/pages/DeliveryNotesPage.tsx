@@ -792,7 +792,7 @@ export default function DeliveryNotesPage() {
             <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13 }}>
               {signedAttachments.map((a) => (
                 <li key={a.id} style={{ marginBottom: 4 }}>
-                  <a href={a.url} target="_blank" rel="noreferrer" style={{ color: colors.accent }}>
+                  <a href={a.url} target="_blank" rel="noreferrer" style={{ color: colors.accentText }}>
                     {a.file_name || 'Signed delivery note'}
                   </a>{' '}
                   <button type="button" style={ghostTiny} onClick={() => void removeSignedAttachment(a.id)}>

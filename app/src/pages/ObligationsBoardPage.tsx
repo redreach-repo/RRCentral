@@ -201,7 +201,7 @@ export default function ObligationsBoardPage() {
       <h1 style={pageTitleStyle}>{t('page.obligations.title')}</h1>
       <p style={pageSubtitleStyle}>
         {t('page.obligations.subtitleLead')}{' '}
-        <Link to="/clause-library" style={{ color: colors.accent }}>
+        <Link to="/clause-library" style={{ color: colors.accentText }}>
           {t('page.obligations.clauseLibrary')}
         </Link>
         {t('page.obligations.subtitleTrail')}

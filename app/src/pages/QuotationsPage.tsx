@@ -2277,7 +2277,7 @@ export default function QuotationsPage() {
           </div>
           <div>
             Total:{' '}
-            <strong style={{ color: colors.accent }}>
+            <strong style={{ color: colors.accentText }}>
               {form.quotation_currency} {totals.total.toLocaleString('en-AE', { minimumFractionDigits: 2 })}
             </strong>
           </div>
@@ -2726,7 +2726,7 @@ export default function QuotationsPage() {
                 style={{
                   ...buttonSecondaryStyle,
                   ...(depositPct === opt.value
-                    ? { borderColor: colors.accent, color: colors.accent }
+                    ? { borderColor: colors.accent, color: colors.accentText }
                     : null),
                 }}
                 onClick={() => setDepositPct(opt.value)}

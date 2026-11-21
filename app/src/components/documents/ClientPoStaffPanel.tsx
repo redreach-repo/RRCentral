@@ -36,7 +36,7 @@ export default function ClientPoStaffPanel(props: {
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <Users size={15} />
         <strong>Uniform sizes for this PO</strong>
-        <Link to="/uniform-sizes" style={{ marginLeft: 'auto', color: colors.accent, fontSize: 12 }}>
+        <Link to="/uniform-sizes" style={{ marginLeft: 'auto', color: colors.accentText, fontSize: 12 }}>
           Open Uniform sizes
         </Link>
       </div>

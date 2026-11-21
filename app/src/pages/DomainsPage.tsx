@@ -538,7 +538,7 @@ export default function DomainsPage() {
                                 href={d.website_url}
                                 target="_blank"
                                 rel="noreferrer"
-                                style={{ color: colors.accent }}
+                                style={{ color: colors.accentText }}
                               >
                                 {t('page.domains.openSite')}{' '}
                                 <ExternalLink size={10} style={{ verticalAlign: -1 }} />

@@ -332,7 +332,7 @@ export default function PipelinesSettingsCard() {
                 style={{
                   ...buttonSecondaryStyle,
                   ...(selected?.id === p.id
-                    ? { borderColor: colors.accent, color: colors.accent, fontWeight: 600 }
+                    ? { borderColor: colors.accent, color: colors.accentText, fontWeight: 600 }
                     : {}),
                 }}
               >

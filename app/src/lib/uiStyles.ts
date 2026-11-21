@@ -6,6 +6,8 @@ export const colors = {
   card: 'var(--card)',
   border: 'var(--border)',
   accent: 'var(--primary)',
+  /** Brand red for text and links: lifted in dark mode so it stays readable. */
+  accentText: 'var(--primary-text)',
   text: 'var(--text)',
   muted: 'var(--muted)',
   muted2: 'var(--muted-2)',

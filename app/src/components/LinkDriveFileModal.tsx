@@ -288,7 +288,7 @@ export default function LinkDriveFileModal({
                   appearance: 'none',
                   border: 0,
                   background: 'transparent',
-                  color: colors.accent,
+                  color: colors.accentText,
                   cursor: 'pointer',
                   padding: 0,
                   fontSize: 12,

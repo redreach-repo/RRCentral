@@ -902,7 +902,7 @@ export default function ExpensesPage() {
             it to Google Drive and paste the share link below.
           </p>
           {parsing ? (
-            <p style={{ margin: '6px 0 0', fontSize: 13, color: colors.accent }}>Reading PDF…</p>
+            <p style={{ margin: '6px 0 0', fontSize: 13, color: colors.accentText }}>Reading PDF…</p>
           ) : null}
           {parseHint ? (
             <p style={{ margin: '6px 0 0', fontSize: 13, color: colors.muted }}>{parseHint}</p>
@@ -1018,7 +1018,7 @@ export default function ExpensesPage() {
             ) : null}
             <p style={{ margin: '4px 0 0', fontSize: 11, color: colors.muted }}>
               Register suppliers under{' '}
-              <Link to="/vendors" style={{ color: colors.accent }}>
+              <Link to="/vendors" style={{ color: colors.accentText }}>
                 Vendors
               </Link>
               . Saving also registers a new company name automatically.
@@ -1227,7 +1227,7 @@ export default function ExpensesPage() {
             <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13 }}>
               {attachments.map((a) => (
                 <li key={a.id} style={{ marginBottom: 4 }}>
-                  <a href={a.url} target="_blank" rel="noreferrer" style={{ color: colors.accent }}>
+                  <a href={a.url} target="_blank" rel="noreferrer" style={{ color: colors.accentText }}>
                     {a.file_name || 'Attachment'}
                   </a>{' '}
                   <button type="button" style={buttonGhostTiny} onClick={() => void removeAttachment(a.id)}>

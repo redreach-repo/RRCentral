@@ -686,7 +686,7 @@ export default function PaymentsPage() {
                 <div style={{ fontWeight: 700, fontSize: 16 }}>
                   <Link
                     to={`/quotations?ref=${encodeURIComponent(selected.reference_number || '')}`}
-                    style={{ color: colors.accent, textDecoration: 'none' }}
+                    style={{ color: colors.accentText, textDecoration: 'none' }}
                   >
                     {selected.reference_number || selected.quote_id}
                   </Link>{' '}

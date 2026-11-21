@@ -550,7 +550,7 @@ export default function MyDealsPage() {
                     {d.account_id ? (
                       <>
                         {' · '}
-                        <Link to={`/crm?edit=${d.id}`} style={{ color: colors.accent }}>
+                        <Link to={`/crm?edit=${d.id}`} style={{ color: colors.accentText }}>
                           Open sheet
                         </Link>
                       </>
@@ -694,7 +694,7 @@ export default function MyDealsPage() {
             {manageStagesHref ? (
               <>
                 {' '}
-                <Link to={manageStagesHref} style={{ color: colors.accent }}>
+                <Link to={manageStagesHref} style={{ color: colors.accentText }}>
                   Open {filters.pipeline === 'sales' ? 'AI CRM' : 'CTRM'} detail
                 </Link>
               </>

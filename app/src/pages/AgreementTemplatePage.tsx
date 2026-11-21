@@ -456,7 +456,7 @@ export default function AgreementTemplatePage() {
             <details style={{ marginTop: 12 }}>
               <summary style={{ cursor: 'pointer', fontSize: 13 }}>
                 {t('page.agreementTemplate.insertClause')}{' '}
-                <Link to="/clause-library" style={{ color: colors.accent, marginLeft: 6 }} onClick={(e) => e.stopPropagation()}>
+                <Link to="/clause-library" style={{ color: colors.accentText, marginLeft: 6 }} onClick={(e) => e.stopPropagation()}>
                   {t('page.agreementTemplate.manageLibrary')}
                 </Link>
               </summary>

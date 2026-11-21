@@ -397,7 +397,7 @@ export default function SupportPage() {
           { label: 'Due soon', value: summary.warning, color: colors.warn },
           { label: 'Past SLA', value: summary.breached, color: colors.danger },
           ...(summary.unfiled
-            ? [{ label: 'Unknown sender', value: summary.unfiled, color: colors.accent, onClick: () => setFilter('type', 'unfiled', 'all') }]
+            ? [{ label: 'Unknown sender', value: summary.unfiled, color: colors.accentText, onClick: () => setFilter('type', 'unfiled', 'all') }]
             : []),
         ].map((s) => (
           <button

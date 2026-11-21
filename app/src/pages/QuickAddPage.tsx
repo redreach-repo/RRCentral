@@ -413,7 +413,7 @@ export default function QuickAddPage() {
                   {busy ? 'Saving…' : 'Log the call'}
                 </button>
                 {current?.kind === 'contact' ? (
-                  <Link to={`/accounts/${current.accountId}`} style={{ color: colors.accent, fontSize: 13 }}>
+                  <Link to={`/accounts/${current.accountId}`} style={{ color: colors.accentText, fontSize: 13 }}>
                     Open the account
                   </Link>
                 ) : null}

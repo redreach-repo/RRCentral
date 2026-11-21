@@ -44,7 +44,7 @@ export default function ChurchFacts({ view }: { view: ChurchView }) {
           href={view.adminUrl}
           target="_blank"
           rel="noopener noreferrer"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 13, marginTop: 6, color: colors.accent }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 13, marginTop: 6, color: colors.accentText }}
         >
           Open in WorshipHub admin <ExternalLink size={13} />
         </a>
