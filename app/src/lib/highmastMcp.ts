@@ -9,7 +9,8 @@
  * level security), and the "MCP ..." database policies
  * (supabase/migrations/20261323090000_highmast_mcp.sql).
  */
-import { PIPELINE_STAGES } from './config'
+import { DIVISIONS, PIPELINE_STAGES } from './config'
+import { roundAmount } from './money/index'
 import { invoiceDueDate, isCollectible } from './contractBilling'
 import { CTRM_STAGES, isOpenDeal } from './ctrm'
 import { ACCOUNT_TYPES, nextAccountReference } from './accounts'
@@ -52,6 +53,73 @@ export function toolNameProblem(name: string): string | null {
     if (w.includes('_') ? name.toLowerCase().includes(w) : parts.includes(w)) return `tool "${name}" touches "${w}"`
   }
   return null
+}
+
+/**
+ * Admin scope (Alfred, 2026-11-20): extra tools for a key that acts as a
+ * dedicated "AI Assistant" admin member. They cover every area, HR and payroll
+ * included, but: deletes are soft (restore_record undoes them), sent invoices
+ * and recorded payments are only corrected by a credit note or a reversal,
+ * payroll stays draft, and users are read only. Standard keys never get these.
+ */
+export const MCP_ADMIN_TOOLS = [
+  // Any area
+  'list_records', 'get_record', 'create_record', 'update_record', 'delete_record', 'restore_record',
+  // CRM
+  'create_account', 'update_account', 'create_contact', 'update_contact',
+  'create_deal', 'update_deal', 'set_deal_stage', 'close_deal',
+  // Quotes, invoices, payments, expenses
+  'get_quote', 'create_quote', 'update_quote', 'finalize_quote', 'mark_quote_sent', 'convert_quote_to_invoice',
+  'get_invoice', 'create_invoice', 'update_invoice', 'finalize_invoice',
+  'record_payment', 'reverse_payment', 'create_credit_note', 'create_expense', 'update_expense',
+  // Support desk
+  'create_ticket', 'update_ticket', 'reply_ticket', 'close_ticket',
+  // Documents
+  'add_document',
+  // HR and payroll (payroll draft only)
+  'list_employees', 'get_employee', 'create_employee', 'update_employee',
+  'create_leave_request', 'update_leave_request',
+  'create_payroll_run', 'generate_payroll_lines', 'update_payroll_line', 'get_payroll_run',
+  // Admin (read only)
+  'list_users',
+] as const
+export type McpAdminToolName = (typeof MCP_ADMIN_TOOLS)[number]
+
+/** Words no admin tool name may contain: nothing approves, pays out, hard deletes or touches secrets. */
+export const FORBIDDEN_ADMIN_TOOL_WORDS = [
+  'approve', 'approval', 'purge', 'destroy', 'drop', 'hard', 'secret', 'setting', 'settings',
+  'password', 'key', 'keys', 'payout', 'wps', 'refund', 'role',
+] as const
+
+export function adminToolNameProblem(name: string): string | null {
+  const parts = name.toLowerCase().split(/[^a-z0-9]+/)
+  for (const w of FORBIDDEN_ADMIN_TOOL_WORDS) if (parts.includes(w)) return `admin tool "${name}" touches "${w}"`
+  return null
+}
+
+export const MCP_KEY_SCOPES = ['standard', 'admin'] as const
+export type McpKeyScope = (typeof MCP_KEY_SCOPES)[number]
+
+/** Brand name the app stores in `vertical` for a division code ('01' -> 'RR Threads'). */
+export function divisionVertical(code: string | null | undefined): string {
+  const c = String(code || '01').padStart(2, '0')
+  return DIVISIONS.find((d) => d.code === c)?.brand || ''
+}
+export const DIVISION_CODES = DIVISIONS.map((d) => d.code)
+
+/** UAE VAT is 5%; tools take a percent and the database a rate. */
+export const UAE_VAT_PERCENT = 5
+export function vatRateFromPercent(percent: number | null | undefined): number {
+  const p = percent == null ? UAE_VAT_PERCENT : Number(percent)
+  if (!Number.isFinite(p) || p < 0 || p > 100) throw new Error('vat_percent must be between 0 and 100')
+  return Math.round(p * 1000) / 100000
+}
+
+/** Expense amounts from the amount before VAT, rounded like the app's money. */
+export function expenseAmounts(amountExVat: number, vatPercent: number | null | undefined = UAE_VAT_PERCENT) {
+  const ex = roundAmount(Number(amountExVat) || 0, 'AED')
+  const vat = roundAmount(ex * vatRateFromPercent(vatPercent), 'AED')
+  return { amount_ex_vat: ex, vat_amount: vat, amount: roundAmount(ex + vat, 'AED') }
 }
 
 /** Only these roles can be given to a key. Admin and manager are refused on purpose. */
@@ -279,11 +347,15 @@ export function ticketReplyAlert(t: TicketLike, now: Date): 'breached' | 'warnin
 // ---- Audit ------------------------------------------------------------------
 
 /** Tool arguments for the audit log: long text cut, at most 20 fields. */
+/** Argument names whose values never go into the audit log. */
+export const SENSITIVE_ARG = /salary|iban|passport|emirates|national_id|labour_card|bank_routing/i
+
 export function auditArgs(args: unknown): Record<string, unknown> {
   if (!args || typeof args !== 'object' || Array.isArray(args)) return {}
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(args as Record<string, unknown>).slice(0, 20)) {
-    if (typeof v === 'string') out[k] = v.length > 200 ? v.slice(0, 200) + '…' : v
+    if (SENSITIVE_ARG.test(k) && v != null && v !== '') out[k] = '[hidden]'
+    else if (typeof v === 'string') out[k] = v.length > 200 ? v.slice(0, 200) + '…' : v
     else if (typeof v === 'number' || typeof v === 'boolean' || v === null) out[k] = v
     else out[k] = '[object]'
   }

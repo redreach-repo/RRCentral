@@ -44,6 +44,7 @@ const OPERATION_LABEL: Record<AuditEntry['operation'], string> = {
   UPDATE: 'Updated',
   DELETE: 'Deleted',
   MCP_CALL: 'AI tool call',
+  MCP_WRITE: 'AI change',
 }
 
 const OPERATION_COLOR: Record<AuditEntry['operation'], string> = {
@@ -51,6 +52,7 @@ const OPERATION_COLOR: Record<AuditEntry['operation'], string> = {
   UPDATE: '#d9a441',
   DELETE: '#e5484d',
   MCP_CALL: '#6e8efb',
+  MCP_WRITE: '#b06efb',
 }
 
 const SINCE_OPTIONS: { value: string; label: string; days: number | null }[] = [
@@ -222,7 +224,7 @@ export default function AuditLogPage() {
           if (SINCE_OPTIONS.some((o) => o.value === nextSince)) setSince(nextSince)
           const nextOp = String(f.operation || 'all')
           setOperation(
-            nextOp === 'INSERT' || nextOp === 'UPDATE' || nextOp === 'DELETE' || nextOp === 'MCP_CALL'
+            nextOp === 'INSERT' || nextOp === 'UPDATE' || nextOp === 'DELETE' || nextOp === 'MCP_CALL' || nextOp === 'MCP_WRITE'
               ? nextOp
               : '',
           )
@@ -304,6 +306,7 @@ export default function AuditLogPage() {
           <option value="UPDATE">Updated</option>
           <option value="DELETE">Deleted</option>
           <option value="MCP_CALL">AI tool call</option>
+          <option value="MCP_WRITE">AI change</option>
         </select>
         <input
           style={{ ...inputStyle, maxWidth: 260 }}

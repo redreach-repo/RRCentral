@@ -249,3 +249,65 @@ Deno.test({ name: "an unknown tool is refused", ...opts, fn: () => withFakeDb(as
   const body = await res.json()
   assert(body.error || body.result?.isError, "delete_account does not exist")
 }) })
+
+// ---- Admin scope (tools_admin.ts) --------------------------------------------
+// Every admin tool against a real database: highmast_mcp_admin_db_test.ts.
+
+const ADMIN_MEMBER = { ...MEMBER, key_name: "AI Assistant", role: "admin", scope: "admin", member_name: "AI Assistant", member_email: "ai-assistant@redreach.ae" }
+
+Deno.test("admin tools write only through the audited database functions, never delete, never use the service key", async () => {
+  const src = await read(FN + "tools_admin.ts")
+  assertFalse(/\.delete\(/.test(src), "tools_admin.ts calls .delete(")
+  assertFalse(/\.(insert|update|upsert)\(/.test(src), "tools_admin.ts writes a table directly instead of through rr_mcp_* functions")
+  assertFalse(/SERVICE_ROLE/.test(src))
+  assertFalse(/rr_hr_leave_decide|approved_by|status:\s*"approved"|"paid"/.test(src), "nothing approves leave or payroll or marks payroll paid")
+  assert(/if \(ctx\.key\.scope !== "admin"\) return/.test(src), "admin tools are only registered for admin keys")
+})
+
+Deno.test("the admin tool list is exactly the agreed one and no name approves, pays out or touches secrets", async () => {
+  const { MCP_ADMIN_TOOLS, adminToolNameProblem } = await import(new URL(FN + "highmastMcp.bundle.js", ROOT).href)
+  const { ADMIN_TOOLS } = await import(new URL(FN + "tools_admin.ts", ROOT).href)
+  assertEquals(ADMIN_TOOLS.map((t: { name: string }) => t.name).sort(), [...MCP_ADMIN_TOOLS].sort())
+  for (const n of MCP_ADMIN_TOOLS) assertEquals(adminToolNameProblem(n), null, n)
+  assertEquals(adminToolNameProblem("approve_payroll_run"), 'admin tool "approve_payroll_run" touches "approve"')
+})
+
+Deno.test({ name: "a standard key never sees the admin tools; an admin key sees both sets", ...opts, fn: () => withFakeDb(async () => {
+  const h = await load()
+  resolveRows = [MEMBER]
+  const std = (await (await h(rpc("tools/list", {}, 7))).json()).result.tools.map((t: { name: string }) => t.name).sort()
+  assertEquals(std, EXPECTED_TOOLS)
+  resolveRows = [{ ...ADMIN_MEMBER, scope: "standard" }]
+  const odd = (await (await h(rpc("tools/list", {}, 8))).json()).result.tools.map((t: { name: string }) => t.name).sort()
+  assertEquals(odd, EXPECTED_TOOLS, "an admin role without the admin scope gets the standard tools")
+  resolveRows = [ADMIN_MEMBER]
+  const tools = (await (await h(rpc("tools/list", {}, 9))).json()).result.tools as { name: string; annotations?: { destructiveHint?: boolean } }[]
+  const names = tools.map((t) => t.name)
+  for (const n of EXPECTED_TOOLS) assert(names.includes(n), `admin key keeps ${n}`)
+  for (const n of ["create_quote", "record_payment", "create_credit_note", "delete_record", "restore_record", "create_payroll_run", "list_users"]) {
+    assert(names.includes(n), `admin key has ${n}`)
+  }
+  assertFalse(names.some((n) => /approve|pay_run|payout|setting|secret|password/.test(n)))
+  for (const t of tools) assertEquals(t.annotations?.destructiveHint, false, `${t.name}: nothing is erased`)
+}) })
+
+Deno.test({ name: "an admin write goes through rr_mcp_save as the AI Assistant, and sensitive arguments are hidden in the call log", ...opts, fn: () => withFakeDb(async () => {
+  const h = await load()
+  resolveRows = [ADMIN_MEMBER]
+  const res = await h(rpc("tools/call", {
+    name: "update_employee",
+    arguments: { employee_id: "55555555-5555-4555-8555-555555555555", job_title: "Designer", iban: "AE070331234567890123456", basic_salary_aed: 9000 },
+  }, 10))
+  assertEquals(res.status, 200)
+  const save = calls.find((c) => c.url.pathname === "/rest/v1/rpc/rr_mcp_save")
+  assert(save, "the write went through rr_mcp_save")
+  const sent = JSON.parse(save!.body)
+  assertEquals(sent.p_table, "hr_employees")
+  assertEquals(sent.p_data.job_title, "Designer")
+  const claims = decodeJwt((save!.headers.get("Authorization") || "").replace(/^Bearer /, ""))
+  assertEquals(claims.sub, ADMIN_MEMBER.auth_user_id)
+  const log = JSON.parse(calls.find((c) => c.url.pathname === "/rest/v1/rpc/rr_mcp_log_call")!.body)
+  assertEquals(log.p_args.iban, "[hidden]")
+  assertEquals(log.p_args.basic_salary_aed, "[hidden]")
+  assert(calls.every((c) => c.method !== "DELETE" && c.method !== "PATCH"), "no direct table writes")
+}) })
