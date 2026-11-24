@@ -85,7 +85,7 @@ export default function ClientPoStaffPanel(props: {
     if (!poId) return
     const item = itemForLine(line.description, UNIFORM_ITEMS)
     const rows = people
-      .map((p) => ({ p, n: Math.round(Number(take[p.id]) || 0) }))
+      .map((p) => ({ p, n: Math.round(Number(take[p.id]) || 0) })) // money-guard: not money (pairs)
       .filter(({ n }) => n > 0)
       .map(({ p, n }) => ({
         staff_id: p.id,
@@ -155,7 +155,7 @@ export default function ClientPoStaffPanel(props: {
           const item = itemForLine(l.description, UNIFORM_ITEMS)
           const isOpen = open === lineId
           const canIssue = Boolean(poId && lineId && props.savedLineIds.has(lineId) && props.poLinked)
-          const takeTotal = people.reduce((s, p) => s + (Math.round(Number(take[p.id]) || 0)), 0)
+          const takeTotal = people.reduce((s, p) => s + (Math.round(Number(take[p.id]) || 0)), 0) // money-guard: not money (pairs)
           return (
             <div key={lineId || i} style={{ borderTop: i ? `1px solid ${colors.border}` : undefined, paddingTop: i ? 8 : 0, display: 'grid', gap: 6 }}>
               <button

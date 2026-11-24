@@ -4,6 +4,7 @@
  * client_po_drawdowns (one row per invoice per PO line); cancelled invoices
  * do not count.
  */
+import { decMul, money, toNumber } from './money/index'
 import type { PoLineItem } from './clientPoReader'
 import type { UniformIssue, UniformSizeField, UniformStaff } from './clientUniforms/clientUniforms'
 
@@ -237,7 +238,8 @@ export function lineAmount(quantity: number | null | undefined, unitPrice: numbe
   const qn = Number(quantity)
   const pn = Number(unitPrice)
   if (quantity == null || unitPrice == null || !Number.isFinite(qn) || !Number.isFinite(pn)) return null
-  return Math.round(qn * pn * 100) / 100 // money-guard: line total shown for checking, saved as typed
+  // Exact decimal product, rounded to 2 places (float qn * pn gets 1.005-style cases wrong).
+  return toNumber(money(decMul(qn, pn), 'AED'))
 }
 
 function nameKey(s: string | null | undefined): string {
