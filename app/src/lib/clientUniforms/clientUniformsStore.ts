@@ -121,7 +121,7 @@ export async function addPoUniformIssues(
 ): Promise<void> {
   const clean = rows
     .filter((r) => r.staff_id && Number(r.quantity) > 0)
-    .map((r) => ({ ...r, item: r.item.trim() || 'Uniform', size: r.size.trim(), quantity: Math.round(Number(r.quantity)), notes: (r.notes || '').trim() }))
+    .map((r) => ({ ...r, item: r.item.trim() || 'Uniform', size: r.size.trim(), quantity: Math.round(Number(r.quantity)), notes: (r.notes || '').trim() })) // money-guard: not money (pairs)
   for (let i = 0; i < clean.length; i += 200) {
     const { error } = await db.from('client_uniform_issues').insert(clean.slice(i, i + 200))
     if (error) throw error
