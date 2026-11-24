@@ -742,3 +742,18 @@ Enter alone never sends.
 **If it fails.** "Not an email address: …" lists what to fix. "You have sent 20 emails in 10 minutes" is the safety
 limit. "Zoho did not send the email: …" passes on Zoho's own reason (for example a sending limit on the Zoho plan).
 
+## 43. AI suggestions to approve (Get suggestions, AI approvals)
+
+**Trigger.** Deploy `hm-ai-propose` (Actions > Deploy Edge Functions). It uses the same `ANTHROPIC_API_KEY` as AI help,
+so Anthropic credit must be topped up. Open a test account you can edit, press **Get suggestions**, keep the default
+instruction and wait for "Asking AI…" to finish.
+
+**You should see.** One to a few suggestions (a timeline note or a safe field update) marked pending; nothing on the
+account has changed yet. Open **AI approvals**: the same suggestions are listed. **Approve** one and it is applied as
+you (timeline note added or field changed); **Reject** another and it stays out. System check shows `hm-ai-propose`
+green.
+
+**If it fails.** "Could not ask AI" with a credit or billing message: top up Anthropic credit. "Has the AI approval
+queue SQL been run?": run `20261223090000_ai_approval_queue` (it was in the 21 Nov go-live SQL). System check red with
+ANTHROPIC_API_KEY: add the secret.
+

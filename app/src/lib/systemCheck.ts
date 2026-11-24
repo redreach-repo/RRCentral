@@ -17,6 +17,7 @@ export type SystemFunction = {
 
 export const SYSTEM_FUNCTIONS: SystemFunction[] = [
   { name: 'ai-assist', feature: 'AI help on accounts', liveTest: '1' },
+  { name: 'hm-ai-propose', feature: 'AI suggestions on an account, to approve under AI approvals', liveTest: '43' },
   { name: 'usage-import', feature: 'WhatsApp and AI usage import', liveTest: '2' },
   { name: 'whatsapp-in', feature: 'WhatsApp messages into tickets', liveTest: '3' },
   { name: 'whatsapp-send', feature: 'WhatsApp replies from tickets', liveTest: '4' },

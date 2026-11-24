@@ -50,6 +50,7 @@ on:
           - client-po-file
           - mail-inbox
           - highmast-mcp
+          - hm-ai-propose
           - other
       other_function:
         description: "Only when Function is 'other': the folder name under supabase/functions (gap plan modules, docs/MODULE_BUILD_PLAN.md)"
