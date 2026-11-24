@@ -6,6 +6,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
 import { withErrorLog } from "../_shared/functionHealth.ts"
+import { serviceRoleKey } from "../_shared/supabaseKeys.ts"
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -44,7 +45,7 @@ Deno.serve(withErrorLog("fireflies-webhook", async (req) => {
   if (!expected || provided !== expected) return json({ error: "forbidden" }, 403)
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+  const serviceKey = serviceRoleKey() || ""
   if (!supabaseUrl || !serviceKey) return json({ error: "server_misconfigured" }, 500)
   const sb = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 

@@ -12,6 +12,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import Stripe from "npm:stripe@22"
 import { buildCheckoutSessionParams, parseCheckoutRequest } from "./checkout.bundle.js"
 import { withErrorLog } from "../_shared/functionHealth.ts"
+import { publicApiKey } from "../_shared/supabaseKeys.ts"
 
 const DEFAULT_ORIGINS = [
   "https://redreach-repo.github.io",
@@ -40,7 +41,7 @@ function corsHeaders(req: Request): Record<string, string> {
 
 /** The project's public (anon or publishable) key; CHECKOUT_PUBLIC_KEYS adds more, comma separated. */
 function shopKeyOk(provided: string): boolean {
-  const keys = [Deno.env.get("SUPABASE_ANON_KEY") || "", ...(Deno.env.get("CHECKOUT_PUBLIC_KEYS") || "").split(",")]
+  const keys = [publicApiKey() || "", ...(Deno.env.get("CHECKOUT_PUBLIC_KEYS") || "").split(",")]
     .map((k) => k.trim())
     .filter(Boolean)
   return provided !== "" && keys.includes(provided.trim())

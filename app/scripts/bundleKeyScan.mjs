@@ -7,6 +7,8 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
 const JWT_RE = /eyJ[A-Za-z0-9_-]{8,}\.(eyJ[A-Za-z0-9_-]{8,})\.[A-Za-z0-9_-]*/g
+// New-style secret keys are opaque (not JWTs) but bypass RLS just the same.
+const SECRET_KEY_RE = /sb_secret_[A-Za-z0-9_-]{8,}/
 const TEXT_EXT = /\.(js|mjs|cjs|html|json|css|map|txt|webmanifest|xml)$/i
 
 /** `role` claim of a JWT payload segment, or null if it is not a JWT. */
@@ -39,12 +41,13 @@ function* walk(dir) {
   }
 }
 
-/** Files under `dir` that contain a service_role JWT, relative to `dir`. */
+/** Files under `dir` that contain a service_role JWT or an sb_secret_ key, relative to `dir`. */
 export function findServiceRoleKeys(dir) {
   const hits = []
   for (const path of walk(dir)) {
     if (!TEXT_EXT.test(path)) continue
-    if (jwtRolesInText(readFileSync(path, 'utf8')).includes('service_role')) {
+    const text = readFileSync(path, 'utf8')
+    if (jwtRolesInText(text).includes('service_role') || SECRET_KEY_RE.test(text)) {
       hits.push(relative(dir, path))
     }
   }

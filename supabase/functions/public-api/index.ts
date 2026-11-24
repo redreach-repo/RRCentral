@@ -16,6 +16,7 @@ import { isDemoEnv } from "../_shared/demoGuard.ts"
 import { withErrorLog } from "../_shared/functionHealth.ts"
 import { withSecurityHeaders } from "../_shared/securityHeaders.ts"
 import { rateLimitAllow } from "../_shared/rateLimit.ts"
+import { serviceRoleKey } from "../_shared/supabaseKeys.ts"
 
 const cors = withSecurityHeaders({
   "Access-Control-Allow-Origin": "*",
@@ -360,7 +361,7 @@ Deno.serve(withErrorLog("public-api", async (req) => {
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+  const serviceKey = serviceRoleKey() || ""
   if (!supabaseUrl || !serviceKey) {
     return json({ error: "server_misconfigured" }, 500)
   }

@@ -1,5 +1,5 @@
 import { itemCount, type CartLine } from './cart'
-import { getSupabaseRuntimeConfig } from '../lib/supabaseConfig'
+import { getSupabaseRuntimeConfig, supabaseRequestHeaders } from '../lib/supabaseConfig'
 
 export function shopPath(path = ''): string {
   const base = import.meta.env.BASE_URL.replace(/\/$/, '')
@@ -25,7 +25,7 @@ export function checkoutTarget(): CheckoutTarget | null {
   if (cfg.source !== 'env') return null
   return {
     url: `${cfg.url.replace(/\/$/, '')}/functions/v1/create-checkout-session`,
-    headers: { apikey: cfg.anonKey, Authorization: `Bearer ${cfg.anonKey}` },
+    headers: supabaseRequestHeaders(cfg.anonKey),
   }
 }
 

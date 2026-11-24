@@ -60,6 +60,7 @@ import {
   ZOHO_MAIL_SCOPES,
 } from "./mailbox.ts"
 import { openToken, sealToken, tokenKeyProblem } from "./tokenBox.ts"
+import { serviceRoleKey, publicApiKey } from "../_shared/supabaseKeys.ts"
 
 const DEFAULT_ORIGINS = [
   "https://redreach-repo.github.io",
@@ -357,8 +358,8 @@ Deno.serve(withErrorLog("mail-inbox", async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors })
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || ""
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+  const anonKey = publicApiKey() || ""
+  const serviceKey = serviceRoleKey() || ""
   if (!supabaseUrl || !anonKey || !serviceKey) return json({ error: "Server misconfigured" }, 500)
   const app = zohoApp()
   const redirectUri = `${supabaseUrl.replace(/\/$/, "")}/functions/v1/mail-inbox`

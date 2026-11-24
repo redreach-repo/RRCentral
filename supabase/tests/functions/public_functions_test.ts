@@ -48,6 +48,10 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "hm-ai-gateway": { kind: "signed in staff JWT", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_staff/ },
   "fireflies-webhook": { kind: "shared secret", pattern: /FIREFLIES_WEBHOOK_SECRET[\s\S]*x-fireflies-secret[\s\S]*provided !== expected/ },
   "highmast-mcp": { kind: "hashed AI connector key (Authorization: Bearer hmk_...)", pattern: /bearerToken\(req\.headers\.get\("Authorization"\)\)[\s\S]*isMcpKeyShape\(apiKey\)[\s\S]*resolveKey\(apiKey\)[\s\S]*if \(!who\.ok\)/ },
+  "hm-ai-propose": { kind: "signed in user (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)/ },
+  "payment-reminder": { kind: "signed in admin, manager or sales (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_staff/ },
+  "worshiphub-read": { kind: "team member JWT", pattern: /if \(!authHeader[\s\S]*rr_is_member[\s\S]*member !== true/ },
+  "worshiphub-manage": { kind: "admin JWT", pattern: /if \(!authHeader[\s\S]*rr_is_admin[\s\S]*isAdmin !== true/ },
   "hm-provision-workspace": { kind: "provision secret or admin JWT", pattern: /WORKSPACE_PROVISION_SECRET[\s\S]*x-provision-secret[\s\S]*rr_is_admin/ },
 }
 

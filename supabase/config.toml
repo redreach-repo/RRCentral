@@ -114,3 +114,18 @@ verify_jwt = false
 
 [functions.hm-provision-workspace]
 verify_jwt = false
+
+# Ready for Supabase JWT signing keys (key rotation, docs/KEY_ROTATION.md):
+# the gateway's verify_jwt only understands the legacy JWT secret, so these
+# signed-in-user functions check the caller in code instead.
+[functions.hm-ai-propose]
+verify_jwt = false
+
+[functions.payment-reminder]
+verify_jwt = false
+
+[functions.worshiphub-read]
+verify_jwt = false
+
+[functions.worshiphub-manage]
+verify_jwt = false

@@ -12,6 +12,7 @@
 //
 // The service role key is never used here.
 import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2"
+import { keyHeaders, publicApiKey } from "../_shared/supabaseKeys.ts"
 
 export type McpKey = {
   keyId: string
@@ -48,9 +49,13 @@ function b64url(bytes: Uint8Array): string {
 
 const b64urlText = (text: string) => b64url(new TextEncoder().encode(text))
 
-/** HS256 JWT, the same kind Supabase Auth issues with the project's JWT secret. */
-export async function signJwt(claims: Record<string, unknown>, secret: string): Promise<string> {
-  const head = b64urlText(JSON.stringify({ alg: "HS256", typ: "JWT" }))
+/**
+ * HS256 JWT, the same kind Supabase Auth issues with the project's JWT secret.
+ * With JWT signing keys, MCP_JWT_SECRET is a "shared secret (HS256)" signing
+ * key and `kid` (MCP_JWT_KID, optional) is that key's id.
+ */
+export async function signJwt(claims: Record<string, unknown>, secret: string, kid?: string): Promise<string> {
+  const head = b64urlText(JSON.stringify(kid ? { alg: "HS256", typ: "JWT", kid } : { alg: "HS256", typ: "JWT" }))
   const body = b64urlText(JSON.stringify(claims))
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
   const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${head}.${body}`)))
@@ -91,7 +96,7 @@ type ResolveRow = {
 /** Checks the key with the database (public key only) and counts the call. */
 export async function resolveKey(rawKey: string, fetcher: typeof fetch = fetch): Promise<ResolveResult> {
   const url = env("SUPABASE_URL").replace(/\/$/, "")
-  const anon = env("SUPABASE_ANON_KEY")
+  const anon = publicApiKey((n) => env(n)) || ""
   if (!url || !anon || !env("MCP_JWT_SECRET")) {
     return { ok: false, status: 503, error: "The HighMast connector is not set up yet (MCP_JWT_SECRET missing)." }
   }
@@ -100,7 +105,7 @@ export async function resolveKey(rawKey: string, fetcher: typeof fetch = fetch):
   try {
     const res = await fetcher(`${url}/rest/v1/rpc/rr_mcp_resolve_key`, {
       method: "POST",
-      headers: { apikey: anon, Authorization: `Bearer ${anon}`, "Content-Type": "application/json" },
+      headers: { ...keyHeaders(anon), "Content-Type": "application/json" },
       body: JSON.stringify({ p_key_hash: hash }),
       signal: AbortSignal.timeout(8_000),
     })
@@ -139,8 +144,8 @@ export async function resolveKey(rawKey: string, fetcher: typeof fetch = fetch):
 
 /** A database client that acts as the key's member (RLS applies). Never the service role. */
 export async function memberClient(key: McpKey): Promise<SupabaseClient> {
-  const token = await signJwt(sessionClaims(key), env("MCP_JWT_SECRET"))
-  return createClient(env("SUPABASE_URL"), env("SUPABASE_ANON_KEY"), {
+  const token = await signJwt(sessionClaims(key), env("MCP_JWT_SECRET"), env("MCP_JWT_KID") || undefined)
+  return createClient(env("SUPABASE_URL"), publicApiKey((n) => env(n)) || "", {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     global: { headers: { Authorization: `Bearer ${token}` } },
   })

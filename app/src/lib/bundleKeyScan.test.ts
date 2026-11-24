@@ -30,4 +30,12 @@ describe('bundle service_role scan', () => {
     writeFileSync(join(dir, 'assets', 'chunk.js'), `y("${fakeJwt('service_role')}")`)
     expect(findServiceRoleKeys(dir)).toEqual([join('assets', 'chunk.js')])
   })
+
+  it('flags a new-style secret key and passes a publishable one', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'rr-scan-'))
+    writeFileSync(join(dir, 'a.js'), 'k("sb_publishable_abcdefghijkl")')
+    expect(findServiceRoleKeys(dir)).toEqual([])
+    writeFileSync(join(dir, 'b.js'), 'k("sb_secret_abcdefghijkl")')
+    expect(findServiceRoleKeys(dir)).toEqual(['b.js'])
+  })
 })

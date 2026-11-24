@@ -5,6 +5,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
 import { withErrorLog } from "../_shared/functionHealth.ts"
+import { serviceRoleKey } from "../_shared/supabaseKeys.ts"
 
 const ADMIN_EMAIL = "info@redreach.ae"
 const ADMIN_NAME = "Red Reach"
@@ -44,7 +45,7 @@ function json(status: number, body: unknown, cors: Record<string, string>) {
 
 function adminClient() {
   const url = Deno.env.get("SUPABASE_URL")
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+  const key = serviceRoleKey()
   if (!url || !key) throw new Error("Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY")
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
 }

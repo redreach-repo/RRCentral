@@ -25,6 +25,7 @@ import {
   sendM365Mail,
   upsertM365Event,
 } from "../_shared/m365MailCalendar.ts"
+import { serviceRoleKey, publicApiKey } from "../_shared/supabaseKeys.ts"
 
 const DEFAULT_ORIGINS = [
   "https://redreach-repo.github.io",
@@ -88,8 +89,8 @@ Deno.serve(withErrorLog("m365-mail-calendar", async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors })
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || ""
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+  const anonKey = publicApiKey() || ""
+  const serviceKey = serviceRoleKey() || ""
   if (!supabaseUrl || !anonKey || !serviceKey) return json({ error: "Server misconfigured" }, 500)
   const app = m365App()
   const redirectUri = `${supabaseUrl.replace(/\/$/, "")}/functions/v1/m365-mail-calendar`

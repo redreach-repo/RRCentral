@@ -13,6 +13,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
 import { sanitiseTenants } from "./worshiphub.bundle.js"
 import { withErrorLog } from "../_shared/functionHealth.ts"
+import { publicApiKey } from "../_shared/supabaseKeys.ts"
 
 const DEFAULT_ORIGINS = [
   "https://redreach-repo.github.io",
@@ -44,7 +45,7 @@ Deno.serve(withErrorLog("worshiphub-read", async (req) => {
   // Act as the signed in user so RLS decides which churches they may see.
   const authHeader = req.headers.get("Authorization") || ""
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || ""
+  const anonKey = publicApiKey() || ""
   if (!authHeader || !supabaseUrl || !anonKey) return json({ error: "Sign in to RR Central first" }, 401)
   const userDb = createClient(supabaseUrl, anonKey, {
     auth: { persistSession: false },
