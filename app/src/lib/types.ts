@@ -204,6 +204,10 @@ export interface Quotation {
   division_code: string
   base_reference: string
   revision: number
+  /** The quote this revision was made from (Revise / Extend validity). Null for ordinary quotes. */
+  revised_from?: string | null
+  /** Why the revision was made (required for Extend validity). */
+  revision_reason?: string
   /**
    * Shared deal key. Sibling “branch” quotes keep the same deal_ref so one
    * supplier invoice can cover several customer quotes (partial delivery).

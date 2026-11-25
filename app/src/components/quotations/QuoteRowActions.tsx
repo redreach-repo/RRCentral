@@ -2,10 +2,12 @@ import { Link } from 'react-router-dom'
 import {
   ChevronDown,
   ChevronUp,
+  CalendarClock,
   Copy,
   ExternalLink,
   FileUp,
   GitBranch,
+  MessageSquareText,
   Pencil,
   Receipt,
   RotateCcw,
@@ -26,6 +28,10 @@ export type QuoteRowActionsProps = {
   onFinalize: (q: Quotation) => void
   onUndoFinalize: (q: Quotation) => void
   onRevise: (q: Quotation) => void
+  /** Same quote with a later valid-until date, in one step. */
+  onExtend?: (q: Quotation) => void
+  /** Notes, revisions and the linked deal (works in every status). */
+  onNotes?: (q: Quotation) => void
   onOutcome: (q: Quotation) => void
   onInvoice: (q: Quotation) => void
   onDeliveryNote: (q: Quotation) => void
@@ -49,6 +55,8 @@ export default function QuoteRowActions({
   onFinalize,
   onUndoFinalize,
   onRevise,
+  onExtend,
+  onNotes,
   onOutcome,
   onInvoice,
   onDeliveryNote,
@@ -61,6 +69,9 @@ export default function QuoteRowActions({
   const canBranch = Boolean(q.reference_number || q.deal_ref) && q.status !== 'Superseded'
   const canOutcome = ['Finalized', 'Sent', 'Accepted', 'Awarded'].includes(q.status)
   const canDn = canCreateDeliveryNoteFromQuote(q)
+  // Revise / Extend: Finalized, Sent or Expired. A revision never goes back to Draft.
+  const canRevise = ['Finalized', 'Sent', 'Expired'].includes(q.status) && Boolean(q.reference_number)
+  const isRevision = Boolean((q as Quotation & { revised_from?: string | null }).revised_from)
 
   if (!expanded) {
     return (
@@ -96,25 +107,35 @@ export default function QuoteRowActions({
           Finalize
         </button>
       ) : null}
-      {q.status === 'Finalized' ? (
-        <>
-          <button
-            type="button"
-            className={styles.primary}
-            disabled={saving}
-            onClick={() => onRevise(q)}
-          >
-            Revise
-          </button>
-          <button
-            type="button"
-            className={styles.btn}
-            disabled={saving}
-            onClick={() => onUndoFinalize(q)}
-          >
-            <RotateCcw size={13} /> Undo
-          </button>
-        </>
+      {canRevise ? (
+        <button
+          type="button"
+          className={styles.primary}
+          disabled={saving}
+          onClick={() => onRevise(q)}
+        >
+          Revise
+        </button>
+      ) : null}
+      {canRevise && onExtend ? (
+        <button type="button" className={styles.btn} disabled={saving} onClick={() => onExtend(q)}>
+          <CalendarClock size={13} /> Extend validity
+        </button>
+      ) : null}
+      {q.status === 'Finalized' && !isRevision ? (
+        <button
+          type="button"
+          className={styles.btn}
+          disabled={saving}
+          onClick={() => onUndoFinalize(q)}
+        >
+          <RotateCcw size={13} /> Undo
+        </button>
+      ) : null}
+      {onNotes ? (
+        <button type="button" className={styles.btn} onClick={() => onNotes(q)}>
+          <MessageSquareText size={13} /> Notes
+        </button>
       ) : null}
       {q.status === 'Awarded' && q.reference_number ? (
         <button type="button" className={styles.primary} onClick={() => onInvoice(q)}>

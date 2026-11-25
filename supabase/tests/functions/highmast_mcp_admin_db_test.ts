@@ -98,11 +98,22 @@ class Query implements PromiseLike<Res> {
   limit(n: number) { this.lim = n; return this }
   maybeSingle() { this.one = "maybe"; return this }
   single() { this.one = "single"; return this }
+  private ins: Row | null = null
+  insert(row: Row) { this.ins = row; return this }
   then<A, B>(ok?: ((v: Res) => A | PromiseLike<A>) | null, bad?: ((e: unknown) => B | PromiseLike<B>) | null) {
     return this.exec().then(ok, bad)
   }
   private async exec(): Promise<Res> {
     const cols = this.cols === "*" ? "*" : this.cols.split(",").map((c) => ident(c.trim())).join(", ")
+    if (this.ins) {
+      const keys = Object.keys(this.ins)
+      const res = await this.db.run(
+        `with t as (insert into public.${ident(this.table)} (${keys.map(ident).join(", ")}) values (${keys.map((k) => lit(this.ins![k])).join(", ")}) returning ${cols})
+         select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) as out from t`,
+      )
+      if (res.error || !this.one) return res
+      return { data: (res.data as Row[])[0] ?? null, error: null }
+    }
     const inner = `select ${cols} from public.${ident(this.table)}` +
       (this.where.length ? ` where ${this.where.join(" and ")}` : "") +
       (this.orders.length ? ` order by ${this.orders.join(", ")}` : "") +
@@ -268,6 +279,34 @@ Deno.test({
         const invoiceId = String(conv.invoice_id)
         assertEquals(conv.invoice_number, fin.quote_number)
         assertEquals((conv.totals as Row).total, 315)
+
+        // Revise and extend a sent quote (fix 2): the Green Cement case, on a second quote.
+        const g = await call("create_quote", { client: "Green Cement", lines: [{ description: "Coverall", quantity: 100, unit_price: 60, unit_cost: 35 }] })
+        const gId = String(g.quote_id)
+        const gFin = await call("finalize_quote", { quote_id: gId })
+        await call("mark_quote_sent", { quote_id: gId })
+        const gNo = String(gFin.quote_number)
+        const note = await call("add_quote_note", { reference: gNo, note: "Meeting: buyer needs two more weeks" })
+        assertEquals((note.recent_notes as Row[]).length, 1)
+        const later = new Date(Date.parse(String(gFin.valid_until)) + 14 * 86_400_000).toISOString().slice(0, 10)
+        await refused("extend_quote_validity", { reference: gNo, valid_until: String(gFin.valid_until), reason: "same date" }, /after the current/)
+        const ext = await call("extend_quote_validity", { reference: gNo, valid_until: later, reason: "Agreed in the meeting" })
+        assertEquals(ext.quote_number, `${gNo}-R1`)
+        assertEquals(ext.status, "Sent")
+        assertEquals(ext.valid_until, later)
+        assertEquals((ext.superseded as Row[]).map((x) => x.reference), [gNo])
+        const old = await call("get_quote", { quote_id: gId })
+        assertEquals((old.quote as Row).status, "Superseded")
+        assertEquals(Number((old.quote as Row).amount), 6300)
+        assert((old.notes as Row[]).some((n) => n.kind === "extended"), "the notes of the chain show on the old quote")
+        const rev = await call("revise_quote", { quote_id: String(ext.quote_id), reason: "New prices" })
+        assertEquals(rev.quote_number, `${gNo}-R2`)
+        assertEquals(rev.status, "Draft")
+        await refused("revise_quote", { quote_id: String(ext.quote_id) }, /already open as a draft/)
+        await call("update_quote", { quote_id: String(rev.quote_id), lines: [{ description: "Coverall", quantity: 100, unit_price: 55 }] })
+        const revFin = await call("finalize_quote", { quote_id: String(rev.quote_id) })
+        assertEquals(revFin.quote_number, `${gNo}-R2`)
+        assertEquals((revFin.superseded as Row[]).map((x) => x.reference).sort(), [gNo, `${gNo}-R1`].sort())
 
         // Sent invoice is locked; payments, reversal, credit note
         await refused("update_invoice", { invoice_id: invoiceId, notes: "x" }, /cannot be edited/)
