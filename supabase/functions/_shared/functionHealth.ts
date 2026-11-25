@@ -10,6 +10,7 @@ import { installDemoGuard } from "./demoGuard.ts"
 import { scrubText } from "./scrub.ts"
 import { sendToSentry } from "./sentry.ts"
 import { logEdge, requestIdFor } from "./structuredLog.ts"
+import { keyHeaders, publicApiKey, serviceRoleKey, supabaseKeyKind } from "./supabaseKeys.ts"
 
 type Handler = (req: Request) => Response | Promise<Response>
 
@@ -54,12 +55,12 @@ export function missingSecrets(secrets: string[] = []): string[] {
 /** Save one failure to app_errors with the service key. Never throws. */
 export async function logFunctionError(fn: string, message: string, detail = ""): Promise<void> {
   const url = env("SUPABASE_URL")
-  const key = env("SUPABASE_SERVICE_ROLE_KEY")
+  const key = serviceRoleKey((n) => env(n)) || ""
   if (!url || !key) return
   try {
     const res = await fetch(`${url.replace(/\/$/, "")}/rest/v1/app_errors`, {
       method: "POST",
-      headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+      headers: { ...keyHeaders(key), "Content-Type": "application/json", Prefer: "return=minimal" },
       body: JSON.stringify({
         kind: "function",
         message: scrubText(message || `${fn} failed`).slice(0, 1000),
@@ -87,7 +88,7 @@ export async function logFunctionError(fn: string, message: string, detail = "")
 async function callerIsAdmin(req: Request): Promise<boolean> {
   const auth = req.headers.get("Authorization") || ""
   const url = env("SUPABASE_URL")
-  const anon = env("SUPABASE_ANON_KEY")
+  const anon = publicApiKey((n) => env(n)) || ""
   if (!/^Bearer\s+\S+/i.test(auth) || !url || !anon) return false
   try {
     const res = await fetch(`${url.replace(/\/$/, "")}/rest/v1/rpc/rr_is_admin`, {
@@ -106,7 +107,11 @@ async function callerIsAdmin(req: Request): Promise<boolean> {
 async function ping(req: Request, fn: string, opts: HealthOptions): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors(req) })
   const body: Record<string, unknown> = { ok: true, function: fn, ping: true }
-  if (await callerIsAdmin(req)) body.missing = missingSecrets(opts.secrets)
+  if (await callerIsAdmin(req)) {
+    body.missing = missingSecrets(opts.secrets)
+    // Which Supabase keys this deploy runs on, so the old ones can be switched off safely.
+    body.keys = supabaseKeyKind((n) => env(n))
+  }
   return json(req, body)
 }
 

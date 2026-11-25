@@ -16,6 +16,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
 import { addWorkingHours, calendarFromSettings, slaHoursFor } from './sla.bundle.js'
 import { withErrorLog } from "../_shared/functionHealth.ts"
+import { serviceRoleKey } from "../_shared/supabaseKeys.ts"
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -76,7 +77,7 @@ Deno.serve(withErrorLog("support-email-in", async (req) => {
   if (provided !== expected) return json({ error: 'Unauthorized' }, 401)
 
   const url = Deno.env.get('SUPABASE_URL')
-  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  const key = serviceRoleKey()
   if (!url || !key) return json({ error: 'Server misconfigured' }, 500)
 
   const raw = (await req.json().catch(() => null)) as Record<string, unknown> | null

@@ -26,6 +26,7 @@ import { assistantLabel, bearerToken, departmentsLabel, isMcpKeyShape } from "./
 import { registerTools, type Reach } from "./tools.ts"
 import { registerAdminTools } from "./tools_admin.ts"
 import { httpRenderer, registerPdfTools, setPdfRenderer } from "./tools_pdf.ts"
+import { publicApiKey } from "../_shared/supabaseKeys.ts"
 
 export const SERVER_NAME = "highmast"
 export const SERVER_VERSION = "1.0.0"
@@ -36,7 +37,7 @@ const RENDER_PDF_URL = (Deno.env.get("RENDER_PDF_URL") || "").trim()
 if (/^https:\/\//.test(RENDER_PDF_URL)) {
   setPdfRenderer(httpRenderer(RENDER_PDF_URL, {
     jwtSecret: Deno.env.get("MCP_JWT_SECRET") || "",
-    anonKey: Deno.env.get("SUPABASE_ANON_KEY") || "",
+    anonKey: publicApiKey() || "",
   }))
 }
 

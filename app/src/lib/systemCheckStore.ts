@@ -8,7 +8,7 @@ import {
   type OutboxHealth,
 } from './eventOutboxWorker'
 import { parseHubSpotNudge } from './hubspotSync'
-import { getSupabaseClient, getSupabaseRuntimeConfig } from './supabaseConfig'
+import { getSupabaseClient, getSupabaseRuntimeConfig, supabaseRequestHeaders } from './supabaseConfig'
 import { checkFunction, lastFunctionErrors, readPing, SYSTEM_FUNCTIONS, type FunctionCheck, type PingResult } from './systemCheck'
 
 /** Ping one function. The wrapper answers ?ping=1 without running it. */
@@ -18,7 +18,7 @@ export async function pingFunction(name: string, accessToken: string): Promise<P
   try {
     const res = await fetch(`${cfg.url.replace(/\/$/, '')}/functions/v1/${name}?ping=1`, {
       method: 'POST',
-      headers: { apikey: cfg.anonKey, Authorization: `Bearer ${accessToken || cfg.anonKey}`, 'Content-Type': 'application/json' },
+      headers: { ...supabaseRequestHeaders(cfg.anonKey, accessToken), 'Content-Type': 'application/json' },
       body: '{}',
       signal: AbortSignal.timeout(20_000),
     })

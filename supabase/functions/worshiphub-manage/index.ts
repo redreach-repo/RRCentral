@@ -13,6 +13,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
 import { withErrorLog } from "../_shared/functionHealth.ts"
+import { serviceRoleKey, publicApiKey } from "../_shared/supabaseKeys.ts"
 
 const DEFAULT_ORIGINS = [
   "https://redreach-repo.github.io",
@@ -46,8 +47,8 @@ Deno.serve(withErrorLog("worshiphub-manage", async (req) => {
 
   const authHeader = req.headers.get("Authorization") || ""
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || ""
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+  const anonKey = publicApiKey() || ""
+  const serviceKey = serviceRoleKey() || ""
   if (!authHeader || !supabaseUrl || !anonKey) return json({ error: "Sign in to RR Central first" }, 401)
   const userDb = createClient(supabaseUrl, anonKey, {
     auth: { persistSession: false },

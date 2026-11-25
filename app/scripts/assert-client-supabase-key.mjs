@@ -41,6 +41,17 @@ if (!url || !key) {
   process.exit(1)
 }
 
+if (/^sb_secret_/.test(key)) {
+  console.error(
+    [
+      '[assert-client-supabase-key] VITE_SUPABASE_ANON_KEY is a Supabase secret key (sb_secret_..., bypasses RLS).',
+      'Use the publishable key (sb_publishable_...) from Supabase → Project Settings → API Keys.',
+      'Refusing to build.',
+    ].join('\n'),
+  )
+  process.exit(1)
+}
+
 const role = jwtRole(key)
 if (role === 'service_role') {
   console.error(

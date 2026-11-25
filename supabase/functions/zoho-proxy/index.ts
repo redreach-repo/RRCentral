@@ -3,6 +3,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
 import { withErrorLog } from "../_shared/functionHealth.ts"
+import { serviceRoleKey } from "../_shared/supabaseKeys.ts"
 
 const ALLOWED_HOST_RE =
   /^([a-z0-9-]+\.)*(zoho\.com|zoho\.eu|zoho\.in|zoho\.com\.au|zohoapis\.com|zohoapis\.eu|zohoapis\.in)$/i
@@ -43,7 +44,7 @@ function json(status: number, body: unknown) {
 
 function adminClient() {
   const url = Deno.env.get("SUPABASE_URL")
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+  const key = serviceRoleKey()
   if (!url || !key) throw new Error("Function is missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY")
   return createClient(url, key, { auth: { persistSession: false } })
 }

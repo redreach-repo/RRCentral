@@ -470,3 +470,12 @@ Deno.test({ name: "with the renderer set up, get_quote_pdf has the app render a 
     renderAnswer = () => json({ ok: true, path: "quotes/RR-01-26007.pdf", size_bytes: 48213 })
   }
 }) })
+
+Deno.test("MCP session JWT carries kid only when MCP_JWT_KID is given", async () => {
+  const { signJwt } = await import("../../functions/highmast-mcp/auth.ts")
+  const head = (t: string) => JSON.parse(atob(t.split(".")[0].replace(/-/g, "+").replace(/_/g, "/")))
+  const plain = await signJwt({ sub: "x" }, "secret")
+  const withKid = await signJwt({ sub: "x" }, "secret", "key-1")
+  if (head(plain).kid !== undefined) throw new Error("no kid expected")
+  if (head(withKid).kid !== "key-1" || head(withKid).alg !== "HS256") throw new Error("kid expected")
+})

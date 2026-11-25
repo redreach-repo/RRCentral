@@ -14,7 +14,7 @@
 // META_ACCESS_TOKEN, optional PAYMENT_REMINDER_WHATSAPP_TEMPLATE (default
 // rr_payment_reminder), PAYMENT_REMINDER_WHATSAPP_LANGUAGE (default en),
 // META_GRAPH_VERSION. Email needs no secret.
-// Deploy: Actions > Deploy Edge Functions (verify_jwt stays on; the function
+// Deploy: Actions > Deploy Edge Functions (verify_jwt off in config.toml; the function
 // also checks the role itself). Steps: docs/payment-reminders.md.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
@@ -29,6 +29,7 @@ import {
 } from "./paymentReminder.bundle.js"
 import { withErrorLog } from "../_shared/functionHealth.ts"
 import { zohoMailer } from "../_shared/zohoMail.ts"
+import { serviceRoleKey, publicApiKey } from "../_shared/supabaseKeys.ts"
 
 type Channel = "email" | "whatsapp"
 type Contact = { id: string; name: string; email: string; phone: string; whatsapp: string; is_primary: boolean }
@@ -86,8 +87,8 @@ Deno.serve(withErrorLog("payment-reminder", async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405)
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || ""
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+  const anonKey = publicApiKey() || ""
+  const serviceKey = serviceRoleKey() || ""
   if (!supabaseUrl || !anonKey || !serviceKey) return json({ error: "Server misconfigured" }, 500)
 
   // Only a signed in admin, manager or sales person, as on the reminder list.

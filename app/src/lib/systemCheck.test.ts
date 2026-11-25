@@ -65,4 +65,12 @@ describe('system check access per role', () => {
       expect(can(role, 'system.check')).toBe(allowed)
     })
   }
+
+  it('says which Supabase keys a working function runs on', () => {
+    const fn = SYSTEM_FUNCTIONS[0]
+    const now = new Date('2026-10-25T08:00:00Z')
+    expect(checkFunction(fn, readPing(200, { ping: true, missing: [], keys: 'new' }), null, now).reason).toBe('Working (new keys)')
+    expect(checkFunction(fn, readPing(200, { ping: true, missing: [], keys: 'legacy' }), null, now).reason).toBe('Working (old keys)')
+    expect(checkFunction(fn, readPing(200, { ping: true, missing: [] }), null, now).reason).toContain('deploy again')
+  })
 })

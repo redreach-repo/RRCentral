@@ -4,8 +4,9 @@
 // Tee Tribe env: CRM_SYNC_URL=https://<project>.supabase.co/functions/v1/teetribe-order-sync
 //                CRM_SYNC_SECRET=<shared secret>
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { withErrorLog } from '../_shared/functionHealth.ts'
+import { serviceRoleKey } from "../_shared/supabaseKeys.ts"
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -32,7 +33,7 @@ Deno.serve(withErrorLog('teetribe-order-sync', async (req) => {
   }
 
   const url = Deno.env.get('SUPABASE_URL')
-  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  const key = serviceRoleKey()
   if (!url || !key) {
     return new Response(JSON.stringify({ error: 'Server misconfigured' }), {
       status: 500,

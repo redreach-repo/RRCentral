@@ -27,6 +27,7 @@ import {
   validSignature,
 } from "./whatsappTickets.bundle.js"
 import { withErrorLog } from "../_shared/functionHealth.ts"
+import { serviceRoleKey } from "../_shared/supabaseKeys.ts"
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } })
@@ -61,7 +62,7 @@ Deno.serve(withErrorLog("whatsapp-in", async (req) => {
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+  const serviceKey = serviceRoleKey()
   if (!supabaseUrl || !serviceKey) return json({ error: "Server misconfigured" }, 500)
   const sb = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 

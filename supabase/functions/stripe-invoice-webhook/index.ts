@@ -14,6 +14,7 @@ import Stripe from "npm:stripe@22"
 import { createClient } from "jsr:@supabase/supabase-js@2"
 import { paymentFromSession } from "./invoicePayLink.bundle.js"
 import { withErrorLog } from "../_shared/functionHealth.ts"
+import { serviceRoleKey } from "../_shared/supabaseKeys.ts"
 
 type PayLinkInvoice = {
   id: string
@@ -63,7 +64,7 @@ Deno.serve(withErrorLog("stripe-invoice-webhook", async (req) => {
   if (!invoiceId || session.metadata?.source !== "rr-central") return json({ ok: true, ignored: "not an RR Central invoice" })
 
   const url = Deno.env.get("SUPABASE_URL") || ""
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+  const key = serviceRoleKey() || ""
   if (!url || !key) return json({ error: "Server misconfigured" }, 500)
   const sb = createClient(url, key, { auth: { persistSession: false } })
 

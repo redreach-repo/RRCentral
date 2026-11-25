@@ -27,6 +27,7 @@ import {
   tidyAiText,
 } from "./aiAssist.bundle.js"
 import { withErrorLog } from "../_shared/functionHealth.ts"
+import { serviceRoleKey, publicApiKey } from "../_shared/supabaseKeys.ts"
 
 const DEFAULT_ORIGINS = [
   "https://redreach-repo.github.io",
@@ -58,8 +59,8 @@ Deno.serve(withErrorLog("ai-assist", async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405)
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || ""
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+  const anonKey = publicApiKey() || ""
+  const serviceKey = serviceRoleKey() || ""
   if (!supabaseUrl || !anonKey || !serviceKey) return json({ error: "Server misconfigured" }, 500)
 
   // Verify JWT is off for this function, so check the signed in user here,

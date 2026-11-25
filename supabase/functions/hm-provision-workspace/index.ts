@@ -7,6 +7,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
 import { withErrorLog } from "../_shared/functionHealth.ts"
+import { serviceRoleKey, publicApiKey } from "../_shared/supabaseKeys.ts"
 
 const DEFAULT_ORIGINS = [
   "https://redreach-repo.github.io",
@@ -40,8 +41,8 @@ Deno.serve(withErrorLog("hm-provision-workspace", async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405)
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || ""
+  const serviceKey = serviceRoleKey() || ""
+  const anonKey = publicApiKey() || ""
   if (!supabaseUrl || !serviceKey || !anonKey) return json({ error: "Server misconfigured" }, 500)
 
   const provisionSecret = Deno.env.get("WORKSPACE_PROVISION_SECRET") || ""

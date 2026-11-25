@@ -28,6 +28,7 @@ import {
   whatsappRedirect,
 } from "./leadIntake.bundle.js"
 import { withErrorLog } from "../_shared/functionHealth.ts"
+import { serviceRoleKey } from "../_shared/supabaseKeys.ts"
 
 const DEFAULT_ORIGINS = [
   "https://redreach-repo.github.io",
@@ -76,7 +77,7 @@ Deno.serve(withErrorLog("lead-intake", async (req) => {
   const secret = Deno.env.get("LEAD_INTAKE_SECRET") || ""
   if (!secret) return json({ error: "LEAD_INTAKE_SECRET is not set" }, 503)
   const url = Deno.env.get("SUPABASE_URL")
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+  const key = serviceRoleKey()
   if (!url || !key) return json({ error: "Server misconfigured" }, 500)
   const sb = createClient(url, key, { auth: { persistSession: false } })
 

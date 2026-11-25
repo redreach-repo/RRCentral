@@ -45,6 +45,7 @@ import {
   safeName,
   uploadFile,
 } from "../_shared/googleDrive.ts"
+import { serviceRoleKey, publicApiKey } from "../_shared/supabaseKeys.ts"
 
 const DEFAULT_ORIGINS = [
   "https://redreach-repo.github.io",
@@ -125,8 +126,8 @@ Deno.serve(withErrorLog("client-po-file", async (req) => {
   if (origin && !allowedOrigins().includes(origin)) return json({ error: "Origin not allowed" }, 403)
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || ""
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+  const anonKey = publicApiKey() || ""
+  const serviceKey = serviceRoleKey() || ""
   if (!supabaseUrl || !anonKey || !serviceKey) return json({ error: "Server misconfigured" }, 500)
 
   // Verify JWT is off for this function, so check the signed in user here, before anything else.

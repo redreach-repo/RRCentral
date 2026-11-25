@@ -24,6 +24,7 @@ import {
 } from "./legalDocuments.bundle.js"
 import { withErrorLog } from "../_shared/functionHealth.ts"
 import { driveUploader } from "../_shared/googleDrive.ts"
+import { serviceRoleKey } from "../_shared/supabaseKeys.ts"
 
 const DEFAULT_ORIGINS = [
   "https://redreach-repo.github.io",
@@ -146,7 +147,7 @@ Deno.serve(withErrorLog("legal-sign", async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405)
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+  const serviceKey = serviceRoleKey() || ""
   if (!supabaseUrl || !serviceKey) return json({ error: "Server misconfigured" }, 500)
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>

@@ -31,6 +31,7 @@ import {
 } from "./dailyDigest.bundle.js"
 import { withErrorLog } from "../_shared/functionHealth.ts"
 import { zohoMailer } from "../_shared/zohoMail.ts"
+import { serviceRoleKey, publicApiKey } from "../_shared/supabaseKeys.ts"
 
 // Shapes from app/src/lib/dailyDigest.ts (the bundle is plain JS).
 type Digest = { date: string }
@@ -127,8 +128,8 @@ Deno.serve(withErrorLog("daily-digest", async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405)
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || ""
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+  const anonKey = publicApiKey() || ""
+  const serviceKey = serviceRoleKey() || ""
   if (!supabaseUrl || !anonKey || !serviceKey) return json({ error: "Server misconfigured" }, 500)
 
   // Who is calling: the schedule (shared secret) or a manager or admin.

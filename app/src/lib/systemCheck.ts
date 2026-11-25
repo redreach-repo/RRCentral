@@ -59,6 +59,8 @@ export type PingResult = {
   ping: boolean
   /** Secrets the function reports as not set (admins only). */
   missing: string[]
+  /** Which Supabase API keys the deploy runs on (admins only); '' from an older deploy. */
+  keys: 'new' | 'legacy' | ''
   error: string
 }
 
@@ -75,11 +77,12 @@ const DAY_MS = 24 * 60 * 60 * 1000
 
 /** Read a ping answer into a PingResult. */
 export function readPing(status: number, body: unknown): PingResult {
-  const b = (body && typeof body === 'object' ? body : {}) as { ping?: unknown; missing?: unknown; error?: unknown }
+  const b = (body && typeof body === 'object' ? body : {}) as { ping?: unknown; missing?: unknown; keys?: unknown; error?: unknown }
   return {
     status,
     ping: b.ping === true,
     missing: Array.isArray(b.missing) ? b.missing.filter((m): m is string => typeof m === 'string') : [],
+    keys: b.keys === 'new' || b.keys === 'legacy' ? b.keys : '',
     error: typeof b.error === 'string' ? b.error : '',
   }
 }
@@ -104,7 +107,17 @@ export function checkFunction(fn: SystemFunction, ping: PingResult, lastError: A
   if (lastError && now.getTime() - new Date(lastError.created_at).getTime() < DAY_MS) {
     return { ...base, state: 'amber', reason: 'Failed in the last 24 hours' }
   }
-  return { ...base, state: 'green', reason: 'Working' }
+  return { ...base, state: 'green', reason: workingReason(ping.keys) }
+}
+
+/**
+ * Green rows also say which Supabase keys the function uses, so the old
+ * (legacy) keys are only switched off once every row says "new keys".
+ */
+export function workingReason(keys: PingResult['keys']): string {
+  if (keys === 'new') return 'Working (new keys)'
+  if (keys === 'legacy') return 'Working (old keys)'
+  return 'Working (older deploy, deploy again before switching off the old keys)'
 }
 
 /** Newest function failure per function name. */

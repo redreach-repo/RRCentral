@@ -13,6 +13,7 @@ import {
   type SaasWebhookApply,
 } from "./saasCheckout.bundle.js"
 import { withErrorLog } from "../_shared/functionHealth.ts"
+import { serviceRoleKey } from "../_shared/supabaseKeys.ts"
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -71,7 +72,7 @@ Deno.serve(withErrorLog("saas-billing-webhook", async (req) => {
   }
 
   const url = Deno.env.get("SUPABASE_URL") || ""
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+  const key = serviceRoleKey() || ""
   if (!url || !key) return json({ error: "Server misconfigured" }, 500)
   const sb = createClient(url, key, { auth: { persistSession: false } })
 

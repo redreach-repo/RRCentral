@@ -13,9 +13,9 @@ if (!existsSync(dir)) {
 
 const hits = findServiceRoleKeys(dir)
 if (hits.length) {
-  console.error('::error::A Supabase service_role key is in the built site. It bypasses row level security.')
+  console.error('::error::A Supabase service_role or secret key is in the built site. It bypasses row level security.')
   for (const file of hits) console.error(`  ${file}`)
-  console.error('Set the GitHub secret VITE_SUPABASE_ANON_KEY to the anon key, then rotate service_role (docs/SECURITY.md).')
+  console.error('Set the GitHub secret VITE_SUPABASE_ANON_KEY to the publishable (or anon) key (docs/KEY_ROTATION.md).')
   process.exit(1)
 }
 console.log(`[scan-bundle] No service_role key in ${dir}.`)

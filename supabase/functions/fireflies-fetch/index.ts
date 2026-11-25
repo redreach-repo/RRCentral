@@ -10,6 +10,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
 import { FIREFLIES_GRAPHQL, parseFirefliesId, readTranscript, TRANSCRIPT_QUERY } from "./fireflies.bundle.js"
 import { withErrorLog } from "../_shared/functionHealth.ts"
+import { publicApiKey } from "../_shared/supabaseKeys.ts"
 
 const DEFAULT_ORIGINS = [
   "https://redreach-repo.github.io",
@@ -41,7 +42,7 @@ Deno.serve(withErrorLog("fireflies-fetch", async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405)
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || ""
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || ""
+  const anonKey = publicApiKey() || ""
   if (!supabaseUrl || !anonKey) return json({ error: "Server misconfigured" }, 500)
 
   // Verify JWT is off for this function, so check the signed in user here, before anything else.

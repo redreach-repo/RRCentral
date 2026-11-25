@@ -34,7 +34,8 @@ export function supabaseJwtRole(token: string): string | null {
 
 /** service_role must never be used in the browser — it bypasses RLS. */
 export function isUnsafeBrowserSupabaseKey(key: string): boolean {
-  return supabaseJwtRole(key) === 'service_role'
+  // New-style secret keys (sb_secret_...) bypass RLS just like service_role.
+  return /^sb_secret_/.test(String(key || '').trim()) || supabaseJwtRole(key) === 'service_role'
 }
 
 /** Whether the browser may use this key. service_role is always refused. */
@@ -42,7 +43,7 @@ function acceptClientKey(key: string): boolean {
   if (!key) return false
   if (isUnsafeBrowserSupabaseKey(key)) {
     console.error(
-      '[RRCentral] Refusing a service_role key in the browser (it bypasses RLS). Set VITE_SUPABASE_ANON_KEY to the anon key.',
+      '[RRCentral] Refusing a service_role or secret key in the browser (it bypasses RLS). Set VITE_SUPABASE_ANON_KEY to the publishable (or anon) key.',
     )
     return false
   }
@@ -71,7 +72,7 @@ export function getSupabaseRuntimeConfig(): SupabaseRuntimeConfig {
 export function saveSupabaseRuntimeConfig(url: string, anonKey: string): void {
   const key = clean(anonKey)
   if (isUnsafeBrowserSupabaseKey(key)) {
-    throw new Error('Do not paste the service_role key. Use the anon (public) key from Supabase → API.')
+    throw new Error('Do not paste the service_role or secret key. Use the publishable (or anon) key from Supabase → API Keys.')
   }
   localStorage.setItem(LS_URL, clean(url))
   localStorage.setItem(LS_KEY, key)
@@ -106,4 +107,14 @@ export function getSupabaseClient(): SupabaseClient {
     clientKey = stamp
   }
   return client
+}
+
+/**
+ * Headers for a direct call to Supabase (REST or an Edge Function). The new
+ * publishable key is not a JWT and goes on `apikey` only; a signed-in user's
+ * token (or a legacy anon JWT) goes on Authorization.
+ */
+export function supabaseRequestHeaders(publicKey: string, accessToken?: string): Record<string, string> {
+  const bearer = accessToken || (supabaseJwtRole(publicKey) ? publicKey : '')
+  return bearer ? { apikey: publicKey, Authorization: `Bearer ${bearer}` } : { apikey: publicKey }
 }
