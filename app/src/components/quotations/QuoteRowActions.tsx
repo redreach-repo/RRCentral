@@ -14,6 +14,7 @@ import {
   Trash2,
   Truck,
 } from 'lucide-react'
+import { Workflow } from 'lucide-react'
 import type { Quotation } from '../../lib/types'
 import { canCreateDeliveryNoteFromQuote } from '../../lib/deliveryNotes'
 import styles from '../../styles/rowActions.module.css'
@@ -32,6 +33,8 @@ export type QuoteRowActionsProps = {
   onExtend?: (q: Quotation) => void
   /** Notes, revisions and the linked deal (works in every status). */
   onNotes?: (q: Quotation) => void
+  /** Opens the document chain (PO, delivery notes, invoices, payments). */
+  onChain?: (q: Quotation) => void
   onOutcome: (q: Quotation) => void
   onInvoice: (q: Quotation) => void
   onDeliveryNote: (q: Quotation) => void
@@ -57,6 +60,7 @@ export default function QuoteRowActions({
   onRevise,
   onExtend,
   onNotes,
+  onChain,
   onOutcome,
   onInvoice,
   onDeliveryNote,
@@ -130,6 +134,11 @@ export default function QuoteRowActions({
           onClick={() => onUndoFinalize(q)}
         >
           <RotateCcw size={13} /> Undo
+        </button>
+      ) : null}
+      {onChain && q.reference_number ? (
+        <button type="button" className={styles.btn} onClick={() => onChain(q)}>
+          <Workflow size={13} /> Chain
         </button>
       ) : null}
       {onNotes ? (

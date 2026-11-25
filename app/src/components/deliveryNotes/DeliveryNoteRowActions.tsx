@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ChevronDown, ChevronUp, ExternalLink, Pencil, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, ExternalLink, Pencil, Trash2, Workflow } from 'lucide-react'
 import type { DeliveryNote } from '../../lib/types'
 import styles from '../../styles/rowActions.module.css'
 
@@ -9,6 +9,8 @@ export type DeliveryNoteRowActionsProps = {
   onToggle: () => void
   onEdit: (note: DeliveryNote) => void
   onDelete: (note: DeliveryNote) => void
+  /** Opens the document chain (quote, PO, invoice, payments). */
+  onChain?: (note: DeliveryNote) => void
 }
 
 export default function DeliveryNoteRowActions({
@@ -17,6 +19,7 @@ export default function DeliveryNoteRowActions({
   onToggle,
   onEdit,
   onDelete,
+  onChain,
 }: DeliveryNoteRowActionsProps) {
   if (!expanded) {
     return (
@@ -39,6 +42,11 @@ export default function DeliveryNoteRowActions({
       <Link to={`/document/delivery-note/${note.id}`} className={styles.btnLink}>
         <ExternalLink size={13} /> PDF / Print
       </Link>
+      {onChain ? (
+        <button type="button" className={styles.btn} onClick={() => onChain(note)}>
+          <Workflow size={13} /> Chain
+        </button>
+      ) : null}
       <button type="button" className={styles.danger} onClick={() => onDelete(note)}>
         <Trash2 size={13} />{' '}
         {(note as DeliveryNote & { deleted_at?: string | null }).deleted_at ? 'Restore' : 'Archive'}

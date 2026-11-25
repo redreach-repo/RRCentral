@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import DocumentChainModal from '../components/documents/DocumentChainModal'
+import type { ChainStart } from '../lib/documentChain'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { Link2, Paperclip, Plus, Truck } from 'lucide-react'
@@ -134,6 +136,8 @@ export default function DeliveryNotesPage() {
   const [signedAttachments, setSignedAttachments] = useState<Attachment[]>([])
   const [linkSignedOpen, setLinkSignedOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<DeliveryNote | null>(null)
+  const [chainStart, setChainStart] = useState<ChainStart | null>(null)
+  const [chainTitle, setChainTitle] = useState('')
   const [poOptions, setPoOptions] = useState<DnPoOption[]>([])
   const [invoiceOptions, setInvoiceOptions] = useState<DnInvoiceOption[]>([])
 
@@ -438,6 +442,10 @@ export default function DeliveryNotesPage() {
         onToggle={() => setActionsOpenId((id) => (id === note.id ? null : note.id))}
         onEdit={(row) => void openEdit(row)}
         onDelete={(row) => setDeleteTarget(row)}
+        onChain={(row) => {
+          setChainTitle(`Document chain · ${row.reference_number}`)
+          setChainStart({ kind: 'dn', id: row.id })
+        }}
       />
     )
   }
@@ -954,6 +962,7 @@ export default function DeliveryNotesPage() {
           </button>
         </div>
       </Modal>
+      <DocumentChainModal start={chainStart} title={chainTitle} onClose={() => setChainStart(null)} />
     </div>
   )
 }

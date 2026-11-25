@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import DocumentChainModal from '../components/documents/DocumentChainModal'
+import type { ChainStart } from '../lib/documentChain'
 import { format } from 'date-fns'
 import { ClipboardList, FileText, Plus } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
@@ -80,6 +82,8 @@ export default function ClientPosPage() {
   const [quoteLinkReady, setQuoteLinkReady] = useState(true)
   const [setup, setSetup] = useState<ClientPoSetup>(CLIENT_PO_SETUP_OFF)
   const [drawdowns, setDrawdowns] = useState<PoDrawdown[]>([])
+  const [chainStart, setChainStart] = useState<ChainStart | null>(null)
+  const [chainTitle, setChainTitle] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -365,6 +369,16 @@ export default function ClientPosPage() {
                       </td>
                       <td className={`${docsStyles.colActions} ${docsStyles.actionsCell}`}>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            style={smallBtn}
+                            onClick={() => {
+                              setChainTitle(`Document chain · PO ${r.po_number}`)
+                              setChainStart({ kind: 'po', id: r.id })
+                            }}
+                          >
+                            Chain
+                          </button>
                           <button type="button" style={smallBtn} onClick={() => openEdit(r)}>
                             {r.file_url || !detailsReady ? 'Details' : 'Details / add file'}
                           </button>
@@ -409,6 +423,7 @@ export default function ClientPosPage() {
           void load()
         }}
       />
+      <DocumentChainModal start={chainStart} title={chainTitle} onClose={() => setChainStart(null)} />
     </div>
   )
 }

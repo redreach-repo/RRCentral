@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import DocumentChainModal from '../components/documents/DocumentChainModal'
+import type { ChainStart } from '../lib/documentChain'
 import { Link, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { Plus, Trash2, Wallet } from 'lucide-react'
@@ -165,6 +167,8 @@ export default function InvoicesPage() {
   const invoicePrefix = settings.invoicePrefix || 'RR'
 
   const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [chainStart, setChainStart] = useState<ChainStart | null>(null)
+  const [chainTitle, setChainTitle] = useState('')
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -809,6 +813,10 @@ export default function InvoicesPage() {
         onDuplicate={(row) => void duplicate(row)}
         onDelete={(row) => setDeleteTarget(row)}
         onChase={(row) => setChaseFor(row)}
+        onChain={(row) => {
+          setChainTitle(`Document chain · ${row.reference_number}`)
+          setChainStart({ kind: 'invoice', id: row.id })
+        }}
       />
     )
   }
@@ -1418,6 +1426,7 @@ export default function InvoicesPage() {
           </button>
         </div>
       </Modal>
+      <DocumentChainModal start={chainStart} title={chainTitle} onClose={() => setChainStart(null)} />
     </div>
   )
 }

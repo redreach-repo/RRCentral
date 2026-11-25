@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from 'react'
+import DocumentChainModal from '../components/documents/DocumentChainModal'
+import type { ChainStart } from '../lib/documentChain'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { FilePlus2, Plus, Trash2 } from 'lucide-react'
@@ -204,6 +206,8 @@ export default function QuotationsPage() {
   const canDeleteQuote = can(userRole, 'quote.deleteAny')
 
   const [quotes, setQuotes] = useState<Quotation[]>([])
+  const [chainStart, setChainStart] = useState<ChainStart | null>(null)
+  const [chainTitle, setChainTitle] = useState('')
   /** Client PO numbers linked to each quote (empty until the PO-quote link SQL is run). */
   const [poByQuote, setPoByQuote] = useState<Map<string, string[]>>(new Map())
   const [customDefs, setCustomDefs] = useState<CustomFieldDefinition[]>([])
@@ -1466,6 +1470,10 @@ export default function QuotationsPage() {
         onRevise={(row) => revise(row)}
         onExtend={(row) => setReviseTarget({ quote: row, mode: 'extend' })}
         onNotes={(row) => setNotesFor(row)}
+        onChain={(row) => {
+          setChainTitle(`Document chain · ${row.reference_number}`)
+          setChainStart({ kind: 'quote', id: row.id })
+        }}
         onOutcome={(row) => {
           setOutcomeTarget(row)
           setOutcomeStatus('Awarded')
@@ -2859,6 +2867,7 @@ export default function QuotationsPage() {
         onClose={() => setSupplierInvoiceTarget(null)}
         onSaved={load}
       />
+      <DocumentChainModal start={chainStart} title={chainTitle} onClose={() => setChainStart(null)} />
     </div>
   )
 }

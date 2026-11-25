@@ -69,3 +69,24 @@ note point at a PO that person can see in the same company.
   shows "PO … · Invoice …" (or "Not invoiced"), search finds notes by PO or
   invoice number, and the CSV has `client_po` and `invoice_ref`.
 - Before the SQL is run, saving still works and the links are skipped.
+
+## Document chain panel (step 3)
+
+There is a **Chain** button on quotations, client POs, delivery notes and
+invoices. It opens one panel showing the whole chain:
+
+1. The quotation and its revisions
+2. The client POs (PO dated after the quote expired is flagged)
+3. The delivery notes
+4. The invoices
+5. The payments
+
+Under the list it shows invoiced, paid and balance, and what is still missing
+(no PO yet, not delivered, delivered but not invoiced, a delivery note not on an
+invoice, payment still owed). Every item opens its own page.
+
+It only reads data, with the signed-in user's own access (row level security),
+so nobody sees more than they could already open. No SQL and no deploy are
+needed. Links whose SQL is not run yet are skipped.
+Code: `app/src/lib/documentChain.ts` (assembly and summary),
+`documentChainStore.ts` (loading) and `components/documents/DocumentChainModal.tsx`.
