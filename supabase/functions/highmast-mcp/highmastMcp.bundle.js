@@ -2052,6 +2052,220 @@ function isOpenTicket(t) {
 // src/lib/watchdog.ts
 var DEFAULT_STALE_DAYS = { crm: 21, sales: 14, ctrm: 14 };
 
+// src/lib/currency.ts
+function roundMoney(n) {
+  return roundAmount(n, "AED");
+}
+
+// src/lib/arChase.ts
+var CHASE_CHANNELS = [
+  { value: "email", label: "Email" },
+  { value: "call", label: "Call" },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "visit", label: "Visit" }
+];
+var CHASE_CHANNEL_VALUES = CHASE_CHANNELS.map((c) => c.value);
+var DEFAULT_CHASE_SETTINGS = { reminderDays: [1, 7, 14, 30], escalateDays: 45, escalateToUserId: null };
+var validDay = (d) => Number.isInteger(Number(d)) && Number(d) >= 1 && Number(d) <= 365;
+function chaseSettingsFrom(row) {
+  if (!row) return { ...DEFAULT_CHASE_SETTINGS, reminderDays: [...DEFAULT_CHASE_SETTINGS.reminderDays] };
+  const days = [...new Set((row.reminder_days || []).map(Number).filter(validDay))].sort((a, b) => a - b);
+  const esc = validDay(row.escalate_days) ? Number(row.escalate_days) : DEFAULT_CHASE_SETTINGS.escalateDays;
+  return {
+    reminderDays: days.length ? days : [...DEFAULT_CHASE_SETTINGS.reminderDays],
+    escalateDays: esc,
+    escalateToUserId: row.escalate_to_user_id || null
+  };
+}
+function chaseSteps(settings) {
+  const steps = settings.reminderDays.filter((d) => d !== settings.escalateDays).map((day) => ({ day, kind: "reminder" }));
+  steps.push({ day: settings.escalateDays, kind: "escalate" });
+  return steps.sort((a, b) => a.day - b.day);
+}
+var DAY_MS = 864e5;
+function isoDate(d) {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString().slice(0, 10);
+}
+function addDaysToIso(iso, days) {
+  return new Date(Date.parse(iso.slice(0, 10) + "T00:00:00Z") + days * DAY_MS).toISOString().slice(0, 10);
+}
+function daysBetween(fromIso, toIso) {
+  return Math.round((Date.parse(toIso.slice(0, 10) + "T00:00:00Z") - Date.parse(fromIso.slice(0, 10) + "T00:00:00Z")) / DAY_MS);
+}
+var AGING_BUCKETS = [
+  { key: "current", label: "Current" },
+  { key: "1-30", label: "1 to 30 days" },
+  { key: "31-60", label: "31 to 60 days" },
+  { key: "61-90", label: "61 to 90 days" },
+  { key: "90+", label: "Over 90 days" }
+];
+var AGING_BUCKET_KEYS = AGING_BUCKETS.map((b) => b.key);
+function agingBucket(daysOverdue) {
+  const d = Number(daysOverdue);
+  if (!Number.isFinite(d) || d <= 0) return "current";
+  if (d <= 30) return "1-30";
+  if (d <= 60) return "31-60";
+  if (d <= 90) return "61-90";
+  return "90+";
+}
+function invoiceDivision(inv) {
+  const m = String(inv.reference_number || "").match(/^[A-Z]{2,4}-(\d{2})-/i);
+  if (m) return m[1];
+  const v = String(inv.vertical || "").trim().toLowerCase();
+  return DIVISIONS.find((d) => d.brand.toLowerCase() === v)?.code || "";
+}
+function sortChaseLog(log) {
+  return [...log].sort((a, b) => b.chased_on.localeCompare(a.chased_on) || String(b.created_at).localeCompare(String(a.created_at)));
+}
+function currentPromise(log, balance, todayIso) {
+  const withPromise = sortChaseLog(log.filter((e) => e.promised_date && !e.deleted_at));
+  const p = withPromise[0];
+  if (!p || !p.promised_date) return null;
+  const date = p.promised_date.slice(0, 10);
+  const state = balance <= 9e-3 ? "kept" : date < todayIso ? "broken" : "pending";
+  return { date, state, logged_on: p.chased_on, contact: p.contact };
+}
+function nextChaseAction(input) {
+  const { daysOverdue, dueDate, promise, todayIso } = input;
+  if (input.balance <= 9e-3) return { kind: "none", due_on: null, text: "Nothing owing." };
+  if (promise?.state === "broken") {
+    return {
+      kind: "promise_broken",
+      due_on: todayIso,
+      text: `Promise to pay by ${promise.date} was broken: call ${promise.contact || "the client"} today and agree a new date.`
+    };
+  }
+  const open = input.tasks.filter((t) => t.status === "open").sort((a, b) => a.due_on.localeCompare(b.due_on));
+  if (open.length) {
+    const t = open[0];
+    return {
+      kind: "task",
+      due_on: t.due_on,
+      task_id: t.id,
+      text: t.kind === "escalate" ? `Escalate to the owner (day ${t.step_day} overdue).` : `Send the day ${t.step_day} reminder (draft ready).`
+    };
+  }
+  if (promise?.state === "pending") {
+    return {
+      kind: "await_promise",
+      due_on: addDaysToIso(promise.date, 1),
+      text: `Client promised payment by ${promise.date}. Check the bank on ${addDaysToIso(promise.date, 1)}.`
+    };
+  }
+  if (!dueDate) return { kind: "none", due_on: null, text: "No due date on this invoice." };
+  const reached = input.steps.filter((s) => s.day <= daysOverdue);
+  const last = reached[reached.length - 1];
+  if (last && !input.tasks.some((t) => t.step_day >= last.day)) {
+    return {
+      kind: last.kind,
+      due_on: todayIso,
+      text: last.kind === "escalate" ? `Escalate to the owner now (day ${last.day} passed).` : `Send the day ${last.day} reminder now.`
+    };
+  }
+  const next = input.steps.find((s) => s.day > Math.max(0, daysOverdue));
+  if (next) {
+    const on = addDaysToIso(dueDate, next.day);
+    return {
+      kind: next.kind,
+      due_on: on,
+      text: next.kind === "escalate" ? `Escalate to the owner on ${on} (day ${next.day}).` : `Day ${next.day} reminder on ${on}.`
+    };
+  }
+  return { kind: "none", due_on: null, text: "Every step is done. Agree a payment date or a plan with the client." };
+}
+var round2 = (n) => roundMoney(n);
+function buildAgingRows(input) {
+  const todayIso = isoDate(input.today);
+  const steps = chaseSteps(input.settings);
+  const logBy = groupBy(input.log.filter((e) => !e.deleted_at), (e) => e.invoice_id);
+  const tasksBy = groupBy(input.tasks, (t) => t.invoice_id);
+  const rows = [];
+  for (const inv of input.invoices) {
+    if (!isCollectible(inv)) continue;
+    const ref = String(inv.reference_number || "").trim();
+    const balance = round2(Math.max(0, (Number(inv.amount) || 0) - (input.paid.get(ref) ?? 0)));
+    if (balance <= 9e-3) continue;
+    const due = invoiceDueDate({ date: inv.date, payment_terms: inv.payment_terms ?? "" });
+    const days = due ? daysBetween(due, todayIso) : 0;
+    const log = sortChaseLog(logBy.get(inv.id) || []);
+    const promise = currentPromise(log, balance, todayIso);
+    rows.push({
+      invoice_id: inv.id,
+      reference: ref,
+      client: String(inv.client || "").trim() || "No client",
+      account_id: inv.account_id || null,
+      division: invoiceDivision(inv),
+      currency: String(inv.currency || "AED").toUpperCase(),
+      amount: round2(Number(inv.amount) || 0),
+      balance,
+      due_date: due,
+      days_overdue: Math.max(0, days),
+      bucket: agingBucket(days),
+      last_chase: log[0] ? { chased_on: log[0].chased_on, channel: log[0].channel, contact: log[0].contact, note: log[0].note } : null,
+      chase_count: log.length,
+      promise,
+      next_action: nextChaseAction({
+        daysOverdue: Math.max(0, days),
+        dueDate: due,
+        balance,
+        promise,
+        tasks: tasksBy.get(inv.id) || [],
+        steps,
+        todayIso
+      })
+    });
+  }
+  return rows.sort((a, b) => b.days_overdue - a.days_overdue || a.reference.localeCompare(b.reference));
+}
+function groupBy(list, key) {
+  const m = /* @__PURE__ */ new Map();
+  for (const x of list) {
+    const k = key(x);
+    const arr = m.get(k);
+    if (arr) arr.push(x);
+    else m.set(k, [x]);
+  }
+  return m;
+}
+function emptyTotals() {
+  return { current: 0, "1-30": 0, "31-60": 0, "61-90": 0, "90+": 0, total: 0, overdue: 0, count: 0 };
+}
+function agingTotalsByCurrency(rows) {
+  const out = {};
+  for (const r of rows) {
+    const t = out[r.currency] ||= emptyTotals();
+    t[r.bucket] = round2(t[r.bucket] + r.balance);
+    t.total = round2(t.total + r.balance);
+    if (r.bucket !== "current") t.overdue = round2(t.overdue + r.balance);
+    t.count += 1;
+  }
+  return out;
+}
+function filterAgingRows(rows, f) {
+  const client = (f.client || "").trim().toLowerCase();
+  return rows.filter(
+    (r) => (!client || r.client.toLowerCase() === client || r.client.toLowerCase().includes(client)) && (!f.division || r.division === f.division) && (!f.bucket || r.bucket === f.bucket)
+  );
+}
+function agingSummary(rows, max = 20) {
+  const overdue = rows.filter((r) => r.days_overdue > 0);
+  return {
+    totals_by_currency: agingTotalsByCurrency(rows),
+    broken_promises: overdue.filter((r) => r.promise?.state === "broken").slice(0, max).map((r) => ({ invoice_id: r.invoice_id, reference: r.reference, client: r.client, balance: r.balance, currency: r.currency, promised_date: r.promise.date })),
+    next_chase_actions: overdue.slice(0, max).map((r) => ({
+      invoice_id: r.invoice_id,
+      reference: r.reference,
+      client: r.client,
+      balance: r.balance,
+      currency: r.currency,
+      days_overdue: r.days_overdue,
+      bucket: r.bucket,
+      next_action: r.next_action.text,
+      next_action_due: r.next_action.due_on
+    }))
+  };
+}
+
 // src/lib/highmastMcp.ts
 var MCP_READ_TOOLS = [
   "search_accounts",
@@ -2063,9 +2277,18 @@ var MCP_READ_TOOLS = [
   "get_ticket",
   "list_quotes",
   "list_invoices",
-  "dashboard_summary"
+  "dashboard_summary",
+  "list_invoice_aging"
 ];
-var MCP_WRITE_TOOLS = ["create_lead", "add_timeline_note", "move_deal_stage", "create_follow_up"];
+var MCP_WRITE_TOOLS = [
+  "create_lead",
+  "add_timeline_note",
+  "move_deal_stage",
+  "create_follow_up",
+  // Overdue invoice chasing: a chase note never changes the invoice or its money.
+  "add_invoice_chase_note",
+  "complete_invoice_chase_task"
+];
 var MCP_TOOLS = [...MCP_READ_TOOLS, ...MCP_WRITE_TOOLS];
 var FORBIDDEN_TOOL_WORDS = [
   "delete",
@@ -2204,7 +2427,7 @@ var MCP_DEPARTMENT_VALUES = MCP_DEPARTMENTS.map((d) => d.value);
 var ALL_DEPTS = ["sales", "marketing", "finance", "hr", "payroll", "operations", "support", "documents"];
 var ACCOUNT_READERS = ["sales", "marketing", "finance", "operations", "support", "documents"];
 var MCP_TOOL_DEPARTMENTS = {
-  // The 14 standard tools
+  // The standard tools
   search_accounts: ACCOUNT_READERS,
   get_account: ACCOUNT_READERS,
   list_deals: ["sales"],
@@ -2219,6 +2442,10 @@ var MCP_TOOL_DEPARTMENTS = {
   add_timeline_note: ["sales", "marketing", "support"],
   move_deal_stage: ["sales"],
   create_follow_up: ["sales"],
+  // Overdue invoice chasing (whoever reads invoices)
+  list_invoice_aging: ["finance", "sales"],
+  add_invoice_chase_note: ["finance", "sales"],
+  complete_invoice_chase_task: ["finance", "sales"],
   // Any area (narrowed to the department's records)
   list_records: ALL_DEPTS,
   get_record: ALL_DEPTS,
@@ -2468,6 +2695,8 @@ function quotePdfNumber(q) {
 }
 export {
   ACCOUNT_TYPE_VALUES,
+  AGING_BUCKET_KEYS,
+  CHASE_CHANNEL_VALUES,
   DIVISION_CODES,
   FORBIDDEN_ADMIN_TOOL_WORDS,
   FORBIDDEN_TOOL_WORDS,
@@ -2497,10 +2726,14 @@ export {
   UAE_VAT_PERCENT,
   addDaysIso,
   adminToolNameProblem,
+  agingSummary,
+  agingTotalsByCurrency,
   assistantLabel,
   auditArgs,
   bearerToken,
+  buildAgingRows,
   canonicalStage,
+  chaseSettingsFrom,
   clampPage,
   companySearchWord,
   daysSince,
@@ -2508,6 +2741,7 @@ export {
   departmentsLabel,
   divisionVertical,
   expenseAmounts,
+  filterAgingRows,
   generatedPdfPath,
   invoiceDaysOverdue,
   invoiceDueDate,

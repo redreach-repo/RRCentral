@@ -293,10 +293,12 @@ declare
   -- The only tables an AI key may add rows to.
   insertable text[] := array[
     'accounts', 'account_contacts', 'account_activities',
-    'crm', 'follow_up_updates', 'sales_deals', 'ctrm_deals', 'ctrm_deal_stage_changes'
+    'crm', 'follow_up_updates', 'sales_deals', 'ctrm_deals', 'ctrm_deal_stage_changes',
+    -- Overdue invoice chasing (20261328090000_ar_chase.sql): chase notes only.
+    'invoice_chase_log'
   ];
   -- The only tables an AI key may change (stage and next follow-up on deals).
-  updatable text[] := array['crm', 'sales_deals', 'ctrm_deals'];
+  updatable text[] := array['crm', 'sales_deals', 'ctrm_deals', 'invoice_chase_tasks'];
 begin
   for t in
     select c.relname as name

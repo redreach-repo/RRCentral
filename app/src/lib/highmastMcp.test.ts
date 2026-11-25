@@ -18,17 +18,28 @@ import {
   ticketReplyAlert,
   toolNameProblem,
   likeText,
+  toolAllowedForDepartments,
 } from './highmastMcp'
 
 describe('MCP tool list', () => {
-  it('has the 14 tools from the spec and nothing else', () => {
+  it('has the 14 tools from the spec plus the 3 chase tools, and nothing else', () => {
     expect([...MCP_TOOLS].sort()).toEqual(
       [
         'search_accounts', 'get_account', 'list_deals', 'get_deal', 'list_follow_ups_due', 'list_tickets',
         'get_ticket', 'list_quotes', 'list_invoices', 'dashboard_summary', 'create_lead', 'add_timeline_note',
         'move_deal_stage', 'create_follow_up',
+        // Overdue invoice chasing (fix 1)
+        'list_invoice_aging', 'add_invoice_chase_note', 'complete_invoice_chase_task',
       ].sort(),
     )
+  })
+
+  it('offers the chase tools to finance and sales keys only', () => {
+    for (const t of ['list_invoice_aging', 'add_invoice_chase_note', 'complete_invoice_chase_task']) {
+      expect(toolAllowedForDepartments(t, ['finance']), t).toBe(true)
+      expect(toolAllowedForDepartments(t, ['sales']), t).toBe(true)
+      expect(toolAllowedForDepartments(t, ['hr', 'payroll', 'support']), t).toBe(false)
+    }
   })
 
   it('has no delete, HR, payroll, secrets, settings, users or payment tools', () => {

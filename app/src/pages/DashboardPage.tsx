@@ -39,6 +39,7 @@ import CtrmRenewalsCard from '../components/ctrm/CtrmRenewalsCard'
 import WatchdogCard from '../components/watchdog/WatchdogCard'
 import NoNextStepCard from '../components/deals/NoNextStepCard'
 import NewLeadsCard from '../components/leads/NewLeadsCard'
+import ReceivablesCard from '../components/invoices/ReceivablesCard'
 import { domainAlertLabel, domainRenewalAlerts } from '../lib/domainAlerts'
 import { syncUnansweredQuoteFollowUps } from '../lib/quoteFollowUpSync'
 import { useSettings } from '../contexts/SettingsContext'
@@ -47,7 +48,7 @@ import { useTenant } from '../contexts/TenantContext'
 import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import { PRODUCT } from '../lib/product'
-import { can } from '../lib/permissions'
+import { can, roleAtLeast } from '../lib/permissions'
 import { exportListCsv } from '../lib/listIo'
 import StatusPill from '../components/StatusPill'
 import EmptyState from '../components/EmptyState'
@@ -478,6 +479,8 @@ export default function DashboardPage() {
           ))}
         </div>
       </section>
+
+      {userRole === 'staff' ? null : <ReceivablesCard canWork={roleAtLeast(userRole, 'sales')} />}
 
       <section className={dash.section} aria-label="Needs attention">
         <button
