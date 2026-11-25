@@ -4,6 +4,7 @@ import { format } from 'date-fns'
 import { Plus, Trash2, Wallet } from 'lucide-react'
 import { getInvoicePayLink } from '../lib/invoicePayLinkStore'
 import InvoiceRowActions from '../components/invoices/InvoiceRowActions'
+import InvoiceChasePanel from '../components/invoices/InvoiceChasePanel'
 import docsStyles from '../styles/docsList.module.css'
 import { db } from '../lib/db'
 import {
@@ -170,6 +171,7 @@ export default function InvoicesPage() {
   const [editorOpen, setEditorOpen] = useState(false)
   const [editorSection, setEditorSection] = useState<EditorSection>('basics')
   const [editing, setEditing] = useState<Invoice | null>(null)
+  const [chaseFor, setChaseFor] = useState<Invoice | null>(null)
   // What this invoice takes from a client PO (null = no PO); poTakeTouched = save it.
   const [poTake, setPoTake] = useState<InvoicePoTake | null>(null)
   const [poTakeTouched, setPoTakeTouched] = useState(false)
@@ -806,6 +808,7 @@ export default function InvoicesPage() {
         onMarkPaid={(row) => void markPaid(row)}
         onDuplicate={(row) => void duplicate(row)}
         onDelete={(row) => setDeleteTarget(row)}
+        onChase={(row) => setChaseFor(row)}
       />
     )
   }
@@ -873,6 +876,22 @@ export default function InvoicesPage() {
       </header>
 
       {roleAtLeast(userRole, 'sales') ? <PaymentRemindersCard /> : null}
+
+      <p style={{ fontSize: 13, margin: '0 0 12px' }}>
+        <Link to="/receivables" style={{ color: colors.accentText }}>
+          Aging and chasing
+        </Link>{' '}
+        <span style={{ color: colors.muted }}>shows what each client owes by age, the chase log and who to chase next.</span>
+      </p>
+
+      <Modal
+        open={Boolean(chaseFor)}
+        title={chaseFor ? `Chase log: ${chaseFor.reference_number || 'invoice'} (${chaseFor.client})` : 'Chase log'}
+        onClose={() => setChaseFor(null)}
+        width={720}
+      >
+        {chaseFor ? <InvoiceChasePanel invoiceId={chaseFor.id} reference={chaseFor.reference_number || 'this invoice'} /> : null}
+      </Modal>
 
       {accountFilter ? (
         <p style={{ fontSize: 13, color: colors.muted, margin: '0 0 12px' }}>

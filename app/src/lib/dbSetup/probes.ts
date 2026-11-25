@@ -162,4 +162,5 @@ export const DB_SETUP_PROBES: DbSetupProbe[] = [
   { migration: '20261325090000_highmast_mcp_departments', label: 'AI connector keys by department', table: 'mcp_keys', column: 'departments' },
   { migration: '20261326090000_generated_pdfs', label: 'AI connector quote and invoice PDFs' },
   { migration: '20261327090000_client_po_uniform_issues', label: 'Uniforms issued against a client PO', table: 'client_uniform_issues', column: 'po_id' },
+  { migration: '20261328090000_ar_chase', label: 'Overdue invoice chasing (chase log, tasks, schedule)', table: 'invoice_chase_log', column: 'promised_date' },
 ]

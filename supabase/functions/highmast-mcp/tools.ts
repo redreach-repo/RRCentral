@@ -8,6 +8,12 @@ import { z } from "npm:zod@3.25.76"
 import type { McpKey } from "./auth.ts"
 import {
   ACCOUNT_TYPE_VALUES,
+  AGING_BUCKET_KEYS,
+  agingSummary,
+  buildAgingRows,
+  CHASE_CHANNEL_VALUES,
+  chaseSettingsFrom,
+  filterAgingRows,
   addDaysIso,
   auditArgs,
   canonicalStage,
@@ -47,7 +53,7 @@ const LEAD_ACCOUNT_TYPE = LEAD_TYPES as Record<"ai_crm" | "ctrm_next", string>
 export type Reach = { departments: string[]; read: Set<string>; write: Set<string> }
 export type ToolContext = { db: SupabaseClient; key: McpKey; now: () => Date; reach?: Reach }
 
-/** Is this tool offered to the key? Standard keys: all 14. Keys with departments: their departments' tools. */
+/** Is this tool offered to the key? Standard keys: all of TOOLS. Keys with departments: their departments' tools. */
 export function toolOffered(name: string, ctx: Pick<ToolContext, "key">): boolean {
   if (ctx.key.scope !== "admin") return true
   return toolAllowedForDepartments(name, ctx.key.departments || [])
@@ -155,6 +161,46 @@ function dealRow(pipeline: McpPipeline, r: Row, owners: Map<string, string>): Ro
   }
   const fields = pipeline === "ai_crm" ? SALES_FIELDS : CTRM_FIELDS
   return { pipeline, ...pick(r, fields), name: accountName(r), owner_name: owners.get(String(r.owner_user_id)) ?? null }
+}
+
+// ---- Overdue invoice chasing ----------------------------------------------------
+
+/** Rows of a chase table, or [] (and missing) before ar-chase.sql has been run. */
+async function chaseRows(build: () => PromiseLike<DbResult>, what: string): Promise<{ rows: Row[]; missing: boolean }> {
+  const res = await build()
+  if (isMissingTable(res.error)) return { rows: [], missing: true }
+  return { rows: (check(res, what) as Row[] | null) || [], missing: false }
+}
+
+/** Unpaid invoices with balances, chase log, tasks and schedule, built by the app's rules (arChase.ts). */
+async function loadAging(ctx: ToolContext) {
+  const [invoices, payments, log, tasks, settings] = await Promise.all([
+    softRows((soft) => {
+      let q = ctx.db.from("invoices").select("*").neq("payment_status", "Paid").limit(2000)
+      if (soft) q = q.is("deleted_at", null)
+      return q
+    }, "read invoices"),
+    ctx.db.from("payment_log").select("invoice_ref, amount").limit(10000),
+    chaseRows(() => ctx.db.from("invoice_chase_log").select("*").is("deleted_at", null).limit(5000), "read the chase log"),
+    chaseRows(() => ctx.db.from("invoice_chase_tasks").select("*").limit(5000), "read chase tasks"),
+    chaseRows(() => ctx.db.from("ar_chase_settings").select("*").limit(1), "read the chase schedule"),
+  ])
+  const paid = new Map<string, number>()
+  // A key that cannot read payments sees full invoice amounts (payments_visible false).
+  const paymentsVisible = !payments.error
+  for (const p of ((payments.error ? [] : payments.data) || []) as Row[]) {
+    const ref = String(p.invoice_ref || "").trim()
+    if (ref) paid.set(ref, (paid.get(ref) || 0) + (Number(p.amount) || 0))
+  }
+  const rows = buildAgingRows({
+    invoices: invoices as never,
+    paid,
+    log: log.rows as never,
+    tasks: tasks.rows as never,
+    settings: chaseSettingsFrom(settings.rows[0] as never),
+    today: ctx.now(),
+  }) as Row[]
+  return { rows, tasks: tasks.rows, setupMissing: log.missing || tasks.missing || settings.missing, paymentsVisible }
 }
 
 type FoundDeal = { pipeline: McpPipeline; row: Row }
@@ -507,7 +553,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: "dashboard_summary",
     title: "Dashboard summary",
-    description: "What needs attention now: overdue invoices, stale deals in each pipeline, support tickets near or past their reply target, and follow-ups due today or overdue. Up to 10 examples of each.",
+    description: "What needs attention now: overdue invoices, receivables aging (totals per currency by age, broken payment promises, the next chase action per overdue invoice), stale deals in each pipeline, support tickets near or past their reply target, and follow-ups due today or overdue. Up to 10 examples of each (20 chase actions).",
     readOnly: true,
     input: {},
     run: async (_a, ctx) => {
@@ -522,7 +568,8 @@ export const TOOLS: ToolDef[] = [
           if (s) q = q.is("deleted_at", null)
           return q
         }, `read ${table}`)
-      const [invoices, crm, sales, ctrm, tickets] = await Promise.all([
+      const [aging, invoices, crm, sales, ctrm, tickets] = await Promise.all([
+        loadAging(ctx).catch(() => null),
         // deno-lint-ignore no-explicit-any
         soft("invoices", "*", (q: any) => q.neq("payment_status", "Paid").limit(2000)),
         // deno-lint-ignore no-explicit-any
@@ -580,7 +627,120 @@ export const TOOLS: ToolDef[] = [
           top: alerts.slice(0, 10),
         },
         follow_ups_due_today_or_overdue: dueNow,
+        receivables_aging: aging
+          ? {
+              ...agingSummary(aging.rows as never),
+              chase_setup: aging.setupMissing ? "not set up yet (run ar-chase.sql)" : "ok",
+              payments_visible: aging.paymentsVisible,
+              note: "Balances after logged payments, by age past the due date. next_action is what to do next; nothing is sent to clients automatically.",
+            }
+          : null,
       }
+    },
+  },
+  {
+    name: "list_invoice_aging",
+    title: "Receivables aging",
+    description:
+      "Unpaid invoices that have gone out, with the balance after logged payments, days past due, age bucket (current, 1-30, 31-60, 61-90, 90+), last chase, promised payment date (pending or broken) and the next chase action. Totals per currency. Filter by client name, division code (01-06) or bucket. Read only. Paginated.",
+    readOnly: true,
+    input: {
+      client: z.string().max(200).optional(),
+      division: z.string().regex(/^\d{2}$/, "Division code, e.g. 03").optional(),
+      bucket: z.enum(AGING_BUCKET_KEYS as [string, ...string[]]).optional(),
+      broken_promises_only: z.boolean().optional(),
+      limit: limitArg,
+      offset: offsetArg,
+    },
+    run: async (a, ctx) => {
+      const { limit, offset } = clampPage(a.limit, a.offset)
+      const aging = await loadAging(ctx)
+      let rows = filterAgingRows(aging.rows as never, { client: String(a.client || ""), division: String(a.division || ""), bucket: String(a.bucket || "") }) as Row[]
+      if (a.broken_promises_only) rows = rows.filter((r) => (r.promise as Row | null)?.state === "broken")
+      const summary = agingSummary(rows as never)
+      return {
+        as_of: isoDay(ctx.now()),
+        totals_by_currency: summary.totals_by_currency,
+        broken_promises: summary.broken_promises.length,
+        chase_setup: aging.setupMissing ? "not set up yet (run ar-chase.sql)" : "ok",
+        payments_visible: aging.paymentsVisible,
+        ...pageOf(rows, limit, offset),
+      }
+    },
+  },
+  {
+    name: "add_invoice_chase_note",
+    title: "Add invoice chase note",
+    description:
+      "Log a chase of an unpaid invoice: channel (email, call, whatsapp, visit), who was contacted, what was said and any promised payment date. Give invoice_id or reference (e.g. RR-03-26102). It records the chase only: it never sends anything to the client and never changes the invoice or its payments.",
+    readOnly: false,
+    input: {
+      invoice_id: uuid("invoice_id").optional(),
+      reference: z.string().max(40).optional().describe("Invoice number, e.g. RR-03-26102."),
+      channel: z.enum(CHASE_CHANNEL_VALUES as [string, ...string[]]),
+      contact: z.string().max(200).optional().describe("Who was contacted."),
+      note: z.string().max(4000).optional().describe("What was said. Needed unless promised_date is given."),
+      promised_date: dateArg.optional().describe("Date the client promised to pay, YYYY-MM-DD, on or after the chase date."),
+      chased_on: dateArg.optional().describe("When the chase happened, YYYY-MM-DD. Default today; never in the future."),
+    },
+    run: async (a, ctx) => {
+      if (!!a.invoice_id === !!a.reference) throw new ToolError("Give exactly one of invoice_id or reference.")
+      const today = isoDay(ctx.now())
+      const chasedOn = String(a.chased_on || today)
+      if (chasedOn > today) throw new ToolError("The chase date cannot be in the future.")
+      const promised = a.promised_date ? String(a.promised_date) : null
+      if (promised && promised < chasedOn) throw new ToolError("The promised payment date cannot be before the chase.")
+      const note = String(a.note || "").trim()
+      if (!note && !promised) throw new ToolError("Add a note or a promised payment date.")
+      const found = await softRows((soft) => {
+        let q = ctx.db.from("invoices").select("id, reference_number, client, status, payment_status").limit(2)
+        q = a.invoice_id ? q.eq("id", String(a.invoice_id)) : q.eq("reference_number", String(a.reference).trim())
+        if (soft) q = q.is("deleted_at", null)
+        return q
+      }, "find the invoice")
+      if (!found.length) throw new ToolError("No invoice with that id or number is visible to this key.")
+      if (found.length > 1) throw new ToolError("More than one invoice has that number. Use invoice_id.")
+      const inv = found[0]
+      if (String(inv.payment_status).toLowerCase() === "paid") throw new ToolError(`${inv.reference_number} is paid; there is nothing to chase.`)
+      const res = await ctx.db
+        .from("invoice_chase_log")
+        .insert({
+          invoice_id: inv.id,
+          chased_on: chasedOn,
+          channel: String(a.channel),
+          contact: String(a.contact || "").trim(),
+          note: (note ? note + signature(ctx.key) : "").slice(0, 4000),
+          promised_date: promised,
+        })
+        .select("id, chased_on, promised_date")
+        .single()
+      if (isMissingTable(res.error)) throw new ToolError("The chase log is not set up in HighMast yet (run ar-chase.sql).")
+      const row = check(res, "log the chase") as Row
+      return { added: true, chase_id: row.id, invoice_id: inv.id, reference: inv.reference_number, client: inv.client, chased_on: row.chased_on, promised_date: row.promised_date }
+    },
+  },
+  {
+    name: "complete_invoice_chase_task",
+    title: "Complete invoice chase task",
+    description:
+      "Mark a chase task (from list_invoice_aging next actions or dashboard_summary) done or skipped, with what happened. It sends nothing; log the chase itself with add_invoice_chase_note.",
+    readOnly: false,
+    input: {
+      task_id: uuid("task_id"),
+      status: z.enum(["done", "skipped"]),
+      outcome: z.string().max(2000).optional(),
+    },
+    run: async (a, ctx) => {
+      const res = await ctx.db
+        .from("invoice_chase_tasks")
+        .update({ status: String(a.status), outcome: (String(a.outcome || "").trim() + signature(ctx.key)).slice(0, 2000) })
+        .eq("id", String(a.task_id))
+        .eq("status", "open")
+        .select("id, invoice_id, step_day, kind, status")
+      if (isMissingTable(res.error)) throw new ToolError("Chase tasks are not set up in HighMast yet (run ar-chase.sql).")
+      const changed = (check(res, "update the chase task") as Row[] | null) || []
+      if (!changed.length) throw new ToolError("No open chase task with that id is visible to this key.")
+      return { updated: true, ...changed[0] }
     },
   },
   {

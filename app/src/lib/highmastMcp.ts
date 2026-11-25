@@ -20,6 +20,16 @@ import { isOpenTicket } from './support'
 import { DEFAULT_STALE_DAYS } from './watchdog'
 
 export { nextAccountReference, invoiceDueDate, isCollectible, isOpenSalesDeal, isOpenDeal, isOpenTicket, slaState }
+// Overdue invoice chasing (aging buckets, promises, next chase action): the same rules as the app.
+export {
+  agingSummary,
+  agingTotalsByCurrency,
+  buildAgingRows,
+  CHASE_CHANNEL_VALUES,
+  chaseSettingsFrom,
+  filterAgingRows,
+  AGING_BUCKET_KEYS,
+} from './arChase'
 
 /** Every tool the server offers. A test fails if anything risky sneaks in. */
 export const MCP_READ_TOOLS = [
@@ -33,8 +43,17 @@ export const MCP_READ_TOOLS = [
   'list_quotes',
   'list_invoices',
   'dashboard_summary',
+  'list_invoice_aging',
 ] as const
-export const MCP_WRITE_TOOLS = ['create_lead', 'add_timeline_note', 'move_deal_stage', 'create_follow_up'] as const
+export const MCP_WRITE_TOOLS = [
+  'create_lead',
+  'add_timeline_note',
+  'move_deal_stage',
+  'create_follow_up',
+  // Overdue invoice chasing: a chase note never changes the invoice or its money.
+  'add_invoice_chase_note',
+  'complete_invoice_chase_task',
+] as const
 export const MCP_TOOLS = [...MCP_READ_TOOLS, ...MCP_WRITE_TOOLS] as const
 export type McpToolName = (typeof MCP_TOOLS)[number]
 
@@ -139,7 +158,7 @@ export const MCP_DEPARTMENT_VALUES = MCP_DEPARTMENTS.map((d) => d.value) as McpD
 const ALL_DEPTS: McpDepartment[] = ['sales', 'marketing', 'finance', 'hr', 'payroll', 'operations', 'support', 'documents']
 const ACCOUNT_READERS: McpDepartment[] = ['sales', 'marketing', 'finance', 'operations', 'support', 'documents']
 export const MCP_TOOL_DEPARTMENTS: Record<string, McpDepartment[]> = {
-  // The 14 standard tools
+  // The standard tools
   search_accounts: ACCOUNT_READERS,
   get_account: ACCOUNT_READERS,
   list_deals: ['sales'],
@@ -154,6 +173,10 @@ export const MCP_TOOL_DEPARTMENTS: Record<string, McpDepartment[]> = {
   add_timeline_note: ['sales', 'marketing', 'support'],
   move_deal_stage: ['sales'],
   create_follow_up: ['sales'],
+  // Overdue invoice chasing (whoever reads invoices)
+  list_invoice_aging: ['finance', 'sales'],
+  add_invoice_chase_note: ['finance', 'sales'],
+  complete_invoice_chase_task: ['finance', 'sales'],
   // Any area (narrowed to the department's records)
   list_records: ALL_DEPTS,
   get_record: ALL_DEPTS,

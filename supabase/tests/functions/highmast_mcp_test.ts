@@ -21,6 +21,8 @@ const EXPECTED_TOOLS = [
   "add_timeline_note", "create_follow_up", "create_lead", "dashboard_summary", "get_account", "get_deal",
   "get_ticket", "list_deals", "list_follow_ups_due", "list_invoices", "list_quotes", "list_tickets",
   "move_deal_stage", "search_accounts",
+  // Overdue invoice chasing: aging, chase notes, chase tasks (never sends, never changes invoices).
+  "list_invoice_aging", "add_invoice_chase_note", "complete_invoice_chase_task",
   // Read-only PDF tools (tools_pdf.ts): every key, limited by what its member can see.
   "get_delivery_note_pdf", "get_invoice_pdf", "get_quote_pdf",
 ].sort()
@@ -77,6 +79,24 @@ const MEMBER = {
   retry_after_seconds: 30,
 }
 
+const CHASE_INVOICES = [
+  ["102", "Mass Allied Freighters", "2026-09-01", 37500],
+  ["104", "Mass Allied Freighters", "2026-09-15", 37500],
+  ["105", "Mass Allied Freighters", "2026-09-15", 37500],
+  ["103", "Arabian Sky Business Center", "2026-09-30", 1732.5],
+].map(([n, client, date, amount]) => ({
+  id: `88888888-8888-4888-8888-000000000${n}`,
+  client,
+  reference_number: `RR-03-26${n}`,
+  date,
+  amount,
+  currency: "AED",
+  status: "Sent",
+  payment_status: "Pending",
+  payment_terms: "Net 30",
+  deleted_at: null,
+}))
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } })
 
@@ -108,6 +128,18 @@ async function fakeFetch(input: Request | URL | string, init?: RequestInit): Pro
     return json({ signedURL: "/object/sign/generated-pdfs/quotes/RR-01-26007.pdf?token=t" })
   }
   if (url.host === "render.test") return renderAnswer()
+  // Overdue invoice chasing: the brief's four overdue invoices (AED 114,232.50).
+  if (url.pathname === "/rest/v1/invoices" && req.method === "GET") {
+    const all = CHASE_INVOICES.filter((i) => !url.searchParams.get("reference_number") || `eq.${i.reference_number}` === url.searchParams.get("reference_number"))
+    return json(all)
+  }
+  if (url.pathname === "/rest/v1/invoice_chase_log" && req.method === "GET") {
+    return json([{ id: "c1", invoice_id: "88888888-8888-4888-8888-000000000102", chased_on: "2026-11-10", channel: "call", contact: "Accounts", note: "Will pay", promised_date: "2026-11-20", created_by_email: "s@x", created_at: "2026-11-10T09:00:00Z", deleted_at: null }])
+  }
+  if (url.pathname === "/rest/v1/invoice_chase_log" && req.method === "POST") {
+    const row = JSON.parse(calls[calls.length - 1].body)
+    return json({ id: "c2", chased_on: row.chased_on, promised_date: row.promised_date })
+  }
   if (url.pathname.startsWith("/rest/v1/")) return json([])
   return json({}, 404)
 }
@@ -245,6 +277,46 @@ Deno.test({ name: "a tool call runs as the key's member (never the service key) 
   assertEquals(logged.p_ok, true)
   assertEquals(logged.p_args.pipeline, "company")
   assert(calls.every((c) => c.method !== "DELETE"), "nothing is deleted")
+}) })
+
+Deno.test({ name: "dashboard_summary shows receivables aging, broken promises and the next chase action", ...opts, fn: () => withFakeDb(async () => {
+  const h = await load()
+  resolveRows = [MEMBER]
+  const body = await (await h(rpc("tools/call", { name: "dashboard_summary", arguments: {} }, 31))).json()
+  assertFalse(body.result.isError, JSON.stringify(body))
+  const out = JSON.parse(body.result.content[0].text)
+  const aging = out.receivables_aging
+  assertEquals(aging.totals_by_currency.AED.overdue, 114232.5)
+  assertEquals(aging.totals_by_currency.AED.count, 4)
+  assertEquals(aging.broken_promises.map((p: { reference: string }) => p.reference), ["RR-03-26102"])
+  assertEquals(aging.next_chase_actions.length, 4)
+  for (const a of aging.next_chase_actions) assert(a.next_action, `${a.reference} has a next action`)
+  assert(calls.every((c) => c.method === "GET" || c.url.pathname.startsWith("/rest/v1/rpc/")), "the summary writes nothing")
+}) })
+
+Deno.test({ name: "add_invoice_chase_note logs a chase and never touches the invoice or sends anything", ...opts, fn: () => withFakeDb(async () => {
+  const h = await load()
+  resolveRows = [MEMBER]
+  const body = await (await h(rpc("tools/call", {
+    name: "add_invoice_chase_note",
+    arguments: { reference: "RR-03-26104", channel: "call", contact: "Ravi", note: "Cheque next week", promised_date: "2099-01-05" },
+  }, 32))).json()
+  assertFalse(body.result.isError, JSON.stringify(body))
+  const out = JSON.parse(body.result.content[0].text)
+  assertEquals(out.reference, "RR-03-26104")
+  const writes = calls.filter((c) => c.method !== "GET" && !c.url.pathname.startsWith("/rest/v1/rpc/"))
+  assertEquals(writes.map((c) => c.url.pathname), ["/rest/v1/invoice_chase_log"], "only the chase log is written")
+  const sent = JSON.parse(writes[0].body)
+  assertEquals(sent.invoice_id, "88888888-8888-4888-8888-000000000104")
+  assertEquals(sent.channel, "call")
+  assertFalse("created_by" in sent || "created_by_email" in sent || "tenant_id" in sent, "who and tenant come from the database")
+  assert(calls.every((c) => !/zoho|whatsapp|graph\.facebook|mail/i.test(c.url.host)), "nothing is sent to anyone")
+
+  const bad = await (await h(rpc("tools/call", { name: "add_invoice_chase_note", arguments: { reference: "RR-03-26104", channel: "fax", note: "x" } }, 33))).json()
+  assert(bad.result.isError)
+  const future = await (await h(rpc("tools/call", { name: "add_invoice_chase_note", arguments: { reference: "RR-03-26104", channel: "call", note: "x", chased_on: "2099-01-01" } }, 34))).json()
+  assert(future.result.isError)
+  assertMatch(future.result.content[0].text, /future/)
 }) })
 
 Deno.test({ name: "a page larger than 50 is refused", ...opts, fn: () => withFakeDb(async () => {

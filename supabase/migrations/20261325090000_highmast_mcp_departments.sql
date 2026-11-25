@@ -381,6 +381,11 @@ begin
       -- Lines belong to their document: quote lines to quotations, invoice lines to invoices.
       expr_r := 'public.rr_mcp_dept_allows(case doc_type when ''Quote'' then ''quotations'' when ''Invoice'' then ''invoices'' else ''delivery_notes'' end, false)';
       expr_w := 'public.rr_mcp_dept_allows(case doc_type when ''Quote'' then ''quotations'' when ''Invoice'' then ''invoices'' else ''delivery_notes'' end, true)';
+    elsif t.name in ('ar_chase_settings', 'invoice_chase_log', 'invoice_chase_tasks') then
+      -- Overdue invoice chasing (20261328090000_ar_chase.sql) follows invoices:
+      -- whoever reads invoices may log a chase or finish a chase task.
+      expr_r := '(select public.rr_mcp_dept_allows(''invoices'', false))';
+      expr_w := expr_r;
     else
       -- Wrapped in a sub-select so it is worked out once per query, not per row.
       expr_r := format('(select public.rr_mcp_dept_allows(%L, false))', t.name);

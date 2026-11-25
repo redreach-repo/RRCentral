@@ -64,7 +64,7 @@ describe('Settings > Modules switches still hide the same pages', () => {
   const cases: [string, string[]][] = [
     ['overview', ['/app', '/guide', '/dashboards']],
     ['sales', ['/quick-add', '/deals', '/crm', '/follow-ups', '/sales', '/ctrm']],
-    ['documents', ['/quotations', '/invoices', '/client-pos', '/delivery-notes', '/customer-files']],
+    ['documents', ['/quotations', '/invoices', '/receivables', '/client-pos', '/delivery-notes', '/customer-files']],
     ['clients', ['/accounts', '/support', '/ctrm-issues', '/client-health', '/client-reports', '/client-updates', '/uniform-sizes']],
     ['delivery', ['/products', '/delivery-settings', '/build-templates', '/agreement-template', '/nda-template', '/clause-library', '/obligations']],
     ['ops', ['/app/wanders', '/catalog', '/inventory', '/purchase-orders', '/projects', '/construction-sites', '/eng-register', '/templates', '/domains']],

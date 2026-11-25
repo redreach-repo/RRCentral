@@ -185,6 +185,7 @@ export default function Layout() {
       '/ctrm',
       '/quotations',
       '/invoices',
+      '/receivables',
       '/client-pos',
       '/delivery-notes',
       '/follow-ups',

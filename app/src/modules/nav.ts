@@ -39,6 +39,7 @@ import {
   PhoneCall,
   Plane,
   Receipt,
+  Hourglass,
   ScrollText,
   Send,
   Settings,
@@ -142,6 +143,7 @@ const CORE_MODULES: ModuleManifest[] = [
     icon: Banknote,
     items: [
       { to: '/invoices', label: 'Invoices', icon: Receipt, section: 'Money in', flag: 'documents' },
+      { to: '/receivables', label: 'Aging and chasing', icon: Hourglass, section: 'Money in', flag: 'documents' },
       { to: '/payments', label: 'Payments', icon: Banknote, section: 'Money in', flag: 'finance' },
       { to: '/expenses', label: 'Expenses', icon: Wallet, section: 'Money out', flag: 'finance' },
       { to: '/vendors', label: 'Vendors', icon: Building2, section: 'Money out', flag: 'finance' },
