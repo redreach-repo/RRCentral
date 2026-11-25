@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { ClipboardList, Plus } from 'lucide-react'
 import { clientPoPartyName } from '../../lib/clientPurchaseOrders'
+import { poQuoteSummary } from '../../lib/clientPoQuoteLink'
 import {
   invoiceLineFromPo,
   issuedNotInvoiced,
@@ -120,6 +121,9 @@ export default function InvoicePoPanel(props: {
   const waiting = issuedByLine ? issuedNotInvoiced(balances, issuedByLine) : {}
   const waitingTotal = Object.values(waiting).reduce((s, n) => s + n, 0)
 
+  const picked = value ? pos.find((p) => p.id === value.poId) : null
+  const quoteLine = picked ? poQuoteSummary(picked) : ''
+
   if (!client.trim()) return null
   if (!value && !forClient.length) {
     return loadError ? (
@@ -153,10 +157,17 @@ export default function InvoicePoPanel(props: {
             <option key={p.id} value={p.id}>
               PO {p.po_number}
               {p.issued_on ? ` · ${p.issued_on}` : ''}
+              {p.quote_reference ? ` · quote ${p.quote_reference}` : ''}
             </option>
           ))}
         </select>
       </div>
+
+      {quoteLine ? (
+        <div style={{ fontSize: 13, color: picked?.after_quote_expiry ? colors.warn : colors.muted }}>
+          For {quoteLine}. Use the quote's own lines with Invoice on the Quotations page, or bill PO lines here.
+        </div>
+      ) : null}
 
       {!ready ? (
         <div style={{ fontSize: 13, color: colors.warn }}>

@@ -430,7 +430,18 @@ export type ClientPurchaseOrder = {
   received_amount?: number
   accounts?: { name: string } | null
   clients?: { company_name: string } | null
-} & Partial<ClientPoDetails>
+} & Partial<ClientPoDetails> &
+  Partial<ClientPoQuoteLinkCols>
+
+/** The quotation the PO is for (supabase/migrations/20261330090000_client_po_quote_link.sql). */
+export type ClientPoQuoteLinkCols = {
+  quotation_id: string | null
+  quote_reference: string
+  quote_valid_until: string | null
+  after_quote_expiry: boolean
+  quote_linked_at: string | null
+  quote_linked_by: string
+}
 
 /** What was on the PO itself (supabase/migrations/20261320160000_client_po_file_and_details.sql). */
 export type ClientPoDetails = {
@@ -453,6 +464,8 @@ const CLIENT_PO_BASE_COLUMNS =
   'id, client_id, account_id, division_code, po_number, status, issued_on, currency, amount, notes, invoice_id, received_amount, accounts(name), clients(company_name)'
 const CLIENT_PO_DETAIL_COLUMNS =
   'file_name, file_url, drive_file_id, line_items, subtotal, vat_rate, vat_amount, contact_name, delivery_date, delivery_address, delivery_terms, payment_terms, details_read_at'
+const CLIENT_PO_QUOTE_COLUMNS =
+  'quotation_id, quote_reference, quote_valid_until, after_quote_expiry, quote_linked_at, quote_linked_by'
 
 /** Postgres "column does not exist": the PO details SQL has not been run yet. */
 function isMissingColumnError(error: { code?: string; message?: string } | null): boolean {
@@ -466,26 +479,37 @@ function isMissingColumnError(error: { code?: string; message?: string } | null)
 export async function listClientPurchaseOrdersWithDetails(): Promise<{
   rows: ClientPurchaseOrder[]
   detailsReady: boolean
+  /** The PO to quote link SQL is on the database. */
+  quoteLinkReady: boolean
 }> {
-  if (!isSupabaseConfigured()) return { rows: [], detailsReady: false }
-  const { data, error } = await db
+  if (!isSupabaseConfigured()) return { rows: [], detailsReady: false, quoteLinkReady: false }
+  let quoteLinkReady = true
+  let { data, error } = await db
     .from('client_purchase_orders')
-    .select(`${CLIENT_PO_BASE_COLUMNS}, ${CLIENT_PO_DETAIL_COLUMNS}`)
+    .select(`${CLIENT_PO_BASE_COLUMNS}, ${CLIENT_PO_DETAIL_COLUMNS}, ${CLIENT_PO_QUOTE_COLUMNS}`)
     .order('issued_on', { ascending: false })
     .limit(100)
   if (error && isMissingColumnError(error)) {
-    return { rows: await listClientPurchaseOrders(), detailsReady: false }
+    quoteLinkReady = false
+    ;({ data, error } = await db
+      .from('client_purchase_orders')
+      .select(`${CLIENT_PO_BASE_COLUMNS}, ${CLIENT_PO_DETAIL_COLUMNS}`)
+      .order('issued_on', { ascending: false })
+      .limit(100))
+  }
+  if (error && isMissingColumnError(error)) {
+    return { rows: await listClientPurchaseOrders(), detailsReady: false, quoteLinkReady: false }
   }
   if (error) {
-    if (isMissingRelationError(error)) return { rows: [], detailsReady: false }
+    if (isMissingRelationError(error)) return { rows: [], detailsReady: false, quoteLinkReady: false }
     throw error
   }
-  const rows = ((data || []) as ClientPurchaseOrder[]).map((r) => ({
+  const rows = ((data || []) as unknown as ClientPurchaseOrder[]).map((r) => ({
     ...r,
     received_amount: Number(r.received_amount) || 0,
     line_items: Array.isArray(r.line_items) ? r.line_items : [],
   }))
-  return { rows, detailsReady: true }
+  return { rows, detailsReady: true, quoteLinkReady }
 }
 
 export async function listClientPurchaseOrders(): Promise<ClientPurchaseOrder[]> {
@@ -547,8 +571,8 @@ export async function createClientPurchaseOrder(input: {
   notes: string
   /** The file and what was on the PO; only sent once the PO details SQL is on the database. */
   details?: Partial<ClientPoDetails>
-}): Promise<void> {
-  const { error } = await db.from('client_purchase_orders').insert({
+}): Promise<string | null> {
+  const { data, error } = await db.from('client_purchase_orders').insert({
     client_id: input.clientId,
     account_id: input.accountId || null,
     division_code: input.divisionCode || null,
@@ -559,8 +583,9 @@ export async function createClientPurchaseOrder(input: {
     notes: input.notes.trim(),
     status: 'open',
     ...(input.details || {}),
-  })
+  }).select('id').maybeSingle()
   if (error) throw error
+  return (data as { id: string } | null)?.id || null
 }
 
 /** Saves corrections to a PO (header fields and the details read off it). */

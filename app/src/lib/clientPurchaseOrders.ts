@@ -143,6 +143,7 @@ export function filterClientPos<
     accounts?: { name?: string | null } | null
     client_id?: string | null
     account_id?: string | null
+    quote_reference?: string | null
   },
 >(rows: R[], opts: { department: string; status: string; search: string }): R[] {
   const q = opts.search.trim().toLowerCase()
@@ -154,7 +155,7 @@ export function filterClientPos<
       if (clientPoStatusLabel(r.status) !== opts.status) return false
     }
     if (q) {
-      const hay = `${r.po_number} ${clientPoPartyName(r)}`.toLowerCase()
+      const hay = `${r.po_number} ${clientPoPartyName(r)} ${r.quote_reference || ''}`.toLowerCase()
       if (!hay.includes(q)) return false
     }
     return true

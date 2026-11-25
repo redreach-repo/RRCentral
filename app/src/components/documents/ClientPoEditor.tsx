@@ -20,6 +20,7 @@ import {
   bytesToBase64,
   fileClientPoInDrive,
   readClientPoFile,
+  relabelClientPoInDrive,
   type ClientPoSetup,
   type PoUpload,
 } from '../../lib/clientPoFile'
@@ -42,6 +43,20 @@ import {
 import { loadPoDrawdowns } from '../../lib/clientPoDrawdownStore'
 import { loadClientUniforms, type UniformLoad } from '../../lib/clientUniforms/clientUniformsStore'
 import ClientPoStaffPanel from './ClientPoStaffPanel'
+import {
+  CLIENT_PO_QUOTE_LINK_SQL,
+  awardsOnLink,
+  linkAdvice,
+  quoteLinkCandidates,
+  shortDate,
+  type LinkableQuote,
+} from '../../lib/clientPoQuoteLink'
+import {
+  afterQuoteAwardedByPo,
+  linkPoToQuote,
+  listQuotesForLinking,
+  unlinkPoQuote,
+} from '../../lib/clientPoQuoteLinkStore'
 import { buttonPrimaryStyle, buttonSecondaryStyle, colors, inputStyle, labelStyle, selectStyle } from '../../lib/uiStyles'
 
 export type ClientPoClientOpt = { id: string; company_name: string; account_id?: string | null; trn?: string | null }
@@ -119,6 +134,10 @@ export default function ClientPoEditor(props: {
   clients: ClientPoClientOpt[]
   setup: ClientPoSetup
   detailsReady: boolean
+  /** The PO to quote link SQL is on the database. */
+  quoteLinkReady?: boolean
+  /** Signed-in email, for the activity log when a quote is awarded. */
+  who?: string
   onClose: () => void
   onSaved: () => void
 }) {
@@ -154,6 +173,23 @@ export default function ClientPoEditor(props: {
   const [drawdownsReady, setDrawdownsReady] = useState(false)
   const [uniforms, setUniforms] = useState<UniformLoad>({ staff: [], issues: [], missingTable: false })
   const [uniformsTick, setUniformsTick] = useState(0)
+  const [quotes, setQuotes] = useState<LinkableQuote[]>([])
+  const [quoteId, setQuoteId] = useState('')
+  const [awardQuote, setAwardQuote] = useState(true)
+  const [allQuotes, setAllQuotes] = useState(false)
+  const quoteLinkReady = props.quoteLinkReady !== false
+
+  // Quotes to link this PO to: any finalized quote, Expired included (best effort).
+  useEffect(() => {
+    if (!open || !quoteLinkReady) return
+    let alive = true
+    listQuotesForLinking()
+      .then((rows) => alive && setQuotes(rows))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [open, quoteLinkReady])
 
   // What invoices have taken from this PO, and the client's uniform staff (both best effort).
   useEffect(() => {
@@ -205,6 +241,9 @@ export default function ClientPoEditor(props: {
     setPaymentTerms(r?.payment_terms || '')
     setNotes(r?.notes || '')
     setLines((r?.line_items || []).map(lineToDraft))
+    setQuoteId(r?.quotation_id || '')
+    setAwardQuote(true)
+    setAllQuotes(false)
     setUpload(null)
     setReading(false)
     setReadAt(r?.details_read_at || null)
@@ -248,6 +287,14 @@ export default function ClientPoEditor(props: {
   })
   const setupNotes = clientPoSetupNotes(setup, detailsReady)
   const hasFile = Boolean(editing?.file_url)
+  const quoteOptions = useMemo(() => {
+    const list = quoteLinkCandidates(quotes, clientName, allQuotes)
+    const current = quotes.find((q) => q.id === quoteId)
+    return current && !list.some((q) => q.id === current.id) ? [current, ...list] : list
+  }, [quotes, clientName, allQuotes, quoteId])
+  const pickedQuote = quotes.find((q) => q.id === quoteId) || null
+  const quoteChanged = quoteId !== (editing?.quotation_id || '')
+  const quoteAdvice = pickedQuote ? linkAdvice({ quote: pickedQuote, poIssuedOn: issuedOn, poClientName: clientName }) : []
   const canUpload = detailsReady && setup.reachable && (setup.reader || setup.drive)
 
   function applyRead(po: ExtractedPo) {
@@ -350,7 +397,7 @@ export default function ClientPoEditor(props: {
         }
         if (upload && setup.drive && !withoutFile) {
           try {
-            const saved = await fileClientPoInDrive(upload, client.id, poNo.trim())
+            const saved = await fileClientPoInDrive(upload, client.id, poNo.trim(), pickedQuote?.reference_number || '')
             details = { ...details, file_name: upload.filename, file_url: saved.url, drive_file_id: saved.id }
           } catch (e) {
             setDriveError(errorMessage(e, 'Google Drive did not take the file'))
@@ -369,14 +416,47 @@ export default function ClientPoEditor(props: {
         notes,
         details,
       }
+      let poId: string | null = editing?.id || null
       if (editing) await updateClientPurchaseOrder(editing.id, input)
-      else await createClientPurchaseOrder(input)
-      showToast(details?.file_url ? 'Client PO saved, file in Google Drive' : 'Client PO saved', 'success')
+      else poId = await createClientPurchaseOrder(input)
+      const savedMsg = details?.file_url ? 'Client PO saved, file in Google Drive' : 'Client PO saved'
+      const linkMsg = poId && quoteLinkReady && quoteChanged ? await saveQuoteLink(poId, Boolean(details?.file_url)) : ''
+      showToast(linkMsg ? `${savedMsg}. ${linkMsg}` : savedMsg, 'success')
       props.onSaved()
     } catch (err) {
       showToast(errorMessage(err, 'Save failed'), 'error')
     } finally {
       setSaving(false)
+    }
+  }
+
+  /** Links or unlinks the quote after the PO is saved; returns what happened, in words. */
+  async function saveQuoteLink(poId: string, justFiled: boolean): Promise<string> {
+    try {
+      if (!quoteId) {
+        await unlinkPoQuote(poId)
+        return 'Quote unlinked'
+      }
+      const res = await linkPoToQuote(poId, quoteId, awardQuote)
+      let msg = `Linked to quote ${res.quote_reference}`
+      if (res.after_expiry && res.days_after_expiry) msg += ` (PO came ${res.days_after_expiry} days after its validity)`
+      if (res.awarded) {
+        msg += `, quote marked Awarded`
+        if (pickedQuote) {
+          const problems = await afterQuoteAwardedByPo(pickedQuote, poNo.trim(), props.who || '')
+          if (problems.length) msg += ` (not updated: ${problems.join(', ')})`
+        }
+      }
+      // An already filed PO gets the quote number in its Google Drive name too.
+      if (!justFiled && editing?.drive_file_id && setup.drive) {
+        await relabelClientPoInDrive(poId).catch(() => {
+          msg += '. The Drive file name was not updated'
+        })
+      }
+      return msg
+    } catch (e) {
+      showToast(errorMessage(e, 'PO saved, but the quote link was not'), 'error')
+      return ''
     }
   }
 
@@ -478,6 +558,58 @@ export default function ClientPoEditor(props: {
             Total incl. VAT
             <input style={inputStyle} type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
           </label>
+        </div>
+
+        <div style={{ display: 'grid', gap: 8 }}>
+          <div style={sectionLabel}>Quotation</div>
+          {!quoteLinkReady ? (
+            <div style={{ ...noteStyle, borderColor: colors.warn }} role="note">
+              Linking this PO to its quotation needs the database update {CLIENT_PO_QUOTE_LINK_SQL} run in Supabase first.
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <select
+                  aria-label="Quotation this PO is for"
+                  style={{ ...selectStyle, width: 'auto', minWidth: 260, flex: '1 1 260px' }}
+                  value={quoteId}
+                  onChange={(e) => setQuoteId(e.target.value)}
+                >
+                  <option value="">No quotation linked</option>
+                  {quoteOptions.map((q) => (
+                    <option key={q.id} value={q.id}>
+                      {q.reference_number || q.quote_id} · {q.status}
+                      {q.valid_until ? ` · valid until ${shortDate(q.valid_until)}` : ''}
+                      {allQuotes || !clientName ? ` · ${q.client}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <label style={{ fontSize: 13, display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                  <input type="checkbox" checked={allQuotes} onChange={(e) => setAllQuotes(e.target.checked)} />
+                  Show other clients' quotes
+                </label>
+              </div>
+              {pickedQuote && quoteChanged && awardsOnLink(pickedQuote.status) ? (
+                <label style={{ fontSize: 13, display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                  <input type="checkbox" checked={awardQuote} onChange={(e) => setAwardQuote(e.target.checked)} />
+                  Mark quote {pickedQuote.reference_number} Awarded (it is {pickedQuote.status} now), so it can be invoiced
+                </label>
+              ) : null}
+              {quoteAdvice.length ? (
+                <div style={{ ...noteStyle, borderColor: colors.warn }} role="note">
+                  {quoteAdvice.map((n) => (
+                    <div key={n}>{n}</div>
+                  ))}
+                </div>
+              ) : null}
+              {!quoteChanged && editing?.quote_linked_at ? (
+                <div style={{ fontSize: 12, color: colors.muted }}>
+                  Linked {shortDate(editing.quote_linked_at)}
+                  {editing.quote_linked_by ? ` by ${editing.quote_linked_by}` : ''}
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
 
         {detailsReady ? (

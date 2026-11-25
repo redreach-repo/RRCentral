@@ -335,10 +335,15 @@ export function matchPoClient<C extends { id: string; company_name: string; trn?
 }
 
 /** The Drive file name: "PO <number> <original name>", so the folder sorts by PO. */
-export function poDriveFilename(poNumberText: string, original: string): string {
+export function poDriveFilename(poNumberText: string, original: string, quoteRef = ''): string {
   const po = String(poNumberText || '').trim()
-  const name = String(original || 'po.pdf').trim() || 'po.pdf'
-  return (po ? `PO ${po} - ${name}` : name).slice(0, 200)
+  const quote = String(quoteRef || '').trim()
+  let name = String(original || 'po.pdf').trim() || 'po.pdf'
+  // Renaming an already filed PO: start again from the original name.
+  if (po && name.startsWith(`PO ${po} - `)) name = name.slice(`PO ${po} - `.length)
+  if (/^Quote [^ ]+ - /.test(name)) name = name.replace(/^Quote [^ ]+ - /, '')
+  const parts = [po ? `PO ${po}` : '', quote ? `Quote ${quote}` : '', name].filter(Boolean)
+  return parts.join(' - ').slice(0, 200)
 }
 
 /**
