@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ChevronDown, ChevronUp, Copy, CreditCard, ExternalLink, History, Pencil, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, Copy, CreditCard, ExternalLink, History, Pencil, Trash2, Workflow } from 'lucide-react'
 import type { Invoice, UserRole } from '../../lib/types'
 import { can } from '../../lib/permissions'
 import { canMakePayLink } from '../../lib/invoicePayLink'
@@ -20,6 +20,8 @@ export type InvoiceRowActionsProps = {
   onDelete: (inv: Invoice) => void
   /** Opens the chase log (calls, emails, promised payment dates). */
   onChase?: (inv: Invoice) => void
+  /** Opens the document chain (quote, PO, delivery notes, payments). */
+  onChain?: (inv: Invoice) => void
 }
 
 export default function InvoiceRowActions({
@@ -35,6 +37,7 @@ export default function InvoiceRowActions({
   onDuplicate,
   onDelete,
   onChase,
+  onChain,
 }: InvoiceRowActionsProps) {
   const unpaid =
     !isCancelledInvoice(inv) && effectiveInvoicePaymentStatus(inv) !== 'Paid'
@@ -82,6 +85,11 @@ export default function InvoiceRowActions({
           onClick={() => onCopyPayLink(inv)}
         >
           <CreditCard size={13} /> Card link
+        </button>
+      ) : null}
+      {onChain ? (
+        <button type="button" className={styles.btn} onClick={() => onChain(inv)}>
+          <Workflow size={13} /> Chain
         </button>
       ) : null}
       {onChase && unpaid && String(inv.status).toLowerCase() !== 'draft' ? (
