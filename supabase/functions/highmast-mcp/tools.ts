@@ -203,6 +203,48 @@ async function loadAging(ctx: ToolContext) {
   return { rows, tasks: tasks.rows, setupMissing: log.missing || tasks.missing || settings.missing, paymentsVisible }
 }
 
+// ---- Quote notes and revisions (20261329090000_quote_revisions.sql) --------------
+
+export const QUOTE_SETUP_MISSING = "Quote notes and revisions are not set up in HighMast yet (run quote-revisions.sql)."
+
+/** Was this a missing quote revisions function or table (SQL not run yet)? */
+export function isQuoteSetupMissing(e: DbResult["error"]): boolean {
+  return !!e && (isMissingTable(e) || e.code === "PGRST202" || e.code === "42883" || /could not find the function/i.test(e.message || ""))
+}
+
+/** One quote by id or by number (e.g. RR-01-26008 or RR-01-26008-R1), visible to this key. */
+export async function findQuote(ctx: ToolContext, a: Row): Promise<Row> {
+  if (!!a.quote_id === !!a.reference) throw new ToolError("Give exactly one of quote_id or reference.")
+  const found = await softRows((soft) => {
+    let q = ctx.db.from("quotations").select("*").limit(2)
+    q = a.quote_id ? q.eq("id", String(a.quote_id)) : q.eq("reference_number", String(a.reference).trim())
+    if (soft) q = q.is("deleted_at", null)
+    return q
+  }, "find the quote")
+  if (!found.length) throw new ToolError("No quote with that id or number is visible to this key.")
+  if (found.length > 1) throw new ToolError("More than one quote has that number. Use quote_id.")
+  return found[0]
+}
+
+/** The notes of a quote's whole chain (all revisions), newest first. */
+export async function quoteChainNotes(ctx: ToolContext, q: Row, limit = 20): Promise<Row[]> {
+  const base = String(q.base_reference || "").trim() || String(q.reference_number || "").replace(/(_revision\s+\d+|-R\d+)$/i, "")
+  let ids = [String(q.id)]
+  if (base) {
+    // One after the other (not Promise.all): keeps a single connection's work in order.
+    const byBase = await ctx.db.from("quotations").select("id").eq("base_reference", base).limit(100)
+    const byRef = await ctx.db.from("quotations").select("id").eq("reference_number", base).limit(5)
+    for (const r of [...((check(byBase, "read the quote's revisions") as Row[] | null) || []), ...((check(byRef, "read the quote") as Row[] | null) || [])]) {
+      ids.push(String(r.id))
+    }
+    ids = [...new Set(ids)]
+  }
+  const res = await ctx.db.from("quote_notes").select("created_at, quote_ref, kind, body, created_by_email, source")
+    .in("quotation_id", ids).order("created_at", { ascending: false }).limit(limit)
+  if (isQuoteSetupMissing(res.error)) return []
+  return (check(res, "read quote notes") as Row[] | null) || []
+}
+
 type FoundDeal = { pipeline: McpPipeline; row: Row }
 
 /** Finds a deal by id in one pipeline, or in all three when none is given. */
@@ -741,6 +783,39 @@ export const TOOLS: ToolDef[] = [
       const changed = (check(res, "update the chase task") as Row[] | null) || []
       if (!changed.length) throw new ToolError("No open chase task with that id is visible to this key.")
       return { updated: true, ...changed[0] }
+    },
+  },
+  {
+    name: "add_quote_note",
+    title: "Add quote note",
+    description:
+      "Add a note to a quote's append-only notes log (e.g. what was agreed in a meeting). Works in every status, including Sent and other locked quotes; it never changes the quote, its lines or totals. Give quote_id or reference (e.g. RR-01-26008). Returns the latest notes of the quote and all its revisions.",
+    readOnly: false,
+    input: {
+      quote_id: uuid("quote_id").optional(),
+      reference: z.string().max(60).optional().describe("Quote number, e.g. RR-01-26008 or RR-01-26008-R1."),
+      note: z.string().min(1).max(3800),
+    },
+    run: async (a, ctx) => {
+      const note = String(a.note || "").trim()
+      if (!note) throw new ToolError("Write the note.")
+      const q = await findQuote(ctx, a)
+      const res = await ctx.db
+        .from("quote_notes")
+        .insert({ quotation_id: q.id, kind: "note", body: (note + signature(ctx.key)).slice(0, 4000) })
+        .select("id, created_at")
+        .single()
+      if (isQuoteSetupMissing(res.error)) throw new ToolError(QUOTE_SETUP_MISSING)
+      const row = check(res, "add the quote note") as Row
+      return {
+        added: true,
+        note_id: row.id,
+        quote_id: q.id,
+        reference: q.reference_number || null,
+        client: q.client,
+        status: q.status,
+        recent_notes: await quoteChainNotes(ctx, q, 10),
+      }
     },
   },
   {

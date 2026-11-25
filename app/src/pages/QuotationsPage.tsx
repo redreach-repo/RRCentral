@@ -68,7 +68,10 @@ import { commitStockForInvoice, releaseStockForQuote, reserveStockForQuote } fro
 import { syncCrmFromQuote } from '../lib/crmSync'
 import { ensureCompanyFromDocument } from '../lib/ensureCompanyFromDocument'
 import { formatAED } from '../lib/money'
-import { formatRevisionReference, parseBaseReference } from '../lib/referenceNumber'
+import ReviseQuoteForm from '../components/quotations/ReviseQuoteForm'
+import QuoteNotesPanel from '../components/quotations/QuoteNotesPanel'
+import { isDraftRevision, revisionMeta } from '../lib/quoteRevisions'
+import { finalizeRevision } from '../lib/quoteRevisionsStore'
 import { allocateReference } from '../lib/numbering'
 import { parseQuotationForm } from '../lib/schemas/quotation'
 import { parseQuotationFinalizeForm } from '../lib/schemas/quotationFinalize'
@@ -240,6 +243,9 @@ export default function QuotationsPage() {
   const [convertTarget, setConvertTarget] = useState<Quotation | null>(null)
   const [depositPct, setDepositPct] = useState('100')
   const [dnTarget, setDnTarget] = useState<Quotation | null>(null)
+  // Revise (new Draft -R1) or Extend validity (one step); notes and history per quote.
+  const [reviseTarget, setReviseTarget] = useState<{ quote: Quotation; mode: 'revise' | 'extend' } | null>(null)
+  const [notesFor, setNotesFor] = useState<Quotation | null>(null)
   const [supplierInvoiceTarget, setSupplierInvoiceTarget] = useState<Quotation | null>(null)
   const [vatFoldOpen, setVatFoldOpen] = useState(false)
   const [vatFoldTarget, setVatFoldTarget] = useState('')
@@ -868,6 +874,10 @@ export default function QuotationsPage() {
       showToast(parsed.error, 'error')
       return
     }
+    if (isDraftRevision(q)) {
+      await finalizeQuoteRevision(q)
+      return
+    }
     setSaving(true)
     try {
       const { data: allRefs } = await db.from('quotations').select('reference_number')
@@ -934,6 +944,10 @@ export default function QuotationsPage() {
 
   async function undoFinalize(q: Quotation) {
     if (!q.reference_number) return
+    if ((q as Quotation & { revised_from?: string | null }).revised_from) {
+      showToast('A finalized revision cannot go back to Draft. Revise it again instead.', 'error')
+      return
+    }
     setSaving(true)
     try {
       const { data: inv } = await db
@@ -966,65 +980,41 @@ export default function QuotationsPage() {
     }
   }
 
-  async function revise(q: Quotation) {
+  /**
+   * Finalize a Draft revision (RR-01-26008-R1): it keeps its number and the
+   * older live quote of the same base becomes Superseded (its totals and PDF
+   * stay as they are). Done in the database: rr_quote_finalize_revision.
+   */
+  async function finalizeQuoteRevision(q: Quotation) {
+    setSaving(true)
+    try {
+      const res = await finalizeRevision(q.id)
+      await logActivity('finalize_quote', 'quotation', q.reference_number, q.client, who)
+      await syncCrmFromQuote({
+        client: q.client,
+        quoteRef: q.reference_number,
+        quoteStatus: 'Finalized',
+        userEmail: who,
+      })
+      const old = res.superseded.map((x) => x.reference).filter(Boolean)
+      showToast(
+        old.length ? `Finalized ${q.reference_number}; ${old.join(', ')} now Superseded` : `Finalized ${q.reference_number}`,
+        'success',
+      )
+      await load()
+    } catch (e) {
+      showToast(errorMessage(e, 'Finalize failed'), 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function revise(q: Quotation) {
     if (!q.reference_number) {
       showToast('Finalize before revising', 'error')
       return
     }
-    setSaving(true)
-    try {
-      const base = parseBaseReference(q.base_reference || q.reference_number)
-      const nextRev = Number(q.revision || 0) + 1
-      const newRef = formatRevisionReference(base, nextRev)
-      const newQuoteId = makeQuoteId()
-      const items = await loadLineItems('Quote', q.quote_id)
-
-      await db.from('quotations').update({ status: 'Superseded', updated_by: who }).eq('id', q.id)
-
-      const newDate = format(new Date(), 'yyyy-MM-dd')
-      const validityDays = Number(settings.quoteValidityDays || 14) || 14
-      const { error } = await db.from('quotations').insert({
-        client: q.client,
-        vertical: q.vertical,
-        division_code: q.division_code,
-        description: q.description,
-        payment_terms: q.payment_terms,
-        delivery_terms: q.delivery_terms,
-        moq: q.moq,
-        notes: q.notes,
-        date: newDate,
-        amount: q.amount,
-        status: 'Finalized',
-        reference_number: newRef,
-        base_reference: base,
-        revision: nextRev,
-        quote_id: newQuoteId,
-        valid_until: quoteValidUntil(newDate, validityDays),
-        created_by: who,
-        updated_by: who,
-      })
-      if (error) throw error
-
-      await saveLineItems(
-        'Quote',
-        newQuoteId,
-        toDraftItems(items),
-        vatRate,
-      )
-      await logActivity('revise_quote', 'quotation', newRef, `Rev ${nextRev} of ${base}`, who)
-      await syncCrmFromQuote({
-        client: q.client,
-        quoteRef: newRef,
-        quoteStatus: 'Finalized',
-        userEmail: who,
-      })
-      showToast(`Created revision ${newRef}`, 'success')
-      await load()
-    } catch (e) {
-      showToast(errorMessage(e, 'Revise failed'), 'error')
-    } finally {
-      setSaving(false)
-    }
+    setReviseTarget({ quote: q, mode: 'revise' })
   }
 
   async function duplicate(q: Quotation) {
@@ -1415,6 +1405,8 @@ export default function QuotationsPage() {
 
   function quoteMeta(q: Quotation): string {
     const bits: string[] = []
+    const rev = revisionMeta(q, quotes)
+    if (rev) bits.push(rev)
     if (q.valid_until && q.reference_number) {
       bits.push(`Valid until ${format(new Date(q.valid_until), 'dd MMM yyyy')}`)
     }
@@ -1440,7 +1432,9 @@ export default function QuotationsPage() {
         onEdit={(row) => void openEdit(row)}
         onFinalize={(row) => void finalize(row)}
         onUndoFinalize={(row) => void undoFinalize(row)}
-        onRevise={(row) => void revise(row)}
+        onRevise={(row) => revise(row)}
+        onExtend={(row) => setReviseTarget({ quote: row, mode: 'extend' })}
+        onNotes={(row) => setNotesFor(row)}
         onOutcome={(row) => {
           setOutcomeTarget(row)
           setOutcomeStatus('Awarded')
@@ -2678,6 +2672,54 @@ export default function QuotationsPage() {
             {(deleteTarget as (Quotation & { deleted_at?: string | null }) | null)?.deleted_at ? 'Restore' : 'Archive'}
           </button>
         </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(reviseTarget)}
+        title={
+          reviseTarget
+            ? `${reviseTarget.mode === 'extend' ? 'Extend validity' : 'Revise'}: ${reviseTarget.quote.reference_number} (${reviseTarget.quote.client})`
+            : 'Revise'
+        }
+        onClose={() => setReviseTarget(null)}
+        width={560}
+      >
+        {reviseTarget ? (
+          <ReviseQuoteForm
+            quote={reviseTarget.quote}
+            mode={reviseTarget.mode}
+            allQuotes={quotes}
+            onCancel={() => setReviseTarget(null)}
+            onDone={async (res) => {
+              const target = reviseTarget
+              setReviseTarget(null)
+              const ref = res.quote.reference_number
+              await logActivity(
+                target.mode === 'extend' ? 'extend_quote_validity' : 'revise_quote',
+                'quotation',
+                ref,
+                `${target.mode === 'extend' ? 'Extended' : 'Revision'} of ${target.quote.reference_number}`,
+                who,
+              )
+              if (target.mode === 'extend') {
+                await syncCrmFromQuote({ client: target.quote.client, quoteRef: ref, quoteStatus: res.quote.status, userEmail: who })
+                showToast(`${ref} is valid until ${res.quote.valid_until}; ${target.quote.reference_number} is now Superseded`, 'success')
+              } else {
+                showToast(`Created ${ref} as a Draft. Edit it, then Finalize to replace ${target.quote.reference_number}.`, 'success')
+              }
+              await load()
+            }}
+          />
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={Boolean(notesFor)}
+        title={notesFor ? `Notes: ${notesFor.reference_number || 'Draft quote'} (${notesFor.client})` : 'Notes'}
+        onClose={() => setNotesFor(null)}
+        width={720}
+      >
+        {notesFor ? <QuoteNotesPanel quote={notesFor} onChanged={() => void load()} /> : null}
       </Modal>
 
       <Modal open={!!outcomeTarget} title="Set outcome" onClose={() => setOutcomeTarget(null)} width={440}>

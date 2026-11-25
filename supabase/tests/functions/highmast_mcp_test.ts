@@ -23,6 +23,8 @@ const EXPECTED_TOOLS = [
   "move_deal_stage", "search_accounts",
   // Overdue invoice chasing: aging, chase notes, chase tasks (never sends, never changes invoices).
   "list_invoice_aging", "add_invoice_chase_note", "complete_invoice_chase_task",
+  // Quote notes (append-only; revise and extend are admin tools).
+  "add_quote_note",
   // Read-only PDF tools (tools_pdf.ts): every key, limited by what its member can see.
   "get_delivery_note_pdf", "get_invoice_pdf", "get_quote_pdf",
 ].sort()

@@ -11,7 +11,19 @@
 // Each call is also logged as an "AI tool call" by runTool, like every tool.
 import type { McpServer } from "npm:@modelcontextprotocol/sdk@1.32.2/server/mcp.js"
 import { z } from "npm:zod@3.25.76"
-import { check, runTool, toolOffered, ToolError, type Row, type ToolContext, type ToolDef } from "./tools.ts"
+import {
+  check,
+  findQuote,
+  isQuoteSetupMissing,
+  QUOTE_SETUP_MISSING,
+  quoteChainNotes,
+  runTool,
+  toolOffered,
+  ToolError,
+  type Row,
+  type ToolContext,
+  type ToolDef,
+} from "./tools.ts"
 import {
   divisionVertical,
   DIVISION_CODES as DIVISION_CODE_LIST,
@@ -252,6 +264,13 @@ async function rpc(ctx: ToolContext, fn: string, args: Row, what: string): Promi
   return check(await ctx.db.rpc(fn, args), what)
 }
 
+/** Quote revision functions: a clear message before quote-revisions.sql is run. */
+async function revisionRpc(ctx: ToolContext, fn: string, args: Row, what: string): Promise<Row> {
+  const res = await ctx.db.rpc(fn, args)
+  if (isQuoteSetupMissing(res.error)) throw new ToolError(QUOTE_SETUP_MISSING)
+  return check(res, what) as Row
+}
+
 async function save(ctx: ToolContext, table: string, id: string | null, data: Row, tool: string, args: Row): Promise<Row> {
   return (await rpc(ctx, "rr_mcp_save", { p_table: table, p_id: id, p_data: data, p_tool: tool, p_args: args }, `save ${table}`)) as Row
 }
@@ -468,12 +487,12 @@ export const ADMIN_TOOLS: ToolDef[] = [
     }),
 
   // ---- Quotes ------------------------------------------------------------------
-  R("get_quote", "Get a quote with its lines", "A quotation with its line items.",
+  R("get_quote", "Get a quote with its lines", "A quotation with its line items and the latest notes of the quote and its revisions.",
     { quote_id: uuid },
     async (a, ctx) => {
       const q = await getRow(ctx, "quotations", String(a.quote_id), "quote")
       const lines = check(await ctx.db.from("line_items").select("*").eq("doc_type", "Quote").eq("reference", String(q.quote_id || "")).order("line_no"), "read quote lines") as Row[]
-      return { quote: q, lines: (lines || []).map((l) => clean(null, l)) }
+      return { quote: q, lines: (lines || []).map((l) => clean(null, l)), notes: await quoteChainNotes(ctx, q, 20) }
     }),
   W("create_quote", "Create a quote (Draft)",
     "Create a Draft quotation with line items. VAT 5% UAE and currency AED by default. A line discount comes off that line's unit price. Returns the quote's id, its draft id (Q-...) and totals; the RR-XX-YYNNN quote number is given by finalize_quote, as in the app.",
@@ -513,11 +532,60 @@ export const ADMIN_TOOLS: ToolDef[] = [
       const q = res.quote as Row
       return { updated: true, quote_id: q.id, status: q.status, totals: res.totals }
     }),
-  W("finalize_quote", "Finalize a quote", "Give a Draft quote its RR-XX-YYNNN number and status Finalized (then it can be sent or converted, and no longer edited).",
+  W("finalize_quote", "Finalize a quote", "Give a Draft quote its RR-XX-YYNNN number and status Finalized (then it can be sent or converted, and no longer edited). A draft revision (RR-XX-YYNNN-R1) keeps its number, and the quote it replaces becomes Superseded.",
     { quote_id: uuid },
     async (a, ctx) => {
+      const draft = await getRow(ctx, "quotations", String(a.quote_id), "quote")
+      if (draft.revised_from && draft.status === "Draft") {
+        const res = await revisionRpc(ctx, "rr_quote_finalize_revision", { p_id: a.quote_id, p_status: "Finalized", p_args: a }, "finalize the revision")
+        const q = res.quote as Row
+        return {
+          finalized: true, quote_id: q.id, quote_number: q.reference_number, total: q.amount, currency: q.quotation_currency || q.currency,
+          valid_until: q.valid_until, superseded: res.superseded,
+        }
+      }
       const q = await rpc(ctx, "rr_mcp_quote_finalize", { p_id: a.quote_id, p_prefix: "RR", p_args: a }, "finalize the quote") as Row
       return { finalized: true, quote_id: q.id, quote_number: q.reference_number, total: q.amount, currency: q.quotation_currency || q.currency, valid_until: q.valid_until }
+    }),
+  W("revise_quote", "Revise a sent quote (new Draft revision)",
+    "Make a new Draft revision of a Finalized, Sent or Expired quote: same client, contact, lines, terms, MOQ, notes and currency, numbered RR-XX-YYNNN-R1 (R2...). The original stays as it is until the revision is finalized (finalize_quote); then it becomes Superseded. Its totals and PDF never change. Change the draft with update_quote. Only one open revision per quote. Give quote_id or reference.",
+    {
+      quote_id: uuid.optional(),
+      reference: z.string().max(60).optional().describe("Quote number, e.g. RR-01-26008."),
+      valid_until: date.optional().describe("New validity date (default: the old valid-until + 14 days)."),
+      reason: z.string().max(1000).optional().describe("Why it is revised (goes in the quote notes)."),
+    },
+    async (a, ctx) => {
+      const q = await findQuote(ctx, a)
+      const res = await revisionRpc(ctx, "rr_quote_revise", {
+        p_id: q.id, p_valid_until: a.valid_until ?? null, p_reason: String(a.reason || ""), p_extend: false, p_args: a,
+      }, "revise the quote")
+      const r = res.quote as Row
+      return {
+        revised: true, quote_id: r.id, quote_number: r.reference_number, status: r.status, valid_until: r.valid_until,
+        total: r.amount, lines_copied: res.lines_copied, revised_from: res.revised_from,
+        next: "Change it with update_quote if needed, then finalize_quote. Until then the original stays live.",
+      }
+    }),
+  W("extend_quote_validity", "Extend a quote's validity",
+    "Give a Finalized, Sent or Expired quote a later valid-until date in one step: makes revision RR-XX-YYNNN-R1 with the same lines and prices and the new date, finalizes it (a Sent quote stays Sent) and marks the old one Superseded. Records who extended it and why. Nothing is sent to the client. Give quote_id or reference.",
+    {
+      quote_id: uuid.optional(),
+      reference: z.string().max(60).optional().describe("Quote number, e.g. RR-01-26008."),
+      valid_until: date.describe("The new valid-until date, after the current one."),
+      reason: z.string().min(1).max(1000).describe("Why (e.g. agreed in the meeting with the buyer on 25 Nov)."),
+    },
+    async (a, ctx) => {
+      const q = await findQuote(ctx, a)
+      const res = await revisionRpc(ctx, "rr_quote_extend_validity", {
+        p_id: q.id, p_valid_until: a.valid_until, p_reason: String(a.reason || ""), p_args: a,
+      }, "extend the quote")
+      const r = res.quote as Row
+      return {
+        extended: true, quote_id: r.id, quote_number: r.reference_number, status: r.status,
+        valid_until: r.valid_until, previous_valid_until: (res.revised_from as Row)?.valid_until ?? null,
+        total: r.amount, superseded: res.superseded, notes: await quoteChainNotes(ctx, r, 5),
+      }
     }),
   W("mark_quote_sent", "Mark a quote as sent", "Record that a finalized quote was sent to the client (status Sent, sent date today). Does not email anything.",
     { quote_id: uuid },

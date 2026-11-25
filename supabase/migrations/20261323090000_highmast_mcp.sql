@@ -295,7 +295,9 @@ declare
     'accounts', 'account_contacts', 'account_activities',
     'crm', 'follow_up_updates', 'sales_deals', 'ctrm_deals', 'ctrm_deal_stage_changes',
     -- Overdue invoice chasing (20261328090000_ar_chase.sql): chase notes only.
-    'invoice_chase_log'
+    'invoice_chase_log',
+    -- Quote notes (20261329090000_quote_revisions.sql): append-only notes.
+    'quote_notes'
   ];
   -- The only tables an AI key may change (stage and next follow-up on deals).
   updatable text[] := array['crm', 'sales_deals', 'ctrm_deals', 'invoice_chase_tasks'];

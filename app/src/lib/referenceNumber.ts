@@ -1,7 +1,7 @@
 /**
  * Finalized reference format: `{prefix}-{divisionCode}-{YY}{seq3}`
  * e.g. RR-01-26004
- * Also recognizes revision suffixes: RR-01-26004_revision 1
+ * Also recognizes revision suffixes: RR-01-26004-R1 (and the older RR-01-26004_revision 1)
  */
 export function generateReference(
   divisionCode: string,
@@ -27,14 +27,15 @@ export function generateReference(
 export function parseBaseReference(reference: string): string {
   const ref = String(reference || '').trim()
   if (!ref) return ''
-  const m = ref.match(/^(.*)_revision\s+\d+$/i)
+  const m = ref.match(/^(.*?)(?:_revision\s+\d+|-R\d+)$/i)
   return m ? m[1] : ref
 }
 
+/** Revision number shown on the quote: RR-01-26008-R1 (revision 0 is the base number). */
 export function formatRevisionReference(baseReference: string, revision: number): string {
   const rev = Number(revision || 0)
   if (!rev) return baseReference
-  return `${baseReference}_revision ${rev}`
+  return `${baseReference}-R${rev}`
 }
 
 function escapeRegExp(s: string): string {

@@ -9,6 +9,8 @@ import {
   isMcpKeyShape,
   MCP_KEY_ROLES,
   MCP_TOOLS,
+  MCP_ADMIN_TOOLS,
+  adminToolNameProblem,
   normalizeCompany,
   pageFrom,
   pageOf,
@@ -22,7 +24,7 @@ import {
 } from './highmastMcp'
 
 describe('MCP tool list', () => {
-  it('has the 14 tools from the spec plus the 3 chase tools, and nothing else', () => {
+  it('has the 14 tools from the spec plus the 3 chase tools and add_quote_note, and nothing else', () => {
     expect([...MCP_TOOLS].sort()).toEqual(
       [
         'search_accounts', 'get_account', 'list_deals', 'get_deal', 'list_follow_ups_due', 'list_tickets',
@@ -30,6 +32,8 @@ describe('MCP tool list', () => {
         'move_deal_stage', 'create_follow_up',
         // Overdue invoice chasing (fix 1)
         'list_invoice_aging', 'add_invoice_chase_note', 'complete_invoice_chase_task',
+        // Revise and extend sent quotes (fix 2)
+        'add_quote_note',
       ].sort(),
     )
   })
@@ -39,6 +43,19 @@ describe('MCP tool list', () => {
       expect(toolAllowedForDepartments(t, ['finance']), t).toBe(true)
       expect(toolAllowedForDepartments(t, ['sales']), t).toBe(true)
       expect(toolAllowedForDepartments(t, ['hr', 'payroll', 'support']), t).toBe(false)
+    }
+  })
+
+  it('offers quote notes to whoever reads quotes, and revise / extend to sales admin keys only', () => {
+    expect(toolAllowedForDepartments('add_quote_note', ['finance'])).toBe(true)
+    expect(toolAllowedForDepartments('add_quote_note', ['sales'])).toBe(true)
+    expect(toolAllowedForDepartments('add_quote_note', ['hr', 'support'])).toBe(false)
+    for (const t of ['revise_quote', 'extend_quote_validity']) {
+      expect(MCP_ADMIN_TOOLS as readonly string[], t).toContain(t)
+      expect(MCP_TOOLS as readonly string[], t).not.toContain(t)
+      expect(toolAllowedForDepartments(t, ['sales']), t).toBe(true)
+      expect(toolAllowedForDepartments(t, ['finance', 'hr']), t).toBe(false)
+      expect(adminToolNameProblem(t), t).toBeNull()
     }
   })
 

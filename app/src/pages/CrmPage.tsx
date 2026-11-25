@@ -130,6 +130,7 @@ import {
   syncCrmContactsToAccount,
   type CrmAccountLink,
 } from '../lib/crmAccountLink'
+import { DealQuoteNotes } from '../components/quotations/QuoteNotesPanel'
 
 type CrmForm = {
   company_name: string
@@ -1959,6 +1960,11 @@ export default function CrmPage() {
                           placeholder="RR-01-26001"
                         />
                       </Field>
+                      {editing?.quote_ref ? (
+                        <div style={{ gridColumn: '1 / -1' }}>
+                          <DealQuoteNotes quoteRef={editing.quote_ref} />
+                        </div>
+                      ) : null}
                       {form.pipeline_stage === 'Lost' ? (
                         <div style={{ gridColumn: '1 / -1' }}>
                           <LostReasonFields

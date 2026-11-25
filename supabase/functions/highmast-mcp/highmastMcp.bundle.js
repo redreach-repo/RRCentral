@@ -2287,7 +2287,9 @@ var MCP_WRITE_TOOLS = [
   "create_follow_up",
   // Overdue invoice chasing: a chase note never changes the invoice or its money.
   "add_invoice_chase_note",
-  "complete_invoice_chase_task"
+  "complete_invoice_chase_task",
+  // Quote notes: append-only, never changes the quote, its lines or totals.
+  "add_quote_note"
 ];
 var MCP_TOOLS = [...MCP_READ_TOOLS, ...MCP_WRITE_TOOLS];
 var FORBIDDEN_TOOL_WORDS = [
@@ -2349,6 +2351,8 @@ var MCP_ADMIN_TOOLS = [
   "finalize_quote",
   "mark_quote_sent",
   "convert_quote_to_invoice",
+  "revise_quote",
+  "extend_quote_validity",
   "get_invoice",
   "create_invoice",
   "update_invoice",
@@ -2446,6 +2450,8 @@ var MCP_TOOL_DEPARTMENTS = {
   list_invoice_aging: ["finance", "sales"],
   add_invoice_chase_note: ["finance", "sales"],
   complete_invoice_chase_task: ["finance", "sales"],
+  // Quote notes (whoever reads quotes)
+  add_quote_note: ["sales", "finance"],
   // Any area (narrowed to the department's records)
   list_records: ALL_DEPTS,
   get_record: ALL_DEPTS,
@@ -2468,6 +2474,8 @@ var MCP_TOOL_DEPARTMENTS = {
   update_quote: ["sales"],
   finalize_quote: ["sales"],
   mark_quote_sent: ["sales"],
+  revise_quote: ["sales"],
+  extend_quote_validity: ["sales"],
   convert_quote_to_invoice: ["finance"],
   // Invoices and money
   get_invoice: ["finance"],

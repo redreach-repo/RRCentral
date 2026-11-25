@@ -53,6 +53,8 @@ export const MCP_WRITE_TOOLS = [
   // Overdue invoice chasing: a chase note never changes the invoice or its money.
   'add_invoice_chase_note',
   'complete_invoice_chase_task',
+  // Quote notes: append-only, never changes the quote, its lines or totals.
+  'add_quote_note',
 ] as const
 export const MCP_TOOLS = [...MCP_READ_TOOLS, ...MCP_WRITE_TOOLS] as const
 export type McpToolName = (typeof MCP_TOOLS)[number]
@@ -89,6 +91,7 @@ export const MCP_ADMIN_TOOLS = [
   'create_deal', 'update_deal', 'set_deal_stage', 'close_deal',
   // Quotes, invoices, payments, expenses
   'get_quote', 'create_quote', 'update_quote', 'finalize_quote', 'mark_quote_sent', 'convert_quote_to_invoice',
+  'revise_quote', 'extend_quote_validity',
   'get_invoice', 'create_invoice', 'update_invoice', 'finalize_invoice',
   'record_payment', 'reverse_payment', 'create_credit_note', 'create_expense', 'update_expense',
   // Support desk
@@ -177,6 +180,8 @@ export const MCP_TOOL_DEPARTMENTS: Record<string, McpDepartment[]> = {
   list_invoice_aging: ['finance', 'sales'],
   add_invoice_chase_note: ['finance', 'sales'],
   complete_invoice_chase_task: ['finance', 'sales'],
+  // Quote notes (whoever reads quotes)
+  add_quote_note: ['sales', 'finance'],
   // Any area (narrowed to the department's records)
   list_records: ALL_DEPTS,
   get_record: ALL_DEPTS,
@@ -199,6 +204,8 @@ export const MCP_TOOL_DEPARTMENTS: Record<string, McpDepartment[]> = {
   update_quote: ['sales'],
   finalize_quote: ['sales'],
   mark_quote_sent: ['sales'],
+  revise_quote: ['sales'],
+  extend_quote_validity: ['sales'],
   convert_quote_to_invoice: ['finance'],
   // Invoices and money
   get_invoice: ['finance'],

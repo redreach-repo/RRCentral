@@ -386,6 +386,11 @@ begin
       -- whoever reads invoices may log a chase or finish a chase task.
       expr_r := '(select public.rr_mcp_dept_allows(''invoices'', false))';
       expr_w := expr_r;
+    elsif t.name = 'quote_notes' then
+      -- Quote notes (20261329090000_quote_revisions.sql) follow quotes:
+      -- whoever reads quotes may add a note.
+      expr_r := '(select public.rr_mcp_dept_allows(''quotations'', false))';
+      expr_w := expr_r;
     else
       -- Wrapped in a sub-select so it is worked out once per query, not per row.
       expr_r := format('(select public.rr_mcp_dept_allows(%L, false))', t.name);
