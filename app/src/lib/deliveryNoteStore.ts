@@ -1,5 +1,5 @@
 import { db } from './db'
-import { asError, shouldFallbackDeliveryNoteStorage } from './errors'
+import { asError, isUndefinedColumnError, shouldFallbackDeliveryNoteStorage } from './errors'
 import {
   loadLineItems,
   saveLineItems,
@@ -130,9 +130,24 @@ export async function getDeliveryNote(id: string): Promise<DeliveryNote | null> 
   return blob.notes.find((n) => n.id === id) || null
 }
 
+/** The PO / invoice link columns, left out when the link SQL is not on the database yet. */
+function withoutLinkColumns<T extends Partial<DeliveryNote>>(row: T): T {
+  const rest = { ...row }
+  delete rest.client_po_id
+  delete rest.invoice_ref
+  return rest
+}
+
+function hasLinkColumns(row: Partial<DeliveryNote>): boolean {
+  return 'client_po_id' in row || 'invoice_ref' in row
+}
+
 export async function insertDeliveryNote(note: DeliveryNote): Promise<DeliveryNote> {
   if (tableMissing !== true) {
-    const { error } = await db.from('delivery_notes').insert(note)
+    let { error } = await db.from('delivery_notes').insert(note)
+    if (error && isUndefinedColumnError(error) && hasLinkColumns(note)) {
+      ;({ error } = await db.from('delivery_notes').insert(withoutLinkColumns(note)))
+    }
     if (!error) {
       tableMissing = false
       return note
@@ -148,7 +163,10 @@ export async function insertDeliveryNote(note: DeliveryNote): Promise<DeliveryNo
 
 export async function updateDeliveryNote(id: string, patch: Partial<DeliveryNote>): Promise<void> {
   if (tableMissing !== true) {
-    const { error } = await db.from('delivery_notes').update(patch).eq('id', id)
+    let { error } = await db.from('delivery_notes').update(patch).eq('id', id)
+    if (error && isUndefinedColumnError(error) && hasLinkColumns(patch)) {
+      ;({ error } = await db.from('delivery_notes').update(withoutLinkColumns(patch)).eq('id', id))
+    }
     if (error && shouldFallbackDeliveryNoteStorage(error)) tableMissing = true
     else if (error) throw asError(error, 'Could not save delivery note')
     else tableMissing = false
