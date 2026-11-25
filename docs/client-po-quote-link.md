@@ -52,3 +52,20 @@ Migration `20261330090000_client_po_quote_link.sql` (copy: project file
 1. Run `client-po-quote-link.sql` in the Supabase SQL editor.
 2. Deploy `client-po-file` (Actions > Deploy Edge Functions). This is only needed
    for the quote number in Drive file names. Linking works without it.
+
+## Delivery notes to the PO and invoice (step 2)
+
+Migration `20261330100000_delivery_note_po_invoice_link.sql` (project file
+`supabase-sql/delivery-note-po-invoice-link.sql`) adds `delivery_notes.client_po_id`
+and `delivery_notes.invoice_ref`. A trigger, running as the person, only lets a
+note point at a PO that person can see in the same company.
+
+- A delivery note made from a quote takes the quote's client PO when the quote
+  has exactly one. If the invoice was already made from the quote, the note
+  takes that invoice number too.
+- When **Invoice** is used on a quote, that quote's delivery notes that are not
+  yet invoiced get the invoice number.
+- **Delivery notes > Edit** has **Client PO** and **Invoice** pickers. The list
+  shows "PO … · Invoice …" (or "Not invoiced"), search finds notes by PO or
+  invoice number, and the CSV has `client_po` and `invoice_ref`.
+- Before the SQL is run, saving still works and the links are skipped.

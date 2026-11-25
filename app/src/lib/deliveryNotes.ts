@@ -5,6 +5,7 @@ import { isInternalDraftId } from './documents'
 import { generateReference } from './referenceNumber'
 import { allocateReference } from './numbering'
 import { loadLineItems, newDraftLine, toDraftItems, type DraftLineItem } from './lineItems'
+import { linksForNewNote } from './deliveryNoteLinksStore'
 import {
   insertDeliveryNote,
   listDeliveryNoteRefs,
@@ -192,6 +193,9 @@ export async function createDeliveryNoteFromQuote(opts: {
     }
   }
 
+  // Point at the quote's client PO and the invoice already made from it (best effort).
+  const links = opts.quote.id ? await linksForNewNote(opts.quote) : { client_po_id: null, invoice_ref: '' }
+
   const now = new Date().toISOString()
   const id = crypto.randomUUID()
   const row = buildDeliveryNoteRow({
@@ -203,6 +207,8 @@ export async function createDeliveryNoteFromQuote(opts: {
   const payload: DeliveryNote = {
     id,
     ...row,
+    ...(links.client_po_id ? { client_po_id: links.client_po_id } : {}),
+    ...(links.invoice_ref ? { invoice_ref: links.invoice_ref } : {}),
     created_at: now,
     updated_at: now,
   }

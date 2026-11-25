@@ -393,6 +393,10 @@ export interface DeliveryNote {
   notes: string
   received_by: string
   vehicle_notes: string
+  /** The client PO delivered against (delivery-note-po-invoice-link.sql). */
+  client_po_id?: string | null
+  /** The invoice number that billed this delivery. */
+  invoice_ref?: string
   created_by: string
   updated_by: string
   created_at: string

@@ -68,6 +68,7 @@ import { commitStockForInvoice, releaseStockForQuote, reserveStockForQuote } fro
 import { syncCrmFromQuote } from '../lib/crmSync'
 import { invoicePoNote } from '../lib/clientPoQuoteLink'
 import { loadPoNumbersByQuote } from '../lib/clientPoQuoteLinkStore'
+import { stampInvoiceOnQuoteNotes } from '../lib/deliveryNoteLinksStore'
 import { ensureCompanyFromDocument } from '../lib/ensureCompanyFromDocument'
 import { formatAED } from '../lib/money'
 import ReviseQuoteForm from '../components/quotations/ReviseQuoteForm'
@@ -1395,6 +1396,9 @@ export default function QuotationsPage() {
       } catch {
         /* advisory: the invoice is made either way */
       }
+
+      // Delivery notes of this quote not yet invoiced now point at the new invoice.
+      await stampInvoiceOnQuoteNotes(q.reference_number, q.reference_number).catch(() => {})
 
       await logActivity('convert_invoice', 'invoice', q.reference_number, `${q.client} · ${pct}%`, who)
       showToast('Invoice created', 'success')

@@ -44,6 +44,15 @@ import {
   loadSignedDeliveryNoteAttachments,
 } from '../lib/signedDeliveryNotes'
 import { errorMessage } from '../lib/errors'
+import {
+  invoiceOptionsForNote,
+  noteChainLabel,
+  noteInvoiceRef,
+  poOptionsForNote,
+  type DnInvoiceOption,
+  type DnPoOption,
+} from '../lib/deliveryNoteLinks'
+import { loadDnInvoiceOptions, loadDnPoOptions } from '../lib/deliveryNoteLinksStore'
 import { csvRowsToObjects, exportListCsv, parseCsv, parseListIoRows } from '../lib/listIo'
 import { parseDeliveryNoteForm } from '../lib/schemas/deliveryNote'
 import { parseDeliveryNoteFromQuoteForm } from '../lib/schemas/deliveryNoteFromQuote'
@@ -72,6 +81,8 @@ interface NoteForm {
   notes: string
   received_by: string
   vehicle_notes: string
+  client_po_id: string
+  invoice_ref: string
   items: DraftLineItem[]
 }
 
@@ -83,6 +94,8 @@ const emptyForm = (): NoteForm => ({
   notes: '',
   received_by: '',
   vehicle_notes: '',
+  client_po_id: '',
+  invoice_ref: '',
   items: [],
 })
 
@@ -121,6 +134,8 @@ export default function DeliveryNotesPage() {
   const [signedAttachments, setSignedAttachments] = useState<Attachment[]>([])
   const [linkSignedOpen, setLinkSignedOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<DeliveryNote | null>(null)
+  const [poOptions, setPoOptions] = useState<DnPoOption[]>([])
+  const [invoiceOptions, setInvoiceOptions] = useState<DnInvoiceOption[]>([])
 
   function closeEdit() {
     setEditing(null)
@@ -154,6 +169,11 @@ export default function DeliveryNotesPage() {
       if (qRes.error) throw qRes.error
       setNotes(sortByDateDesc(notesRows))
       setQuotes((qRes.data || []) as Quotation[])
+      // Client POs and invoices the notes point at (best effort).
+      void Promise.all([loadDnPoOptions().catch(() => []), loadDnInvoiceOptions().catch(() => [])]).then(([p, i]) => {
+        setPoOptions(p)
+        setInvoiceOptions(i)
+      })
     } catch (e) {
       showToast(errorMessage(e, 'Failed to load delivery notes'), 'error')
     } finally {
@@ -254,6 +274,15 @@ export default function DeliveryNotesPage() {
     )
   }, [quotes, quoteFilter])
 
+  const poNumberById = useMemo(() => new Map(poOptions.map((p) => [p.id, p.po_number])), [poOptions])
+  const invoiceRefs = useMemo(() => new Set(invoiceOptions.map((i) => i.reference_number)), [invoiceOptions])
+  const chainLabel = (n: DeliveryNote) =>
+    noteChainLabel(n.client_po_id ? poNumberById.get(n.client_po_id) || 'linked' : '', noteInvoiceRef(n, invoiceRefs))
+  const editingQuoteId = useMemo(
+    () => (editing ? quotes.find((q) => q.reference_number === editing.quote_ref)?.id || null : null),
+    [editing, quotes],
+  )
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return notes.filter((n) => {
@@ -263,10 +292,12 @@ export default function DeliveryNotesPage() {
         n.client.toLowerCase().includes(q) ||
         n.reference_number.toLowerCase().includes(q) ||
         n.quote_ref.toLowerCase().includes(q) ||
+        String(n.invoice_ref || '').toLowerCase().includes(q) ||
+        String((n.client_po_id && poNumberById.get(n.client_po_id)) || '').toLowerCase().includes(q) ||
         n.description.toLowerCase().includes(q)
       )
     })
-  }, [notes, search, tab])
+  }, [notes, search, tab, poNumberById])
 
   async function createFromQuote() {
     const parsed = parseDeliveryNoteFromQuoteForm({ quoteId: quotePick })
@@ -306,6 +337,8 @@ export default function DeliveryNotesPage() {
         notes: note.notes || '',
         received_by: note.received_by || '',
         vehicle_notes: note.vehicle_notes || '',
+        client_po_id: note.client_po_id || '',
+        invoice_ref: note.invoice_ref || '',
         items: toDeliveryNoteLineDrafts(items),
       })
       void refreshSignedAttachments(note).catch((e) => {
@@ -349,6 +382,8 @@ export default function DeliveryNotesPage() {
         notes: f.notes,
         received_by: f.received_by,
         vehicle_notes: f.vehicle_notes,
+        client_po_id: form.client_po_id || null,
+        invoice_ref: form.invoice_ref.trim(),
         updated_by: who,
         updated_at: new Date().toISOString(),
       })
@@ -443,11 +478,13 @@ export default function DeliveryNotesPage() {
             onClick={() => {
               exportListCsv(
                 'delivery-notes.csv',
-                ['reference_number', 'client', 'quote_ref', 'status', 'delivery_date', 'ship_to', 'notes'],
+                ['reference_number', 'client', 'quote_ref', 'client_po', 'invoice_ref', 'status', 'delivery_date', 'ship_to', 'notes'],
                 notes.map((n) => ({
                   reference_number: n.reference_number,
                   client: n.client,
                   quote_ref: n.quote_ref,
+                  client_po: n.client_po_id ? poNumberById.get(n.client_po_id) || '' : '',
+                  invoice_ref: noteInvoiceRef(n, invoiceRefs),
                   status: n.status,
                   delivery_date: n.delivery_date || '',
                   ship_to: n.ship_to,
@@ -549,6 +586,7 @@ export default function DeliveryNotesPage() {
                   >
                     <td className={docsStyles.colRef}>
                       <div className={docsStyles.ref}>{note.reference_number || '—'}</div>
+                      <div className={docsStyles.meta}>{chainLabel(note)}</div>
                     </td>
                     <td className={`${docsStyles.colClient} ${docsStyles.clientCell}`}>
                       {note.client || '—'}
@@ -636,6 +674,51 @@ export default function DeliveryNotesPage() {
           sections={['basics', 'lines', 'notes']}
         />
         <div style={editorPanelStyle(editorSection === 'basics')}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 12 }}>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Client PO</label>
+            <select
+              style={selectStyle}
+              aria-label="Client PO this delivery is against"
+              value={form.client_po_id}
+              onChange={(e) => setForm((f) => ({ ...f, client_po_id: e.target.value }))}
+            >
+              <option value="">No PO</option>
+              {form.client_po_id && !poOptionsForNote(poOptions, editing?.client || '', editingQuoteId).some((p) => p.id === form.client_po_id) ? (
+                <option value={form.client_po_id}>PO {poNumberById.get(form.client_po_id) || 'linked'}</option>
+              ) : null}
+              {poOptionsForNote(poOptions, editing?.client || '', editingQuoteId).map((p) => (
+                <option key={p.id} value={p.id}>
+                  PO {p.po_number}
+                  {p.quotation_id && p.quotation_id === editingQuoteId ? ' (this quote)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Invoice</label>
+            <select
+              style={selectStyle}
+              aria-label="Invoice that billed this delivery"
+              value={form.invoice_ref}
+              onChange={(e) => setForm((f) => ({ ...f, invoice_ref: e.target.value }))}
+            >
+              <option value="">Not invoiced yet</option>
+              {form.invoice_ref &&
+              !invoiceOptionsForNote(invoiceOptions, editing?.client || '', editing?.quote_ref || '').some(
+                (i) => i.reference_number === form.invoice_ref,
+              ) ? (
+                <option value={form.invoice_ref}>{form.invoice_ref}</option>
+              ) : null}
+              {invoiceOptionsForNote(invoiceOptions, editing?.client || '', editing?.quote_ref || '').map((i) => (
+                <option key={i.reference_number} value={i.reference_number}>
+                  {i.reference_number}
+                  {i.reference_number === editing?.quote_ref ? ' (from this quote)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
           <div style={fieldStyle}>
             <label style={labelStyle}>Delivery date</label>
