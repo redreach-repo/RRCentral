@@ -66,6 +66,8 @@ import {
 import { STANDARD_SIZES, emptySizeBreakdown, sumSizes } from '../lib/sizes'
 import { commitStockForInvoice, releaseStockForQuote, reserveStockForQuote } from '../lib/inventory'
 import { syncCrmFromQuote } from '../lib/crmSync'
+import { invoicePoNote } from '../lib/clientPoQuoteLink'
+import { loadPoNumbersByQuote } from '../lib/clientPoQuoteLinkStore'
 import { ensureCompanyFromDocument } from '../lib/ensureCompanyFromDocument'
 import { formatAED } from '../lib/money'
 import ReviseQuoteForm from '../components/quotations/ReviseQuoteForm'
@@ -201,6 +203,8 @@ export default function QuotationsPage() {
   const canDeleteQuote = can(userRole, 'quote.deleteAny')
 
   const [quotes, setQuotes] = useState<Quotation[]>([])
+  /** Client PO numbers linked to each quote (empty until the PO-quote link SQL is run). */
+  const [poByQuote, setPoByQuote] = useState<Map<string, string[]>>(new Map())
   const [customDefs, setCustomDefs] = useState<CustomFieldDefinition[]>([])
   const [customValues, setCustomValues] = useState<
     Record<string, Record<string, unknown>>
@@ -344,6 +348,9 @@ export default function QuotationsPage() {
       }
 
       setQuotes(rows)
+      loadPoNumbersByQuote()
+        .then(setPoByQuote)
+        .catch(() => setPoByQuote(new Map()))
       const defs = await listCustomFieldDefinitions('quotation').catch(
         () => [] as CustomFieldDefinition[],
       )
@@ -1318,7 +1325,11 @@ export default function QuotationsPage() {
         payment_status: 'Pending',
         payment_terms: q.payment_terms,
         moq: q.moq,
-        notes: (q.notes || '') + depositNote + discountNote,
+        notes:
+          (q.notes || '') +
+          depositNote +
+          discountNote +
+          (invoicePoNote(poByQuote.get(q.id) || []) ? `\n${invoicePoNote(poByQuote.get(q.id) || [])}` : ''),
         delivery_terms: q.delivery_terms,
         created_by: who,
         updated_by: who,
@@ -1367,6 +1378,22 @@ export default function QuotationsPage() {
         await db.from('income').update(incomePayload).eq('id', inc.id)
       } else {
         await db.from('income').insert(incomePayload)
+      }
+
+      // A client PO linked to this quote, not yet matched to an invoice, points at the new invoice.
+      try {
+        if (poByQuote.get(q.id)?.length) {
+          const { data: inv } = await db.from('invoices').select('id').eq('reference_number', q.reference_number).maybeSingle()
+          if (inv?.id) {
+            await db
+              .from('client_purchase_orders')
+              .update({ invoice_id: inv.id, updated_at: new Date().toISOString() })
+              .eq('quotation_id', q.id)
+              .is('invoice_id', null)
+          }
+        }
+      } catch {
+        /* advisory: the invoice is made either way */
       }
 
       await logActivity('convert_invoice', 'invoice', q.reference_number, `${q.client} · ${pct}%`, who)
@@ -1620,6 +1647,9 @@ export default function QuotationsPage() {
                         {q.reference_number || <span className={qStyles.refMuted}>DRAFT</span>}
                       </div>
                       {quoteMeta(q) ? <div className={qStyles.meta}>{quoteMeta(q)}</div> : null}
+                      {poByQuote.get(q.id)?.length ? (
+                        <div className={qStyles.meta}>Client PO {poByQuote.get(q.id)?.join(', ')}</div>
+                      ) : null}
                     </td>
                     <td className={`${qStyles.colClient} ${qStyles.clientCell}`}>{q.client || '—'}</td>
                     <td className={qStyles.colDivision}>{q.vertical || divisionBrand(q.division_code)}</td>

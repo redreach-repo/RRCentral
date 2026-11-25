@@ -343,10 +343,14 @@ function matchPoClient(po, clients) {
   });
   return partial.length === 1 ? partial[0] : null;
 }
-function poDriveFilename(poNumberText, original) {
+function poDriveFilename(poNumberText, original, quoteRef = "") {
   const po = String(poNumberText || "").trim();
-  const name = String(original || "po.pdf").trim() || "po.pdf";
-  return (po ? `PO ${po} - ${name}` : name).slice(0, 200);
+  const quote = String(quoteRef || "").trim();
+  let name = String(original || "po.pdf").trim() || "po.pdf";
+  if (po && name.startsWith(`PO ${po} - `)) name = name.slice(`PO ${po} - `.length);
+  if (/^Quote [^ ]+ - /.test(name)) name = name.replace(/^Quote [^ ]+ - /, "");
+  const parts = [po ? `PO ${po}` : "", quote ? `Quote ${quote}` : "", name].filter(Boolean);
+  return parts.join(" - ").slice(0, 200);
 }
 function clientPoSetupNotes(setup, detailsReady) {
   const out = [];

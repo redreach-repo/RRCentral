@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { ClipboardList, FileText, Plus } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
+import { useAuth } from '../contexts/AuthContext'
+import { poQuoteSummary } from '../lib/clientPoQuoteLink'
 import EmptyState from '../components/EmptyState'
 import ClientPoEditor, { type ClientPoClientOpt } from '../components/documents/ClientPoEditor'
 import StatusPill from '../components/StatusPill'
@@ -62,6 +64,7 @@ function poLeftSummary(r: ClientPurchaseOrder, drawdowns: PoDrawdown[]): string 
 
 export default function ClientPosPage() {
   const { showToast } = useToast()
+  const { user } = useAuth()
   const [rows, setRows] = useState<ClientPurchaseOrder[]>([])
   const [clients, setClients] = useState<ClientPoClientOpt[]>([])
   const [invoices, setInvoices] = useState<InvoiceOpt[]>([])
@@ -74,6 +77,7 @@ export default function ClientPosPage() {
   const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState<ClientPurchaseOrder | null>(null)
   const [detailsReady, setDetailsReady] = useState(false)
+  const [quoteLinkReady, setQuoteLinkReady] = useState(true)
   const [setup, setSetup] = useState<ClientPoSetup>(CLIENT_PO_SETUP_OFF)
   const [drawdowns, setDrawdowns] = useState<PoDrawdown[]>([])
 
@@ -92,6 +96,7 @@ export default function ClientPosPage() {
       ])
       setRows(pos.rows)
       setDetailsReady(pos.detailsReady)
+      setQuoteLinkReady(pos.quoteLinkReady)
       // What invoices have taken from each PO's lines (best effort: needs client-po-drawdowns.sql).
       const withLines = pos.rows.filter((r) => r.line_items?.length).map((r) => r.id)
       if (withLines.length) {
@@ -193,12 +198,14 @@ export default function ClientPosPage() {
             onClick={() => {
               exportListCsv(
                 'client-pos.csv',
-                ['po_number', 'client', 'vertical', 'issued_on', 'amount', 'received', 'currency', 'status', 'invoice_id', 'vat_amount', 'payment_terms', 'delivery_date', 'lines', 'file_url'],
+                ['po_number', 'client', 'vertical', 'issued_on', 'quote_reference', 'after_quote_expiry', 'amount', 'received', 'currency', 'status', 'invoice_id', 'vat_amount', 'payment_terms', 'delivery_date', 'lines', 'file_url'],
                 filtered.map((r) => ({
                   po_number: r.po_number,
                   client: clientPoPartyName(r),
                   vertical: clientPoDepartmentLabel(r.division_code),
                   issued_on: r.issued_on || '',
+                  quote_reference: r.quote_reference || '',
+                  after_quote_expiry: r.after_quote_expiry ? 'yes' : '',
                   amount: r.amount,
                   received: r.received_amount || 0,
                   currency: r.currency,
@@ -255,7 +262,7 @@ export default function ClientPosPage() {
         </div>
         <input
           className={docsStyles.search}
-          placeholder="Search client / PO number…"
+          placeholder="Search client / PO / quote number…"
           aria-label="Search client POs"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -317,6 +324,11 @@ export default function ClientPosPage() {
                           >
                             <FileText size={12} /> PO file
                           </a>
+                        ) : null}
+                        {poQuoteSummary(r) ? (
+                          <div className={docsStyles.meta} style={r.after_quote_expiry ? { color: colors.warn } : undefined}>
+                            {poQuoteSummary(r)}
+                          </div>
                         ) : null}
                         {r.line_items?.length ? (
                           <div className={docsStyles.meta}>
@@ -389,6 +401,8 @@ export default function ClientPosPage() {
         clients={clients}
         setup={setup}
         detailsReady={detailsReady}
+        quoteLinkReady={quoteLinkReady}
+        who={user?.email || ''}
         onClose={() => setEditorOpen(false)}
         onSaved={() => {
           setEditorOpen(false)

@@ -4,8 +4,11 @@
 //        -> { reader: bool, drive: bool }  (what is set up, so the page can say what is missing)
 //   POST { action: "read", filename, content_base64, content_type }
 //        -> { po, warnings, costUsd }      (nothing is saved; the page fills in the form)
-//   POST { action: "file", client_id, po_number, filename, content_base64, content_type }
+//   POST { action: "file", client_id, po_number, quote_ref?, filename, content_base64, content_type }
 //        -> { id, url, folder_url }        (into RR Central / Customers / <client>)
+//   POST { action: "relabel", po_id }
+//        -> { id, name }                   (renames the filed PO to "PO <no> - Quote <ref> - <file>"
+//                                           after its quotation is linked; read as the user)
 //
 // The two steps are separate on purpose: reading works without Google Drive,
 // and filing works without the AI key, so a missing setup step only switches
@@ -72,6 +75,56 @@ function corsHeadersFor(req: Request): Record<string, string> {
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Renames a PO already filed in Google Drive so its name carries the linked
+ * quotation number. Everything comes from the PO row as the user can see it
+ * (row level security), never from the request: only the PO id is sent.
+ */
+async function relabel(
+  sb: SupabaseClient,
+  userDb: SupabaseClient,
+  body: Record<string, unknown>,
+  json: (b: unknown, status?: number) => Response,
+): Promise<Response> {
+  const app = googleApp()
+  if (!app) return json({ error: "Google Drive is not set up yet.", setup: "drive" }, 503)
+  const conn = await loadConnection(sb)
+  if (!conn) return json({ error: "Google Drive is not connected yet.", setup: "drive" }, 503)
+  const poId = typeof body.po_id === "string" && UUID.test(body.po_id) ? body.po_id : ""
+  if (!poId) return json({ error: "Which PO?" }, 400)
+  const { data: po } = await userDb
+    .from("client_purchase_orders")
+    .select("id, po_number, file_name, drive_file_id, quote_reference")
+    .eq("id", poId)
+    .maybeSingle()
+  if (!po) return json({ error: "Client PO not found" }, 404)
+  const row = po as { po_number: string; file_name: string; drive_file_id: string; quote_reference: string }
+  if (!row.drive_file_id || !/^[A-Za-z0-9_-]{10,200}$/.test(row.drive_file_id)) {
+    return json({ error: "This PO has no file in Google Drive" }, 400)
+  }
+  const name = safeName(poDriveFilename(row.po_number, row.file_name || "po.pdf", row.quote_reference || ""))
+  const token = await accessToken(app, conn.refresh_token)
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(row.drive_file_id)}?supportsAllDrives=true&fields=id,name`,
+    {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json; charset=UTF-8" },
+      body: JSON.stringify({
+        name,
+        description: row.quote_reference ? `Client PO ${row.po_number} for quotation ${row.quote_reference}` : `Client PO ${row.po_number}`,
+      }),
+      signal: AbortSignal.timeout(20_000),
+    },
+  )
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 160)
+    console.error("client-po-file relabel", res.status, detail)
+    return json({ error: `Google Drive did not rename the file (${res.status})` }, 502)
+  }
+  await res.body?.cancel()
+  return json({ id: row.drive_file_id, name })
+}
 
 function decodeBase64(content: string): Uint8Array {
   const bin = atob(content)
@@ -154,6 +207,7 @@ Deno.serve(withErrorLog("client-po-file", async (req) => {
     const conn = app ? await loadConnection(sb) : null
     return json({ reader: Boolean(apiKey), drive: Boolean(app && conn) })
   }
+  if (action === "relabel") return await relabel(sb, userDb, body, json)
   if (action !== "read" && action !== "file") return json({ error: "Unknown action" }, 400)
 
   const filename = String(body.filename || "").trim().slice(0, 200)
@@ -217,7 +271,7 @@ Deno.serve(withErrorLog("client-po-file", async (req) => {
   const folder = await ensureClientsFolder(sb, token, conn, client as { id: string; company_name: string; drive_folder_url: string })
   const saved = await uploadFile(token, {
     folderId: folder.id,
-    filename: poDriveFilename(String(body.po_number || ""), filename),
+    filename: poDriveFilename(String(body.po_number || ""), filename, String(body.quote_ref || "").slice(0, 60)),
     contentType,
     bytes: decodeBase64(content),
   })

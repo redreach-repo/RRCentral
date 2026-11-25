@@ -63,13 +63,25 @@ export async function fileClientPoInDrive(
   file: PoUpload,
   clientId: string,
   poNumber: string,
+  /** The linked quotation's number, put in the Drive file name. */
+  quoteRef = '',
 ): Promise<{ id: string; url: string; folder_url: string }> {
   return callPoFile({
     action: 'file',
     client_id: clientId,
     po_number: poNumber,
+    quote_ref: quoteRef,
     filename: file.filename,
     content_type: file.contentType,
     content_base64: file.base64,
   })
+}
+
+/**
+ * Renames a PO already in Google Drive after its quote is linked, e.g.
+ * "PO 4200050362 - Quote RR-01-26003 - scan.pdf". The function reads the PO
+ * (as the signed-in user) for its number, file and quote; nothing else is sent.
+ */
+export async function relabelClientPoInDrive(poId: string): Promise<{ id: string; name: string }> {
+  return callPoFile({ action: 'relabel', po_id: poId })
 }

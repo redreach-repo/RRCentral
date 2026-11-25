@@ -186,6 +186,9 @@ describe('finding the client', () => {
   it('names the Drive file after the PO', () => {
     expect(poDriveFilename('LPO-118', 'scan.pdf')).toBe('PO LPO-118 - scan.pdf')
     expect(poDriveFilename('', 'scan.pdf')).toBe('scan.pdf')
+    expect(poDriveFilename('LPO-118', 'scan.pdf', 'RR-01-26003')).toBe('PO LPO-118 - Quote RR-01-26003 - scan.pdf')
+    // relabelling an already filed name does not repeat the prefix
+    expect(poDriveFilename('LPO-118', 'PO LPO-118 - Quote RR-01-26001 - scan.pdf', 'RR-01-26003')).toBe('PO LPO-118 - Quote RR-01-26003 - scan.pdf')
   })
 })
 

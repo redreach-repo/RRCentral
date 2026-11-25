@@ -79,7 +79,7 @@ describe('client PO departments', () => {
 describe('client PO list filter', () => {
   const rows = [
     { po_number: 'PO-1', status: 'open', division_code: '01', clients: { company_name: 'Uniform Buyer' } },
-    { po_number: 'PO-2', status: 'partial', division_code: '06', clients: { company_name: 'Steel Trader' } },
+    { po_number: 'PO-2', status: 'partial', division_code: '06', clients: { company_name: 'Steel Trader' }, quote_reference: 'RR-06-26010' },
     { po_number: 'PO-3', status: 'fulfilled', division_code: '07', accounts: { name: 'ICOC Dubai' } },
     { po_number: 'PO-4', status: 'canceled', division_code: null, clients: { company_name: 'Walk-in' } },
   ]
@@ -100,6 +100,7 @@ describe('client PO list filter', () => {
     expect(ids({ department: '', status: 'Fulfilled', search: '' })).toEqual(['PO-3'])
     expect(ids({ department: '', status: 'All', search: 'icoc' })).toEqual(['PO-3'])
     expect(ids({ department: '', status: 'All', search: 'po-2' })).toEqual(['PO-2'])
+    expect(ids({ department: '', status: 'All', search: 'rr-06-26010' })).toEqual(['PO-2'])
     expect(clientPoStatusLabel('canceled')).toBe('Canceled')
   })
 })
