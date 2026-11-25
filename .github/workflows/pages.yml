@@ -6,6 +6,10 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  # deploy-pages looks up the uploaded github-pages artifact through the
+  # Actions API. Without this it finds 0 artifacts and the deploy fails
+  # (every run since 21 Nov 2026).
+  actions: read
   pages: write
   id-token: write
 concurrency:
