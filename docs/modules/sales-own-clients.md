@@ -1,4 +1,4 @@
-# Sales see only their own clients (Sales lockdown, PR 1)
+# Sales see only their own clients (Sales lockdown, PR 1 and 2)
 
 Migration: `supabase/migrations/20261332090000_sales_own_clients.sql`
 Test: `supabase/tests/modules/sales_own_clients_test.sql`
@@ -36,8 +36,8 @@ company-wide reference numbers. They cannot reassign or delete (unchanged).
 | --- | --- |
 | `clients.view_all` | Read every client, lead and account. No editing of others' records |
 | `finance.company` | Lifts the lock: the Sales access from before this migration |
-| `quotes.margin` | For the screens (PR 2): show supplier cost and margin |
-| `export.csv` | For the screens (PR 2): CSV download buttons |
+| `quotes.margin` | Not used by the screens yet (cost moves to its own table later) |
+| `export.csv` | CSV download buttons |
 | `ai.connector` | For the screens (PR 3): allow an AI connector key |
 
 Only admins switch them. `granted_by` comes from the session. Every change is in
@@ -52,11 +52,24 @@ table, ANDed with the existing ones. They only bite when
 (`rr_sales_client_keys()`, `rr_sales_quote_ids()`, `rr_sales_doc_refs()` ...),
 wrapped in `(select ...)` so each runs once per query.
 
-## Not in this PR
+## Screens (PR 2)
 
-- Screens: Finance pages and CSV buttons still show for Sales (with fewer or no
-  rows), Home money cards show only their own invoices' income, the switches
-  have no screen yet (set them in SQL until PR 2).
+- Switches: Settings, Users, edit a Sales user, "Per-person switches". Saved at once.
+  The app reads them at sign-in (`AuthContext`: `permissions`, `salesLocked`, `hasPermission`).
+- Sidebar and search: items marked `money: true` in `modules/nav.ts` are hidden
+  for locked Sales. Typing such an address shows "You do not have access to this page"
+  (`pathAllowed`, applied only when the Sales lock is on).
+- Home: the This month money section, receivables card and income note are hidden.
+  Contract billing and recurring deduction syncs do not run for locked Sales.
+- CSV: every download goes through `downloadCsv`, which checks `lib/exportPolicy.ts`.
+  Sales need `export.csv`.
+- Projects: locked Sales get "My projects" (projects they are on, read only, no
+  budget, cost, WIP or billing). Managers and admins add and remove people on a
+  project from the Projects page (`ProjectMembersPanel`).
+
+## Not done yet
+
 - Supplier cost and margin on their own quotes and lines are still visible to
   them (moving cost to its own table is a later PR).
 - Viewer still reads everything, including money.
+- Safeguards (export log, sign-in history, leaver button, two-step): PR 3.

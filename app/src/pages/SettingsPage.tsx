@@ -48,6 +48,7 @@ import {
 } from '../lib/companyDocs'
 import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { can, ROLE_DESCRIPTIONS, ROLE_LABELS, USER_ROLES } from '../lib/permissions'
+import UserSwitchesPanel from '../components/settings/UserSwitchesPanel'
 import {
   listNumberingSequences,
   previewNextReference,
@@ -1932,6 +1933,9 @@ export default function SettingsPage() {
           />
           <label htmlFor="user-active" style={{ fontSize: 13 }}>Active</label>
         </div>
+        {editingUser && userForm.role === 'sales' && editingUser.role === 'sales' ? (
+          <UserSwitchesPanel userId={editingUser.id} />
+        ) : null}
         <div style={fieldStyle}>
           <label style={labelStyle}>
             {editingUser ? 'New password (optional)' : 'Initial password *'}

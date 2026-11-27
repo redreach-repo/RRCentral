@@ -126,13 +126,13 @@ const CORE_MODULES: ModuleManifest[] = [
       { to: '/nda-template', label: 'NDA template', icon: FileSignature, forStaff: true, section: 'Contracts', flag: 'delivery' },
       { to: '/clause-library', label: 'Clause library', icon: ScrollText, forStaff: true, section: 'Contracts', flag: 'delivery' },
       { to: '/obligations', label: 'Obligations', icon: ClipboardList, forStaff: true, section: 'Contracts', flag: 'delivery' },
-      { to: '/projects', label: 'Projects', icon: Briefcase, minRole: 'manager', section: 'Projects', flag: 'ops' },
+      { to: '/projects', label: 'Projects', icon: Briefcase, minRole: 'sales', section: 'Projects', flag: 'ops' },
       { to: '/construction-sites', label: 'Sites', icon: HardHat, minRole: 'manager', section: 'Projects', flag: 'ops' },
       { to: '/eng-register', label: 'Eng register', icon: DraftingCompass, minRole: 'manager', section: 'Projects', flag: 'ops' },
       { to: '/app/wanders', label: 'Wanders', icon: Plane, section: 'Projects', flag: 'ops' },
-      { to: '/catalog', label: 'Catalog', icon: Package, section: 'Stock and buying', flag: 'ops' },
-      { to: '/inventory', label: 'Inventory', icon: Boxes, section: 'Stock and buying', flag: 'ops' },
-      { to: '/purchase-orders', label: 'Purchase orders', icon: Truck, section: 'Stock and buying', flag: 'ops' },
+      { to: '/catalog', label: 'Catalog', icon: Package, section: 'Stock and buying', flag: 'ops', money: true },
+      { to: '/inventory', label: 'Inventory', icon: Boxes, section: 'Stock and buying', flag: 'ops', money: true },
+      { to: '/purchase-orders', label: 'Purchase orders', icon: Truck, section: 'Stock and buying', flag: 'ops', money: true },
       { to: '/templates', label: 'Templates', icon: LayoutTemplate, section: 'Web and files', flag: 'ops' },
       { to: '/domains', label: 'Domains', icon: Globe, section: 'Web and files', flag: 'ops' },
       { to: '/customer-files', label: 'Google Drive', icon: FolderOpen, section: 'Web and files', flag: 'documents' },
@@ -144,16 +144,16 @@ const CORE_MODULES: ModuleManifest[] = [
     icon: Banknote,
     items: [
       { to: '/invoices', label: 'Invoices', icon: Receipt, section: 'Money in', flag: 'documents' },
-      { to: '/receivables', label: 'Aging and chasing', icon: Hourglass, section: 'Money in', flag: 'documents' },
-      { to: '/payments', label: 'Payments', icon: Banknote, section: 'Money in', flag: 'finance' },
-      { to: '/expenses', label: 'Expenses', icon: Wallet, section: 'Money out', flag: 'finance' },
-      { to: '/vendors', label: 'Vendors', icon: Building2, section: 'Money out', flag: 'finance' },
-      { to: '/supplier-advances', label: 'Supplier advances', icon: HandCoins, section: 'Money out', flag: 'finance' },
-      { to: '/ledger', label: 'Ledger', icon: BookOpen, minRole: 'manager', section: 'Books and reports', flag: 'finance' },
-      { to: '/reports', label: 'Reports', icon: BarChart3, section: 'Books and reports', flag: 'finance' },
-      { to: '/mrr', label: 'MRR', icon: TrendingUp, minRole: 'manager', section: 'Books and reports', flag: 'finance' },
-      { to: '/insights', label: 'Utilisation', icon: Gauge, minRole: 'manager', section: 'Books and reports', flag: 'finance' },
-      { to: '/planning-goals', label: 'Goals', icon: Target, minRole: 'manager', section: 'Books and reports', flag: 'finance' },
+      { to: '/receivables', label: 'Aging and chasing', icon: Hourglass, section: 'Money in', flag: 'documents', money: true },
+      { to: '/payments', label: 'Payments', icon: Banknote, section: 'Money in', flag: 'finance', money: true },
+      { to: '/expenses', label: 'Expenses', icon: Wallet, section: 'Money out', flag: 'finance', money: true },
+      { to: '/vendors', label: 'Vendors', icon: Building2, section: 'Money out', flag: 'finance', money: true },
+      { to: '/supplier-advances', label: 'Supplier advances', icon: HandCoins, section: 'Money out', flag: 'finance', money: true },
+      { to: '/ledger', label: 'Ledger', icon: BookOpen, minRole: 'manager', section: 'Books and reports', flag: 'finance', money: true },
+      { to: '/reports', label: 'Reports', icon: BarChart3, section: 'Books and reports', flag: 'finance', money: true },
+      { to: '/mrr', label: 'MRR', icon: TrendingUp, minRole: 'manager', section: 'Books and reports', flag: 'finance', money: true },
+      { to: '/insights', label: 'Utilisation', icon: Gauge, minRole: 'manager', section: 'Books and reports', flag: 'finance', money: true },
+      { to: '/planning-goals', label: 'Goals', icon: Target, minRole: 'manager', section: 'Books and reports', flag: 'finance', money: true },
     ],
   },
   {
@@ -250,8 +250,10 @@ export function navItemVisible(
   item: ModuleNavItem,
   userRole: UserRole,
   settings: Record<string, string | undefined> = {},
+  salesLocked = false,
 ): boolean {
   if (userRole === 'staff' && !item.forStaff) return false
+  if (item.money && salesLocked) return false
   // Soft-hide must run before minRole — /sales and /ctrm both set minRole: sales.
   if (shouldHidePipelineDetailNavItem(item.to, settings, userRole)) return false
   if (item.roles) return item.roles.includes(userRole)
@@ -268,14 +270,38 @@ export function visibleAppModules(
   settings: Record<string, string | undefined> = {},
   flags?: Record<string, boolean>,
   modules: ModuleManifest[] = APP_MODULES,
+  salesLocked = false,
 ): ModuleManifest[] {
   const resolvedFlags = flags ?? parseModuleFlags(settings)
   return modulesEnabled(modules, resolvedFlags)
     .map((group) => ({
       ...group,
       items: group.items.filter(
-        (item) => (!item.flag || resolvedFlags[item.flag] !== false) && navItemVisible(item, userRole, settings),
+        (item) => (!item.flag || resolvedFlags[item.flag] !== false) && navItemVisible(item, userRole, settings, salesLocked),
       ),
     }))
     .filter((group) => group.items.length > 0)
+}
+
+/**
+ * Whether this person may open a page by its address (typed or bookmarked).
+ * A page that is a sidebar link is allowed when at least one of its links is
+ * visible to them (by role and the Sales lock; Settings > Modules switches only
+ * hide links). Pages that are no sidebar link (detail pages, forms) are allowed:
+ * the database decides what they show.
+ */
+export function pathAllowed(
+  pathname: string,
+  userRole: UserRole,
+  settings: Record<string, string | undefined> = {},
+  salesLocked = false,
+  modules: ModuleManifest[] = APP_MODULES,
+): boolean {
+  const path = pathname.replace(/\/+$/, '') || '/'
+  const matches = modules.flatMap((m) => m.items).filter((i) => {
+    const base = i.to.split('#')[0] || '/'
+    return base === path || (base !== '/' && path.startsWith(`${base}/`))
+  })
+  if (matches.length === 0) return true
+  return matches.some((i) => navItemVisible(i, userRole, settings, salesLocked))
 }

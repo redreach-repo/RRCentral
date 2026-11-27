@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { checkCsvExport } from './exportPolicy'
 
 /** Shared CRM chrome — reads HighMast design tokens (see styles/tokens.css). */
 export const colors = {
@@ -192,6 +193,7 @@ export function formatMoney(amount: number, currency = 'AED'): string {
 }
 
 export function downloadCsv(filename: string, csv: string) {
+  if (!checkCsvExport(filename)) return
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

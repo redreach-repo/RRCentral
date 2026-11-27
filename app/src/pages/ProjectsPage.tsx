@@ -4,6 +4,8 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import EmptyState from '../components/EmptyState'
 import SavedViewsBar from '../components/SavedViewsBar'
+import ProjectMembersPanel from '../components/projects/ProjectMembersPanel'
+import SalesProjectsView from '../components/projects/SalesProjectsView'
 import { errorMessage } from '../lib/errors'
 import { computeWipAed, projectCostTotal, projectHealth } from '../lib/projectAccounting'
 import {
@@ -29,7 +31,8 @@ import docsStyles from '../styles/docsList.module.css'
 
 /** M9b: project headers + cost lines. */
 export default function ProjectsPage() {
-  const { appUserId } = useAuth()
+  const { appUserId, userRole, salesLocked } = useAuth()
+  const canManageMembers = userRole === 'admin' || userRole === 'manager'
   const { showToast } = useToast()
   const [rows, setRows] = useState<DeliveryProject[]>([])
   const [selected, setSelected] = useState<DeliveryProject | null>(null)
@@ -141,6 +144,8 @@ export default function ProjectsPage() {
       if (importInputRef.current) importInputRef.current.value = ''
     }
   }
+
+  if (salesLocked) return <SalesProjectsView rows={rows} loading={loading} />
 
   return (
     <div className={docsStyles.page}>
@@ -324,6 +329,7 @@ export default function ProjectsPage() {
                   }).toFixed(2)}{' '}
                   AED
                 </h3>
+                <ProjectMembersPanel projectId={selected.id} canManage={canManageMembers} />
                 <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 1fr auto', marginTop: 8, alignItems: 'end' }}>
                   <label style={labelStyle}>
                     Billed to date (AED)
