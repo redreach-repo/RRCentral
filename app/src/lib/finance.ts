@@ -1,5 +1,6 @@
 import { format, parseISO, startOfMonth } from 'date-fns'
 import type { Expense, IncomeEntry, Invoice } from './types'
+import { sumAmounts } from './money/index'
 
 const LOST_STATUSES = new Set(['not awarded', 'not_awarded', 'lost', 'cancelled', 'canceled'])
 
@@ -93,16 +94,16 @@ export function sumIncomeReceivedInMonth(
   month = startOfMonth(new Date()),
   deletedInvoiceRefs?: Set<string> | string[],
 ): number {
-  const byRef = new Map<string, Array<{ amount: number; date: string | null }>>()
+  const byRef = new Map<string, Array<{ amount: unknown; date: string | null }>>()
   for (const p of payments) {
     const ref = String(p.invoice_ref || '').trim()
     if (!ref) continue
     const list = byRef.get(ref) || []
-    list.push({ amount: Number(p.amount) || 0, date: paymentDate(p.created_at) })
+    list.push({ amount: p.amount ?? 0, date: paymentDate(p.created_at) })
     byRef.set(ref, list)
   }
 
-  let total = 0
+  const amounts: unknown[] = []
   const seen = new Set<string>()
   for (const row of rows) {
     if (!countsTowardIncome(row, invoices, deletedInvoiceRefs)) continue
@@ -111,12 +112,12 @@ export function sumIncomeReceivedInMonth(
     if (paid && paid.length) {
       if (seen.has(ref)) continue
       seen.add(ref)
-      for (const p of paid) if (isInMonth(p.date, month)) total += p.amount
+      for (const p of paid) if (isInMonth(p.date, month)) amounts.push(p.amount)
     } else if (isInMonth(row.date, month)) {
-      total += Number(row.total_amount || 0)
+      amounts.push(row.total_amount || 0)
     }
   }
-  return Math.round(total * 100) / 100
+  return sumAmounts(amounts)
 }
 
 /** Active (non-cancelled) invoices that are still collectible. */
