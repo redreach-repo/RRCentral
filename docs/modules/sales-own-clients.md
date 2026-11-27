@@ -1,4 +1,4 @@
-# Sales see only their own clients (Sales lockdown, PR 1 and 2)
+# Sales see only their own clients (Sales lockdown, PRs 1 to 3)
 
 Migration: `supabase/migrations/20261332090000_sales_own_clients.sql`
 Test: `supabase/tests/modules/sales_own_clients_test.sql`
@@ -67,9 +67,28 @@ wrapped in `(select ...)` so each runs once per query.
   budget, cost, WIP or billing). Managers and admins add and remove people on a
   project from the Projects page (`ProjectMembersPanel`).
 
+## Safeguards (PR 3)
+
+Migration: `supabase/migrations/20261333090000_sales_safeguards.sql`
+(project file `supabase-sql/sales-safeguards.sql`).
+Test: `supabase/tests/modules/sales_safeguards_test.sql`
+
+- **CSV export log and cap**: every download calls `rr_log_export()` first
+  (`lib/exportPolicy.ts`, `lib/securityLogStore.ts`). It is logged in
+  `export_log`, refused ones too. Sales need `export.csv` and have a daily cap:
+  app setting `salesExportDailyCap` (default 10). Managers and admins read the log.
+  If the function is not on the database yet, only the local switch decides.
+- **Sign in history**: the app calls `rr_record_sign_in()` once per tab, after
+  two step where the role needs it. `sign_in_log` keeps a year. Admins read it.
+- **Leaver button**: Settings, Users, edit a user (admins). `rr_offboard_user()`
+  switches them off, hands their accounts (`owner_user_id`) and leads (`crm.owner`,
+  by name or email) to the chosen person, removes their switches and project
+  places, revokes their AI connector keys and ends their sign in sessions.
+- **Two step sign in** is now required for Sales too (`TWO_STEP_ROLES`).
+
 ## Not done yet
 
 - Supplier cost and margin on their own quotes and lines are still visible to
   them (moving cost to its own table is a later PR).
 - Viewer still reads everything, including money.
-- Safeguards (export log, sign-in history, leaver button, two-step): PR 3.
+- Per-person daily digest: waits for the digest setup (DIGEST_CRON_SECRET).

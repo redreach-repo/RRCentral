@@ -49,6 +49,7 @@ import {
 import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { can, ROLE_DESCRIPTIONS, ROLE_LABELS, USER_ROLES } from '../lib/permissions'
 import UserSwitchesPanel from '../components/settings/UserSwitchesPanel'
+import UserSecurityPanel from '../components/settings/UserSecurityPanel'
 import {
   listNumberingSequences,
   previewNextReference,
@@ -1935,6 +1936,16 @@ export default function SettingsPage() {
         </div>
         {editingUser && userForm.role === 'sales' && editingUser.role === 'sales' ? (
           <UserSwitchesPanel userId={editingUser.id} />
+        ) : null}
+        {editingUser && !isLocalMode && userRole === 'admin' ? (
+          <UserSecurityPanel
+            user={editingUser}
+            currentUserEmail={user?.email || ''}
+            onOffboarded={() => {
+              setUserOpen(false)
+              void loadUsers()
+            }}
+          />
         ) : null}
         <div style={fieldStyle}>
           <label style={labelStyle}>

@@ -142,7 +142,10 @@ export default function Layout() {
   const pageAllowed = !salesLocked || pathAllowed(location.pathname, userRole, settings, salesLocked)
 
   useEffect(() => {
-    const onBlocked = () => showToast(CSV_EXPORT_BLOCKED_MESSAGE, 'error')
+    const onBlocked = (e: Event) => {
+      const message = (e as CustomEvent<{ message?: string }>).detail?.message
+      showToast(message || CSV_EXPORT_BLOCKED_MESSAGE, 'error')
+    }
     window.addEventListener(CSV_EXPORT_BLOCKED_EVENT, onBlocked)
     return () => window.removeEventListener(CSV_EXPORT_BLOCKED_EVENT, onBlocked)
   }, [showToast])

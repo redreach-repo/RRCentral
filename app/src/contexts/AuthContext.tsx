@@ -18,7 +18,9 @@ import { DEMO_ROLE_EVENT, effectiveDemoRole } from '../lib/demo/demoRole'
 import { isDemoBuild } from '../lib/demo/demoMode'
 import type { UserRole } from '../lib/types'
 import { isSalesLocked, hasUserPermission, type UserPermissionKey } from '../lib/userPermissions'
-import { setCsvExportAllowed } from '../lib/exportPolicy'
+import { setCsvExportAllowed, setExportLogger } from '../lib/exportPolicy'
+import { logExportOnServer, recordSignInOnce } from '../lib/securityLogStore'
+import { TWO_STEP_ROLES, getAssuranceLevel } from '../lib/twoStep'
 
 export const LOGIN_DOMAIN_REJECT_KEY = 'rrcentral_login_domain_reject'
 
@@ -225,6 +227,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setCsvExportAllowed(canExportCsv)
   }, [canExportCsv])
+
+  // Sales safeguards: CSV downloads go to the server log (and Sales' daily cap).
+  useEffect(() => {
+    setExportLogger(isSupabaseConfigured() && membership.active && membership.id ? logExportOnServer : null)
+  }, [membership.active, membership.id])
+
+  // Sign in history: once per tab, after two step where the role needs it.
+  useEffect(() => {
+    if (!isSupabaseConfigured() || !user || !membership.active || !membership.id) return
+    const userId = membership.id
+    const needsTwoStep = TWO_STEP_ROLES.includes(membership.role)
+    void getAssuranceLevel()
+      .then((level) => {
+        const fullySignedIn = level.currentLevel === 'aal2'
+        if (needsTwoStep && !fullySignedIn) return
+        return recordSignInOnce(userId, fullySignedIn)
+      })
+      .catch(() => undefined)
+  }, [user, membership.active, membership.id, membership.role])
 
   const hasPermission = useCallback(
     (key: UserPermissionKey) => hasUserPermission(effectiveRole, membership.permissions, key),
