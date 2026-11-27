@@ -16,7 +16,7 @@ insert into app_users (email, name, role, active) values
   ('former@redreach.ae', 'Former', 'sales', false);
 insert into app_settings values ('zohoClientSecret', 's3cret'), ('zohoRefreshToken', 'rt'), ('zohoClientId', 'cid');
 insert into vendors (company_name) values ('Acme Supplier');
-insert into crm (company_name) values ('Lead Co');
+insert into crm (company_name, owner) values ('Lead Co', 'Sales');
 insert into invoices (client, reference_number) values ('Client A', 'RR-1');
 insert into expenses (vendor) values ('Fuel');
 insert into owned_domains (domain_name, registrar) values ('example.ae', 'Registrar Co');
@@ -201,14 +201,31 @@ select pg_temp.expect((select count(*) from audit_log) = 0, 'viewer cannot read 
 reset role;
 select pg_temp.expect(exists (select 1 from accounts where name = 'Unassigned Church'), 'viewer update changed nothing');
 
--- sales: sees all accounts, cannot reassign or delete
+-- sales: sees only the accounts they own (20261332090000_sales_own_clients.sql),
+-- cannot reassign or delete
 set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+update accounts set owner_user_id = (select id from app_users where lower(email) = 'sales@redreach.ae')
+where name = 'Other Trading House';
 set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
-select pg_temp.expect((select count(*) from accounts) = 4, 'sales sees all accounts');
-select pg_temp.expect(pg_temp.fails($q$update accounts set owner_user_id = null where name = 'Assigned Clinic LLC'$q$), 'sales cannot reassign accounts');
+select pg_temp.expect((select array_agg(name) from accounts) = array['Other Trading House'], 'sales sees only the account they own');
+select pg_temp.expect(pg_temp.fails($q$update accounts set owner_user_id = null where name = 'Other Trading House'$q$), 'sales cannot reassign accounts');
+delete from accounts where name = 'Other Trading House';
 delete from accounts where name = 'Unassigned Church';
 reset role;
-select pg_temp.expect(exists (select 1 from accounts where name = 'Unassigned Church'), 'sales cannot delete accounts');
+select pg_temp.expect(exists (select 1 from accounts where name = 'Other Trading House'), 'sales cannot delete accounts');
+select pg_temp.expect(exists (select 1 from accounts where name = 'Unassigned Church'), 'sales cannot delete an account they cannot see');
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+update accounts set owner_user_id = (select id from app_users where email = 'alfred@redreach.ae')
+where name = 'Other Trading House';
+reset role;
+
+-- From here on sales@redreach.ae is the full-access Sales user these older
+-- checks were written for: the "see company money" switch lifts the Sales lock.
+-- The lock itself is tested in tests/modules/sales_own_clients_test.sql.
+insert into user_permissions (user_id, permission)
+select id, 'finance.company' from app_users where lower(email) = 'sales@redreach.ae';
 
 -- manager: can reassign
 set role authenticated;

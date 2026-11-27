@@ -64,3 +64,15 @@ begin
 end $$;
 
 grant execute on all functions in schema pg_temp to anon, authenticated;
+
+-- Sales lockdown (20261332090000_sales_own_clients.sql): module tests written
+-- before it treat Sales as a full-access team member, so mt-sales keeps the
+-- "see company money" switch here. sales_own_clients_test.sql removes it.
+do $$
+begin
+  if to_regclass('public.user_permissions') is not null then
+    insert into public.user_permissions (user_id, permission)
+    select id, 'finance.company' from public.app_users where email = 'mt-sales@redreach.ae'
+    on conflict (user_id, permission) do nothing;
+  end if;
+end $$;
