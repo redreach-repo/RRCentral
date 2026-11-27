@@ -10,6 +10,7 @@ import {
   monthKey,
   quarterMonths,
   sumExpenses,
+  sumIncomeReceivedInMonth,
 } from './finance'
 import type { Expense, IncomeEntry, Invoice } from './types'
 
@@ -113,5 +114,46 @@ describe('finance', () => {
     expect(expenseChargesVat({ vat_amount: 0 })).toBe(false)
     expect(expenseChargesVat({ vat_amount: 50 })).toBe(true)
     expect(expenseChargesVat({ vat_amount: null })).toBe(true)
+  })
+})
+
+describe('sumIncomeReceivedInMonth', () => {
+  const nov = new Date(2026, 10, 1)
+  const oct = new Date(2026, 9, 1)
+  const row = (ref: string, date: string, total: number, pay = 'Paid'): IncomeEntry =>
+    ({ reference_number: ref, date, total_amount: total, status: pay, payment_status: pay }) as IncomeEntry
+  const inv = (ref: string, pay = 'Paid') =>
+    ({ reference_number: ref, status: 'Finalized', payment_status: pay }) as Invoice
+
+  it('counts an October invoice paid in November in November', () => {
+    const rows = [row('RR-1', '2026-10-05', 1000)]
+    const pays = [{ invoice_ref: 'RR-1', amount: 1000, created_at: '2026-11-27T10:00:00+00:00' }]
+    expect(sumIncomeReceivedInMonth(rows, [inv('RR-1')], pays, nov)).toBe(1000)
+    expect(sumIncomeReceivedInMonth(rows, [inv('RR-1')], pays, oct)).toBe(0)
+  })
+
+  it('splits partial payments across the months they came in', () => {
+    const rows = [row('RR-2', '2026-10-05', 1000, 'Partial')]
+    const pays = [
+      { invoice_ref: 'RR-2', amount: 400, created_at: '2026-10-20T12:00:00+04:00' },
+      { invoice_ref: 'RR-2', amount: 300, created_at: '2026-11-02T12:00:00+04:00' },
+    ]
+    const invs = [inv('RR-2', 'Partial')]
+    expect(sumIncomeReceivedInMonth(rows, invs, pays, oct)).toBe(400)
+    expect(sumIncomeReceivedInMonth(rows, invs, pays, nov)).toBe(300)
+  })
+
+  it('falls back to the income date when no payment was logged', () => {
+    const rows = [row('', '2026-11-03', 250), row('RR-3', '2026-11-10', 500)]
+    expect(sumIncomeReceivedInMonth(rows, [inv('RR-3')], [], nov)).toBe(750)
+  })
+
+  it('ignores unpaid and cancelled invoices even with payments', () => {
+    const rows = [row('RR-4', '2026-11-01', 900, 'Paid')]
+    const pays = [{ invoice_ref: 'RR-4', amount: 900, created_at: '2026-11-05T12:00:00+04:00' }]
+    expect(
+      sumIncomeReceivedInMonth(rows, [{ reference_number: 'RR-4', status: 'Cancelled', payment_status: 'Paid' } as Invoice], pays, nov),
+    ).toBe(0)
+    expect(sumIncomeReceivedInMonth(rows, [inv('RR-4', 'Pending')], pays, nov)).toBe(0)
   })
 })
