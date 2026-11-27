@@ -23,11 +23,11 @@ import type {
   Quotation,
 } from '../lib/types'
 import {
-  countsTowardIncome,
   isInMonth,
   isOpenInvoice,
   sortByDateDesc,
   sumExpenses,
+  sumIncomeReceivedInMonth,
   sumRecognizedIncome,
 } from '../lib/finance'
 import { loadDeletedInvoiceRefs, reconcileInvoiceFinance } from '../lib/invoiceFinance'
@@ -68,6 +68,8 @@ import {
 import dash from './DashboardPage.module.css'
 import { errorMessage } from '../lib/errors'
 
+type PaymentRow = { invoice_ref: string; amount: number; created_at: string }
+
 export default function DashboardPage() {
   const { userRole } = useAuth()
   const { settings } = useSettings()
@@ -81,6 +83,7 @@ export default function DashboardPage() {
   const [quotations, setQuotations] = useState<Quotation[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [income, setIncome] = useState<IncomeEntry[]>([])
+  const [payments, setPayments] = useState<PaymentRow[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [crm, setCrm] = useState<CrmEntry[]>([])
   const [deletedInvoiceRefs, setDeletedInvoiceRefs] = useState<string[]>([])
@@ -104,6 +107,8 @@ export default function DashboardPage() {
         listCompanyDocuments().catch(() => ({ rows: [] as CompanyDocument[], missingTable: true })),
         listOwnedDomains().catch(() => [] as OwnedDomain[]),
       ])
+      // Payments decide which month income lands in; if they can't be read, fall back to invoice dates.
+      const payRes = await db.from('payment_log').select('invoice_ref,amount,created_at')
 
       if (qRes.error) throw qRes.error
       if (iRes.error) throw iRes.error
@@ -138,6 +143,7 @@ export default function DashboardPage() {
       setQuotations(quotes)
       setInvoices(sortByDateDesc((iRes.data as Invoice[]) ?? []))
       setIncome((incRes.data as IncomeEntry[]) ?? [])
+      setPayments(payRes.error ? [] : ((payRes.data as PaymentRow[]) ?? []))
       setExpenses((expRes.data as Expense[]) ?? [])
       setCrm(crmRows)
       setDeletedInvoiceRefs([...deleted])
@@ -156,17 +162,10 @@ export default function DashboardPage() {
   const thisMonth = startOfMonth(new Date())
   const monthLabel = format(thisMonth, 'MMM yyyy')
 
-  const recognizedIncome = useMemo(
-    () => income.filter((r) => countsTowardIncome(r, invoices, deletedInvoiceRefs)),
-    [income, invoices, deletedInvoiceRefs],
-  )
-
+  /** Money received this month: by payment date, so an older invoice paid today counts now. */
   const monthIncome = useMemo(
-    () =>
-      recognizedIncome
-        .filter((r) => isInMonth(r.date, thisMonth))
-        .reduce((s, r) => s + Number(r.total_amount || 0), 0),
-    [recognizedIncome, thisMonth],
+    () => sumIncomeReceivedInMonth(income, invoices, payments, thisMonth, deletedInvoiceRefs),
+    [income, invoices, payments, thisMonth, deletedInvoiceRefs],
   )
 
   const monthExpenses = useMemo(

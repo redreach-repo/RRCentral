@@ -1,5 +1,6 @@
 import { format, parseISO, startOfMonth } from 'date-fns'
 import type { Expense, IncomeEntry, Invoice } from './types'
+import { sumAmounts } from './money/index'
 
 const LOST_STATUSES = new Set(['not awarded', 'not_awarded', 'lost', 'cancelled', 'canceled'])
 
@@ -67,6 +68,56 @@ export function sumRecognizedIncome(
     ? rows.filter((r) => countsTowardIncome(r, invoices, deletedInvoiceRefs))
     : rows.filter(isRecognizedIncome)
   return filtered.reduce((s, r) => s + Number(r.total_amount || 0), 0)
+}
+
+/** A payment's received day (local time), so a payment logged late on the 30th stays in its month. */
+export function paymentDate(createdAt: string | null | undefined): string | null {
+  if (!createdAt) return null
+  const s = String(createdAt)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+  const d = parseISO(s)
+  if (Number.isNaN(d.getTime())) return monthKey(s) ? s.slice(0, 10) : null
+  return format(d, 'yyyy-MM-dd')
+}
+
+/**
+ * Income received in a month (cash basis), for the dashboard "This month" card.
+ * An invoice's income counts in the month the money came in (its payment_log rows),
+ * not the month the invoice is dated, so an October invoice paid in November shows
+ * in November. Rows with no logged payments (old sheet income, or invoices marked
+ * paid before payments were logged) fall back to the income row's own date.
+ */
+export function sumIncomeReceivedInMonth(
+  rows: IncomeEntry[],
+  invoices: Array<Pick<Invoice, 'reference_number' | 'status' | 'payment_status'>>,
+  payments: Array<{ invoice_ref?: string | null; amount?: number | string | null; created_at?: string | null }>,
+  month = startOfMonth(new Date()),
+  deletedInvoiceRefs?: Set<string> | string[],
+): number {
+  const byRef = new Map<string, Array<{ amount: unknown; date: string | null }>>()
+  for (const p of payments) {
+    const ref = String(p.invoice_ref || '').trim()
+    if (!ref) continue
+    const list = byRef.get(ref) || []
+    list.push({ amount: p.amount ?? 0, date: paymentDate(p.created_at) })
+    byRef.set(ref, list)
+  }
+
+  const amounts: unknown[] = []
+  const seen = new Set<string>()
+  for (const row of rows) {
+    if (!countsTowardIncome(row, invoices, deletedInvoiceRefs)) continue
+    const ref = String(row.reference_number || '').trim()
+    const paid = ref ? byRef.get(ref) : undefined
+    if (paid && paid.length) {
+      if (seen.has(ref)) continue
+      seen.add(ref)
+      for (const p of paid) if (isInMonth(p.date, month)) amounts.push(p.amount)
+    } else if (isInMonth(row.date, month)) {
+      amounts.push(row.total_amount || 0)
+    }
+  }
+  return sumAmounts(amounts)
 }
 
 /** Active (non-cancelled) invoices that are still collectible. */
