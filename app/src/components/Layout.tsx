@@ -192,6 +192,7 @@ export default function Layout() {
       '/customer-files',
       '/expenses',
       '/vendors',
+      '/supplier-advances',
       '/payments',
       '/catalog',
       '/domains',

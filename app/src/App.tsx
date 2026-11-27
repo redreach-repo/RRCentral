@@ -75,6 +75,7 @@ import TemplatesPage from './pages/TemplatesPage'
 import ReportsPage from './pages/ReportsPage'
 import ExpensesPage from './pages/ExpensesPage'
 import VendorsPage from './pages/VendorsPage'
+import SupplierAdvancesPage from './pages/SupplierAdvancesPage'
 import DomainsPage from './pages/DomainsPage'
 import CustomerFilesPage from './pages/CustomerFilesPage'
 import SettingsPage from './pages/SettingsPage'
@@ -229,6 +230,7 @@ export default function App() {
               <Route path="reports" element={<ReportsPage />} />
               <Route path="expenses" element={<ExpensesPage />} />
               <Route path="vendors" element={<VendorsPage />} />
+              <Route path="supplier-advances" element={<SupplierAdvancesPage />} />
               <Route path="domains" element={<DomainsPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="audit-log" element={<AuditLogPage />} />

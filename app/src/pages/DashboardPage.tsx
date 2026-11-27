@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { loadSupplierAdvancesQuiet } from '../lib/supplierAdvanceStore'
+import { withAdvanceCosts } from '../lib/supplierAdvances'
 import { buildDivisionPipeline } from '../lib/divisionPipeline'
 import { Link } from 'react-router-dom'
 import {
@@ -109,6 +111,8 @@ export default function DashboardPage() {
       ])
       // Payments decide which month income lands in; if they can't be read, fall back to invoice dates.
       const payRes = await db.from('payment_log').select('invoice_ref,amount,created_at')
+      // Advances paid to suppliers whose bill is not in yet count as money out (open part only).
+      const adv = await loadSupplierAdvancesQuiet()
 
       if (qRes.error) throw qRes.error
       if (iRes.error) throw iRes.error
@@ -144,7 +148,7 @@ export default function DashboardPage() {
       setInvoices(sortByDateDesc((iRes.data as Invoice[]) ?? []))
       setIncome((incRes.data as IncomeEntry[]) ?? [])
       setPayments(payRes.error ? [] : ((payRes.data as PaymentRow[]) ?? []))
-      setExpenses((expRes.data as Expense[]) ?? [])
+      setExpenses(withAdvanceCosts((expRes.data as Expense[]) ?? [], adv.advances, adv.applications))
       setCrm(crmRows)
       setDeletedInvoiceRefs([...deleted])
       setCompanyDocs(docsRes.rows || [])

@@ -166,4 +166,5 @@ export const DB_SETUP_PROBES: DbSetupProbe[] = [
   { migration: '20261329090000_quote_revisions', label: 'Revise and extend sent quotes (quote notes, revisions)', table: 'quote_notes', column: 'kind' },
   { migration: '20261330090000_client_po_quote_link', label: 'Link client POs to quotations (even after expiry)', table: 'client_purchase_orders', column: 'quote_reference' },
   { migration: '20261330100000_delivery_note_po_invoice_link', label: 'Delivery notes linked to the client PO and invoice', table: 'delivery_notes', column: 'invoice_ref' },
+  { migration: '20261331090000_supplier_advances', label: 'Supplier advances (linked to client PO and quote)', table: 'supplier_advances', column: 'quote_reference' },
 ]
