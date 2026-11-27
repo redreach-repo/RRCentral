@@ -1766,99 +1766,6 @@ function normalizePhone(raw, countryCode = "971") {
   return digits;
 }
 
-// src/lib/finance.ts
-function isCancelledInvoice(inv) {
-  return String(inv.status || "").trim().toLowerCase() === "cancelled";
-}
-
-// src/lib/templates.ts
-function applyMessageTemplate(template, vars) {
-  return String(template || "").replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_m, key) => {
-    const v = vars[key];
-    if (v == null) return "";
-    return String(v);
-  });
-}
-
-// src/lib/contractBilling.ts
-var REMINDER_STAGES = [3, 7, 14];
-function paymentTermDays(terms) {
-  const m = String(terms || "").match(/net\s*(\d{1,3})/i) || String(terms || "").match(/(\d{1,3})\s*days?/i);
-  return m ? Number(m[1]) : 0;
-}
-function invoiceDueDate(inv) {
-  if (!inv.date) return null;
-  return format(addDays(parseISO(String(inv.date).slice(0, 10)), paymentTermDays(inv.payment_terms)), "yyyy-MM-dd");
-}
-function isCollectible(inv) {
-  if (isCancelledInvoice(inv)) return false;
-  if (String(inv.status || "").toLowerCase() === "draft") return false;
-  return String(inv.payment_status || "").toLowerCase() !== "paid";
-}
-function dueReminder(inv, balance, sentStages, today = /* @__PURE__ */ new Date()) {
-  if (!isCollectible(inv) || balance <= 9e-3) return null;
-  const dueDate = invoiceDueDate(inv);
-  if (!dueDate) return null;
-  const daysLate = differenceInCalendarDays(today, parseISO(dueDate));
-  const reached = REMINDER_STAGES.filter((s) => daysLate >= s);
-  if (reached.length === 0) return null;
-  const stage = reached[reached.length - 1];
-  if (sentStages.some((s) => s >= stage)) return null;
-  return { stage, daysLate, dueDate };
-}
-function reminderMessage(input) {
-  const due = format(parseISO(input.dueDate), "d MMMM yyyy");
-  const subjectTpl = input.template?.subject?.trim() || "";
-  const bodyTpl = input.template?.body?.trim() ? input.template.body : "";
-  const vars = {
-    contact: input.contactName || "team",
-    ref: input.reference,
-    balance: input.balanceText,
-    dueDate: due,
-    daysLate: input.daysLate,
-    stage: input.stage,
-    company: input.companyName
-  };
-  const built = builtInReminder(input, due);
-  return {
-    subject: subjectTpl ? applyMessageTemplate(subjectTpl, vars) : built.subject,
-    body: bodyTpl ? applyMessageTemplate(bodyTpl, vars) : built.body
-  };
-}
-function builtInReminder(input, due) {
-  const hello = `Dear ${input.contactName || "team"},`;
-  const sign = `Best regards,
-${input.companyName}`;
-  if (input.stage === 3) {
-    return {
-      subject: `Friendly reminder: invoice ${input.reference}`,
-      body: `${hello}
-
-A quick reminder that invoice ${input.reference} for ${input.balanceText} was due on ${due}. If you have already paid, thank you, and please ignore this message.
-
-${sign}`
-    };
-  }
-  if (input.stage === 7) {
-    return {
-      subject: `Invoice ${input.reference} is now ${input.daysLate} days overdue`,
-      body: `${hello}
-
-Invoice ${input.reference} for ${input.balanceText} is now ${input.daysLate} days past its due date of ${due}. Could you let us know when payment will be made?
-
-${sign}`
-    };
-  }
-  return {
-    subject: `Payment overdue: invoice ${input.reference}`,
-    body: `${hello}
-
-Invoice ${input.reference} for ${input.balanceText} is ${input.daysLate} days overdue (due ${due}). Please arrange payment this week. If something is holding it up, reply and we will sort it out together.
-
-${sign}`
-  };
-}
-
 // src/lib/money/index.ts
 var ZERO_DECIMAL = /* @__PURE__ */ new Set([
   "BIF",
@@ -1984,6 +1891,99 @@ function formatMoney(m, locale = "en-AE") {
 }
 function roundAmount(n, currency = "AED") {
   return toNumber(moneyOrZero(n, currency));
+}
+
+// src/lib/finance.ts
+function isCancelledInvoice(inv) {
+  return String(inv.status || "").trim().toLowerCase() === "cancelled";
+}
+
+// src/lib/templates.ts
+function applyMessageTemplate(template, vars) {
+  return String(template || "").replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_m, key) => {
+    const v = vars[key];
+    if (v == null) return "";
+    return String(v);
+  });
+}
+
+// src/lib/contractBilling.ts
+var REMINDER_STAGES = [3, 7, 14];
+function paymentTermDays(terms) {
+  const m = String(terms || "").match(/net\s*(\d{1,3})/i) || String(terms || "").match(/(\d{1,3})\s*days?/i);
+  return m ? Number(m[1]) : 0;
+}
+function invoiceDueDate(inv) {
+  if (!inv.date) return null;
+  return format(addDays(parseISO(String(inv.date).slice(0, 10)), paymentTermDays(inv.payment_terms)), "yyyy-MM-dd");
+}
+function isCollectible(inv) {
+  if (isCancelledInvoice(inv)) return false;
+  if (String(inv.status || "").toLowerCase() === "draft") return false;
+  return String(inv.payment_status || "").toLowerCase() !== "paid";
+}
+function dueReminder(inv, balance, sentStages, today = /* @__PURE__ */ new Date()) {
+  if (!isCollectible(inv) || balance <= 9e-3) return null;
+  const dueDate = invoiceDueDate(inv);
+  if (!dueDate) return null;
+  const daysLate = differenceInCalendarDays(today, parseISO(dueDate));
+  const reached = REMINDER_STAGES.filter((s) => daysLate >= s);
+  if (reached.length === 0) return null;
+  const stage = reached[reached.length - 1];
+  if (sentStages.some((s) => s >= stage)) return null;
+  return { stage, daysLate, dueDate };
+}
+function reminderMessage(input) {
+  const due = format(parseISO(input.dueDate), "d MMMM yyyy");
+  const subjectTpl = input.template?.subject?.trim() || "";
+  const bodyTpl = input.template?.body?.trim() ? input.template.body : "";
+  const vars = {
+    contact: input.contactName || "team",
+    ref: input.reference,
+    balance: input.balanceText,
+    dueDate: due,
+    daysLate: input.daysLate,
+    stage: input.stage,
+    company: input.companyName
+  };
+  const built = builtInReminder(input, due);
+  return {
+    subject: subjectTpl ? applyMessageTemplate(subjectTpl, vars) : built.subject,
+    body: bodyTpl ? applyMessageTemplate(bodyTpl, vars) : built.body
+  };
+}
+function builtInReminder(input, due) {
+  const hello = `Dear ${input.contactName || "team"},`;
+  const sign = `Best regards,
+${input.companyName}`;
+  if (input.stage === 3) {
+    return {
+      subject: `Friendly reminder: invoice ${input.reference}`,
+      body: `${hello}
+
+A quick reminder that invoice ${input.reference} for ${input.balanceText} was due on ${due}. If you have already paid, thank you, and please ignore this message.
+
+${sign}`
+    };
+  }
+  if (input.stage === 7) {
+    return {
+      subject: `Invoice ${input.reference} is now ${input.daysLate} days overdue`,
+      body: `${hello}
+
+Invoice ${input.reference} for ${input.balanceText} is now ${input.daysLate} days past its due date of ${due}. Could you let us know when payment will be made?
+
+${sign}`
+    };
+  }
+  return {
+    subject: `Payment overdue: invoice ${input.reference}`,
+    body: `${hello}
+
+Invoice ${input.reference} for ${input.balanceText} is ${input.daysLate} days overdue (due ${due}). Please arrange payment this week. If something is holding it up, reply and we will sort it out together.
+
+${sign}`
+  };
 }
 
 // src/lib/money.ts
