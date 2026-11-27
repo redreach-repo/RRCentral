@@ -190,7 +190,7 @@ export default function TwoStepCard() {
       <p style={{ color: colors.muted, fontSize: 13, marginTop: 12, lineHeight: 1.5 }}>
         {required
           ? 'Your role needs a code from an authenticator app at each sign in. New phone? Remove the old authenticator here, then sign in again to set up the new one.'
-          : 'Required for admins and managers. Your role signs in with a password only.'}
+          : 'Required for admins, managers and Sales. Your role signs in with a password only.'}
       </p>
       {csvFiltered ? (
         <p style={{ color: colors.muted, fontSize: 13, margin: '0 0 8px', lineHeight: 1.45 }}>

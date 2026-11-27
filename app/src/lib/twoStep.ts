@@ -3,14 +3,17 @@ import type { UserRole } from './types'
 import { PRODUCT } from './product'
 
 /**
- * Two step sign in: after the password, admins and managers enter a 6 digit
+ * Two step sign in: after the password, admins, managers and Sales enter a 6 digit
  * code from an authenticator app (Google Authenticator, Microsoft
  * Authenticator, 1Password and so on). Supabase Auth keeps the authenticator
  * (TOTP) and raises the session to "aal2" once the code is checked.
  */
 
-/** Roles that must use two step sign in: the owner (admin) and admins (manager). */
-export const TWO_STEP_ROLES: UserRole[] = ['admin', 'manager']
+/**
+ * Roles that must use two step sign in: the owner (admin), admins (manager)
+ * and Sales (they hold client lists and prices; Sales lockdown PR 3).
+ */
+export const TWO_STEP_ROLES: UserRole[] = ['admin', 'manager', 'sales']
 
 export type AssuranceLevel = { currentLevel: string | null; nextLevel: string | null }
 

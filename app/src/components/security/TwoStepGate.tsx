@@ -54,7 +54,7 @@ const plain: CSSProperties = {
 }
 
 /**
- * After the password, admins and managers must pass two step sign in before
+ * After the password, admins, managers and Sales must pass two step sign in before
  * they see anything. Everyone else goes straight in.
  */
 export default function TwoStepGate({ children }: { children: ReactNode }) {
@@ -165,7 +165,9 @@ export default function TwoStepGate({ children }: { children: ReactNode }) {
         ) : (
           <>
             <p style={muted}>
-              As an {userRole === 'admin' ? 'owner' : 'admin'} you can see contracts, prices and commission, so{' '}
+              {userRole === 'sales'
+                ? 'You can see client details and prices, so'
+                : `As an ${userRole === 'admin' ? 'owner' : 'admin'} you can see contracts, prices and commission, so`}{' '}
               {PRODUCT.name} asks for a code from your phone as well as your password. It takes a minute to set up,
               once.
             </p>
