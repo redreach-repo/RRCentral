@@ -17,6 +17,8 @@ import { normalizeUserRole } from '../lib/permissions'
 import { DEMO_ROLE_EVENT, effectiveDemoRole } from '../lib/demo/demoRole'
 import { isDemoBuild } from '../lib/demo/demoMode'
 import type { UserRole } from '../lib/types'
+import { isSalesLocked, hasUserPermission, type UserPermissionKey } from '../lib/userPermissions'
+import { setCsvExportAllowed } from '../lib/exportPolicy'
 
 export const LOGIN_DOMAIN_REJECT_KEY = 'rrcentral_login_domain_reject'
 
@@ -32,6 +34,12 @@ interface AuthContextValue {
   tenantId: string | null
   /** False when signed in but not an active member of app_users (cloud mode). */
   hasAccess: boolean
+  /** Per-person switches (user_permissions) of the signed-in person. */
+  permissions: string[]
+  /** Sales without the "see company money" switch: own clients only, no money screens. */
+  salesLocked: boolean
+  /** Whether the signed-in person has a switch (admins and managers have all). */
+  hasPermission: (key: UserPermissionKey) => boolean
   signInWithPassword: (email: string, password: string) => Promise<void>
   changePassword: (newPassword: string) => Promise<void>
   signOut: () => Promise<void>
@@ -47,9 +55,22 @@ type Membership = {
   active: boolean
   id: string | null
   tenantId: string | null
+  permissions: string[]
 }
 
-const NO_MEMBERSHIP: Membership = { role: 'sales', active: false, id: null, tenantId: null }
+const NO_MEMBERSHIP: Membership = { role: 'sales', active: false, id: null, tenantId: null, permissions: [] }
+
+/** Per-person switches. Before the Sales lockdown SQL the table is missing: no switches. */
+async function lookupPermissions(userId: string | null): Promise<string[]> {
+  if (!userId) return []
+  try {
+    const { data, error } = await db.from('user_permissions').select('permission').eq('user_id', userId)
+    if (error || !data) return []
+    return (data as { permission: string }[]).map((r) => String(r.permission))
+  } catch {
+    return []
+  }
+}
 
 /**
  * Look up the signed-in user in app_users. In cloud mode RLS only returns the
@@ -77,11 +98,15 @@ async function lookupMembership(email: string | undefined): Promise<Membership> 
   }
 
   if (error || !data) return NO_MEMBERSHIP
+  const role = normalizeUserRole(data.role)
+  const id = data.id ? String(data.id) : null
   return {
-    role: normalizeUserRole(data.role),
+    role,
     active: data.active !== false,
-    id: data.id ? String(data.id) : null,
+    id,
     tenantId: data.tenant_id ? String(data.tenant_id) : null,
+    // Switches only change anything for Sales; skip the lookup for everyone else.
+    permissions: role === 'sales' ? await lookupPermissions(id) : [],
   }
 }
 
@@ -192,14 +217,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(DEMO_ROLE_EVENT, bump)
   }, [])
 
+  const effectiveRole = effectiveDemoRole(membership.role)
+  // Local mode has no database lock, so nothing is locked there either.
+  const salesLocked = isSupabaseConfigured() && isSalesLocked(effectiveRole, membership.permissions)
+  const canExportCsv =
+    !isSupabaseConfigured() || effectiveRole !== 'sales' || membership.permissions.includes('export.csv')
+  useEffect(() => {
+    setCsvExportAllowed(canExportCsv)
+  }, [canExportCsv])
+
+  const hasPermission = useCallback(
+    (key: UserPermissionKey) => hasUserPermission(effectiveRole, membership.permissions, key),
+    [effectiveRole, membership.permissions],
+  )
+
   const value = useMemo(
     () => ({
       user,
-      userRole: effectiveDemoRole(membership.role),
+      userRole: effectiveRole,
       membershipRole: membership.role,
       appUserId: membership.id,
       tenantId: membership.tenantId,
       hasAccess: membership.active || !isSupabaseConfigured(),
+      permissions: membership.permissions,
+      salesLocked,
+      hasPermission,
       signInWithPassword,
       changePassword,
       signOut,
@@ -209,7 +251,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }),
     // demoRoleTick forces a refresh when the presenter switches roles
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional tick dependency
-    [user, membership, signInWithPassword, changePassword, signOut, loading, demoRoleTick],
+    [user, membership, effectiveRole, salesLocked, hasPermission, signInWithPassword, changePassword, signOut, loading, demoRoleTick],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

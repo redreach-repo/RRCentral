@@ -73,7 +73,7 @@ import { errorMessage } from '../lib/errors'
 type PaymentRow = { invoice_ref: string; amount: number; created_at: string }
 
 export default function DashboardPage() {
-  const { userRole } = useAuth()
+  const { userRole, salesLocked } = useAuth()
   const { settings } = useSettings()
   const { activeCompany } = useTenant()
   const { t } = useI18n()
@@ -311,7 +311,7 @@ export default function DashboardPage() {
           {myDayCount > 0 ? t('page.dashboard.heroTitleDue') : t('page.dashboard.heroTitleClear')}
         </h1>
         <p className={dash.heroLead}>
-          {heroLine} {t('page.dashboard.heroIncomeNote')}
+          {heroLine} {salesLocked ? null : t('page.dashboard.heroIncomeNote')}
         </p>
         <div className={dash.heroActions}>
           <Link to="/crm?follow=Due&owner=me" className={dash.heroPrimary}>
@@ -337,9 +337,14 @@ export default function DashboardPage() {
                   { metric: 'open_pipeline', value: openPipeline },
                   { metric: 'open_quotes', value: openQuotes },
                   { metric: 'pending_invoices', value: pendingInvoices },
-                  { metric: 'month_income', value: monthIncome },
-                  { metric: 'month_expenses', value: monthExpenses },
-                  { metric: 'month_net', value: monthNet },
+                  // Company money stays out of a locked Sales user's snapshot.
+                  ...(salesLocked
+                    ? []
+                    : [
+                        { metric: 'month_income', value: monthIncome },
+                        { metric: 'month_expenses', value: monthExpenses },
+                        { metric: 'month_net', value: monthNet },
+                      ]),
                 ],
               )
               exportListCsv(
@@ -397,6 +402,8 @@ export default function DashboardPage() {
         </p>
       ) : null}
 
+      {/* Company money: not for Sales users without the "see company money" switch. */}
+      {salesLocked ? null : (
       <section className={dash.section} aria-label={t('page.dashboard.thisMonth')}>
         <div className={dash.sectionHead}>
           <h2 className={dash.sectionTitle}>
@@ -437,6 +444,7 @@ export default function DashboardPage() {
           </div>
         </div>
       </section>
+      )}
 
       <section className={dash.section} aria-label={t('page.dashboard.schedule')}>
         <div className={dash.sectionHead}>
@@ -483,7 +491,7 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {userRole === 'staff' ? null : <ReceivablesCard canWork={roleAtLeast(userRole, 'sales')} />}
+      {userRole === 'staff' || salesLocked ? null : <ReceivablesCard canWork={roleAtLeast(userRole, 'sales')} />}
 
       <section className={dash.section} aria-label="Needs attention">
         <button

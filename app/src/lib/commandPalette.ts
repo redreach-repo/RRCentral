@@ -14,9 +14,10 @@ export function commandPaletteItems(
   userRole: UserRole,
   settings: Record<string, string | undefined> = {},
   translate: (key: string) => string = (key) => key,
+  salesLocked = false,
 ): CommandPaletteItem[] {
   const rows: CommandPaletteItem[] = []
-  for (const mod of visibleAppModules(userRole, settings)) {
+  for (const mod of visibleAppModules(userRole, settings, undefined, undefined, salesLocked)) {
     const group = translateNavLabel(translate, navModuleKey(mod.id), mod.label)
     for (const item of mod.items) {
       const label = translateNavLabel(translate, navItemKey(item.to), item.label)

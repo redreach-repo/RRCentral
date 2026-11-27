@@ -39,9 +39,13 @@ import {
   APP_MODULES,
   itemMatchesPath,
   moduleIdForPath,
+  pathAllowed,
   titleForPath,
   visibleAppModules,
 } from '../modules/nav'
+import { useToast } from '../contexts/ToastContext'
+import { CSV_EXPORT_BLOCKED_EVENT, CSV_EXPORT_BLOCKED_MESSAGE } from '../lib/exportPolicy'
+import NoAccessPage from './NoAccessPage'
 import CompanyMark from './CompanyMark'
 import { DEFAULT_LOGO_URL } from '../lib/brand'
 import CommandPalette from './CommandPalette'
@@ -91,8 +95,9 @@ function writeSavedSection(id: string) {
 }
 
 export default function Layout() {
-  const { user, userRole, membershipRole, signOut, isLocalMode } = useAuth()
+  const { user, userRole, membershipRole, signOut, isLocalMode, salesLocked } = useAuth()
   const { settings } = useSettings()
+  const { showToast } = useToast()
   const {
     companies,
     activeCompanyId,
@@ -124,14 +129,23 @@ export default function Layout() {
   const reminders = useFollowUpReminders(user?.email)
   const { timer, now } = useRunningTimer(user?.email)
   useFridayHoursReminder(Boolean(user) && userRole !== 'viewer', reminders.permission)
-  useContractBillingSync(Boolean(user) && can(userRole, 'delivery.contracts'))
-  useRecurringDeductionsSync(Boolean(user) && roleAtLeast(userRole, 'sales'))
+  // Both write company money (contract invoices, expenses): never for a locked Sales user.
+  useContractBillingSync(Boolean(user) && can(userRole, 'delivery.contracts') && !salesLocked)
+  useRecurringDeductionsSync(Boolean(user) && roleAtLeast(userRole, 'sales') && !salesLocked)
   const phoneNav = userRole === 'staff' ? staffPhoneNav : phonePrimaryNav
 
   const visibleGroups = useMemo(
-    () => visibleAppModules(userRole, settings),
-    [userRole, settings],
+    () => visibleAppModules(userRole, settings, undefined, undefined, salesLocked),
+    [userRole, settings, salesLocked],
   )
+  // Only the Sales lock blocks typed addresses; other roles keep today's behaviour.
+  const pageAllowed = !salesLocked || pathAllowed(location.pathname, userRole, settings, salesLocked)
+
+  useEffect(() => {
+    const onBlocked = () => showToast(CSV_EXPORT_BLOCKED_MESSAGE, 'error')
+    window.addEventListener(CSV_EXPORT_BLOCKED_EVENT, onBlocked)
+    return () => window.removeEventListener(CSV_EXPORT_BLOCKED_EVENT, onBlocked)
+  }, [showToast])
 
   const pathSection = moduleIdForPath(location.pathname)
   // One group open at a time, so the sidebar never turns into a long list.
@@ -491,7 +505,7 @@ export default function Layout() {
         <main id="main-content" className={styles.content} tabIndex={-1}>
           <ErrorBoundary key={location.pathname}>
             <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} />
-            <Outlet />
+            {pageAllowed ? <Outlet /> : <NoAccessPage />}
           </ErrorBoundary>
         </main>
 

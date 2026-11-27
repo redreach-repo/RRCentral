@@ -111,7 +111,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   admin: 'Users, Settings, secrets, audit, delete invoices/expenses, mark paid',
   manager: 'All CRM data, reassign owners, delete quotes/CRM mistakes — no Settings/secrets',
-  sales: 'CRM, quotes, invoices day-to-day — no Settings, audit, or hard finance deletes',
+  sales: 'Own clients only: leads, quotes, invoices, delivery notes and POs for their clients. No company money unless switched on',
   staff: 'Only the accounts assigned to them. For the VA and freelancers',
   viewer: 'Can look at everything except Settings and the audit log. Cannot change anything',
 }

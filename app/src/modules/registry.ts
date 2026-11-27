@@ -19,6 +19,11 @@ export type ModuleNavItem = {
   forStaff?: boolean
   /** Settings > Modules switch for this link only; when false, the link is hidden. */
   flag?: string
+  /**
+   * Company money (finance, buying, stock). Hidden from Sales users without the
+   * "see company money" switch (Sales lockdown); the database is closed to them too.
+   */
+  money?: boolean
 }
 
 export type ModuleManifest = {
