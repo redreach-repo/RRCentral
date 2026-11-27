@@ -36,6 +36,9 @@ import {
   type ClientPurchaseOrder,
 } from '../lib/opsSliceStores'
 import { exportListCsv } from '../lib/listIo'
+import { advancesByPo } from '../lib/supplierAdvances'
+import { loadSupplierAdvancesQuiet } from '../lib/supplierAdvanceStore'
+import { formatAED } from '../lib/money'
 import { buttonSecondaryStyle, colors } from '../lib/uiStyles'
 import docsStyles from '../styles/docsList.module.css'
 
@@ -84,6 +87,8 @@ export default function ClientPosPage() {
   const [drawdowns, setDrawdowns] = useState<PoDrawdown[]>([])
   const [chainStart, setChainStart] = useState<ChainStart | null>(null)
   const [chainTitle, setChainTitle] = useState('')
+  /** Supplier advances paid per PO (paid and still open), when that SQL is on the database. */
+  const [advanceTotals, setAdvanceTotals] = useState<Map<string, { paid: number; open: number }>>(new Map())
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -108,6 +113,9 @@ export default function ClientPosPage() {
           .then((d) => setDrawdowns(d.rows))
           .catch(() => setDrawdowns([]))
       }
+      loadSupplierAdvancesQuiet()
+        .then((a) => setAdvanceTotals(advancesByPo(a.advances, a.applications)))
+        .catch(() => setAdvanceTotals(new Map()))
       setClients((cl.data || []) as ClientPoClientOpt[])
       setInvoices((inv.data || []) as InvoiceOpt[])
     } catch (e) {
@@ -355,7 +363,15 @@ export default function ClientPosPage() {
                       <td className={docsStyles.colDate}>
                         {r.issued_on ? format(new Date(r.issued_on), 'dd MMM yyyy') : '—'}
                       </td>
-                      <td className={`${docsStyles.colAmount} ${docsStyles.amount}`}>{formatPoMoney(Number(r.amount), r.currency)}</td>
+                      <td className={`${docsStyles.colAmount} ${docsStyles.amount}`}>
+                        {formatPoMoney(Number(r.amount), r.currency)}
+                        {advanceTotals.get(r.id) ? (
+                          <div className={docsStyles.meta} style={{ fontWeight: 400 }}>
+                            Supplier advances {formatAED(advanceTotals.get(r.id)!.paid)}
+                            {advanceTotals.get(r.id)!.open > 0 ? ` (${formatAED(advanceTotals.get(r.id)!.open)} open)` : ''}
+                          </div>
+                        ) : null}
+                      </td>
                       <td className={docsStyles.colAmount}>
                         {formatPoMoney(Number(r.received_amount || 0), r.currency)}
                         {open ? (

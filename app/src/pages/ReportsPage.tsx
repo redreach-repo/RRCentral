@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { loadSupplierAdvancesQuiet } from '../lib/supplierAdvanceStore'
+import { advanceCostRows } from '../lib/supplierAdvances'
 import { differenceInCalendarDays, format, parseISO, startOfMonth, subMonths } from 'date-fns'
 import { Download } from 'lucide-react'
 import { db } from '../lib/db'
@@ -120,6 +122,9 @@ export default function ReportsPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [income, setIncome] = useState<IncomeEntry[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
+  /** Open supplier advances as expense rows (P&L and statement only). */
+  const [advanceCosts, setAdvanceCosts] = useState<Expense[]>([])
+  const costs = useMemo(() => (advanceCosts.length ? [...expenses, ...advanceCosts] : expenses), [expenses, advanceCosts])
   const [crm, setCrm] = useState<CrmEntry[]>([])
   const [payments, setPayments] = useState<CustomerPayment[]>([])
   const [refunds, setRefunds] = useState<CustomerRefund[]>([])
@@ -157,6 +162,9 @@ export default function ReportsPage() {
         db.from('supplier_commitments').select('*'),
         db.from('payment_log').select('id, invoice_ref, amount, created_at'),
       ])
+      // Supplier advances not yet on a bill count as money out in the P&L (not in the VAT return).
+      const adv = await loadSupplierAdvancesQuiet()
+      setAdvanceCosts(advanceCostRows(adv.advances, adv.applications))
       // Pipelines for the sales answers. Each can be missing or hidden by role, so none of them stops the page.
       const [acc, sd, cd, cc] = await Promise.all([
         db.from('accounts').select('id, name, source'),
@@ -328,7 +336,7 @@ export default function ReportsPage() {
       const m = months.find((x) => x.key === key)
       if (m) m.income += Number(row.total_amount) || 0
     }
-    for (const row of expenses) {
+    for (const row of costs) {
       const key = monthKey(row.date)
       if (!key) continue
       const m = months.find((x) => x.key === key)
@@ -336,7 +344,7 @@ export default function ReportsPage() {
     }
     for (const m of months) m.net = m.income - m.expenses
     return months
-  }, [recognizedIncome, expenses])
+  }, [recognizedIncome, costs])
 
   const vatMonths = useMemo(() => quarterMonths(vatYear, vatQuarter), [vatYear, vatQuarter])
 
@@ -417,8 +425,8 @@ export default function ReportsPage() {
   }, [recognizedIncome, expenses, vatMonths, vatRate])
 
   const statement = useMemo(
-    () => buildStatement(recognizedIncome, expenses, stmtFrom, stmtTo, vatRate, paymentLog),
-    [recognizedIncome, expenses, stmtFrom, stmtTo, vatRate, paymentLog],
+    () => buildStatement(recognizedIncome, costs, stmtFrom, stmtTo, vatRate, paymentLog),
+    [recognizedIncome, costs, stmtFrom, stmtTo, vatRate, paymentLog],
   )
   const statementName = `income-expenses-${stmtFrom}-to-${stmtTo}`
 

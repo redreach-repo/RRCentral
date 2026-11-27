@@ -18,6 +18,9 @@ const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   Open: { bg: 'rgba(59,130,246,0.2)', color: '#60a5fa' },
   Fulfilled: { bg: 'rgba(34,197,94,0.2)', color: '#4ade80' },
   Canceled: { bg: 'rgba(239,68,68,0.2)', color: '#f87171' },
+  // Supplier advances (Open shares the Client PO colour)
+  'Part applied': { bg: 'rgba(249,115,22,0.2)', color: '#fb923c' },
+  Applied: { bg: 'rgba(34,197,94,0.2)', color: '#4ade80' },
 }
 
 const pillStyle: CSSProperties = {

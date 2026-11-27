@@ -68,7 +68,7 @@ describe('Settings > Modules switches still hide the same pages', () => {
     ['clients', ['/accounts', '/support', '/ctrm-issues', '/client-health', '/client-reports', '/client-updates', '/uniform-sizes']],
     ['delivery', ['/products', '/delivery-settings', '/build-templates', '/agreement-template', '/nda-template', '/clause-library', '/obligations']],
     ['ops', ['/app/wanders', '/catalog', '/inventory', '/purchase-orders', '/projects', '/construction-sites', '/eng-register', '/templates', '/domains']],
-    ['finance', ['/payments', '/expenses', '/vendors', '/ledger', '/reports', '/planning-goals', '/mrr', '/insights', '/duplicates']],
+    ['finance', ['/payments', '/expenses', '/vendors', '/supplier-advances', '/ledger', '/reports', '/planning-goals', '/mrr', '/insights', '/duplicates']],
     ['hr', ['/hr/people', '/hr/leave', '/hr/attendance']],
     ['payroll', ['/payroll']],
     ['marketing', ['/marketing']],
@@ -138,6 +138,15 @@ describe('visibleAppModules by role', () => {
     expect(visiblePaths('manager')).toContain('/client-pos')
     expect(visiblePaths('sales')).toContain('/client-pos')
     expect(visiblePaths('staff')).not.toContain('/client-pos')
+  })
+
+  it('shows Supplier advances under Finance > Money out, next to Vendors, not to staff', () => {
+    const finance = visibleAppModules('admin', {}).find((m) => m.id === 'finance')?.items || []
+    const moneyOut = finance.filter((i) => i.section === 'Money out').map((i) => i.to)
+    expect(moneyOut).toEqual(['/expenses', '/vendors', '/supplier-advances'])
+    expect(visiblePaths('manager')).toContain('/supplier-advances')
+    expect(visiblePaths('sales')).toContain('/supplier-advances')
+    expect(visiblePaths('staff')).not.toContain('/supplier-advances')
   })
 
   it('soft-hides pipeline detail nav for non-admins when the setting is on', () => {
