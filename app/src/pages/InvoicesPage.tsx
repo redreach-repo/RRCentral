@@ -203,6 +203,11 @@ export default function InvoicesPage() {
   const compact = useCompactCrm()
   const [searchParams, setSearchParams] = useSearchParams()
   const accountFilter = searchParams.get('account') || ''
+  // Opened from Home ("Made by Sales"): search for that invoice number.
+  const refParam = searchParams.get('ref') || ''
+  useEffect(() => {
+    if (refParam) setSearch(refParam)
+  }, [refParam])
   const [accounts, setAccounts] = useState<Account[]>([])
   const accountById = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
 
