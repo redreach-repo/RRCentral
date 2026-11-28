@@ -23,6 +23,7 @@ import {
   WAIT_BUCKET_KEYS,
   addDaysIso,
   auditArgs,
+  buildClient360,
   canonicalStage,
   clampPage,
   companySearchWord,
@@ -403,6 +404,122 @@ export const TOOLS: ToolDef[] = [
         ],
         open_tickets: tickets.error ? null : tickets.count ?? 0,
         recent_timeline: ((check(timeline, "read the timeline") as Row[]) || []).map((t) => pick(t, ["id", "kind", "body", "user_email", "created_at"])),
+      }
+    },
+  },
+  {
+    name: "get_client_360",
+    title: "Get client (everything)",
+    description:
+      "Everything about one client company on one page: legal name, TRN, address, owner, credit limit and hold; totals quoted, awarded, invoiced, balance due and overdue per currency; and its inquiries and deals, quotations (revisions grouped under the base reference), purchase orders, invoices and credit notes (balance, days overdue), payments, delivery notes, contacts, documents, support tickets and one merged timeline, newest first. Give client_id, or name to search (returns the matches to pick from when more than one). Money is left out for keys that cannot see invoices; margin is shown to admin keys only. Read only. Each list shows up to 50 rows; counts are the full totals.",
+    readOnly: true,
+    input: {
+      client_id: uuid("client_id").optional(),
+      name: z.string().min(2).max(200).optional().describe("Client name, short name, TRN or email to search."),
+    },
+    run: async (a, ctx) => {
+      if (!!a.client_id === !!a.name) throw new ToolError("Give exactly one of client_id or name.")
+      let clientId = a.client_id ? String(a.client_id) : ""
+      if (!clientId) {
+        const text = likeText(String(a.name), 120)
+        const res = await ctx.db
+          .from("clients")
+          .select("*")
+          .or(`company_name.ilike.%${text}%,trn.ilike.%${text}%,email.ilike.%${text}%`)
+          .order("company_name")
+          .limit(10)
+        const found = ((check(res, "search clients") as Row[] | null) || []).filter((c) => !c.deleted_at && !c.merged_into)
+        if (!found.length) throw new ToolError("No client with that name is visible to this key.")
+        if (found.length > 1) {
+          return { matches: found.map((c) => pick(c, ["id", "company_name", "trn", "email"])), note: "More than one client matches. Call again with client_id." }
+        }
+        clientId = String(found[0].id)
+      }
+      const cr = await ctx.db.from("clients").select("*").eq("id", clientId).limit(1)
+      const client = ((check(cr, "read the client") as Row[] | null) || [])[0]
+      if (!client) throw new ToolError("No client with that id is visible to this key.")
+      const accountId = client.account_id ? String(client.account_id) : ""
+      const money = ctx.key.role !== "staff"
+      const soft = async (table: string, col: string, val: string | string[] | null, what: string): Promise<Row[]> => {
+        if (!val || (Array.isArray(val) && !val.length)) return []
+        const q = ctx.db.from(table).select("*")
+        const res = await (Array.isArray(val) ? q.in(col, val) : q.eq(col, val)).limit(500)
+        if (isMissingTable(res.error) || isMissingColumn(res.error)) return []
+        if (res.error && (res.error.code === "42501" || /row-level security|permission denied/i.test(res.error.message || ""))) return []
+        return (check(res, what) as Row[] | null) || []
+      }
+      const [accounts, quotes, invoices, customerPayments, posC, posA, dns, crm, salesDeals, ctrmDeals, inquiries, ticketsC, ticketsA, accountContacts, activities] =
+        await Promise.all([
+          soft("accounts", "id", accountId || null, "read the account"),
+          money ? soft("quotations", "client_id", clientId, "read quotations") : [],
+          money ? soft("invoices", "client_id", clientId, "read invoices") : [],
+          money ? soft("customer_payments", "client_id", clientId, "read payments") : [],
+          soft("client_purchase_orders", "client_id", clientId, "read client POs"),
+          soft("client_purchase_orders", "account_id", accountId || null, "read client POs"),
+          soft("delivery_notes", "client_id", clientId, "read delivery notes"),
+          soft("crm", "client_id", clientId, "read deals"),
+          soft("sales_deals", "account_id", accountId || null, "read AI CRM deals"),
+          soft("ctrm_deals", "account_id", accountId || null, "read CTRM Next deals"),
+          soft("website_inquiries", "client_id", clientId, "read enquiries"),
+          soft("tickets", "client_id", clientId, "read tickets"),
+          soft("tickets", "account_id", accountId || null, "read tickets"),
+          soft("account_contacts", "account_id", accountId || null, "read contacts"),
+          soft("account_activities", "account_id", accountId || null, "read the timeline"),
+        ])
+      const uniq = (list: Row[]) => [...new Map(list.map((r) => [String(r.id), r])).values()]
+      const refs = invoices.map((i) => String(i.reference_number || "")).filter(Boolean)
+      const quoteIds = quotes.map((q) => String(q.id))
+      const invoiceIds = invoices.map((i) => String(i.id))
+      const dealIds = crm.map((d) => String(d.id))
+      const [payments, quoteNotes, chaseLog, followUps, documents, mails] = await Promise.all([
+        money ? soft("payment_log", "invoice_ref", refs, "read payments") : [],
+        money ? soft("quote_notes", "quotation_id", quoteIds, "read quote notes") : [],
+        money ? soft("invoice_chase_log", "invoice_id", invoiceIds, "read chase notes") : [],
+        soft("follow_up_updates", "crm_id", dealIds, "read deal updates"),
+        soft("customer_documents", "crm_id", dealIds, "read documents"),
+        soft("mail_links", "target_id", [clientId, ...(accountId ? [accountId] : []), ...quoteIds, ...invoiceIds, ...dealIds], "read linked emails"),
+      ])
+      const owners = await ownerNames(ctx.db, [accounts[0]?.owner_user_id])
+      const view = buildClient360({
+        client,
+        account: accounts[0] ?? null,
+        ownerName: owners.get(String(accounts[0]?.owner_user_id)) ?? "",
+        quotes,
+        invoices,
+        payments,
+        customerPayments,
+        pos: uniq([...posC, ...posA]),
+        deliveryNotes: dns,
+        crmDeals: crm,
+        salesDeals,
+        ctrmDeals,
+        inquiries,
+        tickets: uniq([...ticketsC, ...ticketsA]),
+        accountContacts,
+        documents,
+        quoteNotes,
+        chaseLog,
+        followUps,
+        activities,
+        mails: mails.map((m) => pick(m, ["id", "subject", "from_address", "sent_at", "created_at", "linked_by"])),
+        today: ctx.now(),
+        moneyVisible: money,
+        marginVisible: money && ctx.key.scope === "admin",
+      }) as Row
+      const cap = (k: string) => ((view[k] as unknown[]) || []).slice(0, 50)
+      return {
+        ...view,
+        inquiries: cap("inquiries"),
+        quotes: cap("quotes"),
+        pos: cap("pos"),
+        invoices: cap("invoices"),
+        payments: cap("payments"),
+        delivery_notes: cap("delivery_notes"),
+        contacts: cap("contacts"),
+        documents: cap("documents"),
+        tickets: cap("tickets"),
+        timeline: cap("timeline"),
+        client_page: `/clients/${clientId}`,
       }
     },
   },

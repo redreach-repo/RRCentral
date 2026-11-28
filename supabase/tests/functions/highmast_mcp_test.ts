@@ -27,6 +27,8 @@ const EXPECTED_TOOLS = [
   "add_quote_note",
   // Quote follow-up chasing: waiting quotes, follow-up notes, follow-up tasks (never sends, never changes quotes).
   "list_quote_followups", "add_quote_chase_note", "complete_quote_chase_task",
+  // One client, everything (read only, same view as the client page).
+  "get_client_360",
   // Read-only PDF tools (tools_pdf.ts): every key, limited by what its member can see.
   "get_delivery_note_pdf", "get_invoice_pdf", "get_quote_pdf",
 ].sort()

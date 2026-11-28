@@ -33,7 +33,7 @@ describe('sidebar groups (rebuilt Nov 2026)', () => {
   })
 
   it('gives Sales its own pages only', () => {
-    expect(groupPaths('sales')).toEqual(['/quick-add', '/deals', '/crm', '/sales', '/ctrm', '/quotations', '/quote-followup', '/client-pos', '/marketing', '/outreach'])
+    expect(groupPaths('sales')).toEqual(['/quick-add', '/deals', '/crm', '/sales', '/ctrm', '/clients', '/quotations', '/quote-followup', '/client-pos', '/marketing', '/outreach'])
   })
 
   it('gives Operations client care, delivery, contracts, projects, stock and files', () => {
@@ -64,7 +64,7 @@ describe('Settings > Modules switches still hide the same pages', () => {
   const cases: [string, string[]][] = [
     ['overview', ['/app', '/guide', '/dashboards']],
     ['sales', ['/quick-add', '/deals', '/crm', '/follow-ups', '/sales', '/ctrm', '/outreach']],
-    ['documents', ['/quotations', '/quote-followup', '/invoices', '/receivables', '/client-pos', '/delivery-notes', '/customer-files']],
+    ['documents', ['/clients', '/quotations', '/quote-followup', '/invoices', '/receivables', '/client-pos', '/delivery-notes', '/customer-files']],
     ['clients', ['/accounts', '/support', '/ctrm-issues', '/client-health', '/client-reports', '/client-updates', '/uniform-sizes']],
     ['delivery', ['/products', '/delivery-settings', '/build-templates', '/agreement-template', '/nda-template', '/clause-library', '/obligations']],
     ['ops', ['/app/wanders', '/catalog', '/inventory', '/purchase-orders', '/projects', '/construction-sites', '/eng-register', '/templates', '/domains']],

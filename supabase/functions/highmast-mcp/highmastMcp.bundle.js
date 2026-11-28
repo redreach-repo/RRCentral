@@ -45,10 +45,10 @@ function currencyDecimals(currency) {
   return 2;
 }
 var POW10 = [];
-function pow10(n) {
-  if (n < 0 || !Number.isInteger(n)) throw new RangeError(`bad power ${n}`);
-  if (POW10[n] === void 0) POW10[n] = 10n ** BigInt(n);
-  return POW10[n];
+function pow10(n2) {
+  if (n2 < 0 || !Number.isInteger(n2)) throw new RangeError(`bad power ${n2}`);
+  if (POW10[n2] === void 0) POW10[n2] = 10n ** BigInt(n2);
+  return POW10[n2];
 }
 function isDecimal(v) {
   return typeof v === "object" && v !== null && "coef" in v && "scale" in v;
@@ -58,8 +58,8 @@ function parseDecimal(input) {
   if (isDecimal(input)) return input;
   if (typeof input === "bigint") return { coef: input, scale: 0 };
   if (typeof input === "number" && !Number.isFinite(input)) throw new RangeError(`Not a finite amount: ${input}`);
-  const s = String(input).trim().replace(/_/g, "");
-  const m = DECIMAL_RE.exec(s);
+  const s2 = String(input).trim().replace(/_/g, "");
+  const m = DECIMAL_RE.exec(s2);
   if (!m || !m[2] && !m[3]) throw new RangeError(`Not a decimal amount: "${String(input)}"`);
   const sign = m[1] === "-" ? -1n : 1n;
   const frac = m[3] || "";
@@ -133,8 +133,8 @@ function toDecimalString(m) {
 function toNumber(m) {
   return Number(toDecimalString(m));
 }
-function roundAmount(n, currency = "AED") {
-  return toNumber(moneyOrZero(n, currency));
+function roundAmount(n2, currency = "AED") {
+  return toNumber(moneyOrZero(n2, currency));
 }
 
 // node_modules/date-fns/constants.js
@@ -187,8 +187,8 @@ function startOfWeek(date, options) {
   const defaultOptions2 = getDefaultOptions();
   const weekStartsOn = options?.weekStartsOn ?? options?.locale?.options?.weekStartsOn ?? defaultOptions2.weekStartsOn ?? defaultOptions2.locale?.options?.weekStartsOn ?? 0;
   const _date = toDate(date, options?.in);
-  const day = _date.getDay();
-  const diff = (day < weekStartsOn ? 7 : 0) + day - weekStartsOn;
+  const day2 = _date.getDay();
+  const diff = (day2 < weekStartsOn ? 7 : 0) + day2 - weekStartsOn;
   _date.setDate(_date.getDate() - diff);
   _date.setHours(0, 0, 0, 0);
   return _date;
@@ -1815,7 +1815,7 @@ function parseDate(dateString, year) {
   const isWeekDate = !!captures[4];
   const dayOfYear = parseDateUnit(captures[1]);
   const month = parseDateUnit(captures[2]) - 1;
-  const day = parseDateUnit(captures[3]);
+  const day2 = parseDateUnit(captures[3]);
   const week = parseDateUnit(captures[4]);
   const dayOfWeek = parseDateUnit(captures[5]) - 1;
   if (isWeekDate) {
@@ -1825,10 +1825,10 @@ function parseDate(dateString, year) {
     return dayOfISOWeekYear(year, week, dayOfWeek);
   } else {
     const date = /* @__PURE__ */ new Date(0);
-    if (!validateDate(year, month, day) || !validateDayOfYearDate(year, dayOfYear)) {
+    if (!validateDate(year, month, day2) || !validateDayOfYearDate(year, dayOfYear)) {
       return /* @__PURE__ */ new Date(NaN);
     }
-    date.setUTCFullYear(year, month, Math.max(dayOfYear, day));
+    date.setUTCFullYear(year, month, Math.max(dayOfYear, day2));
     return date;
   }
 }
@@ -1861,11 +1861,11 @@ function parseTimezone(timezoneString) {
   }
   return sign * (hours * millisecondsInHour + minutes * millisecondsInMinute);
 }
-function dayOfISOWeekYear(isoWeekYear, week, day) {
+function dayOfISOWeekYear(isoWeekYear, week, day2) {
   const date = /* @__PURE__ */ new Date(0);
   date.setUTCFullYear(isoWeekYear, 0, 4);
   const fourthOfJanuaryDay = date.getUTCDay() || 7;
-  const diff = (week - 1) * 7 + day + 1 - fourthOfJanuaryDay;
+  const diff = (week - 1) * 7 + day2 + 1 - fourthOfJanuaryDay;
   date.setUTCDate(date.getUTCDate() + diff);
   return date;
 }
@@ -1879,8 +1879,8 @@ function validateDate(year, month, date) {
 function validateDayOfYearDate(year, dayOfYear) {
   return dayOfYear >= 1 && dayOfYear <= (isLeapYearIndex(year) ? 366 : 365);
 }
-function validateWeekDate(_year, week, day) {
-  return week >= 1 && week <= 53 && day >= 0 && day <= 6;
+function validateWeekDate(_year, week, day2) {
+  return week >= 1 && week <= 53 && day2 >= 0 && day2 <= 6;
 }
 function validateTime(hours, minutes, seconds) {
   if (hours === 24) {
@@ -2053,8 +2053,335 @@ function isOpenTicket(t) {
 var DEFAULT_STALE_DAYS = { crm: 21, sales: 14, ctrm: 14 };
 
 // src/lib/currency.ts
-function roundMoney(n) {
-  return roundAmount(n, "AED");
+function roundMoney(n2) {
+  return roundAmount(n2, "AED");
+}
+
+// src/lib/client360.ts
+var s = (v) => (v == null ? "" : String(v)).trim();
+var n = (v) => {
+  const x = Number(v);
+  return Number.isFinite(x) ? x : 0;
+};
+var day = (v) => s(v) ? s(v).slice(0, 10) : null;
+var cur = (v) => s(v).toUpperCase() || "AED";
+var AWARDED = /* @__PURE__ */ new Set(["accepted", "awarded"]);
+function divisionOf(reference) {
+  const m = /^RR-(\d{2})-/i.exec(s(reference));
+  return m ? m[1] : "";
+}
+var newest = (key) => (a, b) => s(key(b)).localeCompare(s(key(a)));
+function emptyTotals(currency) {
+  return { currency, quoted: 0, awarded: 0, invoiced: 0, paid: 0, balance: 0, overdue: 0 };
+}
+function quoteRow(q, marginVisible) {
+  const amount = n(q.amount);
+  const cost = n(q.supplier_cost_base);
+  const fx = n(q.fx_rate) || 1;
+  const baseAmount = n(q.base_amount) || amount * fx;
+  const margin = marginVisible && cost > 0 ? roundMoney(baseAmount - cost) : null;
+  return {
+    id: s(q.id),
+    reference: s(q.reference_number) || s(q.quote_id) || "Draft quote",
+    revision: n(q.revision),
+    status: s(q.status) || "Draft",
+    date: day(q.date),
+    valid_until: day(q.valid_until),
+    amount: roundMoney(amount),
+    currency: cur(q.quotation_currency || q.currency),
+    margin,
+    margin_pct: margin != null && baseAmount > 0 ? Math.round(margin / baseAmount * 1e3) / 10 : null,
+    division: s(q.division_code) || divisionOf(q.reference_number)
+  };
+}
+function groupQuotes(quotes, marginVisible) {
+  const groups = /* @__PURE__ */ new Map();
+  for (const q of quotes) {
+    if (q.deleted_at) continue;
+    const row = quoteRow(q, marginVisible);
+    const base = s(q.base_reference) || s(q.reference_number) || s(q.quote_id) || row.id;
+    const list = groups.get(base);
+    if (list) list.push(row);
+    else groups.set(base, [row]);
+  }
+  const out = [];
+  for (const [base, rows] of groups) {
+    rows.sort((a, b) => b.revision - a.revision || s(b.date).localeCompare(s(a.date)));
+    const current = rows.find((r) => r.status.toLowerCase() !== "draft" && r.status.toLowerCase() !== "superseded") ?? rows[0];
+    out.push({ base_reference: base, current, revisions: rows, date: current.date ?? rows[0].date, status: current.status, division: current.division });
+  }
+  return out.sort(newest((g) => g.date));
+}
+function buildClient360(input) {
+  const today = input.today.toISOString().slice(0, 10);
+  const c = input.client;
+  const a = input.account ?? null;
+  const money2 = input.moneyVisible;
+  const margin = money2 && input.marginVisible;
+  const header = {
+    id: s(c.id),
+    legal_name: s(c.company_name),
+    short_name: s(c.short_name) || s(a?.name),
+    trn: s(c.trn),
+    address: s(c.address),
+    account_id: s(c.account_id) || null,
+    account_reference: s(a?.reference),
+    owner: s(input.ownerName) || s(c.company_owner),
+    status: s(c.merged_into) ? "merged" : s(a?.status) || "active",
+    credit_limit: a && a.credit_limit_aed != null && s(a.credit_limit_aed) !== "" ? n(a.credit_limit_aed) : null,
+    credit_hold: Boolean(a?.credit_hold),
+    merged_into: s(c.merged_into) || null
+  };
+  const quoteGroups = money2 ? groupQuotes(input.quotes ?? [], margin) : [];
+  const paidByRef = /* @__PURE__ */ new Map();
+  for (const p of money2 ? input.payments ?? [] : []) {
+    const ref = s(p.invoice_ref);
+    if (ref) paidByRef.set(ref, (paidByRef.get(ref) ?? 0) + n(p.amount));
+  }
+  const invoices = money2 ? (input.invoices ?? []).filter((i) => !i.deleted_at).map((i) => {
+    const ref = s(i.reference_number);
+    const amount = roundMoney(n(i.amount));
+    const paid = roundMoney(paidByRef.get(ref) ?? 0);
+    const collectible = isCollectible({ status: s(i.status), payment_status: s(i.payment_status) });
+    const balance = collectible ? roundMoney(Math.max(0, amount - paid)) : 0;
+    const due = invoiceDueDate({ date: day(i.date), payment_terms: s(i.payment_terms) });
+    const days = due && balance > 0 && due < today ? Math.round((Date.parse(today) - Date.parse(due)) / 864e5) : 0;
+    return {
+      id: s(i.id),
+      reference: ref || "Invoice",
+      date: day(i.date),
+      status: s(i.status),
+      payment_status: s(i.payment_status),
+      amount,
+      currency: cur(i.currency),
+      paid,
+      balance,
+      due_date: due,
+      days_overdue: days,
+      credit_note: amount < 0 || /credit/i.test(s(i.status)),
+      division: s(i.division_code) || divisionOf(ref)
+    };
+  }).sort(newest((r) => r.date)) : [];
+  const totals = /* @__PURE__ */ new Map();
+  const t = (currency) => {
+    let x = totals.get(currency);
+    if (!x) totals.set(currency, x = emptyTotals(currency));
+    return x;
+  };
+  for (const g of quoteGroups) {
+    if (g.current.status.toLowerCase() === "draft") continue;
+    t(g.current.currency).quoted += g.current.amount;
+    if (AWARDED.has(g.current.status.toLowerCase())) t(g.current.currency).awarded += g.current.amount;
+  }
+  for (const i of invoices) {
+    if (i.status.toLowerCase() === "draft" || isCancelledInvoice(i)) continue;
+    const x = t(i.currency);
+    x.invoiced += i.amount;
+    x.paid += i.paid;
+    x.balance += i.balance;
+    if (i.days_overdue > 0) x.overdue += i.balance;
+  }
+  const totalsList = [...totals.values()].map((x) => ({
+    ...x,
+    quoted: roundMoney(x.quoted),
+    awarded: roundMoney(x.awarded),
+    invoiced: roundMoney(x.invoiced),
+    paid: roundMoney(x.paid),
+    balance: roundMoney(x.balance),
+    overdue: roundMoney(x.overdue)
+  })).sort((p, q) => p.currency === "AED" ? -1 : q.currency === "AED" ? 1 : p.currency.localeCompare(q.currency));
+  const payments = money2 ? [
+    ...(input.payments ?? []).map((p) => ({
+      id: s(p.id),
+      date: day(p.created_at),
+      amount: roundMoney(n(p.amount)),
+      currency: cur(p.currency),
+      invoice_ref: s(p.invoice_ref),
+      method: s(p.method),
+      status: "Recorded",
+      division: divisionOf(p.invoice_ref)
+    })),
+    ...(input.customerPayments ?? []).filter((p) => !p.deleted_at).map((p) => ({
+      id: s(p.id),
+      date: day(p.payment_date),
+      amount: roundMoney(n(p.amount_received)),
+      currency: cur(p.currency),
+      invoice_ref: s(p.invoice_ref) || s(p.quote_ref),
+      method: s(p.payment_method),
+      status: s(p.status) || "Received",
+      division: divisionOf(p.invoice_ref || p.quote_ref)
+    }))
+  ].sort(newest((r) => r.date)) : [];
+  const pos = (input.pos ?? []).filter((p) => !p.deleted_at).map((p) => ({
+    id: s(p.id),
+    po_number: s(p.po_number) || "PO",
+    date: day(p.issued_on) || day(p.created_at),
+    amount: money2 ? roundMoney(n(p.amount)) : 0,
+    currency: cur(p.currency),
+    quote_reference: s(p.quote_reference),
+    status: s(p.status),
+    division: s(p.division_code) || divisionOf(p.quote_reference),
+    file_url: s(p.file_url)
+  })).sort(newest((r) => r.date));
+  const deliveryNotes = (input.deliveryNotes ?? []).filter((d) => !d.deleted_at).map((d) => ({
+    id: s(d.id),
+    reference: s(d.reference_number) || "Delivery note",
+    date: day(d.delivery_date) || day(d.date),
+    status: s(d.status),
+    quote_ref: s(d.quote_ref),
+    invoice_ref: s(d.invoice_ref),
+    division: s(d.division_code) || divisionOf(d.reference_number)
+  })).sort(newest((r) => r.date));
+  const inquiries = [
+    ...(input.crmDeals ?? []).filter((d) => !d.deleted_at).map((d) => ({
+      id: s(d.id),
+      kind: "deal",
+      pipeline: "Company",
+      title: s(d.next_action) || s(d.primary_contact) || s(d.company_name),
+      stage: s(d.pipeline_stage),
+      date: day(d.created_at),
+      owner: s(d.owner),
+      division: divisionOf(d.quote_ref)
+    })),
+    ...(input.salesDeals ?? []).filter((d) => !d.deleted_at).map((d) => ({
+      id: s(d.id),
+      kind: "deal",
+      pipeline: "AI CRM",
+      title: s(d.next_action) || s(d.notes).slice(0, 80) || "AI CRM deal",
+      stage: s(d.stage),
+      date: day(d.created_at),
+      owner: "",
+      division: ""
+    })),
+    ...(input.ctrmDeals ?? []).filter((d) => !d.deleted_at).map((d) => ({
+      id: s(d.id),
+      kind: "deal",
+      pipeline: "CTRM Next",
+      title: s(d.next_action) || s(d.notes).slice(0, 80) || "CTRM Next deal",
+      stage: s(d.stage),
+      date: day(d.created_at),
+      owner: "",
+      division: ""
+    })),
+    ...(input.inquiries ?? []).map((w) => ({
+      id: s(w.id),
+      kind: "enquiry",
+      pipeline: "Website",
+      title: s(w.message).slice(0, 120) || s(w.name) || "Website enquiry",
+      stage: s(w.status),
+      date: day(w.created_at),
+      owner: "",
+      division: ""
+    }))
+  ].sort(newest((r) => r.date));
+  const contacts = [];
+  const seenContact = /* @__PURE__ */ new Set();
+  const addContact = (x) => {
+    const key = (x.email || x.phone || x.name).toLowerCase().replace(/\s+/g, "");
+    if (!key || seenContact.has(key)) return;
+    seenContact.add(key);
+    contacts.push(x);
+  };
+  if (s(c.primary_contact) || s(c.email)) {
+    addContact({ name: s(c.primary_contact), role: "Primary", email: s(c.email), phone: s(c.mobile) || s(c.office), source: "client" });
+  }
+  for (const x of Array.isArray(c.contacts) ? c.contacts : []) {
+    addContact({ name: s(x.name), role: s(x.role) || s(x.title), email: s(x.email), phone: s(x.phone) || s(x.mobile), source: "client" });
+  }
+  for (const x of input.accountContacts ?? []) {
+    if (x.deleted_at) continue;
+    addContact({ name: s(x.name), role: s(x.role), email: s(x.email), phone: s(x.phone) || s(x.whatsapp), source: "account" });
+  }
+  const documents = [
+    ...(input.documents ?? []).filter((d) => !d.deleted_at).map((d) => ({
+      id: s(d.id),
+      title: s(d.title) || s(d.file_name) || "Document",
+      category: s(d.category),
+      url: s(d.drive_url),
+      date: day(d.uploaded_at),
+      source: "Customer files",
+      status: s(d.category)
+    })),
+    ...(input.pos ?? []).filter((p) => !p.deleted_at && s(p.file_url)).map((p) => ({
+      id: `po-${s(p.id)}`,
+      title: s(p.file_name) || `PO ${s(p.po_number)}`,
+      category: "Purchase order",
+      url: s(p.file_url),
+      date: day(p.issued_on) || day(p.created_at),
+      source: "Client PO",
+      status: "Purchase order"
+    }))
+  ].sort(newest((r) => r.date));
+  const tickets = (input.tickets ?? []).filter((k) => !k.deleted_at).map((k) => ({ id: s(k.id), subject: s(k.subject) || "Ticket", status: s(k.status), priority: s(k.priority), date: day(k.created_at) })).sort(newest((r) => r.date));
+  const quoteRef = /* @__PURE__ */ new Map();
+  for (const g of quoteGroups) for (const r of g.revisions) quoteRef.set(r.id, r.reference);
+  const invoiceRef = new Map(invoices.map((i) => [i.id, i.reference]));
+  const timeline = [
+    ...(money2 ? input.quoteNotes ?? [] : []).map((x) => ({
+      at: s(x.created_at),
+      kind: s(x.kind) === "note" ? "Quote note" : "Quote status",
+      text: s(x.body),
+      ref: quoteRef.get(s(x.quotation_id)) || s(x.quote_ref),
+      by: s(x.created_by_email),
+      status: s(x.kind)
+    })),
+    ...(money2 ? input.chaseLog ?? [] : []).filter((x) => !x.deleted_at).map((x) => ({
+      at: s(x.created_at) || s(x.chased_on),
+      kind: "Chase",
+      text: [s(x.channel), s(x.contact), s(x.note), s(x.promised_date) ? `promised ${s(x.promised_date)}` : ""].filter(Boolean).join(" \xB7 "),
+      ref: invoiceRef.get(s(x.invoice_id)) || "",
+      by: s(x.created_by_email),
+      status: "chase"
+    })),
+    ...(input.followUps ?? []).map((x) => ({ at: s(x.created_at), kind: "Deal update", text: s(x.update_text), ref: "", by: s(x.user_email), status: "update" })),
+    ...(input.activities ?? []).map((x) => ({ at: s(x.created_at), kind: s(x.kind) === "email" ? "Email" : "Activity", text: s(x.body), ref: "", by: s(x.user_email), status: s(x.kind) })),
+    ...(input.mails ?? []).map((x) => ({
+      at: s(x.sent_at) || s(x.created_at),
+      kind: "Email",
+      text: [s(x.subject), s(x.from_address) ? `from ${s(x.from_address)}` : ""].filter(Boolean).join(" \xB7 "),
+      ref: "",
+      by: s(x.linked_by),
+      status: "email"
+    })),
+    ...quoteGroups.flatMap(
+      (g) => g.revisions.filter((r) => r.date).map((r) => ({ at: s(r.date), kind: "Quote", text: `${r.reference} ${r.status}`, ref: r.reference, by: "", status: r.status }))
+    ),
+    ...invoices.filter((i) => i.date).map((i) => ({ at: s(i.date), kind: "Invoice", text: `${i.reference} ${i.status}`, ref: i.reference, by: "", status: i.status })),
+    ...pos.filter((p) => p.date).map((p) => ({ at: s(p.date), kind: "Purchase order", text: `PO ${p.po_number} received`, ref: p.po_number, by: "", status: p.status })),
+    ...payments.filter((p) => p.date).map((p) => ({ at: s(p.date), kind: "Payment", text: `${p.currency} ${p.amount.toFixed(2)} received`, ref: p.invoice_ref, by: "", status: p.status })),
+    ...deliveryNotes.filter((d) => d.date).map((d) => ({ at: s(d.date), kind: "Delivery", text: `${d.reference} ${d.status}`, ref: d.reference, by: "", status: d.status }))
+  ].filter((x) => x.at).sort(newest((r) => r.at));
+  const out = {
+    header,
+    totals: money2 ? totalsList : [],
+    money_visible: money2,
+    margin_visible: margin,
+    inquiries,
+    quotes: quoteGroups,
+    pos,
+    invoices,
+    payments,
+    delivery_notes: deliveryNotes,
+    contacts,
+    documents,
+    tickets,
+    timeline
+  };
+  return {
+    ...out,
+    counts: {
+      inquiries: inquiries.length,
+      quotes: quoteGroups.length,
+      pos: pos.length,
+      invoices: invoices.length,
+      payments: payments.length,
+      delivery_notes: deliveryNotes.length,
+      contacts: contacts.length,
+      documents: documents.length,
+      tickets: tickets.length,
+      timeline: timeline.length
+    }
+  };
 }
 
 // src/lib/arChase.ts
@@ -2078,7 +2405,7 @@ function chaseSettingsFrom(row) {
   };
 }
 function chaseSteps(settings) {
-  const steps = settings.reminderDays.filter((d) => d !== settings.escalateDays).map((day) => ({ day, kind: "reminder" }));
+  const steps = settings.reminderDays.filter((d) => d !== settings.escalateDays).map((day2) => ({ day: day2, kind: "reminder" }));
   steps.push({ day: settings.escalateDays, kind: "escalate" });
   return steps.sort((a, b) => a.day - b.day);
 }
@@ -2153,7 +2480,7 @@ function nextChaseAction(input) {
     };
   }
   if (!dueDate) return { kind: "none", due_on: null, text: "No due date on this invoice." };
-  const reached = input.steps.filter((s) => s.day <= daysOverdue);
+  const reached = input.steps.filter((s2) => s2.day <= daysOverdue);
   const last = reached[reached.length - 1];
   if (last && !input.tasks.some((t) => t.step_day >= last.day)) {
     return {
@@ -2162,7 +2489,7 @@ function nextChaseAction(input) {
       text: last.kind === "escalate" ? `Escalate to the owner now (day ${last.day} passed).` : `Send the day ${last.day} reminder now.`
     };
   }
-  const next = input.steps.find((s) => s.day > Math.max(0, daysOverdue));
+  const next = input.steps.find((s2) => s2.day > Math.max(0, daysOverdue));
   if (next) {
     const on = addDaysToIso(dueDate, next.day);
     return {
@@ -2173,7 +2500,7 @@ function nextChaseAction(input) {
   }
   return { kind: "none", due_on: null, text: "Every step is done. Agree a payment date or a plan with the client." };
 }
-var round2 = (n) => roundMoney(n);
+var round2 = (n2) => roundMoney(n2);
 function buildAgingRows(input) {
   const todayIso = isoDate(input.today);
   const steps = chaseSteps(input.settings);
@@ -2227,13 +2554,13 @@ function groupBy(list, key) {
   }
   return m;
 }
-function emptyTotals() {
+function emptyTotals2() {
   return { current: 0, "1-30": 0, "31-60": 0, "61-90": 0, "90+": 0, total: 0, overdue: 0, count: 0 };
 }
 function agingTotalsByCurrency(rows) {
   const out = {};
   for (const r of rows) {
-    const t = out[r.currency] ||= emptyTotals();
+    const t = out[r.currency] ||= emptyTotals2();
     t[r.bucket] = round2(t[r.bucket] + r.balance);
     t.total = round2(t.total + r.balance);
     if (r.bucket !== "current") t.overdue = round2(t.overdue + r.balance);
@@ -2299,7 +2626,7 @@ var DAY_MS2 = 864e5;
 function daysBetween2(fromIso, toIso) {
   return Math.round((Date.parse(toIso.slice(0, 10) + "T00:00:00Z") - Date.parse(fromIso.slice(0, 10) + "T00:00:00Z")) / DAY_MS2);
 }
-var isIsoDay = (s) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}/.test(s);
+var isIsoDay = (s2) => typeof s2 === "string" && /^\d{4}-\d{2}-\d{2}/.test(s2);
 function quoteSteps(settings, sentIso, validUntil) {
   const steps = settings.followupDays.filter((d) => d !== settings.escalateDays).map((d) => ({ kind: "followup", step_day: d, due_on: addDaysToIso(sentIso, d) }));
   steps.push({ kind: "escalate", step_day: settings.escalateDays, due_on: addDaysToIso(sentIso, settings.escalateDays) });
@@ -2331,10 +2658,10 @@ function sortQuoteChaseLog(log) {
   return [...log].sort((a, b) => b.chased_on.localeCompare(a.chased_on) || String(b.created_at).localeCompare(String(a.created_at)));
 }
 function currentCallback(log, todayIso) {
-  const newest = sortQuoteChaseLog(log.filter((e) => !e.deleted_at))[0];
-  if (!newest?.next_follow_up) return null;
-  const date = newest.next_follow_up.slice(0, 10);
-  return { date, state: date < todayIso ? "missed" : "pending", contact: newest.contact };
+  const newest2 = sortQuoteChaseLog(log.filter((e) => !e.deleted_at))[0];
+  if (!newest2?.next_follow_up) return null;
+  const date = newest2.next_follow_up.slice(0, 10);
+  return { date, state: date < todayIso ? "missed" : "pending", contact: newest2.contact };
 }
 function quoteDivision(q) {
   const own = String(q.division_code || "").trim();
@@ -2382,20 +2709,20 @@ function nextQuoteAction(input) {
   if (r.callback?.state === "pending") {
     return { kind: "await_callback", due_on: r.callback.date, text: `Follow up on ${r.callback.date} as agreed with ${r.callback.contact || "the client"}.` };
   }
-  const due = input.steps.filter((s) => !stepCovered(s, r.last_contact_on));
-  const reached = due.filter((s) => s.due_on <= todayIso);
+  const due = input.steps.filter((s2) => !stepCovered(s2, r.last_contact_on));
+  const reached = due.filter((s2) => s2.due_on <= todayIso);
   const last = reached[reached.length - 1];
   if (last && !input.tasks.some((t) => t.due_on >= last.due_on)) {
     return { kind: last.kind, due_on: todayIso, text: `${stepLabel(last, r.valid_until)} now.` };
   }
-  const next = due.find((s) => s.due_on > todayIso);
+  const next = due.find((s2) => s2.due_on > todayIso);
   if (next) return { kind: next.kind, due_on: next.due_on, text: `${stepLabel(next, r.valid_until)} on ${next.due_on}.` };
   return { kind: "none", due_on: null, text: "Every follow-up is done. Ask for a decision, or mark the quote not awarded." };
 }
-function stepLabel(s, validUntil) {
-  if (s.kind === "escalate") return `Escalate to the owner (day ${s.step_day} with no decision)`;
-  if (s.kind === "expiry") return `Remind the client it expires${validUntil ? ` on ${validUntil}` : ""}`;
-  return `Day ${s.step_day} follow-up`;
+function stepLabel(s2, validUntil) {
+  if (s2.kind === "escalate") return `Escalate to the owner (day ${s2.step_day} with no decision)`;
+  if (s2.kind === "expiry") return `Remind the client it expires${validUntil ? ` on ${validUntil}` : ""}`;
+  return `Day ${s2.step_day} follow-up`;
 }
 function taskText(t, validUntil) {
   if (t.kind === "escalate") return `${stepLabel(t, validUntil)}.`;
@@ -2499,7 +2826,7 @@ var QUOTE_CHASE_STATES = [
   { value: "missed", label: "Missed call-back" },
   { value: "due", label: "Follow-up due now" }
 ];
-var QUOTE_CHASE_STATE_VALUES = QUOTE_CHASE_STATES.map((s) => s.value);
+var QUOTE_CHASE_STATE_VALUES = QUOTE_CHASE_STATES.map((s2) => s2.value);
 function rowInState(r, state, todayIso) {
   switch (state) {
     case "decide":
@@ -2564,7 +2891,9 @@ var MCP_READ_TOOLS = [
   "list_invoices",
   "dashboard_summary",
   "list_invoice_aging",
-  "list_quote_followups"
+  "list_quote_followups",
+  // One client, everything: the same view as the client page.
+  "get_client_360"
 ];
 var MCP_WRITE_TOOLS = [
   "create_lead",
@@ -2745,6 +3074,8 @@ var MCP_TOOL_DEPARTMENTS = {
   list_quote_followups: ["sales", "finance"],
   add_quote_chase_note: ["sales", "finance"],
   complete_quote_chase_task: ["sales", "finance"],
+  // Client page (whoever reads accounts; money still follows each table's rules)
+  get_client_360: ACCOUNT_READERS,
   // Any area (narrowed to the department's records)
   list_records: ALL_DEPTS,
   get_record: ALL_DEPTS,
@@ -2880,27 +3211,27 @@ var MCP_PIPELINES = {
 var MCP_PIPELINE_NAMES = Object.keys(MCP_PIPELINES);
 function defaultStages(pipeline) {
   const outcome = (k) => k === "Won" || k === "signed" ? "won" : k === "Lost" || k === "lost" ? "lost" : "open";
-  const keys = pipeline === "company" ? [...PIPELINE_STAGES] : pipeline === "ai_crm" ? SALES_STAGES.map((s) => s.value) : CTRM_STAGES.map((s) => s.value);
+  const keys = pipeline === "company" ? [...PIPELINE_STAGES] : pipeline === "ai_crm" ? SALES_STAGES.map((s2) => s2.value) : CTRM_STAGES.map((s2) => s2.value);
   return keys.map((key) => ({ key, outcome: outcome(key) }));
 }
 function stagesFor(pipeline, dbStages) {
-  const active = (dbStages || []).filter((s) => s.active !== false && s.stage_key);
+  const active = (dbStages || []).filter((s2) => s2.active !== false && s2.stage_key);
   if (!active.length) return defaultStages(pipeline);
-  const allowed = new Set(defaultStages(pipeline).map((s) => s.key));
-  const list = active.filter((s) => pipeline === "company" || allowed.has(s.stage_key)).map((s) => ({
-    key: s.stage_key,
-    outcome: s.outcome === "won" || s.outcome === "lost" ? s.outcome : "open"
+  const allowed = new Set(defaultStages(pipeline).map((s2) => s2.key));
+  const list = active.filter((s2) => pipeline === "company" || allowed.has(s2.stage_key)).map((s2) => ({
+    key: s2.stage_key,
+    outcome: s2.outcome === "won" || s2.outcome === "lost" ? s2.outcome : "open"
   }));
   return list.length ? list : defaultStages(pipeline);
 }
 var CLOSED_WORDS = /* @__PURE__ */ new Set(["won", "lost", "signed"]);
 function stageMoveProblem(stages, from, to) {
-  const target = stages.find((s) => s.key.toLowerCase() === to.toLowerCase());
-  if (!target) return `Unknown stage "${to}". Stages: ${stages.filter((s) => s.outcome === "open").map((s) => s.key).join(", ")}`;
+  const target = stages.find((s2) => s2.key.toLowerCase() === to.toLowerCase());
+  if (!target) return `Unknown stage "${to}". Stages: ${stages.filter((s2) => s2.outcome === "open").map((s2) => s2.key).join(", ")}`;
   if (target.outcome !== "open" || CLOSED_WORDS.has(target.key.toLowerCase())) {
     return `Moving a deal to "${target.key}" is not allowed from the AI connector. A person must close deals in HighMast.`;
   }
-  const fromIdx = stages.findIndex((s) => s.key.toLowerCase() === String(from || "").toLowerCase());
+  const fromIdx = stages.findIndex((s2) => s2.key.toLowerCase() === String(from || "").toLowerCase());
   const fromStage = fromIdx >= 0 ? stages[fromIdx] : null;
   if (fromStage && fromStage.outcome !== "open") return `This deal is already closed (${fromStage.key}).`;
   const toIdx = stages.indexOf(target);
@@ -2910,7 +3241,7 @@ function stageMoveProblem(stages, from, to) {
   return null;
 }
 function canonicalStage(stages, to) {
-  return stages.find((s) => s.key.toLowerCase() === to.toLowerCase())?.key ?? to;
+  return stages.find((s2) => s2.key.toLowerCase() === to.toLowerCase())?.key ?? to;
 }
 var COMPANY_SUFFIXES = /\b(l\s*l\s*c|llc|fze|fzco|fz\s*llc|fzc|dmcc|ltd|limited|inc|incorporated|co|company|corp|corporation|plc|gmbh|pvt|private|est|establishment|trading|group)\b/g;
 function normalizeCompany(name) {
@@ -2968,8 +3299,8 @@ function isOpenCrmStage(stage) {
 }
 function ticketReplyAlert(t, now) {
   if (!isOpenTicket(t)) return null;
-  const s = slaState(t, now);
-  return s === "breached" || s === "warning" ? s : null;
+  const s2 = slaState(t, now);
+  return s2 === "breached" || s2 === "warning" ? s2 : null;
 }
 var SENSITIVE_ARG = /salary|iban|passport|emirates|national_id|labour_card|bank_routing/i;
 function auditArgs(args) {
@@ -2987,9 +3318,9 @@ var GENERATED_PDF_BUCKET = "generated-pdfs";
 var PDF_FOLDER = { quote: "quotes", invoice: "invoices", "delivery-note": "delivery-notes" };
 var GENERATED_PDF_LINK_SECONDS = 3600;
 function generatedPdfPath(kind, number) {
-  const n = String(number || "").trim();
-  if (!/^[A-Za-z0-9._-]{1,80}$/.test(n) || n.startsWith(".")) return null;
-  return `${PDF_FOLDER[kind]}/${n}.pdf`;
+  const n2 = String(number || "").trim();
+  if (!/^[A-Za-z0-9._-]{1,80}$/.test(n2) || n2.startsWith(".")) return null;
+  return `${PDF_FOLDER[kind]}/${n2}.pdf`;
 }
 function quotePdfNumber(q) {
   return String(q.reference_number || q.quote_id || "").trim();
@@ -3036,6 +3367,7 @@ export {
   auditArgs,
   bearerToken,
   buildAgingRows,
+  buildClient360,
   buildQuoteChaseRows,
   canonicalStage,
   chaseSettingsFrom,

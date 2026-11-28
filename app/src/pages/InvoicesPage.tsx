@@ -829,10 +829,17 @@ export default function InvoicesPage() {
   /** Client name, linked to its account when the invoice is linked to one. */
   function clientCell(inv: Invoice) {
     const account = inv.account_id ? accountById.get(inv.account_id) : undefined
-    if (!account) return inv.client || '—'
+    if (!account) {
+      if (!inv.client_id) return inv.client || '—'
+      return (
+        <Link to={`/clients/${inv.client_id}`} style={{ color: 'inherit' }} onClick={(e) => e.stopPropagation()}>
+          {inv.client || 'Client'}
+        </Link>
+      )
+    }
     return (
       <>
-        <Link to={`/accounts/${account.id}`} style={{ color: 'inherit' }}>
+        <Link to={inv.client_id ? `/clients/${inv.client_id}` : `/accounts/${account.id}`} style={{ color: 'inherit' }}>
           {inv.client || account.name}
         </Link>
         <span style={{ display: 'block', fontSize: 11, color: colors.muted2 }}>{accountTypeLabel(account.type)}</span>
