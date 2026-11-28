@@ -174,4 +174,5 @@ export const DB_SETUP_PROBES: DbSetupProbe[] = [
   { migration: '20261336090000_user_hidden_pages', label: 'Pick the pages each person sees (Settings, Users)', table: 'user_hidden_pages', column: 'page_path' },
   { migration: '20261337090000_document_created_by', label: 'Who made each quote, invoice, delivery note and client PO (Made by Sales on Home)', table: 'client_purchase_orders', column: 'created_by' },
   { migration: '20261338090000_outreach_pipeline', label: 'Prospect outreach (import, review, approve, send from your mailbox)', table: 'outreach_messages', column: 'approved_hash' },
+  { migration: '20261339090000_client_links', label: 'Quotes, invoices and deals linked to a real client record (Duplicates, Documents to link)', table: 'client_link_log', column: 'match' },
 ]

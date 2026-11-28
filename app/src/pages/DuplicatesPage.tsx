@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
+import ClientLinkReview from '../components/ClientLinkReview'
 import SavedViewsBar from '../components/SavedViewsBar'
 import { accountFills, findAccountDuplicates, findContactDuplicates, mergeSummary, suggestKeep, type DuplicateKind, type DuplicatePair } from '../lib/duplicates'
 import { DUPLICATES_CSV_COLUMNS, DUPLICATES_CSV_HEADERS, parseDuplicateCsvAction } from '../lib/duplicatesCsv'
@@ -30,6 +31,8 @@ export default function DuplicatesPage() {
   const { showToast } = useToast()
   const [data, setData] = useState<DuplicateData | null>(null)
   const [kind, setKind] = useState<DuplicateKind>('account')
+  const [showLinks, setShowLinks] = useState(false)
+  const [linkCount, setLinkCount] = useState<number | null>(null)
   const [open, setOpen] = useState<DuplicatePair | null>(null)
   const [importing, setImporting] = useState(false)
   const importInputRef = useRef<HTMLInputElement>(null)
@@ -219,18 +222,22 @@ export default function DuplicatesPage() {
         filtersEqual={(a, b) => String(a.kind || 'account') === String(b.kind || 'account')}
       />
       <div style={{ display: 'flex', gap: 8, margin: '12px 0 16px' }}>
-        <button type="button" style={tab(kind === 'account')} onClick={() => (setKind('account'), setOpen(null))}>
+        <button type="button" style={tab(!showLinks && kind === 'account')} onClick={() => (setKind('account'), setShowLinks(false), setOpen(null))}>
           Accounts ({pairs.account.length})
         </button>
-        <button type="button" style={tab(kind === 'contact')} onClick={() => (setKind('contact'), setOpen(null))}>
+        <button type="button" style={tab(!showLinks && kind === 'contact')} onClick={() => (setKind('contact'), setShowLinks(false), setOpen(null))}>
           Contacts ({pairs.contact.length})
+        </button>
+        <button type="button" style={tab(showLinks)} onClick={() => (setShowLinks(true), setOpen(null))}>
+          Documents to link{linkCount === null ? '' : ` (${linkCount})`}
         </button>
       </div>
 
-      {!data ? <p style={muted}>Looking for duplicates…</p> : null}
-      {data && !list.length ? <p style={muted}>No possible duplicates found.</p> : null}
+      {showLinks ? <ClientLinkReview isAdmin={userRole === 'admin'} onCount={setLinkCount} /> : null}
+      {!showLinks && !data ? <p style={muted}>Looking for duplicates…</p> : null}
+      {!showLinks && data && !list.length ? <p style={muted}>No possible duplicates found.</p> : null}
 
-      <div style={{ display: 'grid', gap: 10 }}>
+      <div style={{ display: showLinks ? 'none' : 'grid', gap: 10 }}>
         {list.map((p) => {
           const isOpen = open && open.a === p.a && open.b === p.b
           return (
