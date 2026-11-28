@@ -32,6 +32,7 @@ export const SYSTEM_FUNCTIONS: SystemFunction[] = [
   { name: 'client-po-file', feature: 'Client PO upload: read with AI and file in Google Drive', liveTest: '34' },
   { name: 'hubspot-sync', feature: 'Accounts, contacts and deals to HubSpot', liveTest: '32' },
   { name: 'manage-auth-user', feature: 'Set team login passwords', liveTest: '9' },
+  { name: 'admin-view-as', feature: 'Admin View as user', liveTest: '—' },
   { name: 'create-checkout-session', feature: 'Shop checkout (Stripe)', liveTest: '9' },
   { name: 'teetribe-order-sync', feature: `Tee Tribe orders into ${PRODUCT.name}`, liveTest: '9' },
   { name: 'contract-invoices', feature: 'Contract invoices each morning', liveTest: '10' },

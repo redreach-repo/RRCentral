@@ -170,4 +170,5 @@ export const DB_SETUP_PROBES: DbSetupProbe[] = [
   { migration: '20261332090000_sales_own_clients', label: 'Sales see only their own clients (per-person switches, project members)', table: 'user_permissions', column: 'permission' },
   { migration: '20261333090000_sales_safeguards', label: 'Sales safeguards (CSV export log and cap, sign in history, leaver button)', table: 'sign_in_log', column: 'two_step' },
   { migration: '20261334090000_quote_chase', label: 'Quote follow-up chasing (follow-up log, tasks, schedule)', table: 'quote_chase_log', column: 'next_follow_up' },
+  { migration: '20261335090000_admin_view_as', label: 'Admin View as user (history, one time sign in, 30 minute limit)', table: 'view_as_sessions', column: 'end_reason' },
 ]

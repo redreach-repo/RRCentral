@@ -52,6 +52,7 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "payment-reminder": { kind: "signed in admin, manager or sales (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)[\s\S]*rr_is_staff/ },
   "worshiphub-read": { kind: "team member JWT", pattern: /if \(!authHeader[\s\S]*rr_is_member[\s\S]*member !== true/ },
   "worshiphub-manage": { kind: "admin JWT", pattern: /if \(!authHeader[\s\S]*rr_is_admin[\s\S]*isAdmin !== true/ },
+  "admin-view-as": { kind: "admin JWT with two step done, request checked by the database", pattern: /admin\.auth\.getUser\(jwt\)[\s\S]*if \(whoErr \|\| !email\)[\s\S]*aal !== "aal2"[\s\S]*rr_view_as_issue/ },
   "hm-provision-workspace": { kind: "provision secret or admin JWT", pattern: /WORKSPACE_PROVISION_SECRET[\s\S]*x-provision-secret[\s\S]*rr_is_admin/ },
 }
 
@@ -188,6 +189,12 @@ Deno.test({ name: "mail-inbox refuses anyone not signed in, before touching the 
   // Zoho's answer without a valid signed state saves nothing.
   assertEquals(await call("mail-inbox", new Request(URL_BASE + "mail-inbox?code=abc")), 400)
   assertEquals(await call("mail-inbox", new Request(URL_BASE + "mail-inbox?code=abc&state=forged.sig")), 400)
+} })
+
+Deno.test({ name: "admin-view-as refuses anyone not signed in, before issuing a sign in token", ...opts, fn: async () => {
+  assertEquals(await call("admin-view-as", post("admin-view-as", { id: "00000000-0000-4000-8000-000000000001" })), 401)
+  assertEquals(await call("admin-view-as", post("admin-view-as", { id: "00000000-0000-4000-8000-000000000001" }, { Authorization: "Bearer someone" })), 401)
+  assertEquals(await call("admin-view-as", new Request(URL_BASE + "admin-view-as")), 405)
 } })
 
 Deno.test({ name: "watchdog refuses a signed in user who is not a manager or admin", ...opts, fn: async () => {
