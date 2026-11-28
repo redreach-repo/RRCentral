@@ -50,6 +50,7 @@ on:
           - client-updates
           - client-po-file
           - mail-inbox
+          - outreach-unsubscribe
           - highmast-mcp
           - hm-ai-propose
           - other

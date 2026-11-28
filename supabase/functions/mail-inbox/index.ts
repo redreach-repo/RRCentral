@@ -15,9 +15,11 @@
 //          attachments?: [{ name, base64 }], linkTo?: { targetType, targetId } }  -> { ok, messageId, linked }
 //        (mode: new | reply | replyAll | forward; only from the Send button, from the person's own address;
 //         attachments: PDFs only, at most 3 and 10 MB; linkTo files the sent email in that record's email history)
+//   POST { action: "outreach_send", id }                      -> { ok, messageId, recorded }
+//        (prospect outreach: an email this person approved, checked by rr_outreach_claim_send)
 //
 // Nothing is moved, deleted or marked as read in the mailbox here. Email is
-// sent only by "send", which the page calls only when the person presses Send.
+// sent only by "send" and "outreach_send", which the page calls only when the person presses Send.
 // Each person's Zoho refresh token is stored encrypted in mail_accounts
 // (service role only, no policies) and the access token never leaves this
 // function. The browser only ever gets mail content.
@@ -60,6 +62,7 @@ import {
   ZOHO_MAIL_SCOPES,
 } from "./mailbox.ts"
 import { openToken, sealToken, tokenKeyProblem } from "./tokenBox.ts"
+import { isOutreachId, type OutreachClaim, outreachClaimProblem, outreachPayload, unsubscribeUrl } from "./outreachMail.ts"
 import { serviceRoleKey, publicApiKey } from "../_shared/supabaseKeys.ts"
 
 const DEFAULT_ORIGINS = [
@@ -607,6 +610,52 @@ Deno.serve(withErrorLog("mail-inbox", async (req) => {
         }
       }
       return json({ ok: true, messageId, linked })
+    }
+
+    if (action === "outreach_send") {
+      // Prospect outreach (migration 20261338090000): one approved email, sent
+      // only because this person pressed Send. The database checks, with this
+      // person's own sign in token, that they approved this exact text, that it
+      // is under the daily cap and not suppressed; then it is sent from their
+      // own mailbox and the result is recorded. The email text is never logged.
+      if (!isOutreachId(body.id)) return json({ error: "Pick the outreach email to send" }, 400)
+      const { data: isManager } = await userDb.rpc("rr_is_manager_or_admin")
+      if (isManager !== true) return json({ error: "Only an admin or manager can send outreach email" }, 403)
+      const box = await myBox(sb, app, email)
+      if (!box.canSend) {
+        return json({ error: "Sending needs one more permission from Zoho. Open Mail and press Allow sending.", setup: true, needsSendScope: true }, 409)
+      }
+      const now = Date.now()
+      const history = (sends.get(email) || []).filter((t) => now - t < 10 * 60_000)
+      if (!underSendLimit(history, now)) return json({ error: "You have sent 20 emails in 10 minutes. Wait a few minutes and try again." }, 429)
+
+      const { data: claimed, error: claimError } = await userDb.rpc("rr_outreach_claim_send", { p_id: body.id })
+      if (claimError) return json({ error: claimError.message || "This email cannot be sent" }, 409)
+      const claim = claimed as OutreachClaim
+      const finish = (ok: boolean, zohoId: string, problem: string) =>
+        sb.rpc("rr_outreach_finish_send", { p_id: body.id, p_ok: ok, p_zoho_message_id: zohoId, p_error: problem })
+      const problem = outreachClaimProblem(claim, box.address)
+      if (problem) {
+        await finish(false, "", problem)
+        return json({ error: problem }, 409)
+      }
+      const link = unsubscribeUrl(supabaseUrl, claim.unsubscribe_token)
+      let sent: unknown
+      try {
+        sent = await zohoPost(email, box, "/messages", outreachPayload(claim, box.address, link))
+      } catch (e) {
+        const why = e instanceof MailError ? e.message : "Zoho Mail could not be reached"
+        await finish(false, "", why)
+        throw e
+      }
+      history.push(now)
+      sends.set(email, history)
+      const id = String(((sent && typeof sent === "object" ? sent : {}) as { messageId?: unknown }).messageId ?? "")
+      const messageId = isZohoId(id) ? id : ""
+      const { error: finishError } = await finish(true, messageId, "")
+      // The email has gone: a recording problem is reported, never as a failed send.
+      if (finishError) console.error("mail-inbox outreach finish failed", finishError.message)
+      return json({ ok: true, messageId, recorded: !finishError })
     }
 
     return json({ error: "Unknown action" }, 400)
