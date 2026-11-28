@@ -181,6 +181,8 @@ export interface Quotation {
   id: string
   /** Linked account (RR Central modules). Null until linked. */
   account_id?: string | null
+  /** Linked client record (20261339090000_client_links.sql). Null until linked. */
+  client_id?: string | null
   client: string
   /**
    * Contact person chosen for this quote when the company has several contacts.
@@ -352,6 +354,8 @@ export interface Invoice {
   id: string
   /** Linked account (RR Central modules). Null until linked. */
   account_id?: string | null
+  /** Linked client record (20261339090000_client_links.sql). Null until linked. */
+  client_id?: string | null
   client: string
   vertical: string
   reference_number: string

@@ -38,6 +38,8 @@ import AccountDetailPage from './pages/AccountDetailPage'
 import ClientReportPage from './pages/ClientReportPage'
 import ClientReportsPage from './pages/ClientReportsPage'
 import DuplicatesPage from './pages/DuplicatesPage'
+import ClientPage from './pages/ClientPage'
+import ClientsPage from './pages/ClientsPage'
 import CtrmIssuesPage from './pages/CtrmIssuesPage'
 import ClientUpdatesPage from './pages/ClientUpdatesPage'
 import FitSheetPage from './pages/FitSheetPage'
@@ -206,6 +208,8 @@ export default function App() {
               <Route path="client-reports" element={<ClientReportsPage />} />
               <Route path="mrr" element={<MrrPage />} />
               <Route path="duplicates" element={<DuplicatesPage />} />
+              <Route path="clients" element={<ClientsPage />} />
+              <Route path="clients/:id" element={<ClientPage />} />
               <Route path="quick-add" element={<QuickAddPage />} />
               <Route path="insights" element={<InsightsPage />} />
               <Route path="support" element={<SupportPage />} />

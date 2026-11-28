@@ -174,6 +174,7 @@ export default function AccountDetailPage() {
   const [account, setAccount] = useState<Account | null>(null)
   // Bumped when Make contract adds a contract, so the delivery panel reloads.
   const [deliveryKey, setDeliveryKey] = useState(0)
+  const [clientRecordId, setClientRecordId] = useState<string | null>(null)
   const [contacts, setContacts] = useState<ContactRow[]>([])
   const [importingContacts, setImportingContacts] = useState(false)
   const contactImportRef = useRef<HTMLInputElement>(null)
@@ -210,6 +211,8 @@ export default function AccountDetailPage() {
       setContacts(c)
       setTimeline(t)
       setTeam(people)
+      const linked = await db.from('clients').select('id').eq('account_id', id).limit(1)
+      setClientRecordId(!linked.error && linked.data?.[0] ? String(linked.data[0].id) : null)
       if (seesMoney) {
         const [inv, quo] = await Promise.all([
           db.from('invoices').select('*').order('date', { ascending: false }),
@@ -533,6 +536,11 @@ export default function AccountDetailPage() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {clientRecordId ? (
+              <Link to={`/clients/${clientRecordId}`} style={{ alignSelf: 'center', fontSize: 13, color: colors.accentText }}>
+                Client page
+              </Link>
+            ) : null}
             <CallBriefButton
               account={account}
               accountKind={accountTypeLabel(account.type)}

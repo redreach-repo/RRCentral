@@ -36,6 +36,8 @@ describe('MCP tool list', () => {
         'add_quote_note',
         // Quote follow-up chasing
         'list_quote_followups', 'add_quote_chase_note', 'complete_quote_chase_task',
+        // Client page (fix 3)
+        'get_client_360',
       ].sort(),
     )
   })

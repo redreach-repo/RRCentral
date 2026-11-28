@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from 'react'
 import DocumentChainModal from '../components/documents/DocumentChainModal'
 import type { ChainStart } from '../lib/documentChain'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { FilePlus2, Plus, Trash2 } from 'lucide-react'
 import { db } from '../lib/db'
@@ -1666,7 +1666,15 @@ export default function QuotationsPage() {
                         <div className={qStyles.meta}>Client PO {poByQuote.get(q.id)?.join(', ')}</div>
                       ) : null}
                     </td>
-                    <td className={`${qStyles.colClient} ${qStyles.clientCell}`}>{q.client || '—'}</td>
+                    <td className={`${qStyles.colClient} ${qStyles.clientCell}`}>
+                      {q.client_id ? (
+                        <Link to={`/clients/${q.client_id}`} style={{ color: 'inherit' }} onClick={(e) => e.stopPropagation()}>
+                          {q.client || 'Client'}
+                        </Link>
+                      ) : (
+                        q.client || '—'
+                      )}
+                    </td>
                     <td className={qStyles.colDivision}>{q.vertical || divisionBrand(q.division_code)}</td>
                     <td className={qStyles.colDate}>
                       {q.date ? format(new Date(q.date), 'dd MMM yyyy') : '—'}

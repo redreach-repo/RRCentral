@@ -104,6 +104,7 @@ const CORE_MODULES: ModuleManifest[] = [
       { to: '/crm', label: 'My Day', icon: Users, section: 'Work', flag: 'sales' },
       { to: '/sales', label: 'AI CRM detail', icon: TrendingUp, minRole: 'sales', section: 'Work', flag: 'sales' },
       { to: '/ctrm', label: 'CTRM detail', icon: Handshake, minRole: 'sales', section: 'Work', flag: 'sales' },
+      { to: '/clients', label: 'Client records', icon: Building2, section: 'Quotes and orders', flag: 'documents' },
       { to: '/quotations', label: 'Quotations', icon: FileText, section: 'Quotes and orders', flag: 'documents' },
       { to: '/quote-followup', label: 'Quote follow-up', icon: MessagesSquare, section: 'Quotes and orders', flag: 'documents' },
       { to: '/client-pos', label: 'Client POs', icon: ClipboardList, section: 'Quotes and orders', flag: 'documents' },

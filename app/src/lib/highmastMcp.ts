@@ -20,6 +20,8 @@ import { isOpenTicket } from './support'
 import { DEFAULT_STALE_DAYS } from './watchdog'
 
 export { nextAccountReference, invoiceDueDate, isCollectible, isOpenSalesDeal, isOpenDeal, isOpenTicket, slaState }
+// One client, everything (client page and get_client_360).
+export { buildClient360 } from './client360'
 // Overdue invoice chasing (aging buckets, promises, next chase action): the same rules as the app.
 export {
   agingSummary,
@@ -55,6 +57,8 @@ export const MCP_READ_TOOLS = [
   'dashboard_summary',
   'list_invoice_aging',
   'list_quote_followups',
+  // One client, everything: the same view as the client page.
+  'get_client_360',
 ] as const
 export const MCP_WRITE_TOOLS = [
   'create_lead',
@@ -200,6 +204,8 @@ export const MCP_TOOL_DEPARTMENTS: Record<string, McpDepartment[]> = {
   list_quote_followups: ['sales', 'finance'],
   add_quote_chase_note: ['sales', 'finance'],
   complete_quote_chase_task: ['sales', 'finance'],
+  // Client page (whoever reads accounts; money still follows each table's rules)
+  get_client_360: ACCOUNT_READERS,
   // Any area (narrowed to the department's records)
   list_records: ALL_DEPTS,
   get_record: ALL_DEPTS,
