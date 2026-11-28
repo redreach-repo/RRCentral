@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { canSetQuoteOutcome } from '../../lib/quoteOutcome'
 import {
   ChevronDown,
   ChevronUp,
@@ -74,7 +75,7 @@ export default function QuoteRowActions({
 }: QuoteRowActionsProps) {
   const canView = Boolean(q.reference_number || q.id)
   const canBranch = Boolean(q.reference_number || q.deal_ref) && q.status !== 'Superseded'
-  const canOutcome = ['Finalized', 'Sent', 'Accepted', 'Awarded'].includes(q.status)
+  const canOutcome = canSetQuoteOutcome(q.status)
   const canDn = canCreateDeliveryNoteFromQuote(q)
   // Revise / Extend: Finalized, Sent or Expired. A revision never goes back to Draft.
   const canRevise = ['Finalized', 'Sent', 'Expired'].includes(q.status) && Boolean(q.reference_number)
