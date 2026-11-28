@@ -33,7 +33,7 @@ describe('sidebar groups (rebuilt Nov 2026)', () => {
   })
 
   it('gives Sales its own pages only', () => {
-    expect(groupPaths('sales')).toEqual(['/quick-add', '/deals', '/crm', '/sales', '/ctrm', '/quotations', '/quote-followup', '/client-pos', '/marketing'])
+    expect(groupPaths('sales')).toEqual(['/quick-add', '/deals', '/crm', '/sales', '/ctrm', '/quotations', '/quote-followup', '/client-pos', '/marketing', '/outreach'])
   })
 
   it('gives Operations client care, delivery, contracts, projects, stock and files', () => {
@@ -63,7 +63,7 @@ describe('sidebar groups (rebuilt Nov 2026)', () => {
 describe('Settings > Modules switches still hide the same pages', () => {
   const cases: [string, string[]][] = [
     ['overview', ['/app', '/guide', '/dashboards']],
-    ['sales', ['/quick-add', '/deals', '/crm', '/follow-ups', '/sales', '/ctrm']],
+    ['sales', ['/quick-add', '/deals', '/crm', '/follow-ups', '/sales', '/ctrm', '/outreach']],
     ['documents', ['/quotations', '/quote-followup', '/invoices', '/receivables', '/client-pos', '/delivery-notes', '/customer-files']],
     ['clients', ['/accounts', '/support', '/ctrm-issues', '/client-health', '/client-reports', '/client-updates', '/uniform-sizes']],
     ['delivery', ['/products', '/delivery-settings', '/build-templates', '/agreement-template', '/nda-template', '/clause-library', '/obligations']],
@@ -155,5 +155,21 @@ describe('visibleAppModules by role', () => {
     expect(work).not.toContain('/sales')
     expect(work).not.toContain('/ctrm')
     expect(work).toContain('/deals')
+  })
+})
+
+describe('Prospect outreach page', () => {
+  it('is for admins and managers only', () => {
+    expect(visiblePaths('admin')).toContain('/outreach')
+    expect(visiblePaths('manager')).toContain('/outreach')
+    for (const role of ['sales', 'staff', 'viewer'] as const) expect(visiblePaths(role)).not.toContain('/outreach')
+  })
+})
+
+describe('Prospect outreach in the page picker', () => {
+  it('can be hidden per person from Settings, Users', async () => {
+    const { pickablePageGroups } = await import('./pagePicker')
+    const paths = pickablePageGroups('manager', {}).flatMap((g) => g.pages.map((p) => p.path))
+    expect(paths).toContain('/outreach')
   })
 })

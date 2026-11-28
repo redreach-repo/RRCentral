@@ -17,6 +17,7 @@ const GUARDS: Record<string, { kind: string; pattern: RegExp }> = {
   "watchdog": { kind: "cron secret or manager JWT", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret[\s\S]*rr_is_manager_or_admin/ },
   "contract-invoices": { kind: "cron secret or manager JWT", pattern: /x-cron-secret[\s\S]*providedSecret !== cronSecret[\s\S]*rr_is_manager_or_admin/ },
   "client-portal": { kind: "hashed link token", pattern: /isPortalToken\(token\)[\s\S]*token_hash[\s\S]*portalAccessState/ },
+  "outreach-unsubscribe": { kind: "hashed link token (hash checked in the database)", pattern: /isUnsubscribeToken\(token\)[\s\S]*rr_outreach_unsubscribe/ },
   "quote-accept": { kind: "hashed link token", pattern: /isAcceptToken\(token\)[\s\S]*token_hash[\s\S]*acceptLinkState/ },
   "legal-sign": { kind: "hashed link token", pattern: /isLegalSignToken\(token\)[\s\S]*token_hash[\s\S]*legalSignLinkState/ },
   "ai-assist": { kind: "signed in user (JWT read in code)", pattern: /auth\.getUser\(jwt\)[\s\S]*if \(!who\?\.user\)/ },
@@ -189,6 +190,19 @@ Deno.test({ name: "mail-inbox refuses anyone not signed in, before touching the 
   // Zoho's answer without a valid signed state saves nothing.
   assertEquals(await call("mail-inbox", new Request(URL_BASE + "mail-inbox?code=abc")), 400)
   assertEquals(await call("mail-inbox", new Request(URL_BASE + "mail-inbox?code=abc&state=forged.sig")), 400)
+} })
+
+Deno.test({ name: "outreach-unsubscribe needs a full link token and never unsubscribes on a plain open", ...opts, fn: async () => {
+  assertEquals(await call("outreach-unsubscribe", new Request(URL_BASE + "outreach-unsubscribe")), 400)
+  assertEquals(await call("outreach-unsubscribe", new Request(URL_BASE + "outreach-unsubscribe?t=abc", { method: "POST" })), 400)
+  // Opening the link only shows the button; nothing is recorded on GET.
+  assertEquals(await call("outreach-unsubscribe", new Request(URL_BASE + "outreach-unsubscribe?t=" + "a".repeat(64))), 200)
+  assertEquals(await call("outreach-unsubscribe", new Request(URL_BASE + "outreach-unsubscribe?t=" + "a".repeat(64), { method: "DELETE" })), 405)
+} })
+
+Deno.test({ name: "mail-inbox outreach_send refuses anyone not signed in", ...opts, fn: async () => {
+  assertEquals(await call("mail-inbox", post("mail-inbox", { action: "outreach_send", id: "00000000-0000-4000-8000-000000000001" })), 401)
+  assertEquals(await call("mail-inbox", post("mail-inbox", { action: "outreach_send", id: "00000000-0000-4000-8000-000000000001" }, { Authorization: "Bearer someone" })), 401)
 } })
 
 Deno.test({ name: "admin-view-as refuses anyone not signed in, before issuing a sign in token", ...opts, fn: async () => {
