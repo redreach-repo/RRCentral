@@ -138,7 +138,9 @@ export default function GmailCalendarCard() {
         </p>
       ) : (
         <p style={{ color: colors.muted, fontSize: 13, marginBottom: 12 }}>
-          {status.configured
+          {status.deployed === false
+            ? 'Not set up. The gmail-calendar function is not deployed; you only need it if your team uses Gmail.'
+            : status.configured
             ? 'Not connected yet.'
             : 'Google OAuth client secrets are not set on the Edge Functions yet.'}
         </p>

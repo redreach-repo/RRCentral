@@ -135,7 +135,9 @@ export default function M365MailCalendarCard() {
         </p>
       ) : (
         <p style={{ color: colors.muted, fontSize: 13, marginBottom: 12 }}>
-          {status.configured
+          {status.deployed === false
+            ? 'Not set up. The m365-mail-calendar function is not deployed; you only need it if your team uses Microsoft 365.'
+            : status.configured
             ? 'Not connected yet.'
             : 'Microsoft OAuth client secrets are not set on the Edge Functions yet.'}
         </p>
