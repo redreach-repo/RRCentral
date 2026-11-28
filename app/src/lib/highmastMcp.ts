@@ -30,6 +30,16 @@ export {
   filterAgingRows,
   AGING_BUCKET_KEYS,
 } from './arChase'
+// Quote follow-up chasing (waiting quotes, call-backs, next follow-up): the same rules as the app.
+export {
+  buildQuoteChaseRows,
+  filterQuoteChaseRows,
+  QUOTE_CHASE_STATE_VALUES,
+  QUOTE_RESPONSE_VALUES,
+  quoteChaseSettingsFrom,
+  quoteFollowupSummary,
+  WAIT_BUCKET_KEYS,
+} from './quoteChase'
 
 /** Every tool the server offers. A test fails if anything risky sneaks in. */
 export const MCP_READ_TOOLS = [
@@ -44,6 +54,7 @@ export const MCP_READ_TOOLS = [
   'list_invoices',
   'dashboard_summary',
   'list_invoice_aging',
+  'list_quote_followups',
 ] as const
 export const MCP_WRITE_TOOLS = [
   'create_lead',
@@ -55,6 +66,9 @@ export const MCP_WRITE_TOOLS = [
   'complete_invoice_chase_task',
   // Quote notes: append-only, never changes the quote, its lines or totals.
   'add_quote_note',
+  // Quote follow-up chasing: a follow-up note never changes the quote.
+  'add_quote_chase_note',
+  'complete_quote_chase_task',
 ] as const
 export const MCP_TOOLS = [...MCP_READ_TOOLS, ...MCP_WRITE_TOOLS] as const
 export type McpToolName = (typeof MCP_TOOLS)[number]
@@ -182,6 +196,10 @@ export const MCP_TOOL_DEPARTMENTS: Record<string, McpDepartment[]> = {
   complete_invoice_chase_task: ['finance', 'sales'],
   // Quote notes (whoever reads quotes)
   add_quote_note: ['sales', 'finance'],
+  // Quote follow-up chasing (whoever reads quotes)
+  list_quote_followups: ['sales', 'finance'],
+  add_quote_chase_note: ['sales', 'finance'],
+  complete_quote_chase_task: ['sales', 'finance'],
   // Any area (narrowed to the department's records)
   list_records: ALL_DEPTS,
   get_record: ALL_DEPTS,

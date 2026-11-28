@@ -75,6 +75,7 @@ import { ensureCompanyFromDocument } from '../lib/ensureCompanyFromDocument'
 import { formatAED } from '../lib/money'
 import ReviseQuoteForm from '../components/quotations/ReviseQuoteForm'
 import QuoteNotesPanel from '../components/quotations/QuoteNotesPanel'
+import QuoteChasePanel from '../components/quotations/QuoteChasePanel'
 import { isDraftRevision, revisionMeta } from '../lib/quoteRevisions'
 import { finalizeRevision } from '../lib/quoteRevisionsStore'
 import { allocateReference } from '../lib/numbering'
@@ -255,6 +256,7 @@ export default function QuotationsPage() {
   // Revise (new Draft -R1) or Extend validity (one step); notes and history per quote.
   const [reviseTarget, setReviseTarget] = useState<{ quote: Quotation; mode: 'revise' | 'extend' } | null>(null)
   const [notesFor, setNotesFor] = useState<Quotation | null>(null)
+  const [followUpFor, setFollowUpFor] = useState<Quotation | null>(null)
   const [supplierInvoiceTarget, setSupplierInvoiceTarget] = useState<Quotation | null>(null)
   const [vatFoldOpen, setVatFoldOpen] = useState(false)
   const [vatFoldTarget, setVatFoldTarget] = useState('')
@@ -1470,6 +1472,7 @@ export default function QuotationsPage() {
         onRevise={(row) => revise(row)}
         onExtend={(row) => setReviseTarget({ quote: row, mode: 'extend' })}
         onNotes={(row) => setNotesFor(row)}
+        onFollowUp={(row) => setFollowUpFor(row)}
         onChain={(row) => {
           setChainTitle(`Document chain · ${row.reference_number}`)
           setChainStart({ kind: 'quote', id: row.id })
@@ -2762,6 +2765,33 @@ export default function QuotationsPage() {
         width={720}
       >
         {notesFor ? <QuoteNotesPanel quote={notesFor} onChanged={() => void load()} /> : null}
+      </Modal>
+
+      <Modal
+        open={Boolean(followUpFor)}
+        title={followUpFor ? `Follow-ups: ${followUpFor.reference_number} (${followUpFor.client})` : 'Follow-ups'}
+        onClose={() => setFollowUpFor(null)}
+        width={720}
+      >
+        {followUpFor ? (
+          <>
+            <p style={{ margin: '0 0 12px', fontSize: 13 }}>
+              Every follow-up of this quote and the client’s answer. The schedule and drafts are on{' '}
+              <button
+                type="button"
+                style={{ all: 'unset', cursor: 'pointer', color: colors.accentText, textDecoration: 'underline' }}
+                onClick={() => {
+                  setFollowUpFor(null)
+                  navigate('/quote-followup')
+                }}
+              >
+                Quote follow-up
+              </button>
+              .
+            </p>
+            <QuoteChasePanel quotationId={followUpFor.id} reference={followUpFor.reference_number} />
+          </>
+        ) : null}
       </Modal>
 
       <Modal open={!!outcomeTarget} title="Set outcome" onClose={() => setOutcomeTarget(null)} width={440}>

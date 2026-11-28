@@ -14,7 +14,7 @@ import {
   Trash2,
   Truck,
 } from 'lucide-react'
-import { Workflow } from 'lucide-react'
+import { PhoneCall, Workflow } from 'lucide-react'
 import type { Quotation } from '../../lib/types'
 import { canCreateDeliveryNoteFromQuote } from '../../lib/deliveryNotes'
 import styles from '../../styles/rowActions.module.css'
@@ -33,6 +33,8 @@ export type QuoteRowActionsProps = {
   onExtend?: (q: Quotation) => void
   /** Notes, revisions and the linked deal (works in every status). */
   onNotes?: (q: Quotation) => void
+  /** Follow-up log of a sent quote (calls, emails, the client's answer, call-back date). */
+  onFollowUp?: (q: Quotation) => void
   /** Opens the document chain (PO, delivery notes, invoices, payments). */
   onChain?: (q: Quotation) => void
   onOutcome: (q: Quotation) => void
@@ -60,6 +62,7 @@ export default function QuoteRowActions({
   onRevise,
   onExtend,
   onNotes,
+  onFollowUp,
   onChain,
   onOutcome,
   onInvoice,
@@ -144,6 +147,11 @@ export default function QuoteRowActions({
       {onNotes ? (
         <button type="button" className={styles.btn} onClick={() => onNotes(q)}>
           <MessageSquareText size={13} /> Notes
+        </button>
+      ) : null}
+      {onFollowUp && ['Sent', 'Accepted', 'Expired'].includes(q.status) ? (
+        <button type="button" className={styles.btn} onClick={() => onFollowUp(q)}>
+          <PhoneCall size={13} /> Follow-ups
         </button>
       ) : null}
       {q.status === 'Awarded' && q.reference_number ? (

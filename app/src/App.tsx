@@ -66,6 +66,7 @@ import FollowupsPage from './pages/FollowupsPage'
 import QuotationsPage from './pages/QuotationsPage'
 import InvoicesPage from './pages/InvoicesPage'
 import ArAgingPage from './pages/ArAgingPage'
+import QuoteFollowUpPage from './pages/QuoteFollowUpPage'
 import DeliveryNotesPage from './pages/DeliveryNotesPage'
 import CatalogPage from './pages/CatalogPage'
 import InventoryPage from './pages/InventoryPage'
@@ -221,6 +222,7 @@ export default function App() {
               <Route path="quotations" element={<QuotationsPage />} />
               <Route path="invoices" element={<InvoicesPage />} />
               <Route path="receivables" element={<ArAgingPage />} />
+              <Route path="quote-followup" element={<QuoteFollowUpPage />} />
               <Route path="delivery-notes" element={<DeliveryNotesPage />} />
               <Route path="customer-files" element={<CustomerFilesPage />} />
               <Route path="catalog" element={<CatalogPage />} />

@@ -201,6 +201,7 @@ export default function Layout() {
       '/sales',
       '/ctrm',
       '/quotations',
+      '/quote-followup',
       '/invoices',
       '/receivables',
       '/client-pos',

@@ -24,7 +24,7 @@ import {
 } from './highmastMcp'
 
 describe('MCP tool list', () => {
-  it('has the 14 tools from the spec plus the 3 chase tools and add_quote_note, and nothing else', () => {
+  it('has the 14 tools from the spec plus the chase tools and add_quote_note, and nothing else', () => {
     expect([...MCP_TOOLS].sort()).toEqual(
       [
         'search_accounts', 'get_account', 'list_deals', 'get_deal', 'list_follow_ups_due', 'list_tickets',
@@ -34,12 +34,17 @@ describe('MCP tool list', () => {
         'list_invoice_aging', 'add_invoice_chase_note', 'complete_invoice_chase_task',
         // Revise and extend sent quotes (fix 2)
         'add_quote_note',
+        // Quote follow-up chasing
+        'list_quote_followups', 'add_quote_chase_note', 'complete_quote_chase_task',
       ].sort(),
     )
   })
 
   it('offers the chase tools to finance and sales keys only', () => {
-    for (const t of ['list_invoice_aging', 'add_invoice_chase_note', 'complete_invoice_chase_task']) {
+    for (const t of [
+      'list_invoice_aging', 'add_invoice_chase_note', 'complete_invoice_chase_task',
+      'list_quote_followups', 'add_quote_chase_note', 'complete_quote_chase_task',
+    ]) {
       expect(toolAllowedForDepartments(t, ['finance']), t).toBe(true)
       expect(toolAllowedForDepartments(t, ['sales']), t).toBe(true)
       expect(toolAllowedForDepartments(t, ['hr', 'payroll', 'support']), t).toBe(false)

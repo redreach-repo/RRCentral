@@ -25,6 +25,8 @@ const EXPECTED_TOOLS = [
   "list_invoice_aging", "add_invoice_chase_note", "complete_invoice_chase_task",
   // Quote notes (append-only; revise and extend are admin tools).
   "add_quote_note",
+  // Quote follow-up chasing: waiting quotes, follow-up notes, follow-up tasks (never sends, never changes quotes).
+  "list_quote_followups", "add_quote_chase_note", "complete_quote_chase_task",
   // Read-only PDF tools (tools_pdf.ts): every key, limited by what its member can see.
   "get_delivery_note_pdf", "get_invoice_pdf", "get_quote_pdf",
 ].sort()
@@ -141,6 +143,20 @@ async function fakeFetch(input: Request | URL | string, init?: RequestInit): Pro
   if (url.pathname === "/rest/v1/invoice_chase_log" && req.method === "POST") {
     const row = JSON.parse(calls[calls.length - 1].body)
     return json({ id: "c2", chased_on: row.chased_on, promised_date: row.promised_date })
+  }
+  // Quote follow-up chasing: Sharjah ReadyMix RR-01-26007 has client PO 4200050362 but still shows Sent.
+  if (url.pathname === "/rest/v1/quotations" && req.method === "GET" && (url.searchParams.get("status") || "").startsWith("in.")) {
+    return json([
+      { id: "66666666-6666-4666-8666-666666666666", client: "Sharjah ReadyMix Concrete", reference_number: "RR-01-26007", division_code: "01", amount: 18900, quotation_currency: "AED", status: "Sent", sent_at: "2026-10-20T09:00:00Z", valid_until: "2099-12-31", deleted_at: null },
+      { id: "99999999-9999-4999-8999-000000000010", client: "Fresh Co", reference_number: "RR-03-26010", division_code: "03", amount: 5000, quotation_currency: "AED", status: "Sent", sent_at: "2026-11-01T09:00:00Z", valid_until: "2099-12-31", deleted_at: null },
+    ])
+  }
+  if (url.pathname === "/rest/v1/client_purchase_orders" && req.method === "GET") {
+    return json([{ id: "p1", po_number: "4200050362", quotation_id: "66666666-6666-4666-8666-666666666666", quote_reference: "RR-01-26007", status: "open", issued_on: "2026-11-10" }])
+  }
+  if (url.pathname === "/rest/v1/quote_chase_log" && req.method === "POST") {
+    const row = JSON.parse(calls[calls.length - 1].body)
+    return json({ id: "qc1", chased_on: row.chased_on, response: row.response, next_follow_up: row.next_follow_up })
   }
   if (url.pathname.startsWith("/rest/v1/")) return json([])
   return json({}, 404)
@@ -319,6 +335,53 @@ Deno.test({ name: "add_invoice_chase_note logs a chase and never touches the inv
   const future = await (await h(rpc("tools/call", { name: "add_invoice_chase_note", arguments: { reference: "RR-03-26104", channel: "call", note: "x", chased_on: "2099-01-01" } }, 34))).json()
   assert(future.result.isError)
   assertMatch(future.result.content[0].text, /future/)
+}) })
+
+Deno.test({ name: "dashboard_summary and list_quote_followups show quotes waiting, with a client PO not yet awarded first", ...opts, fn: () => withFakeDb(async () => {
+  const h = await load()
+  resolveRows = [MEMBER]
+  const body = await (await h(rpc("tools/call", { name: "dashboard_summary", arguments: {} }, 41))).json()
+  assertFalse(body.result.isError, JSON.stringify(body))
+  const q = JSON.parse(body.result.content[0].text).quote_followups
+  assertEquals(q.waiting, 2)
+  assertEquals(q.totals_by_currency.AED.total, 23900)
+  assertEquals(q.po_not_awarded.map((p: { reference: string; po_number: string }) => `${p.reference} ${p.po_number}`), ["RR-01-26007 4200050362"])
+  assertEquals(q.next_actions[0].reference, "RR-01-26007")
+  assertMatch(q.next_actions[0].next_action, /mark the quote Awarded/)
+  assert(calls.every((c) => c.method === "GET" || c.url.pathname.startsWith("/rest/v1/rpc/")), "the summary writes nothing")
+
+  const list = await (await h(rpc("tools/call", { name: "list_quote_followups", arguments: { state: "decide" } }, 42))).json()
+  assertFalse(list.result.isError, JSON.stringify(list))
+  const out = JSON.parse(list.result.content[0].text)
+  assertEquals(out.needs_decision, 1)
+  assertEquals(out.client_pos_visible, true)
+}) })
+
+Deno.test({ name: "add_quote_chase_note logs a follow-up only for sent quotes and never touches the quote or sends anything", ...opts, fn: () => withFakeDb(async () => {
+  const h = await load()
+  resolveRows = [MEMBER]
+  const body = await (await h(rpc("tools/call", {
+    name: "add_quote_chase_note",
+    arguments: { reference: "RR-01-26007", channel: "whatsapp", contact: "Vishraj", note: "PO is with accounts", response: "interested", next_follow_up: "2099-01-05" },
+  }, 43))).json()
+  assertFalse(body.result.isError, JSON.stringify(body))
+  const out = JSON.parse(body.result.content[0].text)
+  assertEquals(out.reference, "RR-01-26007")
+  const writes = calls.filter((c) => c.method !== "GET" && !c.url.pathname.startsWith("/rest/v1/rpc/"))
+  assertEquals(writes.map((c) => c.url.pathname), ["/rest/v1/quote_chase_log"], "only the follow-up log is written")
+  const sent = JSON.parse(writes[0].body)
+  assertEquals(sent.quotation_id, "66666666-6666-4666-8666-666666666666")
+  assertEquals(sent.response, "interested")
+  assertFalse("created_by" in sent || "created_by_email" in sent || "tenant_id" in sent, "who and tenant come from the database")
+  assert(calls.every((c) => !/zoho|whatsapp|graph\.facebook|mail/i.test(c.url.host)), "nothing is sent to anyone")
+
+  const draft = await (await h(rpc("tools/call", { name: "add_quote_chase_note", arguments: { reference: "RR-01-26008", channel: "call", note: "x" } }, 44))).json()
+  assert(draft.result.isError)
+  assertMatch(draft.result.content[0].text, /only sent quotes/)
+  const empty = await (await h(rpc("tools/call", { name: "add_quote_chase_note", arguments: { reference: "RR-01-26007", channel: "call" } }, 45))).json()
+  assert(empty.result.isError)
+  const bad = await (await h(rpc("tools/call", { name: "add_quote_chase_note", arguments: { reference: "RR-01-26007", channel: "call", response: "maybe" } }, 46))).json()
+  assert(bad.result.isError)
 }) })
 
 Deno.test({ name: "a page larger than 50 is refused", ...opts, fn: () => withFakeDb(async () => {

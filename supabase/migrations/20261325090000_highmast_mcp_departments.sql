@@ -386,6 +386,11 @@ begin
       -- whoever reads invoices may log a chase or finish a chase task.
       expr_r := '(select public.rr_mcp_dept_allows(''invoices'', false))';
       expr_w := expr_r;
+    elsif t.name in ('quote_chase_settings', 'quote_chase_log', 'quote_chase_tasks') then
+      -- Quote follow-up chasing (20261334090000_quote_chase.sql) follows quotes:
+      -- whoever reads quotes may log a follow-up or finish a follow-up task.
+      expr_r := '(select public.rr_mcp_dept_allows(''quotations'', false))';
+      expr_w := expr_r;
     elsif t.name = 'quote_notes' then
       -- Quote notes (20261329090000_quote_revisions.sql) follow quotes:
       -- whoever reads quotes may add a note.
