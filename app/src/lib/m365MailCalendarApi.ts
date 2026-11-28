@@ -16,8 +16,11 @@ import type {
   TeamMeetingInput,
 } from './mailCalendar/types'
 import { PRODUCT } from './product'
+import { FunctionNotDeployedError, isNotDeployed } from './edgeFunctionNotDeployed'
 
 export type M365Status = {
+  /** False when the m365-mail-calendar Edge Function is not deployed (only needed by teams that use it). */
+  deployed?: boolean
   configured: boolean
   connected: boolean
   account_email: string
@@ -64,6 +67,9 @@ async function callM365<T>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await getSupabaseClient().functions.invoke('m365-mail-calendar', { body })
   if (error) {
     const ctx = (error as { context?: Response }).context
+    if (ctx?.status === 404 || /Failed to send a request/i.test(String(error.message))) {
+      throw new FunctionNotDeployedError('m365-mail-calendar')
+    }
     const detail = ctx && typeof ctx.json === 'function' ? await ctx.json().catch(() => null) : null
     throw new Error((detail as { error?: string } | null)?.error || error.message || 'Microsoft 365 did not answer')
   }
@@ -74,7 +80,14 @@ async function callM365<T>(body: Record<string, unknown>): Promise<T> {
 
 export async function getM365Status(): Promise<M365Status> {
   if (!isSupabaseConfigured()) return M365_OFF
-  return callM365<M365Status>({ action: 'status' })
+  try {
+    return await callM365<M365Status>({ action: 'status' })
+  } catch (e) {
+    // Not deployed is a normal state (this team may not use it), so the
+    // Settings page shows it as off instead of an error toast.
+    if (isNotDeployed(e)) return { ...M365_OFF, deployed: false }
+    throw e
+  }
 }
 
 export async function startM365Connect(returnTo = window.location.href): Promise<void> {

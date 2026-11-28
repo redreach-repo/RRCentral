@@ -15,8 +15,11 @@ import type {
   TeamMeetingInput,
 } from './mailCalendar/types'
 import { PRODUCT } from './product'
+import { FunctionNotDeployedError, isNotDeployed } from './edgeFunctionNotDeployed'
 
 export type GmailStatus = {
+  /** False when the gmail-calendar Edge Function is not deployed (only needed by teams that use it). */
+  deployed?: boolean
   configured: boolean
   connected: boolean
   account_email: string
@@ -63,6 +66,9 @@ async function callGmail<T>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await getSupabaseClient().functions.invoke('gmail-calendar', { body })
   if (error) {
     const ctx = (error as { context?: Response }).context
+    if (ctx?.status === 404 || /Failed to send a request/i.test(String(error.message))) {
+      throw new FunctionNotDeployedError('gmail-calendar')
+    }
     const detail = ctx && typeof ctx.json === 'function' ? await ctx.json().catch(() => null) : null
     throw new Error((detail as { error?: string } | null)?.error || error.message || 'Gmail did not answer')
   }
@@ -73,7 +79,14 @@ async function callGmail<T>(body: Record<string, unknown>): Promise<T> {
 
 export async function getGmailStatus(): Promise<GmailStatus> {
   if (!isSupabaseConfigured()) return GMAIL_OFF
-  return callGmail<GmailStatus>({ action: 'status' })
+  try {
+    return await callGmail<GmailStatus>({ action: 'status' })
+  } catch (e) {
+    // Not deployed is a normal state (this team may not use it), so the
+    // Settings page shows it as off instead of an error toast.
+    if (isNotDeployed(e)) return { ...GMAIL_OFF, deployed: false }
+    throw e
+  }
 }
 
 export async function startGmailConnect(returnTo = window.location.href): Promise<void> {
