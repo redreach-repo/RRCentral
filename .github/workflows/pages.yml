@@ -16,10 +16,7 @@ concurrency:
   group: pages
   cancel-in-progress: true
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -68,5 +65,15 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: app/dist
+  # Deploy runs as its own job so the uploaded artifact is fully listed by the
+  # Actions API before deploy-pages looks it up. In one job it sometimes found
+  # "0 artifact(s)" right after a good upload (25 and 28 Nov 2026).
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v4
