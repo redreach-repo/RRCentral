@@ -2053,8 +2053,24 @@ function isOpenTicket(t) {
 var DEFAULT_STALE_DAYS = { crm: 21, sales: 14, ctrm: 14 };
 
 // src/lib/currency.ts
+var BASE_CURRENCY = "AED";
 function roundMoney(n2) {
   return roundAmount(n2, "AED");
+}
+function formatMoneyAmount(amount, currency) {
+  const code = (currency || BASE_CURRENCY).toUpperCase();
+  const n2 = roundMoney(amount);
+  try {
+    return new Intl.NumberFormat("en-AE", {
+      style: "currency",
+      currency: code,
+      currencyDisplay: "code",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(n2);
+  } catch {
+    return `${code} ${n2.toLocaleString("en-AE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
 }
 
 // src/lib/client360.ts
@@ -2091,6 +2107,7 @@ function quoteRow(q, marginVisible) {
     currency: cur(q.quotation_currency || q.currency),
     margin,
     margin_pct: margin != null && baseAmount > 0 ? Math.round(margin / baseAmount * 1e3) / 10 : null,
+    // money-guard: not money (a percentage)
     division: s(q.division_code) || divisionOf(q.reference_number)
   };
 }
@@ -2348,7 +2365,7 @@ function buildClient360(input) {
     ),
     ...invoices.filter((i) => i.date).map((i) => ({ at: s(i.date), kind: "Invoice", text: `${i.reference} ${i.status}`, ref: i.reference, by: "", status: i.status })),
     ...pos.filter((p) => p.date).map((p) => ({ at: s(p.date), kind: "Purchase order", text: `PO ${p.po_number} received`, ref: p.po_number, by: "", status: p.status })),
-    ...payments.filter((p) => p.date).map((p) => ({ at: s(p.date), kind: "Payment", text: `${p.currency} ${p.amount.toFixed(2)} received`, ref: p.invoice_ref, by: "", status: p.status })),
+    ...payments.filter((p) => p.date).map((p) => ({ at: s(p.date), kind: "Payment", text: `${formatMoneyAmount(p.amount, p.currency)} received`, ref: p.invoice_ref, by: "", status: p.status })),
     ...deliveryNotes.filter((d) => d.date).map((d) => ({ at: s(d.date), kind: "Delivery", text: `${d.reference} ${d.status}`, ref: d.reference, by: "", status: d.status }))
   ].filter((x) => x.at).sort(newest((r) => r.at));
   const out = {
