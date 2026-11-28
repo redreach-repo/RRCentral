@@ -254,6 +254,12 @@ export default function DeliveryNotesPage() {
     }
   }
 
+  // Opened from Home ("Made by Sales"): search for that delivery note number.
+  const findParam = searchParams.get('find') || ''
+  useEffect(() => {
+    if (findParam) setSearch(findParam)
+  }, [findParam])
+
   useEffect(() => {
     if (loading) return
     const query =

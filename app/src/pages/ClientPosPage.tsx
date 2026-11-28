@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import DocumentChainModal from '../components/documents/DocumentChainModal'
 import type { ChainStart } from '../lib/documentChain'
 import { format } from 'date-fns'
@@ -78,6 +79,12 @@ export default function ClientPosPage() {
   const [department, setDepartment] = useState('')
   const [statusTab, setStatusTab] = useState<(typeof STATUS_TABS)[number]>('All')
   const [search, setSearch] = useState('')
+  // Opened from Home ("Made by Sales"): search for that PO number.
+  const [searchParams] = useSearchParams()
+  const refParam = searchParams.get('ref') || ''
+  useEffect(() => {
+    if (refParam) setSearch(refParam)
+  }, [refParam])
 
   const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState<ClientPurchaseOrder | null>(null)
