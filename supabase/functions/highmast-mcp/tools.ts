@@ -14,6 +14,13 @@ import {
   CHASE_CHANNEL_VALUES,
   chaseSettingsFrom,
   filterAgingRows,
+  buildQuoteChaseRows,
+  filterQuoteChaseRows,
+  QUOTE_CHASE_STATE_VALUES,
+  QUOTE_RESPONSE_VALUES,
+  quoteChaseSettingsFrom,
+  quoteFollowupSummary,
+  WAIT_BUCKET_KEYS,
   addDaysIso,
   auditArgs,
   canonicalStage,
@@ -243,6 +250,36 @@ export async function quoteChainNotes(ctx: ToolContext, q: Row, limit = 20): Pro
     .in("quotation_id", ids).order("created_at", { ascending: false }).limit(limit)
   if (isQuoteSetupMissing(res.error)) return []
   return (check(res, "read quote notes") as Row[] | null) || []
+}
+
+// ---- Quote follow-up chasing -------------------------------------------------------
+
+/** Sent quotes waiting for an answer, with follow-ups, tasks, client POs and schedule, by the app's rules (quoteChase.ts). */
+async function loadQuoteFollowups(ctx: ToolContext) {
+  const [quotes, log, tasks, settings, pos] = await Promise.all([
+    softRows((soft) => {
+      let q = ctx.db.from("quotations").select("*").in("status", ["Sent", "Accepted", "Expired"]).limit(2000)
+      if (soft) q = q.is("deleted_at", null)
+      return q
+    }, "read quotes"),
+    chaseRows(() => ctx.db.from("quote_chase_log").select("*").is("deleted_at", null).limit(5000), "read the follow-up log"),
+    chaseRows(() => ctx.db.from("quote_chase_tasks").select("*").limit(5000), "read follow-up tasks"),
+    chaseRows(() => ctx.db.from("quote_chase_settings").select("*").limit(1), "read the follow-up schedule"),
+    ctx.db.from("client_purchase_orders").select("*").limit(5000),
+  ])
+  // A key that cannot read client POs still gets the list, without the PO check.
+  const poRows = ((pos.error ? [] : pos.data) || []) as Row[]
+  const rows = buildQuoteChaseRows({
+    quotes: quotes as never,
+    log: log.rows as never,
+    tasks: tasks.rows as never,
+    pos: poRows
+      .filter((p) => p.status !== "canceled")
+      .map((p) => ({ quotation_id: p.quotation_id ?? null, quote_reference: p.quote_reference ?? null, po_number: String(p.po_number || ""), po_date: p.issued_on ?? null })) as never,
+    settings: quoteChaseSettingsFrom(settings.rows[0] as never),
+    today: ctx.now(),
+  }) as Row[]
+  return { rows, setupMissing: log.missing || tasks.missing || settings.missing, posVisible: !pos.error }
 }
 
 type FoundDeal = { pipeline: McpPipeline; row: Row }
@@ -595,7 +632,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: "dashboard_summary",
     title: "Dashboard summary",
-    description: "What needs attention now: overdue invoices, receivables aging (totals per currency by age, broken payment promises, the next chase action per overdue invoice), stale deals in each pipeline, support tickets near or past their reply target, and follow-ups due today or overdue. Up to 10 examples of each (20 chase actions).",
+    description: "What needs attention now: overdue invoices, receivables aging (totals per currency by age, broken payment promises, the next chase action per overdue invoice), quotes waiting for an answer (value by days waiting, quotes needing a decision such as a client PO received or expired, missed call-backs, the next follow-up per quote), stale deals in each pipeline, support tickets near or past their reply target, and follow-ups due today or overdue. Up to 10 examples of each (20 chase actions).",
     readOnly: true,
     input: {},
     run: async (_a, ctx) => {
@@ -610,8 +647,9 @@ export const TOOLS: ToolDef[] = [
           if (s) q = q.is("deleted_at", null)
           return q
         }, `read ${table}`)
-      const [aging, invoices, crm, sales, ctrm, tickets] = await Promise.all([
+      const [aging, followups, invoices, crm, sales, ctrm, tickets] = await Promise.all([
         loadAging(ctx).catch(() => null),
+        loadQuoteFollowups(ctx).catch(() => null),
         // deno-lint-ignore no-explicit-any
         soft("invoices", "*", (q: any) => q.neq("payment_status", "Paid").limit(2000)),
         // deno-lint-ignore no-explicit-any
@@ -675,6 +713,13 @@ export const TOOLS: ToolDef[] = [
               chase_setup: aging.setupMissing ? "not set up yet (run ar-chase.sql)" : "ok",
               payments_visible: aging.paymentsVisible,
               note: "Balances after logged payments, by age past the due date. next_action is what to do next; nothing is sent to clients automatically.",
+            }
+          : null,
+        quote_followups: followups
+          ? {
+              ...quoteFollowupSummary(followups.rows as never, now, 10),
+              follow_up_setup: followups.setupMissing ? "not set up yet (run quote-chase.sql)" : "ok",
+              note: "Sent quotes with no answer yet, by days since sent. next_action is what to do next; nothing is sent to clients and no quote status is changed automatically.",
             }
           : null,
       }
@@ -816,6 +861,122 @@ export const TOOLS: ToolDef[] = [
         status: q.status,
         recent_notes: await quoteChainNotes(ctx, q, 10),
       }
+    },
+  },
+  {
+    name: "list_quote_followups",
+    title: "Quotes waiting for an answer",
+    description:
+      "Sent (or client-accepted) quotes with no decision yet, plus quotes that expired in the last 7 days: value, days since sent, valid until, last follow-up, the client's answer, any agreed call-back date (pending or missed), a client PO that arrived but is not Awarded yet, and the next follow-up action. Totals per currency by days waiting (0-7, 8-14, 15-30, 31+). Filter by client name or quote number, division code (01-06), bucket or state (decide, expiring, missed, due). Read only. Paginated.",
+    readOnly: true,
+    input: {
+      client: z.string().max(200).optional(),
+      division: z.string().regex(/^\d{2}$/, "Division code, e.g. 01").optional(),
+      bucket: z.enum(WAIT_BUCKET_KEYS as [string, ...string[]]).optional(),
+      state: z.enum(QUOTE_CHASE_STATE_VALUES as [string, ...string[]]).optional(),
+      limit: limitArg,
+      offset: offsetArg,
+    },
+    run: async (a, ctx) => {
+      const { limit, offset } = clampPage(a.limit, a.offset)
+      const data = await loadQuoteFollowups(ctx)
+      const today = isoDay(ctx.now())
+      const rows = filterQuoteChaseRows(
+        data.rows as never,
+        { client: String(a.client || ""), division: String(a.division || ""), bucket: String(a.bucket || ""), state: String(a.state || "") },
+        today,
+      ) as Row[]
+      const summary = quoteFollowupSummary(rows as never, ctx.now())
+      return {
+        as_of: today,
+        totals_by_currency: summary.totals_by_currency,
+        needs_decision: summary.needs_decision.length,
+        missed_callbacks: summary.missed_callbacks.length,
+        follow_up_setup: data.setupMissing ? "not set up yet (run quote-chase.sql)" : "ok",
+        client_pos_visible: data.posVisible,
+        ...pageOf(rows, limit, offset),
+      }
+    },
+  },
+  {
+    name: "add_quote_chase_note",
+    title: "Log a quote follow-up",
+    description:
+      "Log a follow-up of a sent quote: channel (email, call, whatsapp, visit), who was contacted, what was said, the client's answer (no_reply, interested, needs_changes, on_hold, declined) and any agreed call-back date. Give quote_id or reference (e.g. RR-01-26008). It records the follow-up only: it never sends anything to the client and never changes the quote or its status (use the quote's own tools or buttons for Awarded, Not awarded or a revision).",
+    readOnly: false,
+    input: {
+      quote_id: uuid("quote_id").optional(),
+      reference: z.string().max(60).optional().describe("Quote number, e.g. RR-01-26008."),
+      channel: z.enum(CHASE_CHANNEL_VALUES as [string, ...string[]]),
+      contact: z.string().max(200).optional().describe("Who was contacted."),
+      note: z.string().max(3800).optional().describe("What was said. Needed unless response or next_follow_up is given."),
+      response: z.enum(QUOTE_RESPONSE_VALUES as [string, ...string[]]).optional(),
+      next_follow_up: dateArg.optional().describe("Agreed date to follow up again, YYYY-MM-DD, on or after the follow-up date."),
+      chased_on: dateArg.optional().describe("When the follow-up happened, YYYY-MM-DD. Default today; never in the future."),
+    },
+    run: async (a, ctx) => {
+      const today = isoDay(ctx.now())
+      const chasedOn = String(a.chased_on || today)
+      if (chasedOn > today) throw new ToolError("The follow-up date cannot be in the future.")
+      const callback = a.next_follow_up ? String(a.next_follow_up) : null
+      if (callback && callback < chasedOn) throw new ToolError("The call-back date cannot be before the follow-up.")
+      const note = String(a.note || "").trim()
+      const response = a.response ? String(a.response) : ""
+      if (!note && !callback && !response) throw new ToolError("Add a note, the client's answer or a call-back date.")
+      const q = await findQuote(ctx, a)
+      if (!["Sent", "Accepted", "Expired"].includes(String(q.status))) {
+        throw new ToolError(`${q.reference_number || "This quote"} is ${q.status}; only sent quotes are followed up.`)
+      }
+      const res = await ctx.db
+        .from("quote_chase_log")
+        .insert({
+          quotation_id: q.id,
+          chased_on: chasedOn,
+          channel: String(a.channel),
+          contact: String(a.contact || "").trim(),
+          note: (note ? note + signature(ctx.key) : "").slice(0, 4000),
+          response,
+          next_follow_up: callback,
+        })
+        .select("id, chased_on, response, next_follow_up")
+        .single()
+      if (isMissingTable(res.error)) throw new ToolError("The quote follow-up log is not set up in HighMast yet (run quote-chase.sql).")
+      const row = check(res, "log the follow-up") as Row
+      return {
+        added: true,
+        follow_up_id: row.id,
+        quote_id: q.id,
+        reference: q.reference_number || null,
+        client: q.client,
+        status: q.status,
+        chased_on: row.chased_on,
+        response: row.response || null,
+        next_follow_up: row.next_follow_up,
+      }
+    },
+  },
+  {
+    name: "complete_quote_chase_task",
+    title: "Complete quote follow-up task",
+    description:
+      "Mark a quote follow-up task (from list_quote_followups next actions or dashboard_summary) done or skipped, with what happened. It sends nothing; log the follow-up itself with add_quote_chase_note.",
+    readOnly: false,
+    input: {
+      task_id: uuid("task_id"),
+      status: z.enum(["done", "skipped"]),
+      outcome: z.string().max(2000).optional(),
+    },
+    run: async (a, ctx) => {
+      const res = await ctx.db
+        .from("quote_chase_tasks")
+        .update({ status: String(a.status), outcome: (String(a.outcome || "").trim() + signature(ctx.key)).slice(0, 2000) })
+        .eq("id", String(a.task_id))
+        .eq("status", "open")
+        .select("id, quotation_id, step_day, kind, status")
+      if (isMissingTable(res.error)) throw new ToolError("Quote follow-up tasks are not set up in HighMast yet (run quote-chase.sql).")
+      const changed = (check(res, "update the follow-up task") as Row[] | null) || []
+      if (!changed.length) throw new ToolError("No open quote follow-up task with that id is visible to this key.")
+      return { updated: true, ...changed[0] }
     },
   },
   {

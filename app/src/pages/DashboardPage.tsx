@@ -42,6 +42,7 @@ import WatchdogCard from '../components/watchdog/WatchdogCard'
 import NoNextStepCard from '../components/deals/NoNextStepCard'
 import NewLeadsCard from '../components/leads/NewLeadsCard'
 import ReceivablesCard from '../components/invoices/ReceivablesCard'
+import QuoteFollowUpCard from '../components/quotations/QuoteFollowUpCard'
 import { domainAlertLabel, domainRenewalAlerts } from '../lib/domainAlerts'
 import { syncUnansweredQuoteFollowUps } from '../lib/quoteFollowUpSync'
 import { useSettings } from '../contexts/SettingsContext'
@@ -492,6 +493,7 @@ export default function DashboardPage() {
       </section>
 
       {userRole === 'staff' || salesLocked ? null : <ReceivablesCard canWork={roleAtLeast(userRole, 'sales')} />}
+      {userRole === 'staff' ? null : <QuoteFollowUpCard canWork={roleAtLeast(userRole, 'sales')} />}
 
       <section className={dash.section} aria-label="Needs attention">
         <button

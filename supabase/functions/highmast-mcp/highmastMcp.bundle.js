@@ -2266,6 +2266,291 @@ function agingSummary(rows, max = 20) {
   };
 }
 
+// src/lib/quoteChase.ts
+var QUOTE_RESPONSES = [
+  { value: "no_reply", label: "No reply" },
+  { value: "interested", label: "Interested" },
+  { value: "needs_changes", label: "Wants changes" },
+  { value: "on_hold", label: "On hold" },
+  { value: "declined", label: "Declined" }
+];
+var QUOTE_RESPONSE_VALUES = QUOTE_RESPONSES.map((r) => r.value);
+var DEFAULT_QUOTE_CHASE_SETTINGS = {
+  followupDays: [3, 7, 14],
+  expiryWarnDays: 3,
+  escalateDays: 21,
+  escalateToUserId: null
+};
+var EXPIRED_GRACE_DAYS = 7;
+var validDay2 = (d, min = 1, max = 180) => Number.isInteger(Number(d)) && Number(d) >= min && Number(d) <= max;
+function quoteChaseSettingsFrom(row) {
+  const d = DEFAULT_QUOTE_CHASE_SETTINGS;
+  if (!row) return { ...d, followupDays: [...d.followupDays] };
+  const days = [...new Set((row.followup_days || []).map(Number).filter((x) => validDay2(x)))].sort((a, b) => a - b);
+  const hasWarn = row.expiry_warn_days !== null && row.expiry_warn_days !== void 0;
+  return {
+    followupDays: days.length ? days : [...d.followupDays],
+    expiryWarnDays: hasWarn && validDay2(row.expiry_warn_days, 0, 60) ? Number(row.expiry_warn_days) : d.expiryWarnDays,
+    escalateDays: validDay2(row.escalate_days) ? Number(row.escalate_days) : d.escalateDays,
+    escalateToUserId: row.escalate_to_user_id || null
+  };
+}
+var DAY_MS2 = 864e5;
+function daysBetween2(fromIso, toIso) {
+  return Math.round((Date.parse(toIso.slice(0, 10) + "T00:00:00Z") - Date.parse(fromIso.slice(0, 10) + "T00:00:00Z")) / DAY_MS2);
+}
+var isIsoDay = (s) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}/.test(s);
+function quoteSteps(settings, sentIso, validUntil) {
+  const steps = settings.followupDays.filter((d) => d !== settings.escalateDays).map((d) => ({ kind: "followup", step_day: d, due_on: addDaysToIso(sentIso, d) }));
+  steps.push({ kind: "escalate", step_day: settings.escalateDays, due_on: addDaysToIso(sentIso, settings.escalateDays) });
+  if (settings.expiryWarnDays > 0 && isIsoDay(validUntil)) {
+    const due = addDaysToIso(validUntil, -settings.expiryWarnDays);
+    if (due > sentIso.slice(0, 10)) steps.push({ kind: "expiry", step_day: settings.expiryWarnDays, due_on: due });
+  }
+  const order = { followup: 0, expiry: 1, escalate: 2 };
+  return steps.sort((a, b) => a.due_on.localeCompare(b.due_on) || order[a.kind] - order[b.kind]);
+}
+function stepCovered(step, lastContactIso) {
+  if (step.kind !== "followup" || !lastContactIso) return false;
+  return lastContactIso.slice(0, 10) >= addDaysToIso(step.due_on, -2);
+}
+var WAIT_BUCKETS = [
+  { key: "0-7", label: "Up to 7 days" },
+  { key: "8-14", label: "8 to 14 days" },
+  { key: "15-30", label: "15 to 30 days" },
+  { key: "31+", label: "Over 30 days" }
+];
+var WAIT_BUCKET_KEYS = WAIT_BUCKETS.map((b) => b.key);
+function waitBucket(days) {
+  if (!Number.isFinite(days) || days <= 7) return "0-7";
+  if (days <= 14) return "8-14";
+  if (days <= 30) return "15-30";
+  return "31+";
+}
+function sortQuoteChaseLog(log) {
+  return [...log].sort((a, b) => b.chased_on.localeCompare(a.chased_on) || String(b.created_at).localeCompare(String(a.created_at)));
+}
+function currentCallback(log, todayIso) {
+  const newest = sortQuoteChaseLog(log.filter((e) => !e.deleted_at))[0];
+  if (!newest?.next_follow_up) return null;
+  const date = newest.next_follow_up.slice(0, 10);
+  return { date, state: date < todayIso ? "missed" : "pending", contact: newest.contact };
+}
+function quoteDivision(q) {
+  const own = String(q.division_code || "").trim();
+  if (/^\d{2}$/.test(own)) return own;
+  const m = String(q.reference_number || "").match(/^[A-Z]{2,4}-(\d{2})-/i);
+  return m ? m[1] : "";
+}
+function isChaseable(q, todayIso) {
+  if (q.deleted_at) return false;
+  if (q.status === "Sent" || q.status === "Accepted") return true;
+  if (q.status === "Expired" && isIsoDay(q.valid_until)) return daysBetween2(q.valid_until, todayIso) <= EXPIRED_GRACE_DAYS;
+  return false;
+}
+function nextQuoteAction(input) {
+  const { row: r, todayIso } = input;
+  if (r.status === "Accepted") {
+    return { kind: "award", due_on: todayIso, text: "The client accepted through the link: mark the quote Awarded." };
+  }
+  if (r.po) {
+    return { kind: "award", due_on: todayIso, text: `Client PO ${r.po.po_number} received: mark the quote Awarded.` };
+  }
+  if (r.validity === "expired" && r.valid_until) {
+    const until = addDaysToIso(r.valid_until, EXPIRED_GRACE_DAYS);
+    return {
+      kind: "expired",
+      due_on: todayIso,
+      text: `Expired on ${r.valid_until}: revise it, extend the validity or mark it not awarded (on this list until ${until}).`
+    };
+  }
+  if (r.callback?.state === "missed") {
+    return {
+      kind: "callback_missed",
+      due_on: todayIso,
+      text: `Call-back agreed for ${r.callback.date} was missed: follow up with ${r.callback.contact || "the client"} today.`
+    };
+  }
+  if (r.response === "declined") {
+    return { kind: "close", due_on: todayIso, text: "The client declined: mark the quote Not awarded with the reason." };
+  }
+  const open = input.tasks.filter((t) => t.status === "open").sort((a, b) => a.due_on.localeCompare(b.due_on));
+  if (open.length) {
+    const t = open[0];
+    return { kind: "task", due_on: t.due_on, task_id: t.id, text: taskText(t, r.valid_until) };
+  }
+  if (r.callback?.state === "pending") {
+    return { kind: "await_callback", due_on: r.callback.date, text: `Follow up on ${r.callback.date} as agreed with ${r.callback.contact || "the client"}.` };
+  }
+  const due = input.steps.filter((s) => !stepCovered(s, r.last_contact_on));
+  const reached = due.filter((s) => s.due_on <= todayIso);
+  const last = reached[reached.length - 1];
+  if (last && !input.tasks.some((t) => t.due_on >= last.due_on)) {
+    return { kind: last.kind, due_on: todayIso, text: `${stepLabel(last, r.valid_until)} now.` };
+  }
+  const next = due.find((s) => s.due_on > todayIso);
+  if (next) return { kind: next.kind, due_on: next.due_on, text: `${stepLabel(next, r.valid_until)} on ${next.due_on}.` };
+  return { kind: "none", due_on: null, text: "Every follow-up is done. Ask for a decision, or mark the quote not awarded." };
+}
+function stepLabel(s, validUntil) {
+  if (s.kind === "escalate") return `Escalate to the owner (day ${s.step_day} with no decision)`;
+  if (s.kind === "expiry") return `Remind the client it expires${validUntil ? ` on ${validUntil}` : ""}`;
+  return `Day ${s.step_day} follow-up`;
+}
+function taskText(t, validUntil) {
+  if (t.kind === "escalate") return `${stepLabel(t, validUntil)}.`;
+  return `${stepLabel(t, validUntil)} (draft ready).`;
+}
+function buildQuoteChaseRows(input) {
+  const todayIso = isoDate(input.today);
+  const logBy = groupBy2(input.log.filter((e) => !e.deleted_at), (e) => e.quotation_id);
+  const tasksBy = groupBy2(input.tasks, (t) => t.quotation_id);
+  const poById = /* @__PURE__ */ new Map();
+  const poByRef = /* @__PURE__ */ new Map();
+  for (const p of input.pos || []) {
+    if (p.quotation_id && !poById.has(p.quotation_id)) poById.set(p.quotation_id, p);
+    const ref = String(p.quote_reference || "").trim().toUpperCase();
+    if (ref && !poByRef.has(ref)) poByRef.set(ref, p);
+  }
+  const warn = input.settings.expiryWarnDays || 3;
+  const rows = [];
+  for (const q of input.quotes) {
+    if (!isChaseable(q, todayIso)) continue;
+    const sentIso = [q.sent_at, q.date, q.created_at].find(isIsoDay)?.slice(0, 10) || todayIso;
+    const days = Math.max(0, daysBetween2(sentIso, todayIso));
+    const validUntil = isIsoDay(q.valid_until) ? q.valid_until.slice(0, 10) : null;
+    const toExpiry = validUntil ? daysBetween2(todayIso, validUntil) : null;
+    const validity = q.status === "Expired" || toExpiry !== null && toExpiry < 0 ? "expired" : toExpiry === null ? "none" : toExpiry <= warn ? "expiring" : "ok";
+    const log = sortQuoteChaseLog(logBy.get(q.id) || []);
+    const ref = String(q.reference_number || "").trim();
+    const po = poById.get(q.id) || poByRef.get(ref.toUpperCase()) || null;
+    const contacted = [log[0]?.chased_on, isIsoDay(q.followed_up_at) ? q.followed_up_at.slice(0, 10) : null].filter((x) => Boolean(x)).sort().pop() || null;
+    const base = {
+      quote_id: q.id,
+      reference: ref,
+      client: String(q.client || "").trim() || "No client",
+      account_id: q.account_id || null,
+      created_by: String(q.created_by || "").trim().toLowerCase(),
+      division: quoteDivision(q),
+      currency: String(q.quotation_currency || q.currency || "AED").toUpperCase(),
+      amount: roundMoney(Number(q.amount) || 0),
+      status: q.status,
+      sent_on: sentIso,
+      days_since_sent: days,
+      bucket: waitBucket(days),
+      valid_until: validUntil,
+      days_to_expiry: toExpiry,
+      validity,
+      last_chase: log[0] ? { chased_on: log[0].chased_on, channel: log[0].channel, contact: log[0].contact, note: log[0].note } : null,
+      chase_count: log.length,
+      last_contact_on: contacted,
+      response: log.find((e) => e.response)?.response || "",
+      callback: currentCallback(log, todayIso),
+      po: po ? { po_number: po.po_number, po_date: po.po_date || null } : null
+    };
+    rows.push({
+      ...base,
+      next_action: nextQuoteAction({
+        row: base,
+        tasks: tasksBy.get(q.id) || [],
+        steps: quoteSteps(input.settings, sentIso, validUntil),
+        todayIso
+      })
+    });
+  }
+  return rows.sort((a, b) => urgency(a) - urgency(b) || b.days_since_sent - a.days_since_sent || a.reference.localeCompare(b.reference));
+}
+function urgency(r) {
+  switch (r.next_action.kind) {
+    case "award":
+      return 0;
+    case "expired":
+    case "callback_missed":
+      return 1;
+    case "close":
+      return 2;
+    default:
+      return 3;
+  }
+}
+function groupBy2(list, key) {
+  const m = /* @__PURE__ */ new Map();
+  for (const x of list) {
+    const k = key(x);
+    const arr = m.get(k);
+    if (arr) arr.push(x);
+    else m.set(k, [x]);
+  }
+  return m;
+}
+function quoteChaseTotalsByCurrency(rows) {
+  const out = {};
+  for (const r of rows) {
+    const t = out[r.currency] ||= { "0-7": 0, "8-14": 0, "15-30": 0, "31+": 0, total: 0, count: 0 };
+    t[r.bucket] = roundMoney(t[r.bucket] + r.amount);
+    t.total = roundMoney(t.total + r.amount);
+    t.count += 1;
+  }
+  return out;
+}
+var QUOTE_CHASE_STATES = [
+  { value: "decide", label: "Needs a decision (accepted, PO, expired, declined)" },
+  { value: "expiring", label: "Expiring soon" },
+  { value: "missed", label: "Missed call-back" },
+  { value: "due", label: "Follow-up due now" }
+];
+var QUOTE_CHASE_STATE_VALUES = QUOTE_CHASE_STATES.map((s) => s.value);
+function rowInState(r, state, todayIso) {
+  switch (state) {
+    case "decide":
+      return ["award", "expired", "close"].includes(r.next_action.kind);
+    case "expiring":
+      return r.validity === "expiring";
+    case "missed":
+      return r.callback?.state === "missed";
+    case "due":
+      return Boolean(r.next_action.due_on && r.next_action.due_on <= todayIso);
+    default:
+      return true;
+  }
+}
+function filterQuoteChaseRows(rows, f, todayIso) {
+  const client = (f.client || "").trim().toLowerCase();
+  return rows.filter(
+    (r) => (!client || r.client.toLowerCase().includes(client) || r.reference.toLowerCase() === client) && (!f.division || r.division === f.division) && (!f.bucket || r.bucket === f.bucket) && (!f.state || rowInState(r, f.state, todayIso))
+  );
+}
+function quoteFollowupSummary(rows, today, max = 20) {
+  const todayIso = isoDate(today);
+  const brief = (r) => ({
+    quote_id: r.quote_id,
+    reference: r.reference,
+    client: r.client,
+    amount: r.amount,
+    currency: r.currency,
+    status: r.status,
+    days_since_sent: r.days_since_sent,
+    valid_until: r.valid_until
+  });
+  return {
+    totals_by_currency: quoteChaseTotalsByCurrency(rows),
+    waiting: rows.length,
+    needs_decision: rows.filter((r) => rowInState(r, "decide", todayIso)).slice(0, max).map((r) => ({ ...brief(r), why: r.next_action.text })),
+    po_not_awarded: rows.filter((r) => r.po && r.status !== "Accepted").slice(0, max).map((r) => ({ ...brief(r), po_number: r.po.po_number })),
+    expiring_soon: rows.filter((r) => r.validity === "expiring").slice(0, max).map(brief),
+    missed_callbacks: rows.filter((r) => r.callback?.state === "missed").slice(0, max).map((r) => ({ ...brief(r), callback_date: r.callback.date })),
+    next_actions: rows.slice(0, max).map((r) => ({
+      ...brief(r),
+      bucket: r.bucket,
+      last_follow_up: r.last_contact_on,
+      response: r.response || null,
+      next_action: r.next_action.text,
+      next_action_due: r.next_action.due_on,
+      task_id: r.next_action.task_id ?? null
+    }))
+  };
+}
+
 // src/lib/highmastMcp.ts
 var MCP_READ_TOOLS = [
   "search_accounts",
@@ -2278,7 +2563,8 @@ var MCP_READ_TOOLS = [
   "list_quotes",
   "list_invoices",
   "dashboard_summary",
-  "list_invoice_aging"
+  "list_invoice_aging",
+  "list_quote_followups"
 ];
 var MCP_WRITE_TOOLS = [
   "create_lead",
@@ -2289,7 +2575,10 @@ var MCP_WRITE_TOOLS = [
   "add_invoice_chase_note",
   "complete_invoice_chase_task",
   // Quote notes: append-only, never changes the quote, its lines or totals.
-  "add_quote_note"
+  "add_quote_note",
+  // Quote follow-up chasing: a follow-up note never changes the quote.
+  "add_quote_chase_note",
+  "complete_quote_chase_task"
 ];
 var MCP_TOOLS = [...MCP_READ_TOOLS, ...MCP_WRITE_TOOLS];
 var FORBIDDEN_TOOL_WORDS = [
@@ -2452,6 +2741,10 @@ var MCP_TOOL_DEPARTMENTS = {
   complete_invoice_chase_task: ["finance", "sales"],
   // Quote notes (whoever reads quotes)
   add_quote_note: ["sales", "finance"],
+  // Quote follow-up chasing (whoever reads quotes)
+  list_quote_followups: ["sales", "finance"],
+  add_quote_chase_note: ["sales", "finance"],
+  complete_quote_chase_task: ["sales", "finance"],
   // Any area (narrowed to the department's records)
   list_records: ALL_DEPTS,
   get_record: ALL_DEPTS,
@@ -2730,8 +3023,11 @@ export {
   MCP_WRITE_TOOLS,
   PAGE_DEFAULT,
   PAGE_MAX,
+  QUOTE_CHASE_STATE_VALUES,
+  QUOTE_RESPONSE_VALUES,
   SENSITIVE_ARG,
   UAE_VAT_PERCENT,
+  WAIT_BUCKET_KEYS,
   addDaysIso,
   adminToolNameProblem,
   agingSummary,
@@ -2740,6 +3036,7 @@ export {
   auditArgs,
   bearerToken,
   buildAgingRows,
+  buildQuoteChaseRows,
   canonicalStage,
   chaseSettingsFrom,
   clampPage,
@@ -2750,6 +3047,7 @@ export {
   divisionVertical,
   expenseAmounts,
   filterAgingRows,
+  filterQuoteChaseRows,
   generatedPdfPath,
   invoiceDaysOverdue,
   invoiceDueDate,
@@ -2767,6 +3065,8 @@ export {
   normalizeDepartments,
   pageFrom,
   pageOf,
+  quoteChaseSettingsFrom,
+  quoteFollowupSummary,
   quotePdfNumber,
   sameCompany,
   slaState,
