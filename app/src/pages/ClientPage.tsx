@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { CLIENT_SECTIONS, filterClientRows, type Client360, type ClientFilter, type ClientSectionKey } from '../lib/client360'
@@ -23,6 +23,9 @@ const money = (n: number, c: string) => formatMoneyAmount(n, c)
 export default function ClientPage() {
   const { id = '' } = useParams()
   const [params, setParams] = useSearchParams()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const mergedFrom = (location.state as { mergedFrom?: string } | null)?.mergedFrom
   const { userRole, salesLocked, hasPermission } = useAuth()
   const { showToast } = useToast()
   const [view, setView] = useState<Client360 | null | undefined>(undefined)
@@ -48,6 +51,14 @@ export default function ClientPage() {
     setView(undefined)
     void load()
   }, [load])
+
+  // An old link to a merged record opens the client it was merged into.
+  const mergedInto = view?.header.merged_into
+  useEffect(() => {
+    if (mergedInto && mergedInto !== id) {
+      navigate({ pathname: `/clients/${mergedInto}`, search: params.toString() ? `?${params}` : '' }, { replace: true, state: { mergedFrom: id } })
+    }
+  }, [mergedInto, id, navigate, params])
 
   useEffect(() => {
     if (!printing) return
@@ -87,6 +98,9 @@ export default function ClientPage() {
 
   return (
     <div className={styles.page}>
+      {mergedFrom && !h.merged_into ? (
+        <div className={styles.notice}>The record you opened was merged into this one.</div>
+      ) : null}
       {h.merged_into ? (
         <div className={styles.notice}>
           This record was merged. <Link to={`/clients/${h.merged_into}`}>Open the client it was merged into</Link>.

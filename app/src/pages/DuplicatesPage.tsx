@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../contexts/I18nContext'
 import { useToast } from '../contexts/ToastContext'
 import ClientLinkReview from '../components/ClientLinkReview'
+import ClientMergePanel from '../components/ClientMergePanel'
 import SavedViewsBar from '../components/SavedViewsBar'
 import { accountFills, findAccountDuplicates, findContactDuplicates, mergeSummary, suggestKeep, type DuplicateKind, type DuplicatePair } from '../lib/duplicates'
 import { DUPLICATES_CSV_COLUMNS, DUPLICATES_CSV_HEADERS, parseDuplicateCsvAction } from '../lib/duplicatesCsv'
@@ -31,7 +32,8 @@ export default function DuplicatesPage() {
   const { showToast } = useToast()
   const [data, setData] = useState<DuplicateData | null>(null)
   const [kind, setKind] = useState<DuplicateKind>('account')
-  const [showLinks, setShowLinks] = useState(false)
+  const [panel, setPanel] = useState<'pairs' | 'links' | 'merge'>('pairs')
+  const showLinks = panel !== 'pairs'
   const [linkCount, setLinkCount] = useState<number | null>(null)
   const [open, setOpen] = useState<DuplicatePair | null>(null)
   const [importing, setImporting] = useState(false)
@@ -222,18 +224,24 @@ export default function DuplicatesPage() {
         filtersEqual={(a, b) => String(a.kind || 'account') === String(b.kind || 'account')}
       />
       <div style={{ display: 'flex', gap: 8, margin: '12px 0 16px' }}>
-        <button type="button" style={tab(!showLinks && kind === 'account')} onClick={() => (setKind('account'), setShowLinks(false), setOpen(null))}>
+        <button type="button" style={tab(!showLinks && kind === 'account')} onClick={() => (setKind('account'), setPanel('pairs'), setOpen(null))}>
           Accounts ({pairs.account.length})
         </button>
-        <button type="button" style={tab(!showLinks && kind === 'contact')} onClick={() => (setKind('contact'), setShowLinks(false), setOpen(null))}>
+        <button type="button" style={tab(!showLinks && kind === 'contact')} onClick={() => (setKind('contact'), setPanel('pairs'), setOpen(null))}>
           Contacts ({pairs.contact.length})
         </button>
-        <button type="button" style={tab(showLinks)} onClick={() => (setShowLinks(true), setOpen(null))}>
+        <button type="button" style={tab(panel === 'links')} onClick={() => (setPanel('links'), setOpen(null))}>
           Documents to link{linkCount === null ? '' : ` (${linkCount})`}
         </button>
+        {userRole === 'admin' ? (
+          <button type="button" style={tab(panel === 'merge')} onClick={() => (setPanel('merge'), setOpen(null))}>
+            Merge clients
+          </button>
+        ) : null}
       </div>
 
-      {showLinks ? <ClientLinkReview isAdmin={userRole === 'admin'} onCount={setLinkCount} /> : null}
+      {panel === 'links' ? <ClientLinkReview isAdmin={userRole === 'admin'} onCount={setLinkCount} /> : null}
+      {panel === 'merge' && userRole === 'admin' ? <ClientMergePanel /> : null}
       {!showLinks && !data ? <p style={muted}>Looking for duplicates…</p> : null}
       {!showLinks && data && !list.length ? <p style={muted}>No possible duplicates found.</p> : null}
 
