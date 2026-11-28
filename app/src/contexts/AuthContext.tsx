@@ -22,6 +22,7 @@ import { setCsvExportAllowed, setExportLogger } from '../lib/exportPolicy'
 import { logExportOnServer, recordSignInOnce } from '../lib/securityLogStore'
 import { isViewAsBrowser, signOutMeansStop, stopViewAs } from '../lib/viewAs'
 import { TWO_STEP_ROLES, getAssuranceLevel } from '../lib/twoStep'
+import { canPickPagesFor, cleanHiddenPages } from '../lib/hiddenPages'
 
 export const LOGIN_DOMAIN_REJECT_KEY = 'rrcentral_login_domain_reject'
 
@@ -41,6 +42,8 @@ interface AuthContextValue {
   permissions: string[]
   /** Sales without the "see company money" switch: own clients only, no money screens. */
   salesLocked: boolean
+  /** Sidebar pages an admin hid from the signed-in person (user_hidden_pages). */
+  hiddenPages: string[]
   /** Whether the signed-in person has a switch (admins and managers have all). */
   hasPermission: (key: UserPermissionKey) => boolean
   signInWithPassword: (email: string, password: string) => Promise<void>
@@ -59,9 +62,22 @@ type Membership = {
   id: string | null
   tenantId: string | null
   permissions: string[]
+  hiddenPages: string[]
 }
 
-const NO_MEMBERSHIP: Membership = { role: 'sales', active: false, id: null, tenantId: null, permissions: [] }
+const NO_MEMBERSHIP: Membership = { role: 'sales', active: false, id: null, tenantId: null, permissions: [], hiddenPages: [] }
+
+/** Pages an admin hid from this person. Before that SQL is run the table is missing: none hidden. */
+async function lookupHiddenPages(userId: string | null): Promise<string[]> {
+  if (!userId) return []
+  try {
+    const { data, error } = await db.from('user_hidden_pages').select('page_path').eq('user_id', userId)
+    if (error || !data) return []
+    return cleanHiddenPages((data as { page_path: string }[]).map((r) => String(r.page_path)))
+  } catch {
+    return []
+  }
+}
 
 /** Per-person switches. Before the Sales lockdown SQL the table is missing: no switches. */
 async function lookupPermissions(userId: string | null): Promise<string[]> {
@@ -110,6 +126,8 @@ async function lookupMembership(email: string | undefined): Promise<Membership> 
     tenantId: data.tenant_id ? String(data.tenant_id) : null,
     // Switches only change anything for Sales; skip the lookup for everyone else.
     permissions: role === 'sales' ? await lookupPermissions(id) : [],
+    // Admins always see every page; skip the lookup for them.
+    hiddenPages: canPickPagesFor(role) ? await lookupHiddenPages(id) : [],
   }
 }
 
@@ -271,6 +289,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       hasAccess: membership.active || !isSupabaseConfigured(),
       permissions: membership.permissions,
       salesLocked,
+      hiddenPages: isSupabaseConfigured() ? membership.hiddenPages : [],
       hasPermission,
       signInWithPassword,
       changePassword,
