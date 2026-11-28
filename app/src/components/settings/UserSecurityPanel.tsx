@@ -12,7 +12,9 @@ import {
   type SignInRow,
 } from '../../lib/securityLogStore'
 import type { AppUser } from '../../lib/types'
-import { buttonSecondaryStyle, colors, labelStyle, selectStyle } from '../../lib/uiStyles'
+import { listViewAsHistory, startViewAs, type ViewAsHistoryRow } from '../../lib/viewAs'
+import { PRODUCT } from '../../lib/product'
+import { buttonSecondaryStyle, colors, inputStyle, labelStyle, selectStyle } from '../../lib/uiStyles'
 
 function when(iso: string): string {
   const d = new Date(iso)
@@ -39,6 +41,9 @@ export default function UserSecurityPanel({
   const [team, setTeam] = useState<TeamMember[]>([])
   const [handTo, setHandTo] = useState('')
   const [busy, setBusy] = useState(false)
+  const [reason, setReason] = useState('')
+  const [viewing, setViewing] = useState(false)
+  const [viewHistory, setViewHistory] = useState<ViewAsHistoryRow[]>([])
 
   useEffect(() => {
     let live = true
@@ -56,7 +61,27 @@ export default function UserSecurityPanel({
     }
   }, [user.email, user.id])
 
+  useEffect(() => {
+    let live = true
+    void listViewAsHistory(user.email).then((rows) => {
+      if (live) setViewHistory(rows)
+    })
+    return () => {
+      live = false
+    }
+  }, [user.email])
+
   const isSelf = user.email.toLowerCase() === currentUserEmail.toLowerCase()
+
+  async function viewAs() {
+    setViewing(true)
+    try {
+      await startViewAs(user.id, reason.trim())
+    } catch (err) {
+      showToast(errorMessage(err, 'Could not start View as'), 'error')
+      setViewing(false)
+    }
+  }
 
   async function offboard() {
     if (!handTo) return
@@ -113,6 +138,43 @@ export default function UserSecurityPanel({
           ))}
         </ul>
       )}
+
+      {user.active && !isSelf && user.role !== 'admin' ? (
+        <div style={{ marginTop: 12 }}>
+          <h4 style={{ fontSize: 13, margin: '0 0 4px' }}>View as {user.name || user.email}</h4>
+          <p style={{ fontSize: 12, color: colors.muted, margin: '0 0 6px' }}>
+            Opens {PRODUCT.name} as this person so you see exactly what they see. No password needed, a red banner
+            shows the whole time, it ends after 30 minutes, and every use is logged. Anything you change is saved as them.
+          </p>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'end', flexWrap: 'wrap' }}>
+            <label style={{ ...labelStyle, minWidth: 200, flex: 1 }}>
+              Why (optional, kept in the log)
+              <input
+                style={inputStyle}
+                value={reason}
+                maxLength={300}
+                placeholder="e.g. Check the Sales screens"
+                onChange={(e) => setReason(e.target.value)}
+              />
+            </label>
+            <button type="button" style={buttonSecondaryStyle} disabled={viewing} onClick={() => void viewAs()}>
+              {viewing ? 'Opening…' : 'View as user'}
+            </button>
+          </div>
+          {viewHistory.length > 0 ? (
+            <ul style={{ ...small, marginTop: 6 }} aria-label="Recent View as">
+              {viewHistory.map((v) => (
+                <li key={v.id}>
+                  {when(v.requested_at)} · {v.admin_email}
+                  {v.reason ? ` · ${v.reason}` : ''}
+                  {v.claimed_at ? '' : ' · not opened'}
+                  {v.ended_at && v.end_reason ? ` · ${v.end_reason}` : v.ended_at ? '' : ' · open now'}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
 
       {user.active && !isSelf ? (
         <div style={{ marginTop: 12 }}>

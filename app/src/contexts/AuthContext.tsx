@@ -20,6 +20,7 @@ import type { UserRole } from '../lib/types'
 import { isSalesLocked, hasUserPermission, type UserPermissionKey } from '../lib/userPermissions'
 import { setCsvExportAllowed, setExportLogger } from '../lib/exportPolicy'
 import { logExportOnServer, recordSignInOnce } from '../lib/securityLogStore'
+import { isViewAsBrowser, signOutMeansStop, stopViewAs } from '../lib/viewAs'
 import { TWO_STEP_ROLES, getAssuranceLevel } from '../lib/twoStep'
 
 export const LOGIN_DOMAIN_REJECT_KEY = 'rrcentral_login_domain_reject'
@@ -205,6 +206,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signOut = useCallback(async () => {
+    // Admin View as: Sign out means Stop. A normal sign out here would end the
+    // member's sign ins on all their own devices.
+    if (isSupabaseConfigured() && (await signOutMeansStop())) {
+      await stopViewAs()
+      return
+    }
     await authApi.signOut()
     setUser(null)
     setMembership(NO_MEMBERSHIP)
@@ -236,6 +243,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Sign in history: once per tab, after two step where the role needs it.
   useEffect(() => {
     if (!isSupabaseConfigured() || !user || !membership.active || !membership.id) return
+    // An admin viewing as this member is not the member signing in.
+    if (isViewAsBrowser()) return
     const userId = membership.id
     const needsTwoStep = TWO_STEP_ROLES.includes(membership.role)
     void getAssuranceLevel()

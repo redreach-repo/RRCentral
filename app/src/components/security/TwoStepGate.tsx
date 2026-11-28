@@ -13,6 +13,8 @@ import {
   type Enrollment,
   type TwoStepState,
 } from '../../lib/twoStep'
+import { isViewAsBrowser, settleViewAs, type ViewAsInfo } from '../../lib/viewAs'
+import ViewAsBanner from './ViewAsBanner'
 
 const screen: CSSProperties = {
   minHeight: '100vh',
@@ -64,15 +66,24 @@ export default function TwoStepGate({ children }: { children: ReactNode }) {
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [viewAs, setViewAs] = useState<ViewAsInfo | null>(null)
 
   const check = useCallback(async () => {
     try {
+      // Admin View as: the admin already passed two step on their own account,
+      // and the database confirms this exact sign in session is theirs.
+      const va = !isLocalMode && isViewAsBrowser() ? await settleViewAs(user?.email || '') : null
+      setViewAs(va)
+      if (va) {
+        setState('done')
+        return
+      }
       setState(twoStepState(userRole, await getAssuranceLevel(), !isLocalMode))
     } catch (e) {
       setError(errorMessage(e, 'Could not check two step sign in'))
       setState(twoStepState(userRole, { currentLevel: null, nextLevel: null }, !isLocalMode))
     }
-  }, [userRole, isLocalMode])
+  }, [userRole, isLocalMode, user?.email])
 
   useEffect(() => {
     void check()
@@ -111,6 +122,14 @@ export default function TwoStepGate({ children }: { children: ReactNode }) {
     }
   }
 
+  if (viewAs && state === 'done') {
+    return (
+      <>
+        <ViewAsBanner info={viewAs} />
+        {children}
+      </>
+    )
+  }
   if (state === 'not_needed' || state === 'done') return <>{children}</>
   if (state === 'checking') return <div style={screen}>Checking sign in</div>
 

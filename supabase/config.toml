@@ -129,3 +129,7 @@ verify_jwt = false
 
 [functions.worshiphub-manage]
 verify_jwt = false
+
+# Admin View as user: checks the admin JWT (two step done) and the request in code.
+[functions.admin-view-as]
+verify_jwt = false
