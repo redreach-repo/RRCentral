@@ -57,6 +57,7 @@ import {
 import { WorshipHubIcon } from '../components/worshiphub/WorshipHubIcon'
 import { shouldHidePipelineDetailNavItem } from '../lib/pipelineDetailNav'
 import { roleAtLeast } from '../lib/permissions'
+import { isPageHidden } from '../lib/hiddenPages'
 import type { UserRole } from '../lib/types'
 import { modulesEnabled, parseModuleFlags, type ModuleManifest, type ModuleNavItem } from './registry'
 import { EXTENSION_MODULES } from './extensions'
@@ -253,8 +254,11 @@ export function navItemVisible(
   userRole: UserRole,
   settings: Record<string, string | undefined> = {},
   salesLocked = false,
+  hiddenPages: readonly string[] = [],
 ): boolean {
   if (userRole === 'staff' && !item.forStaff) return false
+  // Pages an admin hid from this person (Settings, Users). Admins see every page.
+  if (userRole !== 'admin' && isPageHidden(item.to, hiddenPages)) return false
   if (item.money && salesLocked) return false
   // Soft-hide must run before minRole — /sales and /ctrm both set minRole: sales.
   if (shouldHidePipelineDetailNavItem(item.to, settings, userRole)) return false
@@ -273,13 +277,14 @@ export function visibleAppModules(
   flags?: Record<string, boolean>,
   modules: ModuleManifest[] = APP_MODULES,
   salesLocked = false,
+  hiddenPages: readonly string[] = [],
 ): ModuleManifest[] {
   const resolvedFlags = flags ?? parseModuleFlags(settings)
   return modulesEnabled(modules, resolvedFlags)
     .map((group) => ({
       ...group,
       items: group.items.filter(
-        (item) => (!item.flag || resolvedFlags[item.flag] !== false) && navItemVisible(item, userRole, settings, salesLocked),
+        (item) => (!item.flag || resolvedFlags[item.flag] !== false) && navItemVisible(item, userRole, settings, salesLocked, hiddenPages),
       ),
     }))
     .filter((group) => group.items.length > 0)
@@ -288,8 +293,8 @@ export function visibleAppModules(
 /**
  * Whether this person may open a page by its address (typed or bookmarked).
  * A page that is a sidebar link is allowed when at least one of its links is
- * visible to them (by role and the Sales lock; Settings > Modules switches only
- * hide links). Pages that are no sidebar link (detail pages, forms) are allowed:
+ * visible to them (by role, the Sales lock and the pages an admin hid from
+ * them; Settings > Modules switches only hide links). Pages that are no sidebar link (detail pages, forms) are allowed:
  * the database decides what they show.
  */
 export function pathAllowed(
@@ -298,6 +303,7 @@ export function pathAllowed(
   settings: Record<string, string | undefined> = {},
   salesLocked = false,
   modules: ModuleManifest[] = APP_MODULES,
+  hiddenPages: readonly string[] = [],
 ): boolean {
   const path = pathname.replace(/\/+$/, '') || '/'
   const matches = modules.flatMap((m) => m.items).filter((i) => {
@@ -305,5 +311,5 @@ export function pathAllowed(
     return base === path || (base !== '/' && path.startsWith(`${base}/`))
   })
   if (matches.length === 0) return true
-  return matches.some((i) => navItemVisible(i, userRole, settings, salesLocked))
+  return matches.some((i) => navItemVisible(i, userRole, settings, salesLocked, hiddenPages))
 }

@@ -35,6 +35,7 @@ import { useRecurringDeductionsSync } from '../hooks/useRecurringDeductionsSync'
 import { usePhoneShell } from '../hooks/useMediaQuery'
 import { can, roleAtLeast } from '../lib/permissions'
 import { navItemKey, navModuleKey, navSectionKey, translateNavLabel } from '../lib/navI18n'
+import { isPageHidden } from '../lib/hiddenPages'
 import {
   APP_MODULES,
   itemMatchesPath,
@@ -95,7 +96,7 @@ function writeSavedSection(id: string) {
 }
 
 export default function Layout() {
-  const { user, userRole, membershipRole, signOut, isLocalMode, salesLocked } = useAuth()
+  const { user, userRole, membershipRole, signOut, isLocalMode, salesLocked, hiddenPages } = useAuth()
   const { settings } = useSettings()
   const { showToast } = useToast()
   const {
@@ -132,14 +133,22 @@ export default function Layout() {
   // Both write company money (contract invoices, expenses): never for a locked Sales user.
   useContractBillingSync(Boolean(user) && can(userRole, 'delivery.contracts') && !salesLocked)
   useRecurringDeductionsSync(Boolean(user) && roleAtLeast(userRole, 'sales') && !salesLocked)
-  const phoneNav = userRole === 'staff' ? staffPhoneNav : phonePrimaryNav
+  const phoneNav = useMemo(
+    () =>
+      (userRole === 'staff' ? staffPhoneNav : phonePrimaryNav).filter(
+        (item) => userRole === 'admin' || !isPageHidden(item.to, hiddenPages),
+      ),
+    [userRole, hiddenPages],
+  )
 
   const visibleGroups = useMemo(
-    () => visibleAppModules(userRole, settings, undefined, undefined, salesLocked),
-    [userRole, settings, salesLocked],
+    () => visibleAppModules(userRole, settings, undefined, undefined, salesLocked, hiddenPages),
+    [userRole, settings, salesLocked, hiddenPages],
   )
-  // Only the Sales lock blocks typed addresses; other roles keep today's behaviour.
-  const pageAllowed = !salesLocked || pathAllowed(location.pathname, userRole, settings, salesLocked)
+  // The Sales lock and pages an admin hid block typed addresses; otherwise today's behaviour.
+  const pageAllowed =
+    (!salesLocked && hiddenPages.length === 0) ||
+    pathAllowed(location.pathname, userRole, settings, salesLocked, undefined, hiddenPages)
 
   useEffect(() => {
     const onBlocked = (e: Event) => {

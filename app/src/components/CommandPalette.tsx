@@ -14,7 +14,7 @@ type Props = {
 }
 
 export default function CommandPalette({ open, onClose }: Props) {
-  const { userRole, salesLocked } = useAuth()
+  const { userRole, salesLocked, hiddenPages } = useAuth()
   const { settings } = useSettings()
   const { t } = useI18n()
   const navigate = useNavigate()
@@ -24,7 +24,10 @@ export default function CommandPalette({ open, onClose }: Props) {
   const panelRef = useRef<HTMLDivElement>(null)
   const previouslyFocused = useRef<HTMLElement | null>(null)
 
-  const all = useMemo(() => commandPaletteItems(userRole, settings, t, salesLocked), [userRole, settings, t, salesLocked])
+  const all = useMemo(
+    () => commandPaletteItems(userRole, settings, t, salesLocked, hiddenPages),
+    [userRole, settings, t, salesLocked, hiddenPages],
+  )
   const items = useMemo(() => filterCommandPaletteItems(all, query), [all, query])
 
   // Latest onClose in a ref so a new inline callback from the parent does not

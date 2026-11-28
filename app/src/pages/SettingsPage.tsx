@@ -49,6 +49,8 @@ import {
 import { csvRowsToObjects, exportListCsv, parseCsv } from '../lib/listIo'
 import { can, ROLE_DESCRIPTIONS, ROLE_LABELS, USER_ROLES } from '../lib/permissions'
 import UserSwitchesPanel from '../components/settings/UserSwitchesPanel'
+import UserPagesPanel from '../components/settings/UserPagesPanel'
+import { canPickPagesFor } from '../lib/hiddenPages'
 import UserSecurityPanel from '../components/settings/UserSecurityPanel'
 import {
   listNumberingSequences,
@@ -1936,6 +1938,9 @@ export default function SettingsPage() {
         </div>
         {editingUser && userForm.role === 'sales' && editingUser.role === 'sales' ? (
           <UserSwitchesPanel userId={editingUser.id} />
+        ) : null}
+        {editingUser && !isLocalMode && userRole === 'admin' && canPickPagesFor(editingUser.role) && userForm.role === editingUser.role ? (
+          <UserPagesPanel userId={editingUser.id} role={editingUser.role} />
         ) : null}
         {editingUser && !isLocalMode && userRole === 'admin' ? (
           <UserSecurityPanel
